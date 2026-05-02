@@ -3,6 +3,7 @@
 pub fn build_init_script(
     area_remove_enabled: bool,
     custom_css: &str,
+    visible_links: &[String],
 ) -> String {
     let tab_selector = include_str!("tab_selector.js");
     let header_customizer = include_str!("header_customizer.js");
@@ -12,9 +13,11 @@ pub fn build_init_script(
     let scroll_event = include_str!("scroll_event.js");
 
     // header_customizer.js が読み取る初期設定を先に注入する
+    let visible_links_json = serde_json::to_string(visible_links).unwrap_or_else(|_| "[]".to_string());
     let config = format!(
-        "window.__twitterViewerConfig = {{ areaRemoveEnabled: {} }};",
-        area_remove_enabled
+        "window.__twitterViewerConfig = {{ areaRemoveEnabled: {}, visibleLinks: {} }};",
+        area_remove_enabled,
+        visible_links_json
     );
 
     let mut script = format!(

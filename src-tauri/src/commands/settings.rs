@@ -26,6 +26,9 @@ pub struct ColumnSettings {
     pub area_remove_enabled: bool,
     #[serde(rename = "customCSS")]
     pub custom_css: String,
+    #[serde(rename = "visibleLinks")]
+    #[serde(default)]
+    pub visible_links: Vec<String>,
 }
 
 fn default_true() -> bool { true }
