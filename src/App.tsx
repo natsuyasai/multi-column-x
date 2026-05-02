@@ -6,7 +6,10 @@ import { useAccounts } from './hooks/useAccounts';
 import { ColumnHeader } from './components/ColumnHeader/ColumnHeader';
 import { AddColumnDialog } from './components/AddColumnDialog/AddColumnDialog';
 import { AccountManager } from './components/AccountManager/AccountManager';
+import { SettingsPanel } from './components/SettingsPanel/SettingsPanel';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+import type { ColumnSettings } from './types';
 import styles from './App.module.scss';
 
 const App: React.FC = () => {
@@ -14,14 +17,22 @@ const App: React.FC = () => {
   const {
     columns,
     containerRef,
+    scrollRef,
+    scrollbarRef,
     restoreColumns,
     handleAddColumn,
     handleRemoveColumn,
+    handleUpdateColumn,
+    recalculateAllBounds,
+    hideColumnWebviews,
+    handleHeaderScroll,
+    handleScrollbarScroll,
   } = useColumns();
   const { startAddAccount, removeAccount } = useAccounts();
 
   const [showAddColumn, setShowAddColumn] = useState(false);
   const [showAccountManager, setShowAccountManager] = useState(false);
+  const [settingsColumnId, setSettingsColumnId] = useState<string | null>(null);
 
   useEffect(() => {
     loadSettings().then(() => {
@@ -29,11 +40,47 @@ const App: React.FC = () => {
     });
   }, []);
 
+  // WebView 内の横ホイールを受け取ってスクロールバーを動かす
+  useEffect(() => {
+    const unlisten = listen<number>('webview-scroll', (e) => {
+      const el = scrollbarRef.current;
+      if (el) el.scrollLeft += e.payload;
+    });
+    return () => { unlisten.then(fn => fn()); };
+  }, []);
+
+  // ダイアログ表示中は列WebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
+  const dialogOpen = showAddColumn || showAccountManager || !!settingsColumnId;
+  useEffect(() => {
+    if (dialogOpen) {
+      hideColumnWebviews();
+    } else {
+      recalculateAllBounds();
+    }
+  }, [dialogOpen]);
+
   const handleReload = useCallback(async (columnId: string) => {
     const webviewLabel = `column-${columnId}`;
-    await invoke('eval_in_webview', { label: webviewLabel, script: 'window.location.reload();' })
-      .catch(console.error);
+    await invoke('eval_in_webview', {
+      label: webviewLabel,
+      script: 'window.__twitterViewer && window.__twitterViewer.triggerReload();',
+    }).catch(console.error);
   }, []);
+
+  const handleApplySettings = useCallback(async (columnId: string, settings: ColumnSettings, width: number) => {
+    handleUpdateColumn(columnId, { settings, width });
+    setSettingsColumnId(null);
+    const webviewLabel = `column-${columnId}`;
+    await invoke('eval_in_webview', {
+      label: webviewLabel,
+      script: `window.__twitterViewer && window.__twitterViewer.applyAreaRemove(${settings.areaRemoveEnabled});`,
+    }).catch(console.error);
+    const escaped = settings.customCSS.replace(/`/g, '\\`');
+    await invoke('eval_in_webview', {
+      label: webviewLabel,
+      script: `(function(){var el=document.getElementById('__custom_css__');if(!el){el=document.createElement('style');el.id='__custom_css__';document.head.appendChild(el);}el.textContent=\`${escaped}\`;})();`,
+    }).catch(console.error);
+  }, [handleUpdateColumn]);
 
   if (!isLoaded) {
     return (
@@ -45,8 +92,16 @@ const App: React.FC = () => {
 
   return (
     <div className={styles.app} ref={containerRef}>
-      <div className={styles.headerRow}>
-        <div className={styles.columnHeaders}>
+      <div
+        className={styles.headerRow}
+        onWheel={(e) => {
+          const el = scrollbarRef.current;
+          if (!el) return;
+          // 縦スクロールも横スクロールに転換する（ヘッダー上での操作）
+          el.scrollLeft += e.deltaY !== 0 ? e.deltaY : e.deltaX;
+        }}
+      >
+        <div className={styles.columnHeaders} ref={scrollRef} onScroll={handleHeaderScroll}>
           {columns
             .slice()
             .sort((a, b) => a.order - b.order)
@@ -62,7 +117,7 @@ const App: React.FC = () => {
                     column={column}
                     account={account}
                     onReload={handleReload}
-                    onSettings={() => {}}
+                    onSettings={setSettingsColumnId}
                     onClose={handleRemoveColumn}
                   />
                 </div>
@@ -92,6 +147,17 @@ const App: React.FC = () => {
 
       <div className={styles.webviewArea} />
 
+      <div
+        className={styles.bottomScrollbar}
+        ref={scrollbarRef}
+        onScroll={handleScrollbarScroll}
+      >
+        <div
+          className={styles.bottomScrollbarInner}
+          style={{ width: columns.reduce((sum, c) => sum + c.width, 0) }}
+        />
+      </div>
+
       {showAddColumn && accounts.length > 0 && (
         <AddColumnDialog
           accounts={accounts}
@@ -120,6 +186,17 @@ const App: React.FC = () => {
           onClose={() => setShowAccountManager(false)}
         />
       )}
+
+      {settingsColumnId && (() => {
+        const col = columns.find(c => c.id === settingsColumnId);
+        return col ? (
+          <SettingsPanel
+            column={col}
+            onApply={handleApplySettings}
+            onClose={() => setSettingsColumnId(null)}
+          />
+        ) : null;
+      })()}
     </div>
   );
 };

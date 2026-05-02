@@ -1,31 +1,63 @@
 // src-tauri/src/inject/image_popup.js
 (function() {
-  function isMediaLink(el) {
-    if (!el) return false;
-    var href = el.getAttribute('href') || '';
+  function isMediaLink(href) {
     return /\/status\/\d+\/(photo|video)\//.test(href) ||
            /\/i\/status\/\d+/.test(href);
+  }
+
+  function isExternalLink(href) {
+    if (!href || href.startsWith('/') || href.startsWith('#') || href.startsWith('javascript:')) return false;
+    try {
+      var url = new URL(href);
+      return url.hostname !== 'x.com' && url.hostname !== 'twitter.com';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function resolveAbsolute(href) {
+    return href.startsWith('http') ? href : 'https://x.com' + href;
+  }
+
+  function tauriInvoke(cmd, args) {
+    if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
+      window.__TAURI__.core.invoke(cmd, args);
+    } else if (window.__TAURI__ && window.__TAURI__.invoke) {
+      window.__TAURI__.invoke(cmd, args);
+    }
   }
 
   document.addEventListener('click', function(e) {
     var target = e.target;
     if (!target) return;
     var link = target.closest('a');
-    if (link && isMediaLink(link)) {
+    if (!link) return;
+
+    // ナビバー内リンクは header_customizer.js が処理するため除外
+    if (link.hasAttribute('data-tv-navlink')) return;
+
+    var href = link.getAttribute('href') || '';
+    if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+
+    if (isMediaLink(href)) {
       e.preventDefault();
       e.stopPropagation();
-      var href = link.getAttribute('href');
-      var url = href.startsWith('http') ? href : 'https://x.com' + href;
-      if (window.__TAURI__ && window.__TAURI__.invoke) {
-        window.__TAURI__.invoke('open_popup_window', {
-          webviewLabelCaller: window.__TAURI_INTERNALS__
-            ? (window.__TAURI_INTERNALS__.metadata && window.__TAURI_INTERNALS__.metadata.currentWindow
-                ? window.__TAURI_INTERNALS__.metadata.currentWindow.label
-                : 'unknown')
-            : 'unknown',
-          url: url
-        });
-      }
+      tauriInvoke('open_popup_window', {
+        webviewLabelCaller: window.__TAURI_INTERNALS__
+          ? (window.__TAURI_INTERNALS__.metadata && window.__TAURI_INTERNALS__.metadata.currentWindow
+              ? window.__TAURI_INTERNALS__.metadata.currentWindow.label
+              : 'unknown')
+          : 'unknown',
+        url: resolveAbsolute(href),
+      });
+      return;
     }
+
+    if (isExternalLink(href)) {
+      e.preventDefault();
+      e.stopPropagation();
+      tauriInvoke('open_in_browser', { url: href });
+    }
+    // x.com 内リンクはデフォルト動作（SPA ナビゲーション）に任せる
   }, true);
 })();

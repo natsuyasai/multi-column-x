@@ -19,11 +19,16 @@ pub struct ColumnSettings {
     pub auto_reload_enabled: bool,
     #[serde(rename = "autoReloadInterval")]
     pub auto_reload_interval: u32,
+    #[serde(rename = "showCountdown")]
+    #[serde(default = "default_true")]
+    pub show_countdown: bool,
     #[serde(rename = "areaRemoveEnabled")]
     pub area_remove_enabled: bool,
     #[serde(rename = "customCSS")]
     pub custom_css: String,
 }
+
+fn default_true() -> bool { true }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ColumnData {

@@ -1,4 +1,4 @@
-use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, WebviewBuilder, WebviewUrl};
+use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewBuilder, WebviewUrl};
 use std::path::PathBuf;
 use crate::state::AppState;
 use crate::inject::build_init_script;
@@ -10,7 +10,10 @@ fn webview_label(column_id: &str) -> String {
 
 fn resolve_url(column: &ColumnData) -> String {
     match column.page_type.as_str() {
-        "home" => "https://x.com/home".to_string(),
+        "home" => match column.home_tab_name.as_deref().filter(|s| !s.is_empty()) {
+            Some(tab) => format!("https://x.com/home?{}", urlencoding::encode(tab)),
+            None => "https://x.com/home".to_string(),
+        },
         "notifications" => "https://x.com/notifications".to_string(),
         "search" => format!(
             "https://x.com/search?q={}",
@@ -32,6 +35,7 @@ fn parse_url(s: &str) -> Result<tauri::Url, String> {
 #[derive(serde::Deserialize)]
 pub struct CreateWebviewArgs {
     pub column: ColumnData,
+    #[serde(rename = "dataDirectory")]
     pub data_directory: String,
     pub x: f64,
     pub y: f64,
@@ -49,10 +53,7 @@ pub async fn create_column_webview(
     let data_dir = PathBuf::from(&args.data_directory);
 
     let init_script = build_init_script(
-        args.column.home_tab_name.as_deref(),
         args.column.settings.area_remove_enabled,
-        args.column.settings.auto_reload_enabled,
-        args.column.settings.auto_reload_interval,
         &args.column.settings.custom_css,
     );
 
@@ -98,6 +99,7 @@ pub async fn remove_column_webview(
 
 #[derive(serde::Deserialize)]
 pub struct ResizeBounds {
+    #[serde(rename = "columnId")]
     pub column_id: String,
     pub x: f64,
     pub y: f64,
@@ -162,4 +164,14 @@ pub async fn eval_in_webview(
         webview.eval(&script).map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+#[tauri::command]
+pub async fn report_webview_scroll(app: AppHandle, delta: f64) -> Result<(), String> {
+    app.emit("webview-scroll", delta).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn open_in_browser(url: String) -> Result<(), String> {
+    tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())
 }

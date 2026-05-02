@@ -4,28 +4,32 @@ import { invoke } from '@tauri-apps/api/core';
 import { useAppStore } from '../store/useAppStore';
 import type { Column } from '../types';
 
-const HEADER_HEIGHT = 36; // ColumnHeaderの高さ（px）
+const HEADER_HEIGHT = 36;    // ColumnHeader の高さ（px）
+const SCROLLBAR_HEIGHT = 12; // 下部スクロールバーの高さ（px）
 
 export function useColumns() {
   const { columns, accounts, addColumn, removeColumn, updateColumn } = useAppStore();
   const containerRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);    // ヘッダースクロールコンテナ
+  const scrollbarRef = useRef<HTMLDivElement>(null); // 下部スクロールバーコンテナ
 
-  // カラムのWebViewのboundsを計算する
+  // カラムのWebViewのboundsを計算する（scrollLeft を x から引くことでスクロール連動）
   const calculateBounds = useCallback((
     columnIndex: number,
     allColumns: Column[],
     _containerWidth: number,
-    containerHeight: number
+    containerHeight: number,
+    scrollLeft: number = 0,
   ) => {
     let x = 0;
     for (let i = 0; i < columnIndex; i++) {
       x += allColumns[i].width;
     }
     return {
-      x,
+      x: x - scrollLeft,
       y: HEADER_HEIGHT,
       width: allColumns[columnIndex].width,
-      height: containerHeight - HEADER_HEIGHT,
+      height: containerHeight - HEADER_HEIGHT - SCROLLBAR_HEIGHT,
     };
   }, []);
 
@@ -34,14 +38,17 @@ export function useColumns() {
     if (!containerRef.current) return;
     const containerWidth = containerRef.current.clientWidth;
     const containerHeight = containerRef.current.clientHeight;
-    const sortedColumns = [...columns].sort((a, b) => a.order - b.order);
+    const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
+    // loadSettings() 完了後に呼ばれるため、ストアから直接最新値を取得する
+    const { columns: currentColumns, accounts: currentAccounts } = useAppStore.getState();
+    const sortedColumns = [...currentColumns].sort((a, b) => a.order - b.order);
 
     for (let i = 0; i < sortedColumns.length; i++) {
       const column = sortedColumns[i];
-      const account = accounts.find((a) => a.id === column.accountId);
+      const account = currentAccounts.find((a) => a.id === column.accountId);
       if (!account) continue;
 
-      const bounds = calculateBounds(i, sortedColumns, containerWidth, containerHeight);
+      const bounds = calculateBounds(i, sortedColumns, containerWidth, containerHeight, scrollLeft);
       await invoke('create_column_webview', {
         args: {
           column,
@@ -50,23 +57,24 @@ export function useColumns() {
         },
       }).catch(console.error);
     }
-  }, [columns, accounts, calculateBounds]);
+  }, [calculateBounds]);
 
   // 全カラムのboundsを再計算して更新
   const recalculateAllBounds = useCallback(async () => {
     if (!containerRef.current) return;
     const containerHeight = containerRef.current.clientHeight;
     const containerWidth = containerRef.current.clientWidth;
+    const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
     const currentColumns = useAppStore.getState().columns;
     const sortedColumns = [...currentColumns].sort((a, b) => a.order - b.order);
 
     for (let i = 0; i < sortedColumns.length; i++) {
-      const bounds = calculateBounds(i, sortedColumns, containerWidth, containerHeight);
+      const bounds = calculateBounds(i, sortedColumns, containerWidth, containerHeight, scrollLeft);
       await invoke('resize_column_webview', {
         bounds: { columnId: sortedColumns[i].id, ...bounds },
       }).catch(console.error);
     }
-  }, [calculateBounds]); // No longer depends on `columns`
+  }, [calculateBounds]);
 
   // カラム追加
   const handleAddColumn = useCallback(async (column: Column) => {
@@ -76,7 +84,8 @@ export function useColumns() {
     const orderedColumns = [...columns, { ...column, order: columns.length }];
     const containerHeight = containerRef.current.clientHeight;
     const containerWidth = containerRef.current.clientWidth;
-    const bounds = calculateBounds(orderedColumns.length - 1, orderedColumns, containerWidth, containerHeight);
+    const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
+    const bounds = calculateBounds(orderedColumns.length - 1, orderedColumns, containerWidth, containerHeight, scrollLeft);
 
     await invoke('create_column_webview', {
       args: {
@@ -88,6 +97,16 @@ export function useColumns() {
 
     addColumn({ ...column, order: columns.length });
   }, [columns, accounts, addColumn, calculateBounds]);
+
+  // ダイアログ表示時に全カラムWebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
+  const hideColumnWebviews = useCallback(async () => {
+    const currentColumns = useAppStore.getState().columns;
+    await Promise.all(currentColumns.map(col =>
+      invoke('resize_column_webview', {
+        bounds: { columnId: col.id, x: -9999, y: HEADER_HEIGHT, width: col.width, height: 1 },
+      }).catch(() => {})
+    ));
+  }, []);
 
   // カラム削除
   const handleRemoveColumn = useCallback(async (columnId: string) => {
@@ -116,13 +135,34 @@ export function useColumns() {
     };
   }, [recalculateAllBounds]);
 
+  // ヘッダースクロール → WebView 追従 + 下部スクロールバー同期
+  const handleHeaderScroll = useCallback(() => {
+    recalculateAllBounds();
+    if (scrollbarRef.current && scrollRef.current) {
+      scrollbarRef.current.scrollLeft = scrollRef.current.scrollLeft;
+    }
+  }, [recalculateAllBounds]);
+
+  // 下部スクロールバー操作 → ヘッダースクロール同期 + WebView 追従
+  const handleScrollbarScroll = useCallback(() => {
+    if (scrollRef.current && scrollbarRef.current) {
+      scrollRef.current.scrollLeft = scrollbarRef.current.scrollLeft;
+    }
+    recalculateAllBounds();
+  }, [recalculateAllBounds]);
+
   return {
     columns,
     containerRef,
+    scrollRef,
+    scrollbarRef,
     restoreColumns,
     handleAddColumn,
     handleRemoveColumn,
     handleUpdateColumn,
     recalculateAllBounds,
+    hideColumnWebviews,
+    handleHeaderScroll,
+    handleScrollbarScroll,
   };
 }

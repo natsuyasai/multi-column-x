@@ -1,46 +1,76 @@
 // src-tauri/src/inject/auto_reload.js
 (function() {
-  var timerId = null;
-  var isEnabled = true;
-  var intervalSec = 60;
-  var isScrolling = false;
-  var scrollTimer = null;
+  function isScrolling() {
+    return document.scrollingElement
+      ? document.scrollingElement.scrollTop > 0
+      : false;
+  }
 
-  document.addEventListener('scroll', function() {
-    isScrolling = true;
-    clearTimeout(scrollTimer);
-    scrollTimer = setTimeout(function() { isScrolling = false; }, 1000);
-  }, true);
-
-  function startAutoReload(intervalSeconds) {
-    stopAutoReload();
-    intervalSec = intervalSeconds || intervalSec;
-    isEnabled = true;
-    timerId = setInterval(function() {
-      if (!isScrolling && isEnabled) {
-        window.location.reload();
+  function isFollowingTabActive() {
+    var tabs = document.querySelectorAll("div[role='tab']");
+    for (var i = 0; i < tabs.length; i++) {
+      var elem = tabs[i];
+      if (elem.getAttribute("aria-selected") === "true" && elem.hasAttribute("aria-expanded")) {
+        return true;
       }
-    }, intervalSec * 1000);
-  }
-
-  function stopAutoReload() {
-    if (timerId !== null) {
-      clearInterval(timerId);
-      timerId = null;
     }
-    isEnabled = false;
+    return false;
   }
 
-  function setAutoReloadEnabled(enabled, intervalSeconds) {
-    if (enabled) {
-      startAutoReload(intervalSeconds);
+  function findNewPostsButton() {
+    var section = document.querySelector("section[aria-labelledby]");
+    if (!section) return null;
+    var cells = section.querySelectorAll('[data-testid="cellInnerDiv"]');
+    for (var i = 0; i < cells.length; i++) {
+      if (cells[i].querySelector("article")) continue;
+      var btn = cells[i].querySelector('button[type="button"]');
+      if (btn) return btn;
+    }
+    return null;
+  }
+
+  function waitAndClickNewPostsButton() {
+    var btn = findNewPostsButton();
+    if (btn) { btn.click(); return; }
+    var section = document.querySelector("section[aria-labelledby]");
+    if (!section) return;
+    var observer = new MutationObserver(function() {
+      var found = findNewPostsButton();
+      if (found) { observer.disconnect(); found.click(); }
+    });
+    observer.observe(section, { childList: true, subtree: true });
+    setTimeout(function() { observer.disconnect(); }, 30000);
+  }
+
+  function triggerFollowingRefresh() {
+    window.dispatchEvent(new Event("focus"));
+    waitAndClickNewPostsButton();
+  }
+
+  function reselectTab() {
+    var tabs = document.querySelectorAll("div[role='tab']");
+    for (var i = 0; i < tabs.length; i++) {
+      var elem = tabs[i];
+      if (elem.getAttribute("aria-selected") === "true") {
+        // フォロー中タブはスキップ（専用処理で更新）
+        if (!elem.hasAttribute("aria-expanded")) {
+          elem.click();
+        }
+        break;
+      }
+    }
+  }
+
+  // Shell 側（React）からカウントダウン完了時に呼び出されるエントリポイント
+  function triggerReload() {
+    if (isScrolling()) return;
+    if (isFollowingTabActive()) {
+      triggerFollowingRefresh();
     } else {
-      stopAutoReload();
+      reselectTab();
     }
   }
 
   window.__twitterViewer = window.__twitterViewer || {};
-  window.__twitterViewer.setAutoReloadEnabled = setAutoReloadEnabled;
-  window.__twitterViewer.startAutoReload = startAutoReload;
-  window.__twitterViewer.stopAutoReload = stopAutoReload;
+  window.__twitterViewer.triggerReload = triggerReload;
 })();

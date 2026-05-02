@@ -23,13 +23,28 @@
   height: 36px;
   flex-shrink: 0;
   border-bottom: 1px solid #1a1a1a;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: hidden;
 }
 
 .columnHeaders {
   display: flex;
   flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  // ツールバーの幅分スクロールできるように末尾に余白を確保
+  & > :last-child {
+    margin-right: 0;
+  }
+  &::after {
+    content: "";
+    flex-shrink: 0;
+    width: 1px;
+  }
 }
 
 .toolbar {
@@ -60,6 +75,32 @@
 
 .webviewArea {
   flex: 1;
+}
+
+.bottomScrollbar {
+  flex-shrink: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  height: 12px;
+
+  &::-webkit-scrollbar {
+    height: 12px;
+  }
+  &::-webkit-scrollbar-track {
+    background: #0a0a0a;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 6px;
+    border: 3px solid #0a0a0a;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
+}
+
+.bottomScrollbarInner {
+  height: 1px;
 }
 
 .noAccountsPrompt {

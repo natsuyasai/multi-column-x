@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Account, Column } from '../../types';
+import { useAutoReload } from '../../hooks/useAutoReload';
 import styles from './ColumnHeader.module.scss';
 
 interface ColumnHeaderProps {
@@ -18,15 +19,27 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
   onClose,
 }) => {
   const label = column.label ?? `${account.label} - ${getPageLabel(column)}`;
+  const { remaining, reset } = useAutoReload({
+    columnId: column.id,
+    enabled: column.settings.autoReloadEnabled,
+    intervalSec: column.settings.autoReloadInterval,
+  });
+
+  const showCountdown = column.settings.showCountdown && remaining !== null;
 
   return (
     <div className={styles.header} style={{ borderTopColor: account.color }}>
       <span className={styles.dot} style={{ backgroundColor: account.color }} />
       <span className={styles.label}>{label}</span>
+      {showCountdown && (
+        <span className={styles.countdown} title="次の自動更新まで">
+          {remaining}s
+        </span>
+      )}
       <div className={styles.actions}>
         <button
           className={styles.actionBtn}
-          onClick={() => onReload(column.id)}
+          onClick={() => { onReload(column.id); reset(); }}
           aria-label="更新"
           title="更新"
         >

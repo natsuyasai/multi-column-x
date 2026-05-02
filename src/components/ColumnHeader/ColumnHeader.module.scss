@@ -27,6 +27,14 @@
   white-space: nowrap;
 }
 
+.countdown {
+  font-size: 10px;
+  color: #444;
+  flex-shrink: 0;
+  min-width: 28px;
+  text-align: right;
+}
+
 .actions {
   display: flex;
   gap: 2px;

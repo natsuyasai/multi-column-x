@@ -10,20 +10,6 @@ pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
     let data_dir = app_data.join("accounts").join(format!("account-{}", &account_id));
     std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
 
-    let detect_script = r#"
-        (function() {
-            var lastUrl = window.location.href;
-            setInterval(function() {
-                if (window.location.href !== lastUrl) {
-                    lastUrl = window.location.href;
-                    if (window.location.pathname === '/home') {
-                        window.__TAURI__.invoke('notify_account_logged_in');
-                    }
-                }
-            }, 500);
-        })();
-    "#;
-
     tauri::WebviewWindowBuilder::new(
         &app,
         &window_label,
@@ -32,9 +18,29 @@ pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
     .title("アカウントを追加")
     .inner_size(500.0, 700.0)
     .data_directory(data_dir.clone())
-    .initialization_script(detect_script)
     .build()
     .map_err(|e| e.to_string())?;
+
+    // Rust側でURLをポーリングしてログイン完了を検出する（外部WebViewではIPC不可のため）
+    let app_clone = app.clone();
+    let window_label_clone = window_label.clone();
+    tokio::spawn(async move {
+        let mut notified = false;
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            match app_clone.get_webview_window(&window_label_clone) {
+                Some(w) => {
+                    if let Ok(url) = w.url() {
+                        if !notified && url.path() == "/home" {
+                            notified = true;
+                            let _ = app_clone.emit("account-login-complete", ());
+                        }
+                    }
+                }
+                None => break, // ウィンドウが閉じられた
+            }
+        }
+    });
 
     Ok(serde_json::json!({
         "accountId": account_id,

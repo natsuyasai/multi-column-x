@@ -11,6 +11,7 @@ export interface Account {
 export interface ColumnSettings {
   autoReloadEnabled: boolean;
   autoReloadInterval: number; // 秒
+  showCountdown: boolean;
   areaRemoveEnabled: boolean;
   customCSS: string;
 }
@@ -44,6 +45,7 @@ export interface AppSettings {
 export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
   autoReloadEnabled: true,
   autoReloadInterval: 60,
+  showCountdown: true,
   areaRemoveEnabled: true,
   customCSS: '',
 };
