@@ -44,11 +44,33 @@
       "Bash(Remove-Item \"C:\\\\Users\\\\fuku\\\\Desktop\\\\twitter-viewer\\\\src-tauri\\\\src\\\\inject\\\\area_remove.js\")",
       "Bash(git check-ignore *)",
       "Bash(git worktree *)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(git checkout *)",
+      "Bash(git pull *)",
+      "Bash(git merge *)",
+      "Bash(git branch *)",
+      "WebFetch(domain:nabetama.com)",
+      "Bash(cargo check *)",
+      "PowerShell($env:PATH += \";$env:USERPROFILE\\\\.cargo\\\\bin\"; Set-Location \"c:\\\\Users\\\\fuku\\\\Desktop\\\\twitter-viewer\\\\src-tauri\"; cargo check 2>&1)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\fuku\\\\Desktop\\\\twitter-viewer\" -Recurse -Depth 3)",
+      "Bash(Select-Object FullName)",
+      "Bash(Format-List)",
+      "Bash(node -e \"console.log\\(typeof __dirname\\)\")",
+      "Bash(node --input-type=module -e \"console.log\\(typeof __dirname\\)\")",
+      "Bash(npx vite *)",
+      "Bash(node -e \"const v = require\\('./node_modules/vite/package.json'\\); console.log\\(v.version\\)\")",
+      "Bash(node -e \"const r = require\\('./node_modules/rollup/package.json'\\); console.log\\(r.version\\)\")",
+      "Bash(node --input-type=module -e ' *)",
+      "Bash(node -e ' *)",
+      "Bash(Get-ChildItem -Path \"D:\\\\project\\\\twitter-utils\\\\src\\\\content-scripts\\\\header-customizer\" -Force)",
+      "PowerShell(if \\(-not $?\\) { \"Directory not found\" })",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('scripts',{}\\), indent=2, ensure_ascii=False\\)\\)\")",
+      "Bash(git rm *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\fuku\\.claude\\projects\\c--Users-fuku-Desktop-twitter-viewer\\memory",
-      "C:\\Users\\fuku\\Desktop\\twitter-viewer\\docs\\superpowers"
+      "C:\\Users\\fuku\\Desktop\\twitter-viewer\\docs\\superpowers",
+      "c:\\Users\\fuku\\Desktop\\twitter-viewer\\docs\\superpowers\\specs"
     ]
   }
 }
