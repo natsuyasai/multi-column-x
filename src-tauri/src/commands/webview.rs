@@ -70,7 +70,7 @@ pub async fn create_column_webview(
                 }
                 let url_str = url.to_string();
                 tauri::async_runtime::spawn(async move {
-                    let _ = tauri_plugin_opener::open_url(&url_str, None::<&str>);
+                    let _ = open::that(&url_str);
                 });
                 false
             }),
