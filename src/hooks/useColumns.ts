@@ -34,13 +34,14 @@ export function useColumns() {
     if (!containerRef.current) return;
     const containerWidth = containerRef.current.clientWidth;
     const containerHeight = containerRef.current.clientHeight;
+    const sortedColumns = [...columns].sort((a, b) => a.order - b.order);
 
-    for (let i = 0; i < columns.length; i++) {
-      const column = columns[i];
+    for (let i = 0; i < sortedColumns.length; i++) {
+      const column = sortedColumns[i];
       const account = accounts.find((a) => a.id === column.accountId);
       if (!account) continue;
 
-      const bounds = calculateBounds(i, columns, containerWidth, containerHeight);
+      const bounds = calculateBounds(i, sortedColumns, containerWidth, containerHeight);
       await invoke('create_column_webview', {
         args: {
           column,
@@ -56,7 +57,8 @@ export function useColumns() {
     if (!containerRef.current) return;
     const containerHeight = containerRef.current.clientHeight;
     const containerWidth = containerRef.current.clientWidth;
-    const sortedColumns = [...columns].sort((a, b) => a.order - b.order);
+    const currentColumns = useAppStore.getState().columns;
+    const sortedColumns = [...currentColumns].sort((a, b) => a.order - b.order);
 
     for (let i = 0; i < sortedColumns.length; i++) {
       const bounds = calculateBounds(i, sortedColumns, containerWidth, containerHeight);
@@ -64,7 +66,7 @@ export function useColumns() {
         bounds: { columnId: sortedColumns[i].id, ...bounds },
       }).catch(console.error);
     }
-  }, [columns, calculateBounds]);
+  }, [calculateBounds]); // No longer depends on `columns`
 
   // カラム追加
   const handleAddColumn = useCallback(async (column: Column) => {
@@ -102,9 +104,16 @@ export function useColumns() {
 
   // ウィンドウリサイズ時に全カラムを再配置
   useEffect(() => {
-    const handleResize = () => { recalculateAllBounds(); };
+    let timer: ReturnType<typeof setTimeout>;
+    const handleResize = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => { recalculateAllBounds(); }, 100);
+    };
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', handleResize);
+    };
   }, [recalculateAllBounds]);
 
   return {

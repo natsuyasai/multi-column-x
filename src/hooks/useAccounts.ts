@@ -2,7 +2,6 @@
 import { useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import type { Account } from '../types';
 
@@ -14,24 +13,28 @@ const ACCOUNT_COLORS = [
 export function useAccounts() {
   const { accounts, addAccount, removeAccount } = useAppStore();
 
-  useEffect(() => {
-    const unlisten = listen<void>('account-login-complete', () => {
-      // ログイン完了時にフロントエンドがaddPendingAccountを呼び出す
-    });
-    return () => { unlisten.then((fn) => fn()); };
-  }, []);
-
   const startAddAccount = useCallback(async () => {
     const result = await invoke<string>('open_add_account_window');
-    const { accountId, dataDirectory, windowLabel } = JSON.parse(result);
+    let parsed: { accountId: string; dataDirectory: string; windowLabel: string };
+    try {
+      parsed = JSON.parse(result);
+    } catch {
+      throw new Error('Failed to parse open_add_account_window response');
+    }
+    const { accountId, dataDirectory, windowLabel } = parsed;
 
-    // ログイン完了を待つ
-    return new Promise<void>((resolve) => {
-      const unlisten = listen<void>('account-login-complete', async () => {
-        unlisten.then((fn) => fn());
+    return new Promise<void>((resolve, reject) => {
+      let unlistenFn: (() => void) | null = null;
+      const isAdding = { current: true };
 
-        const label = prompt('このアカウントの名前を入力してください') ?? `アカウント ${accounts.length + 1}`;
-        const color = ACCOUNT_COLORS[accounts.length % ACCOUNT_COLORS.length];
+      listen<void>('account-login-complete', async () => {
+        if (!isAdding.current) return;
+        isAdding.current = false;
+        unlistenFn?.();
+
+        const currentAccounts = useAppStore.getState().accounts;
+        const label = prompt('このアカウントの名前を入力してください') ?? `アカウント ${currentAccounts.length + 1}`;
+        const color = ACCOUNT_COLORS[currentAccounts.length % ACCOUNT_COLORS.length];
 
         const account: Account = {
           id: accountId,
@@ -42,13 +45,14 @@ export function useAccounts() {
         };
 
         addAccount(account);
-
-        // ログインウィンドウを閉じる
         await invoke('close_window', { label: windowLabel }).catch(() => {});
         resolve();
-      });
+      }).then((fn) => {
+        unlistenFn = fn;
+        if (!isAdding.current) fn(); // already resolved, clean up immediately
+      }).catch(reject);
     });
-  }, [accounts, addAccount]);
+  }, [addAccount]);
 
   const handleRemoveAccount = useCallback(async (id: string) => {
     const account = accounts.find((a) => a.id === id);
