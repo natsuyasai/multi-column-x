@@ -6,16 +6,24 @@ interface ColumnHeaderProps {
   column: Column;
   account: Account;
   onReload: (columnId: string) => void;
+  onMoveLeft: (columnId: string) => void;
+  onMoveRight: (columnId: string) => void;
   onSettings: (columnId: string) => void;
   onClose: (columnId: string) => void;
+  isFirst: boolean;
+  isLast: boolean;
 }
 
 export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
   column,
   account,
   onReload,
+  onMoveLeft,
+  onMoveRight,
   onSettings,
   onClose,
+  isFirst,
+  isLast,
 }) => {
   const label = column.label ?? `${account.label} - ${getPageLabel(column)}`;
 
@@ -31,6 +39,24 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
           title="更新"
         >
           ↺
+        </button>
+        <button
+          className={styles.actionBtn}
+          onClick={() => onMoveLeft(column.id)}
+          disabled={isFirst}
+          aria-label="左に移動"
+          title="左に移動"
+        >
+          ←
+        </button>
+        <button
+          className={styles.actionBtn}
+          onClick={() => onMoveRight(column.id)}
+          disabled={isLast}
+          aria-label="右に移動"
+          title="右に移動"
+        >
+          →
         </button>
         <button
           className={styles.actionBtn}
