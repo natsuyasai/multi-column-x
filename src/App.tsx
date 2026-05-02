@@ -1,51 +1,127 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+// src/App.tsx
+import React, { useEffect, useState, useCallback } from 'react';
+import { useAppStore } from './store/useAppStore';
+import { useColumns } from './hooks/useColumns';
+import { useAccounts } from './hooks/useAccounts';
+import { ColumnHeader } from './components/ColumnHeader/ColumnHeader';
+import { AddColumnDialog } from './components/AddColumnDialog/AddColumnDialog';
+import { AccountManager } from './components/AccountManager/AccountManager';
+import { invoke } from '@tauri-apps/api/core';
+import styles from './App.module.scss';
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+const App: React.FC = () => {
+  const { loadSettings, isLoaded, accounts } = useAppStore();
+  const {
+    columns,
+    containerRef,
+    restoreColumns,
+    handleAddColumn,
+    handleRemoveColumn,
+  } = useColumns();
+  const { startAddAccount, removeAccount } = useAccounts();
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
+  const [showAddColumn, setShowAddColumn] = useState(false);
+  const [showAccountManager, setShowAccountManager] = useState(false);
+
+  useEffect(() => {
+    loadSettings().then(() => {
+      restoreColumns();
+    });
+  }, []);
+
+  const handleReload = useCallback(async (columnId: string) => {
+    const webviewLabel = `column-${columnId}`;
+    await invoke('eval_in_webview', { label: webviewLabel, script: 'window.location.reload();' })
+      .catch(console.error);
+  }, []);
+
+  if (!isLoaded) {
+    return (
+      <div className={styles.loading}>
+        <span>読み込み中...</span>
+      </div>
+    );
   }
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
+    <div className={styles.app} ref={containerRef}>
+      <div className={styles.headerRow}>
+        <div className={styles.columnHeaders}>
+          {columns
+            .slice()
+            .sort((a, b) => a.order - b.order)
+            .map((column) => {
+              const account = accounts.find((a) => a.id === column.accountId);
+              if (!account) return null;
+              return (
+                <div
+                  key={column.id}
+                  style={{ width: column.width, flexShrink: 0 }}
+                >
+                  <ColumnHeader
+                    column={column}
+                    account={account}
+                    onReload={handleReload}
+                    onSettings={() => {}}
+                    onClose={handleRemoveColumn}
+                  />
+                </div>
+              );
+            })}
+        </div>
 
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+        <div className={styles.toolbar}>
+          <button
+            className={styles.toolbarBtn}
+            onClick={() => setShowAddColumn(true)}
+            title="カラムを追加"
+            aria-label="カラムを追加"
+          >
+            +
+          </button>
+          <button
+            className={styles.toolbarBtn}
+            onClick={() => setShowAccountManager(true)}
+            title="アカウント管理"
+            aria-label="アカウント管理"
+          >
+            👤
+          </button>
+        </div>
       </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
 
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
+      <div className={styles.webviewArea} />
+
+      {showAddColumn && accounts.length > 0 && (
+        <AddColumnDialog
+          accounts={accounts}
+          onAdd={(column) => {
+            handleAddColumn(column);
+            setShowAddColumn(false);
+          }}
+          onCancel={() => setShowAddColumn(false)}
         />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+      )}
+
+      {showAddColumn && accounts.length === 0 && (
+        <div className={styles.noAccountsPrompt}>
+          <p>先にアカウントを追加してください</p>
+          <button onClick={() => { setShowAddColumn(false); setShowAccountManager(true); }}>
+            アカウント管理を開く
+          </button>
+        </div>
+      )}
+
+      {showAccountManager && (
+        <AccountManager
+          accounts={accounts}
+          onAddAccount={startAddAccount}
+          onRemoveAccount={removeAccount}
+          onClose={() => setShowAccountManager(false)}
+        />
+      )}
+    </div>
   );
-}
+};
 
 export default App;
