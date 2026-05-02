@@ -132,7 +132,7 @@ pub async fn open_popup_window(
     let data_dir = {
         let registry = state.registry.lock().unwrap();
         registry.get_data_directory(&webview_label_caller)
-            .map(|s| PathBuf::from(s))
+            .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from(""))
     };
 

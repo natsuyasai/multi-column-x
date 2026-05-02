@@ -7,7 +7,9 @@ pub struct WebviewRegistry {
 }
 
 pub struct WebviewEntry {
+    #[allow(dead_code)]
     pub column_id: String,
+    #[allow(dead_code)]
     pub account_id: String,
     pub data_directory: String,
 }
@@ -39,6 +41,7 @@ impl WebviewRegistry {
         self.entries.remove(label);
     }
 
+    #[allow(dead_code)]
     pub fn get_account_id(&self, label: &str) -> Option<&str> {
         self.entries.get(label).map(|e| e.account_id.as_str())
     }
