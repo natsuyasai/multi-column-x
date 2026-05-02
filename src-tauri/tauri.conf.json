@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "twitter-viewer",
+  "version": "0.1.0",
+  "identifier": "com.twitter-viewer",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Twitter Viewer",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 600,
+        "minHeight": 400,
+        "decorations": true,
+        "transparent": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "plugins": {
+    "store": {
+      "autoSave": 100
+    }
+  }
+}
