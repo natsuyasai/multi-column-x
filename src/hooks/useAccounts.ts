@@ -13,13 +13,12 @@ const ACCOUNT_COLORS = [
 export function useAccounts() {
   const { accounts, addAccount, removeAccount } = useAppStore();
   const isAddingRef = useRef(false);
-  const pendingUnlistenRef = useRef<(() => void) | null>(null);
+  const pendingCleanupRef = useRef<(() => void) | null>(null);
 
-  // Clean up any pending listener on unmount
   useEffect(() => {
     return () => {
-      pendingUnlistenRef.current?.();
-      pendingUnlistenRef.current = null;
+      pendingCleanupRef.current?.();
+      pendingCleanupRef.current = null;
     };
   }, []);
 
@@ -38,9 +37,20 @@ export function useAccounts() {
       const { accountId, dataDirectory, windowLabel } = parsed;
 
       await new Promise<void>((resolve, reject) => {
+        let unlistenLogin: (() => void) | null = null;
+        let unlistenDestroyed: (() => void) | null = null;
+
+        const cleanup = () => {
+          unlistenLogin?.();
+          unlistenLogin = null;
+          unlistenDestroyed?.();
+          unlistenDestroyed = null;
+          pendingCleanupRef.current = null;
+        };
+
+        // Listen for successful login
         listen<void>('account-login-complete', async () => {
-          pendingUnlistenRef.current?.();
-          pendingUnlistenRef.current = null;
+          cleanup();
 
           const currentAccounts = useAppStore.getState().accounts;
           const label = prompt('このアカウントの名前を入力してください') ?? `アカウント ${currentAccounts.length + 1}`;
@@ -58,8 +68,22 @@ export function useAccounts() {
           await invoke('close_window', { label: windowLabel }).catch(() => {});
           resolve();
         }).then((fn) => {
-          pendingUnlistenRef.current = fn;
+          unlistenLogin = fn;
+          pendingCleanupRef.current = cleanup;
         }).catch(reject);
+
+        // Detect login window closed without completing login (user abandoned)
+        import('@tauri-apps/api/webviewWindow').then(({ WebviewWindow }) => {
+          WebviewWindow.getByLabel(windowLabel).then((loginWindow) => {
+            if (!loginWindow) return;
+            loginWindow.once('tauri://destroyed', () => {
+              cleanup();
+              reject(new Error('Login window closed'));
+            }).then((fn) => {
+              unlistenDestroyed = fn;
+            }).catch(() => {});
+          }).catch(() => {});
+        }).catch(() => {});
       });
     } finally {
       isAddingRef.current = false;
