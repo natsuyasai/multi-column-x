@@ -14,6 +14,7 @@ export interface ColumnSettings {
   showCountdown: boolean;
   areaRemoveEnabled: boolean;
   customCSS: string;
+  visibleLinks: string[];
 }
 
 export interface Column {
@@ -48,6 +49,7 @@ export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
   showCountdown: true,
   areaRemoveEnabled: true,
   customCSS: '',
+  visibleLinks: [],
 };
 
 export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
