@@ -5,16 +5,6 @@
            /\/i\/status\/\d+/.test(href);
   }
 
-  function isExternalLink(href) {
-    if (!href || href.startsWith('/') || href.startsWith('#') || href.startsWith('javascript:')) return false;
-    try {
-      var url = new URL(href);
-      return url.hostname !== 'x.com' && url.hostname !== 'twitter.com';
-    } catch (e) {
-      return false;
-    }
-  }
-
   function resolveAbsolute(href) {
     return href.startsWith('http') ? href : 'https://x.com' + href;
   }
@@ -50,14 +40,8 @@
           : 'unknown',
         url: resolveAbsolute(href),
       });
-      return;
     }
-
-    if (isExternalLink(href)) {
-      e.preventDefault();
-      e.stopPropagation();
-      tauriInvoke('open_in_browser', { url: href });
-    }
+    // 外部リンクは Rust 側の on_navigation でデフォルトブラウザに渡す
     // x.com 内リンクはデフォルト動作（SPA ナビゲーション）に任せる
   }, true);
 })();
