@@ -24,9 +24,9 @@ export default defineConfig({
         entries.map((name) => [name, resolve(srcDir, `${name}.ts`)])
       ),
       output: {
-        format: "iife",
+        format: "es",
         entryFileNames: "[name].js",
-        inlineDynamicImports: false,
+        inlineDynamicImports: true,
       },
     },
   },
