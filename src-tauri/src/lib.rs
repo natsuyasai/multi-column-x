@@ -1,18 +1,27 @@
 mod state;
 mod inject;
+mod commands;
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
+use state::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_store::Builder::default().build())
-        .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![greet])
+        .plugin(tauri_plugin_store::Builder::new().build())
+        .manage(AppState::new())
+        .invoke_handler(tauri::generate_handler![
+            commands::settings::load_settings,
+            commands::settings::save_settings,
+            commands::webview::create_column_webview,
+            commands::webview::remove_column_webview,
+            commands::webview::resize_column_webview,
+            commands::webview::open_popup_window,
+            commands::webview::eval_in_webview,
+            commands::account::open_add_account_window,
+            commands::account::notify_account_logged_in,
+            commands::account::delete_account_data,
+            commands::account::close_window,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
