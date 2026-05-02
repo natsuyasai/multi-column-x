@@ -9,6 +9,7 @@ interface TwitterViewerAPI {
 
 interface TwitterViewerConfig {
   areaRemoveEnabled: boolean;
+  visibleLinks: string[];
 }
 
 interface TauriCore {
