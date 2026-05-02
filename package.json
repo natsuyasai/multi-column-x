@@ -4,8 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "build:inject": "vite build --config vite.inject.config.ts",
+    "dev": "npm run build:inject && vite",
+    "build": "npm run build:inject && tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest run",
