@@ -37,7 +37,7 @@ const App: React.FC = () => {
     if (!toolbarRef.current) return columnsWidth;
     const toolbarWidth = toolbarRef.current.offsetWidth;
     return columnsWidth + toolbarWidth;
-  }, [toolbarRef]);
+  }, [toolbarRef, columns]);
 
   const [showAddColumn, setShowAddColumn] = useState(false);
   const [showAccountManager, setShowAccountManager] = useState(false);
