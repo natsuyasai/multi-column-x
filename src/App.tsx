@@ -22,6 +22,7 @@ const App: React.FC = () => {
     restoreColumns,
     handleAddColumn,
     handleRemoveColumn,
+    handleMoveColumn,
     handleUpdateColumn,
     recalculateAllBounds,
     hideColumnWebviews,
@@ -97,15 +98,13 @@ const App: React.FC = () => {
         onWheel={(e) => {
           const el = scrollbarRef.current;
           if (!el) return;
-          // 縦スクロールも横スクロールに転換する（ヘッダー上での操作）
           el.scrollLeft += e.deltaY !== 0 ? e.deltaY : e.deltaX;
         }}
       >
         <div className={styles.columnHeaders} ref={scrollRef} onScroll={handleHeaderScroll}>
-          {columns
-            .slice()
-            .sort((a, b) => a.order - b.order)
-            .map((column) => {
+          {(() => {
+            const sorted = columns.slice().sort((a, b) => a.order - b.order);
+            return sorted.map((column, idx) => {
               const account = accounts.find((a) => a.id === column.accountId);
               if (!account) return null;
               return (
@@ -117,12 +116,17 @@ const App: React.FC = () => {
                     column={column}
                     account={account}
                     onReload={handleReload}
+                    onMoveLeft={(id) => handleMoveColumn(id, 'left')}
+                    onMoveRight={(id) => handleMoveColumn(id, 'right')}
                     onSettings={setSettingsColumnId}
                     onClose={handleRemoveColumn}
+                    isFirst={idx === 0}
+                    isLast={idx === sorted.length - 1}
                   />
                 </div>
               );
-            })}
+            });
+          })()}
         </div>
 
         <div className={styles.toolbar}>

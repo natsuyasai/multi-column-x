@@ -16,6 +16,7 @@ interface AppStore {
   removeColumn: (id: string) => void;
   updateColumn: (id: string, patch: Partial<Column>) => void;
   updateGlobalSettings: (patch: Partial<GlobalSettings>) => void;
+  moveColumn: (columnId: string, direction: 'left' | 'right') => void;
 }
 
 export const useAppStore = create<AppStore>((set, get) => ({
@@ -72,6 +73,24 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   updateGlobalSettings: (patch) => {
     set((state) => ({ globalSettings: { ...state.globalSettings, ...patch } }));
+    get().saveSettings();
+  },
+
+  moveColumn: (columnId, direction) => {
+    const { columns } = get();
+    const sorted = [...columns].sort((a, b) => a.order - b.order);
+    const idx = sorted.findIndex((c) => c.id === columnId);
+    const neighborIdx = direction === 'left' ? idx - 1 : idx + 1;
+    if (neighborIdx < 0 || neighborIdx >= sorted.length) return;
+    const target = sorted[idx];
+    const neighbor = sorted[neighborIdx];
+    set((state) => ({
+      columns: state.columns.map((c) => {
+        if (c.id === target.id) return { ...c, order: neighbor.order };
+        if (c.id === neighbor.id) return { ...c, order: target.order };
+        return c;
+      }),
+    }));
     get().saveSettings();
   },
 }));

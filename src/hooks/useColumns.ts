@@ -8,7 +8,7 @@ const HEADER_HEIGHT = 36;    // ColumnHeader の高さ（px）
 const SCROLLBAR_HEIGHT = 12; // 下部スクロールバーの高さ（px）
 
 export function useColumns() {
-  const { columns, accounts, addColumn, removeColumn, updateColumn } = useAppStore();
+  const { columns, accounts, addColumn, removeColumn, updateColumn, moveColumn } = useAppStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);    // ヘッダースクロールコンテナ
   const scrollbarRef = useRef<HTMLDivElement>(null); // 下部スクロールバーコンテナ
@@ -121,6 +121,12 @@ export function useColumns() {
     updateColumn(id, patch);
   }, [updateColumn]);
 
+  // カラム移動
+  const handleMoveColumn = useCallback(async (columnId: string, direction: 'left' | 'right') => {
+    moveColumn(columnId, direction);
+    await recalculateAllBounds();
+  }, [moveColumn, recalculateAllBounds]);
+
   // ウィンドウリサイズ時に全カラムを再配置
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
@@ -159,6 +165,7 @@ export function useColumns() {
     restoreColumns,
     handleAddColumn,
     handleRemoveColumn,
+    handleMoveColumn,
     handleUpdateColumn,
     recalculateAllBounds,
     hideColumnWebviews,
