@@ -9,3 +9,4 @@ aidlc-docs/audit.md
 
 # inject scripts build artifacts
 src-tauri/src/inject/*.js
+src-tauri/src/inject/*.svg
