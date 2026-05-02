@@ -7,6 +7,9 @@
     "core:default",
     "core:webview:default",
     "opener:default",
-    "opener:allow-open-url"
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://**" }, { "url": "http://**" }, { "url": "mailto://**" }]
+    }
   ]
 }

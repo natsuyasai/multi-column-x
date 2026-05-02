@@ -62,18 +62,7 @@ pub async fn create_column_webview(
     window.add_child(
         WebviewBuilder::new(&label, WebviewUrl::External(parse_url(&url)?))
             .initialization_script(&init_script)
-            .data_directory(data_dir)
-            .on_navigation(|url| {
-                let host = url.host_str().unwrap_or("");
-                if host == "x.com" || host == "twitter.com" || host.ends_with(".x.com") || host.ends_with(".twitter.com") {
-                    return true;
-                }
-                let url_str = url.to_string();
-                tauri::async_runtime::spawn(async move {
-                    let _ = open::that(&url_str);
-                });
-                false
-            }),
+            .data_directory(data_dir),
         LogicalPosition::new(args.x, args.y),
         LogicalSize::new(args.width, args.height),
     ).map_err(|e| e.to_string())?;
