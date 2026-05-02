@@ -17,6 +17,7 @@ const App: React.FC = () => {
     restoreColumns,
     handleAddColumn,
     handleRemoveColumn,
+    handleMoveColumn,
   } = useColumns();
   const { startAddAccount, removeAccount } = useAccounts();
 
@@ -47,10 +48,9 @@ const App: React.FC = () => {
     <div className={styles.app} ref={containerRef}>
       <div className={styles.headerRow}>
         <div className={styles.columnHeaders}>
-          {columns
-            .slice()
-            .sort((a, b) => a.order - b.order)
-            .map((column) => {
+          {(() => {
+            const sorted = columns.slice().sort((a, b) => a.order - b.order);
+            return sorted.map((column, idx) => {
               const account = accounts.find((a) => a.id === column.accountId);
               if (!account) return null;
               return (
@@ -62,12 +62,17 @@ const App: React.FC = () => {
                     column={column}
                     account={account}
                     onReload={handleReload}
+                    onMoveLeft={(id) => handleMoveColumn(id, 'left')}
+                    onMoveRight={(id) => handleMoveColumn(id, 'right')}
                     onSettings={() => {}}
                     onClose={handleRemoveColumn}
+                    isFirst={idx === 0}
+                    isLast={idx === sorted.length - 1}
                   />
                 </div>
               );
-            })}
+            });
+          })()}
         </div>
 
         <div className={styles.toolbar}>

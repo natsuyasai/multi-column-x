@@ -26,47 +26,59 @@ const mockColumn: Column = {
   },
 };
 
+const defaultProps = {
+  column: mockColumn,
+  account: mockAccount,
+  onReload: vi.fn(),
+  onMoveLeft: vi.fn(),
+  onMoveRight: vi.fn(),
+  onSettings: vi.fn(),
+  onClose: vi.fn(),
+  isFirst: false,
+  isLast: false,
+};
+
 describe('ColumnHeader', () => {
   it('アカウント名を表示する', () => {
-    render(
-      <ColumnHeader
-        column={mockColumn}
-        account={mockAccount}
-        onReload={vi.fn()}
-        onSettings={vi.fn()}
-        onClose={vi.fn()}
-      />
-    );
+    render(<ColumnHeader {...defaultProps} />);
     expect(screen.getByText('テストアカウント - フォロー中')).toBeInTheDocument();
   });
 
   it('閉じるボタンクリックでonCloseが呼ばれる', () => {
     const onClose = vi.fn();
-    render(
-      <ColumnHeader
-        column={mockColumn}
-        account={mockAccount}
-        onReload={vi.fn()}
-        onSettings={vi.fn()}
-        onClose={onClose}
-      />
-    );
+    render(<ColumnHeader {...defaultProps} onClose={onClose} />);
     fireEvent.click(screen.getByLabelText('カラムを閉じる'));
     expect(onClose).toHaveBeenCalledWith('col-1');
   });
 
   it('更新ボタンクリックでonReloadが呼ばれる', () => {
     const onReload = vi.fn();
-    render(
-      <ColumnHeader
-        column={mockColumn}
-        account={mockAccount}
-        onReload={onReload}
-        onSettings={vi.fn()}
-        onClose={vi.fn()}
-      />
-    );
+    render(<ColumnHeader {...defaultProps} onReload={onReload} />);
     fireEvent.click(screen.getByLabelText('更新'));
     expect(onReload).toHaveBeenCalledWith('col-1');
+  });
+
+  it('左移動ボタンクリックでonMoveLeftが呼ばれる', () => {
+    const onMoveLeft = vi.fn();
+    render(<ColumnHeader {...defaultProps} onMoveLeft={onMoveLeft} />);
+    fireEvent.click(screen.getByLabelText('左に移動'));
+    expect(onMoveLeft).toHaveBeenCalledWith('col-1');
+  });
+
+  it('右移動ボタンクリックでonMoveRightが呼ばれる', () => {
+    const onMoveRight = vi.fn();
+    render(<ColumnHeader {...defaultProps} onMoveRight={onMoveRight} />);
+    fireEvent.click(screen.getByLabelText('右に移動'));
+    expect(onMoveRight).toHaveBeenCalledWith('col-1');
+  });
+
+  it('isFirst=true のとき左移動ボタンが disabled', () => {
+    render(<ColumnHeader {...defaultProps} isFirst={true} />);
+    expect(screen.getByLabelText('左に移動')).toBeDisabled();
+  });
+
+  it('isLast=true のとき右移動ボタンが disabled', () => {
+    render(<ColumnHeader {...defaultProps} isLast={true} />);
+    expect(screen.getByLabelText('右に移動')).toBeDisabled();
   });
 });
