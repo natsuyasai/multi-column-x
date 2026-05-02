@@ -24,10 +24,10 @@ export default defineConfig({
         entries.map((name) => [name, resolve(srcDir, `${name}.ts`)])
       ),
       output: {
-        format: "es",
+        format: "iife",
         entryFileNames: "[name].js",
-        inlineDynamicImports: true,
       },
+      manualChunks: undefined,
     },
   },
 });
