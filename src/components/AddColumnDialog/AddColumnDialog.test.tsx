@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { AddColumnDialog } from "./AddColumnDialog";
-import type { Account } from "../../types";
+import type { Account, GlobalSettings } from "../../types";
 
 const mockAccounts: Account[] = [
   {
@@ -13,11 +13,20 @@ const mockAccounts: Account[] = [
   },
 ];
 
+const mockGlobalSettings: GlobalSettings = {
+  theme: "dark",
+  customCSS: "",
+  windowBounds: { x: 0, y: 0, width: 1400, height: 900 },
+  defaultAutoReloadEnabled: true,
+  defaultAutoReloadInterval: 60,
+};
+
 describe("AddColumnDialog", () => {
   it("アカウント一覧が表示される", () => {
     render(
       <AddColumnDialog
         accounts={mockAccounts}
+        globalSettings={mockGlobalSettings}
         onAdd={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -29,6 +38,7 @@ describe("AddColumnDialog", () => {
     render(
       <AddColumnDialog
         accounts={mockAccounts}
+        globalSettings={mockGlobalSettings}
         onAdd={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -44,6 +54,7 @@ describe("AddColumnDialog", () => {
     render(
       <AddColumnDialog
         accounts={mockAccounts}
+        globalSettings={mockGlobalSettings}
         onAdd={vi.fn()}
         onCancel={onCancel}
       />,

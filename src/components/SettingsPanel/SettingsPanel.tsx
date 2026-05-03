@@ -24,12 +24,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   };
 
   return (
-    <div
-      className={styles.overlay}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
+    <div className={styles.overlay}>
       <div className={styles.panel}>
         <div className={styles.header}>
           <h2 className={styles.title}>カラム設定</h2>

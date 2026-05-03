@@ -11,6 +11,7 @@ import { ColumnHeader } from "./components/ColumnHeader/ColumnHeader";
 import { AddColumnDialog } from "./components/AddColumnDialog/AddColumnDialog";
 import { AccountManager } from "./components/AccountManager/AccountManager";
 import { SettingsPanel } from "./components/SettingsPanel/SettingsPanel";
+import { AppSettingsPanel } from "./components/AppSettingsPanel/AppSettingsPanel";
 import { Sidebar } from "./components/Sidebar/Sidebar";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -54,6 +55,7 @@ const App: React.FC = () => {
 
   const [showAddColumn, setShowAddColumn] = useState(false);
   const [showAccountManager, setShowAccountManager] = useState(false);
+  const [showAppSettings, setShowAppSettings] = useState(false);
   const [settingsColumnId, setSettingsColumnId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -79,7 +81,7 @@ const App: React.FC = () => {
   }, []);
 
   // ダイアログ表示中は列WebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
-  const dialogOpen = showAddColumn || showAccountManager || !!settingsColumnId;
+  const dialogOpen = showAddColumn || showAccountManager || showAppSettings || !!settingsColumnId;
   useEffect(() => {
     if (dialogOpen) {
       hideColumnWebviews();
@@ -174,6 +176,7 @@ const App: React.FC = () => {
         onToggleExpand={handleToggleSidebar}
         onAddColumn={() => setShowAddColumn(true)}
         onAccountManager={() => setShowAccountManager(true)}
+        onAppSettings={() => setShowAppSettings(true)}
         onComposeTweet={handleComposeTweet}
         onJumpToColumn={handleJumpToColumn}
       />
@@ -237,6 +240,7 @@ const App: React.FC = () => {
       {showAddColumn && accounts.length > 0 && (
         <AddColumnDialog
           accounts={accounts}
+          globalSettings={globalSettings}
           onAdd={(column) => {
             handleAddColumn(column);
             setShowAddColumn(false);
@@ -267,6 +271,14 @@ const App: React.FC = () => {
           onRemoveAccount={removeAccount}
           onSetDefault={handleSetDefaultAccount}
           onClose={() => setShowAccountManager(false)}
+        />
+      )}
+
+      {showAppSettings && (
+        <AppSettingsPanel
+          settings={globalSettings}
+          onApply={updateGlobalSettings}
+          onClose={() => setShowAppSettings(false)}
         />
       )}
 

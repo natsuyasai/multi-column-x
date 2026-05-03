@@ -1,17 +1,19 @@
 import React, { useState } from "react";
 import { v4 as uuidv4 } from "uuid";
-import type { Account, Column, PageType } from "../../types";
+import type { Account, Column, GlobalSettings, PageType } from "../../types";
 import { DEFAULT_COLUMN_SETTINGS } from "../../types";
 import styles from "./AddColumnDialog.module.scss";
 
 interface AddColumnDialogProps {
   accounts: Account[];
+  globalSettings: GlobalSettings;
   onAdd: (column: Column) => void;
   onCancel: () => void;
 }
 
 export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
   accounts,
+  globalSettings,
   onAdd,
   onCancel,
 }) => {
@@ -34,7 +36,11 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
       customUrl: pageType === "custom" ? customUrl : undefined,
       width: 350,
       order: 9999,
-      settings: { ...DEFAULT_COLUMN_SETTINGS },
+      settings: {
+        ...DEFAULT_COLUMN_SETTINGS,
+        autoReloadEnabled: globalSettings.defaultAutoReloadEnabled,
+        autoReloadInterval: globalSettings.defaultAutoReloadInterval,
+      },
     };
     onAdd(column);
   };

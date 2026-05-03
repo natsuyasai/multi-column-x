@@ -9,6 +9,7 @@ interface SidebarProps {
   onToggleExpand: () => void;
   onAddColumn: () => void;
   onAccountManager: () => void;
+  onAppSettings: () => void;
   onComposeTweet: () => void;
   onJumpToColumn: (columnId: string) => void;
 }
@@ -42,6 +43,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleExpand,
   onAddColumn,
   onAccountManager,
+  onAppSettings,
   onComposeTweet,
   onJumpToColumn,
 }) => {
@@ -134,6 +136,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title="アカウント管理"
         >
           👤
+        </button>
+      )}
+
+      {expanded ? (
+        <button
+          className={`${styles.btn} ${styles.btnExpanded}`}
+          onClick={onAppSettings}
+          title="アプリ設定"
+        >
+          <span className={styles.icon}>⚙</span>
+          <span className={styles.label}>設定</span>
+        </button>
+      ) : (
+        <button
+          className={styles.btn}
+          onClick={onAppSettings}
+          title="アプリ設定"
+        >
+          ⚙
         </button>
       )}
 
