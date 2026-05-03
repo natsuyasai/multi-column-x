@@ -3,8 +3,17 @@ use crate::inject::build_init_script;
 use crate::state::AppState;
 use std::path::PathBuf;
 use tauri::{
-    window, AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewBuilder, WebviewUrl,
+    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewBuilder, WebviewUrl,
 };
+
+#[derive(serde::Deserialize, serde::Serialize)]
+pub struct AccountInfo {
+    pub id: String,
+    pub label: String,
+    pub color: String,
+    #[serde(rename = "dataDirectory")]
+    pub data_directory: String,
+}
 
 fn webview_label(column_id: &str) -> String {
     format!("column-{}", column_id)
@@ -131,51 +140,48 @@ pub async fn open_popup_window(
     app: AppHandle,
     webview_label_caller: String,
     url: String,
+    accounts: Vec<AccountInfo>,
 ) -> Result<(), String> {
     let state = app.state::<AppState>();
-    let data_dir = {
+    let (data_dir, current_account_id) = {
         let registry = state.registry.lock().unwrap();
-        registry
+        let data_dir = registry
             .get_data_directory(&webview_label_caller)
             .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from(""))
+            .unwrap_or_else(|| PathBuf::from(""));
+        let account_id = registry
+            .get_account_id(&webview_label_caller)
+            .unwrap_or("")
+            .to_string();
+        (data_dir, account_id)
     };
 
     let popup_label = format!("popup-{}", uuid::Uuid::new_v4());
 
-    let (window_pos, window_size) = if let Some(window) = app.get_window("main") {
-        if let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) {
-            (
-                LogicalPosition::new(pos.x as f64, pos.y as f64),
-                LogicalSize::new(size.width as f64, size.height as f64),
-            )
-        } else {
-            (
-                LogicalPosition::new(0.0, 0.0),
-                LogicalSize::new(800.0, 600.0),
-            )
-        }
-    } else {
-        (
-            LogicalPosition::new(0.0, 0.0),
-            LogicalSize::new(800.0, 600.0),
-        )
-    };
+    let accounts_json = serde_json::to_string(&accounts).unwrap_or_else(|_| "[]".to_string());
+    let popup_init = crate::inject::build_popup_init_script(&accounts_json, &current_account_id);
 
-    const PADDING: f64 = 50.0;
+    const POPUP_WIDTH: f64 = 900.0;
+    const POPUP_HEIGHT: f64 = 700.0;
 
-    let builder = tauri::WebviewWindowBuilder::new(
+    let mut builder = tauri::WebviewWindowBuilder::new(
         &app,
         &popup_label,
         WebviewUrl::External(parse_url(&url)?),
     )
     .title("X - メディア")
-    .inner_size(
-        window_size.width - (PADDING * 2.0),
-        window_size.height - (PADDING * 2.0),
-    )
-    .data_directory(data_dir)
-    .position(window_pos.x + PADDING, window_pos.y + PADDING);
+    .inner_size(POPUP_WIDTH, POPUP_HEIGHT)
+    .initialization_script(&popup_init)
+    .data_directory(data_dir);
+
+    if let Some(window) = app.get_window("main") {
+        if let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) {
+            let scale = window.scale_factor().unwrap_or(1.0);
+            let center_x = pos.x as f64 + (size.width as f64 - POPUP_WIDTH * scale) / 2.0;
+            let center_y = pos.y as f64 + (size.height as f64 - POPUP_HEIGHT * scale) / 2.0;
+            builder = builder.position(center_x / scale, center_y / scale);
+        }
+    }
 
     builder.build().map_err(|e| e.to_string())?;
 
