@@ -51,8 +51,8 @@ const App: React.FC = () => {
     : SIDEBAR_COLLAPSED_WIDTH;
 
   const scrollbarWidth = useMemo(() => {
-    return Object.values(columnBounds).reduce((max, b) => Math.max(max, b.x + b.width), 0);
-  }, [columnBounds]);
+    return Object.values(columnBounds).reduce((max, b) => Math.max(max, b.x + b.width), 0) - sidebarWidth;
+  }, [columnBounds, sidebarWidth]);
 
   const [showAddColumn, setShowAddColumn] = useState(false);
   const [showAccountManager, setShowAccountManager] = useState(false);
@@ -195,7 +195,7 @@ const App: React.FC = () => {
               key={column.id}
               className={styles.columnHeaderWrapper}
               style={{
-                left: bounds.x,
+                left: bounds.x - sidebarWidth,
                 top: bounds.y - HEADER_HEIGHT,
                 width: bounds.width,
               }}
