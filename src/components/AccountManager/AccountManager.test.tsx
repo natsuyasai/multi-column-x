@@ -20,6 +20,7 @@ describe('AccountManager', () => {
         accounts={mockAccounts}
         onAddAccount={vi.fn()}
         onRemoveAccount={vi.fn()}
+        onSetDefault={vi.fn()}
         onClose={vi.fn()}
       />
     );
@@ -33,6 +34,7 @@ describe('AccountManager', () => {
         accounts={mockAccounts}
         onAddAccount={vi.fn()}
         onRemoveAccount={onRemoveAccount}
+        onSetDefault={vi.fn()}
         onClose={vi.fn()}
       />
     );

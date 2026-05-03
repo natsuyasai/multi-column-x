@@ -14,7 +14,7 @@ import type { ColumnSettings } from "./types";
 import styles from "./App.module.scss";
 
 const App: React.FC = () => {
-  const { loadSettings, isLoaded, accounts, sidebarExpanded, setSidebarExpanded } = useAppStore();
+  const { loadSettings, isLoaded, accounts, globalSettings, updateGlobalSettings, sidebarExpanded, setSidebarExpanded } = useAppStore();
   const {
     columns,
     containerRef,
@@ -123,6 +123,20 @@ const App: React.FC = () => {
     [handleUpdateColumn],
   );
 
+  const handleComposeTweet = useCallback(async () => {
+    if (accounts.length === 0) return;
+    const targetId = globalSettings.defaultAccountId ?? accounts[0].id;
+    const account = accounts.find((a) => a.id === targetId) ?? accounts[0];
+    await invoke('open_compose_window', {
+      accountId: account.id,
+      dataDirectory: account.dataDirectory,
+    }).catch(console.error);
+  }, [accounts, globalSettings.defaultAccountId]);
+
+  const handleSetDefaultAccount = useCallback((id: string) => {
+    updateGlobalSettings({ defaultAccountId: id });
+  }, [updateGlobalSettings]);
+
   if (!isLoaded) {
     return (
       <div className={styles.loading}>
@@ -140,7 +154,7 @@ const App: React.FC = () => {
         onToggleExpand={handleToggleSidebar}
         onAddColumn={() => setShowAddColumn(true)}
         onAccountManager={() => setShowAccountManager(true)}
-        onComposeTweet={() => {}}
+        onComposeTweet={handleComposeTweet}
         onJumpToColumn={handleJumpToColumn}
       />
 
@@ -228,8 +242,10 @@ const App: React.FC = () => {
       {showAccountManager && (
         <AccountManager
           accounts={accounts}
+          defaultAccountId={globalSettings.defaultAccountId}
           onAddAccount={startAddAccount}
           onRemoveAccount={removeAccount}
+          onSetDefault={handleSetDefaultAccount}
           onClose={() => setShowAccountManager(false)}
         />
       )}
