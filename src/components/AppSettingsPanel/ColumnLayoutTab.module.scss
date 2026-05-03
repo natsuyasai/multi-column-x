@@ -23,8 +23,12 @@
   border-radius: 4px;
   color: #eee;
   font-size: 13px;
-  padding: 4px 8px;
+  padding: 7px 8px;
   text-align: center;
+
+  &::-webkit-inner-spin-button {
+    margin-left: 4px;
+  }
 
   &:focus {
     outline: none;
@@ -284,7 +288,7 @@
   border-radius: 4px;
   color: #eee;
   font-size: 13px;
-  padding: 4px 6px;
+  padding: 7px 6px;
 
   &:focus {
     outline: none;
