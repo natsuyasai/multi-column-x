@@ -1,9 +1,10 @@
 import React from "react";
-import type { Column } from "../../types";
+import type { Account, Column } from "../../types";
 import styles from "./Sidebar.module.scss";
 
 interface SidebarProps {
   columns: Column[];
+  accounts: Account[];
   expanded: boolean;
   onToggleExpand: () => void;
   onAddColumn: () => void;
@@ -12,19 +13,26 @@ interface SidebarProps {
   onJumpToColumn: (columnId: string) => void;
 }
 
-function columnDisplayName(column: Column): string {
-  if (column.label) return column.label;
+function getPageLabel(column: Column): string {
   switch (column.pageType) {
-    case "home": return "ホーム";
+    case "home": return column.homeTabName ?? "ホーム";
     case "notifications": return "通知";
-    case "search": return column.searchQuery ?? "検索";
+    case "search": return `検索: ${column.searchQuery ?? ""}`;
     case "list": return "リスト";
     case "custom": return "カスタム";
   }
 }
 
+function columnDisplayName(column: Column, accounts: Account[]): string {
+  if (column.label) return column.label;
+  const account = accounts.find((a) => a.id === column.accountId);
+  if (account) return `${account.label} - ${getPageLabel(column)}`;
+  return getPageLabel(column);
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({
   columns,
+  accounts,
   expanded,
   onToggleExpand,
   onAddColumn,
@@ -64,17 +72,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
               key={col.id}
               className={`${styles.btn} ${styles.btnExpanded}`}
               onClick={() => onJumpToColumn(col.id)}
-              title={columnDisplayName(col)}
+              title={columnDisplayName(col, accounts)}
             >
               <span className={styles.icon}>📋</span>
-              <span className={styles.label}>{columnDisplayName(col)}</span>
+              <span className={styles.label}>{columnDisplayName(col, accounts)}</span>
             </button>
           ) : (
             <button
               key={col.id}
               className={styles.btn}
               onClick={() => onJumpToColumn(col.id)}
-              title={columnDisplayName(col)}
+              title={columnDisplayName(col, accounts)}
             >
               📋
             </button>

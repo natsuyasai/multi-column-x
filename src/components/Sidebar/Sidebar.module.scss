@@ -1,5 +1,5 @@
 $sidebar-collapsed-width: 40px;
-$sidebar-expanded-width: 70px;
+$sidebar-expanded-width: 200px;
 $transition: 200ms ease;
 
 .sidebar {
@@ -47,7 +47,7 @@ $transition: 200ms ease;
 }
 
 .btnExpanded {
-  width: 58px;
+  width: 186px;
   height: 28px;
   flex-direction: row;
   gap: 5px;

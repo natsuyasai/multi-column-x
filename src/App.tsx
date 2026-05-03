@@ -75,6 +75,18 @@ const App: React.FC = () => {
     setTimeout(() => recalculateAllBounds(), 220);
   }, [sidebarExpanded, setSidebarExpanded, recalculateAllBounds]);
 
+  const handleJumpToColumn = useCallback((columnId: string) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const sorted = [...columns].sort((a, b) => a.order - b.order);
+    let x = 0;
+    for (const col of sorted) {
+      if (col.id === columnId) break;
+      x += col.width;
+    }
+    el.scrollLeft = x;
+  }, [columns, scrollRef]);
+
   const handleReload = useCallback(async (columnId: string) => {
     const webviewLabel = `column-${columnId}`;
     await invoke("eval_in_webview", {
@@ -119,12 +131,13 @@ const App: React.FC = () => {
     <div className={styles.app} ref={containerRef} style={{ paddingLeft: sidebarWidth }}>
       <Sidebar
         columns={columns}
+        accounts={accounts}
         expanded={sidebarExpanded}
         onToggleExpand={handleToggleSidebar}
         onAddColumn={() => setShowAddColumn(true)}
         onAccountManager={() => setShowAccountManager(true)}
         onComposeTweet={() => {}}
-        onJumpToColumn={() => {}}
+        onJumpToColumn={handleJumpToColumn}
       />
 
       <div
