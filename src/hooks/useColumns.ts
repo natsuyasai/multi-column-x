@@ -17,7 +17,6 @@ export interface ColumnBounds {
 }
 
 interface GridBoundsOptions {
-  containerWidth: number;
   containerHeight: number;
   scrollLeft: number;
   sidebarWidth: number;
@@ -72,13 +71,14 @@ export function calculateGridBounds(
       } else {
         height = autoHeight;
       }
+      const yNext = yOffset + height;
       result[col.id] = {
         x: xOffset - scrollLeft,
-        y: yOffset,
+        y: Math.round(yOffset),
         width: col.width,
-        height: Math.round(height),
+        height: Math.round(yNext) - Math.round(yOffset),
       };
-      yOffset += Math.round(height);
+      yOffset = yNext;
     }
 
     // 同じ gridCol 内の最大 width を使って x を進める
@@ -115,7 +115,6 @@ export function useColumns() {
       : SIDEBAR_COLLAPSED_WIDTH;
 
     const bounds = calculateGridBounds(currentColumns, {
-      containerWidth,
       containerHeight,
       scrollLeft,
       sidebarWidth,
@@ -146,7 +145,6 @@ export function useColumns() {
         useAppStore.getState();
 
       const bounds = calculateGridBounds(currentColumns, {
-        containerWidth,
         containerHeight,
         scrollLeft,
         sidebarWidth,
@@ -182,16 +180,13 @@ export function useColumns() {
       addColumn(column);
 
       const containerHeight = containerRef.current.clientHeight;
-      const containerWidth = containerRef.current.clientWidth;
       const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
       const { sidebarExpanded, columns: updatedColumns } = useAppStore.getState();
       const sidebarWidth = sidebarExpanded
         ? SIDEBAR_EXPANDED_WIDTH
         : SIDEBAR_COLLAPSED_WIDTH;
 
-      const allColumns = [...updatedColumns];
-      const bounds = calculateGridBounds(allColumns, {
-        containerWidth,
+      const bounds = calculateGridBounds(updatedColumns, {
         containerHeight,
         scrollLeft,
         sidebarWidth,
@@ -207,7 +202,7 @@ export function useColumns() {
         args: { column, dataDirectory: account.dataDirectory, ...b },
       });
     },
-    [columns, accounts, addColumn],
+    [accounts, addColumn],
   );
 
   // ダイアログ表示時に全カラムWebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
