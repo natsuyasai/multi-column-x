@@ -31,6 +31,7 @@ const mockColumn: Column = {
     autoReloadInterval: 60,
     showCountdown: true,
     areaRemoveEnabled: true,
+    showCustomMenu: false,
     customCSS: "",
     visibleLinks: [],
   },
