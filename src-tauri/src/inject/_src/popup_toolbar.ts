@@ -76,7 +76,6 @@
       accountId: selectedAccount.id,
       dataDirectory: selectedAccount.dataDirectory,
       url: window.location.href,
-      accounts,
     });
   });
 

@@ -63,8 +63,7 @@
       popupLabel,
       accountId: selectedAccount.id,
       dataDirectory: selectedAccount.dataDirectory,
-      url: window.location.href,
-      accounts
+      url: window.location.href
     });
   });
   toolbar.appendChild(label);

@@ -41,7 +41,6 @@ impl WebviewRegistry {
         self.entries.remove(label);
     }
 
-    #[allow(dead_code)]
     pub fn get_account_id(&self, label: &str) -> Option<&str> {
         self.entries.get(label).map(|e| e.account_id.as_str())
     }
