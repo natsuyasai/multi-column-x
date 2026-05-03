@@ -23,6 +23,7 @@ interface TauriGlobal {
 
 interface TauriInternalsMetadata {
   currentWindow?: { label: string };
+  currentWebview?: { label: string };
 }
 
 interface TauriInternals {

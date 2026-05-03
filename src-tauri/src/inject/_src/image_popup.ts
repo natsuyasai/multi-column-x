@@ -37,7 +37,7 @@
         e.preventDefault();
         e.stopPropagation();
         const label =
-          window.__TAURI_INTERNALS__?.metadata?.currentWindow?.label ??
+          window.__TAURI_INTERNALS__?.metadata?.currentWebview?.label ??
           "unknown";
         tauriInvoke("open_popup_window", {
           webviewLabelCaller: label,
