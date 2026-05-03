@@ -62,7 +62,7 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
   const handleRemove = useCallback((columnId: string) => {
     setDraft((prev) =>
       prev.map((c) =>
-        c.id === columnId ? { ...c, gridRow: 9999, gridCol: 9999 } : c
+        c.id === columnId ? { ...c, gridRow: 0, gridCol: 0 } : c
       )
     );
     setSelectedCellKey(null);
@@ -167,7 +167,7 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
             </div>
           ))}
           {unassigned.length === 0 && (
-            <div style={{ fontSize: 11, color: "#444" }}>なし</div>
+            <div className={styles.emptyNotice}>なし</div>
           )}
         </div>
       </div>
