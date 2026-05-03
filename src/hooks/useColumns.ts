@@ -20,8 +20,9 @@ export function useColumns() {
     _containerWidth: number,
     containerHeight: number,
     scrollLeft: number = 0,
+    sidebarWidth: number = 0,
   ) => {
-    let x = 0;
+    let x = sidebarWidth;
     for (let i = 0; i < columnIndex; i++) {
       x += allColumns[i].width;
     }
@@ -40,7 +41,8 @@ export function useColumns() {
     const containerHeight = containerRef.current.clientHeight;
     const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
     // loadSettings() 完了後に呼ばれるため、ストアから直接最新値を取得する
-    const { columns: currentColumns, accounts: currentAccounts } = useAppStore.getState();
+    const { columns: currentColumns, accounts: currentAccounts, sidebarExpanded } = useAppStore.getState();
+    const sidebarWidth = sidebarExpanded ? 70 : 40;
     const sortedColumns = [...currentColumns].sort((a, b) => a.order - b.order);
 
     for (let i = 0; i < sortedColumns.length; i++) {
@@ -48,7 +50,7 @@ export function useColumns() {
       const account = currentAccounts.find((a) => a.id === column.accountId);
       if (!account) continue;
 
-      const bounds = calculateBounds(i, sortedColumns, containerWidth, containerHeight, scrollLeft);
+      const bounds = calculateBounds(i, sortedColumns, containerWidth, containerHeight, scrollLeft, sidebarWidth);
       await invoke('create_column_webview', {
         args: {
           column,
@@ -65,11 +67,12 @@ export function useColumns() {
     const containerHeight = containerRef.current.clientHeight;
     const containerWidth = containerRef.current.clientWidth;
     const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
-    const currentColumns = useAppStore.getState().columns;
+    const { columns: currentColumns, sidebarExpanded } = useAppStore.getState();
+    const sidebarWidth = sidebarExpanded ? 70 : 40;
     const sortedColumns = [...currentColumns].sort((a, b) => a.order - b.order);
 
     for (let i = 0; i < sortedColumns.length; i++) {
-      const bounds = calculateBounds(i, sortedColumns, containerWidth, containerHeight, scrollLeft);
+      const bounds = calculateBounds(i, sortedColumns, containerWidth, containerHeight, scrollLeft, sidebarWidth);
       await invoke('resize_column_webview', {
         bounds: { columnId: sortedColumns[i].id, ...bounds },
       }).catch(console.error);
@@ -85,7 +88,9 @@ export function useColumns() {
     const containerHeight = containerRef.current.clientHeight;
     const containerWidth = containerRef.current.clientWidth;
     const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
-    const bounds = calculateBounds(orderedColumns.length - 1, orderedColumns, containerWidth, containerHeight, scrollLeft);
+    const { sidebarExpanded } = useAppStore.getState();
+    const sidebarWidth = sidebarExpanded ? 70 : 40;
+    const bounds = calculateBounds(orderedColumns.length - 1, orderedColumns, containerWidth, containerHeight, scrollLeft, sidebarWidth);
 
     await invoke('create_column_webview', {
       args: {
