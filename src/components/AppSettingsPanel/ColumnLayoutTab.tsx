@@ -1,9 +1,10 @@
 import React, { useState, useCallback } from "react";
-import type { Column } from "../../types";
+import type { Account, Column } from "../../types";
 import styles from "./ColumnLayoutTab.module.scss";
 
 interface ColumnLayoutTabProps {
   columns: Column[];
+  accounts: Account[];
   onApply: (columns: Column[]) => void;
   onCancel: () => void;
 }
@@ -13,8 +14,19 @@ interface CellKey {
   col: number;
 }
 
+function getPageLabel(col: Column): string {
+  switch (col.pageType) {
+    case "home": return col.homeTabName ?? "ホーム";
+    case "notifications": return "通知";
+    case "search": return `検索: ${col.searchQuery ?? ""}`;
+    case "list": return "リスト";
+    case "custom": return "カスタム";
+  }
+}
+
 export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
   columns,
+  accounts,
   onApply,
   onCancel,
 }) => {
@@ -88,7 +100,10 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
     []
   );
 
-  const getColumnLabel = (col: Column) => col.label ?? col.pageType;
+  const getColumnLabel = (col: Column) => {
+    const account = accounts.find((a) => a.id === col.accountId);
+    return col.label ?? `${account?.label ?? col.accountId} - ${getPageLabel(col)}`;
+  };
 
   return (
     <div className={styles.container}>

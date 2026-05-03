@@ -271,6 +271,7 @@ const App: React.FC = () => {
         <AppSettingsPanel
           settings={globalSettings}
           columns={columns}
+          accounts={accounts}
           onApply={updateGlobalSettings}
           onApplyLayout={(updatedColumns) => {
             replaceColumns(updatedColumns);

@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import type { GlobalSettings, Column } from "../../types";
+import type { GlobalSettings, Column, Account } from "../../types";
 import { ColumnLayoutTab } from "./ColumnLayoutTab";
 import styles from "./AppSettingsPanel.module.scss";
 
 interface AppSettingsPanelProps {
   settings: GlobalSettings;
   columns: Column[];
+  accounts: Account[];
   onApply: (patch: Partial<GlobalSettings>) => void;
   onApplyLayout: (columns: Column[]) => void;
   onClose: () => void;
@@ -14,6 +15,7 @@ interface AppSettingsPanelProps {
 export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   settings,
   columns,
+  accounts,
   onApply,
   onApplyLayout,
   onClose,
@@ -137,6 +139,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
           {activeTab === "layout" && (
             <ColumnLayoutTab
               columns={columns}
+              accounts={accounts}
               onApply={(updatedColumns) => {
                 onApplyLayout(updatedColumns);
                 onClose();
