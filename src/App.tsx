@@ -1,7 +1,7 @@
 // src/App.tsx
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useAppStore } from "./store/useAppStore";
-import { useColumns } from "./hooks/useColumns";
+import { useColumns, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_EXPANDED_WIDTH } from "./hooks/useColumns";
 import { useAccounts } from "./hooks/useAccounts";
 import { ColumnHeader } from "./components/ColumnHeader/ColumnHeader";
 import { AddColumnDialog } from "./components/AddColumnDialog/AddColumnDialog";
@@ -32,6 +32,8 @@ const App: React.FC = () => {
   } = useColumns();
   const { startAddAccount, removeAccount } = useAccounts();
 
+  const sidebarWidth = sidebarExpanded ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
+
   const scrollbarWidth = useMemo(() => {
     return columns.reduce((sum, c) => sum + c.width, 0);
   }, [columns]);
@@ -47,7 +49,7 @@ const App: React.FC = () => {
   // isLoaded が true になった（= DOM レンダリング完了後）タイミングで WebView を復元
   useEffect(() => {
     if (isLoaded) {
-      restoreColumns();
+      restoreColumns(sidebarWidth);
     }
   }, [isLoaded]);
 

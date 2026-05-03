@@ -37,14 +37,13 @@ export function useColumns() {
   }, []);
 
   // 全カラムのWebViewを作成（起動時に呼ぶ）
-  const restoreColumns = useCallback(async () => {
+  const restoreColumns = useCallback(async (sidebarWidth: number) => {
     if (!containerRef.current) return;
     const containerWidth = containerRef.current.clientWidth;
     const containerHeight = containerRef.current.clientHeight;
     const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
     // loadSettings() 完了後に呼ばれるため、ストアから直接最新値を取得する
-    const { columns: currentColumns, accounts: currentAccounts, sidebarExpanded } = useAppStore.getState();
-    const sidebarWidth = sidebarExpanded ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
+    const { columns: currentColumns, accounts: currentAccounts } = useAppStore.getState();
     const sortedColumns = [...currentColumns].sort((a, b) => a.order - b.order);
 
     for (let i = 0; i < sortedColumns.length; i++) {
