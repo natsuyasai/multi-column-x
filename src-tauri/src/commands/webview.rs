@@ -2,6 +2,7 @@ use super::settings::ColumnData;
 use crate::inject::build_init_script;
 use crate::state::AppState;
 use std::path::PathBuf;
+use std::time::Duration;
 use tauri::{
     AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewBuilder, WebviewUrl,
 };
@@ -232,6 +233,7 @@ pub async fn switch_popup_session(
         let pos = window.outer_position().ok();
         let size = window.outer_size().ok();
         window.close().map_err(|e| e.to_string())?;
+        tokio::time::sleep(Duration::from_millis(150)).await;
         (pos, size)
     } else {
         (None, None)
