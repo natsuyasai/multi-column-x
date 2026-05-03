@@ -41,10 +41,15 @@ const App: React.FC = () => {
   const [settingsColumnId, setSettingsColumnId] = useState<string | null>(null);
 
   useEffect(() => {
-    loadSettings().then(() => {
-      restoreColumns();
-    });
+    loadSettings();
   }, []);
+
+  // isLoaded が true になった（= DOM レンダリング完了後）タイミングで WebView を復元
+  useEffect(() => {
+    if (isLoaded) {
+      restoreColumns();
+    }
+  }, [isLoaded]);
 
   // WebView 内の横ホイールを受け取ってスクロールバーを動かす
   useEffect(() => {

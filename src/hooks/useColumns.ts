@@ -43,8 +43,8 @@ export function useColumns() {
     const containerHeight = containerRef.current.clientHeight;
     const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
     // loadSettings() 完了後に呼ばれるため、ストアから直接最新値を取得する
-    const { columns: currentColumns, accounts: currentAccounts } = useAppStore.getState();
-    const sidebarWidth = containerRef.current.offsetLeft;
+    const { columns: currentColumns, accounts: currentAccounts, sidebarExpanded } = useAppStore.getState();
+    const sidebarWidth = sidebarExpanded ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
     const sortedColumns = [...currentColumns].sort((a, b) => a.order - b.order);
 
     for (let i = 0; i < sortedColumns.length; i++) {
@@ -69,8 +69,8 @@ export function useColumns() {
     const containerHeight = containerRef.current.clientHeight;
     const containerWidth = containerRef.current.clientWidth;
     const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
-    const { columns: currentColumns } = useAppStore.getState();
-    const sidebarWidth = containerRef.current.offsetLeft;
+    const { columns: currentColumns, sidebarExpanded } = useAppStore.getState();
+    const sidebarWidth = sidebarExpanded ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
     const sortedColumns = [...currentColumns].sort((a, b) => a.order - b.order);
 
     for (let i = 0; i < sortedColumns.length; i++) {
@@ -90,7 +90,8 @@ export function useColumns() {
     const containerHeight = containerRef.current.clientHeight;
     const containerWidth = containerRef.current.clientWidth;
     const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
-    const sidebarWidth = containerRef.current.offsetLeft;
+    const { sidebarExpanded } = useAppStore.getState();
+    const sidebarWidth = sidebarExpanded ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
     const bounds = calculateBounds(orderedColumns.length - 1, orderedColumns, containerWidth, containerHeight, scrollLeft, sidebarWidth);
 
     await invoke('create_column_webview', {
