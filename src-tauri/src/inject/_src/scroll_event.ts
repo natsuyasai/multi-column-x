@@ -8,9 +8,17 @@
     function (e: WheelEvent) {
       const deltaX = e.deltaX;
       const deltaY = e.deltaY;
-      const delta = Math.abs(deltaX) >= Math.abs(deltaY) ? deltaX : 0;
+
+      let delta: number;
+      if (e.shiftKey) {
+        // Shift+縦スクロールを横スクロールとして扱う
+        delta = Math.abs(deltaY) > Math.abs(deltaX) ? deltaY : deltaX;
+      } else {
+        delta = Math.abs(deltaX) >= Math.abs(deltaY) ? deltaX : 0;
+      }
       if (delta === 0) return;
 
+      e.preventDefault();
       accumulatedDelta += delta;
 
       if (!ticking) {
@@ -27,6 +35,6 @@
         });
       }
     },
-    { passive: true },
+    { capture: true, passive: false },
   );
 })();
