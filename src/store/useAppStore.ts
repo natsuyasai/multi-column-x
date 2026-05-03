@@ -77,20 +77,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   moveColumn: (columnId, direction) => {
-    const { columns } = get();
-    const sorted = [...columns].sort((a, b) => a.order - b.order);
-    const idx = sorted.findIndex((c) => c.id === columnId);
-    const neighborIdx = direction === 'left' ? idx - 1 : idx + 1;
-    if (neighborIdx < 0 || neighborIdx >= sorted.length) return;
-    const target = sorted[idx];
-    const neighbor = sorted[neighborIdx];
-    set((state) => ({
-      columns: state.columns.map((c) => {
-        if (c.id === target.id) return { ...c, order: neighbor.order };
-        if (c.id === neighbor.id) return { ...c, order: target.order };
-        return c;
-      }),
-    }));
+    set((state) => {
+      const sorted = [...state.columns].sort((a, b) => a.order - b.order);
+      const idx = sorted.findIndex((c) => c.id === columnId);
+      const neighborIdx = direction === 'left' ? idx - 1 : idx + 1;
+      if (neighborIdx < 0 || neighborIdx >= sorted.length) return state;
+      [sorted[idx], sorted[neighborIdx]] = [sorted[neighborIdx], sorted[idx]];
+      const reordered = sorted.map((c, i) => ({ ...c, order: i }));
+      return { columns: reordered };
+    });
     get().saveSettings();
   },
 }));
