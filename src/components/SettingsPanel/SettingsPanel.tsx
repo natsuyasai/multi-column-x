@@ -118,6 +118,21 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               />
               ヘッダー・投稿欄を非表示にする
             </label>
+            {settings.areaRemoveEnabled && (
+              <label className={styles.checkLabel}>
+                <input
+                  type="checkbox"
+                  checked={settings.showCustomMenu}
+                  onChange={(e) =>
+                    setSettings((s) => ({
+                      ...s,
+                      showCustomMenu: e.target.checked,
+                    }))
+                  }
+                />
+                カスタムメニューボタンを表示する
+              </label>
+            )}
           </section>
 
           <section className={styles.section}>

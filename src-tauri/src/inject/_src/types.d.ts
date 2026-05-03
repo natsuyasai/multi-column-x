@@ -9,6 +9,7 @@ interface TwitterViewerAPI {
 
 interface TwitterViewerConfig {
   areaRemoveEnabled: boolean;
+  showCustomMenu: boolean;
   visibleLinks: string[];
 }
 

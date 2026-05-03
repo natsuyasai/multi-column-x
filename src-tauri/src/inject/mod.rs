@@ -2,6 +2,7 @@
 
 pub fn build_init_script(
     area_remove_enabled: bool,
+    show_custom_menu: bool,
     auto_reload_enabled: bool,
     custom_css: &str,
     visible_links: &[String],
@@ -16,8 +17,9 @@ pub fn build_init_script(
 
     let visible_links_json = serde_json::to_string(visible_links).unwrap_or_else(|_| "[]".to_string());
     let config = format!(
-        "window.__twitterViewerConfig = {{ areaRemoveEnabled: {}, visibleLinks: {} }};",
+        "window.__twitterViewerConfig = {{ areaRemoveEnabled: {}, showCustomMenu: {}, visibleLinks: {} }};",
         area_remove_enabled,
+        show_custom_menu,
         visible_links_json
     );
 

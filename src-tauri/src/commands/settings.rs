@@ -24,6 +24,9 @@ pub struct ColumnSettings {
     pub show_countdown: bool,
     #[serde(rename = "areaRemoveEnabled")]
     pub area_remove_enabled: bool,
+    #[serde(rename = "showCustomMenu")]
+    #[serde(default = "default_true")]
+    pub show_custom_menu: bool,
     #[serde(rename = "customCSS")]
     pub custom_css: String,
     #[serde(rename = "visibleLinks")]

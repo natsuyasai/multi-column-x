@@ -13,6 +13,7 @@ export interface ColumnSettings {
   autoReloadInterval: number; // 秒
   showCountdown: boolean;
   areaRemoveEnabled: boolean;
+  showCustomMenu: boolean;
   customCSS: string;
   visibleLinks: string[];
 }
@@ -54,9 +55,10 @@ export interface AppSettings {
 
 export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
   autoReloadEnabled: true,
-  autoReloadInterval: 60,
+  autoReloadInterval: 600,
   showCountdown: true,
   areaRemoveEnabled: true,
+  showCustomMenu: true,
   customCSS: "",
   visibleLinks: [],
 };
