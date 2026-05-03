@@ -30,12 +30,22 @@ interface TauriInternals {
   metadata?: TauriInternalsMetadata;
 }
 
+interface TvAccountInfo {
+  id: string;
+  label: string;
+  color: string;
+  dataDirectory: string;
+}
+
 declare global {
   interface Window {
     __twitterViewer: TwitterViewerAPI;
     __twitterViewerConfig?: TwitterViewerConfig;
     __TAURI__?: TauriGlobal;
     __TAURI_INTERNALS__?: TauriInternals;
+    __tvAccountList?: TvAccountInfo[];
+    __tvAccounts?: TvAccountInfo[];
+    __tvCurrentAccountId?: string;
   }
 }
 

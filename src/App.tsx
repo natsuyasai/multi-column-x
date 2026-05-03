@@ -60,6 +60,15 @@ const App: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    window.__tvAccountList = accounts.map((a) => ({
+      id: a.id,
+      label: a.label,
+      color: a.color,
+      dataDirectory: a.dataDirectory,
+    }));
+  }, [accounts]);
+
   // ダイアログ表示中は列WebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
   const dialogOpen = showAddColumn || showAccountManager || !!settingsColumnId;
   useEffect(() => {
