@@ -3,19 +3,24 @@
   const accounts: TvAccountInfo[] = window.__tvAccounts ?? [];
   const currentAccountId: string = window.__tvCurrentAccountId ?? "";
 
+  if (document.getElementById("tv-popup-toolbar")) return;
+
   if (accounts.length === 0) return;
 
   function tauriInvoke(cmd: string, args: Record<string, unknown>): void {
     const invoke =
       window.__TAURI__?.core?.invoke ?? window.__TAURI__?.invoke;
     if (invoke) {
-      invoke(cmd, args);
+      invoke(cmd, args).catch(function (err: unknown) {
+        console.error("[popup_toolbar]", err);
+      });
     }
   }
 
   const TOOLBAR_HEIGHT = 40;
 
   const toolbar = document.createElement("div");
+  toolbar.id = "tv-popup-toolbar";
   toolbar.style.cssText = [
     "position: fixed",
     "top: 0",

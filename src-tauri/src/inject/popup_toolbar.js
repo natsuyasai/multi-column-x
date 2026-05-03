@@ -1,19 +1,19 @@
 (function() {
   const accounts = window.__tvAccounts ?? [];
   const currentAccountId = window.__tvCurrentAccountId ?? "";
-
+  if (document.getElementById("tv-popup-toolbar")) return;
   if (accounts.length === 0) return;
-
   function tauriInvoke(cmd, args) {
     const invoke = window.__TAURI__?.core?.invoke ?? window.__TAURI__?.invoke;
     if (invoke) {
-      invoke(cmd, args);
+      invoke(cmd, args).catch(function(err) {
+        console.error("[popup_toolbar]", err);
+      });
     }
   }
-
   const TOOLBAR_HEIGHT = 40;
-
   const toolbar = document.createElement("div");
+  toolbar.id = "tv-popup-toolbar";
   toolbar.style.cssText = [
     "position: fixed",
     "top: 0",
@@ -31,11 +31,9 @@
     "font-size: 13px",
     "color: #e7e9ea"
   ].join(";");
-
   const label = document.createElement("span");
   label.textContent = "アカウント: ";
   label.style.cssText = "margin-right: 8px; white-space: nowrap;";
-
   const select = document.createElement("select");
   select.style.cssText = [
     "background: #253341",
@@ -47,8 +45,7 @@
     "cursor: pointer",
     "max-width: 200px"
   ].join(";");
-
-  accounts.forEach(function(account) {
+  accounts.forEach((account) => {
     const option = document.createElement("option");
     option.value = account.id;
     option.textContent = account.label;
@@ -57,10 +54,9 @@
     }
     select.appendChild(option);
   });
-
   select.addEventListener("change", function() {
     const selectedId = select.value;
-    const selectedAccount = accounts.find(function(a) { return a.id === selectedId; });
+    const selectedAccount = accounts.find((a) => a.id === selectedId);
     if (!selectedAccount) return;
     const popupLabel = window.__TAURI_INTERNALS__?.metadata?.currentWebview?.label ?? "";
     tauriInvoke("switch_popup_session", {
@@ -71,10 +67,8 @@
       accounts
     });
   });
-
   toolbar.appendChild(label);
   toolbar.appendChild(select);
-
   function inject() {
     if (document.body) {
       document.body.style.paddingTop = TOOLBAR_HEIGHT + "px";
@@ -86,6 +80,5 @@
       });
     }
   }
-
   inject();
 })();
