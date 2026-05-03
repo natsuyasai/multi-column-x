@@ -1,6 +1,7 @@
 (function() {
   const accounts = window.__tvAccounts ?? [];
   const currentAccountId = window.__tvCurrentAccountId ?? "";
+  const targetHref = window.__tvTargetHref ?? "";
   if (document.getElementById("tv-popup-toolbar")) return;
   if (accounts.length === 0) return;
   function tauriInvoke(cmd, args) {
@@ -69,13 +70,56 @@
   toolbar.appendChild(label);
   toolbar.appendChild(select);
   function inject() {
-    if (document.body) {
+    const doInject = () => {
       document.body.appendChild(toolbar);
+    };
+    if (document.body) {
+      doInject();
     } else {
-      document.addEventListener("DOMContentLoaded", function() {
-        document.body.appendChild(toolbar);
-      });
+      document.addEventListener("DOMContentLoaded", doInject);
     }
   }
   inject();
+
+  // targetHref と一致する <a> をページロード後に自動クリックする
+  if (!targetHref) return;
+
+  function normalizeHref(href) {
+    if (!href) return "";
+    try {
+      return new URL(href, "https://x.com").pathname + new URL(href, "https://x.com").search;
+    } catch {
+      return href;
+    }
+  }
+
+  function tryClick(root) {
+    const targetPath = normalizeHref(targetHref);
+    const links = root.querySelectorAll("a[href]");
+    for (const link of links) {
+      if (normalizeHref(link.getAttribute("href")) === targetPath) {
+        link.click();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function watchAndClick() {
+    if (tryClick(document)) return;
+    const observer = new MutationObserver(function() {
+      if (tryClick(document)) {
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    // 10秒後に諦める
+    setTimeout(function() { observer.disconnect(); }, 10000);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", watchAndClick);
+  } else {
+    watchAndClick();
+  }
 })();

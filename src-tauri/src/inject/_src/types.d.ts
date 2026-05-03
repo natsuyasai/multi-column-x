@@ -45,6 +45,7 @@ declare global {
     __TAURI_INTERNALS__?: TauriInternals;
     __tvAccounts?: TvAccountInfo[];
     __tvCurrentAccountId?: string;
+    __tvTargetHref?: string;
   }
 }
 

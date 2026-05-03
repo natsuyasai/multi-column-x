@@ -2,6 +2,7 @@
 (function () {
   const accounts: TvAccountInfo[] = window.__tvAccounts ?? [];
   const currentAccountId: string = window.__tvCurrentAccountId ?? "";
+  const targetHref: string = window.__tvTargetHref ?? "";
 
   if (document.getElementById("tv-popup-toolbar")) return;
 
@@ -95,4 +96,45 @@
   }
 
   inject();
+
+  // targetHref と一致する <a> をページロード後に自動クリックする
+  if (!targetHref) return;
+
+  function normalizeHref(href: string): string {
+    try {
+      const u = new URL(href, "https://x.com");
+      return u.pathname + u.search;
+    } catch {
+      return href;
+    }
+  }
+
+  function tryClick(root: Document): boolean {
+    const targetPath = normalizeHref(targetHref);
+    const links = root.querySelectorAll<HTMLAnchorElement>("a[href]");
+    for (const link of links) {
+      if (normalizeHref(link.getAttribute("href") ?? "") === targetPath) {
+        link.click();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function watchAndClick(): void {
+    if (tryClick(document)) return;
+    const observer = new MutationObserver(() => {
+      if (tryClick(document)) {
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    setTimeout(() => observer.disconnect(), 10000);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", watchAndClick);
+  } else {
+    watchAndClick();
+  }
 })();

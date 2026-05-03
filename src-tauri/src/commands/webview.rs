@@ -169,7 +169,7 @@ pub async fn open_popup_window(
     };
 
     let accounts_json = load_accounts_json(&app);
-    let popup_init = crate::inject::build_popup_init_script(&accounts_json, &current_account_id);
+    let popup_init = crate::inject::build_popup_init_script(&accounts_json, &current_account_id, &url);
 
     let popup_label = format!("popup-{}", uuid::Uuid::new_v4());
 
@@ -235,7 +235,7 @@ pub async fn switch_popup_session(
     let data_dir = PathBuf::from(&dataDirectory);
 
     let accounts_json = load_accounts_json(&app);
-    let popup_init = crate::inject::build_popup_init_script(&accounts_json, &accountId);
+    let popup_init = crate::inject::build_popup_init_script(&accounts_json, &accountId, &url);
 
     let mut builder = tauri::WebviewWindowBuilder::new(
         &app,
@@ -277,7 +277,7 @@ pub async fn open_compose_window(
     let data_dir = std::path::PathBuf::from(&dataDirectory);
 
     let accounts_json = load_accounts_json(&app);
-    let popup_init = crate::inject::build_popup_init_script(&accounts_json, &accountId);
+    let popup_init = crate::inject::build_popup_init_script(&accounts_json, &accountId, "");
 
     let compose_label = format!("compose-{}", uuid::Uuid::new_v4());
 
