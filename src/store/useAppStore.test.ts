@@ -23,6 +23,9 @@ const mockColumn: Column = {
   homeTabName: "フォロー中",
   width: 350,
   order: 0,
+  gridRow: 1,
+  gridCol: 1,
+  heightMode: "auto",
   settings: {
     autoReloadEnabled: true,
     autoReloadInterval: 60,

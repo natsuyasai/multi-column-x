@@ -29,6 +29,11 @@ export interface Column {
   order: number;
   label?: string;
   settings: ColumnSettings;
+  gridRow: number;
+  gridCol: number;
+  heightMode: "auto" | "fixed";
+  heightValue?: number;
+  heightUnit?: "px" | "%";
 }
 
 export interface GlobalSettings {
