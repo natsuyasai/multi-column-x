@@ -5,15 +5,7 @@ use std::path::PathBuf;
 use tauri::{
     AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewBuilder, WebviewUrl,
 };
-
-#[derive(serde::Deserialize, serde::Serialize)]
-pub struct AccountInfo {
-    pub id: String,
-    pub label: String,
-    pub color: String,
-    #[serde(rename = "dataDirectory")]
-    pub data_directory: String,
-}
+use tauri_plugin_store::StoreExt;
 
 fn webview_label(column_id: &str) -> String {
     format!("column-{}", column_id)
@@ -135,12 +127,31 @@ pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Resu
     Ok(())
 }
 
+fn load_accounts_json(app: &AppHandle) -> String {
+    app.store("settings.json")
+        .ok()
+        .and_then(|store| store.get("appSettings"))
+        .and_then(|v| v.get("accounts").cloned())
+        .and_then(|accounts| {
+            let arr = accounts.as_array()?;
+            let infos: Vec<serde_json::Value> = arr.iter().filter_map(|a| {
+                Some(serde_json::json!({
+                    "id": a.get("id")?.as_str()?,
+                    "label": a.get("label")?.as_str()?,
+                    "color": a.get("color")?.as_str()?,
+                    "dataDirectory": a.get("dataDirectory")?.as_str()?,
+                }))
+            }).collect();
+            serde_json::to_string(&infos).ok()
+        })
+        .unwrap_or_else(|| "[]".to_string())
+}
+
 #[tauri::command]
 pub async fn open_popup_window(
     app: AppHandle,
     webview_label_caller: String,
     url: String,
-    accounts: Vec<AccountInfo>,
 ) -> Result<(), String> {
     let state = app.state::<AppState>();
     let (data_dir, current_account_id) = {
@@ -156,10 +167,10 @@ pub async fn open_popup_window(
         (data_dir, account_id)
     };
 
-    let popup_label = format!("popup-{}", uuid::Uuid::new_v4());
-
-    let accounts_json = serde_json::to_string(&accounts).unwrap_or_else(|_| "[]".to_string());
+    let accounts_json = load_accounts_json(&app);
     let popup_init = crate::inject::build_popup_init_script(&accounts_json, &current_account_id);
+
+    let popup_label = format!("popup-{}", uuid::Uuid::new_v4());
 
     const POPUP_WIDTH: f64 = 900.0;
     const POPUP_HEIGHT: f64 = 700.0;
@@ -210,7 +221,6 @@ pub struct SwitchPopupSessionArgs {
     #[serde(rename = "dataDirectory")]
     pub data_directory: String,
     pub url: String,
-    pub accounts: Vec<AccountInfo>,
 }
 
 #[tauri::command]
@@ -230,7 +240,7 @@ pub async fn switch_popup_session(
     let new_label = format!("popup-{}", uuid::Uuid::new_v4());
     let data_dir = PathBuf::from(&args.data_directory);
 
-    let accounts_json = serde_json::to_string(&args.accounts).unwrap_or_else(|_| "[]".to_string());
+    let accounts_json = load_accounts_json(&app);
     let popup_init = crate::inject::build_popup_init_script(&accounts_json, &args.account_id);
 
     let mut builder = tauri::WebviewWindowBuilder::new(

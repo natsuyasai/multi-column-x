@@ -43,7 +43,6 @@ declare global {
     __twitterViewerConfig?: TwitterViewerConfig;
     __TAURI__?: TauriGlobal;
     __TAURI_INTERNALS__?: TauriInternals;
-    __tvAccountList?: TvAccountInfo[];
     __tvAccounts?: TvAccountInfo[];
     __tvCurrentAccountId?: string;
   }

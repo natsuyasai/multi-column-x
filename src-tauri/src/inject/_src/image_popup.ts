@@ -39,11 +39,9 @@
         const label =
           window.__TAURI_INTERNALS__?.metadata?.currentWebview?.label ??
           "unknown";
-        const accounts = window.__tvAccountList ?? [];
         tauriInvoke("open_popup_window", {
           webviewLabelCaller: label,
           url: resolveAbsolute(href),
-          accounts,
         });
       }
     },
