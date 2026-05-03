@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { useAppStore } from "./useAppStore";
+import { useAppStore, migrateColumn } from "./useAppStore";
 import type { Account, Column } from "../types";
 
 // Mock invoke from @tauri-apps/api/core
@@ -96,5 +96,47 @@ describe("useAppStore", () => {
       result.current.updateColumn("col-1", { width: 400 });
     });
     expect(result.current.columns[0].width).toBe(400);
+  });
+});
+
+describe("migrateColumn", () => {
+  it("gridフィールドがない既存カラムにデフォルト値を補完する", () => {
+    const legacy = {
+      id: "col-1",
+      accountId: "acc-1",
+      pageType: "home" as const,
+      width: 350,
+      order: 2,
+      settings: {
+        autoReloadEnabled: true,
+        autoReloadInterval: 60,
+        showCountdown: true,
+        areaRemoveEnabled: true,
+        customCSS: "",
+        visibleLinks: [],
+      },
+    };
+    const result = migrateColumn(legacy as Column);
+    expect(result.gridRow).toBe(1);
+    expect(result.gridCol).toBe(3); // order + 1
+    expect(result.heightMode).toBe("auto");
+    expect(result.heightValue).toBeUndefined();
+    expect(result.heightUnit).toBeUndefined();
+  });
+
+  it("gridフィールドがある新しいカラムはそのまま返す", () => {
+    const col: Column = {
+      ...mockColumn,
+      gridRow: 2,
+      gridCol: 3,
+      heightMode: "fixed",
+      heightValue: 400,
+      heightUnit: "px",
+    };
+    const result = migrateColumn(col);
+    expect(result.gridRow).toBe(2);
+    expect(result.gridCol).toBe(3);
+    expect(result.heightMode).toBe("fixed");
+    expect(result.heightValue).toBe(400);
   });
 });

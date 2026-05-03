@@ -1,4 +1,5 @@
 /// <reference types="vitest/globals" />
+import { vi } from "vitest";
 import "@testing-library/jest-dom";
 
 // Tauri APIをモック
