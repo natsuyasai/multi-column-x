@@ -78,7 +78,7 @@ const App: React.FC = () => {
     return () => {
       unlisten.then((fn) => fn());
     };
-  }, []);
+  }, [scrollbarRef]);
 
   // ダイアログ表示中は列WebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
   const dialogOpen = showAddColumn || showAccountManager || showAppSettings || !!settingsColumnId;
@@ -156,6 +156,11 @@ const App: React.FC = () => {
     [updateGlobalSettings],
   );
 
+  const sortedColumns = useMemo(
+    () => [...columns].sort((a, b) => a.order - b.order),
+    [columns],
+  );
+
   if (!isLoaded) {
     return (
       <div className={styles.loading}>
@@ -183,8 +188,7 @@ const App: React.FC = () => {
           const account = accounts.find((a) => a.id === column.accountId);
           const bounds = columnBounds[column.id];
           if (!account || !bounds) return null;
-          const sorted = [...columns].sort((a, b) => a.order - b.order);
-          const idx = sorted.findIndex((c) => c.id === column.id);
+          const idx = sortedColumns.findIndex((c) => c.id === column.id);
           return (
             <div
               key={column.id}
@@ -204,7 +208,7 @@ const App: React.FC = () => {
                 onSettings={setSettingsColumnId}
                 onClose={handleRemoveColumn}
                 isFirst={idx === 0}
-                isLast={idx === sorted.length - 1}
+                isLast={idx === sortedColumns.length - 1}
               />
             </div>
           );

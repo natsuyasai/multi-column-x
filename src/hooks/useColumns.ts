@@ -99,7 +99,6 @@ export function useColumns() {
     moveColumn,
   } = useAppStore();
   const containerRef = useRef<HTMLDivElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null); // ヘッダースクロールコンテナ
   const scrollbarRef = useRef<HTMLDivElement>(null); // 下部スクロールバーコンテナ
   const [columnBounds, setColumnBounds] = useState<Record<string, ColumnBounds>>({});
 
@@ -107,8 +106,7 @@ export function useColumns() {
   const recalculateAllBounds = useCallback(async () => {
     if (!containerRef.current) return;
     const containerHeight = containerRef.current.clientHeight;
-    const containerWidth = containerRef.current.clientWidth;
-    const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
+    const scrollLeft = scrollbarRef.current?.scrollLeft ?? 0;
     const { columns: currentColumns, sidebarExpanded } = useAppStore.getState();
     const sidebarWidth = sidebarExpanded
       ? SIDEBAR_EXPANDED_WIDTH
@@ -137,9 +135,8 @@ export function useColumns() {
   const restoreColumns = useCallback(
     async (sidebarWidth: number) => {
       if (!containerRef.current) return;
-      const containerWidth = containerRef.current.clientWidth;
       const containerHeight = containerRef.current.clientHeight;
-      const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
+      const scrollLeft = scrollbarRef.current?.scrollLeft ?? 0;
       // loadSettings() 完了後に呼ばれるため、ストアから直接最新値を取得する
       const { columns: currentColumns, accounts: currentAccounts } =
         useAppStore.getState();
@@ -180,7 +177,7 @@ export function useColumns() {
       addColumn(column);
 
       const containerHeight = containerRef.current.clientHeight;
-      const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
+      const scrollLeft = scrollbarRef.current?.scrollLeft ?? 0;
       const { sidebarExpanded, columns: updatedColumns } = useAppStore.getState();
       const sidebarWidth = sidebarExpanded
         ? SIDEBAR_EXPANDED_WIDTH
@@ -267,19 +264,8 @@ export function useColumns() {
     };
   }, [recalculateAllBounds]);
 
-  // ヘッダースクロール → WebView 追従 + 下部スクロールバー同期
-  const handleHeaderScroll = useCallback(() => {
-    recalculateAllBounds();
-    if (scrollbarRef.current && scrollRef.current) {
-      scrollbarRef.current.scrollLeft = scrollRef.current.scrollLeft;
-    }
-  }, [recalculateAllBounds]);
-
-  // 下部スクロールバー操作 → ヘッダースクロール同期 + WebView 追従
+  // 下部スクロールバー操作 → WebView 追従
   const handleScrollbarScroll = useCallback(() => {
-    if (scrollRef.current && scrollbarRef.current) {
-      scrollRef.current.scrollLeft = scrollbarRef.current.scrollLeft;
-    }
     recalculateAllBounds();
   }, [recalculateAllBounds]);
 
@@ -287,7 +273,6 @@ export function useColumns() {
     columns,
     columnBounds,
     containerRef,
-    scrollRef,
     scrollbarRef,
     restoreColumns,
     handleAddColumn,
@@ -296,7 +281,6 @@ export function useColumns() {
     handleUpdateColumn,
     recalculateAllBounds,
     hideColumnWebviews,
-    handleHeaderScroll,
     handleScrollbarScroll,
   };
 }
