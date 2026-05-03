@@ -13,6 +13,7 @@
   flex: 1;
   overflow: hidden;
   min-width: 0;
+  position: relative;
 }
 
 .loading {
@@ -25,34 +26,10 @@
   font-size: 14px;
 }
 
-.headerRow {
-  display: flex;
-  align-items: stretch;
-  height: 36px;
-  flex-shrink: 0;
-  border-bottom: 1px solid #1a1a1a;
-  overflow: hidden;
-}
-
-.columnHeaders {
-  display: flex;
-  flex: 1;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-  &::-webkit-scrollbar {
-    display: none;
-  }
-
-  // ツールバーの幅分スクロールできるように末尾に余白を確保
-  & > :last-child {
-    margin-right: 0;
-  }
-  &::after {
-    content: "";
-    flex-shrink: 0;
-    width: 1px;
-  }
+.columnHeaderWrapper {
+  position: absolute;
+  z-index: 10;
+  pointer-events: auto;
 }
 
 .webviewArea {
