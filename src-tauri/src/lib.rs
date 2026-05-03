@@ -13,35 +13,32 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .manage(AppState::new())
         .setup(|app| {
+            use crate::commands::settings::AppSettingsData;
             let store = app.store("settings.json").map_err(|e| e.to_string())?;
-            if let Some(value) = store.get("appSettings") {
-                if let Some(bounds) = value
-                    .get("globalSettings")
-                    .and_then(|gs| gs.get("windowBounds"))
-                {
-                    let x = bounds.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
-                    let y = bounds.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
-                    let w = bounds.get("width").and_then(|v| v.as_f64()).unwrap_or(1400.0);
-                    let h = bounds.get("height").and_then(|v| v.as_f64()).unwrap_or(900.0);
-
-                    if let Some(window) = app.get_webview_window("main") {
-                        let monitors = window.available_monitors().unwrap_or_default();
-                        let on_screen = monitors.iter().any(|m| {
-                            let pos = m.position();
-                            let size = m.size();
-                            x >= pos.x as f64
-                                && y >= pos.y as f64
-                                && x < (pos.x as f64 + size.width as f64)
-                                && y < (pos.y as f64 + size.height as f64)
-                        });
-
-                        if on_screen {
-                            let _ = window.set_position(PhysicalPosition::new(x as i32, y as i32));
-                        }
-                        let clamped_w = w.max(600.0) as u32;
-                        let clamped_h = h.max(400.0) as u32;
-                        let _ = window.set_size(PhysicalSize::new(clamped_w, clamped_h));
+            if let Some(settings) = store
+                .get("appSettings")
+                .and_then(|v| serde_json::from_value::<AppSettingsData>(v).ok())
+            {
+                let wb = &settings.global_settings.window_bounds;
+                if let Some(window) = app.get_webview_window("main") {
+                    let monitors = window.available_monitors().unwrap_or_default();
+                    let min_visible = 100.0_f64;
+                    let on_screen = monitors.iter().any(|m| {
+                        let pos = m.position();
+                        let size = m.size();
+                        let mx = pos.x as f64;
+                        let my = pos.y as f64;
+                        let mw = size.width as f64;
+                        let mh = size.height as f64;
+                        wb.x + min_visible > mx && wb.x < mx + mw
+                            && wb.y + min_visible > my && wb.y < my + mh
+                    });
+                    if on_screen {
+                        let _ = window.set_position(PhysicalPosition::new(wb.x as i32, wb.y as i32));
                     }
+                    let clamped_w = wb.width.max(600.0) as u32;
+                    let clamped_h = wb.height.max(400.0) as u32;
+                    let _ = window.set_size(PhysicalSize::new(clamped_w, clamped_h));
                 }
             }
             Ok(())
