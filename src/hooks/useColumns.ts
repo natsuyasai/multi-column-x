@@ -4,8 +4,10 @@ import { invoke } from '@tauri-apps/api/core';
 import { useAppStore } from '../store/useAppStore';
 import type { Column } from '../types';
 
-const HEADER_HEIGHT = 36;    // ColumnHeader の高さ（px）
-const SCROLLBAR_HEIGHT = 12; // 下部スクロールバーの高さ（px）
+const HEADER_HEIGHT = 36;            // ColumnHeader の高さ（px）
+const SCROLLBAR_HEIGHT = 12;         // 下部スクロールバーの高さ（px）
+const SIDEBAR_COLLAPSED_WIDTH = 40;  // サイドバー折りたたみ時の幅（px）
+const SIDEBAR_EXPANDED_WIDTH = 70;   // サイドバー展開時の幅（px）
 
 export function useColumns() {
   const { columns, accounts, addColumn, removeColumn, updateColumn, moveColumn } = useAppStore();
@@ -42,7 +44,7 @@ export function useColumns() {
     const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
     // loadSettings() 完了後に呼ばれるため、ストアから直接最新値を取得する
     const { columns: currentColumns, accounts: currentAccounts, sidebarExpanded } = useAppStore.getState();
-    const sidebarWidth = sidebarExpanded ? 70 : 40;
+    const sidebarWidth = sidebarExpanded ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
     const sortedColumns = [...currentColumns].sort((a, b) => a.order - b.order);
 
     for (let i = 0; i < sortedColumns.length; i++) {
@@ -68,7 +70,7 @@ export function useColumns() {
     const containerWidth = containerRef.current.clientWidth;
     const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
     const { columns: currentColumns, sidebarExpanded } = useAppStore.getState();
-    const sidebarWidth = sidebarExpanded ? 70 : 40;
+    const sidebarWidth = sidebarExpanded ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
     const sortedColumns = [...currentColumns].sort((a, b) => a.order - b.order);
 
     for (let i = 0; i < sortedColumns.length; i++) {
@@ -89,7 +91,7 @@ export function useColumns() {
     const containerWidth = containerRef.current.clientWidth;
     const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
     const { sidebarExpanded } = useAppStore.getState();
-    const sidebarWidth = sidebarExpanded ? 70 : 40;
+    const sidebarWidth = sidebarExpanded ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
     const bounds = calculateBounds(orderedColumns.length - 1, orderedColumns, containerWidth, containerHeight, scrollLeft, sidebarWidth);
 
     await invoke('create_column_webview', {
