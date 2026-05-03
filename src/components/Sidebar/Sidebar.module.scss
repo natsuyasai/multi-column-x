@@ -81,6 +81,7 @@ $transition: 200ms ease;
 }
 
 .composeTweetBtnExpanded {
+  composes: btn;
   composes: btnExpanded;
   background: #1d9bf0;
   color: #fff;
@@ -140,6 +141,7 @@ $transition: 200ms ease;
 }
 
 .toggleBtnExpanded {
+  composes: btn;
   composes: btnExpanded;
   color: #444;
 
