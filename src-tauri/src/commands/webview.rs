@@ -201,6 +201,64 @@ pub async fn report_webview_scroll(app: AppHandle, delta: f64) -> Result<(), Str
     app.emit("webview-scroll", delta).map_err(|e| e.to_string())
 }
 
+#[derive(serde::Deserialize)]
+pub struct SwitchPopupSessionArgs {
+    #[serde(rename = "popupLabel")]
+    pub popup_label: String,
+    #[serde(rename = "accountId")]
+    pub account_id: String,
+    #[serde(rename = "dataDirectory")]
+    pub data_directory: String,
+    pub url: String,
+    pub accounts: Vec<AccountInfo>,
+}
+
+#[tauri::command]
+pub async fn switch_popup_session(
+    app: AppHandle,
+    args: SwitchPopupSessionArgs,
+) -> Result<(), String> {
+    let (pos, size) = if let Some(window) = app.get_webview_window(&args.popup_label) {
+        let pos = window.outer_position().ok();
+        let size = window.outer_size().ok();
+        window.close().map_err(|e| e.to_string())?;
+        (pos, size)
+    } else {
+        (None, None)
+    };
+
+    let new_label = format!("popup-{}", uuid::Uuid::new_v4());
+    let data_dir = PathBuf::from(&args.data_directory);
+
+    let accounts_json = serde_json::to_string(&args.accounts).unwrap_or_else(|_| "[]".to_string());
+    let popup_init = crate::inject::build_popup_init_script(&accounts_json, &args.account_id);
+
+    let mut builder = tauri::WebviewWindowBuilder::new(
+        &app,
+        &new_label,
+        WebviewUrl::External(parse_url(&args.url)?),
+    )
+    .title("X - メディア")
+    .initialization_script(&popup_init)
+    .data_directory(data_dir);
+
+    if let (Some(p), Some(s)) = (pos, size) {
+        let scale = app
+            .get_window("main")
+            .and_then(|w| w.scale_factor().ok())
+            .unwrap_or(1.0);
+        builder = builder
+            .inner_size(s.width as f64 / scale, s.height as f64 / scale)
+            .position(p.x as f64 / scale, p.y as f64 / scale);
+    } else {
+        builder = builder.inner_size(900.0, 700.0);
+    }
+
+    builder.build().map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn open_in_browser(url: String) -> Result<(), String> {
     tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())

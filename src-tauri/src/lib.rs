@@ -17,6 +17,7 @@ pub fn run() {
             commands::webview::remove_column_webview,
             commands::webview::resize_column_webview,
             commands::webview::open_popup_window,
+            commands::webview::switch_popup_session,
             commands::webview::eval_in_webview,
             commands::webview::report_webview_scroll,
             commands::webview::open_in_browser,
