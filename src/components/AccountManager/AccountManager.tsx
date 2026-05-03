@@ -1,6 +1,6 @@
-import React from 'react';
-import type { Account } from '../../types';
-import styles from './AccountManager.module.scss';
+import React from "react";
+import type { Account } from "../../types";
+import styles from "./AccountManager.module.scss";
 
 interface AccountManagerProps {
   accounts: Account[];
@@ -24,7 +24,13 @@ export const AccountManager: React.FC<AccountManagerProps> = ({
       <div className={styles.panel}>
         <div className={styles.header}>
           <h2 className={styles.title}>アカウント管理</h2>
-          <button className={styles.closeBtn} onClick={onClose} aria-label="閉じる">✕</button>
+          <button
+            className={styles.closeBtn}
+            onClick={onClose}
+            aria-label="閉じる"
+          >
+            ✕
+          </button>
         </div>
 
         <div className={styles.list}>
@@ -32,7 +38,9 @@ export const AccountManager: React.FC<AccountManagerProps> = ({
             <p className={styles.empty}>アカウントがありません</p>
           )}
           {accounts.map((account) => {
-            const isDefault = account.id === defaultAccountId || (!defaultAccountId && accounts[0]?.id === account.id);
+            const isDefault =
+              account.id === defaultAccountId ||
+              (!defaultAccountId && accounts[0]?.id === account.id);
             return (
               <div key={account.id} className={styles.item}>
                 <span
@@ -41,12 +49,12 @@ export const AccountManager: React.FC<AccountManagerProps> = ({
                 />
                 <span className={styles.label}>{account.label}</span>
                 <button
-                  className={`${styles.defaultBtn}${isDefault ? ` ${styles.defaultBtnActive}` : ''}`}
+                  className={`${styles.defaultBtn}${isDefault ? ` ${styles.defaultBtnActive}` : ""}`}
                   onClick={() => onSetDefault(account.id)}
                   title="ツイート時のデフォルトアカウントに設定"
                   aria-label={`${account.label} をデフォルトに設定`}
                 >
-                  {isDefault ? '★' : '☆'}
+                  {isDefault ? "★" : "☆"}
                 </button>
                 <button
                   className={styles.removeBtn}

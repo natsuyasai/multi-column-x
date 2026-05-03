@@ -1,36 +1,32 @@
 {
-    // VS Code の IntelliSense 入力支援機能を使用して、利用可能な属性について学習してください。
-    // マウスを既存の属性の上にかざすと、その説明が表示されます。
-    // 詳細については、https://go.microsoft.com/fwlink/?linkid=830387 をご覧ください。
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Tauri Development Debug",
-            "cargo": {
-                "args": [
-                    "build",
-                    "--manifest-path=./src-tauri/Cargo.toml",
-                    "--no-default-features"
-                ]
-            },
-            // `beforeDevCommand` のタスクを使用する場合は、`.vscode/tasks.json` で設定する必要があります。
-            "preLaunchTask": "ui:dev"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Tauri Production Debug",
-            "cargo": {
-                "args": [
-                    "build",
-                    "--release",
-                    "--manifest-path=./src-tauri/Cargo.toml"
-                ]
-            },
-            // `beforeBuildCommand` のタスクを使用する場合は、`.vscode/tasks.json` で設定する必要があります。
-            "preLaunchTask": "ui:build"
-        }
-    ]
+  // VS Code の IntelliSense 入力支援機能を使用して、利用可能な属性について学習してください。
+  // マウスを既存の属性の上にかざすと、その説明が表示されます。
+  // 詳細については、https://go.microsoft.com/fwlink/?linkid=830387 をご覧ください。
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Tauri Development Debug",
+      "cargo": {
+        "args": [
+          "build",
+          "--manifest-path=./src-tauri/Cargo.toml",
+          "--no-default-features"
+        ]
+      },
+      // `beforeDevCommand` のタスクを使用する場合は、`.vscode/tasks.json` で設定する必要があります。
+      "preLaunchTask": "ui:dev"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Tauri Production Debug",
+      "cargo": {
+        "args": ["build", "--release", "--manifest-path=./src-tauri/Cargo.toml"]
+      },
+      // `beforeBuildCommand` のタスクを使用する場合は、`.vscode/tasks.json` で設定する必要があります。
+      "preLaunchTask": "ui:build"
+    }
+  ]
 }

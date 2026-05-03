@@ -29,7 +29,7 @@
 
 - アプリ起動時および アカウント追加・削除時に以下を実行する:
   ```ts
-  window.__tvAccountList = accounts.map(a => ({
+  window.__tvAccountList = accounts.map((a) => ({
     id: a.id,
     label: a.label,
     color: a.color,
@@ -127,6 +127,7 @@ pub async fn switch_popup_session(
 引数に `accounts: Vec<AccountInfo>` も追加する（ツールバー再注入のため）。
 
 処理フロー:
+
 1. `app.get_webview_window(&args.popup_label)` で現在ウィンドウを取得
 2. `outer_position()` と `outer_size()` で位置・サイズを保存
 3. 現在ウィンドウを `close()`
@@ -175,24 +176,24 @@ Rust: switch_popup_session
 
 ## エラーハンドリング
 
-| ケース | 対応 |
-|--------|------|
-| `window.__tvAccountList` が未定義 | `accounts = []` として扱い、ツールバーのドロップダウンを非表示 |
-| `switch_popup_session` 時にウィンドウがすでに閉じられていた | 新ウィンドウのみ作成して続行（エラーにしない） |
-| アカウントが1件のみ | ドロップダウンを表示するが選択肢は1件（切り替え不要だが非表示にはしない） |
-| `serde_json::to_string` 失敗 | `"[]"` にフォールバック |
+| ケース                                                      | 対応                                                                      |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `window.__tvAccountList` が未定義                           | `accounts = []` として扱い、ツールバーのドロップダウンを非表示            |
+| `switch_popup_session` 時にウィンドウがすでに閉じられていた | 新ウィンドウのみ作成して続行（エラーにしない）                            |
+| アカウントが1件のみ                                         | ドロップダウンを表示するが選択肢は1件（切り替え不要だが非表示にはしない） |
+| `serde_json::to_string` 失敗                                | `"[]"` にフォールバック                                                   |
 
 ---
 
 ## 対象ファイル一覧
 
-| ファイル | 変更種別 |
-|----------|----------|
-| `src-tauri/src/commands/webview.rs` | 変更（`open_popup_window` 引数追加、`switch_popup_session` 追加・accounts引数も含む） |
-| `src-tauri/src/lib.rs` | 変更（コマンド登録追加） |
-| `src-tauri/src/inject/_src/image_popup.ts` | 変更（accounts引数を渡す） |
-| `src-tauri/src/inject/_src/popup_toolbar.ts` | 新規 |
-| `src-tauri/src/inject/_src/types.d.ts` | 変更（`__tvAccountList`, `__tvAccounts`, `__tvCurrentAccountId` 型追加） |
-| `src-tauri/src/inject/image_popup.js` | 変更（ビルド済みJS更新） |
-| `src-tauri/src/inject/popup_toolbar.js` | 新規（ビルド済みJS） |
-| `src/App.tsx`（または適切なコンポーネント） | 変更（`__tvAccountList` の書き出し） |
+| ファイル                                     | 変更種別                                                                              |
+| -------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `src-tauri/src/commands/webview.rs`          | 変更（`open_popup_window` 引数追加、`switch_popup_session` 追加・accounts引数も含む） |
+| `src-tauri/src/lib.rs`                       | 変更（コマンド登録追加）                                                              |
+| `src-tauri/src/inject/_src/image_popup.ts`   | 変更（accounts引数を渡す）                                                            |
+| `src-tauri/src/inject/_src/popup_toolbar.ts` | 新規                                                                                  |
+| `src-tauri/src/inject/_src/types.d.ts`       | 変更（`__tvAccountList`, `__tvAccounts`, `__tvCurrentAccountId` 型追加）              |
+| `src-tauri/src/inject/image_popup.js`        | 変更（ビルド済みJS更新）                                                              |
+| `src-tauri/src/inject/popup_toolbar.js`      | 新規（ビルド済みJS）                                                                  |
+| `src/App.tsx`（または適切なコンポーネント）  | 変更（`__tvAccountList` の書き出し）                                                  |

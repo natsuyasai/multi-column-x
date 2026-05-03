@@ -81,13 +81,13 @@ SECURITYルールが現在のプロジェクトに適用されない場合（例
 
 **ルール**：HTMLを提供するすべてのエンドポイントに以下のHTTPレスポンスヘッダーが**設定されなければなりません**：
 
-| ヘッダー | 必須の値 |
-|---|---|
-| `Content-Security-Policy` | 制限的なポリシーを定義する（最低限：`default-src 'self'`） |
-| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` |
-| `X-Content-Type-Options` | `nosniff` |
-| `X-Frame-Options` | `DENY`（フレーミングが必要な場合は`SAMEORIGIN`） |
-| `Referrer-Policy` | `strict-origin-when-cross-origin` |
+| ヘッダー                    | 必須の値                                                   |
+| --------------------------- | ---------------------------------------------------------- |
+| `Content-Security-Policy`   | 制限的なポリシーを定義する（最低限：`default-src 'self'`） |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains`                      |
+| `X-Content-Type-Options`    | `nosniff`                                                  |
+| `X-Frame-Options`           | `DENY`（フレーミングが必要な場合は`SAMEORIGIN`）           |
+| `Referrer-Policy`           | `strict-origin-when-cross-origin`                          |
 
 **注**：`X-XSS-Protection`は現代のブラウザでは非推奨です。代わりに`Content-Security-Policy`を使用してください。
 
@@ -328,13 +328,13 @@ SECURITYルールが現在のプロジェクトに適用されない場合（例
 
 人間のレビュアーのために、以下はSECURITYルールをOWASP Top 10（2025）カテゴリーにマッピングします：
 
-| SECURITYルール | OWASPカテゴリー |
-|---|---|
-| SECURITY-08 | A01:2025 – アクセス制御の不備 |
-| SECURITY-09 | A02:2025 – セキュリティ設定の誤り |
-| SECURITY-10 | A03:2025 – ソフトウェアのサプライチェーン障害 |
-| SECURITY-11 | A06:2025 – 安全でない設計 |
-| SECURITY-12 | A07:2025 – 認証の不備 |
-| SECURITY-13 | A08:2025 – ソフトウェアまたはデータの整合性障害 |
-| SECURITY-14 | A09:2025 – ログとアラートの不備 |
-| SECURITY-15 | A10:2025 – 例外処理の不備 |
+| SECURITYルール | OWASPカテゴリー                                 |
+| -------------- | ----------------------------------------------- |
+| SECURITY-08    | A01:2025 – アクセス制御の不備                   |
+| SECURITY-09    | A02:2025 – セキュリティ設定の誤り               |
+| SECURITY-10    | A03:2025 – ソフトウェアのサプライチェーン障害   |
+| SECURITY-11    | A06:2025 – 安全でない設計                       |
+| SECURITY-12    | A07:2025 – 認証の不備                           |
+| SECURITY-13    | A08:2025 – ソフトウェアまたはデータの整合性障害 |
+| SECURITY-14    | A09:2025 – ログとアラートの不備                 |
+| SECURITY-15    | A10:2025 – 例外処理の不備                       |

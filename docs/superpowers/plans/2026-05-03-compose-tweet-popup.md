@@ -12,20 +12,21 @@
 
 ## ファイル構成
 
-| ファイル | 変更種別 | 内容 |
-|---|---|---|
-| `src/types/index.ts` | Modify | `GlobalSettings` に `defaultAccountId?: string` 追加 |
-| `src/components/AccountManager/AccountManager.tsx` | Modify | `onSetDefault` prop追加、★ボタンUI追加 |
-| `src/components/AccountManager/AccountManager.module.scss` | Modify | `defaultBtn` スタイル追加 |
-| `src/App.tsx` | Modify | `handleComposeTweet` 実装、AccountManager に `onSetDefault` を渡す |
-| `src-tauri/src/commands/webview.rs` | Modify | `open_compose_window` コマンド追加 |
-| `src-tauri/src/lib.rs` | Modify | `open_compose_window` をコマンド登録 |
+| ファイル                                                   | 変更種別 | 内容                                                               |
+| ---------------------------------------------------------- | -------- | ------------------------------------------------------------------ |
+| `src/types/index.ts`                                       | Modify   | `GlobalSettings` に `defaultAccountId?: string` 追加               |
+| `src/components/AccountManager/AccountManager.tsx`         | Modify   | `onSetDefault` prop追加、★ボタンUI追加                             |
+| `src/components/AccountManager/AccountManager.module.scss` | Modify   | `defaultBtn` スタイル追加                                          |
+| `src/App.tsx`                                              | Modify   | `handleComposeTweet` 実装、AccountManager に `onSetDefault` を渡す |
+| `src-tauri/src/commands/webview.rs`                        | Modify   | `open_compose_window` コマンド追加                                 |
+| `src-tauri/src/lib.rs`                                     | Modify   | `open_compose_window` をコマンド登録                               |
 
 ---
 
 ## Task 1: `GlobalSettings` に `defaultAccountId` を追加
 
 **Files:**
+
 - Modify: `src/types/index.ts`
 
 - [ ] **Step 1: `GlobalSettings` インターフェースに `defaultAccountId` を追加する**
@@ -34,7 +35,7 @@
 
 ```typescript
 export interface GlobalSettings {
-  theme: 'dark' | 'light';
+  theme: "dark" | "light";
   customCSS: string;
   windowBounds: { x: number; y: number; width: number; height: number };
   defaultAccountId?: string;
@@ -62,6 +63,7 @@ git commit -m "feat: add defaultAccountId to GlobalSettings"
 ## Task 2: AccountManager にデフォルトアカウント設定UIを追加
 
 **Files:**
+
 - Modify: `src/components/AccountManager/AccountManager.tsx`
 - Modify: `src/components/AccountManager/AccountManager.module.scss`
 
@@ -154,7 +156,9 @@ export const AccountManager: React.FC<AccountManagerProps> = ({
   font-size: 16px;
   padding: 2px 6px;
   line-height: 1;
-  &:hover { color: #e5c07b; }
+  &:hover {
+    color: #e5c07b;
+  }
 }
 
 .defaultBtnActive {
@@ -182,6 +186,7 @@ git commit -m "feat: add default account selector to AccountManager"
 ## Task 3: App.tsx に `handleComposeTweet` と `onSetDefault` を実装する
 
 **Files:**
+
 - Modify: `src/App.tsx`
 
 - [ ] **Step 1: `handleComposeTweet` を App.tsx に追加し、AccountManager に `onSetDefault` を渡す**
@@ -191,31 +196,42 @@ git commit -m "feat: add default account selector to AccountManager"
 **`useAppStore` の destructuring に `globalSettings` と `updateGlobalSettings` を追加**（既存の行 `const { loadSettings, isLoaded, accounts, sidebarExpanded, setSidebarExpanded } = useAppStore();` を変更）:
 
 ```typescript
-const { loadSettings, isLoaded, accounts, globalSettings, updateGlobalSettings, sidebarExpanded, setSidebarExpanded } = useAppStore();
+const {
+  loadSettings,
+  isLoaded,
+  accounts,
+  globalSettings,
+  updateGlobalSettings,
+  sidebarExpanded,
+  setSidebarExpanded,
+} = useAppStore();
 ```
 
 **`handleApplySettings` の後（`if (!isLoaded)` の前）に追加**:
 
 ```typescript
-  const handleComposeTweet = useCallback(async () => {
-    if (accounts.length === 0) return;
-    const targetId = globalSettings.defaultAccountId ?? accounts[0].id;
-    const account = accounts.find((a) => a.id === targetId) ?? accounts[0];
-    await invoke('open_compose_window', {
-      accountId: account.id,
-      dataDirectory: account.dataDirectory,
-    }).catch(console.error);
-  }, [accounts, globalSettings.defaultAccountId]);
+const handleComposeTweet = useCallback(async () => {
+  if (accounts.length === 0) return;
+  const targetId = globalSettings.defaultAccountId ?? accounts[0].id;
+  const account = accounts.find((a) => a.id === targetId) ?? accounts[0];
+  await invoke("open_compose_window", {
+    accountId: account.id,
+    dataDirectory: account.dataDirectory,
+  }).catch(console.error);
+}, [accounts, globalSettings.defaultAccountId]);
 
-  const handleSetDefaultAccount = useCallback((id: string) => {
+const handleSetDefaultAccount = useCallback(
+  (id: string) => {
     updateGlobalSettings({ defaultAccountId: id });
-  }, [updateGlobalSettings]);
+  },
+  [updateGlobalSettings],
+);
 ```
 
 **`onComposeTweet={() => {}}` を `onComposeTweet={handleComposeTweet}` に変更**:
 
 ```typescript
-        onComposeTweet={handleComposeTweet}
+onComposeTweet = { handleComposeTweet };
 ```
 
 **`showAccountManager` の AccountManager レンダリング部分を変更**（`onSetDefault` と `defaultAccountId` を追加）:
@@ -253,6 +269,7 @@ git commit -m "feat: implement handleComposeTweet and default account wiring in 
 ## Task 4: Rust に `open_compose_window` コマンドを追加する
 
 **Files:**
+
 - Modify: `src-tauri/src/commands/webview.rs`
 - Modify: `src-tauri/src/lib.rs`
 

@@ -33,10 +33,10 @@
 
 ### 幅
 
-| 状態 | 幅 |
-|------|----|
+| 状態               | 幅   |
+| ------------------ | ---- |
 | 閉じ（デフォルト） | 40px |
-| 開き | 70px |
+| 開き               | 70px |
 
 幅の変化は CSS transition でアニメーション（200ms ease）。
 
@@ -77,8 +77,15 @@
 `calculateBounds` に `sidebarWidth` パラメータを追加する：
 
 ```ts
-const calculateBounds = (columnIndex, allColumns, containerWidth, containerHeight, scrollLeft, sidebarWidth) => {
-  let x = sidebarWidth;  // ← サイドバー幅を加算
+const calculateBounds = (
+  columnIndex,
+  allColumns,
+  containerWidth,
+  containerHeight,
+  scrollLeft,
+  sidebarWidth,
+) => {
+  let x = sidebarWidth; // ← サイドバー幅を加算
   for (let i = 0; i < columnIndex; i++) {
     x += allColumns[i].width;
   }
@@ -113,6 +120,7 @@ setSidebarExpanded: (v: boolean) => void
 `src/components/Sidebar/Sidebar.tsx` + `Sidebar.module.scss`
 
 Props:
+
 ```ts
 interface SidebarProps {
   columns: Column[];
@@ -120,8 +128,8 @@ interface SidebarProps {
   onToggleExpand: () => void;
   onAddColumn: () => void;
   onAccountManager: () => void;
-  onComposeTweet: () => void;        // Phase 1 はダミー（何もしない）
-  onJumpToColumn: (columnId: string) => void;  // Phase 1 はダミー
+  onComposeTweet: () => void; // Phase 1 はダミー（何もしない）
+  onJumpToColumn: (columnId: string) => void; // Phase 1 はダミー
 }
 ```
 
@@ -134,7 +142,7 @@ interface SidebarProps {
 ```ts
 const scrollbarWidth = useMemo(() => {
   const columnsWidth = columns.reduce((sum, c) => sum + c.width, 0);
-  return columnsWidth + sidebarWidth;  // サイドバー幅を加算
+  return columnsWidth + sidebarWidth; // サイドバー幅を加算
 }, [columns, sidebarWidth]);
 ```
 
@@ -152,11 +160,11 @@ const scrollbarWidth = useMemo(() => {
 
 ## 影響ファイル
 
-| ファイル | 変更種別 |
-|---------|---------|
-| `src/App.tsx` | Sidebar コンポーネント追加、toolbar 削除、padding-left 追加 |
-| `src/App.module.scss` | toolbar スタイル削除、padding-left 対応 |
-| `src/hooks/useColumns.ts` | calculateBounds に sidebarWidth 追加 |
-| `src/store/useAppStore.ts` | sidebarExpanded 状態追加 |
-| `src/components/Sidebar/Sidebar.tsx` | 新規作成 |
-| `src/components/Sidebar/Sidebar.module.scss` | 新規作成 |
+| ファイル                                     | 変更種別                                                    |
+| -------------------------------------------- | ----------------------------------------------------------- |
+| `src/App.tsx`                                | Sidebar コンポーネント追加、toolbar 削除、padding-left 追加 |
+| `src/App.module.scss`                        | toolbar スタイル削除、padding-left 対応                     |
+| `src/hooks/useColumns.ts`                    | calculateBounds に sidebarWidth 追加                        |
+| `src/store/useAppStore.ts`                   | sidebarExpanded 状態追加                                    |
+| `src/components/Sidebar/Sidebar.tsx`         | 新規作成                                                    |
+| `src/components/Sidebar/Sidebar.module.scss` | 新規作成                                                    |

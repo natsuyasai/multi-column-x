@@ -1,8 +1,8 @@
 /// <reference types="vitest/globals" />
-import '@testing-library/jest-dom';
+import "@testing-library/jest-dom";
 
 // Tauri APIをモック
-Object.defineProperty(window, '__TAURI__', {
+Object.defineProperty(window, "__TAURI__", {
   value: {
     invoke: vi.fn(),
     event: {

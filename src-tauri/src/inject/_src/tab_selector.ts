@@ -23,7 +23,7 @@
 
   function selectTab(tabName: string): boolean {
     const tabs = document.querySelectorAll<HTMLElement>(
-      'div[role="tablist"] div[role="tab"]'
+      'div[role="tablist"] div[role="tab"]',
     );
     for (const tab of tabs) {
       const span = tab.querySelector("span");
@@ -91,6 +91,7 @@
   }
   startUrlObserver();
 
-  window.__twitterViewer = window.__twitterViewer || ({} as Window["__twitterViewer"]);
+  window.__twitterViewer =
+    window.__twitterViewer || ({} as Window["__twitterViewer"]);
   window.__twitterViewer.selectHomeTab = function () {};
 })();

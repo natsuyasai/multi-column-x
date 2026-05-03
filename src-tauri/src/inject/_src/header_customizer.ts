@@ -12,7 +12,8 @@ import { HeaderCustomizer } from "./HeaderCustomizer";
       setTimeout(mount, 50);
       return;
     }
-    if (document.getElementById("twitter-viewer-header-customizer-root")) return;
+    if (document.getElementById("twitter-viewer-header-customizer-root"))
+      return;
     const container = document.createElement("div");
     container.id = "twitter-viewer-header-customizer-root";
     document.body.appendChild(container);
@@ -28,7 +29,8 @@ import { HeaderCustomizer } from "./HeaderCustomizer";
     document.getElementById("twitter-viewer-header-customizer-root")?.remove();
   }
 
-  window.__twitterViewer = window.__twitterViewer || ({} as Window["__twitterViewer"]);
+  window.__twitterViewer =
+    window.__twitterViewer || ({} as Window["__twitterViewer"]);
   window.__twitterViewer.applyAreaRemove = function (enabled: boolean) {
     if (enabled) {
       mount();

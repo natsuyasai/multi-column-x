@@ -17,9 +17,7 @@ export function HeaderCustomizer() {
         type="button"
         className={styles.toggleButton}
         onClick={toggleNavVisibility}
-        title={
-          isNavVisible ? "ナビゲーションを非表示" : "ナビゲーションを表示"
-        }
+        title={isNavVisible ? "ナビゲーションを非表示" : "ナビゲーションを表示"}
       >
         {isNavVisible ? "×" : "☰"}
       </button>

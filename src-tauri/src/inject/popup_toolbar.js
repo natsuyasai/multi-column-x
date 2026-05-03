@@ -80,43 +80,36 @@
     }
   }
   inject();
-
-  // targetHref と一致する <a> をページロード後に自動クリックする
   if (!targetHref) return;
-
   function normalizeHref(href) {
-    if (!href) return "";
     try {
-      return new URL(href, "https://x.com").pathname + new URL(href, "https://x.com").search;
+      const u = new URL(href, "https://x.com");
+      return u.pathname + u.search;
     } catch {
       return href;
     }
   }
-
   function tryClick(root) {
     const targetPath = normalizeHref(targetHref);
     const links = root.querySelectorAll("a[href]");
     for (const link of links) {
-      if (normalizeHref(link.getAttribute("href")) === targetPath) {
+      if (normalizeHref(link.getAttribute("href") ?? "") === targetPath) {
         link.click();
         return true;
       }
     }
     return false;
   }
-
   function watchAndClick() {
     if (tryClick(document)) return;
-    const observer = new MutationObserver(function() {
+    const observer = new MutationObserver(() => {
       if (tryClick(document)) {
         observer.disconnect();
       }
     });
     observer.observe(document.body, { childList: true, subtree: true });
-    // 10秒後に諦める
-    setTimeout(function() { observer.disconnect(); }, 10000);
+    setTimeout(() => observer.disconnect(), 1e4);
   }
-
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", watchAndClick);
   } else {

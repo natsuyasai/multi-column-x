@@ -2,16 +2,9 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "column-webview",
   "description": "Capability for column webviews",
-  "windows": [
-    "column-*",
-    "popup-*",
-    "main"
-  ],
+  "windows": ["column-*", "popup-*", "main"],
   "remote": {
-    "urls": [
-      "https://*",
-      "http://*"
-    ]
+    "urls": ["https://*", "http://*"]
   },
   "permissions": [
     "core:default",

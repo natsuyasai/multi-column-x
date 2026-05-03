@@ -1,7 +1,7 @@
-import { create } from 'zustand';
-import { invoke } from '@tauri-apps/api/core';
-import type { Account, Column, GlobalSettings, AppSettings } from '../types';
-import { DEFAULT_GLOBAL_SETTINGS } from '../types';
+import { create } from "zustand";
+import { invoke } from "@tauri-apps/api/core";
+import type { Account, Column, GlobalSettings, AppSettings } from "../types";
+import { DEFAULT_GLOBAL_SETTINGS } from "../types";
 
 interface AppStore {
   accounts: Account[];
@@ -18,7 +18,7 @@ interface AppStore {
   removeColumn: (id: string) => void;
   updateColumn: (id: string, patch: Partial<Column>) => void;
   updateGlobalSettings: (patch: Partial<GlobalSettings>) => void;
-  moveColumn: (columnId: string, direction: 'left' | 'right') => void;
+  moveColumn: (columnId: string, direction: "left" | "right") => void;
 }
 
 export const useAppStore = create<AppStore>((set, get) => ({
@@ -31,7 +31,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   loadSettings: async () => {
     try {
-      const settings = await invoke<AppSettings>('load_settings');
+      const settings = await invoke<AppSettings>("load_settings");
       set({
         accounts: settings.accounts,
         columns: settings.columns.sort((a, b) => a.order - b.order),
@@ -45,7 +45,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   saveSettings: async () => {
     const { accounts, columns, globalSettings } = get();
-    await invoke('save_settings', { settings: { accounts, columns, globalSettings } });
+    await invoke("save_settings", {
+      settings: { accounts, columns, globalSettings },
+    });
   },
 
   addAccount: (account) => {
@@ -84,7 +86,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set((state) => {
       const sorted = [...state.columns].sort((a, b) => a.order - b.order);
       const idx = sorted.findIndex((c) => c.id === columnId);
-      const neighborIdx = direction === 'left' ? idx - 1 : idx + 1;
+      const neighborIdx = direction === "left" ? idx - 1 : idx + 1;
       if (neighborIdx < 0 || neighborIdx >= sorted.length) return state;
       [sorted[idx], sorted[neighborIdx]] = [sorted[neighborIdx], sorted[idx]];
       const reordered = sorted.map((c, i) => ({ ...c, order: i }));

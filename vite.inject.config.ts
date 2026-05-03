@@ -28,7 +28,7 @@ function safeHeadInjectPlugin(): Plugin {
         if (chunk.type !== "chunk") continue;
         chunk.code = chunk.code.replace(
           /document\.head\.appendChild\(([^)]+)\)/g,
-          "(function(el){if(document.head){document.head.appendChild(el);}else{document.addEventListener('DOMContentLoaded',function(){document.head.appendChild(el);});}})($1)"
+          "(function(el){if(document.head){document.head.appendChild(el);}else{document.addEventListener('DOMContentLoaded',function(){document.head.appendChild(el);});}})($1)",
         );
       }
     },
@@ -64,7 +64,7 @@ export default defineConfig(({ mode }) => {
       minify: false,
       rollupOptions: {
         input: Object.fromEntries(
-          plainEntries.map((name) => [name, resolve(srcDir, `${name}.ts`)])
+          plainEntries.map((name) => [name, resolve(srcDir, `${name}.ts`)]),
         ),
         output: {
           format: "es",

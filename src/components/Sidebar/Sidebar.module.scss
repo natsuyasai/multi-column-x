@@ -34,7 +34,9 @@ $transition: 200ms ease;
   font-size: 15px;
   flex-shrink: 0;
   padding: 0;
-  transition: width $transition, background $transition;
+  transition:
+    width $transition,
+    background $transition;
 
   &:hover {
     color: #aaa;
@@ -82,7 +84,8 @@ $transition: 200ms ease;
   background: #1d9bf0;
   color: #fff;
 
-  .icon, .label {
+  .icon,
+  .label {
     color: #fff;
   }
 
@@ -146,7 +149,8 @@ $transition: 200ms ease;
     background: #1a1a1a;
   }
 
-  .icon, .label {
+  .icon,
+  .label {
     color: #444;
   }
 }

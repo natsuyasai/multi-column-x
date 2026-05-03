@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 interface UseAutoReloadOptions {
   columnId: string;
@@ -9,10 +9,14 @@ interface UseAutoReloadOptions {
 
 interface UseAutoReloadResult {
   remaining: number | null; // null = 自動更新無効
-  reset: () => void;        // 手動更新時にカウントをリセット
+  reset: () => void; // 手動更新時にカウントをリセット
 }
 
-export function useAutoReload({ columnId, enabled, intervalSec }: UseAutoReloadOptions): UseAutoReloadResult {
+export function useAutoReload({
+  columnId,
+  enabled,
+  intervalSec,
+}: UseAutoReloadOptions): UseAutoReloadResult {
   const [remaining, setRemaining] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const intervalSecRef = useRef(intervalSec);
@@ -27,9 +31,10 @@ export function useAutoReload({ columnId, enabled, intervalSec }: UseAutoReloadO
       setRemaining((prev) => {
         if (prev === null) return null;
         if (prev <= 1) {
-          invoke('eval_in_webview', {
+          invoke("eval_in_webview", {
             label: `column-${columnId}`,
-            script: 'window.__twitterViewer && window.__twitterViewer.triggerReload();',
+            script:
+              "window.__twitterViewer && window.__twitterViewer.triggerReload();",
           }).catch(() => {});
           return intervalSecRef.current;
         }

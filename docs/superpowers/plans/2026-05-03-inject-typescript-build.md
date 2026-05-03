@@ -13,6 +13,7 @@
 ### Task 1: tsconfig.inject.json を作成する
 
 **Files:**
+
 - Create: `tsconfig.inject.json`
 
 - [ ] **Step 1: tsconfig.inject.json を作成する**
@@ -49,6 +50,7 @@ git commit -m "build: add tsconfig for inject scripts"
 inject スクリプトが参照する `window.__twitterViewer`、`window.__twitterViewerConfig`、`window.__TAURI__`、`window.__TAURI_INTERNALS__` の型を定義する。
 
 **Files:**
+
 - Create: `src-tauri/src/inject/_src/types.d.ts`
 
 - [ ] **Step 1: `_src/` ディレクトリを作成し、types.d.ts を作成する**
@@ -108,6 +110,7 @@ git commit -m "build: add global type definitions for inject scripts"
 ### Task 3: vite.inject.config.ts を作成する
 
 **Files:**
+
 - Create: `vite.inject.config.ts`
 
 - [ ] **Step 1: vite.inject.config.ts を作成する**
@@ -157,6 +160,7 @@ git commit -m "build: add vite config for inject scripts"
 ### Task 4: package.json の scripts を更新する
 
 **Files:**
+
 - Modify: `package.json`
 
 - [ ] **Step 1: package.json の scripts セクションを確認する**
@@ -193,6 +197,7 @@ git commit -m "build: prepend build:inject to dev and build scripts"
 ### Task 5: custom_css.ts を作成する（最もシンプルなスクリプトから移行）
 
 **Files:**
+
 - Create: `src-tauri/src/inject/_src/custom_css.ts`
 
 - [ ] **Step 1: custom_css.ts を作成する**
@@ -212,7 +217,8 @@ git commit -m "build: prepend build:inject to dev and build scripts"
     document.head.appendChild(style);
   }
 
-  window.__twitterViewer = window.__twitterViewer || ({} as Window["__twitterViewer"]);
+  window.__twitterViewer =
+    window.__twitterViewer || ({} as Window["__twitterViewer"]);
   window.__twitterViewer.applyCustomCSS = applyCustomCSS;
 })();
 ```
@@ -237,6 +243,7 @@ git commit -m "feat: migrate custom_css inject script to TypeScript"
 ### Task 6: scroll_event.ts を作成する
 
 **Files:**
+
 - Create: `src-tauri/src/inject/_src/scroll_event.ts`
 
 - [ ] **Step 1: scroll_event.ts を作成する**
@@ -271,7 +278,7 @@ git commit -m "feat: migrate custom_css inject script to TypeScript"
         });
       }
     },
-    { passive: true }
+    { passive: true },
   );
 })();
 ```
@@ -296,6 +303,7 @@ git commit -m "feat: migrate scroll_event inject script to TypeScript"
 ### Task 7: auto_reload.ts を作成する
 
 **Files:**
+
 - Create: `src-tauri/src/inject/_src/auto_reload.ts`
 
 - [ ] **Step 1: auto_reload.ts を作成する**
@@ -328,7 +336,9 @@ git commit -m "feat: migrate scroll_event inject script to TypeScript"
     const cells = section.querySelectorAll('[data-testid="cellInnerDiv"]');
     for (const cell of cells) {
       if (cell.querySelector("article")) continue;
-      const btn = cell.querySelector<HTMLButtonElement>('button[type="button"]');
+      const btn = cell.querySelector<HTMLButtonElement>(
+        'button[type="button"]',
+      );
       if (btn) return btn;
     }
     return null;
@@ -381,7 +391,8 @@ git commit -m "feat: migrate scroll_event inject script to TypeScript"
     }
   }
 
-  window.__twitterViewer = window.__twitterViewer || ({} as Window["__twitterViewer"]);
+  window.__twitterViewer =
+    window.__twitterViewer || ({} as Window["__twitterViewer"]);
   window.__twitterViewer.triggerReload = triggerReload;
 })();
 ```
@@ -406,6 +417,7 @@ git commit -m "feat: migrate auto_reload inject script to TypeScript"
 ### Task 8: tab_selector.ts を作成する
 
 **Files:**
+
 - Create: `src-tauri/src/inject/_src/tab_selector.ts`
 
 - [ ] **Step 1: tab_selector.ts を作成する**
@@ -436,7 +448,7 @@ git commit -m "feat: migrate auto_reload inject script to TypeScript"
 
   function selectTab(tabName: string): boolean {
     const tabs = document.querySelectorAll<HTMLElement>(
-      'div[role="tablist"] div[role="tab"]'
+      'div[role="tablist"] div[role="tab"]',
     );
     for (const tab of tabs) {
       const span = tab.querySelector("span");
@@ -494,7 +506,8 @@ git commit -m "feat: migrate auto_reload inject script to TypeScript"
     }
   }).observe(document.documentElement, { childList: true, subtree: true });
 
-  window.__twitterViewer = window.__twitterViewer || ({} as Window["__twitterViewer"]);
+  window.__twitterViewer =
+    window.__twitterViewer || ({} as Window["__twitterViewer"]);
   window.__twitterViewer.selectHomeTab = function () {};
 })();
 ```
@@ -519,6 +532,7 @@ git commit -m "feat: migrate tab_selector inject script to TypeScript"
 ### Task 9: image_popup.ts を作成する
 
 **Files:**
+
 - Create: `src-tauri/src/inject/_src/image_popup.ts`
 
 - [ ] **Step 1: image_popup.ts を作成する**
@@ -538,8 +552,7 @@ git commit -m "feat: migrate tab_selector inject script to TypeScript"
   }
 
   function tauriInvoke(cmd: string, args: Record<string, unknown>): void {
-    const invoke =
-      window.__TAURI__?.core?.invoke ?? window.__TAURI__?.invoke;
+    const invoke = window.__TAURI__?.core?.invoke ?? window.__TAURI__?.invoke;
     if (invoke) {
       invoke(cmd, args);
     }
@@ -571,7 +584,7 @@ git commit -m "feat: migrate tab_selector inject script to TypeScript"
         });
       }
     },
-    true
+    true,
   );
 })();
 ```
@@ -596,6 +609,7 @@ git commit -m "feat: migrate image_popup inject script to TypeScript"
 ### Task 10: header_customizer.ts を作成する（最も複雑）
 
 **Files:**
+
 - Create: `src-tauri/src/inject/_src/header_customizer.ts`
 
 - [ ] **Step 1: header_customizer.ts を作成する**
@@ -1010,6 +1024,7 @@ git commit -m "feat: migrate header_customizer inject script to TypeScript"
 ### Task 11: .gitignore を更新して旧JSファイルを除外する
 
 **Files:**
+
 - Modify: `.gitignore`
 
 - [ ] **Step 1: .gitignore に追記する**

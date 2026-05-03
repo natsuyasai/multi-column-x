@@ -37,7 +37,9 @@
   color: #666;
   cursor: pointer;
   font-size: 16px;
-  &:hover { color: #aaa; }
+  &:hover {
+    color: #aaa;
+  }
 }
 
 .list {
@@ -85,7 +87,9 @@
   cursor: pointer;
   font-size: 12px;
   padding: 4px 10px;
-  &:hover { background: #2a1515; }
+  &:hover {
+    background: #2a1515;
+  }
 }
 
 .addBtn {
@@ -108,7 +112,9 @@
   font-size: 16px;
   padding: 2px 6px;
   line-height: 1;
-  &:hover { color: #e5c07b; }
+  &:hover {
+    color: #e5c07b;
+  }
 }
 
 .defaultBtnActive {

@@ -9,8 +9,7 @@
   if (accounts.length === 0) return;
 
   function tauriInvoke(cmd: string, args: Record<string, unknown>): void {
-    const invoke =
-      window.__TAURI__?.core?.invoke ?? window.__TAURI__?.invoke;
+    const invoke = window.__TAURI__?.core?.invoke ?? window.__TAURI__?.invoke;
     if (invoke) {
       invoke(cmd, args).catch(function (err: unknown) {
         console.error("[popup_toolbar]", err);

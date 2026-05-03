@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import type { Column, ColumnSettings } from '../../types';
-import styles from './SettingsPanel.module.scss';
+import React, { useState } from "react";
+import type { Column, ColumnSettings } from "../../types";
+import styles from "./SettingsPanel.module.scss";
 
 interface SettingsPanelProps {
   column: Column;
@@ -8,8 +8,14 @@ interface SettingsPanelProps {
   onClose: () => void;
 }
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ column, onApply, onClose }) => {
-  const [settings, setSettings] = useState<ColumnSettings>({ ...column.settings });
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({
+  column,
+  onApply,
+  onClose,
+}) => {
+  const [settings, setSettings] = useState<ColumnSettings>({
+    ...column.settings,
+  });
   const [width, setWidth] = useState<number>(column.width);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -18,11 +24,22 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ column, onApply, o
   };
 
   return (
-    <div className={styles.overlay} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div
+      className={styles.overlay}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div className={styles.panel}>
         <div className={styles.header}>
           <h2 className={styles.title}>カラム設定</h2>
-          <button className={styles.closeBtn} onClick={onClose} aria-label="閉じる">✕</button>
+          <button
+            className={styles.closeBtn}
+            onClick={onClose}
+            aria-label="閉じる"
+          >
+            ✕
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className={styles.form}>
@@ -47,7 +64,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ column, onApply, o
               <input
                 type="checkbox"
                 checked={settings.autoReloadEnabled}
-                onChange={(e) => setSettings(s => ({ ...s, autoReloadEnabled: e.target.checked }))}
+                onChange={(e) =>
+                  setSettings((s) => ({
+                    ...s,
+                    autoReloadEnabled: e.target.checked,
+                  }))
+                }
               />
               自動更新を有効にする
             </label>
@@ -61,14 +83,24 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ column, onApply, o
                     min={10}
                     max={3600}
                     value={settings.autoReloadInterval}
-                    onChange={(e) => setSettings(s => ({ ...s, autoReloadInterval: Number(e.target.value) }))}
+                    onChange={(e) =>
+                      setSettings((s) => ({
+                        ...s,
+                        autoReloadInterval: Number(e.target.value),
+                      }))
+                    }
                   />
                 </label>
                 <label className={styles.checkLabel}>
                   <input
                     type="checkbox"
                     checked={settings.showCountdown}
-                    onChange={(e) => setSettings(s => ({ ...s, showCountdown: e.target.checked }))}
+                    onChange={(e) =>
+                      setSettings((s) => ({
+                        ...s,
+                        showCountdown: e.target.checked,
+                      }))
+                    }
                   />
                   カウントダウンを表示する
                 </label>
@@ -82,7 +114,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ column, onApply, o
               <input
                 type="checkbox"
                 checked={settings.areaRemoveEnabled}
-                onChange={(e) => setSettings(s => ({ ...s, areaRemoveEnabled: e.target.checked }))}
+                onChange={(e) =>
+                  setSettings((s) => ({
+                    ...s,
+                    areaRemoveEnabled: e.target.checked,
+                  }))
+                }
               />
               ヘッダー・投稿欄を非表示にする
             </label>
@@ -93,14 +130,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ column, onApply, o
             <textarea
               className={styles.cssTextarea}
               value={settings.customCSS}
-              onChange={(e) => setSettings(s => ({ ...s, customCSS: e.target.value }))}
+              onChange={(e) =>
+                setSettings((s) => ({ ...s, customCSS: e.target.value }))
+              }
               placeholder="/* カスタムCSSを入力 */"
               spellCheck={false}
             />
           </section>
 
           <div className={styles.actions}>
-            <button type="button" className={styles.cancelBtn} onClick={onClose}>
+            <button
+              type="button"
+              className={styles.cancelBtn}
+              onClick={onClose}
+            >
               キャンセル
             </button>
             <button type="submit" className={styles.applyBtn}>

@@ -11,14 +11,16 @@ import {
 
 export function useHeaderCustomizer() {
   // visibleLinks は window.__twitterViewerConfig から取得（空配列 = 全リンク表示）
-  const visibleLinks: string[] = window.__twitterViewerConfig?.visibleLinks ?? [];
+  const visibleLinks: string[] =
+    window.__twitterViewerConfig?.visibleLinks ?? [];
 
   const [navLinks, setNavLinks] = useState<NavLink[]>([]);
   const [isNavVisible, setIsNavVisible] = useState<boolean>(() => {
     const stored = localStorage.getItem(NAV_VISIBLE_KEY);
     return stored === null ? false : stored === "true";
   });
-  const [isTweetInputVisible, setIsTweetInputVisible] = useState<boolean>(false);
+  const [isTweetInputVisible, setIsTweetInputVisible] =
+    useState<boolean>(false);
   const composeButtonRef = useRef<HTMLAnchorElement | null>(null);
 
   // ヘッダーを非表示にする
@@ -53,9 +55,12 @@ export function useHeaderCustomizer() {
   // ヘッダーからリンクを抽出する
   useEffect(() => {
     const extractLinks = () => {
-      const header = document.querySelector<HTMLElement>("header[role='banner']");
+      const header = document.querySelector<HTMLElement>(
+        "header[role='banner']",
+      );
       if (!header) return false;
-      const anchorElements = header.querySelectorAll<HTMLAnchorElement>('a[role="link"]');
+      const anchorElements =
+        header.querySelectorAll<HTMLAnchorElement>('a[role="link"]');
       const links: NavLink[] = [];
       anchorElements.forEach((anchor) => {
         const href = anchor.getAttribute("href");
@@ -64,18 +69,29 @@ export function useHeaderCustomizer() {
         if (ariaLabel === "X") return;
         if (href && svg && ariaLabel) {
           if (visibleLinks.length === 0 || visibleLinks.includes(ariaLabel)) {
-            links.push({ href, ariaLabel, svgContent: svg.outerHTML, label: ariaLabel });
+            links.push({
+              href,
+              ariaLabel,
+              svgContent: svg.outerHTML,
+              label: ariaLabel,
+            });
           }
         }
       });
-      if (links.length > 0) { setNavLinks(links); return true; }
+      if (links.length > 0) {
+        setNavLinks(links);
+        return true;
+      }
       return false;
     };
 
     const applyFallbackLinks = () => {
-      const links: NavLink[] = visibleLinks.length === 0
-        ? Object.values(DEFAULT_NAV_LINKS)
-        : visibleLinks.map((label) => DEFAULT_NAV_LINKS[label]).filter(Boolean);
+      const links: NavLink[] =
+        visibleLinks.length === 0
+          ? Object.values(DEFAULT_NAV_LINKS)
+          : visibleLinks
+              .map((label) => DEFAULT_NAV_LINKS[label])
+              .filter(Boolean);
       if (links.length > 0) setNavLinks(links);
     };
 
@@ -144,17 +160,30 @@ export function useHeaderCustomizer() {
       setIsTweetInputVisible(false);
       if (composeButtonRef.current) {
         const svg = composeButtonRef.current.querySelector("svg");
-        if (svg) { svg.innerHTML = `<path d="${COMPOSE_ICON_PATH}"></path>`; composeButtonRef.current.setAttribute("aria-label", "ポストする"); }
+        if (svg) {
+          svg.innerHTML = `<path d="${COMPOSE_ICON_PATH}"></path>`;
+          composeButtonRef.current.setAttribute("aria-label", "ポストする");
+        }
       }
     } else {
       existingStyle?.remove();
       setIsTweetInputVisible(true);
       if (composeButtonRef.current) {
         const svg = composeButtonRef.current.querySelector("svg");
-        if (svg) { svg.innerHTML = `<path d="${CLOSE_ICON_PATH}"></path>`; composeButtonRef.current.setAttribute("aria-label", "閉じる"); }
+        if (svg) {
+          svg.innerHTML = `<path d="${CLOSE_ICON_PATH}"></path>`;
+          composeButtonRef.current.setAttribute("aria-label", "閉じる");
+        }
       }
     }
   }, [isTweetInputVisible]);
 
-  return { navLinks, isNavVisible, isTweetInputVisible, toggleNavVisibility, toggleTweetInputArea, composeButtonRef };
+  return {
+    navLinks,
+    isNavVisible,
+    isTweetInputVisible,
+    toggleNavVisibility,
+    toggleTweetInputArea,
+    composeButtonRef,
+  };
 }

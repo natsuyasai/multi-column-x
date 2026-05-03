@@ -12,6 +12,7 @@
     document.head.appendChild(style);
   }
 
-  window.__twitterViewer = window.__twitterViewer || ({} as Window["__twitterViewer"]);
+  window.__twitterViewer =
+    window.__twitterViewer || ({} as Window["__twitterViewer"]);
   window.__twitterViewer.applyCustomCSS = applyCustomCSS;
 })();

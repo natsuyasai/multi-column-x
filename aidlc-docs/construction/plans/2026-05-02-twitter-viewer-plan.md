@@ -73,6 +73,7 @@ twitter-viewer/
 ## Task 1: Tauri v2 プロジェクト初期化
 
 **Files:**
+
 - Create: `package.json`, `vite.config.ts`, `tsconfig.json`, `index.html`
 - Create: `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`
 - Create: `src/main.tsx`, `src/App.tsx`
@@ -85,6 +86,7 @@ npm create tauri-app@latest . -- --template react-ts --manager npm
 ```
 
 プロンプトが出た場合：
+
 - App name: `twitter-viewer`
 - Window title: `Twitter Viewer`
 - Frontend: `React` + `TypeScript` + `Vite`
@@ -171,15 +173,15 @@ strip = true
 
 ```typescript
 // vitest.config.ts
-import { defineConfig } from 'vitest/config';
-import react from '@vitejs/plugin-react';
+import { defineConfig } from "vitest/config";
+import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
   test: {
-    environment: 'jsdom',
+    environment: "jsdom",
     globals: true,
-    setupFiles: ['./src/test-setup.ts'],
+    setupFiles: ["./src/test-setup.ts"],
   },
 });
 ```
@@ -188,10 +190,10 @@ export default defineConfig({
 
 ```typescript
 // src/test-setup.ts
-import '@testing-library/jest-dom';
+import "@testing-library/jest-dom";
 
 // Tauri APIをモック
-Object.defineProperty(window, '__TAURI__', {
+Object.defineProperty(window, "__TAURI__", {
   value: {
     invoke: vi.fn(),
     event: {
@@ -230,6 +232,7 @@ git commit -m "feat: initialize Tauri v2 project with React + TypeScript"
 ## Task 2: 型定義
 
 **Files:**
+
 - Create: `src/types/index.ts`
 - Create: `src/types/index.test.ts`
 
@@ -237,34 +240,39 @@ git commit -m "feat: initialize Tauri v2 project with React + TypeScript"
 
 ```typescript
 // src/types/index.test.ts
-import { describe, it, expect } from 'vitest';
-import { resolveColumnUrl } from './index';
+import { describe, it, expect } from "vitest";
+import { resolveColumnUrl } from "./index";
 
-describe('resolveColumnUrl', () => {
-  it('homeページのURLを返す', () => {
-    expect(resolveColumnUrl({ pageType: 'home' })).toBe('https://x.com/home');
+describe("resolveColumnUrl", () => {
+  it("homeページのURLを返す", () => {
+    expect(resolveColumnUrl({ pageType: "home" })).toBe("https://x.com/home");
   });
 
-  it('notificationsページのURLを返す', () => {
-    expect(resolveColumnUrl({ pageType: 'notifications' })).toBe('https://x.com/notifications');
-  });
-
-  it('searchページのURLをクエリ付きで返す', () => {
-    expect(resolveColumnUrl({ pageType: 'search', searchQuery: 'tauri' })).toBe(
-      'https://x.com/search?q=tauri'
+  it("notificationsページのURLを返す", () => {
+    expect(resolveColumnUrl({ pageType: "notifications" })).toBe(
+      "https://x.com/notifications",
     );
   });
 
-  it('listページのURLをリストID付きで返す', () => {
-    expect(resolveColumnUrl({ pageType: 'list', listId: '12345' })).toBe(
-      'https://x.com/i/lists/12345'
+  it("searchページのURLをクエリ付きで返す", () => {
+    expect(resolveColumnUrl({ pageType: "search", searchQuery: "tauri" })).toBe(
+      "https://x.com/search?q=tauri",
     );
   });
 
-  it('customページのURLをそのまま返す', () => {
-    expect(resolveColumnUrl({ pageType: 'custom', customUrl: 'https://x.com/explore' })).toBe(
-      'https://x.com/explore'
+  it("listページのURLをリストID付きで返す", () => {
+    expect(resolveColumnUrl({ pageType: "list", listId: "12345" })).toBe(
+      "https://x.com/i/lists/12345",
     );
+  });
+
+  it("customページのURLをそのまま返す", () => {
+    expect(
+      resolveColumnUrl({
+        pageType: "custom",
+        customUrl: "https://x.com/explore",
+      }),
+    ).toBe("https://x.com/explore");
   });
 });
 ```
@@ -282,7 +290,7 @@ Expected: FAIL - `resolveColumnUrl` が未定義
 ```typescript
 // src/types/index.ts
 
-export type PageType = 'home' | 'notifications' | 'search' | 'list' | 'custom';
+export type PageType = "home" | "notifications" | "search" | "list" | "custom";
 
 export interface Account {
   id: string;
@@ -314,7 +322,7 @@ export interface Column {
 }
 
 export interface GlobalSettings {
-  theme: 'dark' | 'light';
+  theme: "dark" | "light";
   customCSS: string;
   windowBounds: { x: number; y: number; width: number; height: number };
 }
@@ -329,12 +337,12 @@ export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
   autoReloadEnabled: true,
   autoReloadInterval: 60,
   areaRemoveEnabled: true,
-  customCSS: '',
+  customCSS: "",
 };
 
 export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
-  theme: 'dark',
-  customCSS: '',
+  theme: "dark",
+  customCSS: "",
   windowBounds: { x: 0, y: 0, width: 1400, height: 900 },
 };
 
@@ -347,16 +355,16 @@ interface ResolveColumnUrlInput {
 
 export function resolveColumnUrl(input: ResolveColumnUrlInput): string {
   switch (input.pageType) {
-    case 'home':
-      return 'https://x.com/home';
-    case 'notifications':
-      return 'https://x.com/notifications';
-    case 'search':
-      return `https://x.com/search?q=${encodeURIComponent(input.searchQuery ?? '')}`;
-    case 'list':
-      return `https://x.com/i/lists/${input.listId ?? ''}`;
-    case 'custom':
-      return input.customUrl ?? 'https://x.com/home';
+    case "home":
+      return "https://x.com/home";
+    case "notifications":
+      return "https://x.com/notifications";
+    case "search":
+      return `https://x.com/search?q=${encodeURIComponent(input.searchQuery ?? "")}`;
+    case "list":
+      return `https://x.com/i/lists/${input.listId ?? ""}`;
+    case "custom":
+      return input.customUrl ?? "https://x.com/home";
   }
 }
 ```
@@ -381,6 +389,7 @@ git commit -m "feat: add core type definitions and resolveColumnUrl"
 ## Task 3: 設定ストア（React側）
 
 **Files:**
+
 - Create: `src/store/useAppStore.ts`
 - Create: `src/store/useAppStore.test.ts`
 
@@ -388,40 +397,40 @@ git commit -m "feat: add core type definitions and resolveColumnUrl"
 
 ```typescript
 // src/store/useAppStore.test.ts
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
-import { useAppStore } from './useAppStore';
-import type { Account, Column } from '../types';
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { renderHook, act } from "@testing-library/react";
+import { useAppStore } from "./useAppStore";
+import type { Account, Column } from "../types";
 
 const mockAccount: Account = {
-  id: 'acc-1',
-  label: 'テストアカウント',
-  dataDirectory: '/path/to/data',
-  color: '#1d9bf0',
-  createdAt: '2026-05-02T00:00:00Z',
+  id: "acc-1",
+  label: "テストアカウント",
+  dataDirectory: "/path/to/data",
+  color: "#1d9bf0",
+  createdAt: "2026-05-02T00:00:00Z",
 };
 
 const mockColumn: Column = {
-  id: 'col-1',
-  accountId: 'acc-1',
-  pageType: 'home',
-  homeTabName: 'フォロー中',
+  id: "col-1",
+  accountId: "acc-1",
+  pageType: "home",
+  homeTabName: "フォロー中",
   width: 350,
   order: 0,
   settings: {
     autoReloadEnabled: true,
     autoReloadInterval: 60,
     areaRemoveEnabled: true,
-    customCSS: '',
+    customCSS: "",
   },
 };
 
-describe('useAppStore', () => {
+describe("useAppStore", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('アカウントを追加できる', () => {
+  it("アカウントを追加できる", () => {
     const { result } = renderHook(() => useAppStore());
     act(() => {
       result.current.addAccount(mockAccount);
@@ -429,16 +438,16 @@ describe('useAppStore', () => {
     expect(result.current.accounts).toContainEqual(mockAccount);
   });
 
-  it('アカウントを削除できる', () => {
+  it("アカウントを削除できる", () => {
     const { result } = renderHook(() => useAppStore());
     act(() => {
       result.current.addAccount(mockAccount);
-      result.current.removeAccount('acc-1');
+      result.current.removeAccount("acc-1");
     });
     expect(result.current.accounts).not.toContainEqual(mockAccount);
   });
 
-  it('カラムを追加できる', () => {
+  it("カラムを追加できる", () => {
     const { result } = renderHook(() => useAppStore());
     act(() => {
       result.current.addColumn(mockColumn);
@@ -446,20 +455,20 @@ describe('useAppStore', () => {
     expect(result.current.columns).toContainEqual(mockColumn);
   });
 
-  it('カラムを削除できる', () => {
+  it("カラムを削除できる", () => {
     const { result } = renderHook(() => useAppStore());
     act(() => {
       result.current.addColumn(mockColumn);
-      result.current.removeColumn('col-1');
+      result.current.removeColumn("col-1");
     });
     expect(result.current.columns).not.toContainEqual(mockColumn);
   });
 
-  it('カラム設定を更新できる', () => {
+  it("カラム設定を更新できる", () => {
     const { result } = renderHook(() => useAppStore());
     act(() => {
       result.current.addColumn(mockColumn);
-      result.current.updateColumn('col-1', { width: 400 });
+      result.current.updateColumn("col-1", { width: 400 });
     });
     expect(result.current.columns[0].width).toBe(400);
   });
@@ -478,10 +487,10 @@ Expected: FAIL
 
 ```typescript
 // src/store/useAppStore.ts
-import { create } from 'zustand';
-import { invoke } from '@tauri-apps/api/core';
-import type { Account, Column, GlobalSettings, AppSettings } from '../types';
-import { DEFAULT_GLOBAL_SETTINGS } from '../types';
+import { create } from "zustand";
+import { invoke } from "@tauri-apps/api/core";
+import type { Account, Column, GlobalSettings, AppSettings } from "../types";
+import { DEFAULT_GLOBAL_SETTINGS } from "../types";
 
 interface AppStore {
   accounts: Account[];
@@ -506,7 +515,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   loadSettings: async () => {
     try {
-      const settings = await invoke<AppSettings>('load_settings');
+      const settings = await invoke<AppSettings>("load_settings");
       set({
         accounts: settings.accounts,
         columns: settings.columns.sort((a, b) => a.order - b.order),
@@ -520,7 +529,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   saveSettings: async () => {
     const { accounts, columns, globalSettings } = get();
-    await invoke('save_settings', { settings: { accounts, columns, globalSettings } });
+    await invoke("save_settings", {
+      settings: { accounts, columns, globalSettings },
+    });
   },
 
   addAccount: (account) => {
@@ -577,6 +588,7 @@ git commit -m "feat: add useAppStore with account/column CRUD"
 ## Task 4: インジェクションスクリプト
 
 **Files:**
+
 - Create: `src-tauri/src/inject/tab_selector.js`
 - Create: `src-tauri/src/inject/area_remove.js`
 - Create: `src-tauri/src/inject/auto_reload.js`
@@ -588,10 +600,10 @@ git commit -m "feat: add useAppStore with account/column CRUD"
 
 ```javascript
 // src-tauri/src/inject/tab_selector.js
-(function() {
+(function () {
   function selectHomeTab(tabName) {
     if (!tabName) return;
-    var observer = new MutationObserver(function() {
+    var observer = new MutationObserver(function () {
       var tabs = document.querySelectorAll('[role="tab"]');
       for (var i = 0; i < tabs.length; i++) {
         if (tabs[i].textContent && tabs[i].textContent.includes(tabName)) {
@@ -602,7 +614,9 @@ git commit -m "feat: add useAppStore with account/column CRUD"
       }
     });
     observer.observe(document.body, { childList: true, subtree: true });
-    setTimeout(function() { observer.disconnect(); }, 10000);
+    setTimeout(function () {
+      observer.disconnect();
+    }, 10000);
   }
   window.__twitterViewer = window.__twitterViewer || {};
   window.__twitterViewer.selectHomeTab = selectHomeTab;
@@ -615,9 +629,9 @@ git commit -m "feat: add useAppStore with account/column CRUD"
 
 ```javascript
 // src-tauri/src/inject/area_remove.js
-(function() {
-  var SIDEBAR_STYLE_ID = 'twitter-viewer-sidebar-hide';
-  var INPUT_STYLE_ID = 'twitter-viewer-input-hide';
+(function () {
+  var SIDEBAR_STYLE_ID = "twitter-viewer-sidebar-hide";
+  var INPUT_STYLE_ID = "twitter-viewer-input-hide";
 
   function applyAreaRemove(enabled) {
     if (!enabled) {
@@ -628,26 +642,28 @@ git commit -m "feat: add useAppStore with account/column CRUD"
       return;
     }
     if (!document.getElementById(SIDEBAR_STYLE_ID)) {
-      var sidebarStyle = document.createElement('style');
+      var sidebarStyle = document.createElement("style");
       sidebarStyle.id = SIDEBAR_STYLE_ID;
-      sidebarStyle.textContent = "header[role='banner'] { display: none !important; }";
+      sidebarStyle.textContent =
+        "header[role='banner'] { display: none !important; }";
       document.head.appendChild(sidebarStyle);
     }
     if (!document.getElementById(INPUT_STYLE_ID)) {
-      var inputStyle = document.createElement('style');
+      var inputStyle = document.createElement("style");
       inputStyle.id = INPUT_STYLE_ID;
-      inputStyle.textContent = "div:has(> [role='progressbar'] + * div[data-testid*='tweetTextarea']) { display: none !important; }";
+      inputStyle.textContent =
+        "div:has(> [role='progressbar'] + * div[data-testid*='tweetTextarea']) { display: none !important; }";
       document.head.appendChild(inputStyle);
     }
     removeHomeTitleElement();
   }
 
   function removeHomeTitleElement() {
-    var h2s = document.querySelectorAll('h2');
+    var h2s = document.querySelectorAll("h2");
     for (var i = 0; i < h2s.length; i++) {
-      if (h2s[i].innerHTML.indexOf('ホーム') >= 0) {
+      if (h2s[i].innerHTML.indexOf("ホーム") >= 0) {
         var el = getElementWithNavAsSibling(h2s[i]);
-        if (el) el.style.display = 'none';
+        if (el) el.style.display = "none";
         break;
       }
     }
@@ -661,12 +677,17 @@ git commit -m "feat: add useAppStore with account/column CRUD"
 
   function debounce(fn, wait) {
     var t;
-    return function() { clearTimeout(t); t = setTimeout(fn, wait); };
+    return function () {
+      clearTimeout(t);
+      t = setTimeout(fn, wait);
+    };
   }
 
-  var debouncedApply = debounce(function() { applyAreaRemove(true); }, 500);
+  var debouncedApply = debounce(function () {
+    applyAreaRemove(true);
+  }, 500);
   var observer = new MutationObserver(debouncedApply);
-  var main = document.getElementsByTagName('main');
+  var main = document.getElementsByTagName("main");
   if (main.length > 0) {
     observer.observe(main[0], { childList: true, subtree: true });
   }
@@ -683,24 +704,30 @@ git commit -m "feat: add useAppStore with account/column CRUD"
 
 ```javascript
 // src-tauri/src/inject/auto_reload.js
-(function() {
+(function () {
   var timerId = null;
   var isEnabled = true;
   var intervalSec = 60;
   var isScrolling = false;
   var scrollTimer = null;
 
-  document.addEventListener('scroll', function() {
-    isScrolling = true;
-    clearTimeout(scrollTimer);
-    scrollTimer = setTimeout(function() { isScrolling = false; }, 1000);
-  }, true);
+  document.addEventListener(
+    "scroll",
+    function () {
+      isScrolling = true;
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(function () {
+        isScrolling = false;
+      }, 1000);
+    },
+    true,
+  );
 
   function startAutoReload(intervalSeconds) {
     stopAutoReload();
     intervalSec = intervalSeconds || intervalSec;
     isEnabled = true;
-    timerId = setInterval(function() {
+    timerId = setInterval(function () {
       if (!isScrolling && isEnabled) {
         window.location.reload();
       }
@@ -734,14 +761,14 @@ git commit -m "feat: add useAppStore with account/column CRUD"
 
 ```javascript
 // src-tauri/src/inject/custom_css.js
-(function() {
-  var CUSTOM_CSS_ID = 'twitter-viewer-custom-css';
+(function () {
+  var CUSTOM_CSS_ID = "twitter-viewer-custom-css";
 
   function applyCustomCSS(css) {
     var existing = document.getElementById(CUSTOM_CSS_ID);
     if (existing) existing.remove();
-    if (!css || css.trim() === '') return;
-    var style = document.createElement('style');
+    if (!css || css.trim() === "") return;
+    var style = document.createElement("style");
     style.id = CUSTOM_CSS_ID;
     style.textContent = css;
     document.head.appendChild(style);
@@ -756,29 +783,35 @@ git commit -m "feat: add useAppStore with account/column CRUD"
 
 ```javascript
 // src-tauri/src/inject/image_popup.js
-(function() {
+(function () {
   function isMediaLink(el) {
     if (!el) return false;
-    var href = el.getAttribute('href') || '';
+    var href = el.getAttribute("href") || "";
     // ツイートの画像/動画リンク: /username/status/xxx/photo/1 や /i/status/xxx
-    return /\/status\/\d+\/(photo|video)\//.test(href) ||
-           /\/i\/status\/\d+/.test(href);
+    return (
+      /\/status\/\d+\/(photo|video)\//.test(href) ||
+      /\/i\/status\/\d+/.test(href)
+    );
   }
 
-  document.addEventListener('click', function(e) {
-    var target = e.target;
-    if (!target) return;
-    var link = target.closest('a');
-    if (link && isMediaLink(link)) {
-      e.preventDefault();
-      e.stopPropagation();
-      var href = link.getAttribute('href');
-      var url = href.startsWith('http') ? href : 'https://x.com' + href;
-      if (window.__TAURI__ && window.__TAURI__.invoke) {
-        window.__TAURI__.invoke('open_popup_window', { url: url });
+  document.addEventListener(
+    "click",
+    function (e) {
+      var target = e.target;
+      if (!target) return;
+      var link = target.closest("a");
+      if (link && isMediaLink(link)) {
+        e.preventDefault();
+        e.stopPropagation();
+        var href = link.getAttribute("href");
+        var url = href.startsWith("http") ? href : "https://x.com" + href;
+        if (window.__TAURI__ && window.__TAURI__.invoke) {
+          window.__TAURI__.invoke("open_popup_window", { url: url });
+        }
       }
-    }
-  }, true);
+    },
+    true,
+  );
 })();
 ```
 
@@ -846,6 +879,7 @@ git commit -m "feat: add injection scripts for auto-reload, area-remove, custom 
 ## Task 5: Rust AppState
 
 **Files:**
+
 - Create: `src-tauri/src/state.rs`
 
 - [ ] **Step 1: state.rs を作成**
@@ -917,6 +951,7 @@ git commit -m "feat: add AppState with WebView registry for column-to-account ma
 ## Task 6: Rust 設定コマンド
 
 **Files:**
+
 - Create: `src-tauri/src/commands/mod.rs`
 - Modify: `src-tauri/src/lib.rs`
 
@@ -1009,7 +1044,7 @@ pub struct AppSettingsData {
 #[tauri::command]
 pub async fn load_settings(app: AppHandle) -> Result<AppSettingsData, String> {
     let store = app.store("settings.json").map_err(|e| e.to_string())?;
-    
+
     let settings = store.get("appSettings")
         .and_then(|v| serde_json::from_value(v).ok())
         .unwrap_or_else(|| AppSettingsData {
@@ -1021,7 +1056,7 @@ pub async fn load_settings(app: AppHandle) -> Result<AppSettingsData, String> {
                 window_bounds: WindowBounds { x: 0.0, y: 0.0, width: 1400.0, height: 900.0 },
             },
         });
-    
+
     Ok(settings)
 }
 
@@ -1079,6 +1114,7 @@ git commit -m "feat: add settings load/save Tauri commands"
 ## Task 7: Rust WebView コマンド
 
 **Files:**
+
 - Create: `src-tauri/src/commands/webview.rs`
 - Modify: `src-tauri/src/lib.rs`
 
@@ -1131,7 +1167,7 @@ pub async fn create_column_webview(
     let url = resolve_url(&args.column);
     let label = webview_label(&args.column.id);
     let data_dir = PathBuf::from(&args.data_directory);
-    
+
     let init_script = build_init_script(
         args.column.home_tab_name.as_deref(),
         args.column.settings.area_remove_enabled,
@@ -1141,7 +1177,7 @@ pub async fn create_column_webview(
     );
 
     let window = app.get_window("main").ok_or("main window not found")?;
-    
+
     window.add_child(
         WebviewBuilder::new(&label, WebviewUrl::External(url.parse().map_err(|e: url::ParseError| e.to_string())?))
             .initialization_script(&init_script)
@@ -1168,7 +1204,7 @@ pub async fn remove_column_webview(
     column_id: String,
 ) -> Result<(), String> {
     let label = webview_label(&column_id);
-    
+
     if let Some(webview) = app.get_webview(&label) {
         webview.close().map_err(|e| e.to_string())?;
     }
@@ -1195,7 +1231,7 @@ pub async fn resize_column_webview(
     bounds: ResizeBounds,
 ) -> Result<(), String> {
     let label = webview_label(&bounds.column_id);
-    
+
     if let Some(webview) = app.get_webview(&label) {
         webview.set_bounds(tauri::Rect {
             position: LogicalPosition::new(bounds.x, bounds.y).into(),
@@ -1221,7 +1257,7 @@ pub async fn open_popup_window(
     };
 
     let popup_label = format!("popup-{}", uuid::Uuid::new_v4());
-    
+
     tauri::WebviewWindowBuilder::new(
         &app,
         &popup_label,
@@ -1238,11 +1274,12 @@ pub async fn open_popup_window(
 ```
 
 注：`image_popup.js` 内の invoke 呼び出しを以下に変更して webview_label_caller を渡す：
+
 ```javascript
 // src-tauri/src/inject/image_popup.js の invoke 呼び出し部分を更新
-window.__TAURI__.invoke('open_popup_window', { 
+window.__TAURI__.invoke("open_popup_window", {
   webviewLabelCaller: window.__TAURI_INTERNALS__.metadata.currentWindow.label,
-  url: url 
+  url: url,
 });
 ```
 
@@ -1287,6 +1324,7 @@ git commit -m "feat: add WebView create/remove/resize/popup Tauri commands"
 ## Task 8: Rust アカウントコマンド
 
 **Files:**
+
 - Create: `src-tauri/src/commands/account.rs`
 - Modify: `src-tauri/src/lib.rs`
 
@@ -1301,7 +1339,7 @@ use std::path::PathBuf;
 pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
     let account_id = uuid::Uuid::new_v4().to_string();
     let window_label = format!("add-account-{}", &account_id[..8]);
-    
+
     let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let data_dir = app_data.join("accounts").join(format!("account-{}", &account_id));
     std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
@@ -1402,6 +1440,7 @@ git commit -m "feat: add account management Tauri commands"
 ## Task 9: ColumnHeader コンポーネント
 
 **Files:**
+
 - Create: `src/components/ColumnHeader/ColumnHeader.tsx`
 - Create: `src/components/ColumnHeader/ColumnHeader.module.scss`
 - Create: `src/components/ColumnHeader/ColumnHeader.test.tsx`
@@ -1635,6 +1674,7 @@ git commit -m "feat: add ColumnHeader component"
 ## Task 10: AddColumnDialog コンポーネント
 
 **Files:**
+
 - Create: `src/components/AddColumnDialog/AddColumnDialog.tsx`
 - Create: `src/components/AddColumnDialog/AddColumnDialog.module.scss`
 - Create: `src/components/AddColumnDialog/AddColumnDialog.test.tsx`
@@ -1906,7 +1946,8 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
   color: #888;
 }
 
-.select, .input {
+.select,
+.input {
   background: #0d0d0d;
   border: 1px solid #333;
   border-radius: 4px;
@@ -1978,6 +2019,7 @@ git commit -m "feat: add AddColumnDialog component"
 ## Task 11: AccountManager コンポーネント
 
 **Files:**
+
 - Create: `src/components/AccountManager/AccountManager.tsx`
 - Create: `src/components/AccountManager/AccountManager.module.scss`
 - Create: `src/components/AccountManager/AccountManager.test.tsx`
@@ -2139,7 +2181,9 @@ export const AccountManager: React.FC<AccountManagerProps> = ({
   color: #666;
   cursor: pointer;
   font-size: 16px;
-  &:hover { color: #aaa; }
+  &:hover {
+    color: #aaa;
+  }
 }
 
 .list {
@@ -2187,7 +2231,9 @@ export const AccountManager: React.FC<AccountManagerProps> = ({
   cursor: pointer;
   font-size: 12px;
   padding: 4px 10px;
-  &:hover { background: #2a1515; }
+  &:hover {
+    background: #2a1515;
+  }
 }
 
 .addBtn {
@@ -2223,6 +2269,7 @@ git commit -m "feat: add AccountManager component"
 ## Task 12: useColumns / useAccounts フック
 
 **Files:**
+
 - Create: `src/hooks/useColumns.ts`
 - Create: `src/hooks/useAccounts.ts`
 
@@ -2230,40 +2277,50 @@ git commit -m "feat: add AccountManager component"
 
 ```typescript
 // src/hooks/useAccounts.ts
-import { useCallback } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
-import { useEffect } from 'react';
-import { useAppStore } from '../store/useAppStore';
-import type { Account } from '../types';
+import { useCallback } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { useEffect } from "react";
+import { useAppStore } from "../store/useAppStore";
+import type { Account } from "../types";
 
 const ACCOUNT_COLORS = [
-  '#1d9bf0', '#e5c07b', '#98c379', '#c678dd',
-  '#e06c75', '#61afef', '#56b6c2', '#abb2bf',
+  "#1d9bf0",
+  "#e5c07b",
+  "#98c379",
+  "#c678dd",
+  "#e06c75",
+  "#61afef",
+  "#56b6c2",
+  "#abb2bf",
 ];
 
 export function useAccounts() {
   const { accounts, addAccount, removeAccount } = useAppStore();
 
   useEffect(() => {
-    const unlisten = listen<void>('account-login-complete', () => {
+    const unlisten = listen<void>("account-login-complete", () => {
       // ログイン完了時にフロントエンドがaddPendingAccountを呼び出す
     });
-    return () => { unlisten.then((fn) => fn()); };
+    return () => {
+      unlisten.then((fn) => fn());
+    };
   }, []);
 
   const startAddAccount = useCallback(async () => {
-    const result = await invoke<string>('open_add_account_window');
+    const result = await invoke<string>("open_add_account_window");
     const { accountId, dataDirectory, windowLabel } = JSON.parse(result);
-    
+
     // ログイン完了を待つ
     return new Promise<void>((resolve) => {
-      const unlisten = listen<void>('account-login-complete', async () => {
+      const unlisten = listen<void>("account-login-complete", async () => {
         unlisten.then((fn) => fn());
-        
-        const label = prompt('このアカウントの名前を入力してください') ?? `アカウント ${accounts.length + 1}`;
+
+        const label =
+          prompt("このアカウントの名前を入力してください") ??
+          `アカウント ${accounts.length + 1}`;
         const color = ACCOUNT_COLORS[accounts.length % ACCOUNT_COLORS.length];
-        
+
         const account: Account = {
           id: accountId,
           label,
@@ -2271,26 +2328,33 @@ export function useAccounts() {
           color,
           createdAt: new Date().toISOString(),
         };
-        
+
         addAccount(account);
-        
+
         // ログインウィンドウを閉じる
-        await invoke('close_window', { label: windowLabel }).catch(() => {});
+        await invoke("close_window", { label: windowLabel }).catch(() => {});
         resolve();
       });
     });
   }, [accounts, addAccount]);
 
-  const handleRemoveAccount = useCallback(async (id: string) => {
-    const account = accounts.find((a) => a.id === id);
-    if (!account) return;
-    
-    const confirmed = confirm(`「${account.label}」を削除しますか？セッションデータも削除されます。`);
-    if (!confirmed) return;
-    
-    await invoke('delete_account_data', { dataDirectory: account.dataDirectory });
-    removeAccount(id);
-  }, [accounts, removeAccount]);
+  const handleRemoveAccount = useCallback(
+    async (id: string) => {
+      const account = accounts.find((a) => a.id === id);
+      if (!account) return;
+
+      const confirmed = confirm(
+        `「${account.label}」を削除しますか？セッションデータも削除されます。`,
+      );
+      if (!confirmed) return;
+
+      await invoke("delete_account_data", {
+        dataDirectory: account.dataDirectory,
+      });
+      removeAccount(id);
+    },
+    [accounts, removeAccount],
+  );
 
   return { accounts, startAddAccount, removeAccount: handleRemoveAccount };
 }
@@ -2300,37 +2364,41 @@ export function useAccounts() {
 
 ```typescript
 // src/hooks/useColumns.ts
-import { useCallback, useEffect, useRef } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { useAppStore } from '../store/useAppStore';
-import type { Column } from '../types';
-import { resolveColumnUrl } from '../types';
+import { useCallback, useEffect, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { useAppStore } from "../store/useAppStore";
+import type { Column } from "../types";
+import { resolveColumnUrl } from "../types";
 
 const HEADER_HEIGHT = 36; // ColumnHeaderの高さ（px）
 const COLUMN_HEADER_Y = 0; // ヘッダはShell UIで表示するためWebViewのY開始点
 
 export function useColumns() {
-  const { columns, accounts, addColumn, removeColumn, updateColumn } = useAppStore();
+  const { columns, accounts, addColumn, removeColumn, updateColumn } =
+    useAppStore();
   const containerRef = useRef<HTMLDivElement>(null);
 
   // カラムのWebViewのboundsを計算する
-  const calculateBounds = useCallback((
-    columnIndex: number,
-    allColumns: Column[],
-    containerWidth: number,
-    containerHeight: number
-  ) => {
-    let x = 0;
-    for (let i = 0; i < columnIndex; i++) {
-      x += allColumns[i].width;
-    }
-    return {
-      x,
-      y: HEADER_HEIGHT,
-      width: allColumns[columnIndex].width,
-      height: containerHeight - HEADER_HEIGHT,
-    };
-  }, []);
+  const calculateBounds = useCallback(
+    (
+      columnIndex: number,
+      allColumns: Column[],
+      containerWidth: number,
+      containerHeight: number,
+    ) => {
+      let x = 0;
+      for (let i = 0; i < columnIndex; i++) {
+        x += allColumns[i].width;
+      }
+      return {
+        x,
+        y: HEADER_HEIGHT,
+        width: allColumns[columnIndex].width,
+        height: containerHeight - HEADER_HEIGHT,
+      };
+    },
+    [],
+  );
 
   // 全カラムのWebViewを作成（起動時に呼ぶ）
   const restoreColumns = useCallback(async () => {
@@ -2342,9 +2410,14 @@ export function useColumns() {
       const column = columns[i];
       const account = accounts.find((a) => a.id === column.accountId);
       if (!account) continue;
-      
-      const bounds = calculateBounds(i, columns, containerWidth, containerHeight);
-      await invoke('create_column_webview', {
+
+      const bounds = calculateBounds(
+        i,
+        columns,
+        containerWidth,
+        containerHeight,
+      );
+      await invoke("create_column_webview", {
         args: {
           column,
           dataDirectory: account.dataDirectory,
@@ -2355,33 +2428,44 @@ export function useColumns() {
   }, [columns, accounts, calculateBounds]);
 
   // カラム追加
-  const handleAddColumn = useCallback(async (column: Column) => {
-    const account = accounts.find((a) => a.id === column.accountId);
-    if (!account || !containerRef.current) return;
-    
-    const orderedColumns = [...columns, { ...column, order: columns.length }];
-    const containerHeight = containerRef.current.clientHeight;
-    const containerWidth = containerRef.current.clientWidth;
-    const bounds = calculateBounds(orderedColumns.length - 1, orderedColumns, containerWidth, containerHeight);
-    
-    await invoke('create_column_webview', {
-      args: {
-        column: { ...column, order: columns.length },
-        dataDirectory: account.dataDirectory,
-        ...bounds,
-      },
-    });
-    
-    addColumn({ ...column, order: columns.length });
-  }, [columns, accounts, addColumn, calculateBounds]);
+  const handleAddColumn = useCallback(
+    async (column: Column) => {
+      const account = accounts.find((a) => a.id === column.accountId);
+      if (!account || !containerRef.current) return;
+
+      const orderedColumns = [...columns, { ...column, order: columns.length }];
+      const containerHeight = containerRef.current.clientHeight;
+      const containerWidth = containerRef.current.clientWidth;
+      const bounds = calculateBounds(
+        orderedColumns.length - 1,
+        orderedColumns,
+        containerWidth,
+        containerHeight,
+      );
+
+      await invoke("create_column_webview", {
+        args: {
+          column: { ...column, order: columns.length },
+          dataDirectory: account.dataDirectory,
+          ...bounds,
+        },
+      });
+
+      addColumn({ ...column, order: columns.length });
+    },
+    [columns, accounts, addColumn, calculateBounds],
+  );
 
   // カラム削除
-  const handleRemoveColumn = useCallback(async (columnId: string) => {
-    await invoke('remove_column_webview', { columnId });
-    removeColumn(columnId);
-    // 残りカラムのboundsを再計算
-    await recalculateAllBounds();
-  }, [removeColumn]);
+  const handleRemoveColumn = useCallback(
+    async (columnId: string) => {
+      await invoke("remove_column_webview", { columnId });
+      removeColumn(columnId);
+      // 残りカラムのboundsを再計算
+      await recalculateAllBounds();
+    },
+    [removeColumn],
+  );
 
   // 全カラムのboundsを再計算して更新
   const recalculateAllBounds = useCallback(async () => {
@@ -2389,25 +2473,35 @@ export function useColumns() {
     const containerHeight = containerRef.current.clientHeight;
     const containerWidth = containerRef.current.clientWidth;
     const sortedColumns = [...columns].sort((a, b) => a.order - b.order);
-    
+
     for (let i = 0; i < sortedColumns.length; i++) {
-      const bounds = calculateBounds(i, sortedColumns, containerWidth, containerHeight);
-      await invoke('resize_column_webview', {
+      const bounds = calculateBounds(
+        i,
+        sortedColumns,
+        containerWidth,
+        containerHeight,
+      );
+      await invoke("resize_column_webview", {
         bounds: { columnId: sortedColumns[i].id, ...bounds },
       }).catch(console.error);
     }
   }, [columns, calculateBounds]);
 
   // カラム更新（設定変更）
-  const handleUpdateColumn = useCallback((id: string, patch: Partial<Column>) => {
-    updateColumn(id, patch);
-  }, [updateColumn]);
+  const handleUpdateColumn = useCallback(
+    (id: string, patch: Partial<Column>) => {
+      updateColumn(id, patch);
+    },
+    [updateColumn],
+  );
 
   // ウィンドウリサイズ時に全カラムを再配置
   useEffect(() => {
-    const handleResize = () => { recalculateAllBounds(); };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    const handleResize = () => {
+      recalculateAllBounds();
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, [recalculateAllBounds]);
 
   return {
@@ -2434,6 +2528,7 @@ git commit -m "feat: add useColumns and useAccounts hooks"
 ## Task 13: App.tsx メインレイアウト
 
 **Files:**
+
 - Modify: `src/App.tsx`
 - Create: `src/App.module.scss`
 
@@ -2733,6 +2828,7 @@ npm run tauri dev
 ```
 
 確認項目：
+
 1. アプリが起動してメインウィンドウが開く
 2. 「👤」ボタンからアカウント管理パネルが開く
 3. 「アカウントを追加」でX.comのログイン画面が開く
@@ -2754,6 +2850,7 @@ git commit -m "feat: implement main app layout with column management"
 ## Task 14: 最終確認・クリーンアップ
 
 **Files:**
+
 - Modify: `CALUDE.md` → `CLAUDE.md` (誤字修正)
 - Create: `.gitignore`
 

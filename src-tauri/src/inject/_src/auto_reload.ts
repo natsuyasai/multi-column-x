@@ -25,7 +25,9 @@
     const cells = section.querySelectorAll('[data-testid="cellInnerDiv"]');
     for (const cell of cells) {
       if (cell.querySelector("article")) continue;
-      const btn = cell.querySelector<HTMLButtonElement>('button[type="button"]');
+      const btn = cell.querySelector<HTMLButtonElement>(
+        'button[type="button"]',
+      );
       if (btn) return btn;
     }
     return null;
@@ -78,6 +80,7 @@
     }
   }
 
-  window.__twitterViewer = window.__twitterViewer || ({} as Window["__twitterViewer"]);
+  window.__twitterViewer =
+    window.__twitterViewer || ({} as Window["__twitterViewer"]);
   window.__twitterViewer.triggerReload = triggerReload;
 })();

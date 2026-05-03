@@ -1,7 +1,11 @@
 // src/App.tsx
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useAppStore } from "./store/useAppStore";
-import { useColumns, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_EXPANDED_WIDTH } from "./hooks/useColumns";
+import {
+  useColumns,
+  SIDEBAR_COLLAPSED_WIDTH,
+  SIDEBAR_EXPANDED_WIDTH,
+} from "./hooks/useColumns";
 import { useAccounts } from "./hooks/useAccounts";
 import { ColumnHeader } from "./components/ColumnHeader/ColumnHeader";
 import { AddColumnDialog } from "./components/AddColumnDialog/AddColumnDialog";
@@ -14,7 +18,15 @@ import type { ColumnSettings } from "./types";
 import styles from "./App.module.scss";
 
 const App: React.FC = () => {
-  const { loadSettings, isLoaded, accounts, globalSettings, updateGlobalSettings, sidebarExpanded, setSidebarExpanded } = useAppStore();
+  const {
+    loadSettings,
+    isLoaded,
+    accounts,
+    globalSettings,
+    updateGlobalSettings,
+    sidebarExpanded,
+    setSidebarExpanded,
+  } = useAppStore();
   const {
     columns,
     containerRef,
@@ -32,7 +44,9 @@ const App: React.FC = () => {
   } = useColumns();
   const { startAddAccount, removeAccount } = useAccounts();
 
-  const sidebarWidth = sidebarExpanded ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
+  const sidebarWidth = sidebarExpanded
+    ? SIDEBAR_EXPANDED_WIDTH
+    : SIDEBAR_COLLAPSED_WIDTH;
 
   const scrollbarWidth = useMemo(() => {
     return columns.reduce((sum, c) => sum + c.width, 0);
@@ -79,17 +93,20 @@ const App: React.FC = () => {
     setTimeout(() => recalculateAllBounds(), 220);
   }, [sidebarExpanded, setSidebarExpanded, recalculateAllBounds]);
 
-  const handleJumpToColumn = useCallback((columnId: string) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const sorted = [...columns].sort((a, b) => a.order - b.order);
-    let x = 0;
-    for (const col of sorted) {
-      if (col.id === columnId) break;
-      x += col.width;
-    }
-    el.scrollLeft = x;
-  }, [columns, scrollRef]);
+  const handleJumpToColumn = useCallback(
+    (columnId: string) => {
+      const el = scrollRef.current;
+      if (!el) return;
+      const sorted = [...columns].sort((a, b) => a.order - b.order);
+      let x = 0;
+      for (const col of sorted) {
+        if (col.id === columnId) break;
+        x += col.width;
+      }
+      el.scrollLeft = x;
+    },
+    [columns, scrollRef],
+  );
 
   const handleReload = useCallback(async (columnId: string) => {
     const webviewLabel = `column-${columnId}`;
@@ -127,15 +144,18 @@ const App: React.FC = () => {
     if (accounts.length === 0) return;
     const targetId = globalSettings.defaultAccountId ?? accounts[0].id;
     const account = accounts.find((a) => a.id === targetId) ?? accounts[0];
-    await invoke('open_compose_window', {
+    await invoke("open_compose_window", {
       accountId: account.id,
       dataDirectory: account.dataDirectory,
     }).catch(console.error);
   }, [accounts, globalSettings.defaultAccountId]);
 
-  const handleSetDefaultAccount = useCallback((id: string) => {
-    updateGlobalSettings({ defaultAccountId: id });
-  }, [updateGlobalSettings]);
+  const handleSetDefaultAccount = useCallback(
+    (id: string) => {
+      updateGlobalSettings({ defaultAccountId: id });
+    },
+    [updateGlobalSettings],
+  );
 
   if (!isLoaded) {
     return (

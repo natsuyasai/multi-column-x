@@ -1,7 +1,7 @@
-import React from 'react';
-import type { Account, Column } from '../../types';
-import { useAutoReload } from '../../hooks/useAutoReload';
-import styles from './ColumnHeader.module.scss';
+import React from "react";
+import type { Account, Column } from "../../types";
+import { useAutoReload } from "../../hooks/useAutoReload";
+import styles from "./ColumnHeader.module.scss";
 
 interface ColumnHeaderProps {
   column: Column;
@@ -47,7 +47,10 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
       <div className={styles.actions}>
         <button
           className={styles.actionBtn}
-          onClick={() => { onReload(column.id); reset(); }}
+          onClick={() => {
+            onReload(column.id);
+            reset();
+          }}
           aria-label="更新"
           title="更新"
         >
@@ -94,10 +97,15 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
 
 function getPageLabel(column: Column): string {
   switch (column.pageType) {
-    case 'home': return column.homeTabName ?? 'ホーム';
-    case 'notifications': return '通知';
-    case 'search': return `検索: ${column.searchQuery ?? ''}`;
-    case 'list': return 'リスト';
-    case 'custom': return 'カスタム';
+    case "home":
+      return column.homeTabName ?? "ホーム";
+    case "notifications":
+      return "通知";
+    case "search":
+      return `検索: ${column.searchQuery ?? ""}`;
+    case "list":
+      return "リスト";
+    case "custom":
+      return "カスタム";
   }
 }

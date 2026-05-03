@@ -15,11 +15,16 @@ interface SidebarProps {
 
 function getPageLabel(column: Column): string {
   switch (column.pageType) {
-    case "home": return column.homeTabName ?? "ホーム";
-    case "notifications": return "通知";
-    case "search": return `検索: ${column.searchQuery ?? ""}`;
-    case "list": return "リスト";
-    case "custom": return "カスタム";
+    case "home":
+      return column.homeTabName ?? "ホーム";
+    case "notifications":
+      return "通知";
+    case "search":
+      return `検索: ${column.searchQuery ?? ""}`;
+    case "list":
+      return "リスト";
+    case "custom":
+      return "カスタム";
   }
 }
 
@@ -43,7 +48,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const sorted = [...columns].sort((a, b) => a.order - b.order);
 
   return (
-    <div className={`${styles.sidebar}${expanded ? ` ${styles.expanded}` : ""}`}>
+    <div
+      className={`${styles.sidebar}${expanded ? ` ${styles.expanded}` : ""}`}
+    >
       {expanded ? (
         <button
           className={`${styles.composeTweetBtn} ${styles.composeTweetBtnExpanded}`}
@@ -66,7 +73,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className={styles.divider} />
 
       <div className={styles.columnList}>
-        {sorted.map((col) => (
+        {sorted.map((col) =>
           expanded ? (
             <button
               key={col.id}
@@ -75,7 +82,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               title={columnDisplayName(col, accounts)}
             >
               <span className={styles.icon}>📋</span>
-              <span className={styles.label}>{columnDisplayName(col, accounts)}</span>
+              <span className={styles.label}>
+                {columnDisplayName(col, accounts)}
+              </span>
             </button>
           ) : (
             <button
@@ -86,8 +95,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               📋
             </button>
-          )
-        ))}
+          ),
+        )}
       </div>
 
       {expanded ? (

@@ -1,4 +1,4 @@
-export type PageType = 'home' | 'notifications' | 'search' | 'list' | 'custom';
+export type PageType = "home" | "notifications" | "search" | "list" | "custom";
 
 export interface Account {
   id: string;
@@ -32,7 +32,7 @@ export interface Column {
 }
 
 export interface GlobalSettings {
-  theme: 'dark' | 'light';
+  theme: "dark" | "light";
   customCSS: string;
   windowBounds: { x: number; y: number; width: number; height: number };
   defaultAccountId?: string;
@@ -49,13 +49,13 @@ export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
   autoReloadInterval: 60,
   showCountdown: true,
   areaRemoveEnabled: true,
-  customCSS: '',
+  customCSS: "",
   visibleLinks: [],
 };
 
 export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
-  theme: 'dark',
-  customCSS: '',
+  theme: "dark",
+  customCSS: "",
   windowBounds: { x: 0, y: 0, width: 1400, height: 900 },
 };
 
@@ -68,15 +68,15 @@ interface ResolveColumnUrlInput {
 
 export function resolveColumnUrl(input: ResolveColumnUrlInput): string {
   switch (input.pageType) {
-    case 'home':
-      return 'https://x.com/home';
-    case 'notifications':
-      return 'https://x.com/notifications';
-    case 'search':
-      return `https://x.com/search?q=${encodeURIComponent(input.searchQuery ?? '')}`;
-    case 'list':
-      return `https://x.com/i/lists/${input.listId ?? ''}`;
-    case 'custom':
-      return input.customUrl ?? 'https://x.com/home';
+    case "home":
+      return "https://x.com/home";
+    case "notifications":
+      return "https://x.com/notifications";
+    case "search":
+      return `https://x.com/search?q=${encodeURIComponent(input.searchQuery ?? "")}`;
+    case "list":
+      return `https://x.com/i/lists/${input.listId ?? ""}`;
+    case "custom":
+      return input.customUrl ?? "https://x.com/home";
   }
 }

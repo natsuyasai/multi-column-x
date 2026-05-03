@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { v4 as uuidv4 } from 'uuid';
-import type { Account, Column, PageType } from '../../types';
-import { DEFAULT_COLUMN_SETTINGS } from '../../types';
-import styles from './AddColumnDialog.module.scss';
+import React, { useState } from "react";
+import { v4 as uuidv4 } from "uuid";
+import type { Account, Column, PageType } from "../../types";
+import { DEFAULT_COLUMN_SETTINGS } from "../../types";
+import styles from "./AddColumnDialog.module.scss";
 
 interface AddColumnDialogProps {
   accounts: Account[];
@@ -15,12 +15,12 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
   onAdd,
   onCancel,
 }) => {
-  const [accountId, setAccountId] = useState(accounts[0]?.id ?? '');
-  const [pageType, setPageType] = useState<PageType>('home');
-  const [homeTabName, setHomeTabName] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [listId, setListId] = useState('');
-  const [customUrl, setCustomUrl] = useState('');
+  const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
+  const [pageType, setPageType] = useState<PageType>("home");
+  const [homeTabName, setHomeTabName] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [listId, setListId] = useState("");
+  const [customUrl, setCustomUrl] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,10 +28,10 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
       id: uuidv4(),
       accountId,
       pageType,
-      homeTabName: pageType === 'home' && homeTabName ? homeTabName : undefined,
-      searchQuery: pageType === 'search' ? searchQuery : undefined,
-      listId: pageType === 'list' ? listId : undefined,
-      customUrl: pageType === 'custom' ? customUrl : undefined,
+      homeTabName: pageType === "home" && homeTabName ? homeTabName : undefined,
+      searchQuery: pageType === "search" ? searchQuery : undefined,
+      listId: pageType === "list" ? listId : undefined,
+      customUrl: pageType === "custom" ? customUrl : undefined,
       width: 350,
       order: 9999,
       settings: { ...DEFAULT_COLUMN_SETTINGS },
@@ -45,7 +45,9 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
         <h2 className={styles.title}>カラムを追加</h2>
 
         <div className={styles.field}>
-          <label className={styles.label} htmlFor="account-select">アカウント</label>
+          <label className={styles.label} htmlFor="account-select">
+            アカウント
+          </label>
           <select
             id="account-select"
             className={styles.select}
@@ -61,7 +63,9 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
         </div>
 
         <div className={styles.field}>
-          <label className={styles.label} htmlFor="page-type-select">ページタイプ</label>
+          <label className={styles.label} htmlFor="page-type-select">
+            ページタイプ
+          </label>
           <select
             id="page-type-select"
             className={styles.select}
@@ -76,9 +80,13 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
           </select>
         </div>
 
-        {pageType === 'home' && (
+        {pageType === "home" && (
           <div className={styles.field}>
-            <label className={styles.label} htmlFor="tab-name" aria-label="タブ名（任意）">
+            <label
+              className={styles.label}
+              htmlFor="tab-name"
+              aria-label="タブ名（任意）"
+            >
               タブ名（任意）
             </label>
             <input
@@ -92,9 +100,11 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
           </div>
         )}
 
-        {pageType === 'search' && (
+        {pageType === "search" && (
           <div className={styles.field}>
-            <label className={styles.label} htmlFor="search-query">検索クエリ</label>
+            <label className={styles.label} htmlFor="search-query">
+              検索クエリ
+            </label>
             <input
               id="search-query"
               className={styles.input}
@@ -106,9 +116,11 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
           </div>
         )}
 
-        {pageType === 'list' && (
+        {pageType === "list" && (
           <div className={styles.field}>
-            <label className={styles.label} htmlFor="list-id">リストID</label>
+            <label className={styles.label} htmlFor="list-id">
+              リストID
+            </label>
             <input
               id="list-id"
               className={styles.input}
@@ -120,9 +132,11 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
           </div>
         )}
 
-        {pageType === 'custom' && (
+        {pageType === "custom" && (
           <div className={styles.field}>
-            <label className={styles.label} htmlFor="custom-url">URL</label>
+            <label className={styles.label} htmlFor="custom-url">
+              URL
+            </label>
             <input
               id="custom-url"
               className={styles.input}

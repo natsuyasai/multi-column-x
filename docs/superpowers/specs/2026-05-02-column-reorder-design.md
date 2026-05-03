@@ -34,6 +34,7 @@ ColumnHeader に「←」「→」ボタンを追加し、隣のカラムと `or
 `moveColumn(columnId: string, direction: 'left' | 'right')` アクションを追加する。
 
 ロジック:
+
 1. `columns` を `order` でソートして配列を作る
 2. 対象カラムのインデックスを特定する
 3. `direction === 'left'` なら `index - 1`、`'right'` なら `index + 1` の隣カラムを取得する
@@ -46,6 +47,7 @@ ColumnHeader に「←」「→」ボタンを追加し、隣のカラムと `or
 `handleMoveColumn(columnId: string, direction: 'left' | 'right')` を追加して公開する。
 
 ロジック:
+
 1. `moveColumn(columnId, direction)` を呼ぶ
 2. `recalculateAllBounds()` を呼んで WebView 位置を更新する
 
@@ -70,6 +72,7 @@ interface ColumnHeaderProps {
 ```
 
 ボタン配置（actionsコンテナ内）:
+
 ```
 ↺ ← → ⚙ ✕
 ```
@@ -99,11 +102,11 @@ interface ColumnHeaderProps {
 
 ## 境界条件
 
-| 状態 | 動作 |
-|------|------|
+| 状態              | 動作                         |
+| ----------------- | ---------------------------- |
 | 先頭カラムで「←」 | ボタン disabled → 何もしない |
 | 末尾カラムで「→」 | ボタン disabled → 何もしない |
-| カラムが1つ | 両方 disabled |
+| カラムが1つ       | 両方 disabled                |
 
 ---
 
