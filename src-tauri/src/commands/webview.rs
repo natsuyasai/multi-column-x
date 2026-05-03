@@ -267,3 +267,43 @@ pub async fn switch_popup_session(
 pub async fn open_in_browser(url: String) -> Result<(), String> {
     tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn open_compose_window(
+    app: AppHandle,
+    #[allow(non_snake_case)] accountId: String,
+    #[allow(non_snake_case)] dataDirectory: String,
+) -> Result<(), String> {
+    let data_dir = std::path::PathBuf::from(&dataDirectory);
+
+    let accounts_json = load_accounts_json(&app);
+    let popup_init = crate::inject::build_popup_init_script(&accounts_json, &accountId);
+
+    let compose_label = format!("compose-{}", uuid::Uuid::new_v4());
+
+    const COMPOSE_WIDTH: f64 = 600.0;
+    const COMPOSE_WINDOW_HEIGHT: f64 = 580.0; // コンテンツ 540px + ツールバー 40px
+
+    let mut builder = tauri::WebviewWindowBuilder::new(
+        &app,
+        &compose_label,
+        WebviewUrl::External(parse_url("https://x.com/compose/post")?),
+    )
+    .title("X - ツイート")
+    .inner_size(COMPOSE_WIDTH, COMPOSE_WINDOW_HEIGHT)
+    .initialization_script(&popup_init)
+    .data_directory(data_dir);
+
+    if let Some(window) = app.get_window("main") {
+        if let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) {
+            let scale = window.scale_factor().unwrap_or(1.0);
+            let center_x = pos.x as f64 + (size.width as f64 - COMPOSE_WIDTH * scale) / 2.0;
+            let center_y = pos.y as f64 + (size.height as f64 - COMPOSE_WINDOW_HEIGHT * scale) / 2.0;
+            builder = builder.position(center_x / scale, center_y / scale);
+        }
+    }
+
+    builder.build().map_err(|e| e.to_string())?;
+
+    Ok(())
+}

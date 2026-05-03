@@ -25,6 +25,7 @@ pub fn run() {
             commands::account::notify_account_logged_in,
             commands::account::delete_account_data,
             commands::account::close_window,
+            commands::webview::open_compose_window,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
