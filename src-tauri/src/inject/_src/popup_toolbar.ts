@@ -82,15 +82,32 @@
   toolbar.appendChild(label);
   toolbar.appendChild(select);
 
+  function applyOffset() {
+    // x.com は body.paddingTop を無視する独自スクロールコンテナを使うため、
+    // react-root に直接 margin-top を当てる
+    const root = document.getElementById("react-root");
+    if (root) {
+      (root as HTMLElement).style.marginTop = TOOLBAR_HEIGHT + "px";
+      (root as HTMLElement).style.height = `calc(100vh - ${TOOLBAR_HEIGHT}px)`;
+    }
+  }
+
   function inject() {
-    if (document.body) {
-      document.body.style.paddingTop = TOOLBAR_HEIGHT + "px";
+    const doInject = () => {
       document.body.insertBefore(toolbar, document.body.firstChild);
-    } else {
-      document.addEventListener("DOMContentLoaded", function () {
-        document.body.style.paddingTop = TOOLBAR_HEIGHT + "px";
-        document.body.insertBefore(toolbar, document.body.firstChild);
+      applyOffset();
+
+      // react-root が後から mount される場合に備えて MutationObserver で追従
+      const observer = new MutationObserver(() => {
+        applyOffset();
       });
+      observer.observe(document.body, { childList: true, subtree: false });
+    };
+
+    if (document.body) {
+      doInject();
+    } else {
+      document.addEventListener("DOMContentLoaded", doInject);
     }
   }
 

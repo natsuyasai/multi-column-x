@@ -68,15 +68,26 @@
   });
   toolbar.appendChild(label);
   toolbar.appendChild(select);
+  function applyOffset() {
+    var root = document.getElementById("react-root");
+    if (root) {
+      root.style.marginTop = TOOLBAR_HEIGHT + "px";
+      root.style.height = "calc(100vh - " + TOOLBAR_HEIGHT + "px)";
+    }
+  }
   function inject() {
-    if (document.body) {
-      document.body.style.paddingTop = TOOLBAR_HEIGHT + "px";
+    function doInject() {
       document.body.insertBefore(toolbar, document.body.firstChild);
-    } else {
-      document.addEventListener("DOMContentLoaded", function() {
-        document.body.style.paddingTop = TOOLBAR_HEIGHT + "px";
-        document.body.insertBefore(toolbar, document.body.firstChild);
+      applyOffset();
+      var observer = new MutationObserver(function() {
+        applyOffset();
       });
+      observer.observe(document.body, { childList: true, subtree: false });
+    }
+    if (document.body) {
+      doInject();
+    } else {
+      document.addEventListener("DOMContentLoaded", doInject);
     }
   }
   inject();
