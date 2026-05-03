@@ -37,3 +37,11 @@ pub fn build_init_script(
 
     script
 }
+
+pub fn build_popup_init_script(accounts_json: &str, current_account_id: &str) -> String {
+    let popup_toolbar = include_str!("popup_toolbar.js");
+    format!(
+        "window.__tvAccounts={};window.__tvCurrentAccountId={:?};\n{}",
+        accounts_json, current_account_id, popup_toolbar
+    )
+}
