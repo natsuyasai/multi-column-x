@@ -74,12 +74,24 @@
       "Read(//c/Users/**)",
       "Bash(cargo build *)",
       "Bash(Select-Object -First 20)",
-      "Bash(Select-Object -First 30)"
+      "Bash(Select-Object -First 30)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\fuku\\\\Desktop\\\\twitter-viewer\\\\src\\\\store\\\\\" -Force)",
+      "PowerShell($env:Path += \";$env:USERPROFILE\\\\.cargo\\\\bin\"; Set-Location \"c:\\\\Users\\\\fuku\\\\Desktop\\\\twitter-viewer\\\\src-tauri\"; cargo check 2>&1)",
+      "Bash(export PATH=\"$PATH:$HOME/.cargo/bin\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\fuku\\\\Desktop\\\\twitter-viewer\\\\src-tauri\\\\src\\\\inject\" -Recurse -File)",
+      "Bash(C:\\\\Users\\\\fuku\\\\.claude\\\\plugins\\\\cache\\\\claude-plugins-official\\\\superpowers\\\\5.0.7\\\\scripts\\\\start-server.sh --project-dir \"C:\\\\Users\\\\fuku\\\\Desktop\\\\twitter-viewer\")",
+      "PowerShell(& \"C:\\\\Users\\\\fuku\\\\.claude\\\\plugins\\\\cache\\\\claude-plugins-official\\\\superpowers\\\\5.0.7\\\\scripts\\\\start-server.sh\" --project-dir \"C:\\\\Users\\\\fuku\\\\Desktop\\\\twitter-viewer\")",
+      "Bash(bash \"C:/Users/fuku/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/scripts/start-server.sh\" --project-dir \"C:/Users/fuku/Desktop/twitter-viewer\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\fuku\\\\Desktop\\\\twitter-viewer\\\\src-tauri\\\\src\\\\commands\" -File)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\fuku\\\\Desktop\\\\twitter-viewer\\\\src\" -Recurse -File)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "PowerShell(& \"$env:USERPROFILE\\\\.cargo\\\\bin\\\\cargo\" check --manifest-path \"c:\\\\Users\\\\fuku\\\\Desktop\\\\twitter-viewer\\\\src-tauri\\\\Cargo.toml\" 2>&1)"
     ],
     "additionalDirectories": [
       "c:\\Users\\fuku\\.claude\\projects\\c--Users-fuku-Desktop-twitter-viewer\\memory",
       "C:\\Users\\fuku\\Desktop\\twitter-viewer\\docs\\superpowers",
-      "c:\\Users\\fuku\\Desktop\\twitter-viewer\\docs\\superpowers\\specs"
+      "c:\\Users\\fuku\\Desktop\\twitter-viewer\\docs\\superpowers\\specs",
+      "c:\\Users\\fuku\\Desktop\\twitter-viewer\\docs\\superpowers\\plans"
     ]
   }
 }
