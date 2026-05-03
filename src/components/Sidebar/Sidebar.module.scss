@@ -3,12 +3,8 @@ $sidebar-expanded-width: 200px;
 $transition: 200ms ease;
 
 .sidebar {
-  position: fixed;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  z-index: 100;
   width: $sidebar-collapsed-width;
+  flex-shrink: 0;
   background: #0a0a0a;
   border-right: 1px solid #222;
   display: flex;

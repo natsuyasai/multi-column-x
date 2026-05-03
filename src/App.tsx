@@ -1,7 +1,7 @@
 // src/App.tsx
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useAppStore } from "./store/useAppStore";
-import { useColumns, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_EXPANDED_WIDTH } from "./hooks/useColumns";
+import { useColumns } from "./hooks/useColumns";
 import { useAccounts } from "./hooks/useAccounts";
 import { ColumnHeader } from "./components/ColumnHeader/ColumnHeader";
 import { AddColumnDialog } from "./components/AddColumnDialog/AddColumnDialog";
@@ -32,12 +32,9 @@ const App: React.FC = () => {
   } = useColumns();
   const { startAddAccount, removeAccount } = useAccounts();
 
-  const sidebarWidth = sidebarExpanded ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
-
   const scrollbarWidth = useMemo(() => {
-    const columnsWidth = columns.reduce((sum, c) => sum + c.width, 0);
-    return columnsWidth + sidebarWidth;
-  }, [columns, sidebarWidth]);
+    return columns.reduce((sum, c) => sum + c.width, 0);
+  }, [columns]);
 
   const [showAddColumn, setShowAddColumn] = useState(false);
   const [showAccountManager, setShowAccountManager] = useState(false);
@@ -128,7 +125,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className={styles.app} ref={containerRef} style={{ paddingLeft: sidebarWidth }}>
+    <div className={styles.app}>
       <Sidebar
         columns={columns}
         accounts={accounts}
@@ -140,58 +137,60 @@ const App: React.FC = () => {
         onJumpToColumn={handleJumpToColumn}
       />
 
-      <div
-        className={styles.headerRow}
-        onWheel={(e) => {
-          const el = scrollbarRef.current;
-          if (!el) return;
-          el.scrollLeft += e.deltaY !== 0 ? e.deltaY : e.deltaX;
-        }}
-      >
+      <div className={styles.appContent} ref={containerRef}>
         <div
-          className={styles.columnHeaders}
-          ref={scrollRef}
-          onScroll={handleHeaderScroll}
+          className={styles.headerRow}
+          onWheel={(e) => {
+            const el = scrollbarRef.current;
+            if (!el) return;
+            el.scrollLeft += e.deltaY !== 0 ? e.deltaY : e.deltaX;
+          }}
         >
-          {(() => {
-            const sorted = columns.slice().sort((a, b) => a.order - b.order);
-            return sorted.map((column, idx) => {
-              const account = accounts.find((a) => a.id === column.accountId);
-              if (!account) return null;
-              return (
-                <div
-                  key={column.id}
-                  style={{ width: column.width, flexShrink: 0 }}
-                >
-                  <ColumnHeader
-                    column={column}
-                    account={account}
-                    onReload={handleReload}
-                    onMoveLeft={(id) => handleMoveColumn(id, "left")}
-                    onMoveRight={(id) => handleMoveColumn(id, "right")}
-                    onSettings={setSettingsColumnId}
-                    onClose={handleRemoveColumn}
-                    isFirst={idx === 0}
-                    isLast={idx === sorted.length - 1}
-                  />
-                </div>
-              );
-            });
-          })()}
+          <div
+            className={styles.columnHeaders}
+            ref={scrollRef}
+            onScroll={handleHeaderScroll}
+          >
+            {(() => {
+              const sorted = columns.slice().sort((a, b) => a.order - b.order);
+              return sorted.map((column, idx) => {
+                const account = accounts.find((a) => a.id === column.accountId);
+                if (!account) return null;
+                return (
+                  <div
+                    key={column.id}
+                    style={{ width: column.width, flexShrink: 0 }}
+                  >
+                    <ColumnHeader
+                      column={column}
+                      account={account}
+                      onReload={handleReload}
+                      onMoveLeft={(id) => handleMoveColumn(id, "left")}
+                      onMoveRight={(id) => handleMoveColumn(id, "right")}
+                      onSettings={setSettingsColumnId}
+                      onClose={handleRemoveColumn}
+                      isFirst={idx === 0}
+                      isLast={idx === sorted.length - 1}
+                    />
+                  </div>
+                );
+              });
+            })()}
+          </div>
         </div>
-      </div>
 
-      <div className={styles.webviewArea} />
+        <div className={styles.webviewArea} />
 
-      <div
-        className={styles.bottomScrollbar}
-        ref={scrollbarRef}
-        onScroll={handleScrollbarScroll}
-      >
         <div
-          className={styles.bottomScrollbarInner}
-          style={{ width: scrollbarWidth }}
-        />
+          className={styles.bottomScrollbar}
+          ref={scrollbarRef}
+          onScroll={handleScrollbarScroll}
+        >
+          <div
+            className={styles.bottomScrollbarInner}
+            style={{ width: scrollbarWidth }}
+          />
+        </div>
       </div>
 
       {showAddColumn && accounts.length > 0 && (
