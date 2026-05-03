@@ -1,8 +1,10 @@
-use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewBuilder, WebviewUrl};
-use std::path::PathBuf;
-use crate::state::AppState;
-use crate::inject::build_init_script;
 use super::settings::ColumnData;
+use crate::inject::build_init_script;
+use crate::state::AppState;
+use std::path::PathBuf;
+use tauri::{
+    window, AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewBuilder, WebviewUrl,
+};
 
 fn webview_label(column_id: &str) -> String {
     format!("column-{}", column_id)
@@ -23,7 +25,10 @@ fn resolve_url(column: &ColumnData) -> String {
             "https://x.com/i/lists/{}",
             column.list_id.as_deref().unwrap_or("")
         ),
-        "custom" => column.custom_url.clone().unwrap_or_else(|| "https://x.com/home".to_string()),
+        "custom" => column
+            .custom_url
+            .clone()
+            .unwrap_or_else(|| "https://x.com/home".to_string()),
         _ => "https://x.com/home".to_string(),
     }
 }
@@ -44,10 +49,7 @@ pub struct CreateWebviewArgs {
 }
 
 #[tauri::command]
-pub async fn create_column_webview(
-    app: AppHandle,
-    args: CreateWebviewArgs,
-) -> Result<(), String> {
+pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> Result<(), String> {
     let url = resolve_url(&args.column);
     let label = webview_label(&args.column.id);
     let data_dir = PathBuf::from(&args.data_directory);
@@ -61,13 +63,15 @@ pub async fn create_column_webview(
 
     let window = app.get_window("main").ok_or("main window not found")?;
 
-    window.add_child(
-        WebviewBuilder::new(&label, WebviewUrl::External(parse_url(&url)?))
-            .initialization_script(&init_script)
-            .data_directory(data_dir),
-        LogicalPosition::new(args.x, args.y),
-        LogicalSize::new(args.width, args.height),
-    ).map_err(|e| e.to_string())?;
+    window
+        .add_child(
+            WebviewBuilder::new(&label, WebviewUrl::External(parse_url(&url)?))
+                .initialization_script(&init_script)
+                .data_directory(data_dir),
+            LogicalPosition::new(args.x, args.y),
+            LogicalSize::new(args.width, args.height),
+        )
+        .map_err(|e| e.to_string())?;
 
     let state = app.state::<AppState>();
     let mut registry = state.registry.lock().unwrap();
@@ -82,10 +86,7 @@ pub async fn create_column_webview(
 }
 
 #[tauri::command]
-pub async fn remove_column_webview(
-    app: AppHandle,
-    column_id: String,
-) -> Result<(), String> {
+pub async fn remove_column_webview(app: AppHandle, column_id: String) -> Result<(), String> {
     let label = webview_label(&column_id);
 
     if let Some(webview) = app.get_webview(&label) {
@@ -110,17 +111,16 @@ pub struct ResizeBounds {
 }
 
 #[tauri::command]
-pub async fn resize_column_webview(
-    app: AppHandle,
-    bounds: ResizeBounds,
-) -> Result<(), String> {
+pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Result<(), String> {
     let label = webview_label(&bounds.column_id);
 
     if let Some(webview) = app.get_webview(&label) {
-        webview.set_bounds(tauri::Rect {
-            position: LogicalPosition::new(bounds.x, bounds.y).into(),
-            size: LogicalSize::new(bounds.width, bounds.height).into(),
-        }).map_err(|e| e.to_string())?;
+        webview
+            .set_bounds(tauri::Rect {
+                position: LogicalPosition::new(bounds.x, bounds.y).into(),
+                size: LogicalSize::new(bounds.width, bounds.height).into(),
+            })
+            .map_err(|e| e.to_string())?;
     }
 
     Ok(())
@@ -135,33 +135,55 @@ pub async fn open_popup_window(
     let state = app.state::<AppState>();
     let data_dir = {
         let registry = state.registry.lock().unwrap();
-        registry.get_data_directory(&webview_label_caller)
+        registry
+            .get_data_directory(&webview_label_caller)
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from(""))
     };
 
     let popup_label = format!("popup-{}", uuid::Uuid::new_v4());
 
-    tauri::WebviewWindowBuilder::new(
+    let (window_pos, window_size) = if let Some(window) = app.get_window("main") {
+        if let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) {
+            (
+                LogicalPosition::new(pos.x as f64, pos.y as f64),
+                LogicalSize::new(size.width as f64, size.height as f64),
+            )
+        } else {
+            (
+                LogicalPosition::new(0.0, 0.0),
+                LogicalSize::new(800.0, 600.0),
+            )
+        }
+    } else {
+        (
+            LogicalPosition::new(0.0, 0.0),
+            LogicalSize::new(800.0, 600.0),
+        )
+    };
+
+    const PADDING: f64 = 50.0;
+
+    let builder = tauri::WebviewWindowBuilder::new(
         &app,
         &popup_label,
         WebviewUrl::External(parse_url(&url)?),
     )
     .title("X - メディア")
-    .inner_size(900.0, 700.0)
+    .inner_size(
+        window_size.width - (PADDING * 2.0),
+        window_size.height - (PADDING * 2.0),
+    )
     .data_directory(data_dir)
-    .build()
-    .map_err(|e| e.to_string())?;
+    .position(window_pos.x + PADDING, window_pos.y + PADDING);
+
+    builder.build().map_err(|e| e.to_string())?;
 
     Ok(())
 }
 
 #[tauri::command]
-pub async fn eval_in_webview(
-    app: AppHandle,
-    label: String,
-    script: String,
-) -> Result<(), String> {
+pub async fn eval_in_webview(app: AppHandle, label: String, script: String) -> Result<(), String> {
     if let Some(webview) = app.get_webview(&label) {
         webview.eval(&script).map_err(|e| e.to_string())?;
     }
