@@ -35,6 +35,7 @@ export interface GlobalSettings {
   theme: 'dark' | 'light';
   customCSS: string;
   windowBounds: { x: number; y: number; width: number; height: number };
+  defaultAccountId?: string;
 }
 
 export interface AppSettings {
