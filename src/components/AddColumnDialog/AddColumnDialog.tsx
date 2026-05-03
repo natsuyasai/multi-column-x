@@ -39,9 +39,10 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
       width: 350,
       order: 9999,
       gridRow: 1,
-      gridCol: existingColumns.length > 0
-        ? Math.max(...existingColumns.map((c) => c.gridCol)) + 1
-        : 1,
+      gridCol: (() => {
+        const occupied = existingColumns.map((c) => c.gridCol).filter((g) => g >= 1);
+        return occupied.length > 0 ? Math.max(...occupied) + 1 : 1;
+      })(),
       heightMode: "auto",
       settings: {
         ...DEFAULT_COLUMN_SETTINGS,
