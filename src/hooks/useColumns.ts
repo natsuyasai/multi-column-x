@@ -29,7 +29,8 @@ export function calculateGridBounds(
   opts: GridBoundsOptions,
 ): Record<string, ColumnBounds> {
   const { containerHeight, scrollLeft, sidebarWidth, headerHeight, scrollbarHeight } = opts;
-  const availableHeight = containerHeight - headerHeight - scrollbarHeight;
+  // 縦に積まれたカラムはそれぞれヘッダーを持つため、列ごとに可用高さが異なる
+  const totalHeight = containerHeight - scrollbarHeight;
 
   // gridCol でグループ化
   const byCol = new Map<number, Column[]>();
@@ -47,7 +48,11 @@ export function calculateGridBounds(
   for (const colNum of sortedCols) {
     const colGroup = byCol.get(colNum)!.slice().sort((a, b) => a.gridRow - b.gridRow);
 
-    // fixed 高さの合計を計算
+    // 各カラムにヘッダー分を引いた残りの高さがWebView領域
+    const headersTotal = colGroup.length * headerHeight;
+    const availableHeight = Math.max(0, totalHeight - headersTotal);
+
+    // fixed WebView 高さの合計を計算
     let fixedTotal = 0;
     let autoCount = 0;
     for (const col of colGroup) {
@@ -63,22 +68,24 @@ export function calculateGridBounds(
     }
     const autoHeight = autoCount > 0 ? Math.max(0, availableHeight - fixedTotal) / autoCount : 0;
 
-    let yOffset = headerHeight;
+    // yOffset はヘッダー上端の絶対y座標（0始まり）
+    let yOffset = 0;
     for (const col of colGroup) {
-      let height: number;
+      let webviewHeight: number;
       if (col.heightMode === "fixed" && col.heightValue != null) {
-        height = col.heightUnit === "%" ? availableHeight * col.heightValue / 100 : col.heightValue;
+        webviewHeight = col.heightUnit === "%" ? availableHeight * col.heightValue / 100 : col.heightValue;
       } else {
-        height = autoHeight;
+        webviewHeight = autoHeight;
       }
-      const yNext = yOffset + height;
+      const webviewHeightRounded = Math.round(webviewHeight);
+      // y = ヘッダー上端、bounds.height = WebView高さのみ（ヘッダー除く）
       result[col.id] = {
         x: xOffset - scrollLeft,
-        y: Math.round(yOffset),
+        y: Math.round(yOffset) + headerHeight,
         width: col.width,
-        height: Math.round(yNext) - Math.round(yOffset),
+        height: webviewHeightRounded,
       };
-      yOffset = yNext;
+      yOffset += headerHeight + webviewHeight;
     }
 
     // 同じ gridCol 内の最大 width を使って x を進める

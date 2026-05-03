@@ -116,7 +116,7 @@ describe("migrateColumn", () => {
         visibleLinks: [],
       },
     };
-    const result = migrateColumn(legacy as Column);
+    const result = migrateColumn(legacy as unknown as Column);
     expect(result.gridRow).toBe(1);
     expect(result.gridCol).toBe(3); // order + 1
     expect(result.heightMode).toBe("auto");

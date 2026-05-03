@@ -41,7 +41,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
 
   return (
     <div className={styles.overlay}>
-      <div className={styles.panel}>
+      <div className={`${styles.panel} ${activeTab === "layout" ? styles.panelWide : ""}`}>
         <div className={styles.header}>
           <h2 className={styles.title}>アプリ設定</h2>
           <button

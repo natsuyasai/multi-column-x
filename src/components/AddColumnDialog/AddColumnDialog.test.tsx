@@ -28,6 +28,7 @@ describe("AddColumnDialog", () => {
       <AddColumnDialog
         accounts={mockAccounts}
         globalSettings={mockGlobalSettings}
+        existingColumns={[]}
         onAdd={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -40,6 +41,7 @@ describe("AddColumnDialog", () => {
       <AddColumnDialog
         accounts={mockAccounts}
         globalSettings={mockGlobalSettings}
+        existingColumns={[]}
         onAdd={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -56,6 +58,7 @@ describe("AddColumnDialog", () => {
       <AddColumnDialog
         accounts={mockAccounts}
         globalSettings={mockGlobalSettings}
+        existingColumns={[]}
         onAdd={vi.fn()}
         onCancel={onCancel}
       />,

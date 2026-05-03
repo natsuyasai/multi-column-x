@@ -21,13 +21,18 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
   const [draft, setDraft] = useState<Column[]>(() =>
     columns.map((c) => ({ ...c }))
   );
-  const [rows, setRows] = useState(() => Math.max(...columns.map((c) => c.gridRow), 1));
-  const [cols, setCols] = useState(() => Math.max(...columns.map((c) => c.gridCol), 1));
+  const [cols, setCols] = useState(() => Math.max(...columns.map((c) => c.gridCol).filter((g) => g >= 1), 1));
   const [selectedCellKey, setSelectedCellKey] = useState<CellKey | null>(null);
   const [pendingCell, setPendingCell] = useState<CellKey | null>(null);
 
-  const assigned = draft.filter((c) => c.gridRow >= 1 && c.gridCol >= 1 && c.gridRow <= rows && c.gridCol <= cols);
-  const unassigned = draft.filter((c) => !(c.gridRow >= 1 && c.gridCol >= 1 && c.gridRow <= rows && c.gridCol <= cols));
+  // 列ごとの行数（各列の最大gridRowを使用）
+  const rowCountForCol = useCallback((colNum: number): number => {
+    const assigned = draft.filter((c) => c.gridCol === colNum && c.gridRow >= 1 && c.gridCol >= 1);
+    return Math.max(...assigned.map((c) => c.gridRow), 1);
+  }, [draft]);
+
+  const assigned = draft.filter((c) => c.gridRow >= 1 && c.gridCol >= 1 && c.gridCol <= cols);
+  const unassigned = draft.filter((c) => !(c.gridRow >= 1 && c.gridCol >= 1 && c.gridCol <= cols));
 
   const selectedColumn = selectedCellKey
     ? assigned.find((c) => c.gridRow === selectedCellKey.row && c.gridCol === selectedCellKey.col) ?? null
@@ -35,7 +40,9 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
 
   const handleCellClick = useCallback((row: number, col: number) => {
     setDraft((prev) => {
-      const colAtCell = prev.find((c) => c.gridRow === row && c.gridCol === col && c.gridRow >= 1 && c.gridCol >= 1) ?? null;
+      const colAtCell = prev.find(
+        (c) => c.gridRow === row && c.gridCol === col && c.gridRow >= 1 && c.gridCol >= 1
+      ) ?? null;
       if (colAtCell) {
         setSelectedCellKey({ row, col });
         setPendingCell(null);
@@ -86,73 +93,89 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
   return (
     <div className={styles.container}>
       <div className={styles.gridSizeRow}>
-        <span>グリッドサイズ:</span>
-        <span>行</span>
-        <input
-          type="number"
-          className={styles.numberInput}
-          min={1}
-          value={rows}
-          onChange={(e) => setRows(Math.max(1, Number(e.target.value)))}
-        />
-        <span>×</span>
-        <span>列</span>
+        <span>列数:</span>
         <input
           type="number"
           className={styles.numberInput}
           min={1}
           value={cols}
-          onChange={(e) => setCols(Math.max(1, Number(e.target.value)))}
+          onChange={(e) => {
+            const newCols = Math.max(1, Number(e.target.value));
+            setCols(newCols);
+            // 範囲外に出たカラムを未割当に戻す
+            setDraft((prev) =>
+              prev.map((c) => c.gridCol > newCols ? { ...c, gridRow: 0, gridCol: 0 } : c)
+            );
+            setSelectedCellKey(null);
+            setPendingCell(null);
+          }}
         />
       </div>
 
       <div className={styles.body}>
         <div className={styles.gridPreview}>
-          {Array.from({ length: rows }, (_, rIdx) => (
-            <div key={rIdx} className={styles.gridRow}>
-              {Array.from({ length: cols }, (_, cIdx) => {
-                const r = rIdx + 1;
-                const c = cIdx + 1;
-                const colAtCell = assigned.find((col) => col.gridRow === r && col.gridCol === c) ?? null;
-                const isSelected = selectedCellKey?.row === r && selectedCellKey?.col === c;
-                const isPending = pendingCell?.row === r && pendingCell?.col === c;
+          {Array.from({ length: cols }, (_, cIdx) => {
+            const colNum = cIdx + 1;
+            const rows = rowCountForCol(colNum);
+            return (
+              <div key={cIdx} className={styles.gridColumn}>
+                <div className={styles.gridColHeader}>列 {colNum}</div>
+                <div className={styles.gridColCells}>
+                  {Array.from({ length: rows }, (_, rIdx) => {
+                    const r = rIdx + 1;
+                    const colAtCell = assigned.find((col) => col.gridRow === r && col.gridCol === colNum) ?? null;
+                    const isSelected = selectedCellKey?.row === r && selectedCellKey?.col === colNum;
+                    const isPending = pendingCell?.row === r && pendingCell?.col === colNum;
 
-                if (colAtCell) {
-                  return (
-                    <div
-                      key={cIdx}
-                      className={`${styles.cell} ${styles.cellAssigned} ${isSelected ? styles.cellSelected : ""}`}
-                      onClick={() => handleCellClick(r, c)}
-                    >
-                      <span className={styles.cellLabel}>{r},{c}</span>
-                      <span className={styles.cellName}>{getColumnLabel(colAtCell)}</span>
-                      <span className={styles.cellHeight}>
-                        {colAtCell.heightMode === "fixed"
-                          ? `${colAtCell.heightValue}${colAtCell.heightUnit}`
-                          : "均等"}
-                      </span>
-                      <button
-                        className={styles.removeBtn}
-                        aria-label="割り当て解除"
-                        onClick={(e) => { e.stopPropagation(); handleRemove(colAtCell.id); }}
+                    if (colAtCell) {
+                      return (
+                        <div
+                          key={rIdx}
+                          className={`${styles.cell} ${styles.cellAssigned} ${isSelected ? styles.cellSelected : ""}`}
+                          onClick={() => handleCellClick(r, colNum)}
+                        >
+                          <span className={styles.cellName}>{getColumnLabel(colAtCell)}</span>
+                          <span className={styles.cellHeight}>
+                            {colAtCell.heightMode === "fixed"
+                              ? `${colAtCell.heightValue}${colAtCell.heightUnit}`
+                              : "均等"}
+                          </span>
+                          <button
+                            className={styles.removeBtn}
+                            aria-label="割り当て解除"
+                            onClick={(e) => { e.stopPropagation(); handleRemove(colAtCell.id); }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div
+                        key={rIdx}
+                        className={`${styles.cell} ${isPending ? styles.cellPending : ""}`}
+                        onClick={() => handleCellClick(r, colNum)}
                       >
-                        ×
-                      </button>
-                    </div>
-                  );
-                }
-                return (
-                  <div
-                    key={cIdx}
-                    className={`${styles.cell} ${isPending ? styles.cellSelected : ""}`}
-                    onClick={() => handleCellClick(r, c)}
+                        {pendingCell ? "← ここに配置" : "+"}
+                      </div>
+                    );
+                  })}
+                  <button
+                    className={styles.addRowBtn}
+                    onClick={() => {
+                      // この列に新しい空行を追加（何もしない — グリッドは最大gridRowで自動伸長）
+                      // 未割当カラムをここに割り当てるために pendingCell をセット
+                      const newRow = rows + 1;
+                      setPendingCell({ row: newRow, col: colNum });
+                      setSelectedCellKey(null);
+                    }}
                   >
-                    +
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+                    + 行を追加
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <div className={styles.unassigned}>
@@ -160,7 +183,7 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
           {unassigned.map((col) => (
             <div
               key={col.id}
-              className={`${styles.unassignedItem} ${pendingCell ? styles.unassignedItemSelected : ""}`}
+              className={`${styles.unassignedItem} ${pendingCell ? styles.unassignedItemActive : ""}`}
               onClick={() => pendingCell && handleAssign(col.id)}
             >
               <div className={styles.unassignedName}>{getColumnLabel(col)}</div>
@@ -169,12 +192,19 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
           {unassigned.length === 0 && (
             <div className={styles.emptyNotice}>なし</div>
           )}
+          {pendingCell && (
+            <div className={styles.pendingHint}>
+              クリックして列 {pendingCell.col} の行 {pendingCell.row} に配置
+            </div>
+          )}
         </div>
       </div>
 
       {selectedColumn && (
         <div className={styles.heightSettings}>
-          <div className={styles.heightSettingsTitle}>高さ設定</div>
+          <div className={styles.heightSettingsTitle}>
+            高さ設定 — {getColumnLabel(selectedColumn)}
+          </div>
           <div className={styles.heightRow}>
             <label className={styles.radioLabel}>
               <input

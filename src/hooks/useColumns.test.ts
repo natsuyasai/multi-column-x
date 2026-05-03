@@ -25,7 +25,6 @@ function makeCol(overrides: Partial<Column> & Pick<Column, "id" | "gridCol" | "g
 
 describe("calculateGridBounds", () => {
   const opts = {
-    containerWidth: 1000,
     containerHeight: 800,
     scrollLeft: 0,
     sidebarWidth: 40,
@@ -33,25 +32,27 @@ describe("calculateGridBounds", () => {
     scrollbarHeight: 12,
   };
 
-  it("横一列（gridCol=1 のみ）の場合、既存と同じ結果を返す", () => {
+  // 1カラム: headersTotal=36, available=800-12-36=752
+  it("横一列（gridCol=1 のみ）の場合、y=headerHeight でheight=available", () => {
     const cols = [makeCol({ id: "c1", gridCol: 1, gridRow: 1 })];
     const result = calculateGridBounds(cols, opts);
     expect(result["c1"]).toEqual({ x: 40, y: 36, width: 350, height: 752 });
-    // height = 800 - 36 - 12 = 752
   });
 
-  it("同じ gridCol に2つのカラムがある場合、縦に積む（autoは均等分割）", () => {
+  // 2カラム縦積み: headersTotal=72, available=800-12-72=716, autoHeight=358
+  it("同じ gridCol に2つのカラムがある場合、縦に積む（autoは均等分割、各行にヘッダー分を含む）", () => {
     const cols = [
       makeCol({ id: "c1", gridCol: 1, gridRow: 1 }),
       makeCol({ id: "c2", gridCol: 1, gridRow: 2 }),
     ];
     const result = calculateGridBounds(cols, opts);
     expect(result["c1"].y).toBe(36);
-    expect(result["c1"].height).toBe(376); // 752 / 2 = 376
-    expect(result["c2"].y).toBe(36 + 376);
-    expect(result["c2"].height).toBe(376);
+    expect(result["c1"].height).toBe(358); // 716 / 2 = 358
+    expect(result["c2"].y).toBe(36 + 358 + 36); // header + webview + header
+    expect(result["c2"].height).toBe(358);
   });
 
+  // fixed px + auto: available=716, c1.height=300, c2.height=716-300=416
   it("heightMode=fixed px のカラムは指定高さで、残りは均等割り", () => {
     const cols = [
       makeCol({ id: "c1", gridCol: 1, gridRow: 1, heightMode: "fixed", heightValue: 300, heightUnit: "px" }),
@@ -59,18 +60,19 @@ describe("calculateGridBounds", () => {
     ];
     const result = calculateGridBounds(cols, opts);
     expect(result["c1"].height).toBe(300);
-    expect(result["c2"].y).toBe(36 + 300);
-    expect(result["c2"].height).toBe(752 - 300); // 残り全部
+    expect(result["c2"].y).toBe(36 + 300 + 36); // c1.y + c1.height + c2.header
+    expect(result["c2"].height).toBe(416); // 716 - 300
   });
 
-  it("heightMode=fixed % のカラムはコンテナ高さに対する割合", () => {
+  // fixed % + auto: available=716, c1.height=716*0.5=358, c2.height=358
+  it("heightMode=fixed % のカラムはavailableHeightに対する割合", () => {
     const cols = [
       makeCol({ id: "c1", gridCol: 1, gridRow: 1, heightMode: "fixed", heightValue: 50, heightUnit: "%" }),
       makeCol({ id: "c2", gridCol: 1, gridRow: 2 }),
     ];
     const result = calculateGridBounds(cols, opts);
-    expect(result["c1"].height).toBe(376); // 752 * 0.5 = 376
-    expect(result["c2"].height).toBe(376);
+    expect(result["c1"].height).toBe(358); // 716 * 0.5 = 358
+    expect(result["c2"].height).toBe(358);
   });
 
   it("異なる gridCol は x 座標をずらす", () => {

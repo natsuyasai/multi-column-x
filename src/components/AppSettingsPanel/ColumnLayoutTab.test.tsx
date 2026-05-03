@@ -35,7 +35,7 @@ describe("ColumnLayoutTab", () => {
   it("セルをクリックして高さ設定が表示される", () => {
     render(<ColumnLayoutTab columns={mockColumns} onApply={vi.fn()} onCancel={vi.fn()} />);
     fireEvent.click(screen.getByText("home"));
-    expect(screen.getByText("高さ設定")).toBeInTheDocument();
+    expect(screen.getByText(/高さ設定/)).toBeInTheDocument();
   });
 
   it("適用ボタンでonApplyが呼ばれる", () => {
