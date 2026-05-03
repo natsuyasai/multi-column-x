@@ -213,23 +213,15 @@ pub async fn report_webview_scroll(app: AppHandle, delta: f64) -> Result<(), Str
     app.emit("webview-scroll", delta).map_err(|e| e.to_string())
 }
 
-#[derive(serde::Deserialize)]
-pub struct SwitchPopupSessionArgs {
-    #[serde(rename = "popupLabel")]
-    pub popup_label: String,
-    #[serde(rename = "accountId")]
-    pub account_id: String,
-    #[serde(rename = "dataDirectory")]
-    pub data_directory: String,
-    pub url: String,
-}
-
 #[tauri::command]
 pub async fn switch_popup_session(
     app: AppHandle,
-    args: SwitchPopupSessionArgs,
+    #[allow(non_snake_case)] popupLabel: String,
+    #[allow(non_snake_case)] accountId: String,
+    #[allow(non_snake_case)] dataDirectory: String,
+    url: String,
 ) -> Result<(), String> {
-    let (pos, size) = if let Some(window) = app.get_webview_window(&args.popup_label) {
+    let (pos, size) = if let Some(window) = app.get_webview_window(&popupLabel) {
         let pos = window.outer_position().ok();
         let size = window.outer_size().ok();
         window.close().map_err(|e| e.to_string())?;
@@ -240,15 +232,15 @@ pub async fn switch_popup_session(
     };
 
     let new_label = format!("popup-{}", uuid::Uuid::new_v4());
-    let data_dir = PathBuf::from(&args.data_directory);
+    let data_dir = PathBuf::from(&dataDirectory);
 
     let accounts_json = load_accounts_json(&app);
-    let popup_init = crate::inject::build_popup_init_script(&accounts_json, &args.account_id);
+    let popup_init = crate::inject::build_popup_init_script(&accounts_json, &accountId);
 
     let mut builder = tauri::WebviewWindowBuilder::new(
         &app,
         &new_label,
-        WebviewUrl::External(parse_url(&args.url)?),
+        WebviewUrl::External(parse_url(&url)?),
     )
     .title("X - メディア")
     .initialization_script(&popup_init)
