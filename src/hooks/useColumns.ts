@@ -6,8 +6,8 @@ import type { Column } from '../types';
 
 const HEADER_HEIGHT = 36;            // ColumnHeader の高さ（px）
 const SCROLLBAR_HEIGHT = 12;         // 下部スクロールバーの高さ（px）
-const SIDEBAR_COLLAPSED_WIDTH = 40;  // サイドバー折りたたみ時の幅（px）
-const SIDEBAR_EXPANDED_WIDTH = 70;   // サイドバー展開時の幅（px）
+export const SIDEBAR_COLLAPSED_WIDTH = 40;  // サイドバー折りたたみ時の幅（px）
+export const SIDEBAR_EXPANDED_WIDTH = 70;   // サイドバー展開時の幅（px）
 
 export function useColumns() {
   const { columns, accounts, addColumn, removeColumn, updateColumn, moveColumn } = useAppStore();
