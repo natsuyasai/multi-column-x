@@ -6,6 +6,36 @@ use state::AppState;
 use tauri::{Manager, PhysicalPosition, PhysicalSize};
 use tauri_plugin_store::StoreExt;
 
+fn save_window_bounds(window: &tauri::Window) {
+    use crate::commands::settings::{AppSettingsData, GlobalSettingsData, WindowBounds};
+    let Ok(pos) = window.outer_position() else { return };
+    let Ok(size) = window.outer_size() else { return };
+    let Ok(store) = window.app_handle().store("settings.json") else { return };
+    let mut settings = store
+        .get("appSettings")
+        .and_then(|v| serde_json::from_value::<AppSettingsData>(v).ok())
+        .unwrap_or_else(|| AppSettingsData {
+            accounts: vec![],
+            columns: vec![],
+            global_settings: GlobalSettingsData {
+                theme: "dark".to_string(),
+                custom_css: String::new(),
+                window_bounds: WindowBounds { x: 0.0, y: 0.0, width: 1400.0, height: 900.0 },
+            },
+        });
+    settings.global_settings.window_bounds = WindowBounds {
+        x: pos.x as f64,
+        y: pos.y as f64,
+        width: size.width as f64,
+        height: size.height as f64,
+    };
+    let Ok(value) = serde_json::to_value(&settings) else { return };
+    store.set("appSettings", value);
+    if let Err(e) = store.save() {
+        eprintln!("[twitter-viewer] failed to save window bounds: {e}");
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -46,27 +76,7 @@ pub fn run() {
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 if window.label() == "main" {
-                    if let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) {
-                        if let Ok(store) = window.app_handle().store("settings.json") {
-                            use crate::commands::settings::AppSettingsData;
-                            let updated = store
-                                .get("appSettings")
-                                .and_then(|v| serde_json::from_value::<AppSettingsData>(v).ok())
-                                .map(|mut s| {
-                                    s.global_settings.window_bounds.x = pos.x as f64;
-                                    s.global_settings.window_bounds.y = pos.y as f64;
-                                    s.global_settings.window_bounds.width = size.width as f64;
-                                    s.global_settings.window_bounds.height = size.height as f64;
-                                    s
-                                });
-                            if let Some(settings) = updated {
-                                if let Ok(value) = serde_json::to_value(&settings) {
-                                    store.set("appSettings", value);
-                                    let _ = store.save();
-                                }
-                            }
-                        }
-                    }
+                    save_window_bounds(window);
                 }
             }
         })
