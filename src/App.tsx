@@ -7,13 +7,14 @@ import { ColumnHeader } from "./components/ColumnHeader/ColumnHeader";
 import { AddColumnDialog } from "./components/AddColumnDialog/AddColumnDialog";
 import { AccountManager } from "./components/AccountManager/AccountManager";
 import { SettingsPanel } from "./components/SettingsPanel/SettingsPanel";
+import { Sidebar } from "./components/Sidebar/Sidebar";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { ColumnSettings } from "./types";
 import styles from "./App.module.scss";
 
 const App: React.FC = () => {
-  const { loadSettings, isLoaded, accounts } = useAppStore();
+  const { loadSettings, isLoaded, accounts, sidebarExpanded, setSidebarExpanded } = useAppStore();
   const {
     columns,
     containerRef,
@@ -31,13 +32,12 @@ const App: React.FC = () => {
   } = useColumns();
   const { startAddAccount, removeAccount } = useAccounts();
 
-  const toolbarRef = React.useRef<HTMLDivElement>(null);
+  const sidebarWidth = sidebarExpanded ? 70 : 40;
+
   const scrollbarWidth = useMemo(() => {
     const columnsWidth = columns.reduce((sum, c) => sum + c.width, 0);
-    if (!toolbarRef.current) return columnsWidth;
-    const toolbarWidth = toolbarRef.current.offsetWidth;
-    return columnsWidth + toolbarWidth;
-  }, [toolbarRef, columns]);
+    return columnsWidth + sidebarWidth;
+  }, [columns, sidebarWidth]);
 
   const [showAddColumn, setShowAddColumn] = useState(false);
   const [showAccountManager, setShowAccountManager] = useState(false);
@@ -69,6 +69,11 @@ const App: React.FC = () => {
       recalculateAllBounds();
     }
   }, [dialogOpen]);
+
+  const handleToggleSidebar = useCallback(() => {
+    setSidebarExpanded(!sidebarExpanded);
+    setTimeout(() => recalculateAllBounds(), 220);
+  }, [sidebarExpanded, setSidebarExpanded, recalculateAllBounds]);
 
   const handleReload = useCallback(async (columnId: string) => {
     const webviewLabel = `column-${columnId}`;
@@ -111,7 +116,17 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className={styles.app} ref={containerRef}>
+    <div className={styles.app} ref={containerRef} style={{ paddingLeft: sidebarWidth }}>
+      <Sidebar
+        columns={columns}
+        expanded={sidebarExpanded}
+        onToggleExpand={handleToggleSidebar}
+        onAddColumn={() => setShowAddColumn(true)}
+        onAccountManager={() => setShowAccountManager(true)}
+        onComposeTweet={() => {}}
+        onJumpToColumn={() => {}}
+      />
+
       <div
         className={styles.headerRow}
         onWheel={(e) => {
@@ -150,25 +165,6 @@ const App: React.FC = () => {
               );
             });
           })()}
-        </div>
-
-        <div className={styles.toolbar} ref={toolbarRef}>
-          <button
-            className={styles.toolbarBtn}
-            onClick={() => setShowAddColumn(true)}
-            title="カラムを追加"
-            aria-label="カラムを追加"
-          >
-            +
-          </button>
-          <button
-            className={styles.toolbarBtn}
-            onClick={() => setShowAccountManager(true)}
-            title="アカウント管理"
-            aria-label="アカウント管理"
-          >
-            👤
-          </button>
         </div>
       </div>
 
