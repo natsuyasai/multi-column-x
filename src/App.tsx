@@ -232,6 +232,7 @@ const App: React.FC = () => {
         <AddColumnDialog
           accounts={accounts}
           globalSettings={globalSettings}
+          existingColumns={columns}
           onAdd={(column) => {
             handleAddColumn(column);
             setShowAddColumn(false);

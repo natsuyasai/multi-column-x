@@ -7,6 +7,7 @@ import styles from "./AddColumnDialog.module.scss";
 interface AddColumnDialogProps {
   accounts: Account[];
   globalSettings: GlobalSettings;
+  existingColumns: Column[];
   onAdd: (column: Column) => void;
   onCancel: () => void;
 }
@@ -14,6 +15,7 @@ interface AddColumnDialogProps {
 export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
   accounts,
   globalSettings,
+  existingColumns,
   onAdd,
   onCancel,
 }) => {
@@ -36,6 +38,11 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
       customUrl: pageType === "custom" ? customUrl : undefined,
       width: 350,
       order: 9999,
+      gridRow: 1,
+      gridCol: existingColumns.length > 0
+        ? Math.max(...existingColumns.map((c) => c.gridCol)) + 1
+        : 1,
+      heightMode: "auto",
       settings: {
         ...DEFAULT_COLUMN_SETTINGS,
         autoReloadEnabled: globalSettings.defaultAutoReloadEnabled,
