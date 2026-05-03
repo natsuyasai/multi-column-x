@@ -43,6 +43,33 @@ pub fn run() {
             }
             Ok(())
         })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                if window.label() == "main" {
+                    if let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) {
+                        if let Ok(store) = window.app_handle().store("settings.json") {
+                            use crate::commands::settings::AppSettingsData;
+                            let updated = store
+                                .get("appSettings")
+                                .and_then(|v| serde_json::from_value::<AppSettingsData>(v).ok())
+                                .map(|mut s| {
+                                    s.global_settings.window_bounds.x = pos.x as f64;
+                                    s.global_settings.window_bounds.y = pos.y as f64;
+                                    s.global_settings.window_bounds.width = size.width as f64;
+                                    s.global_settings.window_bounds.height = size.height as f64;
+                                    s
+                                });
+                            if let Some(settings) = updated {
+                                if let Ok(value) = serde_json::to_value(&settings) {
+                                    store.set("appSettings", value);
+                                    let _ = store.save();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             commands::settings::load_settings,
             commands::settings::save_settings,
