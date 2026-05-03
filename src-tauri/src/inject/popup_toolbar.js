@@ -16,13 +16,13 @@
   toolbar.id = "tv-popup-toolbar";
   toolbar.style.cssText = [
     "position: fixed",
-    "top: 0",
+    "bottom: 0",
     "left: 0",
     "width: 100%",
     "height: " + TOOLBAR_HEIGHT + "px",
     "z-index: 99999",
     "background: #15202b",
-    "border-bottom: 1px solid #38444d",
+    "border-top: 1px solid #38444d",
     "display: flex",
     "align-items: center",
     "padding: 0 12px",
@@ -68,26 +68,13 @@
   });
   toolbar.appendChild(label);
   toolbar.appendChild(select);
-  function applyOffset() {
-    var root = document.getElementById("react-root");
-    if (root) {
-      root.style.marginTop = TOOLBAR_HEIGHT + "px";
-      root.style.height = "calc(100vh - " + TOOLBAR_HEIGHT + "px)";
-    }
-  }
   function inject() {
-    function doInject() {
-      document.body.insertBefore(toolbar, document.body.firstChild);
-      applyOffset();
-      var observer = new MutationObserver(function() {
-        applyOffset();
-      });
-      observer.observe(document.body, { childList: true, subtree: false });
-    }
     if (document.body) {
-      doInject();
+      document.body.appendChild(toolbar);
     } else {
-      document.addEventListener("DOMContentLoaded", doInject);
+      document.addEventListener("DOMContentLoaded", function() {
+        document.body.appendChild(toolbar);
+      });
     }
   }
   inject();

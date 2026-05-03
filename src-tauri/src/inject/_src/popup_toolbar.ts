@@ -23,13 +23,13 @@
   toolbar.id = "tv-popup-toolbar";
   toolbar.style.cssText = [
     "position: fixed",
-    "top: 0",
+    "bottom: 0",
     "left: 0",
     "width: 100%",
     "height: " + TOOLBAR_HEIGHT + "px",
     "z-index: 99999",
     "background: #15202b",
-    "border-bottom: 1px solid #38444d",
+    "border-top: 1px solid #38444d",
     "display: flex",
     "align-items: center",
     "padding: 0 12px",
@@ -82,26 +82,9 @@
   toolbar.appendChild(label);
   toolbar.appendChild(select);
 
-  function applyOffset() {
-    // x.com は body.paddingTop を無視する独自スクロールコンテナを使うため、
-    // react-root に直接 margin-top を当てる
-    const root = document.getElementById("react-root");
-    if (root) {
-      (root as HTMLElement).style.marginTop = TOOLBAR_HEIGHT + "px";
-      (root as HTMLElement).style.height = `calc(100vh - ${TOOLBAR_HEIGHT}px)`;
-    }
-  }
-
   function inject() {
     const doInject = () => {
-      document.body.insertBefore(toolbar, document.body.firstChild);
-      applyOffset();
-
-      // react-root が後から mount される場合に備えて MutationObserver で追従
-      const observer = new MutationObserver(() => {
-        applyOffset();
-      });
-      observer.observe(document.body, { childList: true, subtree: false });
+      document.body.appendChild(toolbar);
     };
 
     if (document.body) {
