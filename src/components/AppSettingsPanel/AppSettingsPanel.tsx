@@ -1,18 +1,24 @@
 import React, { useState } from "react";
-import type { GlobalSettings } from "../../types";
+import type { GlobalSettings, Column } from "../../types";
+import { ColumnLayoutTab } from "./ColumnLayoutTab";
 import styles from "./AppSettingsPanel.module.scss";
 
 interface AppSettingsPanelProps {
   settings: GlobalSettings;
+  columns: Column[];
   onApply: (patch: Partial<GlobalSettings>) => void;
+  onApplyLayout: (columns: Column[]) => void;
   onClose: () => void;
 }
 
 export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   settings,
+  columns,
   onApply,
+  onApplyLayout,
   onClose,
 }) => {
+  const [activeTab, setActiveTab] = useState<"general" | "layout">("general");
   const [autoReloadEnabled, setAutoReloadEnabled] = useState(
     settings.defaultAutoReloadEnabled,
   );
@@ -47,62 +53,98 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className={styles.form}>
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>カラムのデフォルト設定</h3>
-            <label className={styles.checkLabel}>
-              <input
-                type="checkbox"
-                checked={autoReloadEnabled}
-                onChange={(e) => setAutoReloadEnabled(e.target.checked)}
-              />
-              自動更新を有効にする
-            </label>
-            {autoReloadEnabled && (
-              <label className={styles.fieldLabel}>
-                更新間隔（秒）
-                <input
-                  type="number"
-                  className={styles.numberInput}
-                  min={10}
-                  max={3600}
-                  value={autoReloadInterval}
-                  onChange={(e) =>
-                    setAutoReloadInterval(Number(e.target.value))
-                  }
-                />
-              </label>
-            )}
-            <p className={styles.hint}>
-              新しく追加するカラムに適用されます
-            </p>
-          </section>
+        <div className={styles.tabs}>
+          <button
+            className={`${styles.tab} ${activeTab === "general" ? styles.tabActive : ""}`}
+            onClick={() => setActiveTab("general")}
+          >
+            一般
+          </button>
+          <button
+            className={`${styles.tab} ${activeTab === "layout" ? styles.tabActive : ""}`}
+            onClick={() => setActiveTab("layout")}
+          >
+            カラム配置
+          </button>
+        </div>
 
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>ポップアップウィンドウ</h3>
-            <label className={styles.checkLabel}>
-              <input
-                type="checkbox"
-                checked={popupEscCloseEnabled}
-                onChange={(e) => setPopupEscCloseEnabled(e.target.checked)}
-              />
-              Escキーで閉じる
-            </label>
-          </section>
+        <div className={styles.tabContent}>
+          {activeTab === "general" && (
+            <form onSubmit={handleSubmit} className={styles.form}>
+              <section className={styles.section}>
+                <h3 className={styles.sectionTitle}>
+                  カラムのデフォルト設定
+                </h3>
+                <label className={styles.checkLabel}>
+                  <input
+                    type="checkbox"
+                    checked={autoReloadEnabled}
+                    onChange={(e) => setAutoReloadEnabled(e.target.checked)}
+                  />
+                  自動更新を有効にする
+                </label>
+                {autoReloadEnabled && (
+                  <label className={styles.fieldLabel}>
+                    更新間隔（秒）
+                    <input
+                      type="number"
+                      className={styles.numberInput}
+                      min={10}
+                      max={3600}
+                      value={autoReloadInterval}
+                      onChange={(e) =>
+                        setAutoReloadInterval(Number(e.target.value))
+                      }
+                    />
+                  </label>
+                )}
+                <p className={styles.hint}>
+                  新しく追加するカラムに適用されます
+                </p>
+              </section>
 
-          <div className={styles.actions}>
-            <button
-              type="button"
-              className={styles.cancelBtn}
-              onClick={onClose}
-            >
-              キャンセル
-            </button>
-            <button type="submit" className={styles.applyBtn}>
-              適用
-            </button>
-          </div>
-        </form>
+              <section className={styles.section}>
+                <h3 className={styles.sectionTitle}>
+                  ポップアップウィンドウ
+                </h3>
+                <label className={styles.checkLabel}>
+                  <input
+                    type="checkbox"
+                    checked={popupEscCloseEnabled}
+                    onChange={(e) =>
+                      setPopupEscCloseEnabled(e.target.checked)
+                    }
+                  />
+                  Escキーで閉じる
+                </label>
+              </section>
+
+              <div className={styles.actions}>
+                <button
+                  type="button"
+                  className={styles.cancelBtn}
+                  onClick={onClose}
+                >
+                  キャンセル
+                </button>
+                <button type="submit" className={styles.applyBtn}>
+                  適用
+                </button>
+              </div>
+            </form>
+          )}
+
+          {activeTab === "layout" && (
+            <ColumnLayoutTab
+              columns={columns}
+              onApply={(updatedColumns) => {
+                onApplyLayout(updatedColumns);
+                onClose();
+              }}
+              onCancel={onClose}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

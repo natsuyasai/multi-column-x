@@ -268,7 +268,12 @@ const App: React.FC = () => {
       {showAppSettings && (
         <AppSettingsPanel
           settings={globalSettings}
+          columns={columns}
           onApply={updateGlobalSettings}
+          onApplyLayout={(updatedColumns) => {
+            updatedColumns.forEach((col) => handleUpdateColumn(col.id, col));
+            recalculateAllBounds();
+          }}
           onClose={() => setShowAppSettings(false)}
         />
       )}
