@@ -7,9 +7,9 @@ export function migrateColumn(col: Partial<Column> & Pick<Column, "id" | "accoun
   return {
     gridRow: 1,
     gridCol: (col.order ?? 0) + 1,
-    heightMode: "auto",
+    heightMode: "auto" as const,
     ...col,
-  } as Column;
+  };
 }
 
 interface AppStore {
@@ -28,6 +28,7 @@ interface AppStore {
   updateColumn: (id: string, patch: Partial<Column>) => void;
   updateGlobalSettings: (patch: Partial<GlobalSettings>) => void;
   moveColumn: (columnId: string, direction: "left" | "right") => void;
+  replaceColumns: (columns: Column[]) => void;
 }
 
 export const useAppStore = create<AppStore>((set, get) => ({
@@ -101,6 +102,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const reordered = sorted.map((c, i) => ({ ...c, order: i }));
       return { columns: reordered };
     });
+    get().saveSettings();
+  },
+
+  replaceColumns: (columns) => {
+    set({ columns });
     get().saveSettings();
   },
 }));

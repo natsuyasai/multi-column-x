@@ -28,6 +28,7 @@ const App: React.FC = () => {
     updateGlobalSettings,
     sidebarExpanded,
     setSidebarExpanded,
+    replaceColumns,
   } = useAppStore();
   const {
     columns,
@@ -272,7 +273,7 @@ const App: React.FC = () => {
           columns={columns}
           onApply={updateGlobalSettings}
           onApplyLayout={(updatedColumns) => {
-            updatedColumns.forEach((col) => handleUpdateColumn(col.id, col));
+            replaceColumns(updatedColumns);
             recalculateAllBounds();
           }}
           onClose={() => setShowAppSettings(false)}
