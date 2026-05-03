@@ -3,6 +3,7 @@
   const accounts: TvAccountInfo[] = window.__tvAccounts ?? [];
   const currentAccountId: string = window.__tvCurrentAccountId ?? "";
   const targetHref: string = window.__tvTargetHref ?? "";
+  const escCloseEnabled: boolean = window.__tvEscCloseEnabled ?? true;
 
   if (document.getElementById("tv-popup-toolbar")) return;
 
@@ -95,6 +96,17 @@
   }
 
   inject();
+
+  if (escCloseEnabled) {
+    document.addEventListener("keydown", function (e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        tauriInvoke("close_popup_window", {
+          label:
+            window.__TAURI_INTERNALS__?.metadata?.currentWebview?.label ?? "",
+        });
+      }
+    });
+  }
 
   // targetHref と一致する <a> をページロード後に自動クリックする
   if (!targetHref) return;

@@ -19,12 +19,16 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   const [autoReloadInterval, setAutoReloadInterval] = useState(
     settings.defaultAutoReloadInterval,
   );
+  const [popupEscCloseEnabled, setPopupEscCloseEnabled] = useState(
+    settings.popupEscCloseEnabled,
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onApply({
       defaultAutoReloadEnabled: autoReloadEnabled,
       defaultAutoReloadInterval: autoReloadInterval,
+      popupEscCloseEnabled: popupEscCloseEnabled,
     });
     onClose();
   };
@@ -72,6 +76,18 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
             <p className={styles.hint}>
               新しく追加するカラムに適用されます
             </p>
+          </section>
+
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>ポップアップウィンドウ</h3>
+            <label className={styles.checkLabel}>
+              <input
+                type="checkbox"
+                checked={popupEscCloseEnabled}
+                onChange={(e) => setPopupEscCloseEnabled(e.target.checked)}
+              />
+              Escキーで閉じる
+            </label>
           </section>
 
           <div className={styles.actions}>

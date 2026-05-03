@@ -38,10 +38,10 @@ pub fn build_init_script(
     script
 }
 
-pub fn build_popup_init_script(accounts_json: &str, current_account_id: &str, target_href: &str) -> String {
+pub fn build_popup_init_script(accounts_json: &str, current_account_id: &str, target_href: &str, esc_close_enabled: bool) -> String {
     let popup_toolbar = include_str!("popup_toolbar.js");
     format!(
-        "window.__tvAccounts={};window.__tvCurrentAccountId={:?};window.__tvTargetHref={:?};\n{}",
-        accounts_json, current_account_id, target_href, popup_toolbar
+        "window.__tvAccounts={};window.__tvCurrentAccountId={:?};window.__tvTargetHref={:?};window.__tvEscCloseEnabled={};\n{}",
+        accounts_json, current_account_id, target_href, esc_close_enabled, popup_toolbar
     )
 }

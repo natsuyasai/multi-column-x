@@ -46,6 +46,7 @@ declare global {
     __tvAccounts?: TvAccountInfo[];
     __tvCurrentAccountId?: string;
     __tvTargetHref?: string;
+    __tvEscCloseEnabled?: boolean;
   }
 }
 

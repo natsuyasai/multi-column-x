@@ -128,6 +128,15 @@ pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Resu
     Ok(())
 }
 
+fn load_popup_esc_close_enabled(app: &AppHandle) -> bool {
+    app.store("settings.json")
+        .ok()
+        .and_then(|store| store.get("appSettings"))
+        .and_then(|v| v.get("globalSettings").cloned())
+        .and_then(|gs| gs.get("popupEscCloseEnabled").and_then(|v| v.as_bool()))
+        .unwrap_or(true)
+}
+
 fn load_accounts_json(app: &AppHandle) -> String {
     app.store("settings.json")
         .ok()
@@ -172,8 +181,9 @@ pub async fn open_popup_window(
     };
 
     let accounts_json = load_accounts_json(&app);
+    let esc_close_enabled = load_popup_esc_close_enabled(&app);
     let popup_init =
-        crate::inject::build_popup_init_script(&accounts_json, &current_account_id, &url);
+        crate::inject::build_popup_init_script(&accounts_json, &current_account_id, &url, esc_close_enabled);
 
     let popup_label = format!("popup-{}", uuid::Uuid::new_v4());
 
@@ -252,7 +262,8 @@ pub async fn switch_popup_session(
     let data_dir = PathBuf::from(&dataDirectory);
 
     let accounts_json = load_accounts_json(&app);
-    let popup_init = crate::inject::build_popup_init_script(&accounts_json, &accountId, &url);
+    let esc_close_enabled = load_popup_esc_close_enabled(&app);
+    let popup_init = crate::inject::build_popup_init_script(&accounts_json, &accountId, &url, esc_close_enabled);
 
     let mut builder =
         tauri::WebviewWindowBuilder::new(&app, &new_label, WebviewUrl::External(parse_url(&url)?))
@@ -278,6 +289,14 @@ pub async fn switch_popup_session(
 }
 
 #[tauri::command]
+pub async fn close_popup_window(app: AppHandle, label: String) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window(&label) {
+        window.close().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn open_in_browser(url: String) -> Result<(), String> {
     tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())
 }
@@ -291,7 +310,8 @@ pub async fn open_compose_window(
     let data_dir = std::path::PathBuf::from(&dataDirectory);
 
     let accounts_json = load_accounts_json(&app);
-    let popup_init = crate::inject::build_popup_init_script(&accounts_json, &accountId, "");
+    let esc_close_enabled = load_popup_esc_close_enabled(&app);
+    let popup_init = crate::inject::build_popup_init_script(&accounts_json, &accountId, "", esc_close_enabled);
 
     let compose_label = format!("compose-{}", uuid::Uuid::new_v4());
 

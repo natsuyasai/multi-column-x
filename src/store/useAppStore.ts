@@ -35,7 +35,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       set({
         accounts: settings.accounts,
         columns: settings.columns.sort((a, b) => a.order - b.order),
-        globalSettings: settings.globalSettings,
+        globalSettings: { ...DEFAULT_GLOBAL_SETTINGS, ...settings.globalSettings },
         isLoaded: true,
       });
     } catch {

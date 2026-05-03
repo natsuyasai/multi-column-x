@@ -38,6 +38,7 @@ export interface GlobalSettings {
   defaultAccountId?: string;
   defaultAutoReloadEnabled: boolean;
   defaultAutoReloadInterval: number; // 秒
+  popupEscCloseEnabled: boolean;
 }
 
 export interface AppSettings {
@@ -61,6 +62,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   windowBounds: { x: 0, y: 0, width: 1400, height: 900 },
   defaultAutoReloadEnabled: true,
   defaultAutoReloadInterval: 60,
+  popupEscCloseEnabled: true,
 };
 
 interface ResolveColumnUrlInput {

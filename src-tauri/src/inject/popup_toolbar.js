@@ -2,6 +2,7 @@
   const accounts = window.__tvAccounts ?? [];
   const currentAccountId = window.__tvCurrentAccountId ?? "";
   const targetHref = window.__tvTargetHref ?? "";
+  const escCloseEnabled = window.__tvEscCloseEnabled ?? true;
   if (document.getElementById("tv-popup-toolbar")) return;
   if (accounts.length === 0) return;
   function tauriInvoke(cmd, args) {
@@ -80,6 +81,15 @@
     }
   }
   inject();
+  if (escCloseEnabled) {
+    document.addEventListener("keydown", function(e) {
+      if (e.key === "Escape") {
+        tauriInvoke("close_popup_window", {
+          label: window.__TAURI_INTERNALS__?.metadata?.currentWebview?.label ?? ""
+        });
+      }
+    });
+  }
   if (!targetHref) return;
   function normalizeHref(href) {
     try {

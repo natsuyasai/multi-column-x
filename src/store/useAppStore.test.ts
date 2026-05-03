@@ -46,6 +46,7 @@ describe("useAppStore", () => {
         windowBounds: { x: 0, y: 0, width: 1400, height: 900 },
         defaultAutoReloadEnabled: true,
         defaultAutoReloadInterval: 60,
+        popupEscCloseEnabled: true,
       },
       isLoaded: false,
     });
