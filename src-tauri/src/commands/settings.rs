@@ -34,7 +34,15 @@ pub struct ColumnSettings {
     pub visible_links: Vec<String>,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
+fn default_height_mode() -> String {
+    "auto".to_string()
+}
+fn default_auto_reload_interval() -> u32 {
+    600
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ColumnData {
@@ -55,6 +63,19 @@ pub struct ColumnData {
     pub order: u32,
     pub label: Option<String>,
     pub settings: ColumnSettings,
+    #[serde(rename = "gridRow")]
+    #[serde(default)]
+    pub grid_row: u32,
+    #[serde(rename = "gridCol")]
+    #[serde(default)]
+    pub grid_col: u32,
+    #[serde(rename = "heightMode")]
+    #[serde(default = "default_height_mode")]
+    pub height_mode: String,
+    #[serde(rename = "heightValue")]
+    pub height_value: Option<f64>,
+    #[serde(rename = "heightUnit")]
+    pub height_unit: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -72,6 +93,17 @@ pub struct GlobalSettingsData {
     pub custom_css: String,
     #[serde(rename = "windowBounds")]
     pub window_bounds: WindowBounds,
+    #[serde(rename = "defaultAccountId")]
+    pub default_account_id: Option<String>,
+    #[serde(rename = "defaultAutoReloadEnabled")]
+    #[serde(default = "default_true")]
+    pub default_auto_reload_enabled: bool,
+    #[serde(rename = "defaultAutoReloadInterval")]
+    #[serde(default = "default_auto_reload_interval")]
+    pub default_auto_reload_interval: u32,
+    #[serde(rename = "popupEscCloseEnabled")]
+    #[serde(default = "default_true")]
+    pub popup_esc_close_enabled: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -86,7 +118,8 @@ pub struct AppSettingsData {
 pub async fn load_settings(app: AppHandle) -> Result<AppSettingsData, String> {
     let store = app.store("settings.json").map_err(|e| e.to_string())?;
 
-    let settings = store.get("appSettings")
+    let settings = store
+        .get("appSettings")
         .and_then(|v| serde_json::from_value(v).ok())
         .unwrap_or_else(|| AppSettingsData {
             accounts: vec![],
@@ -94,7 +127,16 @@ pub async fn load_settings(app: AppHandle) -> Result<AppSettingsData, String> {
             global_settings: GlobalSettingsData {
                 theme: "dark".to_string(),
                 custom_css: String::new(),
-                window_bounds: WindowBounds { x: 0.0, y: 0.0, width: 1400.0, height: 900.0 },
+                window_bounds: WindowBounds {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 1400.0,
+                    height: 900.0,
+                },
+                default_account_id: None,
+                default_auto_reload_enabled: true,
+                default_auto_reload_interval: 60,
+                popup_esc_close_enabled: true,
             },
         });
 
@@ -104,7 +146,10 @@ pub async fn load_settings(app: AppHandle) -> Result<AppSettingsData, String> {
 #[tauri::command]
 pub async fn save_settings(app: AppHandle, settings: AppSettingsData) -> Result<(), String> {
     let store = app.store("settings.json").map_err(|e| e.to_string())?;
-    store.set("appSettings", serde_json::to_value(&settings).map_err(|e| e.to_string())?);
+    store.set(
+        "appSettings",
+        serde_json::to_value(&settings).map_err(|e| e.to_string())?,
+    );
     store.save().map_err(|e| e.to_string())?;
     Ok(())
 }

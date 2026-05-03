@@ -3,12 +3,23 @@ import { invoke } from "@tauri-apps/api/core";
 import type { Account, Column, GlobalSettings, AppSettings } from "../types";
 import { DEFAULT_GLOBAL_SETTINGS } from "../types";
 
-export function migrateColumn(col: Partial<Column> & Pick<Column, "id" | "accountId" | "pageType" | "width" | "order" | "settings">): Column {
+export function migrateColumn(
+  col: Partial<Column> &
+    Pick<
+      Column,
+      "id" | "accountId" | "pageType" | "width" | "order" | "settings"
+    >,
+): Column {
+  const gridCol =
+    col.gridCol != null && col.gridCol >= 1
+      ? col.gridCol
+      : (col.order ?? 0) + 1;
+  const gridRow = col.gridRow != null && col.gridRow >= 1 ? col.gridRow : 1;
   return {
-    gridRow: 1,
-    gridCol: (col.order ?? 0) + 1,
     heightMode: "auto" as const,
     ...col,
+    gridRow,
+    gridCol,
   };
 }
 
@@ -44,8 +55,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const settings = await invoke<AppSettings>("load_settings");
       set({
         accounts: settings.accounts,
-        columns: settings.columns.map(migrateColumn).sort((a, b) => a.order - b.order),
-        globalSettings: { ...DEFAULT_GLOBAL_SETTINGS, ...settings.globalSettings },
+        columns: settings.columns
+          .map(migrateColumn)
+          .sort((a, b) => a.order - b.order),
+        globalSettings: {
+          ...DEFAULT_GLOBAL_SETTINGS,
+          ...settings.globalSettings,
+        },
         isLoaded: true,
       });
     } catch {

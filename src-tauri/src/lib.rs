@@ -1,6 +1,6 @@
-mod state;
-mod inject;
 mod commands;
+mod inject;
+mod state;
 
 use state::AppState;
 use tauri::{Manager, PhysicalPosition, PhysicalSize};
@@ -8,9 +8,15 @@ use tauri_plugin_store::StoreExt;
 
 fn save_window_bounds(window: &tauri::Window) {
     use crate::commands::settings::{AppSettingsData, GlobalSettingsData, WindowBounds};
-    let Ok(pos) = window.outer_position() else { return };
-    let Ok(size) = window.outer_size() else { return };
-    let Ok(store) = window.app_handle().store("settings.json") else { return };
+    let Ok(pos) = window.outer_position() else {
+        return;
+    };
+    let Ok(size) = window.outer_size() else {
+        return;
+    };
+    let Ok(store) = window.app_handle().store("settings.json") else {
+        return;
+    };
     let mut settings = store
         .get("appSettings")
         .and_then(|v| serde_json::from_value::<AppSettingsData>(v).ok())
@@ -20,7 +26,16 @@ fn save_window_bounds(window: &tauri::Window) {
             global_settings: GlobalSettingsData {
                 theme: "dark".to_string(),
                 custom_css: String::new(),
-                window_bounds: WindowBounds { x: 0.0, y: 0.0, width: 1400.0, height: 900.0 },
+                window_bounds: WindowBounds {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 1400.0,
+                    height: 900.0,
+                },
+                default_account_id: None,
+                default_auto_reload_enabled: true,
+                default_auto_reload_interval: 600,
+                popup_esc_close_enabled: true,
             },
         });
     settings.global_settings.window_bounds = WindowBounds {
@@ -29,7 +44,9 @@ fn save_window_bounds(window: &tauri::Window) {
         width: size.width as f64,
         height: size.height as f64,
     };
-    let Ok(value) = serde_json::to_value(&settings) else { return };
+    let Ok(value) = serde_json::to_value(&settings) else {
+        return;
+    };
     store.set("appSettings", value);
     if let Err(e) = store.save() {
         eprintln!("[twitter-viewer] failed to save window bounds: {e}");
@@ -60,11 +77,14 @@ pub fn run() {
                         let my = pos.y as f64;
                         let mw = size.width as f64;
                         let mh = size.height as f64;
-                        wb.x + min_visible > mx && wb.x < mx + mw
-                            && wb.y + min_visible > my && wb.y < my + mh
+                        wb.x + min_visible > mx
+                            && wb.x < mx + mw
+                            && wb.y + min_visible > my
+                            && wb.y < my + mh
                     });
                     if on_screen {
-                        let _ = window.set_position(PhysicalPosition::new(wb.x as i32, wb.y as i32));
+                        let _ =
+                            window.set_position(PhysicalPosition::new(wb.x as i32, wb.y as i32));
                     }
                     let clamped_w = wb.width.max(600.0) as u32;
                     let clamped_h = wb.height.max(400.0) as u32;
