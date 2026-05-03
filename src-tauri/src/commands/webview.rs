@@ -135,14 +135,17 @@ fn load_accounts_json(app: &AppHandle) -> String {
         .and_then(|v| v.get("accounts").cloned())
         .and_then(|accounts| {
             let arr = accounts.as_array()?;
-            let infos: Vec<serde_json::Value> = arr.iter().filter_map(|a| {
-                Some(serde_json::json!({
-                    "id": a.get("id")?.as_str()?,
-                    "label": a.get("label")?.as_str()?,
-                    "color": a.get("color")?.as_str()?,
-                    "dataDirectory": a.get("dataDirectory")?.as_str()?,
-                }))
-            }).collect();
+            let infos: Vec<serde_json::Value> = arr
+                .iter()
+                .filter_map(|a| {
+                    Some(serde_json::json!({
+                        "id": a.get("id")?.as_str()?,
+                        "label": a.get("label")?.as_str()?,
+                        "color": a.get("color")?.as_str()?,
+                        "dataDirectory": a.get("dataDirectory")?.as_str()?,
+                    }))
+                })
+                .collect();
             serde_json::to_string(&infos).ok()
         })
         .unwrap_or_else(|| "[]".to_string())
@@ -169,12 +172,31 @@ pub async fn open_popup_window(
     };
 
     let accounts_json = load_accounts_json(&app);
-    let popup_init = crate::inject::build_popup_init_script(&accounts_json, &current_account_id, &url);
+    let popup_init =
+        crate::inject::build_popup_init_script(&accounts_json, &current_account_id, &url);
 
     let popup_label = format!("popup-{}", uuid::Uuid::new_v4());
 
-    const POPUP_WIDTH: f64 = 900.0;
-    const POPUP_HEIGHT: f64 = 700.0;
+    let (window_pos, window_size) = if let Some(window) = app.get_window("main") {
+        if let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) {
+            (
+                LogicalPosition::new(pos.x as f64, pos.y as f64),
+                LogicalSize::new(size.width as f64, size.height as f64),
+            )
+        } else {
+            (
+                LogicalPosition::new(0.0, 0.0),
+                LogicalSize::new(800.0, 600.0),
+            )
+        }
+    } else {
+        (
+            LogicalPosition::new(0.0, 0.0),
+            LogicalSize::new(800.0, 600.0),
+        )
+    };
+
+    const PADDING: f64 = 50.0;
 
     let mut builder = tauri::WebviewWindowBuilder::new(
         &app,
@@ -182,18 +204,13 @@ pub async fn open_popup_window(
         WebviewUrl::External(parse_url(&url)?),
     )
     .title("X - メディア")
-    .inner_size(POPUP_WIDTH, POPUP_HEIGHT)
+    .inner_size(
+        window_size.width - (PADDING * 2.0),
+        window_size.height - (PADDING * 2.0),
+    )
+    .position(window_pos.x + PADDING, window_pos.y + PADDING)
     .initialization_script(&popup_init)
     .data_directory(data_dir);
-
-    if let Some(window) = app.get_window("main") {
-        if let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) {
-            let scale = window.scale_factor().unwrap_or(1.0);
-            let center_x = pos.x as f64 + (size.width as f64 - POPUP_WIDTH * scale) / 2.0;
-            let center_y = pos.y as f64 + (size.height as f64 - POPUP_HEIGHT * scale) / 2.0;
-            builder = builder.position(center_x / scale, center_y / scale);
-        }
-    }
 
     builder.build().map_err(|e| e.to_string())?;
 
@@ -237,14 +254,11 @@ pub async fn switch_popup_session(
     let accounts_json = load_accounts_json(&app);
     let popup_init = crate::inject::build_popup_init_script(&accounts_json, &accountId, &url);
 
-    let mut builder = tauri::WebviewWindowBuilder::new(
-        &app,
-        &new_label,
-        WebviewUrl::External(parse_url(&url)?),
-    )
-    .title("X - メディア")
-    .initialization_script(&popup_init)
-    .data_directory(data_dir);
+    let mut builder =
+        tauri::WebviewWindowBuilder::new(&app, &new_label, WebviewUrl::External(parse_url(&url)?))
+            .title("X - メディア")
+            .initialization_script(&popup_init)
+            .data_directory(data_dir);
 
     if let (Some(p), Some(s)) = (pos, size) {
         let scale = app
@@ -298,7 +312,8 @@ pub async fn open_compose_window(
         if let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) {
             let scale = window.scale_factor().unwrap_or(1.0);
             let center_x = pos.x as f64 + (size.width as f64 - COMPOSE_WIDTH * scale) / 2.0;
-            let center_y = pos.y as f64 + (size.height as f64 - COMPOSE_WINDOW_HEIGHT * scale) / 2.0;
+            let center_y =
+                pos.y as f64 + (size.height as f64 - COMPOSE_WINDOW_HEIGHT * scale) / 2.0;
             builder = builder.position(center_x / scale, center_y / scale);
         }
     }
