@@ -54,6 +54,7 @@ pub async fn create_column_webview(
 
     let init_script = build_init_script(
         args.column.settings.area_remove_enabled,
+        args.column.settings.auto_reload_enabled,
         &args.column.settings.custom_css,
         &args.column.settings.visible_links,
     );

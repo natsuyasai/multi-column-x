@@ -2,6 +2,7 @@
 
 pub fn build_init_script(
     area_remove_enabled: bool,
+    auto_reload_enabled: bool,
     custom_css: &str,
     visible_links: &[String],
 ) -> String {
@@ -12,7 +13,6 @@ pub fn build_init_script(
     let image_popup = include_str!("image_popup.js");
     let scroll_event = include_str!("scroll_event.js");
 
-    // header_customizer.js が読み取る初期設定を先に注入する
     let visible_links_json = serde_json::to_string(visible_links).unwrap_or_else(|_| "[]".to_string());
     let config = format!(
         "window.__twitterViewerConfig = {{ areaRemoveEnabled: {}, visibleLinks: {} }};",
@@ -20,9 +20,12 @@ pub fn build_init_script(
         visible_links_json
     );
 
+    let header_part = if area_remove_enabled { format!("\n{}", header_customizer) } else { String::new() };
+    let auto_reload_part = if auto_reload_enabled { format!("\n{}", auto_reload) } else { String::new() };
+
     let mut script = format!(
-        "{}\n{}\n{}\n{}\n{}\n{}\n{}",
-        config, tab_selector, header_customizer, auto_reload, custom_css_js, image_popup, scroll_event
+        "{}\n{}{}{}{}{}{}",
+        config, tab_selector, header_part, auto_reload_part, custom_css_js, image_popup, scroll_event
     );
 
     if !custom_css.is_empty() {

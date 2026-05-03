@@ -54,7 +54,9 @@
         }
       }
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+    const observeTarget = document.body || document.documentElement;
+    if (!observeTarget) return;
+    observer.observe(observeTarget, { childList: true, subtree: true });
     setTimeout(function () {
       observer.disconnect();
     }, 5000);
@@ -73,13 +75,21 @@
   }
 
   let lastUrl = location.href;
-  new MutationObserver(function () {
-    const currentUrl = location.href;
-    if (currentUrl !== lastUrl) {
-      lastUrl = currentUrl;
-      initializeTab();
+  function startUrlObserver(): void {
+    const root = document.documentElement || document.body;
+    if (!root) {
+      setTimeout(startUrlObserver, 100);
+      return;
     }
-  }).observe(document.documentElement, { childList: true, subtree: true });
+    new MutationObserver(function () {
+      const currentUrl = location.href;
+      if (currentUrl !== lastUrl) {
+        lastUrl = currentUrl;
+        initializeTab();
+      }
+    }).observe(root, { childList: true, subtree: true });
+  }
+  startUrlObserver();
 
   window.__twitterViewer = window.__twitterViewer || ({} as Window["__twitterViewer"]);
   window.__twitterViewer.selectHomeTab = function () {};

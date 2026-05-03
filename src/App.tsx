@@ -93,6 +93,11 @@ const App: React.FC = () => {
         label: webviewLabel,
         script: `(function(){var el=document.getElementById('__custom_css__');if(!el){el=document.createElement('style');el.id='__custom_css__';document.head.appendChild(el);}el.textContent=\`${escaped}\`;})();`,
       }).catch(console.error);
+      await invoke("eval_in_webview", {
+        label: webviewLabel,
+        script:
+          "window.__twitterViewer && window.__twitterViewer.triggerReload();",
+      }).catch(console.error);
     },
     [handleUpdateColumn],
   );
