@@ -59,6 +59,9 @@ const App: React.FC = () => {
   const [showAccountManager, setShowAccountManager] = useState(false);
   const [showAppSettings, setShowAppSettings] = useState(false);
   const [settingsColumnId, setSettingsColumnId] = useState<string | null>(null);
+  const [showLinkPopupDialog, setShowLinkPopupDialog] = useState(false);
+  const [linkPopupUrl, setLinkPopupUrl] = useState("");
+  const [linkPopupAccountId, setLinkPopupAccountId] = useState("");
 
   useEffect(() => {
     loadSettings();
@@ -82,8 +85,34 @@ const App: React.FC = () => {
     };
   }, [scrollbarRef]);
 
+  const handleOpenLinkPopup = useCallback(() => {
+    const defaultId =
+      globalSettings.defaultAccountId ?? accounts[0]?.id ?? "";
+    setLinkPopupAccountId(defaultId);
+    setShowLinkPopupDialog(true);
+  }, [accounts, globalSettings.defaultAccountId]);
+
+  const handleSubmitLinkPopup = useCallback(
+    async (url: string, accountId: string) => {
+      setShowLinkPopupDialog(false);
+      setLinkPopupUrl("");
+      if (!url.trim()) return;
+      const resolved = url.startsWith("http") ? url : "https://" + url;
+      const account =
+        accounts.find((a) => a.id === accountId) ?? accounts[0];
+      if (!account) return;
+      await invoke("open_link_popup_window", {
+        webviewLabelCaller: null,
+        accountId: account.id,
+        dataDirectory: account.dataDirectory,
+        url: resolved,
+      }).catch(console.error);
+    },
+    [accounts],
+  );
+
   // ダイアログ表示中は列WebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
-  const dialogOpen = showAddColumn || showAccountManager || showAppSettings || !!settingsColumnId;
+  const dialogOpen = showAddColumn || showAccountManager || showAppSettings || !!settingsColumnId || showLinkPopupDialog;
   useEffect(() => {
     if (dialogOpen) {
       hideColumnWebviews();
@@ -182,6 +211,7 @@ const App: React.FC = () => {
         onAccountManager={() => setShowAccountManager(true)}
         onAppSettings={() => setShowAppSettings(true)}
         onComposeTweet={handleComposeTweet}
+        onOpenLinkPopup={handleOpenLinkPopup}
         onJumpToColumn={handleJumpToColumn}
       />
 
@@ -229,6 +259,60 @@ const App: React.FC = () => {
           />
         </div>
       </div>
+
+      {showLinkPopupDialog && (
+        <div className={styles.linkPopupOverlay}>
+          <div className={styles.linkPopupPanel}>
+            <h3>URLをポップアップウィンドウで開く</h3>
+            <input
+              type="text"
+              placeholder="https://x.com/..."
+              value={linkPopupUrl}
+              onChange={(e) => setLinkPopupUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter")
+                  handleSubmitLinkPopup(linkPopupUrl, linkPopupAccountId);
+                if (e.key === "Escape") {
+                  setShowLinkPopupDialog(false);
+                  setLinkPopupUrl("");
+                }
+              }}
+              autoFocus
+            />
+            {accounts.length > 1 && (
+              <select
+                value={linkPopupAccountId}
+                onChange={(e) => setLinkPopupAccountId(e.target.value)}
+              >
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.label}
+                  </option>
+                ))}
+              </select>
+            )}
+            <div className={styles.linkPopupActions}>
+              <button
+                className={styles.cancelBtn}
+                onClick={() => {
+                  setShowLinkPopupDialog(false);
+                  setLinkPopupUrl("");
+                }}
+              >
+                キャンセル
+              </button>
+              <button
+                className={styles.okBtn}
+                onClick={() =>
+                  handleSubmitLinkPopup(linkPopupUrl, linkPopupAccountId)
+                }
+              >
+                開く
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAddColumn && accounts.length > 0 && (
         <AddColumnDialog

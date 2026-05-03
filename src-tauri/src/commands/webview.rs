@@ -228,6 +228,78 @@ pub async fn open_popup_window(
 }
 
 #[tauri::command]
+pub async fn open_link_popup_window(
+    app: AppHandle,
+    webview_label_caller: Option<String>,
+    #[allow(non_snake_case)] accountId: Option<String>,
+    #[allow(non_snake_case)] dataDirectory: Option<String>,
+    url: String,
+) -> Result<(), String> {
+    let (data_dir, current_account_id) = if let (Some(aid), Some(dd)) = (accountId, dataDirectory) {
+        (PathBuf::from(dd), aid)
+    } else {
+        let label = webview_label_caller.unwrap_or_default();
+        let state = app.state::<AppState>();
+        let registry = state.registry.lock().unwrap();
+        let dd = registry
+            .get_data_directory(&label)
+            .map(PathBuf::from)
+            .unwrap_or_default();
+        let aid = registry
+            .get_account_id(&label)
+            .unwrap_or("")
+            .to_string();
+        (dd, aid)
+    };
+
+    let accounts_json = load_accounts_json(&app);
+    let esc_close_enabled = load_popup_esc_close_enabled(&app);
+    let popup_init =
+        crate::inject::build_popup_init_script(&accounts_json, &current_account_id, "", esc_close_enabled);
+
+    let popup_label = format!("popup-{}", uuid::Uuid::new_v4());
+
+    let (window_pos, window_size) = if let Some(window) = app.get_window("main") {
+        if let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) {
+            (
+                LogicalPosition::new(pos.x as f64, pos.y as f64),
+                LogicalSize::new(size.width as f64, size.height as f64),
+            )
+        } else {
+            (
+                LogicalPosition::new(0.0, 0.0),
+                LogicalSize::new(800.0, 600.0),
+            )
+        }
+    } else {
+        (
+            LogicalPosition::new(0.0, 0.0),
+            LogicalSize::new(800.0, 600.0),
+        )
+    };
+
+    const PADDING: f64 = 50.0;
+
+    let builder = tauri::WebviewWindowBuilder::new(
+        &app,
+        &popup_label,
+        WebviewUrl::External(parse_url(&url)?),
+    )
+    .title("X - リンク")
+    .inner_size(
+        window_size.width - (PADDING * 2.0),
+        window_size.height - (PADDING * 2.0),
+    )
+    .position(window_pos.x + PADDING, window_pos.y + PADDING)
+    .initialization_script(&popup_init)
+    .data_directory(data_dir);
+
+    builder.build().map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn eval_in_webview(app: AppHandle, label: String, script: String) -> Result<(), String> {
     if let Some(webview) = app.get_webview(&label) {
         webview.eval(&script).map_err(|e| e.to_string())?;

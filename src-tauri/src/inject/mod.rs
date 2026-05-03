@@ -11,6 +11,7 @@ pub fn build_init_script(
     let auto_reload = include_str!("auto_reload.js");
     let custom_css_js = include_str!("custom_css.js");
     let image_popup = include_str!("image_popup.js");
+    let context_menu = include_str!("context_menu.js");
     let scroll_event = include_str!("scroll_event.js");
 
     let visible_links_json = serde_json::to_string(visible_links).unwrap_or_else(|_| "[]".to_string());
@@ -24,8 +25,8 @@ pub fn build_init_script(
     let auto_reload_part = if auto_reload_enabled { format!("\n{}", auto_reload) } else { String::new() };
 
     let mut script = format!(
-        "{}\n{}{}{}{}{}{}",
-        config, tab_selector, header_part, auto_reload_part, custom_css_js, image_popup, scroll_event
+        "{}\n{}{}{}{}{}{}{}",
+        config, tab_selector, header_part, auto_reload_part, custom_css_js, image_popup, context_menu, scroll_event
     );
 
     if !custom_css.is_empty() {

@@ -11,6 +11,7 @@ interface SidebarProps {
   onAccountManager: () => void;
   onAppSettings: () => void;
   onComposeTweet: () => void;
+  onOpenLinkPopup: () => void;
   onJumpToColumn: (columnId: string) => void;
 }
 
@@ -45,6 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onAccountManager,
   onAppSettings,
   onComposeTweet,
+  onOpenLinkPopup,
   onJumpToColumn,
 }) => {
   const sorted = [...columns].sort((a, b) => a.order - b.order);
@@ -117,6 +119,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title="カラムを追加"
         >
           ＋
+        </button>
+      )}
+
+      {expanded ? (
+        <button
+          className={`${styles.btn} ${styles.btnExpanded}`}
+          onClick={onOpenLinkPopup}
+          title="URLをポップアップで開く"
+        >
+          <span className={styles.icon}>🔗</span>
+          <span className={styles.label}>URLを開く</span>
+        </button>
+      ) : (
+        <button
+          className={styles.btn}
+          onClick={onOpenLinkPopup}
+          title="URLをポップアップで開く"
+        >
+          🔗
         </button>
       )}
 

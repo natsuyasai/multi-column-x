@@ -14,6 +14,7 @@ const plainEntries = [
   "auto_reload",
   "scroll_event",
   "popup_toolbar",
+  "context_menu",
 ];
 
 // React を含む header_customizer は IIFE + inlineDynamicImports で個別ビルド
