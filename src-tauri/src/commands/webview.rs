@@ -198,7 +198,7 @@ pub async fn open_popup_window(
 
     const PADDING: f64 = 50.0;
 
-    let mut builder = tauri::WebviewWindowBuilder::new(
+    let builder = tauri::WebviewWindowBuilder::new(
         &app,
         &popup_label,
         WebviewUrl::External(parse_url(&url)?),
