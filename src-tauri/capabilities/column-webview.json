@@ -4,6 +4,7 @@
   "description": "Capability for column webviews",
   "windows": [
     "column-*",
+    "popup-*",
     "main"
   ],
   "remote": {
