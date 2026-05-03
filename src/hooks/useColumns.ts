@@ -1,13 +1,93 @@
 // src/hooks/useColumns.ts
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAppStore } from "../store/useAppStore";
 import type { Column } from "../types";
 
-const HEADER_HEIGHT = 36; // ColumnHeader の高さ（px）
-const SCROLLBAR_HEIGHT = 12; // 下部スクロールバーの高さ（px）
+export const HEADER_HEIGHT = 36; // ColumnHeader の高さ（px）
+export const SCROLLBAR_HEIGHT = 12; // 下部スクロールバーの高さ（px）
 export const SIDEBAR_COLLAPSED_WIDTH = 40; // サイドバー折りたたみ時の幅（px）
 export const SIDEBAR_EXPANDED_WIDTH = 200; // サイドバー展開時の幅（px）
+
+export interface ColumnBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface GridBoundsOptions {
+  containerWidth: number;
+  containerHeight: number;
+  scrollLeft: number;
+  sidebarWidth: number;
+  headerHeight: number;
+  scrollbarHeight: number;
+}
+
+export function calculateGridBounds(
+  columns: Column[],
+  opts: GridBoundsOptions,
+): Record<string, ColumnBounds> {
+  const { containerHeight, scrollLeft, sidebarWidth, headerHeight, scrollbarHeight } = opts;
+  const availableHeight = containerHeight - headerHeight - scrollbarHeight;
+
+  // gridCol でグループ化
+  const byCol = new Map<number, Column[]>();
+  for (const col of columns) {
+    if (!byCol.has(col.gridCol)) byCol.set(col.gridCol, []);
+    byCol.get(col.gridCol)!.push(col);
+  }
+
+  // gridCol を昇順にソート
+  const sortedCols = [...byCol.keys()].sort((a, b) => a - b);
+
+  const result: Record<string, ColumnBounds> = {};
+  let xOffset = sidebarWidth;
+
+  for (const colNum of sortedCols) {
+    const colGroup = byCol.get(colNum)!.slice().sort((a, b) => a.gridRow - b.gridRow);
+
+    // fixed 高さの合計を計算
+    let fixedTotal = 0;
+    let autoCount = 0;
+    for (const col of colGroup) {
+      if (col.heightMode === "fixed" && col.heightValue != null) {
+        if (col.heightUnit === "%") {
+          fixedTotal += availableHeight * col.heightValue / 100;
+        } else {
+          fixedTotal += col.heightValue;
+        }
+      } else {
+        autoCount++;
+      }
+    }
+    const autoHeight = autoCount > 0 ? Math.max(0, availableHeight - fixedTotal) / autoCount : 0;
+
+    let yOffset = headerHeight;
+    for (const col of colGroup) {
+      let height: number;
+      if (col.heightMode === "fixed" && col.heightValue != null) {
+        height = col.heightUnit === "%" ? availableHeight * col.heightValue / 100 : col.heightValue;
+      } else {
+        height = autoHeight;
+      }
+      result[col.id] = {
+        x: xOffset - scrollLeft,
+        y: yOffset,
+        width: col.width,
+        height: Math.round(height),
+      };
+      yOffset += Math.round(height);
+    }
+
+    // 同じ gridCol 内の最大 width を使って x を進める
+    const colWidth = Math.max(...colGroup.map((c) => c.width));
+    xOffset += colWidth;
+  }
+
+  return result;
+}
 
 export function useColumns() {
   const {
@@ -21,69 +101,7 @@ export function useColumns() {
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null); // ヘッダースクロールコンテナ
   const scrollbarRef = useRef<HTMLDivElement>(null); // 下部スクロールバーコンテナ
-
-  // カラムのWebViewのboundsを計算する（scrollLeft を x から引くことでスクロール連動）
-  const calculateBounds = useCallback(
-    (
-      columnIndex: number,
-      allColumns: Column[],
-      _containerWidth: number,
-      containerHeight: number,
-      scrollLeft: number = 0,
-      sidebarWidth: number = 0,
-    ) => {
-      let x = sidebarWidth;
-      for (let i = 0; i < columnIndex; i++) {
-        x += allColumns[i].width;
-      }
-      return {
-        x: x - scrollLeft,
-        y: HEADER_HEIGHT,
-        width: allColumns[columnIndex].width,
-        height: containerHeight - HEADER_HEIGHT - SCROLLBAR_HEIGHT,
-      };
-    },
-    [],
-  );
-
-  // 全カラムのWebViewを作成（起動時に呼ぶ）
-  const restoreColumns = useCallback(
-    async (sidebarWidth: number) => {
-      if (!containerRef.current) return;
-      const containerWidth = containerRef.current.clientWidth;
-      const containerHeight = containerRef.current.clientHeight;
-      const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
-      // loadSettings() 完了後に呼ばれるため、ストアから直接最新値を取得する
-      const { columns: currentColumns, accounts: currentAccounts } =
-        useAppStore.getState();
-      const sortedColumns = [...currentColumns].sort(
-        (a, b) => a.order - b.order,
-      );
-
-      for (let i = 0; i < sortedColumns.length; i++) {
-        const column = sortedColumns[i];
-        const account = currentAccounts.find((a) => a.id === column.accountId);
-        if (!account) continue;
-
-        const bounds = calculateBounds(
-          i,
-          sortedColumns,
-          containerWidth,
-          containerHeight,
-          scrollLeft,
-          sidebarWidth,
-        );
-        await invoke("create_column_webview", {
-          args: {
-            column,
-            dataDirectory: account.dataDirectory,
-            ...bounds,
-          },
-        }).catch(console.error);
-      }
-    },
-    [calculateBounds],
-  );
+  const [columnBounds, setColumnBounds] = useState<Record<string, ColumnBounds>>({});
 
   // 全カラムのboundsを再計算して更新
   const recalculateAllBounds = useCallback(async () => {
@@ -95,22 +113,65 @@ export function useColumns() {
     const sidebarWidth = sidebarExpanded
       ? SIDEBAR_EXPANDED_WIDTH
       : SIDEBAR_COLLAPSED_WIDTH;
-    const sortedColumns = [...currentColumns].sort((a, b) => a.order - b.order);
 
-    for (let i = 0; i < sortedColumns.length; i++) {
-      const bounds = calculateBounds(
-        i,
-        sortedColumns,
+    const bounds = calculateGridBounds(currentColumns, {
+      containerWidth,
+      containerHeight,
+      scrollLeft,
+      sidebarWidth,
+      headerHeight: HEADER_HEIGHT,
+      scrollbarHeight: SCROLLBAR_HEIGHT,
+    });
+
+    setColumnBounds(bounds);
+
+    await Promise.all(
+      Object.entries(bounds).map(([columnId, b]) =>
+        invoke("resize_column_webview", {
+          bounds: { columnId, ...b },
+        }).catch(console.error),
+      ),
+    );
+  }, []);
+
+  // 全カラムのWebViewを作成（起動時に呼ぶ）
+  const restoreColumns = useCallback(
+    async (sidebarWidth: number) => {
+      if (!containerRef.current) return;
+      const containerWidth = containerRef.current.clientWidth;
+      const containerHeight = containerRef.current.clientHeight;
+      const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
+      // loadSettings() 完了後に呼ばれるため、ストアから直接最新値を取得する
+      const { columns: currentColumns, accounts: currentAccounts } =
+        useAppStore.getState();
+
+      const bounds = calculateGridBounds(currentColumns, {
         containerWidth,
         containerHeight,
         scrollLeft,
         sidebarWidth,
-      );
-      await invoke("resize_column_webview", {
-        bounds: { columnId: sortedColumns[i].id, ...bounds },
-      }).catch(console.error);
-    }
-  }, [calculateBounds]);
+        headerHeight: HEADER_HEIGHT,
+        scrollbarHeight: SCROLLBAR_HEIGHT,
+      });
+
+      setColumnBounds(bounds);
+
+      for (const column of currentColumns) {
+        const account = currentAccounts.find((a) => a.id === column.accountId);
+        if (!account) continue;
+        const b = bounds[column.id];
+        if (!b) continue;
+        await invoke("create_column_webview", {
+          args: {
+            column,
+            dataDirectory: account.dataDirectory,
+            ...b,
+          },
+        }).catch(console.error);
+      }
+    },
+    [],
+  );
 
   // カラム追加
   const handleAddColumn = useCallback(
@@ -118,34 +179,35 @@ export function useColumns() {
       const account = accounts.find((a) => a.id === column.accountId);
       if (!account || !containerRef.current) return;
 
-      const orderedColumns = [...columns, { ...column, order: columns.length }];
+      addColumn(column);
+
       const containerHeight = containerRef.current.clientHeight;
       const containerWidth = containerRef.current.clientWidth;
       const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
-      const { sidebarExpanded } = useAppStore.getState();
+      const { sidebarExpanded, columns: updatedColumns } = useAppStore.getState();
       const sidebarWidth = sidebarExpanded
         ? SIDEBAR_EXPANDED_WIDTH
         : SIDEBAR_COLLAPSED_WIDTH;
-      const bounds = calculateBounds(
-        orderedColumns.length - 1,
-        orderedColumns,
+
+      const allColumns = [...updatedColumns];
+      const bounds = calculateGridBounds(allColumns, {
         containerWidth,
         containerHeight,
         scrollLeft,
         sidebarWidth,
-      );
-
-      await invoke("create_column_webview", {
-        args: {
-          column: { ...column, order: columns.length },
-          dataDirectory: account.dataDirectory,
-          ...bounds,
-        },
+        headerHeight: HEADER_HEIGHT,
+        scrollbarHeight: SCROLLBAR_HEIGHT,
       });
 
-      addColumn({ ...column, order: columns.length });
+      setColumnBounds(bounds);
+      const b = bounds[column.id];
+      if (!b) return;
+
+      await invoke("create_column_webview", {
+        args: { column, dataDirectory: account.dataDirectory, ...b },
+      });
     },
-    [columns, accounts, addColumn, calculateBounds],
+    [columns, accounts, addColumn],
   );
 
   // ダイアログ表示時に全カラムWebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
@@ -228,6 +290,7 @@ export function useColumns() {
 
   return {
     columns,
+    columnBounds,
     containerRef,
     scrollRef,
     scrollbarRef,
