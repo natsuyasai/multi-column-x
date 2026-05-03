@@ -7,11 +7,14 @@ const baseSettings = {
   autoReloadInterval: 60,
   showCountdown: true,
   areaRemoveEnabled: true,
+  showCustomMenu: false,
   customCSS: "",
   visibleLinks: [],
 };
 
-function makeCol(overrides: Partial<Column> & Pick<Column, "id" | "gridCol" | "gridRow">): Column {
+function makeCol(
+  overrides: Partial<Column> & Pick<Column, "id" | "gridCol" | "gridRow">,
+): Column {
   return {
     accountId: "acc-1",
     pageType: "home",
@@ -55,7 +58,14 @@ describe("calculateGridBounds", () => {
   // fixed px + auto: available=716, c1.height=300, c2.height=716-300=416
   it("heightMode=fixed px のカラムは指定高さで、残りは均等割り", () => {
     const cols = [
-      makeCol({ id: "c1", gridCol: 1, gridRow: 1, heightMode: "fixed", heightValue: 300, heightUnit: "px" }),
+      makeCol({
+        id: "c1",
+        gridCol: 1,
+        gridRow: 1,
+        heightMode: "fixed",
+        heightValue: 300,
+        heightUnit: "px",
+      }),
       makeCol({ id: "c2", gridCol: 1, gridRow: 2 }),
     ];
     const result = calculateGridBounds(cols, opts);
@@ -67,7 +77,14 @@ describe("calculateGridBounds", () => {
   // fixed % + auto: available=716, c1.height=716*0.5=358, c2.height=358
   it("heightMode=fixed % のカラムはavailableHeightに対する割合", () => {
     const cols = [
-      makeCol({ id: "c1", gridCol: 1, gridRow: 1, heightMode: "fixed", heightValue: 50, heightUnit: "%" }),
+      makeCol({
+        id: "c1",
+        gridCol: 1,
+        gridRow: 1,
+        heightMode: "fixed",
+        heightValue: 50,
+        heightUnit: "%",
+      }),
       makeCol({ id: "c2", gridCol: 1, gridRow: 2 }),
     ];
     const result = calculateGridBounds(cols, opts);
