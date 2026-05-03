@@ -8,6 +8,8 @@ interface AppStore {
   columns: Column[];
   globalSettings: GlobalSettings;
   isLoaded: boolean;
+  sidebarExpanded: boolean;
+  setSidebarExpanded: (v: boolean) => void;
   loadSettings: () => Promise<void>;
   saveSettings: () => Promise<void>;
   addAccount: (account: Account) => void;
@@ -24,6 +26,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   columns: [],
   globalSettings: DEFAULT_GLOBAL_SETTINGS,
   isLoaded: false,
+  sidebarExpanded: false,
+  setSidebarExpanded: (v) => set({ sidebarExpanded: v }),
 
   loadSettings: async () => {
     try {
