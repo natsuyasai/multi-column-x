@@ -140,6 +140,7 @@ pub async fn load_settings(app: AppHandle) -> Result<AppSettingsData, String> {
                 default_auto_reload_enabled: true,
                 default_auto_reload_interval: 60,
                 popup_esc_close_enabled: true,
+                video_auto_play_stop_enabled: false,
             },
         });
 

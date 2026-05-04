@@ -36,6 +36,7 @@ fn save_window_bounds(window: &tauri::Window) {
                 default_auto_reload_enabled: true,
                 default_auto_reload_interval: 600,
                 popup_esc_close_enabled: true,
+                video_auto_play_stop_enabled: false,
             },
         });
     settings.global_settings.window_bounds = WindowBounds {
