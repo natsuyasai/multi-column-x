@@ -32,16 +32,14 @@ import { HeaderCustomizer } from "./HeaderCustomizer";
   window.__twitterViewer =
     window.__twitterViewer || ({} as Window["__twitterViewer"]);
   window.__twitterViewer.applyAreaRemove = function (enabled: boolean) {
-    if (enabled && (window.__twitterViewerConfig?.showCustomMenu ?? true)) {
+    if (enabled) {
       mount();
     } else {
       unmount();
     }
   };
 
-  const shouldMount =
-    window.__twitterViewerConfig?.areaRemoveEnabled &&
-    (window.__twitterViewerConfig?.showCustomMenu ?? true);
+  const shouldMount = window.__twitterViewerConfig?.areaRemoveEnabled;
 
   if (shouldMount) {
     if (document.readyState === "loading") {

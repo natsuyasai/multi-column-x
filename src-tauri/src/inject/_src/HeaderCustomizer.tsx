@@ -10,6 +10,10 @@ export function HeaderCustomizer() {
     composeButtonRef,
   } = useHeaderCustomizer();
 
+  if (!(window.__twitterViewerConfig?.showCustomMenu ?? true)) {
+    return null;
+  }
+
   return (
     <div className={styles.navContainer}>
       {/* トグルボタン */}
