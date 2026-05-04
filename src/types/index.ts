@@ -58,7 +58,7 @@ export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
   autoReloadInterval: 600,
   showCountdown: true,
   areaRemoveEnabled: true,
-  showCustomMenu: true,
+  showCustomMenu: false,
   customCSS: "",
   visibleLinks: [],
 };
@@ -68,7 +68,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   customCSS: "",
   windowBounds: { x: 0, y: 0, width: 1400, height: 900 },
   defaultAutoReloadEnabled: true,
-  defaultAutoReloadInterval: 60,
+  defaultAutoReloadInterval: 600,
   popupEscCloseEnabled: true,
 };
 
