@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "twitter-viewer",
   "version": "0.1.0",
-  "identifier": "com.twitter-viewer",
+  "identifier": "com.natsuyasai.twitter-viewer",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
