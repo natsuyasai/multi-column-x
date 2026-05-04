@@ -4,6 +4,7 @@ pub fn build_init_script(
     area_remove_enabled: bool,
     show_custom_menu: bool,
     auto_reload_enabled: bool,
+    video_auto_play_stop_enabled: bool,
     custom_css: &str,
     visible_links: &[String],
 ) -> String {
@@ -14,6 +15,7 @@ pub fn build_init_script(
     let image_popup = include_str!("image_popup.js");
     let context_menu = include_str!("context_menu.js");
     let scroll_event = include_str!("scroll_event.js");
+    let video_control = include_str!("video_control.js");
 
     let visible_links_json = serde_json::to_string(visible_links).unwrap_or_else(|_| "[]".to_string());
     let config = format!(
@@ -25,10 +27,11 @@ pub fn build_init_script(
 
     let header_part = if area_remove_enabled { format!("\n{}", header_customizer) } else { String::new() };
     let auto_reload_part = if auto_reload_enabled { format!("\n{}", auto_reload) } else { String::new() };
+    let video_control_part = if video_auto_play_stop_enabled { format!("\n{}", video_control) } else { String::new() };
 
     let mut script = format!(
-        "{}\n{}{}{}{}{}{}{}",
-        config, tab_selector, header_part, auto_reload_part, custom_css_js, image_popup, context_menu, scroll_event
+        "{}\n{}{}{}{}{}{}{}{}",
+        config, tab_selector, header_part, auto_reload_part, video_control_part, custom_css_js, image_popup, context_menu, scroll_event
     );
 
     if !custom_css.is_empty() {

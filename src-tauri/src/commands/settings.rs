@@ -104,6 +104,9 @@ pub struct GlobalSettingsData {
     #[serde(rename = "popupEscCloseEnabled")]
     #[serde(default = "default_true")]
     pub popup_esc_close_enabled: bool,
+    #[serde(rename = "videoAutoPlayStopEnabled")]
+    #[serde(default)]
+    pub video_auto_play_stop_enabled: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

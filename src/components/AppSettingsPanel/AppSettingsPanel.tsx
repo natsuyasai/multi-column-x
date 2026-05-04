@@ -30,6 +30,9 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   const [popupEscCloseEnabled, setPopupEscCloseEnabled] = useState(
     settings.popupEscCloseEnabled,
   );
+  const [videoAutoPlayStopEnabled, setVideoAutoPlayStopEnabled] = useState(
+    settings.videoAutoPlayStopEnabled,
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,6 +40,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       defaultAutoReloadEnabled: autoReloadEnabled,
       defaultAutoReloadInterval: autoReloadInterval,
       popupEscCloseEnabled: popupEscCloseEnabled,
+      videoAutoPlayStopEnabled: videoAutoPlayStopEnabled,
     });
     onClose();
   };
@@ -118,6 +122,20 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                     }
                   />
                   Escキーで閉じる
+                </label>
+              </section>
+
+              <section className={styles.section}>
+                <h3 className={styles.sectionTitle}>動画</h3>
+                <label className={styles.checkLabel}>
+                  <input
+                    type="checkbox"
+                    checked={videoAutoPlayStopEnabled}
+                    onChange={(e) =>
+                      setVideoAutoPlayStopEnabled(e.target.checked)
+                    }
+                  />
+                  動画の自動再生を停止する
                 </label>
               </section>
 
