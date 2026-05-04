@@ -51,6 +51,7 @@ describe("useAppStore", () => {
         defaultAutoReloadEnabled: true,
         defaultAutoReloadInterval: 60,
         popupEscCloseEnabled: true,
+        videoAutoPlayStopEnabled: false,
       },
       isLoaded: false,
     });
