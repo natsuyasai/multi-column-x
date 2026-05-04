@@ -34,7 +34,7 @@ export function useAutoReload({
           invoke("eval_in_webview", {
             label: `column-${columnId}`,
             script:
-              "window.__twitterViewer && window.__twitterViewer.triggerReload();",
+              "window.__multiColumnX && window.__multiColumnX.triggerReload();",
           }).catch(() => {});
           return intervalSecRef.current;
         }

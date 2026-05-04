@@ -49,7 +49,7 @@ fn save_window_bounds(window: &tauri::Window) {
     };
     store.set("appSettings", value);
     if let Err(e) = store.save() {
-        eprintln!("[twitter-viewer] failed to save window bounds: {e}");
+        eprintln!("[MultiColumnX] failed to save window bounds: {e}");
     }
 }
 

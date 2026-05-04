@@ -10,9 +10,9 @@ import {
 } from "./headerCustomizerTypes";
 
 export function useHeaderCustomizer() {
-  // visibleLinks は window.__twitterViewerConfig から取得（空配列 = 全リンク表示）
+  // visibleLinks は window.__multiColumnXConfig から取得（空配列 = 全リンク表示）
   const visibleLinks: string[] =
-    window.__twitterViewerConfig?.visibleLinks ?? [];
+    window.__multiColumnXConfig?.visibleLinks ?? [];
 
   const [navLinks, setNavLinks] = useState<NavLink[]>([]);
   const [isNavVisible, setIsNavVisible] = useState<boolean>(() => {

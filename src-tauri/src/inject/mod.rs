@@ -17,7 +17,7 @@ pub fn build_init_script(
 
     let visible_links_json = serde_json::to_string(visible_links).unwrap_or_else(|_| "[]".to_string());
     let config = format!(
-        "window.__twitterViewerConfig = {{ areaRemoveEnabled: {}, showCustomMenu: {}, visibleLinks: {} }};",
+        "window.__multiColumnXConfig = {{ areaRemoveEnabled: {}, showCustomMenu: {}, visibleLinks: {} }};",
         area_remove_enabled,
         show_custom_menu,
         visible_links_json
@@ -33,7 +33,7 @@ pub fn build_init_script(
 
     if !custom_css.is_empty() {
         script.push_str(&format!(
-            "\nwindow.__twitterViewer.applyCustomCSS({:?});",
+            "\nwindow.__multiColumnX.applyCustomCSS({:?});",
             custom_css
         ));
     }

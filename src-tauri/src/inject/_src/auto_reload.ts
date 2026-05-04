@@ -80,7 +80,7 @@
     }
   }
 
-  window.__twitterViewer =
-    window.__twitterViewer || ({} as Window["__twitterViewer"]);
-  window.__twitterViewer.triggerReload = triggerReload;
+  window.__multiColumnX =
+    window.__multiColumnX || ({} as Window["__multiColumnX"]);
+  window.__multiColumnX.triggerReload = triggerReload;
 })();

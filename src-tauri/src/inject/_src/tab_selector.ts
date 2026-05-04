@@ -91,7 +91,7 @@
   }
   startUrlObserver();
 
-  window.__twitterViewer =
-    window.__twitterViewer || ({} as Window["__twitterViewer"]);
-  window.__twitterViewer.selectHomeTab = function () {};
+  window.__multiColumnX =
+    window.__multiColumnX || ({} as Window["__multiColumnX"]);
+  window.__multiColumnX.selectHomeTab = function () {};
 })();

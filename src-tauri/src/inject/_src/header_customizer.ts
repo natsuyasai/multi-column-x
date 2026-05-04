@@ -12,10 +12,10 @@ import { HeaderCustomizer } from "./HeaderCustomizer";
       setTimeout(mount, 50);
       return;
     }
-    if (document.getElementById("twitter-viewer-header-customizer-root"))
+    if (document.getElementById("multi-column-x-header-customizer-root"))
       return;
     const container = document.createElement("div");
-    container.id = "twitter-viewer-header-customizer-root";
+    container.id = "multi-column-x-header-customizer-root";
     document.body.appendChild(container);
     root = createRoot(container);
     root.render(React.createElement(HeaderCustomizer));
@@ -26,12 +26,12 @@ import { HeaderCustomizer } from "./HeaderCustomizer";
       root.unmount();
       root = null;
     }
-    document.getElementById("twitter-viewer-header-customizer-root")?.remove();
+    document.getElementById("multi-column-x-header-customizer-root")?.remove();
   }
 
-  window.__twitterViewer =
-    window.__twitterViewer || ({} as Window["__twitterViewer"]);
-  window.__twitterViewer.applyAreaRemove = function (enabled: boolean) {
+  window.__multiColumnX =
+    window.__multiColumnX || ({} as Window["__multiColumnX"]);
+  window.__multiColumnX.applyAreaRemove = function (enabled: boolean) {
     if (enabled) {
       mount();
     } else {
@@ -39,7 +39,7 @@ import { HeaderCustomizer } from "./HeaderCustomizer";
     }
   };
 
-  const shouldMount = window.__twitterViewerConfig?.areaRemoveEnabled;
+  const shouldMount = window.__multiColumnXConfig?.areaRemoveEnabled;
 
   if (shouldMount) {
     if (document.readyState === "loading") {

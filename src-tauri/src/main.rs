@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    twitter_viewer_lib::run()
+    multi_column_x_lib::run()
 }

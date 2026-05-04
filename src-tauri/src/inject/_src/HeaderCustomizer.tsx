@@ -10,7 +10,7 @@ export function HeaderCustomizer() {
     composeButtonRef,
   } = useHeaderCustomizer();
 
-  if (!(window.__twitterViewerConfig?.showCustomMenu ?? true)) {
+  if (!(window.__multiColumnXConfig?.showCustomMenu ?? true)) {
     return null;
   }
 

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "twitter-viewer",
+  "productName": "MultiColumnX",
   "version": "0.1.0",
-  "identifier": "com.natsuyasai.twitter-viewer",
+  "identifier": "com.natsuyasai.multi-column-x",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Twitter Viewer",
+        "title": "MultiColumnX",
         "width": 1400,
         "height": 900,
         "minWidth": 600,

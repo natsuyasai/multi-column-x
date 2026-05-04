@@ -143,7 +143,7 @@ const App: React.FC = () => {
     await invoke("eval_in_webview", {
       label: webviewLabel,
       script:
-        "window.__twitterViewer && window.__twitterViewer.triggerReload();",
+        "window.__multiColumnX && window.__multiColumnX.triggerReload();",
     }).catch(console.error);
   }, []);
 
@@ -154,7 +154,7 @@ const App: React.FC = () => {
       const webviewLabel = `column-${columnId}`;
       await invoke("eval_in_webview", {
         label: webviewLabel,
-        script: `window.__twitterViewer && window.__twitterViewer.applyAreaRemove(${settings.areaRemoveEnabled});`,
+        script: `window.__multiColumnX && window.__multiColumnX.applyAreaRemove(${settings.areaRemoveEnabled});`,
       }).catch(console.error);
       const escaped = settings.customCSS.replace(/`/g, "\\`");
       await invoke("eval_in_webview", {
@@ -164,7 +164,7 @@ const App: React.FC = () => {
       await invoke("eval_in_webview", {
         label: webviewLabel,
         script:
-          "window.__twitterViewer && window.__twitterViewer.triggerReload();",
+          "window.__multiColumnX && window.__multiColumnX.triggerReload();",
       }).catch(console.error);
     },
     [handleUpdateColumn],
