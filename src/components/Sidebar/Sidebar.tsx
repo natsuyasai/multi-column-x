@@ -101,26 +101,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           ),
         )}
+        {expanded ? (
+          <button
+            className={`${styles.btn} ${styles.btnExpanded}`}
+            onClick={onAddColumn}
+            title="カラムを追加"
+          >
+            <span className={styles.icon}>＋</span>
+            <span className={styles.label}>カラム追加</span>
+          </button>
+        ) : (
+          <button
+            className={styles.btn}
+            onClick={onAddColumn}
+            title="カラムを追加"
+          >
+            ＋
+          </button>
+        )}
       </div>
-
-      {expanded ? (
-        <button
-          className={`${styles.btn} ${styles.btnExpanded}`}
-          onClick={onAddColumn}
-          title="カラムを追加"
-        >
-          <span className={styles.icon}>＋</span>
-          <span className={styles.label}>カラム追加</span>
-        </button>
-      ) : (
-        <button
-          className={styles.btn}
-          onClick={onAddColumn}
-          title="カラムを追加"
-        >
-          ＋
-        </button>
-      )}
 
       {expanded ? (
         <button
