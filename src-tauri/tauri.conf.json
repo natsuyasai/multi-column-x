@@ -27,5 +27,10 @@
       "csp": null
     }
   },
-  "plugins": {}
+  "plugins": {},
+  "bundle": {
+    "android": {
+      "minSdkVersion": 24
+    }
+  }
 }
