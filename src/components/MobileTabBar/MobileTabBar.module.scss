@@ -5,11 +5,17 @@
   right: 0;
   height: 56px;
   display: flex;
-  overflow-x: auto;
-  overflow-y: hidden;
+  align-items: stretch;
   background: #1c1c1e;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
   z-index: 100;
+}
+
+.tabs {
+  flex: 1;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
 
   &::-webkit-scrollbar {
@@ -63,5 +69,66 @@
 
   &:hover {
     opacity: 1;
+  }
+}
+
+.actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.actionBtn {
+  height: 100%;
+  padding: 0 14px;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover,
+  &:active {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+  }
+}
+
+.loginBanner {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.loginBannerText {
+  flex: 1;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.loginCompleteBtn {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  background: #1d9bf0;
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:active {
+    background: #1a8cd8;
   }
 }

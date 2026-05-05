@@ -3,7 +3,9 @@ mod inject;
 mod state;
 
 use state::AppState;
+#[cfg(desktop)]
 use tauri::{Manager, PhysicalPosition, PhysicalSize};
+#[cfg(desktop)]
 use tauri_plugin_store::StoreExt;
 
 #[cfg(desktop)]
@@ -99,6 +101,8 @@ pub fn run() {
                     }
                 }
             }
+            #[cfg(not(desktop))]
+            let _ = app;
             Ok(())
         });
 

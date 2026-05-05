@@ -1,6 +1,6 @@
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl};
 #[cfg(mobile)]
-use tauri::{LogicalPosition, LogicalSize, WebviewBuilder};
+use tauri::{LogicalPosition, LogicalSize};
 use std::path::PathBuf;
 
 #[cfg(desktop)]
@@ -64,27 +64,18 @@ pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
         .join(format!("account-{}", &account_id));
     std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
 
-    let window = app.get_window("main").ok_or("main window not found")?;
-    let size = window.inner_size().map_err(|e| e.to_string())?;
-    let scale = window.scale_factor().unwrap_or(1.0);
-    let logical_w = size.width as f64 / scale;
-    let logical_h = size.height as f64 / scale;
-
-    window
-        .add_child(
-            WebviewBuilder::new(
-                &window_label,
-                WebviewUrl::External(
-                    "https://x.com/login"
-                        .parse()
-                        .map_err(|e: url::ParseError| e.to_string())?,
-                ),
-            )
-            .data_directory(data_dir.clone()),
-            LogicalPosition::new(0.0, 0.0),
-            LogicalSize::new(logical_w, logical_h),
-        )
-        .map_err(|e| e.to_string())?;
+    tauri::WebviewWindowBuilder::new(
+        &app,
+        &window_label,
+        WebviewUrl::External(
+            "https://x.com/login"
+                .parse()
+                .map_err(|e: url::ParseError| e.to_string())?,
+        ),
+    )
+    .data_directory(data_dir.clone())
+    .build()
+    .map_err(|e| e.to_string())?;
 
     let app_clone = app.clone();
     let window_label_clone = window_label.clone();
@@ -92,12 +83,19 @@ pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
         let mut notified = false;
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-            match app_clone.get_webview(&window_label_clone) {
+            match app_clone.get_webview_window(&window_label_clone) {
                 Some(w) => {
                     if let Ok(url) = w.url() {
                         if !notified && url.path() == "/home" {
                             notified = true;
                             let _ = app_clone.emit("account-login-complete", ());
+                            // Android の WebviewWindow::close() はタウリ内部状態を破棄するが
+                            // Android View hierarchy からは削除されないことがある。
+                            // 先に画面外へ移動してから close() することで視覚的に隠す。
+                            let _ = w.set_position(LogicalPosition::new(-99999.0_f64, 0.0_f64));
+                            let _ = w.set_size(LogicalSize::new(1.0_f64, 1.0_f64));
+                            let _ = w.close();
+                            break;
                         }
                     }
                 }
@@ -133,7 +131,10 @@ pub async fn delete_account_data(data_directory: String) -> Result<(), String> {
 pub async fn close_window(app: AppHandle, label: String) -> Result<(), String> {
     if let Some(window) = app.get_webview_window(&label) {
         window.close().map_err(|e| e.to_string())?;
-    } else if let Some(webview) = app.get_webview(&label) {
+        return Ok(());
+    }
+    #[cfg(desktop)]
+    if let Some(webview) = app.get_webview(&label) {
         webview.close().map_err(|e| e.to_string())?;
     }
     Ok(())

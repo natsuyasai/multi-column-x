@@ -58,7 +58,12 @@ const App: React.FC = () => {
 
   const scrollbarWidth = useMemo(() => {
     const scrollLeft = scrollbarRef.current?.scrollLeft ?? 0;
-    return Object.values(columnBounds).reduce((max, b) => Math.max(max, b.x + b.width + scrollLeft), 0) - sidebarWidth;
+    return (
+      Object.values(columnBounds).reduce(
+        (max, b) => Math.max(max, b.x + b.width + scrollLeft),
+        0,
+      ) - sidebarWidth
+    );
   }, [columnBounds, sidebarWidth, scrollbarRef]);
 
   const [showAddColumn, setShowAddColumn] = useState(false);
@@ -103,8 +108,7 @@ const App: React.FC = () => {
   }, [scrollbarRef]);
 
   const handleOpenLinkPopup = useCallback(() => {
-    const defaultId =
-      globalSettings.defaultAccountId ?? accounts[0]?.id ?? "";
+    const defaultId = globalSettings.defaultAccountId ?? accounts[0]?.id ?? "";
     setLinkPopupAccountId(defaultId);
     setShowLinkPopupDialog(true);
   }, [accounts, globalSettings.defaultAccountId]);
@@ -115,8 +119,7 @@ const App: React.FC = () => {
       setLinkPopupUrl("");
       if (!url.trim()) return;
       const resolved = url.startsWith("http") ? url : "https://" + url;
-      const account =
-        accounts.find((a) => a.id === accountId) ?? accounts[0];
+      const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
       if (!account) return;
       await invoke("open_link_popup_window", {
         webviewLabelCaller: null,
@@ -129,7 +132,12 @@ const App: React.FC = () => {
   );
 
   // ダイアログ表示中は列WebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
-  const dialogOpen = showAddColumn || showAccountManager || showAppSettings || !!settingsColumnId || showLinkPopupDialog;
+  const dialogOpen =
+    showAddColumn ||
+    showAccountManager ||
+    showAppSettings ||
+    !!settingsColumnId ||
+    showLinkPopupDialog;
   useEffect(() => {
     if (dialogOpen) {
       hideColumnWebviews();
@@ -150,7 +158,10 @@ const App: React.FC = () => {
       const bounds = columnBounds[columnId];
       if (!bounds) return;
       const currentScroll = el.scrollLeft ?? 0;
-      el.scrollLeft = currentScroll + bounds.x - (sidebarExpanded ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH);
+      el.scrollLeft =
+        currentScroll +
+        bounds.x -
+        (sidebarExpanded ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH);
     },
     [columnBounds, scrollbarRef, sidebarExpanded],
   );
@@ -159,8 +170,7 @@ const App: React.FC = () => {
     const webviewLabel = `column-${columnId}`;
     await invoke("eval_in_webview", {
       label: webviewLabel,
-      script:
-        "window.__multiColumnX && window.__multiColumnX.triggerReload();",
+      script: "window.__multiColumnX && window.__multiColumnX.triggerReload();",
     }).catch(console.error);
   }, []);
 
@@ -240,6 +250,8 @@ const App: React.FC = () => {
           activeColumnId={activeColumnId}
           onSelectColumn={setActiveColumn}
           onOpenSettings={setSettingsColumnId}
+          onAddColumn={() => setShowAddColumn(true)}
+          onAccountManager={() => setShowAccountManager(true)}
         />
       )}
 

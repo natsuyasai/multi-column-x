@@ -20,6 +20,8 @@ interface Props {
   activeColumnId: string | null;
   onSelectColumn: (id: string) => void;
   onOpenSettings: (id: string) => void;
+  onAddColumn: () => void;
+  onAccountManager: () => void;
 }
 
 export const MobileTabBar: React.FC<Props> = ({
@@ -28,48 +30,71 @@ export const MobileTabBar: React.FC<Props> = ({
   activeColumnId,
   onSelectColumn,
   onOpenSettings,
+  onAddColumn,
+  onAccountManager,
 }) => {
   const sorted = [...columns].sort((a, b) => a.order - b.order);
 
   return (
     <div className={styles.tabBar}>
-      {sorted.map((col) => {
-        const account = accounts.find((a) => a.id === col.accountId);
-        const isActive = col.id === activeColumnId;
-        return (
-          <div
-            key={col.id}
-            role="button"
-            tabIndex={0}
-            aria-current={isActive ? "true" : undefined}
-            className={`${styles.tab} ${isActive ? styles.active : ""}`}
-            onClick={() => onSelectColumn(col.id)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onSelectColumn(col.id);
-              }
-            }}
-          >
+      <div className={styles.tabs}>
+        {sorted.map((col) => {
+          const account = accounts.find((a) => a.id === col.accountId);
+          const isActive = col.id === activeColumnId;
+          return (
             <div
-              className={styles.accountColor}
-              style={{ backgroundColor: account?.color ?? "#888" }}
-            />
-            <span className={styles.label}>{getTabLabel(col)}</span>
-            <button
-              className={styles.settingsBtn}
-              aria-label="設定"
-              title="設定"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenSettings(col.id);
+              key={col.id}
+              role="button"
+              tabIndex={0}
+              aria-current={isActive ? "true" : undefined}
+              className={`${styles.tab} ${isActive ? styles.active : ""}`}
+              onClick={() => onSelectColumn(col.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelectColumn(col.id);
+                }
               }}
             >
-              ⚙
-            </button>
-          </div>
-        );
-      })}
+              <div
+                className={styles.accountColor}
+                style={{ backgroundColor: account?.color ?? "#888" }}
+              />
+              <span className={styles.label}>{getTabLabel(col)}</span>
+              <button
+                className={styles.settingsBtn}
+                aria-label="設定"
+                title="設定"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenSettings(col.id);
+                }}
+              >
+                ⚙
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className={styles.actions}>
+        <button
+          className={styles.actionBtn}
+          aria-label="アカウント管理"
+          title="アカウント管理"
+          onClick={onAccountManager}
+        >
+          👤
+        </button>
+        <button
+          className={styles.actionBtn}
+          aria-label="カラムを追加"
+          title="カラムを追加"
+          onClick={onAddColumn}
+        >
+          ＋
+        </button>
+      </div>
     </div>
   );
 };

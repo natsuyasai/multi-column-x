@@ -136,7 +136,7 @@ export function useColumns() {
           bounds: {
             columnId: col.id,
             x: isActive ? 0 : -99999,
-            y: isActive ? MOBILE_TAB_BAR_HEIGHT : 0,
+            y: 0,
             width: window.innerWidth,
             height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
           },
@@ -205,7 +205,7 @@ export function useColumns() {
             column,
             dataDirectory: account.dataDirectory,
             x: isFirst ? 0 : -99999,
-            y: isFirst ? MOBILE_TAB_BAR_HEIGHT : 0,
+            y: 0,
             width: window.innerWidth,
             height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
           },

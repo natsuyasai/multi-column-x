@@ -3,10 +3,11 @@ use crate::inject::build_init_script;
 use crate::state::AppState;
 use std::path::PathBuf;
 use std::time::Duration;
-use tauri::{
-    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewBuilder, WebviewUrl,
-};
+use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewUrl};
 use tauri_plugin_store::StoreExt;
+
+#[cfg(desktop)]
+use tauri::WebviewBuilder;
 
 fn webview_label(column_id: &str) -> String {
     format!("column-{}", column_id)
@@ -50,6 +51,7 @@ pub struct CreateWebviewArgs {
     pub height: f64,
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> Result<(), String> {
     let url = resolve_url(&args.column);
@@ -90,11 +92,65 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
     Ok(())
 }
 
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> Result<(), String> {
+    let url = resolve_url(&args.column);
+    let label = webview_label(&args.column.id);
+    let data_dir = PathBuf::from(&args.data_directory);
+
+    let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(&app);
+    let init_script = build_init_script(
+        args.column.settings.area_remove_enabled,
+        args.column.settings.show_custom_menu,
+        args.column.settings.auto_reload_enabled,
+        video_auto_play_stop_enabled,
+        &args.column.settings.custom_css,
+        &args.column.settings.visible_links,
+    );
+
+    tauri::WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(parse_url(&url)?))
+        .initialization_script(&init_script)
+        .data_directory(data_dir)
+        .inner_size(args.width, args.height)
+        .position(args.x, args.y)
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let state = app.state::<AppState>();
+    let mut registry = state.registry.lock().unwrap();
+    registry.register(
+        label,
+        args.column.id.clone(),
+        args.column.account_id.clone(),
+        args.data_directory.clone(),
+    );
+
+    Ok(())
+}
+
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn remove_column_webview(app: AppHandle, column_id: String) -> Result<(), String> {
     let label = webview_label(&column_id);
 
     if let Some(webview) = app.get_webview(&label) {
+        webview.close().map_err(|e| e.to_string())?;
+    }
+
+    let state = app.state::<AppState>();
+    let mut registry = state.registry.lock().unwrap();
+    registry.unregister(&label);
+
+    Ok(())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn remove_column_webview(app: AppHandle, column_id: String) -> Result<(), String> {
+    let label = webview_label(&column_id);
+
+    if let Some(webview) = app.get_webview_window(&label) {
         webview.close().map_err(|e| e.to_string())?;
     }
 
@@ -115,6 +171,7 @@ pub struct ResizeBounds {
     pub height: f64,
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Result<(), String> {
     let label = webview_label(&bounds.column_id);
@@ -125,6 +182,23 @@ pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Resu
                 position: LogicalPosition::new(bounds.x, bounds.y).into(),
                 size: LogicalSize::new(bounds.width, bounds.height).into(),
             })
+            .map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Result<(), String> {
+    let label = webview_label(&bounds.column_id);
+
+    if let Some(webview) = app.get_webview_window(&label) {
+        webview
+            .set_size(LogicalSize::new(bounds.width, bounds.height))
+            .map_err(|e| e.to_string())?;
+        webview
+            .set_position(LogicalPosition::new(bounds.x, bounds.y))
             .map_err(|e| e.to_string())?;
     }
 
@@ -271,20 +345,10 @@ pub async fn open_popup_window(
     );
     let popup_label = format!("popup-{}", uuid::Uuid::new_v4());
 
-    let window = app.get_window("main").ok_or("main window not found")?;
-    let size = window.inner_size().map_err(|e| e.to_string())?;
-    let scale = window.scale_factor().unwrap_or(1.0);
-    let logical_w = size.width as f64 / scale;
-    let logical_h = size.height as f64 / scale;
-
-    window
-        .add_child(
-            WebviewBuilder::new(&popup_label, WebviewUrl::External(parse_url(&url)?))
-                .initialization_script(&popup_init)
-                .data_directory(data_dir),
-            LogicalPosition::new(0.0, 0.0),
-            LogicalSize::new(logical_w, logical_h),
-        )
+    tauri::WebviewWindowBuilder::new(&app, &popup_label, WebviewUrl::External(parse_url(&url)?))
+        .initialization_script(&popup_init)
+        .data_directory(data_dir)
+        .build()
         .map_err(|e| e.to_string())?;
 
     Ok(())
@@ -399,20 +463,10 @@ pub async fn open_link_popup_window(
     );
     let popup_label = format!("popup-{}", uuid::Uuid::new_v4());
 
-    let window = app.get_window("main").ok_or("main window not found")?;
-    let size = window.inner_size().map_err(|e| e.to_string())?;
-    let scale = window.scale_factor().unwrap_or(1.0);
-    let logical_w = size.width as f64 / scale;
-    let logical_h = size.height as f64 / scale;
-
-    window
-        .add_child(
-            WebviewBuilder::new(&popup_label, WebviewUrl::External(parse_url(&url)?))
-                .initialization_script(&popup_init)
-                .data_directory(data_dir),
-            LogicalPosition::new(0.0, 0.0),
-            LogicalSize::new(logical_w, logical_h),
-        )
+    tauri::WebviewWindowBuilder::new(&app, &popup_label, WebviewUrl::External(parse_url(&url)?))
+        .initialization_script(&popup_init)
+        .data_directory(data_dir)
+        .build()
         .map_err(|e| e.to_string())?;
 
     Ok(())
@@ -422,6 +476,8 @@ pub async fn open_link_popup_window(
 pub async fn eval_in_webview(app: AppHandle, label: String, script: String) -> Result<(), String> {
     if let Some(webview) = app.get_webview(&label) {
         webview.eval(&script).map_err(|e| e.to_string())?;
+    } else if let Some(webview_window) = app.get_webview_window(&label) {
+        webview_window.eval(&script).map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -483,7 +539,10 @@ pub async fn switch_popup_session(
 pub async fn close_popup_window(app: AppHandle, label: String) -> Result<(), String> {
     if let Some(window) = app.get_webview_window(&label) {
         window.close().map_err(|e| e.to_string())?;
-    } else if let Some(webview) = app.get_webview(&label) {
+        return Ok(());
+    }
+    #[cfg(desktop)]
+    if let Some(webview) = app.get_webview(&label) {
         webview.close().map_err(|e| e.to_string())?;
     }
     Ok(())
@@ -555,24 +614,15 @@ pub async fn open_compose_window(
     );
     let compose_label = format!("compose-{}", uuid::Uuid::new_v4());
 
-    let window = app.get_window("main").ok_or("main window not found")?;
-    let size = window.inner_size().map_err(|e| e.to_string())?;
-    let scale = window.scale_factor().unwrap_or(1.0);
-    let logical_w = size.width as f64 / scale;
-    let logical_h = size.height as f64 / scale;
-
-    window
-        .add_child(
-            WebviewBuilder::new(
-                &compose_label,
-                WebviewUrl::External(parse_url("https://x.com/compose/post")?),
-            )
-            .initialization_script(&popup_init)
-            .data_directory(data_dir),
-            LogicalPosition::new(0.0, 0.0),
-            LogicalSize::new(logical_w, logical_h),
-        )
-        .map_err(|e| e.to_string())?;
+    tauri::WebviewWindowBuilder::new(
+        &app,
+        &compose_label,
+        WebviewUrl::External(parse_url("https://x.com/compose/post")?),
+    )
+    .initialization_script(&popup_init)
+    .data_directory(data_dir)
+    .build()
+    .map_err(|e| e.to_string())?;
 
     Ok(())
 }
