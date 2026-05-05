@@ -14,6 +14,8 @@ import { AccountManager } from "./components/AccountManager/AccountManager";
 import { SettingsPanel } from "./components/SettingsPanel/SettingsPanel";
 import { AppSettingsPanel } from "./components/AppSettingsPanel/AppSettingsPanel";
 import { Sidebar } from "./components/Sidebar/Sidebar";
+import { MobileTabBar } from "./components/MobileTabBar/MobileTabBar";
+import { platform } from "@tauri-apps/plugin-os";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { ColumnSettings } from "./types";
@@ -29,6 +31,8 @@ const App: React.FC = () => {
     sidebarExpanded,
     setSidebarExpanded,
     replaceColumns,
+    isMobile,
+    setIsMobile,
   } = useAppStore();
   const {
     columns,
@@ -43,6 +47,8 @@ const App: React.FC = () => {
     recalculateAllBounds,
     hideColumnWebviews,
     handleScrollbarScroll,
+    activeColumnId,
+    setActiveColumn,
   } = useColumns();
   const { startAddAccount, removeAccount } = useAccounts();
 
@@ -62,6 +68,12 @@ const App: React.FC = () => {
   const [showLinkPopupDialog, setShowLinkPopupDialog] = useState(false);
   const [linkPopupUrl, setLinkPopupUrl] = useState("");
   const [linkPopupAccountId, setLinkPopupAccountId] = useState("");
+
+  useEffect(() => {
+    try {
+      setIsMobile(platform() === "android");
+    } catch {}
+  }, []);
 
   useEffect(() => {
     loadSettings();
@@ -202,21 +214,33 @@ const App: React.FC = () => {
 
   return (
     <div className={styles.app}>
-      <Sidebar
-        columns={columns}
-        accounts={accounts}
-        expanded={sidebarExpanded}
-        onToggleExpand={handleToggleSidebar}
-        onAddColumn={() => setShowAddColumn(true)}
-        onAccountManager={() => setShowAccountManager(true)}
-        onAppSettings={() => setShowAppSettings(true)}
-        onComposeTweet={handleComposeTweet}
-        onOpenLinkPopup={handleOpenLinkPopup}
-        onJumpToColumn={handleJumpToColumn}
-      />
+      {!isMobile && (
+        <Sidebar
+          columns={columns}
+          accounts={accounts}
+          expanded={sidebarExpanded}
+          onToggleExpand={handleToggleSidebar}
+          onAddColumn={() => setShowAddColumn(true)}
+          onAccountManager={() => setShowAccountManager(true)}
+          onAppSettings={() => setShowAppSettings(true)}
+          onComposeTweet={handleComposeTweet}
+          onOpenLinkPopup={handleOpenLinkPopup}
+          onJumpToColumn={handleJumpToColumn}
+        />
+      )}
+      {isMobile && (
+        <MobileTabBar
+          columns={columns}
+          accounts={accounts}
+          activeColumnId={activeColumnId}
+          onSelectColumn={setActiveColumn}
+          onOpenSettings={setSettingsColumnId}
+        />
+      )}
 
       <div className={styles.appContent} ref={containerRef}>
         {columns.map((column) => {
+          if (isMobile) return null;
           const account = accounts.find((a) => a.id === column.accountId);
           const bounds = columnBounds[column.id];
           if (!account || !bounds) return null;
