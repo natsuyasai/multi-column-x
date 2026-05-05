@@ -6,6 +6,7 @@ use state::AppState;
 use tauri::{Manager, PhysicalPosition, PhysicalSize};
 use tauri_plugin_store::StoreExt;
 
+#[cfg(desktop)]
 fn save_window_bounds(window: &tauri::Window) {
     use crate::commands::settings::{AppSettingsData, GlobalSettingsData, WindowBounds};
     let Ok(pos) = window.outer_position() else {
@@ -56,51 +57,61 @@ fn save_window_bounds(window: &tauri::Window) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .manage(AppState::new())
         .setup(|app| {
-            use crate::commands::settings::AppSettingsData;
-            let store = app.store("settings.json").map_err(|e| e.to_string())?;
-            if let Some(settings) = store
-                .get("appSettings")
-                .and_then(|v| serde_json::from_value::<AppSettingsData>(v).ok())
+            #[cfg(desktop)]
             {
-                let wb = &settings.global_settings.window_bounds;
-                if let Some(window) = app.get_webview_window("main") {
-                    let monitors = window.available_monitors().unwrap_or_default();
-                    let min_visible = 100.0_f64;
-                    let on_screen = monitors.iter().any(|m| {
-                        let pos = m.position();
-                        let size = m.size();
-                        let mx = pos.x as f64;
-                        let my = pos.y as f64;
-                        let mw = size.width as f64;
-                        let mh = size.height as f64;
-                        wb.x + min_visible > mx
-                            && wb.x < mx + mw
-                            && wb.y + min_visible > my
-                            && wb.y < my + mh
-                    });
-                    if on_screen {
-                        let _ =
-                            window.set_position(PhysicalPosition::new(wb.x as i32, wb.y as i32));
+                use crate::commands::settings::AppSettingsData;
+                let store = app.store("settings.json").map_err(|e| e.to_string())?;
+                if let Some(settings) = store
+                    .get("appSettings")
+                    .and_then(|v| serde_json::from_value::<AppSettingsData>(v).ok())
+                {
+                    let wb = &settings.global_settings.window_bounds;
+                    if let Some(window) = app.get_webview_window("main") {
+                        let monitors = window.available_monitors().unwrap_or_default();
+                        let min_visible = 100.0_f64;
+                        let on_screen = monitors.iter().any(|m| {
+                            let pos = m.position();
+                            let size = m.size();
+                            let mx = pos.x as f64;
+                            let my = pos.y as f64;
+                            let mw = size.width as f64;
+                            let mh = size.height as f64;
+                            wb.x + min_visible > mx
+                                && wb.x < mx + mw
+                                && wb.y + min_visible > my
+                                && wb.y < my + mh
+                        });
+                        if on_screen {
+                            let _ = window.set_position(PhysicalPosition::new(
+                                wb.x as i32,
+                                wb.y as i32,
+                            ));
+                        }
+                        let clamped_w = wb.width.max(600.0) as u32;
+                        let clamped_h = wb.height.max(400.0) as u32;
+                        let _ = window.set_size(PhysicalSize::new(clamped_w, clamped_h));
                     }
-                    let clamped_w = wb.width.max(600.0) as u32;
-                    let clamped_h = wb.height.max(400.0) as u32;
-                    let _ = window.set_size(PhysicalSize::new(clamped_w, clamped_h));
                 }
             }
             Ok(())
-        })
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { .. } = event {
-                if window.label() == "main" {
-                    save_window_bounds(window);
-                }
+        });
+
+    #[cfg(desktop)]
+    let builder = builder.on_window_event(|window, event| {
+        if let tauri::WindowEvent::CloseRequested { .. } = event {
+            if window.label() == "main" {
+                save_window_bounds(window);
             }
-        })
+        }
+    });
+
+    builder
         .invoke_handler(tauri::generate_handler![
             commands::settings::load_settings,
             commands::settings::save_settings,
