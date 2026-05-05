@@ -1,4 +1,6 @@
-use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewBuilder, WebviewUrl};
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl};
+#[cfg(mobile)]
+use tauri::{LogicalPosition, LogicalSize, WebviewBuilder};
 use std::path::PathBuf;
 
 #[cfg(desktop)]
