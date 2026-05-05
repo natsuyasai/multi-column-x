@@ -105,4 +105,36 @@ describe("MobileTabBar", () => {
     await userEvent.click(screen.getByRole("button", { name: /設定/ }));
     expect(onSettings).toHaveBeenCalledWith("col-1");
   });
+
+  it("設定ボタンのクリックでは onSelectColumn が呼ばれない", async () => {
+    const onSelect = vi.fn();
+    const onSettings = vi.fn();
+    render(
+      <MobileTabBar
+        columns={[col1]}
+        accounts={[acc1]}
+        activeColumnId="col-1"
+        onSelectColumn={onSelect}
+        onOpenSettings={onSettings}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: /設定/ }));
+    expect(onSettings).toHaveBeenCalledWith("col-1");
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("homeTabName がある場合はそれを表示する", () => {
+    const colWithTabName: Column = { ...col1, homeTabName: "フォロー中" };
+    render(
+      <MobileTabBar
+        columns={[colWithTabName]}
+        accounts={[acc1]}
+        activeColumnId="col-1"
+        onSelectColumn={vi.fn()}
+        onOpenSettings={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("フォロー中")).toBeInTheDocument();
+    expect(screen.queryByText("ホーム")).not.toBeInTheDocument();
+  });
 });

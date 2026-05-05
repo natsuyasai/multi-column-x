@@ -5,11 +5,11 @@ import styles from "./MobileTabBar.module.scss";
 function getTabLabel(column: Column): string {
   if (column.label) return column.label;
   const labels: Record<PageType, string> = {
-    home: "ホーム",
+    home: column.homeTabName ?? "ホーム",
     notifications: "通知",
     search: column.searchQuery ? `検索: ${column.searchQuery}` : "検索",
     list: "リスト",
-    custom: column.customUrl ?? "カスタム",
+    custom: "カスタム",
   };
   return labels[column.pageType];
 }
@@ -39,8 +39,17 @@ export const MobileTabBar: React.FC<Props> = ({
         return (
           <div
             key={col.id}
+            role="button"
+            tabIndex={0}
+            aria-current={isActive ? "true" : undefined}
             className={`${styles.tab} ${isActive ? styles.active : ""}`}
             onClick={() => onSelectColumn(col.id)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelectColumn(col.id);
+              }
+            }}
           >
             <div
               className={styles.accountColor}
@@ -50,6 +59,7 @@ export const MobileTabBar: React.FC<Props> = ({
             <button
               className={styles.settingsBtn}
               aria-label="設定"
+              title="設定"
               onClick={(e) => {
                 e.stopPropagation();
                 onOpenSettings(col.id);
