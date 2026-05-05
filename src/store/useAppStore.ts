@@ -30,6 +30,8 @@ interface AppStore {
   isLoaded: boolean;
   sidebarExpanded: boolean;
   setSidebarExpanded: (v: boolean) => void;
+  isMobile: boolean;
+  setIsMobile: (v: boolean) => void;
   loadSettings: () => Promise<void>;
   saveSettings: () => Promise<void>;
   addAccount: (account: Account) => void;
@@ -49,6 +51,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   isLoaded: false,
   sidebarExpanded: false,
   setSidebarExpanded: (v) => set({ sidebarExpanded: v }),
+  isMobile: false,
+  setIsMobile: (v) => set({ isMobile: v }),
 
   loadSettings: async () => {
     try {

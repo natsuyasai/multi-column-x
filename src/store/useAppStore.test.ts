@@ -54,6 +54,7 @@ describe("useAppStore", () => {
         videoAutoPlayStopEnabled: false,
       },
       isLoaded: false,
+      isMobile: false,
     });
   });
 
@@ -98,6 +99,19 @@ describe("useAppStore", () => {
       result.current.updateColumn("col-1", { width: 400 });
     });
     expect(result.current.columns[0].width).toBe(400);
+  });
+
+  it("isMobile のデフォルト値は false", () => {
+    const { result } = renderHook(() => useAppStore());
+    expect(result.current.isMobile).toBe(false);
+  });
+
+  it("setIsMobile で isMobile を変更できる", () => {
+    const { result } = renderHook(() => useAppStore());
+    act(() => {
+      result.current.setIsMobile(true);
+    });
+    expect(result.current.isMobile).toBe(true);
   });
 });
 
