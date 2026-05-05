@@ -68,6 +68,8 @@ pub async fn delete_account_data(data_directory: String) -> Result<(), String> {
 pub async fn close_window(app: AppHandle, label: String) -> Result<(), String> {
     if let Some(window) = app.get_webview_window(&label) {
         window.close().map_err(|e| e.to_string())?;
+    } else if let Some(webview) = app.get_webview(&label) {
+        webview.close().map_err(|e| e.to_string())?;
     }
     Ok(())
 }
