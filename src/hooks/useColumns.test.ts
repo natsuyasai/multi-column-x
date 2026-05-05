@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calculateGridBounds } from "./useColumns";
+import { calculateGridBounds, MOBILE_TAB_BAR_HEIGHT } from "./useColumns";
 import type { Column } from "../types";
 
 const baseSettings = {
@@ -106,5 +106,11 @@ describe("calculateGridBounds", () => {
     const cols = [makeCol({ id: "c1", gridCol: 1, gridRow: 1 })];
     const result = calculateGridBounds(cols, { ...opts, scrollLeft: 100 });
     expect(result["c1"].x).toBe(40 - 100);
+  });
+});
+
+describe("MOBILE_TAB_BAR_HEIGHT", () => {
+  it("56 px で定義されている", () => {
+    expect(MOBILE_TAB_BAR_HEIGHT).toBe(56);
   });
 });

@@ -8,6 +8,7 @@ export const HEADER_HEIGHT = 36; // ColumnHeader の高さ（px）
 export const SCROLLBAR_HEIGHT = 12; // 下部スクロールバーの高さ（px）
 export const SIDEBAR_COLLAPSED_WIDTH = 40; // サイドバー折りたたみ時の幅（px）
 export const SIDEBAR_EXPANDED_WIDTH = 200; // サイドバー展開時の幅（px）
+export const MOBILE_TAB_BAR_HEIGHT = 56;
 
 export interface ColumnBounds {
   x: number;
@@ -123,9 +124,37 @@ export function useColumns() {
   const [columnBounds, setColumnBounds] = useState<
     Record<string, ColumnBounds>
   >({});
+  const [activeColumnId, setActiveColumnIdState] = useState<string | null>(null);
+
+  const setActiveColumn = useCallback(async (id: string) => {
+    setActiveColumnIdState(id);
+    const { columns: currentColumns } = useAppStore.getState();
+    await Promise.all(
+      currentColumns.map((col) => {
+        const isActive = col.id === id;
+        return invoke("resize_column_webview", {
+          bounds: {
+            columnId: col.id,
+            x: isActive ? 0 : -99999,
+            y: isActive ? MOBILE_TAB_BAR_HEIGHT : 0,
+            width: window.innerWidth,
+            height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
+          },
+        }).catch(console.error);
+      }),
+    );
+  }, []);
 
   // 全カラムのboundsを再計算して更新
   const recalculateAllBounds = useCallback(async () => {
+    const { isMobile } = useAppStore.getState();
+    if (isMobile) {
+      if (activeColumnId) {
+        await setActiveColumn(activeColumnId);
+      }
+      return;
+    }
+
     if (!containerRef.current) return;
     const containerHeight = containerRef.current.clientHeight;
     const scrollLeft = scrollbarRef.current?.scrollLeft ?? 0;
@@ -151,16 +180,42 @@ export function useColumns() {
         }).catch(console.error),
       ),
     );
-  }, []);
+  }, [activeColumnId, setActiveColumn]);
 
   // 全カラムのWebViewを作成（起動時に呼ぶ）
   const restoreColumns = useCallback(async (sidebarWidth: number) => {
     if (!containerRef.current) return;
     const containerHeight = containerRef.current.clientHeight;
     const scrollLeft = scrollbarRef.current?.scrollLeft ?? 0;
-    // loadSettings() 完了後に呼ばれるため、ストアから直接最新値を取得する
-    const { columns: currentColumns, accounts: currentAccounts } =
-      useAppStore.getState();
+    const {
+      columns: currentColumns,
+      accounts: currentAccounts,
+      isMobile,
+    } = useAppStore.getState();
+
+    if (isMobile) {
+      const sortedByOrder = [...currentColumns].sort((a, b) => a.order - b.order);
+      const firstColumn = sortedByOrder[0];
+      for (const column of sortedByOrder) {
+        const account = currentAccounts.find((a) => a.id === column.accountId);
+        if (!account) continue;
+        const isFirst = column.id === firstColumn?.id;
+        await invoke("create_column_webview", {
+          args: {
+            column,
+            dataDirectory: account.dataDirectory,
+            x: isFirst ? 0 : -99999,
+            y: isFirst ? MOBILE_TAB_BAR_HEIGHT : 0,
+            width: window.innerWidth,
+            height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
+          },
+        }).catch(console.error);
+      }
+      if (firstColumn) {
+        setActiveColumnIdState(firstColumn.id);
+      }
+      return;
+    }
 
     const bounds = calculateGridBounds(currentColumns, {
       containerHeight,
@@ -195,6 +250,24 @@ export function useColumns() {
 
       addColumn(column);
 
+      const { isMobile } = useAppStore.getState();
+      if (isMobile) {
+        await invoke("create_column_webview", {
+          args: {
+            column,
+            dataDirectory: account.dataDirectory,
+            x: -99999,
+            y: 0,
+            width: window.innerWidth,
+            height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
+          },
+        });
+        if (activeColumnId === null) {
+          await setActiveColumn(column.id);
+        }
+        return;
+      }
+
       const containerHeight = containerRef.current.clientHeight;
       const scrollLeft = scrollbarRef.current?.scrollLeft ?? 0;
       const { sidebarExpanded, columns: updatedColumns } =
@@ -219,7 +292,7 @@ export function useColumns() {
         args: { column, dataDirectory: account.dataDirectory, ...b },
       });
     },
-    [accounts, addColumn],
+    [accounts, addColumn, activeColumnId, setActiveColumn],
   );
 
   // ダイアログ表示時に全カラムWebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
@@ -245,10 +318,21 @@ export function useColumns() {
     async (columnId: string) => {
       await invoke("remove_column_webview", { columnId });
       removeColumn(columnId);
-      // 残りカラムのboundsを再計算
+      const { isMobile, columns: remainingColumns } = useAppStore.getState();
+      if (isMobile) {
+        if (activeColumnId === columnId) {
+          const next = remainingColumns.find((c) => c.id !== columnId);
+          if (next) {
+            await setActiveColumn(next.id);
+          } else {
+            setActiveColumnIdState(null);
+          }
+        }
+        return;
+      }
       await recalculateAllBounds();
     },
-    [removeColumn, recalculateAllBounds],
+    [removeColumn, recalculateAllBounds, activeColumnId, setActiveColumn],
   );
 
   // カラム更新（設定変更）
@@ -302,5 +386,7 @@ export function useColumns() {
     recalculateAllBounds,
     hideColumnWebviews,
     handleScrollbarScroll,
+    activeColumnId,
+    setActiveColumn,
   };
 }
