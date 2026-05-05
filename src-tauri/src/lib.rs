@@ -67,7 +67,11 @@ pub fn run() {
             .target(tauri_plugin_log::Target::new(
                 tauri_plugin_log::TargetKind::Stdout,
             ))
-            .level(log::LevelFilter::Debug)
+            .level(if cfg!(debug_assertions) {
+                log::LevelFilter::Debug
+            } else {
+                log::LevelFilter::Warn
+            })
             .build()
         )
         .manage(AppState::new())
