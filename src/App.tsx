@@ -69,11 +69,16 @@ const App: React.FC = () => {
   const [linkPopupUrl, setLinkPopupUrl] = useState("");
   const [linkPopupAccountId, setLinkPopupAccountId] = useState("");
 
+  // プラットフォーム検出は loadSettings より先に完了させる必要がある。
+  // restoreColumns（isLoaded 後に呼ばれる）が isMobile を読むため、
+  // setIsMobile は同期的に完了しなければならない。effect の順序を変えないこと。
   useEffect(() => {
     try {
       setIsMobile(platform() === "android");
-    } catch {}
-  }, []);
+    } catch (e) {
+      console.error("platform() failed:", e);
+    }
+  }, [setIsMobile]);
 
   useEffect(() => {
     loadSettings();
