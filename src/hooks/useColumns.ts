@@ -8,7 +8,7 @@ export const HEADER_HEIGHT = 36; // ColumnHeader の高さ（px）
 export const SCROLLBAR_HEIGHT = 12; // 下部スクロールバーの高さ（px）
 export const SIDEBAR_COLLAPSED_WIDTH = 40; // サイドバー折りたたみ時の幅（px）
 export const SIDEBAR_EXPANDED_WIDTH = 200; // サイドバー展開時の幅（px）
-export const MOBILE_TAB_BAR_HEIGHT = 56;
+export const MOBILE_TAB_BAR_HEIGHT = 56; // モバイルタブバーの高さ（px）
 
 export interface ColumnBounds {
   x: number;
@@ -261,7 +261,7 @@ export function useColumns() {
             width: window.innerWidth,
             height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
           },
-        });
+        }).catch(console.error);
         if (activeColumnId === null) {
           await setActiveColumn(column.id);
         }
