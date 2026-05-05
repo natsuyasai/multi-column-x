@@ -53,7 +53,7 @@ fn save_window_bounds(window: &tauri::Window) {
     };
     store.set("appSettings", value);
     if let Err(e) = store.save() {
-        eprintln!("[MultiColumnX] failed to save window bounds: {e}");
+        log::error!("failed to save window bounds: {e}");
     }
 }
 
@@ -63,6 +63,13 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_log::Builder::new()
+            .target(tauri_plugin_log::Target::new(
+                tauri_plugin_log::TargetKind::Stdout,
+            ))
+            .level(log::LevelFilter::Debug)
+            .build()
+        )
         .manage(AppState::new())
         .setup(|app| {
             #[cfg(desktop)]
