@@ -89,7 +89,13 @@
       }
     }).observe(root, { childList: true, subtree: true });
   }
-  startUrlObserver();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      startUrlObserver();
+    });
+  } else {
+    startUrlObserver();
+  }
 
   window.__multiColumnX =
     window.__multiColumnX || ({} as Window["__multiColumnX"]);
