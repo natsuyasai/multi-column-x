@@ -172,6 +172,7 @@ fn load_accounts_json(app: &AppHandle) -> String {
         .unwrap_or_else(|| "[]".to_string())
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn open_popup_window(
     app: AppHandle,
@@ -239,6 +240,57 @@ pub async fn open_popup_window(
     Ok(())
 }
 
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn open_popup_window(
+    app: AppHandle,
+    webview_label_caller: String,
+    url: String,
+) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let (data_dir, current_account_id) = {
+        let registry = state.registry.lock().unwrap();
+        let data_dir = registry
+            .get_data_directory(&webview_label_caller)
+            .map(PathBuf::from)
+            .unwrap_or_default();
+        let account_id = registry
+            .get_account_id(&webview_label_caller)
+            .unwrap_or("")
+            .to_string();
+        (data_dir, account_id)
+    };
+
+    let accounts_json = load_accounts_json(&app);
+    let esc_close_enabled = load_popup_esc_close_enabled(&app);
+    let popup_init = crate::inject::build_popup_init_script(
+        &accounts_json,
+        &current_account_id,
+        &url,
+        esc_close_enabled,
+    );
+    let popup_label = format!("popup-{}", uuid::Uuid::new_v4());
+
+    let window = app.get_window("main").ok_or("main window not found")?;
+    let size = window.inner_size().map_err(|e| e.to_string())?;
+    let scale = window.scale_factor().unwrap_or(1.0);
+    let logical_w = size.width as f64 / scale;
+    let logical_h = size.height as f64 / scale;
+
+    window
+        .add_child(
+            WebviewBuilder::new(&popup_label, WebviewUrl::External(parse_url(&url)?))
+                .initialization_script(&popup_init)
+                .data_directory(data_dir),
+            LogicalPosition::new(0.0, 0.0),
+            LogicalSize::new(logical_w, logical_h),
+        )
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn open_link_popup_window(
     app: AppHandle,
@@ -307,6 +359,61 @@ pub async fn open_link_popup_window(
     .data_directory(data_dir);
 
     builder.build().map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn open_link_popup_window(
+    app: AppHandle,
+    webview_label_caller: Option<String>,
+    #[allow(non_snake_case)] accountId: Option<String>,
+    #[allow(non_snake_case)] dataDirectory: Option<String>,
+    url: String,
+) -> Result<(), String> {
+    let (data_dir, current_account_id) = if let (Some(aid), Some(dd)) = (accountId, dataDirectory) {
+        (PathBuf::from(dd), aid)
+    } else {
+        let label = webview_label_caller.unwrap_or_default();
+        let state = app.state::<AppState>();
+        let registry = state.registry.lock().unwrap();
+        let dd = registry
+            .get_data_directory(&label)
+            .map(PathBuf::from)
+            .unwrap_or_default();
+        let aid = registry
+            .get_account_id(&label)
+            .unwrap_or("")
+            .to_string();
+        (dd, aid)
+    };
+
+    let accounts_json = load_accounts_json(&app);
+    let esc_close_enabled = load_popup_esc_close_enabled(&app);
+    let popup_init = crate::inject::build_popup_init_script(
+        &accounts_json,
+        &current_account_id,
+        "",
+        esc_close_enabled,
+    );
+    let popup_label = format!("popup-{}", uuid::Uuid::new_v4());
+
+    let window = app.get_window("main").ok_or("main window not found")?;
+    let size = window.inner_size().map_err(|e| e.to_string())?;
+    let scale = window.scale_factor().unwrap_or(1.0);
+    let logical_w = size.width as f64 / scale;
+    let logical_h = size.height as f64 / scale;
+
+    window
+        .add_child(
+            WebviewBuilder::new(&popup_label, WebviewUrl::External(parse_url(&url)?))
+                .initialization_script(&popup_init)
+                .data_directory(data_dir),
+            LogicalPosition::new(0.0, 0.0),
+            LogicalSize::new(logical_w, logical_h),
+        )
+        .map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -387,6 +494,7 @@ pub async fn open_in_browser(url: String) -> Result<(), String> {
     tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn open_compose_window(
     app: AppHandle,
@@ -425,6 +533,46 @@ pub async fn open_compose_window(
     }
 
     builder.build().map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn open_compose_window(
+    app: AppHandle,
+    #[allow(non_snake_case)] accountId: String,
+    #[allow(non_snake_case)] dataDirectory: String,
+) -> Result<(), String> {
+    let data_dir = PathBuf::from(&dataDirectory);
+    let accounts_json = load_accounts_json(&app);
+    let esc_close_enabled = load_popup_esc_close_enabled(&app);
+    let popup_init = crate::inject::build_popup_init_script(
+        &accounts_json,
+        &accountId,
+        "",
+        esc_close_enabled,
+    );
+    let compose_label = format!("compose-{}", uuid::Uuid::new_v4());
+
+    let window = app.get_window("main").ok_or("main window not found")?;
+    let size = window.inner_size().map_err(|e| e.to_string())?;
+    let scale = window.scale_factor().unwrap_or(1.0);
+    let logical_w = size.width as f64 / scale;
+    let logical_h = size.height as f64 / scale;
+
+    window
+        .add_child(
+            WebviewBuilder::new(
+                &compose_label,
+                WebviewUrl::External(parse_url("https://x.com/compose/post")?),
+            )
+            .initialization_script(&popup_init)
+            .data_directory(data_dir),
+            LogicalPosition::new(0.0, 0.0),
+            LogicalSize::new(logical_w, logical_h),
+        )
+        .map_err(|e| e.to_string())?;
 
     Ok(())
 }
