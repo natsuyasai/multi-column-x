@@ -290,7 +290,7 @@ export function useColumns() {
 
       await invoke("create_column_webview", {
         args: { column, dataDirectory: account.dataDirectory, ...b },
-      });
+      }).catch(console.error);
     },
     [accounts, addColumn, activeColumnId, setActiveColumn],
   );
@@ -316,12 +316,12 @@ export function useColumns() {
   // カラム削除
   const handleRemoveColumn = useCallback(
     async (columnId: string) => {
-      await invoke("remove_column_webview", { columnId });
+      await invoke("remove_column_webview", { columnId }).catch(console.error);
       removeColumn(columnId);
       const { isMobile, columns: remainingColumns } = useAppStore.getState();
       if (isMobile) {
         if (activeColumnId === columnId) {
-          const next = remainingColumns.find((c) => c.id !== columnId);
+          const next = [...remainingColumns].sort((a, b) => a.order - b.order)[0];
           if (next) {
             await setActiveColumn(next.id);
           } else {
