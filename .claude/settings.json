@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File \"C:\\Users\\fuku\\Desktop\\multi-column-x\\.claude\\hooks\\pre-compact.ps1\""
+          }
+        ]
+      }
+    ]
+  }
+}
