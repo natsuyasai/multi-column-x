@@ -16,8 +16,33 @@ const ACCOUNT_COLORS = [
   "#abb2bf",
 ];
 
+async function createAccountFromResult(
+  accountId: string,
+  dataDirectory: string,
+  windowLabel: string,
+  addAccount: (account: Account) => void,
+): Promise<void> {
+  const currentAccounts = useAppStore.getState().accounts;
+  const label =
+    prompt("このアカウントの名前を入力してください") ??
+    `アカウント ${currentAccounts.length + 1}`;
+  const color =
+    ACCOUNT_COLORS[currentAccounts.length % ACCOUNT_COLORS.length];
+
+  const account: Account = {
+    id: accountId,
+    label,
+    dataDirectory,
+    color,
+    createdAt: new Date().toISOString(),
+  };
+
+  addAccount(account);
+  await invoke("close_window", { label: windowLabel }).catch(() => {});
+}
+
 export function useAccounts() {
-  const { accounts, addAccount, removeAccount } = useAppStore();
+  const { accounts, addAccount, removeAccount, isMobile } = useAppStore();
   const isAddingRef = useRef(false);
   const pendingCleanupRef = useRef<(() => void) | null>(null);
 
@@ -49,36 +74,29 @@ export function useAccounts() {
       await new Promise<void>((resolve, reject) => {
         let unlistenLogin: (() => void) | null = null;
         let unlistenDestroyed: (() => void) | null = null;
+        let unlistenVisibility: (() => void) | null = null;
 
         const cleanup = () => {
           unlistenLogin?.();
           unlistenLogin = null;
           unlistenDestroyed?.();
           unlistenDestroyed = null;
+          unlistenVisibility?.();
+          unlistenVisibility = null;
           pendingCleanupRef.current = null;
         };
 
-        // Listen for successful login
+        // account-login-complete イベント（desktop 主系 / mobile 副系）
+        // desktop: Rust URL ポーリングが検出して emit
+        // mobile:  mark_login_complete が close 成功後に delayed emit
         listen<void>("account-login-complete", async () => {
           cleanup();
-
-          const currentAccounts = useAppStore.getState().accounts;
-          const label =
-            prompt("このアカウントの名前を入力してください") ??
-            `アカウント ${currentAccounts.length + 1}`;
-          const color =
-            ACCOUNT_COLORS[currentAccounts.length % ACCOUNT_COLORS.length];
-
-          const account: Account = {
-            id: accountId,
-            label,
+          await createAccountFromResult(
+            accountId,
             dataDirectory,
-            color,
-            createdAt: new Date().toISOString(),
-          };
-
-          addAccount(account);
-          await invoke("close_window", { label: windowLabel }).catch(() => {});
+            windowLabel,
+            addAccount,
+          );
           resolve();
         })
           .then((fn) => {
@@ -87,30 +105,60 @@ export function useAccounts() {
           })
           .catch(reject);
 
-        // Detect login window closed without completing login (user abandoned)
-        import("@tauri-apps/api/webviewWindow")
-          .then(({ WebviewWindow }) => {
-            WebviewWindow.getByLabel(windowLabel)
-              .then((loginWindow) => {
-                if (!loginWindow) return;
-                loginWindow
-                  .once("tauri://destroyed", () => {
-                    cleanup();
-                    reject(new Error("Login window closed"));
-                  })
-                  .then((fn) => {
-                    unlistenDestroyed = fn;
-                  })
-                  .catch(() => {});
-              })
-              .catch(() => {});
-          })
-          .catch(() => {});
+        if (isMobile) {
+          // mobile 主系: AddAccount Activity が閉じると MainActivity が
+          // フォアグラウンドに戻り visibilitychange が発火する。
+          // check_login_complete で init script が呼んだ mark_login_complete の
+          // フラグを確認してアカウント追加を完了する。
+          const handleVisibilityChange = async () => {
+            if (document.visibilityState !== "visible") return;
+            cleanup();
+            const loginCompleted =
+              await invoke<boolean>("check_login_complete").catch(() => false);
+            if (loginCompleted) {
+              await createAccountFromResult(
+                accountId,
+                dataDirectory,
+                windowLabel,
+                addAccount,
+              );
+              resolve();
+            } else {
+              reject(new Error("Login cancelled"));
+            }
+          };
+          document.addEventListener("visibilitychange", handleVisibilityChange);
+          unlistenVisibility = () =>
+            document.removeEventListener(
+              "visibilitychange",
+              handleVisibilityChange,
+            );
+        } else {
+          // desktop: ログインウィンドウを閉じたことを検出（ユーザーがキャンセル）
+          import("@tauri-apps/api/webviewWindow")
+            .then(({ WebviewWindow }) => {
+              WebviewWindow.getByLabel(windowLabel)
+                .then((loginWindow) => {
+                  if (!loginWindow) return;
+                  loginWindow
+                    .once("tauri://destroyed", () => {
+                      cleanup();
+                      reject(new Error("Login window closed"));
+                    })
+                    .then((fn) => {
+                      unlistenDestroyed = fn;
+                    })
+                    .catch(() => {});
+                })
+                .catch(() => {});
+            })
+            .catch(() => {});
+        }
       });
     } finally {
       isAddingRef.current = false;
     }
-  }, [addAccount]);
+  }, [addAccount, isMobile]);
 
   const handleRemoveAccount = useCallback(
     async (id: string) => {
