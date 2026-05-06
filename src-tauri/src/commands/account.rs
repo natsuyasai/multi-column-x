@@ -1,7 +1,5 @@
-use tauri::{AppHandle, Emitter, Manager, WebviewUrl};
-#[cfg(mobile)]
-use tauri::{LogicalPosition, LogicalSize};
 use std::path::PathBuf;
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl};
 
 #[cfg(desktop)]
 #[tauri::command]
@@ -10,13 +8,19 @@ pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
     let window_label = format!("add-account-{}", &account_id[..8]);
 
     let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let data_dir = app_data.join("accounts").join(format!("account-{}", &account_id));
+    let data_dir = app_data
+        .join("accounts")
+        .join(format!("account-{}", &account_id));
     std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
 
     tauri::WebviewWindowBuilder::new(
         &app,
         &window_label,
-        WebviewUrl::External("https://x.com/login".parse().map_err(|e: url::ParseError| e.to_string())?),
+        WebviewUrl::External(
+            "https://x.com/login"
+                .parse()
+                .map_err(|e: url::ParseError| e.to_string())?,
+        ),
     )
     .title("アカウントを追加")
     .inner_size(500.0, 700.0)
@@ -49,20 +53,30 @@ pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
         "accountId": account_id,
         "dataDirectory": data_dir.to_string_lossy(),
         "windowLabel": window_label,
-    }).to_string())
+    })
+    .to_string())
 }
 
 #[cfg(mobile)]
 #[tauri::command]
 pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
     let account_id = uuid::Uuid::new_v4().to_string();
-    let window_label = format!("add-account-{}", &account_id[..8]);
+    // Android マルチウィンドウでは固定ラベル "add-account" を使用する。
+    // 動的ラベルだと対応する Activity クラスが存在しないため MainActivity が
+    // 乗っ取られ、親の WebView が失われる。
+    let window_label = "add-account".to_string();
 
     let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let data_dir = app_data
         .join("accounts")
         .join(format!("account-{}", &account_id));
     std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
+
+    // 既存の add-account ウィンドウがあれば閉じてから開く
+    if let Some(existing) = app.get_webview_window(&window_label) {
+        let _ = existing.close();
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    }
 
     tauri::WebviewWindowBuilder::new(
         &app,
@@ -80,6 +94,21 @@ pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
     let app_clone = app.clone();
     let window_label_clone = window_label.clone();
     tokio::spawn(async move {
+        // Android では build() 直後に get_webview_window が None を返すことがある。
+        // ウィンドウが現れるまで最大 10 秒待機する。
+        let mut window_appeared = false;
+        for _ in 0..20 {
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            if app_clone.get_webview_window(&window_label_clone).is_some() {
+                window_appeared = true;
+                break;
+            }
+        }
+        if !window_appeared {
+            return;
+        }
+
+        // ウィンドウの URL を監視してログイン完了を検出する
         let mut notified = false;
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(500)).await;
@@ -89,11 +118,6 @@ pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
                         if !notified && url.path() == "/home" {
                             notified = true;
                             let _ = app_clone.emit("account-login-complete", ());
-                            // Android の WebviewWindow::close() はタウリ内部状態を破棄するが
-                            // Android View hierarchy からは削除されないことがある。
-                            // 先に画面外へ移動してから close() することで視覚的に隠す。
-                            let _ = w.set_position(LogicalPosition::new(-99999.0_f64, 0.0_f64));
-                            let _ = w.set_size(LogicalSize::new(1.0_f64, 1.0_f64));
                             let _ = w.close();
                             break;
                         }
@@ -114,7 +138,8 @@ pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
 
 #[tauri::command]
 pub async fn notify_account_logged_in(app: AppHandle) -> Result<(), String> {
-    app.emit("account-login-complete", ()).map_err(|e| e.to_string())?;
+    app.emit("account-login-complete", ())
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
