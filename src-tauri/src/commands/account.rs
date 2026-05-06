@@ -1,5 +1,36 @@
 use std::path::PathBuf;
-use tauri::{AppHandle, Emitter, Manager, WebviewUrl};
+use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewUrl};
+
+/// Android で WebviewWindow の build() 直後は Activity がまだ起動中のため
+/// ウィンドウが Tauri のレジストリに現れてページ URL が確定するまで待機する。
+/// RustWebViewClient.currentUrl は onPageStarted で更新されるため、
+/// x.com の URL が返れば onPageStarted が完了している（initScript が evaluateJavascript 済み）。
+#[cfg(mobile)]
+async fn wait_for_window_url<R: Runtime>(app: &AppHandle<R>, label: &str) {
+    // まずウィンドウが現れるまで待つ（最大 10 秒）
+    for _ in 0..40 {
+        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+        if app.get_webview_window(label).is_some() {
+            break;
+        }
+    }
+    // URL が x.com / twitter.com に変わるまで待つ（onPageStarted 完了の確認、最大 15 秒）
+    for _ in 0..60 {
+        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+        if let Some(w) = app.get_webview_window(label) {
+            if let Ok(url) = w.url() {
+                let host = url.host_str().unwrap_or("");
+                if host == "x.com"
+                    || host.ends_with(".x.com")
+                    || host == "twitter.com"
+                    || host.ends_with(".twitter.com")
+                {
+                    return;
+                }
+            }
+        }
+    }
+}
 
 #[cfg(desktop)]
 #[tauri::command]
@@ -94,20 +125,6 @@ pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
     let app_clone = app.clone();
     let window_label_clone = window_label.clone();
     tokio::spawn(async move {
-        // Android では build() 直後に get_webview_window が None を返すことがある。
-        // ウィンドウが現れるまで最大 10 秒待機する。
-        let mut window_appeared = false;
-        for _ in 0..20 {
-            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-            if app_clone.get_webview_window(&window_label_clone).is_some() {
-                window_appeared = true;
-                break;
-            }
-        }
-        if !window_appeared {
-            return;
-        }
-
         // ウィンドウの URL を監視してログイン完了を検出する
         let mut notified = false;
         loop {
@@ -127,6 +144,12 @@ pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
             }
         }
     });
+
+    // ① ウィンドウが Tauri のレジストリに登録されるまで待機（Activity 起動待ち）
+    wait_for_window_url(&app, &window_label).await;
+    // ② RustWebViewClient.onPageStarted 内の evaluateJavascript(initScript) は非同期のため
+    //    スクリプト実行完了を見越して追加で待機する（std::thread::sleep の代替）
+    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
 
     Ok(serde_json::json!({
         "accountId": account_id,
