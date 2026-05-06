@@ -6,7 +6,7 @@ src-tauri/gen/
 .superpowers/
 aidlc-docs/audit.md
 .worktrees/
-
+.claude/settings.json
 # inject scripts build artifacts
 src-tauri/src/inject/*.js
 src-tauri/src/inject/*.svg
