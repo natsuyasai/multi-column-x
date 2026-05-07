@@ -4,8 +4,8 @@
       {
         "hooks": [
           {
-            "type": "command",
-            "command": "pwsh -NoProfile -File \"C:\\Users\\fuku\\Desktop\\multi-column-x\\.claude\\hooks\\pre-compact.ps1\""
+            "type": "prompt",
+            "prompt": "現在のセッション状態をまとめた引き継ぎファイルを生成して。.claude/handoff/session-{timestamp}.json に保存して。"
           }
         ]
       }
