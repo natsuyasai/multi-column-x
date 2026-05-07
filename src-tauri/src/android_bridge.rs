@@ -4,8 +4,35 @@
 use jni::objects::{GlobalRef, JClass, JObject, JValue};
 use jni::{JNIEnv, JavaVM};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicI32, Ordering};
 
 static MAIN_ACTIVITY: Mutex<Option<(JavaVM, GlobalRef)>> = Mutex::new(None);
+
+/// Kotlin から受け取ったシステムバーの高さ（dp）。
+static STATUS_BAR_HEIGHT_DP: AtomicI32 = AtomicI32::new(0);
+static NAV_BAR_HEIGHT_DP: AtomicI32 = AtomicI32::new(0);
+
+/// AppBridge.onInsets(top, bottom) から呼ばれる JNI エントリポイント。
+/// ステータスバー・ナビゲーションバーの高さ（dp）を保存する。
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onInsets<'local>(
+    _env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    top: i32,
+    bottom: i32,
+) {
+    eprintln!("[AppBridge.onInsets] top={top}dp bottom={bottom}dp");
+    STATUS_BAR_HEIGHT_DP.store(top, Ordering::Relaxed);
+    NAV_BAR_HEIGHT_DP.store(bottom, Ordering::Relaxed);
+}
+
+/// JS 側から呼ばれる get_mobile_insets コマンド用のゲッター。
+pub fn get_system_bar_insets() -> (i32, i32) {
+    let top = STATUS_BAR_HEIGHT_DP.load(Ordering::Relaxed);
+    let bottom = NAV_BAR_HEIGHT_DP.load(Ordering::Relaxed);
+    eprintln!("[get_system_bar_insets] top={top}dp bottom={bottom}dp");
+    (top, bottom)
+}
 
 /// AppBridge.initContext(activity) から呼ばれる JNI エントリポイント。
 /// MainActivity の GlobalRef を保存する。

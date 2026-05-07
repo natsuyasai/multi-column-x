@@ -16,4 +16,11 @@ object AppBridge {
      */
     @JvmStatic
     external fun initContext(activity: WryActivity)
+
+    /**
+     * システムバーの高さ（dp 単位）を Rust 側に渡す。
+     * MainActivity の WindowInsetsCompat リスナーから呼ばれる。
+     */
+    @JvmStatic
+    external fun onInsets(top: Int, bottom: Int)
 }

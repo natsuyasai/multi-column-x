@@ -73,13 +73,13 @@ const App: React.FC = () => {
   const [showLinkPopupDialog, setShowLinkPopupDialog] = useState(false);
   const [linkPopupUrl, setLinkPopupUrl] = useState("");
   const [linkPopupAccountId, setLinkPopupAccountId] = useState("");
-
   // プラットフォーム検出は loadSettings より先に完了させる必要がある。
   // restoreColumns（isLoaded 後に呼ばれる）が isMobile を読むため、
   // setIsMobile は同期的に完了しなければならない。effect の順序を変えないこと。
   useEffect(() => {
     try {
-      setIsMobile(platform() === "android");
+      const mobile = platform() === "android";
+      setIsMobile(mobile);
     } catch (e) {
       console.error("platform() failed:", e);
     }
@@ -106,6 +106,37 @@ const App: React.FC = () => {
       unlisten.then((fn) => fn());
     };
   }, [scrollbarRef]);
+
+  // Mobile: column WebView 内のタブバーからカラム切り替え要求を受信
+  useEffect(() => {
+    if (!isMobile) return;
+    const unlisten = listen<string>("mobile-switch-column", (e) => {
+      setActiveColumn(e.payload);
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [isMobile, setActiveColumn]);
+
+  // Mobile: column WebView 内のタブバーからダイアログ開示要求を受信
+  useEffect(() => {
+    if (!isMobile) return;
+    const unlisten = listen<{ dialog: string; columnId?: string | null }>(
+      "mobile-open-dialog",
+      (e) => {
+        if (e.payload.dialog === "add_column") {
+          setShowAddColumn(true);
+        } else if (e.payload.dialog === "account_manager") {
+          setShowAccountManager(true);
+        } else if (e.payload.dialog === "column_settings" && e.payload.columnId) {
+          setSettingsColumnId(e.payload.columnId);
+        }
+      },
+    );
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [isMobile]);
 
   const handleOpenLinkPopup = useCallback(() => {
     const defaultId = globalSettings.defaultAccountId ?? accounts[0]?.id ?? "";
@@ -243,7 +274,7 @@ const App: React.FC = () => {
           onJumpToColumn={handleJumpToColumn}
         />
       )}
-      {isMobile && (
+      {isMobile && columns.length === 0 && (
         <MobileTabBar
           columns={columns}
           accounts={accounts}

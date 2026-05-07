@@ -49,6 +49,10 @@ pub struct CreateWebviewArgs {
     pub y: f64,
     pub width: f64,
     pub height: f64,
+    #[serde(rename = "mobileTabs")]
+    pub mobile_tabs: Option<String>,
+    #[serde(rename = "mobileActiveId")]
+    pub mobile_active_id: Option<String>,
 }
 
 #[cfg(desktop)]
@@ -100,14 +104,36 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
     let data_dir = PathBuf::from(&args.data_directory);
 
     let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(&app);
-    let init_script = build_init_script(
-        args.column.settings.area_remove_enabled,
-        args.column.settings.show_custom_menu,
-        args.column.settings.auto_reload_enabled,
-        video_auto_play_stop_enabled,
-        &args.column.settings.custom_css,
-        &args.column.settings.visible_links,
-    );
+    #[cfg(target_os = "android")]
+    let (top_inset, bottom_inset) = crate::android_bridge::get_system_bar_insets();
+    #[cfg(not(target_os = "android"))]
+    let (top_inset, bottom_inset) = (0i32, 0i32);
+    let init_script =
+        if let (Some(tabs_json), Some(active_id)) =
+            (args.mobile_tabs.as_deref(), args.mobile_active_id.as_deref())
+        {
+            crate::inject::build_mobile_column_init_script(
+                args.column.settings.area_remove_enabled,
+                args.column.settings.show_custom_menu,
+                args.column.settings.auto_reload_enabled,
+                video_auto_play_stop_enabled,
+                &args.column.settings.custom_css,
+                &args.column.settings.visible_links,
+                tabs_json,
+                active_id,
+                top_inset,
+                bottom_inset,
+            )
+        } else {
+            build_init_script(
+                args.column.settings.area_remove_enabled,
+                args.column.settings.show_custom_menu,
+                args.column.settings.auto_reload_enabled,
+                video_auto_play_stop_enabled,
+                &args.column.settings.custom_css,
+                &args.column.settings.visible_links,
+            )
+        };
 
     tauri::WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(parse_url(&url)?))
         .initialization_script(&init_script)
@@ -470,6 +496,40 @@ pub async fn open_link_popup_window(
         .map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+/// ステータスバーとナビゲーションバーの高さ（dp）を返す。
+/// Kotlin の WindowInsetsCompat から取得した値を JNI 経由で保存したもの。
+#[tauri::command]
+pub async fn get_mobile_insets() -> serde_json::Value {
+    #[cfg(target_os = "android")]
+    {
+        let (top, bottom) = crate::android_bridge::get_system_bar_insets();
+        serde_json::json!({ "top": top, "bottom": bottom })
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        serde_json::json!({ "top": 0, "bottom": 0 })
+    }
+}
+
+#[tauri::command]
+pub async fn switch_mobile_column(app: AppHandle, column_id: String) -> Result<(), String> {
+    app.emit("mobile-switch-column", column_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn open_mobile_dialog(
+    app: AppHandle,
+    dialog: String,
+    column_id: Option<String>,
+) -> Result<(), String> {
+    app.emit(
+        "mobile-open-dialog",
+        serde_json::json!({ "dialog": dialog, "columnId": column_id }),
+    )
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

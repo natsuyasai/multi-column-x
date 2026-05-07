@@ -2,13 +2,58 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAppStore } from "../store/useAppStore";
-import type { Column } from "../types";
+import type { Column, PageType } from "../types";
+
+export function getMobileTabLabel(column: Column): string {
+  if (column.label) return column.label;
+  const labels: Record<PageType, string> = {
+    home: column.homeTabName ?? "ホーム",
+    notifications: "通知",
+    search: column.searchQuery ? `検索: ${column.searchQuery}` : "検索",
+    list: "リスト",
+    custom: "カスタム",
+  };
+  return labels[column.pageType];
+}
+
+function buildMobileTabsJson(columns: Column[]): string {
+  return JSON.stringify(
+    columns.map((col) => ({
+      id: col.id,
+      label: getMobileTabLabel(col),
+      order: col.order,
+    })),
+  );
+}
 
 export const HEADER_HEIGHT = 36; // ColumnHeader の高さ（px）
 export const SCROLLBAR_HEIGHT = 12; // 下部スクロールバーの高さ（px）
 export const SIDEBAR_COLLAPSED_WIDTH = 40; // サイドバー折りたたみ時の幅（px）
 export const SIDEBAR_EXPANDED_WIDTH = 200; // サイドバー展開時の幅（px）
 export const MOBILE_TAB_BAR_HEIGHT = 56; // モバイルタブバーの高さ（px）
+
+// Kotlin の WindowInsetsCompat から取得したシステムバーの高さ（dp）を返す。
+// CSS env(safe-area-inset-*) は Android では notch 領域のみを表すため使用しない。
+// 値が 0 の場合は Kotlin 側がまだ値を設定していない可能性があるためリトライする。
+async function getMobileInsets(): Promise<{ top: number; bottom: number }> {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    try {
+      const result = await invoke<{ top: number; bottom: number }>("get_mobile_insets");
+      console.log(`[getMobileInsets attempt=${attempt}]`, JSON.stringify(result), "innerHeight:", window.innerHeight, "innerWidth:", window.innerWidth);
+      if (result.top > 0 || result.bottom > 0) {
+        return result;
+      }
+      if (attempt < 9) {
+        await new Promise((r) => setTimeout(r, 100));
+      }
+    } catch (e) {
+      console.error("[getMobileInsets] error:", e);
+      break;
+    }
+  }
+  console.warn("[getMobileInsets] all attempts returned {top:0,bottom:0}");
+  return { top: 0, bottom: 0 };
+}
 
 export interface ColumnBounds {
   x: number;
@@ -129,6 +174,7 @@ export function useColumns() {
   const setActiveColumn = useCallback(async (id: string) => {
     setActiveColumnIdState(id);
     const { columns: currentColumns } = useAppStore.getState();
+    await getMobileInsets();
     await Promise.all(
       currentColumns.map((col) => {
         const isActive = col.id === id;
@@ -138,10 +184,21 @@ export function useColumns() {
             x: isActive ? 0 : -99999,
             y: 0,
             width: window.innerWidth,
-            height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
+            height: window.innerHeight,
           },
         }).catch(console.error);
       }),
+    );
+    // タブバーのアクティブ状態を全 column WebView に伝播
+    const tabsJson = buildMobileTabsJson(currentColumns);
+    const script = `window.__mobileUpdateTabBar && window.__mobileUpdateTabBar(${tabsJson}, ${JSON.stringify(id)});`;
+    await Promise.all(
+      currentColumns.map((col) =>
+        invoke("eval_in_webview", {
+          label: `column-${col.id}`,
+          script,
+        }).catch(console.error),
+      ),
     );
   }, []);
 
@@ -196,6 +253,9 @@ export function useColumns() {
     if (isMobile) {
       const sortedByOrder = [...currentColumns].sort((a, b) => a.order - b.order);
       const firstColumn = sortedByOrder[0];
+      const tabsJson = buildMobileTabsJson(currentColumns);
+      const activeId = firstColumn?.id ?? "";
+      await getMobileInsets();
       for (const column of sortedByOrder) {
         const account = currentAccounts.find((a) => a.id === column.accountId);
         if (!account) continue;
@@ -207,7 +267,9 @@ export function useColumns() {
             x: isFirst ? 0 : -99999,
             y: 0,
             width: window.innerWidth,
-            height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
+            height: window.innerHeight,
+            mobileTabs: tabsJson,
+            mobileActiveId: activeId,
           },
         }).catch(console.error);
       }
@@ -252,6 +314,10 @@ export function useColumns() {
 
       const { isMobile } = useAppStore.getState();
       if (isMobile) {
+        const { columns: updatedColumns } = useAppStore.getState();
+        const tabsJson = buildMobileTabsJson(updatedColumns);
+        const newActiveId = activeColumnId ?? column.id;
+        await getMobileInsets();
         await invoke("create_column_webview", {
           args: {
             column,
@@ -259,9 +325,23 @@ export function useColumns() {
             x: -99999,
             y: 0,
             width: window.innerWidth,
-            height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
+            height: window.innerHeight,
+            mobileTabs: tabsJson,
+            mobileActiveId: newActiveId,
           },
         }).catch(console.error);
+        // 既存の column WebView のタブバーも更新
+        const script = `window.__mobileUpdateTabBar && window.__mobileUpdateTabBar(${tabsJson}, ${JSON.stringify(newActiveId)});`;
+        await Promise.all(
+          updatedColumns
+            .filter((col) => col.id !== column.id)
+            .map((col) =>
+              invoke("eval_in_webview", {
+                label: `column-${col.id}`,
+                script,
+              }).catch(console.error),
+            ),
+        );
         if (activeColumnId === null) {
           await setActiveColumn(column.id);
         }
@@ -320,13 +400,29 @@ export function useColumns() {
       removeColumn(columnId);
       const { isMobile, columns: remainingColumns } = useAppStore.getState();
       if (isMobile) {
+        let nextActiveId = activeColumnId;
         if (activeColumnId === columnId) {
           const next = [...remainingColumns].sort((a, b) => a.order - b.order)[0];
           if (next) {
             await setActiveColumn(next.id);
+            nextActiveId = next.id;
           } else {
             setActiveColumnIdState(null);
+            nextActiveId = null;
           }
+        }
+        // 残存 column WebView のタブバーを更新
+        if (remainingColumns.length > 0) {
+          const tabsJson = buildMobileTabsJson(remainingColumns);
+          const script = `window.__mobileUpdateTabBar && window.__mobileUpdateTabBar(${tabsJson}, ${JSON.stringify(nextActiveId ?? "")});`;
+          await Promise.all(
+            remainingColumns.map((col) =>
+              invoke("eval_in_webview", {
+                label: `column-${col.id}`,
+                script,
+              }).catch(console.error),
+            ),
+          );
         }
         return;
       }

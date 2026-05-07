@@ -1,5 +1,33 @@
 // src-tauri/src/inject/mod.rs
 
+pub fn build_mobile_column_init_script(
+    area_remove_enabled: bool,
+    show_custom_menu: bool,
+    auto_reload_enabled: bool,
+    video_auto_play_stop_enabled: bool,
+    custom_css: &str,
+    visible_links: &[String],
+    tabs_json: &str,
+    active_column_id: &str,
+    top_inset: i32,
+    bottom_inset: i32,
+) -> String {
+    let mut script = build_init_script(
+        area_remove_enabled,
+        show_custom_menu,
+        auto_reload_enabled,
+        video_auto_play_stop_enabled,
+        custom_css,
+        visible_links,
+    );
+    let mobile_tab_bar = include_str!("mobile_tab_bar.js");
+    script.push_str(&format!(
+        "\nwindow.__mobileTabs = {};\nwindow.__mobileActiveColumnId = {:?};\nwindow.__mobileTopInset = {};\nwindow.__mobileBottomInset = {};\n{}",
+        tabs_json, active_column_id, top_inset, bottom_inset, mobile_tab_bar
+    ));
+    script
+}
+
 pub fn build_init_script(
     area_remove_enabled: bool,
     show_custom_menu: bool,
