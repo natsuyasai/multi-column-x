@@ -1,6 +1,8 @@
 mod commands;
 mod inject;
 mod state;
+#[cfg(target_os = "android")]
+mod android_bridge;
 
 use state::AppState;
 #[cfg(desktop)]

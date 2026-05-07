@@ -1,37 +1,113 @@
 package com.natsuyasai.multicolumnx
 
+import android.annotation.SuppressLint
+import android.content.Intent
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
+import android.webkit.WebView
+import androidx.activity.OnBackPressedCallback
+import androidx.appcompat.app.AppCompatActivity
 import java.io.File
 
-class AddAccount : TauriActivity() {
+class AddAccount : AppCompatActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private var polling = false
+    private var finished = false
+    private var webViewRef: WebView? = null
+    private var pollCount = 0
+
+    @SuppressLint("SetJavaScriptEnabled")
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        Log.d(TAG, "onCreate: dataDir=${dataDir.absolutePath}")
+
+        val wv = WebView(this).apply {
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.databaseEnabled = true
+            settings.mediaPlaybackRequiresUserGesture = false
+            loadUrl("https://x.com/login")
+        }
+        webViewRef = wv
+        setContentView(wv)
+
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                Log.d(TAG, "onBackPressed: cancel")
+                finishWithResult(success = false)
+            }
+        })
+    }
 
     override fun onResume() {
         super.onResume()
-        polling = true
-        schedulePoll()
+        Log.d(TAG, "onResume: finished=$finished")
+        if (!finished) {
+            polling = true
+            pollCount = 0
+            handler.removeCallbacksAndMessages(null)
+            schedulePoll()
+        }
     }
 
     override fun onPause() {
         super.onPause()
+        Log.d(TAG, "onPause")
         polling = false
         handler.removeCallbacksAndMessages(null)
+    }
+
+    private fun finishWithResult(success: Boolean) {
+        if (finished) return
+        finished = true
+        polling = false
+        handler.removeCallbacksAndMessages(null)
+
+        val fileName = if (success) "add_account_login_complete" else "add_account_login_cancelled"
+        // dataDir = /data/user/0/<package> — Rust の app_data_dir() と一致する
+        val sentinelFile = File(dataDir, fileName)
+        try {
+            sentinelFile.writeText("")
+            Log.d(TAG, "finishWithResult: wrote sentinel ${sentinelFile.absolutePath}")
+        } catch (e: Exception) {
+            Log.e(TAG, "finishWithResult: failed to write sentinel: $e")
+        }
+
+        Log.d(TAG, "finishWithResult: starting MainActivity, success=$success")
+        startActivity(Intent(this, MainActivity::class.java))
+        finish()
     }
 
     private fun schedulePoll() {
         handler.postDelayed({
             if (!polling) return@postDelayed
-            // Rust の mark_login_complete が書くセンチネルファイルを監視する。
-            // filesDir は Tauri の app_data_dir() と同じパスに対応する。
-            val sentinel = File(filesDir, "add_account_login_complete")
-            if (sentinel.exists()) {
-                sentinel.delete()
-                finish()
-            } else {
+            pollCount++
+
+            val wv = webViewRef ?: run {
+                if (pollCount % 10 == 0) Log.d(TAG, "schedulePoll #$pollCount: webViewRef null")
                 schedulePoll()
+                return@postDelayed
+            }
+
+            wv.evaluateJavascript("(function(){return location.pathname;})()") { result ->
+                if (!polling) return@evaluateJavascript
+                val path = result?.removeSurrounding("\"")
+                if (pollCount % 10 == 0) {
+                    Log.d(TAG, "schedulePoll #$pollCount: path=$path")
+                }
+                if (path == "/home") {
+                    Log.d(TAG, "schedulePoll: /home detected! finishing with success")
+                    handler.post { finishWithResult(success = true) }
+                } else {
+                    schedulePoll()
+                }
             }
         }, 500)
+    }
+
+    companion object {
+        private const val TAG = "AddAccount"
     }
 }

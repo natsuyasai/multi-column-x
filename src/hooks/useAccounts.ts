@@ -1,5 +1,5 @@
 // src/hooks/useAccounts.ts
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useAppStore } from "../store/useAppStore";
@@ -44,97 +44,84 @@ async function createAccountFromResult(
 export function useAccounts() {
   const { accounts, addAccount, removeAccount, isMobile } = useAppStore();
   const isAddingRef = useRef(false);
-  const pendingCleanupRef = useRef<(() => void) | null>(null);
-
-  useEffect(() => {
-    return () => {
-      pendingCleanupRef.current?.();
-      pendingCleanupRef.current = null;
-    };
-  }, []);
 
   const startAddAccount = useCallback(async () => {
     if (isAddingRef.current) return;
     isAddingRef.current = true;
 
     try {
-      const result = await invoke<string>("open_add_account_window");
-      let parsed: {
-        accountId: string;
-        dataDirectory: string;
-        windowLabel: string;
-      };
-      try {
-        parsed = JSON.parse(result);
-      } catch {
-        throw new Error("Failed to parse open_add_account_window response");
-      }
-      const { accountId, dataDirectory, windowLabel } = parsed;
-
-      await new Promise<void>((resolve, reject) => {
-        let unlistenLogin: (() => void) | null = null;
-        let unlistenDestroyed: (() => void) | null = null;
-        let unlistenVisibility: (() => void) | null = null;
-
-        const cleanup = () => {
-          unlistenLogin?.();
-          unlistenLogin = null;
-          unlistenDestroyed?.();
-          unlistenDestroyed = null;
-          unlistenVisibility?.();
-          unlistenVisibility = null;
-          pendingCleanupRef.current = null;
+      if (isMobile) {
+        // -----------------------------------------------
+        // mobile 専用フロー
+        // -----------------------------------------------
+        // open_add_account_window は AddAccount Activity が終了するまでブロックする。
+        // JavaScript は WebView が suspend 中に一時停止し、
+        // AddAccount が finish() して MainActivity が前面に戻った時点で再開する。
+        // 成功: resolve → アカウント名入力へ
+        // キャンセル（バックボタン）: reject → 何もしない
+        const result = await invoke<string>("open_add_account_window");
+        let parsed: {
+          accountId: string;
+          dataDirectory: string;
+          windowLabel: string;
         };
+        try {
+          parsed = JSON.parse(result);
+        } catch {
+          throw new Error("Failed to parse open_add_account_window response");
+        }
+        await createAccountFromResult(
+          parsed.accountId,
+          parsed.dataDirectory,
+          parsed.windowLabel,
+          addAccount,
+        );
+      } else {
+        // -----------------------------------------------
+        // desktop 専用フロー
+        // -----------------------------------------------
+        // open_add_account_window はウィンドウを開いて即座に返る。
+        // Rust の URL ポーリングがログイン完了を検出して emit するイベントを listen する。
+        const result = await invoke<string>("open_add_account_window");
+        let parsed: {
+          accountId: string;
+          dataDirectory: string;
+          windowLabel: string;
+        };
+        try {
+          parsed = JSON.parse(result);
+        } catch {
+          throw new Error("Failed to parse open_add_account_window response");
+        }
+        const { accountId, dataDirectory, windowLabel } = parsed;
 
-        // account-login-complete イベント（desktop 主系 / mobile 副系）
-        // desktop: Rust URL ポーリングが検出して emit
-        // mobile:  mark_login_complete が close 成功後に delayed emit
-        listen<void>("account-login-complete", async () => {
-          cleanup();
-          await createAccountFromResult(
-            accountId,
-            dataDirectory,
-            windowLabel,
-            addAccount,
-          );
-          resolve();
-        })
-          .then((fn) => {
-            unlistenLogin = fn;
-            pendingCleanupRef.current = cleanup;
-          })
-          .catch(reject);
+        await new Promise<void>((resolve, reject) => {
+          let unlistenLogin: (() => void) | null = null;
+          let unlistenDestroyed: (() => void) | null = null;
 
-        if (isMobile) {
-          // mobile 主系: AddAccount Activity が閉じると MainActivity が
-          // フォアグラウンドに戻り visibilitychange が発火する。
-          // check_login_complete で init script が呼んだ mark_login_complete の
-          // フラグを確認してアカウント追加を完了する。
-          const handleVisibilityChange = async () => {
-            if (document.visibilityState !== "visible") return;
-            cleanup();
-            const loginCompleted =
-              await invoke<boolean>("check_login_complete").catch(() => false);
-            if (loginCompleted) {
-              await createAccountFromResult(
-                accountId,
-                dataDirectory,
-                windowLabel,
-                addAccount,
-              );
-              resolve();
-            } else {
-              reject(new Error("Login cancelled"));
-            }
+          const cleanup = () => {
+            unlistenLogin?.();
+            unlistenLogin = null;
+            unlistenDestroyed?.();
+            unlistenDestroyed = null;
           };
-          document.addEventListener("visibilitychange", handleVisibilityChange);
-          unlistenVisibility = () =>
-            document.removeEventListener(
-              "visibilitychange",
-              handleVisibilityChange,
+
+          listen<void>("account-login-complete", async () => {
+            cleanup();
+            await createAccountFromResult(
+              accountId,
+              dataDirectory,
+              windowLabel,
+              addAccount,
             );
-        } else {
-          // desktop: ログインウィンドウを閉じたことを検出（ユーザーがキャンセル）
+            resolve();
+          })
+            .then((fn) => {
+              unlistenLogin = fn;
+            })
+            .catch(reject);
+
+          // ログインウィンドウを閉じたことを検出（ユーザーがキャンセル）
           import("@tauri-apps/api/webviewWindow")
             .then(({ WebviewWindow }) => {
               WebviewWindow.getByLabel(windowLabel)
@@ -153,8 +140,11 @@ export function useAccounts() {
                 .catch(() => {});
             })
             .catch(() => {});
-        }
-      });
+        });
+      }
+    } catch {
+      // mobile: バックボタンによるキャンセルは正常フロー。エラー表示は不要。
+      // desktop: ウィンドウを閉じた場合も同様。
     } finally {
       isAddingRef.current = false;
     }

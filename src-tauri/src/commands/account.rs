@@ -37,7 +37,7 @@ pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
     .build()
     .map_err(|e| e.to_string())?;
 
-    // Rust側でURLをポーリングしてログイン完了を検出する（外部WebViewではIPC不可のため）
+    // Rust側でURLをポーリングしてログイン完了を検出する
     let app_clone = app.clone();
     let window_label_clone = window_label.clone();
     tokio::spawn(async move {
@@ -70,8 +70,6 @@ pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
 #[tauri::command]
 pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
     let account_id = uuid::Uuid::new_v4().to_string();
-    // Android マルチウィンドウでは固定ラベルが必要（Activity クラスと 1:1 対応）
-    let window_label = "add-account".to_string();
 
     let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let data_dir = app_data
@@ -79,71 +77,63 @@ pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
         .join(format!("account-{}", &account_id));
     std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
 
-    // AddAccount の WebView に注入する init script。
-    // Rust 側の URL ポーリングは AddAccount Activity が前面にいる間は
-    // メイン WebView を suspend させてしまうため使わない。
-    // 代わりに AddAccount の JS 側で URL を監視し、ログイン完了を自ら通知する。
-    // この invoke は AddAccount WebView（フォアグラウンド）から発行されるため
-    // IPC ルーティングが AddAccount のコンテキストで行われる点が肝要。
-    let init_script = r#"
-        (function() {
-            var invoked = false;
-            function checkLoginComplete() {
-                if (!invoked && location.pathname === '/home') {
-                    if (window.__TAURI_INTERNALS__) {
-                        invoked = true;
-                        window.__TAURI_INTERNALS__.invoke('mark_login_complete')
-                            .catch(function() { invoked = false; });
-                    }
-                }
-                setTimeout(checkLoginComplete, 500);
-            }
-            setTimeout(checkLoginComplete, 500);
-        })();
-    "#;
+    // 古いセンチネルファイルをクリア
+    let sentinel_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let success_sentinel = sentinel_dir.join("add_account_login_complete");
+    let cancel_sentinel = sentinel_dir.join("add_account_login_cancelled");
+    let _ = std::fs::remove_file(&success_sentinel);
+    let _ = std::fs::remove_file(&cancel_sentinel);
+    println!("[open_add_account] sentinel_dir={}", sentinel_dir.display());
 
     let result_json = serde_json::json!({
         "accountId": account_id,
         "dataDirectory": data_dir.to_string_lossy(),
-        "windowLabel": window_label,
+        "windowLabel": "add-account",
     })
     .to_string();
 
-    let app_clone = app.clone();
-    let window_label_clone = window_label.clone();
-    let data_dir_clone = data_dir.clone();
-    let init_script_owned = init_script.to_string();
+    // AddAccount Activity を JNI 経由で起動する
+    #[cfg(target_os = "android")]
+    {
+        println!("[open_add_account] launching AddAccount Activity via JNI");
+        match crate::android_bridge::launch_add_account_activity() {
+            Ok(()) => println!("[open_add_account] AddAccount Activity launched"),
+            Err(e) => println!("[open_add_account] JNI launch error: {e}"),
+        }
+    }
 
-    // Ok() を先に返してから build() を実行することで、IPC コールバックが
-    // AddAccount ではなくメイン WebView に届くようにする。
-    tokio::spawn(async move {
-        if let Some(existing) = app_clone.get_webview_window(&window_label_clone) {
-            let _ = existing.close();
-            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    println!("[open_add_account] entering poll loop");
+
+    // AddAccount.kt がセンチネルファイルを書き込むまでブロックして待機する。
+    // メイン WebView の JavaScript は AddAccount がアクティブな間 suspend されるが、
+    // tokio ランタイムは継続して動作するためこのループは正常に実行される。
+    const POLL_MS: u64 = 500;
+    const MAX_POLLS: u64 = 10 * 60 * 1000 / POLL_MS; // 最大 10 分
+    for i in 0..MAX_POLLS {
+        tokio::time::sleep(std::time::Duration::from_millis(POLL_MS)).await;
+
+        if success_sentinel.exists() {
+            println!("[open_add_account] success sentinel found at poll #{i}");
+            let _ = std::fs::remove_file(&success_sentinel);
+            return Ok(result_json);
+        }
+        if cancel_sentinel.exists() {
+            println!("[open_add_account] cancel sentinel found at poll #{i}");
+            let _ = std::fs::remove_file(&cancel_sentinel);
+            return Err("cancelled".to_string());
         }
 
-        let _ = tauri::WebviewWindowBuilder::new(
-            &app_clone,
-            &window_label_clone,
-            WebviewUrl::External(
-                "https://x.com/login"
-                    .parse()
-                    .expect("static URL is valid"),
-            ),
-        )
-        .initialization_script(&init_script_owned)
-        .data_directory(data_dir_clone)
-        .build();
-    });
+        if i % 20 == 0 {
+            println!("[open_add_account] poll #{i}: still waiting...");
+        }
+    }
 
-    Ok(result_json)
+    println!("[open_add_account] timeout");
+    Err("timeout".to_string())
 }
 
 /// AddAccount WebView の init script から呼ばれる。
-/// AddAccount が自分自身のコンテキストで IPC を発行するため、
-/// close() が正しい Activity に対して dispatch される可能性が高い。
-/// メイン WebView が suspend 中でもフラグで状態を保持し、
-/// visibilitychange 後に check_login_complete で取得できる。
+/// フラグとセンチネルファイルをセットし、AddAccount.kt の finish() を促す。
 #[tauri::command]
 pub async fn mark_login_complete(
     app: AppHandle,
@@ -153,39 +143,53 @@ pub async fn mark_login_complete(
 
     #[cfg(mobile)]
     {
-        // AddAccount.kt の Handler ポーリングが検出してから finish() を呼ぶ。
-        // Rust の URL ポーリングは x.com の SPA 遷移（pushState）を検知できないため
-        // init script 経由でここに到達した場合のみ確実にファイルが書かれる。
         if let Ok(dir) = app.path().app_data_dir() {
             let _ = std::fs::write(dir.join("add_account_login_complete"), "");
         }
-        // Tauri の close も試みる（効かない可能性があるが害はない）
+        // AddAccount.kt の finish() が来る前に Tauri 側でも閉じを試みる
         if let Some(window) = app.get_webview_window("add-account") {
             let _ = window.close();
         }
     }
 
-    // close が成功して MainActivity が前面に戻った後にイベントを届ける（バックアップ）
-    // visibilitychange パスが主系、このイベントは副系として機能する
-    let app_clone = app.clone();
-    tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
-        let _ = app_clone.emit("account-login-complete", ());
-    });
+    // desktop のみ: main WebView は常にアクティブなので emit で通知できる。
+    // mobile は main WebView が suspend 中のため emit を受信できない。
+    // mobile では visibilitychange → check_login_complete で通知する（useAccounts.ts 参照）。
+    #[cfg(not(mobile))]
+    {
+        let app_clone = app.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+            let _ = app_clone.emit("account-login-complete", ());
+        });
+    }
 
     Ok(())
 }
 
 /// メイン WebView が visibilitychange でフォアグラウンド復帰した際に呼ぶ。
 /// フラグを取得してクリアする（一度だけ true を返す）。
+/// Android では AddAccount.kt のネイティブ検出パスがセンチネルファイルを書く場合もあるため、
+/// フラグが false でもセンチネルファイルを確認する。
 #[tauri::command]
 pub async fn check_login_complete(
+    app: AppHandle,
     state: tauri::State<'_, LoginCompleteFlag>,
 ) -> Result<bool, String> {
     let mut flag = state.0.lock().unwrap();
-    let was_set = *flag;
-    *flag = false;
-    Ok(was_set)
+    if *flag {
+        *flag = false;
+        return Ok(true);
+    }
+    #[cfg(mobile)]
+    if let Ok(dir) = app.path().app_data_dir() {
+        let sentinel = dir.join("add_account_login_complete");
+        if sentinel.exists() {
+            let _ = std::fs::remove_file(&sentinel);
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 #[tauri::command]
@@ -210,6 +214,7 @@ pub async fn close_window(app: AppHandle, label: String) -> Result<(), String> {
         window.close().map_err(|e| e.to_string())?;
         return Ok(());
     }
+    // desktop のみ: child WebView (add_child で作成) を閉じる
     #[cfg(desktop)]
     if let Some(webview) = app.get_webview(&label) {
         webview.close().map_err(|e| e.to_string())?;

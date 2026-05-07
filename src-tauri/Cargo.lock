@@ -2193,6 +2193,7 @@ dependencies = [
 name = "multicolumnx"
 version = "0.1.0"
 dependencies = [
+ "jni",
  "log",
  "serde",
  "serde_json",

@@ -1,0 +1,19 @@
+package com.natsuyasai.multicolumnx
+
+/**
+ * Rust の android_bridge モジュールへの JNI ブリッジ。
+ * MainActivity.onCreate から initContext を呼び、Activity 参照を Rust 側に渡す。
+ */
+object AppBridge {
+    init {
+        // Rust.kt で既に読み込まれているが、明示的に書いても idempotent
+        System.loadLibrary("multi_column_x_lib")
+    }
+
+    /**
+     * MainActivity を Rust 側に渡す。
+     * Rust は GlobalRef として保持し、後で AddAccount 起動に使う。
+     */
+    @JvmStatic
+    external fun initContext(activity: WryActivity)
+}
