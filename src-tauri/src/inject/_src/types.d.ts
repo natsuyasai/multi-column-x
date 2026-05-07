@@ -1,44 +1,50 @@
 // src-tauri/src/inject/_src/types.d.ts
 
-interface MultiColumnXAPI {
-  selectHomeTab: () => void;
-  applyCustomCSS: (css: string) => void;
-  triggerReload: () => void;
-  applyAreaRemove: (enabled: boolean) => void;
-}
-
-interface MultiColumnXConfig {
-  areaRemoveEnabled: boolean;
-  showCustomMenu: boolean;
-  visibleLinks: string[];
-}
-
-interface TauriCore {
-  invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
-}
-
-interface TauriGlobal {
-  core?: TauriCore;
-  invoke?: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
-}
-
-interface TauriInternalsMetadata {
-  currentWindow?: { label: string };
-  currentWebview?: { label: string };
-}
-
-interface TauriInternals {
-  metadata?: TauriInternalsMetadata;
-}
-
-interface TvAccountInfo {
-  id: string;
-  label: string;
-  color: string;
-  dataDirectory: string;
-}
-
 declare global {
+  interface MultiColumnXAPI {
+    selectHomeTab: () => void;
+    applyCustomCSS: (css: string) => void;
+    triggerReload: () => void;
+    applyAreaRemove: (enabled: boolean) => void;
+  }
+
+  interface MultiColumnXConfig {
+    areaRemoveEnabled: boolean;
+    showCustomMenu: boolean;
+    visibleLinks: string[];
+  }
+
+  interface TauriCore {
+    invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
+  }
+
+  interface TauriGlobal {
+    core?: TauriCore;
+    invoke?: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
+  }
+
+  interface TauriInternalsMetadata {
+    currentWindow?: { label: string };
+    currentWebview?: { label: string };
+  }
+
+  interface TauriInternals {
+    metadata?: TauriInternalsMetadata;
+  }
+
+  interface TvAccountInfo {
+    id: string;
+    label: string;
+    color: string;
+    dataDirectory: string;
+  }
+
+  interface MobileTab {
+    id: string;
+    label: string;
+    order: number;
+  }
+
   interface Window {
     __multiColumnX: MultiColumnXAPI;
     __multiColumnXConfig?: MultiColumnXConfig;
@@ -48,6 +54,11 @@ declare global {
     __tvCurrentAccountId?: string;
     __tvTargetHref?: string;
     __tvEscCloseEnabled?: boolean;
+    __mobileTopInset?: number;
+    __mobileBottomInset?: number;
+    __mobileTabs?: MobileTab[];
+    __mobileActiveColumnId?: string;
+    __mobileUpdateTabBar?: (tabs: MobileTab[], activeId: string) => void;
   }
 }
 
