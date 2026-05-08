@@ -21,11 +21,12 @@ class AddAccount : AppCompatActivity() {
     private var finished = false
     private var webViewRef: WebView? = null
     private var pollCount = 0
+    private var accountId = "unknown"
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val accountId = intent.getStringExtra("accountId") ?: "unknown"
+        accountId = intent.getStringExtra("accountId") ?: "unknown"
         Log.d(TAG, "onCreate: accountId=$accountId dataDir=${dataDir.absolutePath}")
 
         val wv = WebView(this).apply {
@@ -86,6 +87,10 @@ class AddAccount : AppCompatActivity() {
         polling = false
         handler.removeCallbacksAndMessages(null)
 
+        if (success) {
+            saveCookies()
+        }
+
         val fileName = if (success) "add_account_login_complete" else "add_account_login_cancelled"
         // dataDir = /data/user/0/<package> — Rust の app_data_dir() と一致する
         val sentinelFile = File(dataDir, fileName)
@@ -99,6 +104,24 @@ class AddAccount : AppCompatActivity() {
         Log.d(TAG, "finishWithResult: starting MainActivity, success=$success")
         startActivity(Intent(this, MainActivity::class.java))
         finish()
+    }
+
+    // ログイン成功後の x.com Cookie をアカウントのデータディレクトリに保存する。
+    // MainActivity.setCookieForAccount でカラム表示時に復元する。
+    private fun saveCookies() {
+        val cookieString = CookieManager.getInstance().getCookie("https://x.com") ?: return
+        if (cookieString.isEmpty()) return
+
+        val accountDataDir = File(filesDir, "accounts/account-$accountId")
+        if (!accountDataDir.exists()) accountDataDir.mkdirs()
+
+        val cookieFile = File(accountDataDir, "x_cookies.txt")
+        try {
+            cookieFile.writeText(cookieString)
+            Log.d(TAG, "saveCookies: saved ${cookieString.length} chars for account $accountId")
+        } catch (e: Exception) {
+            Log.e(TAG, "saveCookies: failed: $e")
+        }
     }
 
     private fun schedulePoll() {

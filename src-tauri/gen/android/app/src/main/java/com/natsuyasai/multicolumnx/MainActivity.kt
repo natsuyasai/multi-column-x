@@ -2,7 +2,9 @@ package com.natsuyasai.multicolumnx
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.View
+import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
@@ -12,12 +14,15 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.ProfileStore
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 class MainActivity : TauriActivity() {
   private val columnWebViews = ConcurrentHashMap<String, WebView>()
+  // 現在アクティブなカラムのアカウントID。Cookie 切り替えの要否判定に使う。
+  private var activeColumnAccountId = ""
 
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
@@ -43,7 +48,7 @@ class MainActivity : TauriActivity() {
       // Rust 側にも dp 値を通知する
       val topDp = (systemBars.top / density + 0.5f).toInt()
       val bottomDp = (systemBars.bottom / density + 0.5f).toInt()
-      android.util.Log.d("MainActivity", "insets top=${systemBars.top}px -> ${topDp}dp  bottom=${systemBars.bottom}px -> ${bottomDp}dp")
+      Log.d(TAG, "insets top=${systemBars.top}px -> ${topDp}dp  bottom=${systemBars.bottom}px -> ${bottomDp}dp")
       AppBridge.onInsets(topDp, bottomDp)
 
       insets
@@ -84,7 +89,7 @@ class MainActivity : TauriActivity() {
               WebViewCompat.setProfile(wv, "account-$accountId")
             }
           } catch (e: Exception) {
-            android.util.Log.w("MainActivity", "Profile API unavailable for column $id: ${e.message}")
+            Log.w(TAG, "Profile API unavailable for column $id: ${e.message}")
           }
           if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
             WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
@@ -129,9 +134,16 @@ class MainActivity : TauriActivity() {
   }
 
   // カラム WebView を表示し、サイズを更新する（常に左上原点に配置）。
-  fun showColumnWebView(id: String, widthDp: Int, heightDp: Int) {
+  // accountId が変わった場合は Cookie を切り替えてリロードする。
+  fun showColumnWebView(id: String, widthDp: Int, heightDp: Int, accountId: String) {
     runOnUiThread {
       columnWebViews[id]?.let { wv ->
+        val cookieSwitched = accountId.isNotEmpty() && accountId != activeColumnAccountId
+        if (cookieSwitched) {
+          setCookieForAccount(accountId)
+          activeColumnAccountId = accountId
+        }
+
         val density = resources.displayMetrics.density
         (wv.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
           params.width = (widthDp * density).toInt()
@@ -142,6 +154,10 @@ class MainActivity : TauriActivity() {
         }
         wv.visibility = View.VISIBLE
         wv.requestLayout()
+
+        if (cookieSwitched) {
+          wv.reload()
+        }
       }
     }
   }
@@ -158,5 +174,36 @@ class MainActivity : TauriActivity() {
     runOnUiThread {
       columnWebViews[id]?.evaluateJavascript(script, null)
     }
+  }
+
+  // 保存済みの Cookie をアカウントのデータディレクトリから読み込み CookieManager に設定する。
+  // Profile API が使えない環境での複数アカウント切り替えに使う。
+  private fun setCookieForAccount(accountId: String) {
+    val cookieFile = File(filesDir, "accounts/account-$accountId/x_cookies.txt")
+    if (!cookieFile.exists()) {
+      Log.w(TAG, "setCookieForAccount: cookie file not found for $accountId")
+      return
+    }
+
+    val cookieString = cookieFile.readText()
+    if (cookieString.isEmpty()) return
+
+    val cookieManager = CookieManager.getInstance()
+    cookieManager.removeAllCookies(null)
+    cookieManager.flush()
+
+    for (cookie in cookieString.split(";")) {
+      val trimmed = cookie.trim()
+      if (trimmed.isNotEmpty()) {
+        cookieManager.setCookie("https://x.com", trimmed)
+        cookieManager.setCookie("https://twitter.com", trimmed)
+      }
+    }
+    cookieManager.flush()
+    Log.d(TAG, "setCookieForAccount: set cookies for $accountId")
+  }
+
+  companion object {
+    private const val TAG = "MainActivity"
   }
 }
