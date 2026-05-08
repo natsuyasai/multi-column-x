@@ -51,8 +51,14 @@ const defaultProps = {
   activeColumnId: "col-1",
   onSelectColumn: vi.fn(),
   onOpenSettings: vi.fn(),
+  onMoveLeft: vi.fn(),
+  onMoveRight: vi.fn(),
+  onRemoveColumn: vi.fn(),
   onAddColumn: vi.fn(),
   onAccountManager: vi.fn(),
+  onAppSettings: vi.fn(),
+  onOpenLinkPopup: vi.fn(),
+  showSortButtons: true,
 };
 
 describe("MobileTabBar", () => {
@@ -140,5 +146,29 @@ describe("MobileTabBar", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: "カラムを追加" }));
     expect(onAddColumn).toHaveBeenCalled();
+  });
+
+  it("showSortButtons=false のとき TabItem の左右移動ボタンが非表示になる", () => {
+    render(
+      <MobileTabBar
+        {...defaultProps}
+        columns={[col1]}
+        showSortButtons={false}
+      />,
+    );
+    expect(screen.queryByLabelText("左に移動")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("右に移動")).not.toBeInTheDocument();
+  });
+
+  it("showSortButtons=true のとき TabItem の左右移動ボタンが表示される", () => {
+    render(
+      <MobileTabBar
+        {...defaultProps}
+        columns={[col1]}
+        showSortButtons={true}
+      />,
+    );
+    expect(screen.getByLabelText("左に移動")).toBeInTheDocument();
+    expect(screen.getByLabelText("右に移動")).toBeInTheDocument();
   });
 });

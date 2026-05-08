@@ -26,6 +26,7 @@ interface TabItemProps {
   onMoveLeft: () => void;
   onMoveRight: () => void;
   onRemove: () => void;
+  showSortButtons: boolean;
 }
 
 const TabItem: React.FC<TabItemProps> = ({
@@ -39,6 +40,7 @@ const TabItem: React.FC<TabItemProps> = ({
   onMoveLeft,
   onMoveRight,
   onRemove,
+  showSortButtons,
 }) => {
   const { remaining } = useAutoReload({
     columnId: column.id,
@@ -70,30 +72,34 @@ const TabItem: React.FC<TabItemProps> = ({
       {showCountdown && <span className={styles.countdown}>{remaining}s</span>}
       {isActive && (
         <>
-          <button
-            className={styles.tabBtn}
-            aria-label="左に移動"
-            title="左に移動"
-            disabled={isFirst}
-            onClick={(e) => {
-              e.stopPropagation();
-              onMoveLeft();
-            }}
-          >
-            ←
-          </button>
-          <button
-            className={styles.tabBtn}
-            aria-label="右に移動"
-            title="右に移動"
-            disabled={isLast}
-            onClick={(e) => {
-              e.stopPropagation();
-              onMoveRight();
-            }}
-          >
-            →
-          </button>
+          {showSortButtons && (
+            <>
+              <button
+                className={styles.tabBtn}
+                aria-label="左に移動"
+                title="左に移動"
+                disabled={isFirst}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMoveLeft();
+                }}
+              >
+                ←
+              </button>
+              <button
+                className={styles.tabBtn}
+                aria-label="右に移動"
+                title="右に移動"
+                disabled={isLast}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMoveRight();
+                }}
+              >
+                →
+              </button>
+            </>
+          )}
           <button
             className={styles.tabBtn}
             aria-label="設定"
@@ -135,6 +141,7 @@ interface Props {
   onAccountManager: () => void;
   onAppSettings: () => void;
   onOpenLinkPopup: () => void;
+  showSortButtons: boolean;
 }
 
 export const MobileTabBar: React.FC<Props> = ({
@@ -150,6 +157,7 @@ export const MobileTabBar: React.FC<Props> = ({
   onAccountManager,
   onAppSettings,
   onOpenLinkPopup,
+  showSortButtons,
 }) => {
   const sorted = [...columns].sort((a, b) => a.order - b.order);
   const [expanded, setExpanded] = useState(false);
@@ -173,6 +181,7 @@ export const MobileTabBar: React.FC<Props> = ({
               onMoveLeft={() => onMoveLeft(col.id)}
               onMoveRight={() => onMoveRight(col.id)}
               onRemove={() => onRemoveColumn(col.id)}
+              showSortButtons={showSortButtons}
             />
           );
         })}
