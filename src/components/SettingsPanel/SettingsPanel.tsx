@@ -6,12 +6,14 @@ interface SettingsPanelProps {
   column: Column;
   onApply: (columnId: string, settings: ColumnSettings, width: number) => void;
   onClose: () => void;
+  isMobile: boolean;
 }
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   column,
   onApply,
   onClose,
+  isMobile,
 }) => {
   const [settings, setSettings] = useState<ColumnSettings>({
     ...column.settings,
@@ -38,20 +40,22 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className={styles.form}>
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>カラム</h3>
-            <label className={styles.fieldLabel}>
-              幅（px）
-              <input
-                type="number"
-                className={styles.numberInput}
-                min={200}
-                max={1200}
-                value={width}
-                onChange={(e) => setWidth(Number(e.target.value))}
-              />
-            </label>
-          </section>
+          {!isMobile && (
+            <section className={styles.section}>
+              <h3 className={styles.sectionTitle}>カラム</h3>
+              <label className={styles.fieldLabel}>
+                幅（px）
+                <input
+                  type="number"
+                  className={styles.numberInput}
+                  min={200}
+                  max={1200}
+                  value={width}
+                  onChange={(e) => setWidth(Number(e.target.value))}
+                />
+              </label>
+            </section>
+          )}
 
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>自動更新</h3>
