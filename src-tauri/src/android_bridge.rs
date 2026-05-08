@@ -130,20 +130,17 @@ pub fn remove_column_webview(id: &str) -> Result<(), String> {
 }
 
 /// MainActivity.showColumnWebView を呼び出してカラム WebView を表示する。
-/// account_id が変わった場合は Kotlin 側で Cookie を切り替えてリロードする。
-pub fn show_column_webview(id: &str, width_dp: i32, height_dp: i32, account_id: &str) -> Result<(), String> {
+pub fn show_column_webview(id: &str, width_dp: i32, height_dp: i32) -> Result<(), String> {
     call_activity_method(|env, activity| {
         let j_id = env.new_string(id).map_err(|e| e.to_string())?;
-        let j_account_id = env.new_string(account_id).map_err(|e| e.to_string())?;
         env.call_method(
             activity,
             "showColumnWebView",
-            "(Ljava/lang/String;IILjava/lang/String;)V",
+            "(Ljava/lang/String;II)V",
             &[
                 JValue::Object(&*j_id),
                 JValue::Int(width_dp),
                 JValue::Int(height_dp),
-                JValue::Object(&*j_account_id),
             ],
         )
         .map_err(|e| e.to_string())?;

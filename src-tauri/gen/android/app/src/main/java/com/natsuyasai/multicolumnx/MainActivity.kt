@@ -21,8 +21,6 @@ import java.util.concurrent.TimeUnit
 
 class MainActivity : TauriActivity() {
   private val columnWebViews = ConcurrentHashMap<String, WebView>()
-  // 現在アクティブなカラムのアカウントID。Cookie 切り替えの要否判定に使う。
-  private var activeColumnAccountId = ""
 
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
@@ -66,7 +64,7 @@ class MainActivity : TauriActivity() {
 
   // カラム WebView を content FrameLayout のオーバーレイとして追加する。
   // メイン React WebView の上に重なり、タブバー分の高さを残す。
-  // accountId に対応する WebView Profile を割り当てることで複数アカウントのセッションを分離する。
+  // Profile API 対応端末はプロファイルで分離。非対応端末は loadUrl 前に Cookie を設定する。
   fun createColumnWebView(
     id: String,
     url: String,
@@ -79,17 +77,27 @@ class MainActivity : TauriActivity() {
     val latch = CountDownLatch(1)
     runOnUiThread {
       try {
+        val profileApiSupported = try {
+          WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER")
+        } catch (e: Exception) { false }
+
+        // Profile API 非対応端末では loadUrl 前に Cookie を設定してアカウントを確定する。
+        // createColumnWebView は直列 await で呼ばれるため Cookie の設定が干渉しない。
+        if (!profileApiSupported && accountId.isNotEmpty()) {
+          setCookieForAccount(accountId)
+        }
+
         val webView = WebView(this).also { wv ->
           wv.settings.javaScriptEnabled = true
           wv.settings.domStorageEnabled = true
           wv.webViewClient = WebViewClient()
-          try {
-            if (WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER")) {
+          if (profileApiSupported) {
+            try {
               ProfileStore.getInstance().getOrCreateProfile("account-$accountId")
               WebViewCompat.setProfile(wv, "account-$accountId")
+            } catch (e: Exception) {
+              Log.w(TAG, "Profile API unavailable for column $id: ${e.message}")
             }
-          } catch (e: Exception) {
-            Log.w(TAG, "Profile API unavailable for column $id: ${e.message}")
           }
           if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
             WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
@@ -134,16 +142,9 @@ class MainActivity : TauriActivity() {
   }
 
   // カラム WebView を表示し、サイズを更新する（常に左上原点に配置）。
-  // accountId が変わった場合は Cookie を切り替えてリロードする。
-  fun showColumnWebView(id: String, widthDp: Int, heightDp: Int, accountId: String) {
+  fun showColumnWebView(id: String, widthDp: Int, heightDp: Int) {
     runOnUiThread {
       columnWebViews[id]?.let { wv ->
-        val cookieSwitched = accountId.isNotEmpty() && accountId != activeColumnAccountId
-        if (cookieSwitched) {
-          setCookieForAccount(accountId)
-          activeColumnAccountId = accountId
-        }
-
         val density = resources.displayMetrics.density
         (wv.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
           params.width = (widthDp * density).toInt()
@@ -154,10 +155,6 @@ class MainActivity : TauriActivity() {
         }
         wv.visibility = View.VISIBLE
         wv.requestLayout()
-
-        if (cookieSwitched) {
-          wv.reload()
-        }
       }
     }
   }
