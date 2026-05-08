@@ -97,7 +97,6 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
 pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> Result<(), String> {
     let url = resolve_url(&args.column);
     let label = webview_label(&args.column.id);
-    let data_dir = PathBuf::from(&args.data_directory);
 
     let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(&app);
     let init_script = build_init_script(
@@ -109,16 +108,21 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         &args.column.settings.visible_links,
     );
 
-    let webview = tauri::WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(parse_url(&url)?))
-        .initialization_script(&init_script)
-        .data_directory(data_dir)
-        .inner_size(args.width, args.height)
-        .position(args.x, args.y)
-        .build()
-        .map_err(|e| e.to_string())?;
-
-    if args.x < 0.0 {
-        let _ = webview.hide();
+    // Android では Tauri WebviewWindowBuilder を使わず、
+    // ネイティブ Android WebView を content FrameLayout のオーバーレイとして追加する。
+    // これにより setContentView によるメイン WebView の上書きを回避し、
+    // React MobileTabBar が画面下部に常時表示される。
+    #[cfg(target_os = "android")]
+    {
+        let visible = args.x >= 0.0;
+        crate::android_bridge::create_column_webview(
+            &label,
+            &url,
+            args.width as i32,
+            args.height as i32,
+            &init_script,
+            visible,
+        )?;
     }
 
     let state = app.state::<AppState>();
@@ -154,8 +158,9 @@ pub async fn remove_column_webview(app: AppHandle, column_id: String) -> Result<
 pub async fn remove_column_webview(app: AppHandle, column_id: String) -> Result<(), String> {
     let label = webview_label(&column_id);
 
-    if let Some(webview) = app.get_webview_window(&label) {
-        webview.close().map_err(|e| e.to_string())?;
+    #[cfg(target_os = "android")]
+    {
+        crate::android_bridge::remove_column_webview(&label).ok();
     }
 
     let state = app.state::<AppState>();
@@ -194,21 +199,20 @@ pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Resu
 
 #[cfg(mobile)]
 #[tauri::command]
-pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Result<(), String> {
+pub async fn resize_column_webview(_app: AppHandle, bounds: ResizeBounds) -> Result<(), String> {
     let label = webview_label(&bounds.column_id);
 
-    if let Some(webview) = app.get_webview_window(&label) {
+    #[cfg(target_os = "android")]
+    {
         if bounds.x >= 0.0 {
-            // アクティブカラム: サイズと位置を正してから表示する
-            // let _ で個別エラーを無視し、show() は確実に呼ぶ
-            let _ = webview.set_size(LogicalSize::new(bounds.width, bounds.height));
-            let _ = webview.set_position(LogicalPosition::new(0.0, 0.0));
-            webview.show().map_err(|e| e.to_string())?;
+            crate::android_bridge::show_column_webview(
+                &label,
+                bounds.width as i32,
+                bounds.height as i32,
+            )
+            .ok();
         } else {
-            // 非アクティブカラム: hide() と off-screen 退避を両方実行する
-            // hide() が効かない Android 環境でも set_position が fallback として機能する
-            let _ = webview.hide();
-            let _ = webview.set_position(LogicalPosition::new(-99999.0, 0.0));
+            crate::android_bridge::hide_column_webview(&label).ok();
         }
     }
 
@@ -500,6 +504,13 @@ pub async fn get_mobile_insets() -> serde_json::Value {
 
 #[tauri::command]
 pub async fn eval_in_webview(app: AppHandle, label: String, script: String) -> Result<(), String> {
+    // Android のカラム WebView はネイティブ Android WebView で管理しているため
+    // Tauri の get_webview では見つからない。android_bridge 経由で評価する。
+    #[cfg(target_os = "android")]
+    if label.starts_with("column-") {
+        return crate::android_bridge::eval_in_column_webview(&label, &script);
+    }
+
     if let Some(webview) = app.get_webview(&label) {
         webview.eval(&script).map_err(|e| e.to_string())?;
     } else if let Some(webview_window) = app.get_webview_window(&label) {

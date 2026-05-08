@@ -100,3 +100,119 @@ pub fn launch_add_account_activity() -> Result<(), String> {
 
     Ok(())
 }
+
+// ── カラム WebView ネイティブ操作 ────────────────────────────────────────
+
+/// MainActivity.createColumnWebView を呼び出してカラム WebView を生成する。
+/// width_dp / height_dp は CSS px（= dp）で受け取る。
+pub fn create_column_webview(
+    id: &str,
+    url: &str,
+    width_dp: i32,
+    height_dp: i32,
+    init_script: &str,
+    visible: bool,
+) -> Result<(), String> {
+    call_activity_method(|env, activity| {
+        let j_id = env.new_string(id).map_err(|e| e.to_string())?;
+        let j_url = env.new_string(url).map_err(|e| e.to_string())?;
+        let j_script = env.new_string(init_script).map_err(|e| e.to_string())?;
+        env.call_method(
+            activity,
+            "createColumnWebView",
+            "(Ljava/lang/String;Ljava/lang/String;IILjava/lang/String;Z)V",
+            &[
+                JValue::Object(&*j_id),
+                JValue::Object(&*j_url),
+                JValue::Int(width_dp),
+                JValue::Int(height_dp),
+                JValue::Object(&*j_script),
+                JValue::Bool(visible as u8),
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
+/// MainActivity.removeColumnWebView を呼び出してカラム WebView を削除する。
+pub fn remove_column_webview(id: &str) -> Result<(), String> {
+    call_activity_method(|env, activity| {
+        let j_id = env.new_string(id).map_err(|e| e.to_string())?;
+        env.call_method(
+            activity,
+            "removeColumnWebView",
+            "(Ljava/lang/String;)V",
+            &[JValue::Object(&*j_id)],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
+/// MainActivity.showColumnWebView を呼び出してカラム WebView を表示する。
+pub fn show_column_webview(id: &str, width_dp: i32, height_dp: i32) -> Result<(), String> {
+    call_activity_method(|env, activity| {
+        let j_id = env.new_string(id).map_err(|e| e.to_string())?;
+        env.call_method(
+            activity,
+            "showColumnWebView",
+            "(Ljava/lang/String;II)V",
+            &[
+                JValue::Object(&*j_id),
+                JValue::Int(width_dp),
+                JValue::Int(height_dp),
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
+/// MainActivity.hideColumnWebView を呼び出してカラム WebView を非表示にする。
+pub fn hide_column_webview(id: &str) -> Result<(), String> {
+    call_activity_method(|env, activity| {
+        let j_id = env.new_string(id).map_err(|e| e.to_string())?;
+        env.call_method(
+            activity,
+            "hideColumnWebView",
+            "(Ljava/lang/String;)V",
+            &[JValue::Object(&*j_id)],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
+/// MainActivity.evalInColumnWebView を呼び出してカラム WebView で JS を評価する。
+pub fn eval_in_column_webview(id: &str, script: &str) -> Result<(), String> {
+    call_activity_method(|env, activity| {
+        let j_id = env.new_string(id).map_err(|e| e.to_string())?;
+        let j_script = env.new_string(script).map_err(|e| e.to_string())?;
+        env.call_method(
+            activity,
+            "evalInColumnWebView",
+            "(Ljava/lang/String;Ljava/lang/String;)V",
+            &[JValue::Object(&*j_id), JValue::Object(&*j_script)],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
+/// MAIN_ACTIVITY の JavaVM / GlobalRef を使って JNI 処理を実行するヘルパー。
+fn call_activity_method<F>(f: F) -> Result<(), String>
+where
+    F: FnOnce(&mut JNIEnv, &JObject) -> Result<(), String>,
+{
+    let guard = MAIN_ACTIVITY
+        .lock()
+        .map_err(|e| format!("mutex lock: {e}"))?;
+    let (vm, activity_ref) = guard
+        .as_ref()
+        .ok_or("android context not initialized")?;
+    let mut env = vm
+        .attach_current_thread()
+        .map_err(|e| format!("attach_current_thread: {e}"))?;
+    f(&mut env, activity_ref.as_obj())
+}
