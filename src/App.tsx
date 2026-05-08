@@ -107,37 +107,6 @@ const App: React.FC = () => {
     };
   }, [scrollbarRef]);
 
-  // Mobile: column WebView 内のタブバーからカラム切り替え要求を受信
-  useEffect(() => {
-    if (!isMobile) return;
-    const unlisten = listen<string>("mobile-switch-column", (e) => {
-      setActiveColumn(e.payload);
-    });
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, [isMobile, setActiveColumn]);
-
-  // Mobile: column WebView 内のタブバーからダイアログ開示要求を受信
-  useEffect(() => {
-    if (!isMobile) return;
-    const unlisten = listen<{ dialog: string; columnId?: string | null }>(
-      "mobile-open-dialog",
-      (e) => {
-        if (e.payload.dialog === "add_column") {
-          setShowAddColumn(true);
-        } else if (e.payload.dialog === "account_manager") {
-          setShowAccountManager(true);
-        } else if (e.payload.dialog === "column_settings" && e.payload.columnId) {
-          setSettingsColumnId(e.payload.columnId);
-        }
-      },
-    );
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, [isMobile]);
-
   const handleOpenLinkPopup = useCallback(() => {
     const defaultId = globalSettings.defaultAccountId ?? accounts[0]?.id ?? "";
     setLinkPopupAccountId(defaultId);
@@ -274,7 +243,7 @@ const App: React.FC = () => {
           onJumpToColumn={handleJumpToColumn}
         />
       )}
-      {isMobile && columns.length === 0 && (
+      {isMobile && (
         <MobileTabBar
           columns={columns}
           accounts={accounts}
