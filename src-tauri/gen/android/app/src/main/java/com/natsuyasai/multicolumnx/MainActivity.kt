@@ -142,6 +142,7 @@ class MainActivity : TauriActivity() {
   }
 
   // カラム WebView を表示し、サイズを更新する（常に左上原点に配置）。
+  // onResume() で JS タイマーを再開してから表示する。
   fun showColumnWebView(id: String, widthDp: Int, heightDp: Int) {
     runOnUiThread {
       columnWebViews[id]?.let { wv ->
@@ -153,6 +154,7 @@ class MainActivity : TauriActivity() {
           params.topMargin = 0
           wv.layoutParams = params
         }
+        wv.onResume()
         wv.visibility = View.VISIBLE
         wv.requestLayout()
       }
@@ -160,9 +162,13 @@ class MainActivity : TauriActivity() {
   }
 
   // カラム WebView を非表示にする（View.GONE でレイアウトから除外）。
+  // onPause() で JS タイマーを停止し、非表示中のバックグラウンド API コールを抑制する。
   fun hideColumnWebView(id: String) {
     runOnUiThread {
-      columnWebViews[id]?.visibility = View.GONE
+      columnWebViews[id]?.let { wv ->
+        wv.onPause()
+        wv.visibility = View.GONE
+      }
     }
   }
 

@@ -250,8 +250,13 @@ const App: React.FC = () => {
           activeColumnId={activeColumnId}
           onSelectColumn={setActiveColumn}
           onOpenSettings={setSettingsColumnId}
+          onMoveLeft={(id) => handleMoveColumn(id, "left")}
+          onMoveRight={(id) => handleMoveColumn(id, "right")}
+          onRemoveColumn={handleRemoveColumn}
           onAddColumn={() => setShowAddColumn(true)}
           onAccountManager={() => setShowAccountManager(true)}
+          onAppSettings={() => setShowAppSettings(true)}
+          onOpenLinkPopup={handleOpenLinkPopup}
         />
       )}
 

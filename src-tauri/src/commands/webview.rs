@@ -202,22 +202,16 @@ pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Resu
 
 #[cfg(mobile)]
 #[tauri::command]
-pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Result<(), String> {
+pub async fn resize_column_webview(_app: AppHandle, bounds: ResizeBounds) -> Result<(), String> {
     let label = webview_label(&bounds.column_id);
 
     #[cfg(target_os = "android")]
     {
         if bounds.x >= 0.0 {
-            let account_id = {
-                let state = app.state::<AppState>();
-                let registry = state.registry.lock().unwrap();
-                registry.get_account_id(&label).unwrap_or("").to_string()
-            };
             crate::android_bridge::show_column_webview(
                 &label,
                 bounds.width as i32,
                 bounds.height as i32,
-                &account_id,
             )
             .ok();
         } else {
