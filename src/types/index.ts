@@ -46,6 +46,7 @@ export interface GlobalSettings {
   defaultAutoReloadInterval: number; // 秒
   popupEscCloseEnabled: boolean;
   videoAutoPlayStopEnabled: boolean;
+  showSortButtons: boolean;
 }
 
 export interface AppSettings {
@@ -72,6 +73,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   defaultAutoReloadInterval: 600,
   popupEscCloseEnabled: true,
   videoAutoPlayStopEnabled: false,
+  showSortButtons: true,
 };
 
 interface ResolveColumnUrlInput {
