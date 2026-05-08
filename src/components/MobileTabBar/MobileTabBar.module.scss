@@ -143,3 +143,41 @@
     background: #1a8cd8;
   }
 }
+.btn {
+  $transition: 200ms ease;
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: none;
+  color: #555;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+  padding: 0;
+  transition:
+    width $transition,
+    background $transition;
+
+  &:hover {
+    color: #aaa;
+    background: #1a1a1a;
+  }
+}
+
+.toggleBtn {
+  composes: btn;
+  height: 100%;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  margin-top: 2px;
+  color: #444;
+  font-size: 13px;
+
+  &:hover {
+    color: #888;
+    background: #1a1a1a;
+  }
+}

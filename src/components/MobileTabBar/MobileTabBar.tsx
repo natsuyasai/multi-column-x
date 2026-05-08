@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import type { Column, Account, PageType } from "../../types";
 import { useAutoReload } from "../../hooks/useAutoReload";
 import styles from "./MobileTabBar.module.scss";
@@ -67,9 +67,7 @@ const TabItem: React.FC<TabItemProps> = ({
         style={{ backgroundColor: account?.color ?? "#888" }}
       />
       <span className={styles.label}>{getTabLabel(column)}</span>
-      {showCountdown && (
-        <span className={styles.countdown}>{remaining}s</span>
-      )}
+      {showCountdown && <span className={styles.countdown}>{remaining}s</span>}
       {isActive && (
         <>
           <button
@@ -154,6 +152,7 @@ export const MobileTabBar: React.FC<Props> = ({
   onOpenLinkPopup,
 }) => {
   const sorted = [...columns].sort((a, b) => a.order - b.order);
+  const [expanded, setExpanded] = useState(false);
 
   return (
     <div className={styles.tabBar}>
@@ -179,40 +178,49 @@ export const MobileTabBar: React.FC<Props> = ({
         })}
       </div>
 
-      <div className={styles.actions}>
-        <button
-          className={styles.actionBtn}
-          aria-label="URLをポップアップで開く"
-          title="URLをポップアップで開く"
-          onClick={onOpenLinkPopup}
-        >
-          🔗
-        </button>
-        <button
-          className={styles.actionBtn}
-          aria-label="アプリ設定"
-          title="アプリ設定"
-          onClick={onAppSettings}
-        >
-          ⚙
-        </button>
-        <button
-          className={styles.actionBtn}
-          aria-label="アカウント管理"
-          title="アカウント管理"
-          onClick={onAccountManager}
-        >
-          👤
-        </button>
-        <button
-          className={styles.actionBtn}
-          aria-label="カラムを追加"
-          title="カラムを追加"
-          onClick={onAddColumn}
-        >
-          ＋
-        </button>
-      </div>
+      <button
+        className={styles.toggleBtn}
+        onClick={() => setExpanded((prev) => !prev)}
+        title="メニュー表示の切り替え"
+      >
+        {expanded ? "«" : "»"}
+      </button>
+      {expanded && (
+        <div className={styles.actions}>
+          <button
+            className={styles.actionBtn}
+            aria-label="URLをポップアップで開く"
+            title="URLをポップアップで開く"
+            onClick={onOpenLinkPopup}
+          >
+            🔗
+          </button>
+          <button
+            className={styles.actionBtn}
+            aria-label="アプリ設定"
+            title="アプリ設定"
+            onClick={onAppSettings}
+          >
+            ⚙
+          </button>
+          <button
+            className={styles.actionBtn}
+            aria-label="アカウント管理"
+            title="アカウント管理"
+            onClick={onAccountManager}
+          >
+            👤
+          </button>
+          <button
+            className={styles.actionBtn}
+            aria-label="カラムを追加"
+            title="カラムを追加"
+            onClick={onAddColumn}
+          >
+            ＋
+          </button>
+        </div>
+      )}
     </div>
   );
 };
