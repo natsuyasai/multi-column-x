@@ -13,6 +13,7 @@ interface ColumnHeaderProps {
   onClose: (columnId: string) => void;
   isFirst: boolean;
   isLast: boolean;
+  showSortButtons: boolean;
 }
 
 export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
@@ -25,6 +26,7 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
   onClose,
   isFirst,
   isLast,
+  showSortButtons,
 }) => {
   const label = column.label ?? `${account.label} - ${getPageLabel(column)}`;
   const { remaining, reset } = useAutoReload({
@@ -56,24 +58,28 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
         >
           ↺
         </button>
-        <button
-          className={styles.actionBtn}
-          onClick={() => onMoveLeft(column.id)}
-          disabled={isFirst}
-          aria-label="左に移動"
-          title="左に移動"
-        >
-          ←
-        </button>
-        <button
-          className={styles.actionBtn}
-          onClick={() => onMoveRight(column.id)}
-          disabled={isLast}
-          aria-label="右に移動"
-          title="右に移動"
-        >
-          →
-        </button>
+        {showSortButtons && (
+          <>
+            <button
+              className={styles.actionBtn}
+              onClick={() => onMoveLeft(column.id)}
+              disabled={isFirst}
+              aria-label="左に移動"
+              title="左に移動"
+            >
+              ←
+            </button>
+            <button
+              className={styles.actionBtn}
+              onClick={() => onMoveRight(column.id)}
+              disabled={isLast}
+              aria-label="右に移動"
+              title="右に移動"
+            >
+              →
+            </button>
+          </>
+        )}
         <button
           className={styles.actionBtn}
           onClick={() => onSettings(column.id)}

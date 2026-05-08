@@ -42,6 +42,7 @@ const defaultProps = {
   onClose: vi.fn(),
   isFirst: false,
   isLast: false,
+  showSortButtons: true,
 };
 
 describe("ColumnHeader", () => {
@@ -88,5 +89,17 @@ describe("ColumnHeader", () => {
   it("isLast=true のとき右移動ボタンが disabled", () => {
     render(<ColumnHeader {...defaultProps} isLast={true} />);
     expect(screen.getByLabelText("右に移動")).toBeDisabled();
+  });
+
+  it("showSortButtons=false のとき左右移動ボタンが非表示になる", () => {
+    render(<ColumnHeader {...defaultProps} showSortButtons={false} />);
+    expect(screen.queryByLabelText("左に移動")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("右に移動")).not.toBeInTheDocument();
+  });
+
+  it("showSortButtons=true のとき左右移動ボタンが表示される", () => {
+    render(<ColumnHeader {...defaultProps} showSortButtons={true} />);
+    expect(screen.getByLabelText("左に移動")).toBeInTheDocument();
+    expect(screen.getByLabelText("右に移動")).toBeInTheDocument();
   });
 });
