@@ -60,6 +60,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
 
     let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(&app);
     let init_script = build_init_script(
+        false, // is_mobile
         args.column.settings.area_remove_enabled,
         args.column.settings.show_custom_menu,
         args.column.settings.auto_reload_enabled,
@@ -100,6 +101,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
 
     let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(&app);
     let init_script = build_init_script(
+        true, // is_mobile
         args.column.settings.area_remove_enabled,
         args.column.settings.show_custom_menu,
         args.column.settings.auto_reload_enabled,
@@ -200,16 +202,22 @@ pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Resu
 
 #[cfg(mobile)]
 #[tauri::command]
-pub async fn resize_column_webview(_app: AppHandle, bounds: ResizeBounds) -> Result<(), String> {
+pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Result<(), String> {
     let label = webview_label(&bounds.column_id);
 
     #[cfg(target_os = "android")]
     {
         if bounds.x >= 0.0 {
+            let account_id = {
+                let state = app.state::<AppState>();
+                let registry = state.registry.lock().unwrap();
+                registry.get_account_id(&label).unwrap_or("").to_string()
+            };
             crate::android_bridge::show_column_webview(
                 &label,
                 bounds.width as i32,
                 bounds.height as i32,
+                &account_id,
             )
             .ok();
         } else {
@@ -284,8 +292,12 @@ pub async fn open_popup_window(
 
     let accounts_json = load_accounts_json(&app);
     let esc_close_enabled = load_popup_esc_close_enabled(&app);
-    let popup_init =
-        crate::inject::build_popup_init_script(&accounts_json, &current_account_id, &url, esc_close_enabled);
+    let popup_init = crate::inject::build_popup_init_script(
+        &accounts_json,
+        &current_account_id,
+        &url,
+        esc_close_enabled,
+    );
 
     let popup_label = format!("popup-{}", uuid::Uuid::new_v4());
 
@@ -388,17 +400,18 @@ pub async fn open_link_popup_window(
             .get_data_directory(&label)
             .map(PathBuf::from)
             .unwrap_or_default();
-        let aid = registry
-            .get_account_id(&label)
-            .unwrap_or("")
-            .to_string();
+        let aid = registry.get_account_id(&label).unwrap_or("").to_string();
         (dd, aid)
     };
 
     let accounts_json = load_accounts_json(&app);
     let esc_close_enabled = load_popup_esc_close_enabled(&app);
-    let popup_init =
-        crate::inject::build_popup_init_script(&accounts_json, &current_account_id, "", esc_close_enabled);
+    let popup_init = crate::inject::build_popup_init_script(
+        &accounts_json,
+        &current_account_id,
+        "",
+        esc_close_enabled,
+    );
 
     let popup_label = format!("popup-{}", uuid::Uuid::new_v4());
 
@@ -461,10 +474,7 @@ pub async fn open_link_popup_window(
             .get_data_directory(&label)
             .map(PathBuf::from)
             .unwrap_or_default();
-        let aid = registry
-            .get_account_id(&label)
-            .unwrap_or("")
-            .to_string();
+        let aid = registry.get_account_id(&label).unwrap_or("").to_string();
         (dd, aid)
     };
 
@@ -501,7 +511,6 @@ pub async fn get_mobile_insets() -> serde_json::Value {
         serde_json::json!({ "top": 0, "bottom": 0 })
     }
 }
-
 
 #[tauri::command]
 pub async fn eval_in_webview(app: AppHandle, label: String, script: String) -> Result<(), String> {
@@ -548,7 +557,8 @@ pub async fn switch_popup_session(
 
     let accounts_json = load_accounts_json(&app);
     let esc_close_enabled = load_popup_esc_close_enabled(&app);
-    let popup_init = crate::inject::build_popup_init_script(&accounts_json, &accountId, &url, esc_close_enabled);
+    let popup_init =
+        crate::inject::build_popup_init_script(&accounts_json, &accountId, &url, esc_close_enabled);
 
     let mut builder =
         tauri::WebviewWindowBuilder::new(&app, &new_label, WebviewUrl::External(parse_url(&url)?))
@@ -602,7 +612,8 @@ pub async fn open_compose_window(
 
     let accounts_json = load_accounts_json(&app);
     let esc_close_enabled = load_popup_esc_close_enabled(&app);
-    let popup_init = crate::inject::build_popup_init_script(&accounts_json, &accountId, "", esc_close_enabled);
+    let popup_init =
+        crate::inject::build_popup_init_script(&accounts_json, &accountId, "", esc_close_enabled);
 
     let compose_label = format!("compose-{}", uuid::Uuid::new_v4());
 
@@ -644,12 +655,8 @@ pub async fn open_compose_window(
     let data_dir = PathBuf::from(&dataDirectory);
     let accounts_json = load_accounts_json(&app);
     let esc_close_enabled = load_popup_esc_close_enabled(&app);
-    let popup_init = crate::inject::build_popup_init_script(
-        &accounts_json,
-        &accountId,
-        "",
-        esc_close_enabled,
-    );
+    let popup_init =
+        crate::inject::build_popup_init_script(&accounts_json, &accountId, "", esc_close_enabled);
     let compose_label = format!("compose-{}", uuid::Uuid::new_v4());
 
     tauri::WebviewWindowBuilder::new(
