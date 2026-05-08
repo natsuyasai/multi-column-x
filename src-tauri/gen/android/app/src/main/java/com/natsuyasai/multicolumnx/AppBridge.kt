@@ -23,4 +23,12 @@ object AppBridge {
      */
     @JvmStatic
     external fun onInsets(top: Int, bottom: Int)
+
+    /**
+     * 端末の back ボタンが押されたときに MainActivity から呼ぶ。
+     * ポップアップが開いていれば close-topmost-popup イベントを emit して true を返す。
+     * 開いていなければ false を返してデフォルトの back 動作に委ねる。
+     */
+    @JvmStatic
+    external fun closeTopPopup(): Boolean
 }

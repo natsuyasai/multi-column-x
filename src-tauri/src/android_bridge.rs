@@ -2,11 +2,57 @@
 //! MainActivity.onCreate → AppBridge.initContext(this) → ここの JNI 関数 の順で初期化される。
 
 use jni::objects::{GlobalRef, JClass, JObject, JValue};
+use jni::sys::jboolean;
 use jni::{JNIEnv, JavaVM};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicI32, Ordering};
 
 static MAIN_ACTIVITY: Mutex<Option<(JavaVM, GlobalRef)>> = Mutex::new(None);
+
+/// Tauri AppHandle（back ボタンでポップアップを閉じるイベント emit に使う）。
+static TAURI_APP: Mutex<Option<tauri::AppHandle>> = Mutex::new(None);
+
+/// 現在開いているポップアップウィンドウ数。back ボタン処理の可否判定に使う。
+static POPUP_COUNT: AtomicI32 = AtomicI32::new(0);
+
+/// アプリ起動時に AppHandle を保存する。
+pub fn store_app_handle(app: tauri::AppHandle) {
+    *TAURI_APP.lock().unwrap() = Some(app);
+}
+
+/// ポップアップ/コンポーズウィンドウが開かれたときに呼ぶ。
+pub fn increment_popup_count() {
+    POPUP_COUNT.fetch_add(1, Ordering::Relaxed);
+}
+
+/// ポップアップ/コンポーズウィンドウが閉じられたときに呼ぶ。
+pub fn decrement_popup_count() {
+    let prev = POPUP_COUNT.fetch_sub(1, Ordering::Relaxed);
+    if prev <= 0 {
+        POPUP_COUNT.store(0, Ordering::Relaxed);
+    }
+}
+
+/// AppBridge.closeTopPopup() から呼ばれる JNI エントリポイント。
+/// ポップアップが開いていれば close-topmost-popup イベントを emit して true を返す。
+/// 開いていなければ false を返してデフォルトの back 動作に委ねる。
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_closeTopPopup<'local>(
+    _env: JNIEnv<'local>,
+    _class: JClass<'local>,
+) -> jboolean {
+    use tauri::Emitter;
+    if POPUP_COUNT.load(Ordering::Relaxed) <= 0 {
+        return 0;
+    }
+    let guard = TAURI_APP.lock().unwrap();
+    if let Some(app) = guard.as_ref() {
+        let _ = app.emit("close-topmost-popup", ());
+        1
+    } else {
+        0
+    }
+}
 
 /// Kotlin から受け取ったシステムバーの高さ（dp）。
 static STATUS_BAR_HEIGHT_DP: AtomicI32 = AtomicI32::new(0);
@@ -173,6 +219,42 @@ pub fn eval_in_column_webview(id: &str, script: &str) -> Result<(), String> {
             "evalInColumnWebView",
             "(Ljava/lang/String;Ljava/lang/String;)V",
             &[JValue::Object(&*j_id), JValue::Object(&*j_script)],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
+/// MainActivity.createPopupWebView を呼び出して全画面ポップアップ WebView を生成する。
+pub fn create_popup_webview(id: &str, url: &str, init_script: &str) -> Result<(), String> {
+    call_activity_method(|env, activity| {
+        let j_id = env.new_string(id).map_err(|e| e.to_string())?;
+        let j_url = env.new_string(url).map_err(|e| e.to_string())?;
+        let j_script = env.new_string(init_script).map_err(|e| e.to_string())?;
+        env.call_method(
+            activity,
+            "createPopupWebView",
+            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+            &[
+                JValue::Object(&*j_id),
+                JValue::Object(&*j_url),
+                JValue::Object(&*j_script),
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
+/// MainActivity.removePopupWebView を呼び出してポップアップ WebView を削除する。
+pub fn remove_popup_webview(id: &str) -> Result<(), String> {
+    call_activity_method(|env, activity| {
+        let j_id = env.new_string(id).map_err(|e| e.to_string())?;
+        env.call_method(
+            activity,
+            "removePopupWebView",
+            "(Ljava/lang/String;)V",
+            &[JValue::Object(&*j_id)],
         )
         .map_err(|e| e.to_string())?;
         Ok(())

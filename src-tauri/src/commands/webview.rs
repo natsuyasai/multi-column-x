@@ -343,17 +343,12 @@ pub async fn open_popup_window(
     url: String,
 ) -> Result<(), String> {
     let state = app.state::<AppState>();
-    let (data_dir, current_account_id) = {
+    let current_account_id = {
         let registry = state.registry.lock().unwrap();
-        let data_dir = registry
-            .get_data_directory(&webview_label_caller)
-            .map(PathBuf::from)
-            .unwrap_or_default();
-        let account_id = registry
+        registry
             .get_account_id(&webview_label_caller)
             .unwrap_or("")
-            .to_string();
-        (data_dir, account_id)
+            .to_string()
     };
 
     let accounts_json = load_accounts_json(&app);
@@ -366,13 +361,28 @@ pub async fn open_popup_window(
     );
     let popup_label = format!("popup-{}", uuid::Uuid::new_v4());
 
-    tauri::WebviewWindowBuilder::new(&app, &popup_label, WebviewUrl::External(parse_url(&url)?))
-        .initialization_script(&popup_init)
-        .data_directory(data_dir)
-        .build()
-        .map_err(|e| e.to_string())?;
+    #[cfg(target_os = "android")]
+    {
+        let _ = app;
+        return crate::android_bridge::create_popup_webview(&popup_label, &url, &popup_init);
+    }
 
-    Ok(())
+    #[cfg(not(target_os = "android"))]
+    {
+        let data_dir = {
+            let registry = state.registry.lock().unwrap();
+            registry
+                .get_data_directory(&webview_label_caller)
+                .map(PathBuf::from)
+                .unwrap_or_default()
+        };
+        tauri::WebviewWindowBuilder::new(&app, &popup_label, WebviewUrl::External(parse_url(&url)?))
+            .initialization_script(&popup_init)
+            .data_directory(data_dir)
+            .build()
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
 }
 
 #[cfg(desktop)]
@@ -458,18 +468,13 @@ pub async fn open_link_popup_window(
     #[allow(non_snake_case)] dataDirectory: Option<String>,
     url: String,
 ) -> Result<(), String> {
-    let (data_dir, current_account_id) = if let (Some(aid), Some(dd)) = (accountId, dataDirectory) {
-        (PathBuf::from(dd), aid)
+    let current_account_id = if let Some(aid) = accountId {
+        aid
     } else {
-        let label = webview_label_caller.unwrap_or_default();
+        let label = webview_label_caller.clone().unwrap_or_default();
         let state = app.state::<AppState>();
         let registry = state.registry.lock().unwrap();
-        let dd = registry
-            .get_data_directory(&label)
-            .map(PathBuf::from)
-            .unwrap_or_default();
-        let aid = registry.get_account_id(&label).unwrap_or("").to_string();
-        (dd, aid)
+        registry.get_account_id(&label).unwrap_or("").to_string()
     };
 
     let accounts_json = load_accounts_json(&app);
@@ -482,13 +487,32 @@ pub async fn open_link_popup_window(
     );
     let popup_label = format!("popup-{}", uuid::Uuid::new_v4());
 
-    tauri::WebviewWindowBuilder::new(&app, &popup_label, WebviewUrl::External(parse_url(&url)?))
-        .initialization_script(&popup_init)
-        .data_directory(data_dir)
-        .build()
-        .map_err(|e| e.to_string())?;
+    #[cfg(target_os = "android")]
+    {
+        let _ = (app, dataDirectory);
+        return crate::android_bridge::create_popup_webview(&popup_label, &url, &popup_init);
+    }
 
-    Ok(())
+    #[cfg(not(target_os = "android"))]
+    {
+        let data_dir = if let Some(dd) = dataDirectory {
+            PathBuf::from(dd)
+        } else {
+            let label = webview_label_caller.unwrap_or_default();
+            let state = app.state::<AppState>();
+            let registry = state.registry.lock().unwrap();
+            registry
+                .get_data_directory(&label)
+                .map(PathBuf::from)
+                .unwrap_or_default()
+        };
+        tauri::WebviewWindowBuilder::new(&app, &popup_label, WebviewUrl::External(parse_url(&url)?))
+            .initialization_script(&popup_init)
+            .data_directory(data_dir)
+            .build()
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
 }
 
 /// アクティブカラムのアカウントに CookieManager を切り替える（Android / Profile API 非対応端末のみ）。
@@ -592,6 +616,12 @@ pub async fn switch_popup_session(
 
 #[tauri::command]
 pub async fn close_popup_window(app: AppHandle, label: String) -> Result<(), String> {
+    #[cfg(target_os = "android")]
+    {
+        crate::android_bridge::remove_popup_webview(&label).ok();
+        let _ = app;
+        return Ok(());
+    }
     if let Some(window) = app.get_webview_window(&label) {
         window.close().map_err(|e| e.to_string())?;
         return Ok(());
@@ -659,22 +689,34 @@ pub async fn open_compose_window(
     #[allow(non_snake_case)] accountId: String,
     #[allow(non_snake_case)] dataDirectory: String,
 ) -> Result<(), String> {
-    let data_dir = PathBuf::from(&dataDirectory);
     let accounts_json = load_accounts_json(&app);
     let esc_close_enabled = load_popup_esc_close_enabled(&app);
     let popup_init =
         crate::inject::build_popup_init_script(&accounts_json, &accountId, "", esc_close_enabled);
     let compose_label = format!("compose-{}", uuid::Uuid::new_v4());
 
-    tauri::WebviewWindowBuilder::new(
-        &app,
-        &compose_label,
-        WebviewUrl::External(parse_url("https://x.com/compose/post")?),
-    )
-    .initialization_script(&popup_init)
-    .data_directory(data_dir)
-    .build()
-    .map_err(|e| e.to_string())?;
+    #[cfg(target_os = "android")]
+    {
+        let _ = (app, dataDirectory);
+        return crate::android_bridge::create_popup_webview(
+            &compose_label,
+            "https://x.com/compose/post",
+            &popup_init,
+        );
+    }
 
-    Ok(())
+    #[cfg(not(target_os = "android"))]
+    {
+        let data_dir = PathBuf::from(&dataDirectory);
+        tauri::WebviewWindowBuilder::new(
+            &app,
+            &compose_label,
+            WebviewUrl::External(parse_url("https://x.com/compose/post")?),
+        )
+        .initialization_script(&popup_init)
+        .data_directory(data_dir)
+        .build()
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
 }

@@ -8,6 +8,7 @@ import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -21,6 +22,8 @@ import java.util.concurrent.TimeUnit
 
 class MainActivity : TauriActivity() {
   private val columnWebViews = ConcurrentHashMap<String, WebView>()
+  // ポップアップ WebView スタック（表示順に積む）。UI スレッドからのみ操作する。
+  private val popupWebViews = ArrayDeque<Pair<String, WebView>>()
 
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
@@ -52,6 +55,15 @@ class MainActivity : TauriActivity() {
       insets
     }
     ViewCompat.requestApplyInsets(window.decorView)
+
+    onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+      override fun handleOnBackPressed() {
+        if (!closeTopPopupWebView()) {
+          // ポップアップがない場合はアプリをバックグラウンドに送る（finish しない）
+          moveTaskToBack(true)
+        }
+      }
+    })
   }
 
   // AddAccount Activity を account_id を Intent Extra として渡して起動する。
@@ -60,6 +72,66 @@ class MainActivity : TauriActivity() {
     val intent = Intent(this, AddAccount::class.java)
     intent.putExtra("accountId", accountId)
     startActivity(intent)
+  }
+
+  // ポップアップ WebView を全画面オーバーレイとして追加する。
+  // カラム WebView の上に重なり、戻るボタンで閉じられる。
+  // JNI スレッドから呼ばれるため runOnUiThread + CountDownLatch で UI 操作を同期する。
+  fun createPopupWebView(id: String, url: String, initScript: String) {
+    val latch = CountDownLatch(1)
+    runOnUiThread {
+      try {
+        val webView = WebView(this).also { wv ->
+          wv.settings.javaScriptEnabled = true
+          wv.settings.domStorageEnabled = true
+          wv.webViewClient = WebViewClient()
+          if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
+          }
+        }
+        val contentRoot = window.decorView.findViewById<FrameLayout>(android.R.id.content)
+        val params = FrameLayout.LayoutParams(
+          FrameLayout.LayoutParams.MATCH_PARENT,
+          FrameLayout.LayoutParams.MATCH_PARENT
+        )
+        contentRoot.addView(webView, params)
+        popupWebViews.addLast(Pair(id, webView))
+        webView.loadUrl(url)
+      } finally {
+        latch.countDown()
+      }
+    }
+    latch.await(5, TimeUnit.SECONDS)
+  }
+
+  // 指定 id のポップアップ WebView を削除する。JNI スレッドから呼ばれる。
+  fun removePopupWebView(id: String) {
+    val latch = CountDownLatch(1)
+    runOnUiThread {
+      try {
+        val idx = popupWebViews.indexOfFirst { it.first == id }
+        if (idx >= 0) {
+          val wv = popupWebViews.removeAt(idx).second
+          val contentRoot = window.decorView.findViewById<FrameLayout>(android.R.id.content)
+          contentRoot.removeView(wv)
+          wv.destroy()
+        }
+      } finally {
+        latch.countDown()
+      }
+    }
+    latch.await(5, TimeUnit.SECONDS)
+  }
+
+  // 最前面のポップアップ WebView を閉じる。UI スレッド（OnBackPressedCallback）から呼ばれる。
+  // ポップアップがあれば閉じて true を返し、なければ false を返す。
+  fun closeTopPopupWebView(): Boolean {
+    if (popupWebViews.isEmpty()) return false
+    val wv = popupWebViews.removeLast().second
+    val contentRoot = window.decorView.findViewById<FrameLayout>(android.R.id.content)
+    contentRoot.removeView(wv)
+    wv.destroy()
+    return true
   }
 
   // カラム WebView を content FrameLayout のオーバーレイとして追加する。

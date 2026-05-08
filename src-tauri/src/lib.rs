@@ -115,6 +115,8 @@ pub fn run() {
                     }
                 }
             }
+            #[cfg(target_os = "android")]
+            crate::android_bridge::store_app_handle(app.handle().clone());
             #[cfg(not(desktop))]
             let _ = app;
             Ok(())
