@@ -30,6 +30,7 @@ declare global {
 
   interface TauriInternals {
     metadata?: TauriInternalsMetadata;
+    invoke?: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
   }
 
   interface TvAccountInfo {

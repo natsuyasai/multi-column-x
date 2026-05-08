@@ -135,13 +135,20 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
             )
         };
 
-    tauri::WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(parse_url(&url)?))
+    // position(args.x, args.y) で -99999 を渡し off-screen 退避も試みつつ、
+    // 非アクティブカラムは hide() で確実に非表示にする（Android hitbox 問題への対策）。
+    let webview = tauri::WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(parse_url(&url)?))
         .initialization_script(&init_script)
         .data_directory(data_dir)
         .inner_size(args.width, args.height)
         .position(args.x, args.y)
         .build()
         .map_err(|e| e.to_string())?;
+
+    // 非アクティブカラム（x < 0 で渡される）は作成直後に非表示にする
+    if args.x < 0.0 {
+        let _ = webview.hide();
+    }
 
     let state = app.state::<AppState>();
     let mut registry = state.registry.lock().unwrap();
@@ -220,12 +227,18 @@ pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Resu
     let label = webview_label(&bounds.column_id);
 
     if let Some(webview) = app.get_webview_window(&label) {
-        webview
-            .set_size(LogicalSize::new(bounds.width, bounds.height))
-            .map_err(|e| e.to_string())?;
-        webview
-            .set_position(LogicalPosition::new(bounds.x, bounds.y))
-            .map_err(|e| e.to_string())?;
+        if bounds.x >= 0.0 {
+            // アクティブカラム: サイズと位置を正してから表示する
+            // let _ で個別エラーを無視し、show() は確実に呼ぶ
+            let _ = webview.set_size(LogicalSize::new(bounds.width, bounds.height));
+            let _ = webview.set_position(LogicalPosition::new(0.0, 0.0));
+            webview.show().map_err(|e| e.to_string())?;
+        } else {
+            // 非アクティブカラム: hide() と off-screen 退避を両方実行する
+            // hide() が効かない Android 環境でも set_position が fallback として機能する
+            let _ = webview.hide();
+            let _ = webview.set_position(LogicalPosition::new(-99999.0, 0.0));
+        }
     }
 
     Ok(())

@@ -174,7 +174,6 @@ export function useColumns() {
   const setActiveColumn = useCallback(async (id: string) => {
     setActiveColumnIdState(id);
     const { columns: currentColumns } = useAppStore.getState();
-    await getMobileInsets();
     await Promise.all(
       currentColumns.map((col) => {
         const isActive = col.id === id;
@@ -377,17 +376,13 @@ export function useColumns() {
 
   // ダイアログ表示時に全カラムWebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
   const hideColumnWebviews = useCallback(async () => {
-    const currentColumns = useAppStore.getState().columns;
+    const { columns: currentColumns, isMobile } = useAppStore.getState();
     await Promise.all(
       currentColumns.map((col) =>
         invoke("resize_column_webview", {
-          bounds: {
-            columnId: col.id,
-            x: -9999,
-            y: HEADER_HEIGHT,
-            width: col.width,
-            height: 1,
-          },
+          bounds: isMobile
+            ? { columnId: col.id, x: -99999, y: 0, width: window.innerWidth, height: window.innerHeight }
+            : { columnId: col.id, x: -9999, y: HEADER_HEIGHT, width: col.width, height: 1 },
         }).catch(() => {}),
       ),
     );

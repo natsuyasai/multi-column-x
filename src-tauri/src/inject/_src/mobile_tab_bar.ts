@@ -25,11 +25,15 @@
 
   function tauriInvoke(cmd: string, args?: Record<string, unknown>): void {
     const invoke =
-      (window.__TAURI__ &&
-        ((window.__TAURI__.core && window.__TAURI__.core.invoke) ||
-          window.__TAURI__.invoke)) ||
+      window.__TAURI_INTERNALS__?.invoke ||
+      window.__TAURI__?.core?.invoke ||
+      window.__TAURI__?.invoke ||
       null;
-    if (invoke) invoke(cmd, args);
+    if (invoke) {
+      invoke(cmd, args);
+    } else {
+      console.warn("[MobileTabBar] Tauri invoke not available for cmd:", cmd);
+    }
   }
 
   function escapeHtml(s: string): string {
