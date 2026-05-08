@@ -21,6 +21,7 @@ const mockGlobalSettings: GlobalSettings = {
   defaultAutoReloadInterval: 60,
   popupEscCloseEnabled: true,
   videoAutoPlayStopEnabled: false,
+  showSortButtons: true,
 };
 
 describe("AddColumnDialog", () => {

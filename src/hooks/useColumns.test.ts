@@ -188,6 +188,7 @@ describe("useColumns mobile", () => {
         defaultAutoReloadInterval: 60,
         popupEscCloseEnabled: true,
         videoAutoPlayStopEnabled: false,
+        showSortButtons: true,
       },
       isLoaded: true,
       isMobile: true,

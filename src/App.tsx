@@ -257,6 +257,7 @@ const App: React.FC = () => {
           onAccountManager={() => setShowAccountManager(true)}
           onAppSettings={() => setShowAppSettings(true)}
           onOpenLinkPopup={handleOpenLinkPopup}
+          showSortButtons={globalSettings.showSortButtons}
         />
       )}
 
@@ -287,6 +288,7 @@ const App: React.FC = () => {
                 onClose={handleRemoveColumn}
                 isFirst={idx === 0}
                 isLast={idx === sortedColumns.length - 1}
+                showSortButtons={globalSettings.showSortButtons}
               />
             </div>
           );
@@ -420,6 +422,7 @@ const App: React.FC = () => {
               column={col}
               onApply={handleApplySettings}
               onClose={() => setSettingsColumnId(null)}
+              isMobile={isMobile}
             />
           ) : null;
         })()}

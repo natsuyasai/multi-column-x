@@ -133,6 +133,7 @@ describe("MobileTabBar", () => {
         onAccountManager={onAccountManager}
       />,
     );
+    await userEvent.click(screen.getByTitle("メニュー表示の切り替え"));
     await userEvent.click(
       screen.getByRole("button", { name: "アカウント管理" }),
     );
@@ -144,6 +145,7 @@ describe("MobileTabBar", () => {
     render(
       <MobileTabBar {...defaultProps} columns={[]} onAddColumn={onAddColumn} />,
     );
+    await userEvent.click(screen.getByTitle("メニュー表示の切り替え"));
     await userEvent.click(screen.getByRole("button", { name: "カラムを追加" }));
     expect(onAddColumn).toHaveBeenCalled();
   });
