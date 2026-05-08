@@ -142,8 +142,6 @@ pub fn run() {
             commands::webview::switch_popup_session,
             commands::webview::eval_in_webview,
             commands::webview::report_webview_scroll,
-            commands::webview::switch_mobile_column,
-            commands::webview::open_mobile_dialog,
             commands::webview::get_mobile_insets,
             commands::webview::open_in_browser,
             commands::account::open_add_account_window,
