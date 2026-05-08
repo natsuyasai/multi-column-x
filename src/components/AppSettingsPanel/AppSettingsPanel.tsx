@@ -33,6 +33,9 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   const [videoAutoPlayStopEnabled, setVideoAutoPlayStopEnabled] = useState(
     settings.videoAutoPlayStopEnabled,
   );
+  const [showSortButtons, setShowSortButtons] = useState(
+    settings.showSortButtons,
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +44,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       defaultAutoReloadInterval: autoReloadInterval,
       popupEscCloseEnabled: popupEscCloseEnabled,
       videoAutoPlayStopEnabled: videoAutoPlayStopEnabled,
+      showSortButtons: showSortButtons,
     });
     onClose();
   };
@@ -104,6 +108,14 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                     />
                   </label>
                 )}
+                <label className={styles.checkLabel}>
+                  <input
+                    type="checkbox"
+                    checked={showSortButtons}
+                    onChange={(e) => setShowSortButtons(e.target.checked)}
+                  />
+                  並び替えボタンを表示する
+                </label>
                 <p className={styles.hint}>
                   新しく追加するカラムに適用されます
                 </p>
