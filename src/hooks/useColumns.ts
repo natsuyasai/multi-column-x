@@ -248,7 +248,7 @@ export function useColumns() {
         }).catch(console.error);
       }
       if (firstColumn) {
-        setActiveColumnIdState(firstColumn.id);
+        await setActiveColumn(firstColumn.id);
       }
       return;
     }
