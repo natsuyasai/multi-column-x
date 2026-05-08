@@ -491,6 +491,19 @@ pub async fn open_link_popup_window(
     Ok(())
 }
 
+/// アクティブカラムのアカウントに CookieManager を切り替える（Android / Profile API 非対応端末のみ）。
+/// setActiveColumn から resize_column_webview より先に呼ばれ、正しいアカウントで WebView が動作する。
+#[tauri::command]
+pub async fn set_column_cookies(
+    #[allow(non_snake_case)] accountId: String,
+) -> Result<(), String> {
+    #[cfg(target_os = "android")]
+    {
+        crate::android_bridge::set_account_cookies(&accountId)?;
+    }
+    Ok(())
+}
+
 /// ステータスバーとナビゲーションバーの高さ（dp）を返す。
 /// Kotlin の WindowInsetsCompat から取得した値を JNI 経由で保存したもの。
 #[tauri::command]

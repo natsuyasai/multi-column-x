@@ -164,7 +164,19 @@ export function useColumns() {
 
   const setActiveColumn = useCallback(async (id: string) => {
     setActiveColumnIdState(id);
-    const { columns: currentColumns } = useAppStore.getState();
+    const { columns: currentColumns, isMobile } = useAppStore.getState();
+
+    // モバイル: resize_column_webview より先にアクティブカラムのクッキーを切り替える。
+    // CookieManager は共有のため、WebView が表示される前に正しいアカウントを設定する必要がある。
+    if (isMobile) {
+      const activeCol = currentColumns.find((c) => c.id === id);
+      if (activeCol) {
+        await invoke("set_column_cookies", {
+          accountId: activeCol.accountId,
+        }).catch(console.error);
+      }
+    }
+
     await Promise.all(
       currentColumns.map((col) => {
         const isActive = col.id === id;

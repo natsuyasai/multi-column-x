@@ -179,6 +179,22 @@ pub fn eval_in_column_webview(id: &str, script: &str) -> Result<(), String> {
     })
 }
 
+/// MainActivity.setAccountCookies を呼び出して CookieManager を指定アカウントに切り替える。
+/// showColumnWebView とは独立しているため、WebView の表示状態に影響しない。
+pub fn set_account_cookies(account_id: &str) -> Result<(), String> {
+    call_activity_method(|env, activity| {
+        let j_id = env.new_string(account_id).map_err(|e| e.to_string())?;
+        env.call_method(
+            activity,
+            "setAccountCookies",
+            "(Ljava/lang/String;)V",
+            &[JValue::Object(&*j_id)],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
 /// MAIN_ACTIVITY の JavaVM / GlobalRef を使って JNI 処理を実行するヘルパー。
 fn call_activity_method<F>(f: F) -> Result<(), String>
 where

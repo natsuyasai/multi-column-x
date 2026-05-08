@@ -179,6 +179,16 @@ class MainActivity : TauriActivity() {
     }
   }
 
+  // Profile API 非対応端末で、アクティブカラムのアカウントに CookieManager を切り替える。
+  // showColumnWebView とは独立して呼び出せるため WebView の表示状態に影響しない。
+  fun setAccountCookies(accountId: String) {
+    val profileApiSupported = try {
+      WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER")
+    } catch (e: Exception) { false }
+    if (profileApiSupported || accountId.isEmpty()) return
+    setCookieForAccount(accountId)
+  }
+
   // 保存済みの Cookie をアカウントのデータディレクトリから読み込み CookieManager に設定する。
   // Profile API が使えない環境での複数アカウント切り替えに使う。
   private fun setCookieForAccount(accountId: String) {

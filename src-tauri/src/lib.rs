@@ -143,6 +143,7 @@ pub fn run() {
             commands::webview::eval_in_webview,
             commands::webview::report_webview_scroll,
             commands::webview::get_mobile_insets,
+            commands::webview::set_column_cookies,
             commands::webview::open_in_browser,
             commands::account::open_add_account_window,
             commands::account::notify_account_logged_in,
