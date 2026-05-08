@@ -8,6 +8,7 @@ import android.os.Looper
 import android.util.Log
 import android.webkit.CookieManager
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.webkit.WebViewCompat
@@ -32,6 +33,7 @@ class AddAccount : AppCompatActivity() {
             settings.domStorageEnabled = true
             settings.databaseEnabled = true
             settings.mediaPlaybackRequiresUserGesture = false
+            webViewClient = WebViewClient()
 
             // アカウントごとに独立した WebView Profile を割り当て、セッションを分離する。
             // Profile API 非対応の場合は Cookie をクリアして新鮮なセッションで開始する。
