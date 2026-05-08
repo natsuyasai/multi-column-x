@@ -78,9 +78,13 @@ class MainActivity : TauriActivity() {
           wv.settings.javaScriptEnabled = true
           wv.settings.domStorageEnabled = true
           wv.webViewClient = WebViewClient()
-          if (WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER")) {
-            ProfileStore.getInstance().getOrCreateProfile("account-$accountId")
-            WebViewCompat.setProfile(wv, "account-$accountId")
+          try {
+            if (WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER")) {
+              ProfileStore.getInstance().getOrCreateProfile("account-$accountId")
+              WebViewCompat.setProfile(wv, "account-$accountId")
+            }
+          } catch (e: Exception) {
+            android.util.Log.w("MainActivity", "Profile API unavailable for column $id: ${e.message}")
           }
           if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
             WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
