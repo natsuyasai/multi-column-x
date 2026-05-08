@@ -16,7 +16,6 @@ const plainEntries = [
   "popup_toolbar",
   "context_menu",
   "video_control",
-  "mobile_tab_bar",
 ];
 
 // React を含む header_customizer は IIFE + inlineDynamicImports で個別ビルド
