@@ -183,7 +183,7 @@ export const MobileTabBar: React.FC<Props> = ({
         onClick={() => setExpanded((prev) => !prev)}
         title="メニュー表示の切り替え"
       >
-        {expanded ? "«" : "»"}
+        {expanded ? "»" : "«"}
       </button>
       {expanded && (
         <div className={styles.actions}>
