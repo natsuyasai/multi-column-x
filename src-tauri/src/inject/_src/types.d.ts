@@ -40,12 +40,6 @@ declare global {
     dataDirectory: string;
   }
 
-  interface MobileTab {
-    id: string;
-    label: string;
-    order: number;
-  }
-
   interface Window {
     __multiColumnX: MultiColumnXAPI;
     __multiColumnXConfig?: MultiColumnXConfig;
@@ -57,9 +51,6 @@ declare global {
     __tvEscCloseEnabled?: boolean;
     __mobileTopInset?: number;
     __mobileBottomInset?: number;
-    __mobileTabs?: MobileTab[];
-    __mobileActiveColumnId?: string;
-    __mobileUpdateTabBar?: (tabs: MobileTab[], activeId: string) => void;
   }
 }
 
