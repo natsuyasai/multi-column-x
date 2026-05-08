@@ -6,9 +6,12 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.webkit.CookieManager
 import android.webkit.WebView
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import java.io.File
 
 class AddAccount : AppCompatActivity() {
@@ -21,13 +24,24 @@ class AddAccount : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.d(TAG, "onCreate: dataDir=${dataDir.absolutePath}")
+        val accountId = intent.getStringExtra("accountId") ?: "unknown"
+        Log.d(TAG, "onCreate: accountId=$accountId dataDir=${dataDir.absolutePath}")
 
         val wv = WebView(this).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             settings.databaseEnabled = true
             settings.mediaPlaybackRequiresUserGesture = false
+
+            // アカウントごとに独立した WebView Profile を割り当て、セッションを分離する。
+            // Profile API 非対応の場合は Cookie をクリアして新鮮なセッションで開始する。
+            if (WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER")) {
+                WebViewCompat.setProfile(this, "account-$accountId")
+            } else {
+                CookieManager.getInstance().removeAllCookies(null)
+                CookieManager.getInstance().flush()
+            }
+
             loadUrl("https://x.com/login")
         }
         webViewRef = wv

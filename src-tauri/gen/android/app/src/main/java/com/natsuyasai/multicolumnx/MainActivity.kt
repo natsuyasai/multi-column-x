@@ -1,5 +1,6 @@
 package com.natsuyasai.multicolumnx
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.webkit.WebView
@@ -8,6 +9,7 @@ import android.widget.FrameLayout
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.webkit.ProfileStore
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import java.util.concurrent.ConcurrentHashMap
@@ -49,15 +51,25 @@ class MainActivity : TauriActivity() {
     ViewCompat.requestApplyInsets(window.decorView)
   }
 
+  // AddAccount Activity を account_id を Intent Extra として渡して起動する。
+  // AddAccount は "account-{accountId}" WebView Profile を使って独立したセッションでログインする。
+  fun launchAddAccount(accountId: String) {
+    val intent = Intent(this, AddAccount::class.java)
+    intent.putExtra("accountId", accountId)
+    startActivity(intent)
+  }
+
   // カラム WebView を content FrameLayout のオーバーレイとして追加する。
   // メイン React WebView の上に重なり、タブバー分の高さを残す。
+  // accountId に対応する WebView Profile を割り当てることで複数アカウントのセッションを分離する。
   fun createColumnWebView(
     id: String,
     url: String,
     widthDp: Int,
     heightDp: Int,
     initScript: String,
-    visible: Boolean
+    visible: Boolean,
+    accountId: String
   ) {
     val latch = CountDownLatch(1)
     runOnUiThread {
@@ -66,6 +78,10 @@ class MainActivity : TauriActivity() {
           wv.settings.javaScriptEnabled = true
           wv.settings.domStorageEnabled = true
           wv.webViewClient = WebViewClient()
+          if (WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER")) {
+            ProfileStore.getInstance().getOrCreateProfile("account-$accountId")
+            WebViewCompat.setProfile(wv, "account-$accountId")
+          }
           if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
             WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
           }

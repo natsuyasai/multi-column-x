@@ -60,51 +60,27 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_initContext<
     println!("[AppBridge] context initialized");
 }
 
-/// WryActivity.getAppClass + WryActivity.startActivity 経由で AddAccount を起動する。
-pub fn launch_add_account_activity() -> Result<(), String> {
-    let guard = MAIN_ACTIVITY
-        .lock()
-        .map_err(|e| format!("mutex lock: {e}"))?;
-    let (vm, activity_ref) = guard
-        .as_ref()
-        .ok_or("android context not initialized — AppBridge.initContext が呼ばれていない")?;
-
-    let mut env = vm
-        .attach_current_thread()
-        .map_err(|e| format!("attach_current_thread: {e}"))?;
-
-    let class_name = env
-        .new_string("com.natsuyasai.multicolumnx.AddAccount")
-        .map_err(|e| format!("new_string: {e}"))?;
-
-    // WryActivity.getAppClass(name: String): Class<*>
-    let add_account_class = env
-        .call_method(
-            activity_ref.as_obj(),
-            "getAppClass",
-            "(Ljava/lang/String;)Ljava/lang/Class;",
-            &[JValue::Object(&*class_name)],
+/// MainActivity.launchAddAccount(accountId) 経由で AddAccount Activity を起動する。
+/// accountId は AddAccount Activity に Intent Extra として渡され、WebView Profile の分離に使われる。
+pub fn launch_add_account_activity(account_id: &str) -> Result<(), String> {
+    call_activity_method(|env, activity| {
+        let j_account_id = env.new_string(account_id).map_err(|e| e.to_string())?;
+        env.call_method(
+            activity,
+            "launchAddAccount",
+            "(Ljava/lang/String;)V",
+            &[JValue::Object(&*j_account_id)],
         )
-        .map_err(|e| format!("getAppClass: {e}"))?
-        .l()
-        .map_err(|e| format!("getAppClass l(): {e}"))?;
-
-    // WryActivity.startActivity(cls: Class<*>): Int
-    env.call_method(
-        activity_ref.as_obj(),
-        "startActivity",
-        "(Ljava/lang/Class;)I",
-        &[JValue::Object(&add_account_class)],
-    )
-    .map_err(|e| format!("startActivity: {e}"))?;
-
-    Ok(())
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
 }
 
 // ── カラム WebView ネイティブ操作 ────────────────────────────────────────
 
 /// MainActivity.createColumnWebView を呼び出してカラム WebView を生成する。
 /// width_dp / height_dp は CSS px（= dp）で受け取る。
+/// account_id はアカウントごとの WebView Profile 分離に使われる。
 pub fn create_column_webview(
     id: &str,
     url: &str,
@@ -112,15 +88,17 @@ pub fn create_column_webview(
     height_dp: i32,
     init_script: &str,
     visible: bool,
+    account_id: &str,
 ) -> Result<(), String> {
     call_activity_method(|env, activity| {
         let j_id = env.new_string(id).map_err(|e| e.to_string())?;
         let j_url = env.new_string(url).map_err(|e| e.to_string())?;
         let j_script = env.new_string(init_script).map_err(|e| e.to_string())?;
+        let j_account_id = env.new_string(account_id).map_err(|e| e.to_string())?;
         env.call_method(
             activity,
             "createColumnWebView",
-            "(Ljava/lang/String;Ljava/lang/String;IILjava/lang/String;Z)V",
+            "(Ljava/lang/String;Ljava/lang/String;IILjava/lang/String;ZLjava/lang/String;)V",
             &[
                 JValue::Object(&*j_id),
                 JValue::Object(&*j_url),
@@ -128,6 +106,7 @@ pub fn create_column_webview(
                 JValue::Int(height_dp),
                 JValue::Object(&*j_script),
                 JValue::Bool(visible as u8),
+                JValue::Object(&*j_account_id),
             ],
         )
         .map_err(|e| e.to_string())?;

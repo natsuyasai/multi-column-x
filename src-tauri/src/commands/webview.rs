@@ -122,6 +122,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
             args.height as i32,
             &init_script,
             visible,
+            &args.column.account_id,
         )?;
     }
 

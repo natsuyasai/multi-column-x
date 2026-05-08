@@ -92,11 +92,11 @@ pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
     })
     .to_string();
 
-    // AddAccount Activity を JNI 経由で起動する
+    // AddAccount Activity を JNI 経由で起動する（account_id を渡して WebView Profile を分離する）
     #[cfg(target_os = "android")]
     {
-        println!("[open_add_account] launching AddAccount Activity via JNI");
-        match crate::android_bridge::launch_add_account_activity() {
+        println!("[open_add_account] launching AddAccount Activity via JNI, account_id={account_id}");
+        match crate::android_bridge::launch_add_account_activity(&account_id) {
             Ok(()) => println!("[open_add_account] AddAccount Activity launched"),
             Err(e) => println!("[open_add_account] JNI launch error: {e}"),
         }
