@@ -2,6 +2,7 @@ package com.natsuyasai.multicolumnx
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.graphics.Bitmap
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -22,6 +23,10 @@ class AddAccount : AppCompatActivity() {
     private var webViewRef: WebView? = null
     private var pollCount = 0
     private var accountId = "unknown"
+    // ページ遷移中フラグ（shouldOverrideUrlLoading / onPageStarted で true、onPageFinished で false）
+    private var isPageLoading = false
+    // バック操作のデバウンス用。ナビゲーションが開始されたらキャンセルする。
+    private var pendingClose: Runnable? = null
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,7 +39,16 @@ class AddAccount : AppCompatActivity() {
             settings.domStorageEnabled = true
             settings.databaseEnabled = true
             settings.mediaPlaybackRequiresUserGesture = false
-            webViewClient = WebViewClient()
+            webViewClient = object : WebViewClient() {
+                override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
+                    super.onPageStarted(view, url, favicon)
+                    isPageLoading = true
+                }
+                override fun onPageFinished(view: WebView, url: String) {
+                    super.onPageFinished(view, url)
+                    isPageLoading = false
+                }
+            }
 
             // アカウントごとに独立した WebView Profile を割り当て、セッションを分離する。
             // Profile API 非対応の場合は Cookie をクリアして新鮮なセッションで開始する。
@@ -57,8 +71,20 @@ class AddAccount : AppCompatActivity() {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                Log.d(TAG, "onBackPressed: cancel")
-                finishWithResult(success = false)
+                // ページ遷移中は IME 降下など Android 14+ システム起因のバックイベントが
+                // 誤発火することがあるため無視する
+                if (isPageLoading) {
+                    Log.d(TAG, "onBackPressed: ignored during page load")
+                    return
+                }
+                val wv = webViewRef
+                if (wv != null && wv.canGoBack()) {
+                    // ログイン途中ページ（パスワード入力など）の場合は WebView 内を戻る
+                    wv.goBack()
+                } else {
+                    Log.d(TAG, "onBackPressed: cancel")
+                    finishWithResult(success = false)
+                }
             }
         })
     }

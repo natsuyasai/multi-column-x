@@ -73,6 +73,8 @@ const App: React.FC = () => {
   const [showLinkPopupDialog, setShowLinkPopupDialog] = useState(false);
   const [linkPopupUrl, setLinkPopupUrl] = useState("");
   const [linkPopupAccountId, setLinkPopupAccountId] = useState("");
+  const [showComposeTweetDialog, setShowComposeTweetDialog] = useState(false);
+  const [composeTweetAccountId, setComposeTweetAccountId] = useState("");
   // プラットフォーム検出は loadSettings より先に完了させる必要がある。
   // restoreColumns（isLoaded 後に呼ばれる）が isMobile を読むため、
   // setIsMobile は同期的に完了しなければならない。effect の順序を変えないこと。
@@ -137,7 +139,8 @@ const App: React.FC = () => {
     showAccountManager ||
     showAppSettings ||
     !!settingsColumnId ||
-    showLinkPopupDialog;
+    showLinkPopupDialog ||
+    showComposeTweetDialog;
   useEffect(() => {
     if (dialogOpen) {
       hideColumnWebviews();
@@ -197,14 +200,31 @@ const App: React.FC = () => {
     [handleUpdateColumn],
   );
 
-  const handleComposeTweet = useCallback(async () => {
+  const handleSubmitComposeTweet = useCallback(
+    async (accountId: string) => {
+      setShowComposeTweetDialog(false);
+      const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
+      if (!account) return;
+      await invoke("open_compose_window", {
+        accountId: account.id,
+        dataDirectory: account.dataDirectory,
+      }).catch(console.error);
+    },
+    [accounts],
+  );
+
+  const handleComposeTweet = useCallback(() => {
     if (accounts.length === 0) return;
-    const targetId = globalSettings.defaultAccountId ?? accounts[0].id;
-    const account = accounts.find((a) => a.id === targetId) ?? accounts[0];
-    await invoke("open_compose_window", {
-      accountId: account.id,
-      dataDirectory: account.dataDirectory,
-    }).catch(console.error);
+    if (accounts.length === 1) {
+      invoke("open_compose_window", {
+        accountId: accounts[0].id,
+        dataDirectory: accounts[0].dataDirectory,
+      }).catch(console.error);
+      return;
+    }
+    const defaultId = globalSettings.defaultAccountId ?? accounts[0].id;
+    setComposeTweetAccountId(defaultId);
+    setShowComposeTweetDialog(true);
   }, [accounts, globalSettings.defaultAccountId]);
 
   const handleSetDefaultAccount = useCallback(
@@ -356,6 +376,42 @@ const App: React.FC = () => {
                 }
               >
                 開く
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showComposeTweetDialog && (
+        <div className={styles.linkPopupOverlay}>
+          <div className={styles.linkPopupPanel}>
+            <h3>ツイートするアカウントを選択</h3>
+            <select
+              value={composeTweetAccountId}
+              onChange={(e) => setComposeTweetAccountId(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setShowComposeTweetDialog(false);
+              }}
+              autoFocus
+            >
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.label}
+                </option>
+              ))}
+            </select>
+            <div className={styles.linkPopupActions}>
+              <button
+                className={styles.cancelBtn}
+                onClick={() => setShowComposeTweetDialog(false)}
+              >
+                キャンセル
+              </button>
+              <button
+                className={styles.okBtn}
+                onClick={() => handleSubmitComposeTweet(composeTweetAccountId)}
+              >
+                ツイート
               </button>
             </div>
           </div>
