@@ -49,6 +49,7 @@ const App: React.FC = () => {
     handleScrollbarScroll,
     activeColumnId,
     setActiveColumn,
+    setDialogOpen,
   } = useColumns();
   const { startAddAccount, removeAccount } = useAccounts();
 
@@ -142,6 +143,7 @@ const App: React.FC = () => {
     showLinkPopupDialog ||
     showComposeTweetDialog;
   useEffect(() => {
+    setDialogOpen(dialogOpen);
     if (dialogOpen) {
       hideColumnWebviews();
     } else {

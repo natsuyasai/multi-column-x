@@ -161,6 +161,8 @@ export function useColumns() {
     Record<string, ColumnBounds>
   >({});
   const [activeColumnId, setActiveColumnIdState] = useState<string | null>(null);
+  // ダイアログが開いている間はリサイズによる WebView 再配置を抑制するためのフラグ
+  const dialogOpenRef = useRef(false);
 
   const setActiveColumn = useCallback(async (id: string) => {
     setActiveColumnIdState(id);
@@ -396,10 +398,11 @@ export function useColumns() {
     [moveColumn, recalculateAllBounds],
   );
 
-  // ウィンドウリサイズ時に全カラムを再配置
+  // ウィンドウリサイズ時に全カラムを再配置（ダイアログ表示中は仮想キーボード起因のリサイズを無視）
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     const handleResize = () => {
+      if (dialogOpenRef.current) return;
       clearTimeout(timer);
       timer = setTimeout(() => {
         recalculateAllBounds();
@@ -417,6 +420,10 @@ export function useColumns() {
     recalculateAllBounds();
   }, [recalculateAllBounds]);
 
+  const setDialogOpen = useCallback((open: boolean) => {
+    dialogOpenRef.current = open;
+  }, []);
+
   return {
     columns,
     columnBounds,
@@ -432,5 +439,6 @@ export function useColumns() {
     handleScrollbarScroll,
     activeColumnId,
     setActiveColumn,
+    setDialogOpen,
   };
 }
