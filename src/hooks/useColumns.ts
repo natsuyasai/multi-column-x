@@ -1,9 +1,10 @@
 // src/hooks/useColumns.ts
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useAppStore } from "../store/useAppStore";
 import type { Column, PageType } from "../types";
-import { IPC_COMMANDS } from "../constants/ipc";
+import { IPC_COMMANDS, IPC_EVENTS } from "../constants/ipc";
 
 export function getMobileTabLabel(column: Column): string {
   if (column.label) return column.label;
@@ -422,6 +423,24 @@ export function useColumns() {
       window.removeEventListener("resize", handleResize);
     };
   }, [recalculateAllBounds]);
+
+  // カラムスワイプナビゲーション（モバイルのみ: Android ネイティブジェスチャー → Tauri イベント経由）
+  useEffect(() => {
+    const { isMobile } = useAppStore.getState();
+    if (!isMobile) return;
+    const unlisten = listen<string>(IPC_EVENTS.COLUMN_SWIPE_NAVIGATE, (e) => {
+      if (dialogOpenRef.current) return;
+      const direction = e.payload; // "left" = 次のカラム, "right" = 前のカラム
+      const { columns: cols } = useAppStore.getState();
+      const sorted = [...cols].sort((a, b) => a.order - b.order);
+      const currentIdx = sorted.findIndex((c) => c.id === activeColumnId);
+      if (currentIdx < 0) return;
+      const targetIdx = direction === "left" ? currentIdx + 1 : currentIdx - 1;
+      if (targetIdx < 0 || targetIdx >= sorted.length) return;
+      setActiveColumn(sorted[targetIdx].id);
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, [activeColumnId, setActiveColumn]);
 
   // 下部スクロールバー操作 → WebView 追従
   const handleScrollbarScroll = useCallback(() => {

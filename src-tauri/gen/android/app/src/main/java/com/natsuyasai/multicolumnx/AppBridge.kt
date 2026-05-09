@@ -31,4 +31,11 @@ object AppBridge {
      */
     @JvmStatic
     external fun closeTopPopup(): Boolean
+
+    /**
+     * エッジスワイプを検出したときに MainActivity から呼ぶ。
+     * direction: "left"（次のカラム）または "right"（前のカラム）
+     */
+    @JvmStatic
+    external fun onSwipeNavigate(direction: String)
 }

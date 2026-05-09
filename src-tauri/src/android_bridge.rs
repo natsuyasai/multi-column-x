@@ -54,6 +54,26 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_closeTopPopu
     }
 }
 
+/// AppBridge.onSwipeNavigate(direction) から呼ばれる JNI エントリポイント。
+/// 画面エッジからの水平スワイプを column-swipe-navigate イベントとして React に転送する。
+/// direction: "left"（次のカラム）または "right"（前のカラム）
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onSwipeNavigate<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    direction: jni::objects::JString<'local>,
+) {
+    use tauri::Emitter;
+    let dir: String = match env.get_string(&direction) {
+        Ok(s) => s.into(),
+        Err(_) => return,
+    };
+    let guard = TAURI_APP.lock().unwrap();
+    if let Some(app) = guard.as_ref() {
+        let _ = app.emit(crate::ipc_constants::events::COLUMN_SWIPE_NAVIGATE, dir);
+    }
+}
+
 /// Kotlin から受け取ったシステムバーの高さ（dp）。
 static STATUS_BAR_HEIGHT_DP: AtomicI32 = AtomicI32::new(0);
 static NAV_BAR_HEIGHT_DP: AtomicI32 = AtomicI32::new(0);

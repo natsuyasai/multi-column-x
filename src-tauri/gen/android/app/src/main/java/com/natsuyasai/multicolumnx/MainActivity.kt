@@ -3,6 +3,8 @@ package com.natsuyasai.multicolumnx
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.view.View
 import android.webkit.CookieManager
 import android.webkit.WebView
@@ -10,6 +12,7 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
+import androidx.core.view.GestureDetectorCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.ProfileStore
@@ -24,6 +27,7 @@ class MainActivity : TauriActivity() {
   private val columnWebViews = ConcurrentHashMap<String, WebView>()
   // ポップアップ WebView スタック（表示順に積む）。UI スレッドからのみ操作する。
   private val popupWebViews = ArrayDeque<Pair<String, WebView>>()
+  private lateinit var swipeGestureDetector: GestureDetectorCompat
 
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
@@ -64,6 +68,38 @@ class MainActivity : TauriActivity() {
         }
       }
     })
+
+    // 画面左右エッジからの水平スワイプでカラムを切り替えるジェスチャー検出器。
+    // column WebView は native WebView のため window.__TAURI__ が使えず、
+    // dispatchTouchEvent でネイティブレベルのタッチイベントを観察する。
+    swipeGestureDetector = GestureDetectorCompat(this, object : GestureDetector.SimpleOnGestureListener() {
+      private val EDGE_DP = 30f
+      private val MIN_VELOCITY = 400f
+
+      override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+        if (e1 == null) return false
+        if (popupWebViews.isNotEmpty()) return false
+        if (Math.abs(velocityX) < MIN_VELOCITY) return false
+        if (Math.abs(velocityY) >= Math.abs(velocityX)) return false
+
+        val density = resources.displayMetrics.density
+        val edgePx = EDGE_DP * density
+        val screenWidth = resources.displayMetrics.widthPixels.toFloat()
+
+        val direction = when {
+          e1.x < edgePx && velocityX > 0 -> "right"  // 左エッジから右スワイプ → 前のカラム
+          e1.x > screenWidth - edgePx && velocityX < 0 -> "left"  // 右エッジから左スワイプ → 次のカラム
+          else -> return false
+        }
+        AppBridge.onSwipeNavigate(direction)
+        return true
+      }
+    })
+  }
+
+  override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+    swipeGestureDetector.onTouchEvent(ev)
+    return super.dispatchTouchEvent(ev)
   }
 
   // AddAccount Activity を account_id を Intent Extra として渡して起動する。

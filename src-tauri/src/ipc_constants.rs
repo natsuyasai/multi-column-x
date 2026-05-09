@@ -12,6 +12,8 @@ pub mod events {
     pub const WEBVIEW_SCROLL: &str = "webview-scroll";
     /// 最前面ポップアップを閉じる（Android JNI → TS listen）
     pub const CLOSE_TOPMOST_POPUP: &str = "close-topmost-popup";
+    /// カラムスワイプナビゲーション（Android JNI → TS listen）方向: "left"|"right"
+    pub const COLUMN_SWIPE_NAVIGATE: &str = "column-swipe-navigate";
 }
 
 /// WebView / ウィンドウラベルのプレフィックス
