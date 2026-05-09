@@ -3,8 +3,8 @@ package com.natsuyasai.multicolumnx
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
-import android.view.GestureDetector
 import android.view.MotionEvent
+import android.view.VelocityTracker
 import android.view.View
 import android.webkit.CookieManager
 import android.webkit.WebView
@@ -12,7 +12,6 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
-import androidx.core.view.GestureDetectorCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.ProfileStore
@@ -27,9 +26,16 @@ class MainActivity : TauriActivity() {
   private val columnWebViews = ConcurrentHashMap<String, WebView>()
   // ポップアップ WebView スタック（表示順に積む）。UI スレッドからのみ操作する。
   private val popupWebViews = ArrayDeque<Pair<String, WebView>>()
-  private lateinit var swipeGestureDetector: GestureDetectorCompat
-  private var activeSwipeDirection: String? = null
-  private var flingDetected = false
+
+  // 「↓ → 左右」L字ジェスチャーの状態マシン
+  private enum class LGesturePhase { IDLE, DOWN, HORIZONTAL, CANCELLED }
+  private var lGesturePhase = LGesturePhase.IDLE
+  private var lGestureStartX = 0f
+  private var lGestureStartY = 0f
+  private var lGesturePivotX = 0f  // 下方向移動の最も低い点のX
+  private var lGesturePivotY = 0f  // 下方向移動の最も低い点のY
+  private var lGestureDirection: String? = null
+  private var lVelocityTracker: VelocityTracker? = null
 
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
@@ -71,60 +77,100 @@ class MainActivity : TauriActivity() {
       }
     })
 
-    // 画面上の水平スワイプでカラムを切り替えるジェスチャー検出器。
-    // column WebView は native WebView のため window.__TAURI__ が使えず、
-    // dispatchTouchEvent でネイティブレベルのタッチイベントを観察する。
-    swipeGestureDetector = GestureDetectorCompat(this, object : GestureDetector.SimpleOnGestureListener() {
-      private val MIN_VELOCITY = 800f
-      private val MIN_DISTANCE_DP = 50f
-      private val PROGRESS_MIN_DX_DP = 20f
-
-      override fun onScroll(e1: MotionEvent?, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
-        if (e1 == null || popupWebViews.isNotEmpty()) return false
-        val dx = e2.x - e1.x
-        val dy = e2.y - e1.y
-        val minDxPx = PROGRESS_MIN_DX_DP * resources.displayMetrics.density
-        if (Math.abs(dx) > Math.abs(dy) * 1.2f && Math.abs(dx) > minDxPx) {
-          val dir = if (dx < 0) "left" else "right"
-          if (dir != activeSwipeDirection) {
-            activeSwipeDirection = dir
-            AppBridge.onSwipeProgress(dir)
-          }
-        }
-        return false
-      }
-
-      override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
-        if (e1 == null) return false
-        if (popupWebViews.isNotEmpty()) return false
-        if (Math.abs(velocityX) < MIN_VELOCITY) return false
-        if (Math.abs(velocityY) >= Math.abs(velocityX)) return false
-
-        val density = resources.displayMetrics.density
-        val minDistancePx = MIN_DISTANCE_DP * density
-        if (Math.abs(e2.x - e1.x) < minDistancePx) return false
-
-        val direction = if (velocityX < 0) "left" else "right"
-        Log.d(TAG, "swipe: direction=$direction vx=$velocityX e1x=${e1.x} e2x=${e2.x}")
-        flingDetected = true
-        AppBridge.onSwipeNavigate(direction)
-        return true
-      }
-    })
   }
 
+  // 「↓ → 左右」L字ジェスチャーでカラムを切り替える。
+  // ↓: 縦方向に MIN_DOWN_DP 以上移動してから、横方向に MIN_HORIZ_DP 以上移動すると発動。
+  // コンテンツ内の横スワイプ（画像カルーセル等）や縦スクロールとは区別される。
   override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-    if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
-      flingDetected = false
-      activeSwipeDirection = null
-    }
-    swipeGestureDetector.onTouchEvent(ev)
-    if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) {
-      if (!flingDetected && activeSwipeDirection != null) {
-        AppBridge.onSwipeCancel()
+    val density = resources.displayMetrics.density
+    val MIN_DOWN_PX = 40f * density
+    val MIN_HORIZ_PX = 40f * density
+    val MIN_VELOCITY_PX = 300f
+
+    lVelocityTracker?.addMovement(ev)
+
+    when (ev.actionMasked) {
+      MotionEvent.ACTION_DOWN -> {
+        lVelocityTracker?.recycle()
+        lVelocityTracker = VelocityTracker.obtain()
+        lVelocityTracker?.addMovement(ev)
+        lGesturePhase = LGesturePhase.IDLE
+        lGestureStartX = ev.x
+        lGestureStartY = ev.y
+        lGesturePivotX = ev.x
+        lGesturePivotY = ev.y
+        lGestureDirection = null
       }
-      activeSwipeDirection = null
+      MotionEvent.ACTION_MOVE -> {
+        if (popupWebViews.isNotEmpty()) {
+          lGesturePhase = LGesturePhase.CANCELLED
+        } else when (lGesturePhase) {
+          LGesturePhase.IDLE -> {
+            val dx = ev.x - lGestureStartX
+            val dy = ev.y - lGestureStartY
+            when {
+              // 下方向に十分移動したら DOWN フェーズへ
+              dy > MIN_DOWN_PX && dy > Math.abs(dx) * 1.2f -> {
+                lGesturePhase = LGesturePhase.DOWN
+                lGesturePivotX = ev.x
+                lGesturePivotY = ev.y
+              }
+              // 最初から横方向に動いたらキャンセル（コンテンツスワイプ）
+              Math.abs(dx) > MIN_HORIZ_PX * 0.4f && Math.abs(dx) > dy * 2f -> {
+                lGesturePhase = LGesturePhase.CANCELLED
+              }
+            }
+          }
+          LGesturePhase.DOWN -> {
+            // ピボット（最下点）を更新
+            if (ev.y > lGesturePivotY) {
+              lGesturePivotX = ev.x
+              lGesturePivotY = ev.y
+            }
+            val dxFromPivot = ev.x - lGesturePivotX
+            val dyFromPivot = ev.y - lGesturePivotY
+            // ピボットから横方向に十分移動したら HORIZONTAL フェーズへ
+            if (Math.abs(dxFromPivot) > MIN_HORIZ_PX && Math.abs(dxFromPivot) > Math.abs(dyFromPivot)) {
+              lGesturePhase = LGesturePhase.HORIZONTAL
+              val dir = if (dxFromPivot < 0) "left" else "right"
+              lGestureDirection = dir
+              Log.d(TAG, "L-gesture: progress dir=$dir")
+              AppBridge.onSwipeProgress(dir)
+            }
+          }
+          LGesturePhase.HORIZONTAL -> {
+            val dxFromPivot = ev.x - lGesturePivotX
+            val dir = if (dxFromPivot < 0) "left" else "right"
+            if (dir != lGestureDirection) {
+              lGestureDirection = dir
+              AppBridge.onSwipeProgress(dir)
+            }
+          }
+          LGesturePhase.CANCELLED -> {}
+        }
+      }
+      MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+        if (lGesturePhase == LGesturePhase.HORIZONTAL) {
+          lVelocityTracker?.computeCurrentVelocity(1000)
+          val vx = lVelocityTracker?.xVelocity ?: 0f
+          if (Math.abs(vx) >= MIN_VELOCITY_PX) {
+            val dir = if (vx < 0) "left" else "right"
+            Log.d(TAG, "L-gesture: navigate dir=$dir vx=$vx")
+            AppBridge.onSwipeNavigate(dir)
+          } else {
+            AppBridge.onSwipeCancel()
+          }
+        } else if (lGesturePhase == LGesturePhase.DOWN && lGestureDirection != null) {
+          AppBridge.onSwipeCancel()
+        }
+        lVelocityTracker?.recycle()
+        lVelocityTracker = null
+        lGesturePhase = LGesturePhase.IDLE
+        lGestureDirection = null
+      }
     }
+
     return super.dispatchTouchEvent(ev)
   }
 
