@@ -151,6 +151,7 @@ interface Props {
   onAccountManager: () => void;
   onAppSettings: () => void;
   onOpenLinkPopup: () => void;
+  onComposeTweet: () => void;
   showSortButtons: boolean;
   onTabAction: (columnId: string) => void;
 }
@@ -166,6 +167,7 @@ export const MobileTabBar: React.FC<Props> = ({
   onAccountManager,
   onAppSettings,
   onOpenLinkPopup,
+  onComposeTweet,
   showSortButtons,
   onTabAction,
 }) => {
@@ -205,6 +207,14 @@ export const MobileTabBar: React.FC<Props> = ({
       </button>
       {expanded && (
         <div className={styles.actions}>
+          <button
+            className={styles.actionBtn}
+            aria-label="ツイートを作成"
+            title="ツイートを作成"
+            onClick={onComposeTweet}
+          >
+            ✏
+          </button>
           <button
             className={styles.actionBtn}
             aria-label="URLをポップアップで開く"

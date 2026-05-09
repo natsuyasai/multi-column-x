@@ -290,6 +290,7 @@ const App: React.FC = () => {
           onAccountManager={() => setShowAccountManager(true)}
           onAppSettings={() => setShowAppSettings(true)}
           onOpenLinkPopup={handleOpenLinkPopup}
+          onComposeTweet={handleComposeTweet}
           showSortButtons={globalSettings.showSortButtons}
           onTabAction={handleTabAction}
         />
