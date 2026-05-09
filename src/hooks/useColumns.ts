@@ -156,6 +156,7 @@ export function useColumns() {
     removeColumn,
     updateColumn,
     moveColumn,
+    isMobile,
   } = useAppStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollbarRef = useRef<HTMLDivElement>(null); // 下部スクロールバーコンテナ
@@ -426,7 +427,6 @@ export function useColumns() {
 
   // カラムスワイプナビゲーション（モバイルのみ: Android ネイティブジェスチャー → Tauri イベント経由）
   useEffect(() => {
-    const { isMobile } = useAppStore.getState();
     if (!isMobile) return;
     const unlisten = listen<string>(IPC_EVENTS.COLUMN_SWIPE_NAVIGATE, (e) => {
       if (dialogOpenRef.current) return;
@@ -440,7 +440,7 @@ export function useColumns() {
       setActiveColumn(sorted[targetIdx].id);
     });
     return () => { unlisten.then((fn) => fn()); };
-  }, [activeColumnId, setActiveColumn]);
+  }, [isMobile, activeColumnId, setActiveColumn]);
 
   // 下部スクロールバー操作 → WebView 追従
   const handleScrollbarScroll = useCallback(() => {

@@ -69,12 +69,12 @@ class MainActivity : TauriActivity() {
       }
     })
 
-    // 画面左右エッジからの水平スワイプでカラムを切り替えるジェスチャー検出器。
+    // 画面上の水平スワイプでカラムを切り替えるジェスチャー検出器。
     // column WebView は native WebView のため window.__TAURI__ が使えず、
     // dispatchTouchEvent でネイティブレベルのタッチイベントを観察する。
     swipeGestureDetector = GestureDetectorCompat(this, object : GestureDetector.SimpleOnGestureListener() {
-      private val EDGE_DP = 30f
-      private val MIN_VELOCITY = 400f
+      private val MIN_VELOCITY = 800f
+      private val MIN_DISTANCE_DP = 50f
 
       override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
         if (e1 == null) return false
@@ -83,14 +83,11 @@ class MainActivity : TauriActivity() {
         if (Math.abs(velocityY) >= Math.abs(velocityX)) return false
 
         val density = resources.displayMetrics.density
-        val edgePx = EDGE_DP * density
-        val screenWidth = resources.displayMetrics.widthPixels.toFloat()
+        val minDistancePx = MIN_DISTANCE_DP * density
+        if (Math.abs(e2.x - e1.x) < minDistancePx) return false
 
-        val direction = when {
-          e1.x < edgePx && velocityX > 0 -> "right"  // 左エッジから右スワイプ → 前のカラム
-          e1.x > screenWidth - edgePx && velocityX < 0 -> "left"  // 右エッジから左スワイプ → 次のカラム
-          else -> return false
-        }
+        val direction = if (velocityX < 0) "left" else "right"
+        Log.d(TAG, "swipe: direction=$direction vx=$velocityX e1x=${e1.x} e2x=${e2.x}")
         AppBridge.onSwipeNavigate(direction)
         return true
       }
