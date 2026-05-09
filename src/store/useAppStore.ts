@@ -77,7 +77,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const { accounts, columns, globalSettings } = get();
     await invoke("save_settings", {
       settings: { accounts, columns, globalSettings },
-    });
+    }).catch((e) => console.error("[saveSettings] failed:", e));
   },
 
   addAccount: (account) => {

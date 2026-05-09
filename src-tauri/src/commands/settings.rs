@@ -107,6 +107,9 @@ pub struct GlobalSettingsData {
     #[serde(rename = "videoAutoPlayStopEnabled")]
     #[serde(default)]
     pub video_auto_play_stop_enabled: bool,
+    #[serde(rename = "showSortButtons")]
+    #[serde(default = "default_true")]
+    pub show_sort_buttons: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -141,6 +144,7 @@ pub async fn load_settings(app: AppHandle) -> Result<AppSettingsData, String> {
                 default_auto_reload_interval: 60,
                 popup_esc_close_enabled: true,
                 video_auto_play_stop_enabled: false,
+                show_sort_buttons: true,
             },
         });
 
