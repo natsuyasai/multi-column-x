@@ -8,6 +8,8 @@ pub fn build_init_script(
     show_custom_menu: bool,
     auto_reload_enabled: bool,
     video_auto_play_stop_enabled: bool,
+    small_image_enabled: bool,
+    small_image_width: &str,
     custom_css: &str,
     visible_links: &[String],
 ) -> String {
@@ -15,6 +17,7 @@ pub fn build_init_script(
     let header_customizer = include_str!("header_customizer.js");
     let auto_reload = include_str!("auto_reload.js");
     let custom_css_js = include_str!("custom_css.js");
+    let small_image = include_str!("small_image.js");
     let image_popup = if is_mobile {
         ""
     } else {
@@ -27,11 +30,13 @@ pub fn build_init_script(
     let visible_links_json =
         serde_json::to_string(visible_links).unwrap_or_else(|_| "[]".to_string());
     let config = format!(
-        "window.{} = {{ areaRemoveEnabled: {}, showCustomMenu: {}, visibleLinks: {} }};",
+        "window.{} = {{ areaRemoveEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?} }};",
         globals::MULTI_COLUMN_X_CONFIG,
         area_remove_enabled,
         show_custom_menu,
-        visible_links_json
+        visible_links_json,
+        small_image_enabled,
+        small_image_width
     );
 
     let header_part = if area_remove_enabled {
@@ -51,12 +56,13 @@ pub fn build_init_script(
     };
 
     let mut script = format!(
-        "{}\n{}{}{}{}{}{}{}{}",
+        "{}\n{}{}{}{}{}{}{}{}{}",
         config,
         tab_selector,
         header_part,
         auto_reload_part,
         video_control_part,
+        small_image,
         custom_css_js,
         image_popup,
         context_menu,

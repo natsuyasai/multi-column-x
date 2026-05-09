@@ -121,6 +121,21 @@
   }
 }
 
+.textInput {
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: #eee;
+  font-size: 13px;
+  padding: 7px 8px;
+  width: 120px;
+
+  &:focus {
+    outline: none;
+    border-color: #1d9bf0;
+  }
+}
+
 .hint {
   font-size: 11px;
   color: #555;

@@ -189,6 +189,8 @@ describe("useColumns mobile", () => {
         popupEscCloseEnabled: true,
         videoAutoPlayStopEnabled: false,
         showSortButtons: true,
+        smallImageEnabled: false,
+        smallImageWidth: "50%",
       },
       isLoaded: true,
       isMobile: true,

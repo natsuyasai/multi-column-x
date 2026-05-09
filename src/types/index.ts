@@ -47,6 +47,8 @@ export interface GlobalSettings {
   popupEscCloseEnabled: boolean;
   videoAutoPlayStopEnabled: boolean;
   showSortButtons: boolean;
+  smallImageEnabled: boolean;
+  smallImageWidth: string;
 }
 
 export interface AppSettings {
@@ -74,6 +76,8 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   popupEscCloseEnabled: true,
   videoAutoPlayStopEnabled: false,
   showSortButtons: true,
+  smallImageEnabled: false,
+  smallImageWidth: "50%",
 };
 
 interface ResolveColumnUrlInput {

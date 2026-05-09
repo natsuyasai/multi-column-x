@@ -43,6 +43,9 @@ fn default_height_mode() -> String {
 fn default_auto_reload_interval() -> u32 {
     600
 }
+fn default_small_image_width() -> String {
+    "50%".to_string()
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ColumnData {
@@ -110,6 +113,12 @@ pub struct GlobalSettingsData {
     #[serde(rename = "showSortButtons")]
     #[serde(default = "default_true")]
     pub show_sort_buttons: bool,
+    #[serde(rename = "smallImageEnabled")]
+    #[serde(default)]
+    pub small_image_enabled: bool,
+    #[serde(rename = "smallImageWidth")]
+    #[serde(default = "default_small_image_width")]
+    pub small_image_width: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -145,6 +154,8 @@ pub async fn load_settings(app: AppHandle) -> Result<AppSettingsData, String> {
                 popup_esc_close_enabled: true,
                 video_auto_play_stop_enabled: false,
                 show_sort_buttons: true,
+                small_image_enabled: false,
+                small_image_width: "50%".to_string(),
             },
         });
 

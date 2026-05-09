@@ -12,6 +12,8 @@ declare global {
     areaRemoveEnabled: boolean;
     showCustomMenu: boolean;
     visibleLinks: string[];
+    smallImageEnabled: boolean;
+    smallImageWidth: string;
   }
 
   interface TauriCore {

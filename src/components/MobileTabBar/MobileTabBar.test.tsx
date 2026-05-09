@@ -56,6 +56,7 @@ const defaultProps = {
   onAccountManager: vi.fn(),
   onAppSettings: vi.fn(),
   onOpenLinkPopup: vi.fn(),
+  onComposeTweet: vi.fn(),
   showSortButtons: true,
   onTabAction: vi.fn(),
 };

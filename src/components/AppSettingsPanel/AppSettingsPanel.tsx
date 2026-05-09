@@ -36,6 +36,12 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   const [showSortButtons, setShowSortButtons] = useState(
     settings.showSortButtons,
   );
+  const [smallImageEnabled, setSmallImageEnabled] = useState(
+    settings.smallImageEnabled,
+  );
+  const [smallImageWidth, setSmallImageWidth] = useState(
+    settings.smallImageWidth,
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +51,8 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       popupEscCloseEnabled: popupEscCloseEnabled,
       videoAutoPlayStopEnabled: videoAutoPlayStopEnabled,
       showSortButtons: showSortButtons,
+      smallImageEnabled: smallImageEnabled,
+      smallImageWidth: smallImageWidth,
     });
     onClose();
   };
@@ -149,6 +157,30 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                   />
                   動画の自動再生を停止する
                 </label>
+              </section>
+
+              <section className={styles.section}>
+                <h3 className={styles.sectionTitle}>画像</h3>
+                <label className={styles.checkLabel}>
+                  <input
+                    type="checkbox"
+                    checked={smallImageEnabled}
+                    onChange={(e) => setSmallImageEnabled(e.target.checked)}
+                  />
+                  画像を縮小表示する
+                </label>
+                {smallImageEnabled && (
+                  <label className={styles.fieldLabel}>
+                    幅（例: 50%, 200px）
+                    <input
+                      type="text"
+                      className={styles.textInput}
+                      value={smallImageWidth}
+                      onChange={(e) => setSmallImageWidth(e.target.value)}
+                      placeholder="50%"
+                    />
+                  </label>
+                )}
               </section>
 
               <div className={styles.actions}>

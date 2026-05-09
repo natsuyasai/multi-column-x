@@ -44,6 +44,8 @@ fn save_window_bounds(window: &tauri::Window) {
                 popup_esc_close_enabled: true,
                 video_auto_play_stop_enabled: false,
                 show_sort_buttons: true,
+                small_image_enabled: false,
+                small_image_width: "50%".to_string(),
             },
         });
     settings.global_settings.window_bounds = WindowBounds {

@@ -22,6 +22,8 @@ const mockGlobalSettings: GlobalSettings = {
   popupEscCloseEnabled: true,
   videoAutoPlayStopEnabled: false,
   showSortButtons: true,
+  smallImageEnabled: false,
+  smallImageWidth: "50%",
 };
 
 describe("AddColumnDialog", () => {

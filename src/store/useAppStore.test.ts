@@ -53,6 +53,8 @@ describe("useAppStore", () => {
         popupEscCloseEnabled: true,
         videoAutoPlayStopEnabled: false,
         showSortButtons: true,
+        smallImageEnabled: false,
+        smallImageWidth: "50%",
       },
       isLoaded: false,
       isMobile: false,

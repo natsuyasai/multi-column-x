@@ -60,12 +60,15 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
     let data_dir = PathBuf::from(&args.data_directory);
 
     let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(&app);
+    let (small_image_enabled, small_image_width) = load_small_image_settings(&app);
     let init_script = build_init_script(
         false, // is_mobile
         args.column.settings.area_remove_enabled,
         args.column.settings.show_custom_menu,
         args.column.settings.auto_reload_enabled,
         video_auto_play_stop_enabled,
+        small_image_enabled,
+        &small_image_width,
         &args.column.settings.custom_css,
         &args.column.settings.visible_links,
     );
@@ -101,12 +104,15 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
     let label = webview_label(&args.column.id);
 
     let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(&app);
+    let (small_image_enabled, small_image_width) = load_small_image_settings(&app);
     let init_script = build_init_script(
         true, // is_mobile
         args.column.settings.area_remove_enabled,
         args.column.settings.show_custom_menu,
         args.column.settings.auto_reload_enabled,
         video_auto_play_stop_enabled,
+        small_image_enabled,
+        &small_image_width,
         &args.column.settings.custom_css,
         &args.column.settings.visible_links,
     );
@@ -230,6 +236,23 @@ fn load_video_auto_play_stop_enabled(app: &AppHandle) -> bool {
         .and_then(|v| v.get("globalSettings").cloned())
         .and_then(|gs| gs.get("videoAutoPlayStopEnabled").and_then(|v| v.as_bool()))
         .unwrap_or(false)
+}
+
+fn load_small_image_settings(app: &AppHandle) -> (bool, String) {
+    let gs = app
+        .store("settings.json")
+        .ok()
+        .and_then(|store| store.get("appSettings"))
+        .and_then(|v| v.get("globalSettings").cloned());
+    let enabled = gs
+        .as_ref()
+        .and_then(|g| g.get("smallImageEnabled").and_then(|v| v.as_bool()))
+        .unwrap_or(false);
+    let width = gs
+        .as_ref()
+        .and_then(|g| g.get("smallImageWidth").and_then(|v| v.as_str()).map(str::to_owned))
+        .unwrap_or_else(|| "50%".to_string());
+    (enabled, width)
 }
 
 fn load_popup_esc_close_enabled(app: &AppHandle) -> bool {
