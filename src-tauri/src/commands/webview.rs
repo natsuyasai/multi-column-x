@@ -1,5 +1,6 @@
 use super::settings::ColumnData;
 use crate::inject::build_init_script;
+use crate::ipc_constants::{events, labels};
 use crate::state::AppState;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -10,7 +11,7 @@ use tauri_plugin_store::StoreExt;
 use tauri::WebviewBuilder;
 
 fn webview_label(column_id: &str) -> String {
-    format!("column-{}", column_id)
+    format!("{}{}", labels::COLUMN_PREFIX, column_id)
 }
 
 fn resolve_url(column: &ColumnData) -> String {
@@ -293,7 +294,7 @@ pub async fn open_popup_window(
         esc_close_enabled,
     );
 
-    let popup_label = format!("popup-{}", uuid::Uuid::new_v4());
+    let popup_label = format!("{}{}", labels::POPUP_PREFIX, uuid::Uuid::new_v4());
 
     let (window_pos, window_size) = if let Some(window) = app.get_window("main") {
         if let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) {
@@ -359,7 +360,7 @@ pub async fn open_popup_window(
         &url,
         esc_close_enabled,
     );
-    let popup_label = format!("popup-{}", uuid::Uuid::new_v4());
+    let popup_label = format!("{}{}", labels::POPUP_PREFIX, uuid::Uuid::new_v4());
 
     #[cfg(target_os = "android")]
     {
@@ -417,7 +418,7 @@ pub async fn open_link_popup_window(
         esc_close_enabled,
     );
 
-    let popup_label = format!("popup-{}", uuid::Uuid::new_v4());
+    let popup_label = format!("{}{}", labels::POPUP_PREFIX, uuid::Uuid::new_v4());
 
     let (window_pos, window_size) = if let Some(window) = app.get_window("main") {
         if let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) {
@@ -485,7 +486,7 @@ pub async fn open_link_popup_window(
         "",
         esc_close_enabled,
     );
-    let popup_label = format!("popup-{}", uuid::Uuid::new_v4());
+    let popup_label = format!("{}{}", labels::POPUP_PREFIX, uuid::Uuid::new_v4());
 
     #[cfg(target_os = "android")]
     {
@@ -562,7 +563,7 @@ pub async fn eval_in_webview(app: AppHandle, label: String, script: String) -> R
 
 #[tauri::command]
 pub async fn report_webview_scroll(app: AppHandle, delta: f64) -> Result<(), String> {
-    app.emit("webview-scroll", delta).map_err(|e| e.to_string())
+    app.emit(events::WEBVIEW_SCROLL, delta).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -652,7 +653,7 @@ pub async fn open_compose_window(
     let popup_init =
         crate::inject::build_popup_init_script(&accounts_json, &accountId, "", esc_close_enabled);
 
-    let compose_label = format!("compose-{}", uuid::Uuid::new_v4());
+    let compose_label = format!("{}{}", labels::COMPOSE_PREFIX, uuid::Uuid::new_v4());
 
     const COMPOSE_WIDTH: f64 = 600.0;
     const COMPOSE_WINDOW_HEIGHT: f64 = 580.0; // コンテンツ 540px + ツールバー 40px
@@ -693,7 +694,7 @@ pub async fn open_compose_window(
     let esc_close_enabled = load_popup_esc_close_enabled(&app);
     let popup_init =
         crate::inject::build_popup_init_script(&accounts_json, &accountId, "", esc_close_enabled);
-    let compose_label = format!("compose-{}", uuid::Uuid::new_v4());
+    let compose_label = format!("{}{}", labels::COMPOSE_PREFIX, uuid::Uuid::new_v4());
 
     #[cfg(target_os = "android")]
     {

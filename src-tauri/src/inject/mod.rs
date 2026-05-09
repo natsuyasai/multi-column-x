@@ -1,5 +1,7 @@
 // src-tauri/src/inject/mod.rs
 
+use crate::ipc_constants::globals;
+
 pub fn build_init_script(
     is_mobile: bool,
     area_remove_enabled: bool,
@@ -25,7 +27,8 @@ pub fn build_init_script(
     let visible_links_json =
         serde_json::to_string(visible_links).unwrap_or_else(|_| "[]".to_string());
     let config = format!(
-        "window.__multiColumnXConfig = {{ areaRemoveEnabled: {}, showCustomMenu: {}, visibleLinks: {} }};",
+        "window.{} = {{ areaRemoveEnabled: {}, showCustomMenu: {}, visibleLinks: {} }};",
+        globals::MULTI_COLUMN_X_CONFIG,
         area_remove_enabled,
         show_custom_menu,
         visible_links_json
@@ -62,7 +65,8 @@ pub fn build_init_script(
 
     if !custom_css.is_empty() {
         script.push_str(&format!(
-            "\nwindow.__multiColumnX.applyCustomCSS({:?});",
+            "\nwindow.{}.applyCustomCSS({:?});",
+            globals::MULTI_COLUMN_X,
             custom_css
         ));
     }
@@ -78,7 +82,11 @@ pub fn build_popup_init_script(
 ) -> String {
     let popup_toolbar = include_str!("popup_toolbar.js");
     format!(
-        "window.__tvAccounts={};window.__tvCurrentAccountId={:?};window.__tvTargetHref={:?};window.__tvEscCloseEnabled={};\n{}",
-        accounts_json, current_account_id, target_href, esc_close_enabled, popup_toolbar
+        "window.{}={};window.{}={:?};window.{}={:?};window.{}={};\n{}",
+        globals::TV_ACCOUNTS, accounts_json,
+        globals::TV_CURRENT_ACCOUNT_ID, current_account_id,
+        globals::TV_TARGET_HREF, target_href,
+        globals::TV_ESC_CLOSE_ENABLED, esc_close_enabled,
+        popup_toolbar
     )
 }

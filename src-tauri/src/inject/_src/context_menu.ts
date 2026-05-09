@@ -1,4 +1,7 @@
 // src-tauri/src/inject/_src/context_menu.ts
+// コマンド名定数の一覧は constants.ts を参照
+const OPEN_LINK_POPUP_WINDOW = "open_link_popup_window";
+
 (function () {
   function resolveAbsolute(href: string): string {
     return href.startsWith("http") ? href : "https://x.com" + href;
@@ -65,7 +68,7 @@
       e.preventDefault();
       e.stopPropagation();
       removeContextMenu();
-      tauriInvoke("open_link_popup_window", {
+      tauriInvoke(OPEN_LINK_POPUP_WINDOW, {
         webviewLabelCaller: getCallerLabel(),
         accountId: null,
         dataDirectory: null,

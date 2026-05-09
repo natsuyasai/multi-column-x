@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { IPC_COMMANDS, WEBVIEW_LABELS, WEBVIEW_SCRIPTS } from "../constants/ipc";
 
 interface UseAutoReloadOptions {
   columnId: string;
@@ -31,10 +32,9 @@ export function useAutoReload({
       setRemaining((prev) => {
         if (prev === null) return null;
         if (prev <= 1) {
-          invoke("eval_in_webview", {
-            label: `column-${columnId}`,
-            script:
-              "window.__multiColumnX && window.__multiColumnX.triggerReload();",
+          invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
+            label: WEBVIEW_LABELS.column(columnId),
+            script: WEBVIEW_SCRIPTS.TRIGGER_RELOAD,
           }).catch(() => {});
           return intervalSecRef.current;
         }

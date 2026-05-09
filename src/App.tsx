@@ -20,6 +20,7 @@ import { platform } from "@tauri-apps/plugin-os";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { ColumnSettings } from "./types";
+import { IPC_COMMANDS, IPC_EVENTS, WEBVIEW_LABELS, WEBVIEW_SCRIPTS } from "./constants/ipc";
 import styles from "./App.module.scss";
 
 const App: React.FC = () => {
@@ -105,7 +106,7 @@ const App: React.FC = () => {
 
   // WebView 内の横ホイールを受け取ってスクロールバーを動かす
   useEffect(() => {
-    const unlisten = listen<number>("webview-scroll", (e) => {
+    const unlisten = listen<number>(IPC_EVENTS.WEBVIEW_SCROLL, (e) => {
       const el = scrollbarRef.current;
       if (el) el.scrollLeft += e.payload;
     });
@@ -128,7 +129,7 @@ const App: React.FC = () => {
       const resolved = url.startsWith("http") ? url : "https://" + url;
       const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
       if (!account) return;
-      await invoke("open_link_popup_window", {
+      await invoke(IPC_COMMANDS.OPEN_LINK_POPUP_WINDOW, {
         webviewLabelCaller: null,
         accountId: account.id,
         dataDirectory: account.dataDirectory,
@@ -177,10 +178,9 @@ const App: React.FC = () => {
   );
 
   const handleReload = useCallback(async (columnId: string) => {
-    const webviewLabel = `column-${columnId}`;
-    await invoke("eval_in_webview", {
-      label: webviewLabel,
-      script: "window.__multiColumnX && window.__multiColumnX.triggerReload();",
+    await invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
+      label: WEBVIEW_LABELS.column(columnId),
+      script: WEBVIEW_SCRIPTS.TRIGGER_RELOAD,
     }).catch(console.error);
   }, []);
 
@@ -188,20 +188,18 @@ const App: React.FC = () => {
     async (columnId: string, settings: ColumnSettings, width: number) => {
       handleUpdateColumn(columnId, { settings, width });
       setSettingsColumnId(null);
-      const webviewLabel = `column-${columnId}`;
-      await invoke("eval_in_webview", {
+      const webviewLabel = WEBVIEW_LABELS.column(columnId);
+      await invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
         label: webviewLabel,
-        script: `window.__multiColumnX && window.__multiColumnX.applyAreaRemove(${settings.areaRemoveEnabled});`,
+        script: WEBVIEW_SCRIPTS.applyAreaRemove(settings.areaRemoveEnabled),
       }).catch(console.error);
-      const escaped = settings.customCSS.replace(/`/g, "\\`");
-      await invoke("eval_in_webview", {
+      await invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
         label: webviewLabel,
-        script: `(function(){var el=document.getElementById('__custom_css__');if(!el){el=document.createElement('style');el.id='__custom_css__';document.head.appendChild(el);}el.textContent=\`${escaped}\`;})();`,
+        script: WEBVIEW_SCRIPTS.applyCustomCSS(settings.customCSS),
       }).catch(console.error);
-      await invoke("eval_in_webview", {
+      await invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
         label: webviewLabel,
-        script:
-          "window.__multiColumnX && window.__multiColumnX.triggerReload();",
+        script: WEBVIEW_SCRIPTS.TRIGGER_RELOAD,
       }).catch(console.error);
     },
     [handleUpdateColumn],
@@ -212,7 +210,7 @@ const App: React.FC = () => {
       setShowComposeTweetDialog(false);
       const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
       if (!account) return;
-      await invoke("open_compose_window", {
+      await invoke(IPC_COMMANDS.OPEN_COMPOSE_WINDOW, {
         accountId: account.id,
         dataDirectory: account.dataDirectory,
       }).catch(console.error);

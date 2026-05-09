@@ -1,4 +1,7 @@
 // src-tauri/src/inject/_src/image_popup.ts
+// コマンド名定数の一覧は constants.ts を参照
+const OPEN_POPUP_WINDOW = "open_popup_window";
+
 (function () {
   function isMediaLink(href: string): boolean {
     return (
@@ -38,7 +41,7 @@
         const label =
           window.__TAURI_INTERNALS__?.metadata?.currentWebview?.label ??
           "unknown";
-        tauriInvoke("open_popup_window", {
+        tauriInvoke(OPEN_POPUP_WINDOW, {
           webviewLabelCaller: label,
           url: resolveAbsolute(href),
         });

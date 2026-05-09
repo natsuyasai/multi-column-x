@@ -1,5 +1,6 @@
 mod commands;
 mod inject;
+mod ipc_constants;
 mod state;
 #[cfg(target_os = "android")]
 mod android_bridge;

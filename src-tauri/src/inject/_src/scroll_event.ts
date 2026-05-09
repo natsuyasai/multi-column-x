@@ -1,4 +1,7 @@
 // src-tauri/src/inject/_src/scroll_event.ts
+// コマンド名定数の一覧は constants.ts を参照
+const REPORT_WEBVIEW_SCROLL = "report_webview_scroll";
+
 (function () {
   let accumulatedDelta = 0;
   let ticking = false;
@@ -30,7 +33,7 @@
           const invoke =
             window.__TAURI__?.core?.invoke ?? window.__TAURI__?.invoke;
           if (invoke) {
-            invoke("report_webview_scroll", { delta: d }).catch(function () {});
+            invoke(REPORT_WEBVIEW_SCROLL, { delta: d }).catch(function () {});
           }
         });
       }

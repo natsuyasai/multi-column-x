@@ -1,4 +1,8 @@
 // src-tauri/src/inject/_src/popup_toolbar.ts
+// コマンド名定数の一覧は constants.ts を参照
+const SWITCH_POPUP_SESSION = "switch_popup_session";
+const CLOSE_POPUP_WINDOW = "close_popup_window";
+
 (function () {
   const accounts: TvAccountInfo[] = window.__tvAccounts ?? [];
   const currentAccountId: string = window.__tvCurrentAccountId ?? "";
@@ -72,7 +76,7 @@
     if (!selectedAccount) return;
     const popupLabel =
       window.__TAURI_INTERNALS__?.metadata?.currentWebview?.label ?? "";
-    tauriInvoke("switch_popup_session", {
+    tauriInvoke(SWITCH_POPUP_SESSION, {
       popupLabel,
       accountId: selectedAccount.id,
       dataDirectory: selectedAccount.dataDirectory,
@@ -100,7 +104,7 @@
   if (escCloseEnabled) {
     document.addEventListener("keydown", function (e: KeyboardEvent) {
       if (e.key === "Escape") {
-        tauriInvoke("close_popup_window", {
+        tauriInvoke(CLOSE_POPUP_WINDOW, {
           label:
             window.__TAURI_INTERNALS__?.metadata?.currentWebview?.label ?? "",
         });

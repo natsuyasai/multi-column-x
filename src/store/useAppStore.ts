@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import type { Account, Column, GlobalSettings, AppSettings } from "../types";
 import { DEFAULT_GLOBAL_SETTINGS } from "../types";
+import { IPC_COMMANDS } from "../constants/ipc";
 
 export function migrateColumn(
   col: Partial<Column> &
@@ -56,7 +57,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   loadSettings: async () => {
     try {
-      const settings = await invoke<AppSettings>("load_settings");
+      const settings = await invoke<AppSettings>(IPC_COMMANDS.LOAD_SETTINGS);
       set({
         accounts: settings.accounts,
         columns: settings.columns
@@ -75,7 +76,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   saveSettings: async () => {
     const { accounts, columns, globalSettings } = get();
-    await invoke("save_settings", {
+    await invoke(IPC_COMMANDS.SAVE_SETTINGS, {
       settings: { accounts, columns, globalSettings },
     }).catch((e) => console.error("[saveSettings] failed:", e));
   },

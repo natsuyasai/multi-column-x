@@ -1,3 +1,4 @@
+use crate::ipc_constants::{events, labels};
 use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl};
 
@@ -14,7 +15,7 @@ impl LoginCompleteFlag {
 #[tauri::command]
 pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
     let account_id = uuid::Uuid::new_v4().to_string();
-    let window_label = format!("add-account-{}", &account_id[..8]);
+    let window_label = format!("{}{}", labels::ADD_ACCOUNT_PREFIX, &account_id[..8]);
 
     let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let data_dir = app_data
@@ -49,7 +50,7 @@ pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
                     if let Ok(url) = w.url() {
                         if !notified && url.path() == "/home" {
                             notified = true;
-                            let _ = app_clone.emit("account-login-complete", ());
+                            let _ = app_clone.emit(events::ACCOUNT_LOGIN_COMPLETE, ());
                         }
                     }
                 }
@@ -147,7 +148,7 @@ pub async fn mark_login_complete(
             let _ = std::fs::write(dir.join("add_account_login_complete"), "");
         }
         // AddAccount.kt の finish() が来る前に Tauri 側でも閉じを試みる
-        if let Some(window) = app.get_webview_window("add-account") {
+        if let Some(window) = app.get_webview_window(labels::ADD_ACCOUNT_MOBILE) {
             let _ = window.close();
         }
     }
@@ -160,7 +161,7 @@ pub async fn mark_login_complete(
         let app_clone = app.clone();
         tokio::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
-            let _ = app_clone.emit("account-login-complete", ());
+            let _ = app_clone.emit(events::ACCOUNT_LOGIN_COMPLETE, ());
         });
     }
 
@@ -194,7 +195,7 @@ pub async fn check_login_complete(
 
 #[tauri::command]
 pub async fn notify_account_logged_in(app: AppHandle) -> Result<(), String> {
-    app.emit("account-login-complete", ())
+    app.emit(events::ACCOUNT_LOGIN_COMPLETE, ())
         .map_err(|e| e.to_string())?;
     Ok(())
 }

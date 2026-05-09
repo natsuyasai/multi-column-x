@@ -47,7 +47,7 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_closeTopPopu
     }
     let guard = TAURI_APP.lock().unwrap();
     if let Some(app) = guard.as_ref() {
-        let _ = app.emit("close-topmost-popup", ());
+        let _ = app.emit(crate::ipc_constants::events::CLOSE_TOPMOST_POPUP, ());
         1
     } else {
         0

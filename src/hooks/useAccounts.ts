@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useAppStore } from "../store/useAppStore";
 import type { Account } from "../types";
+import { IPC_COMMANDS, IPC_EVENTS } from "../constants/ipc";
 
 const ACCOUNT_COLORS = [
   "#1d9bf0",
@@ -38,7 +39,7 @@ async function createAccountFromResult(
   };
 
   addAccount(account);
-  await invoke("close_window", { label: windowLabel }).catch(() => {});
+  await invoke(IPC_COMMANDS.CLOSE_WINDOW, { label: windowLabel }).catch(() => {});
 }
 
 export function useAccounts() {
@@ -59,7 +60,7 @@ export function useAccounts() {
         // AddAccount が finish() して MainActivity が前面に戻った時点で再開する。
         // 成功: resolve → アカウント名入力へ
         // キャンセル（バックボタン）: reject → 何もしない
-        const result = await invoke<string>("open_add_account_window");
+        const result = await invoke<string>(IPC_COMMANDS.OPEN_ADD_ACCOUNT_WINDOW);
         let parsed: {
           accountId: string;
           dataDirectory: string;
@@ -82,7 +83,7 @@ export function useAccounts() {
         // -----------------------------------------------
         // open_add_account_window はウィンドウを開いて即座に返る。
         // Rust の URL ポーリングがログイン完了を検出して emit するイベントを listen する。
-        const result = await invoke<string>("open_add_account_window");
+        const result = await invoke<string>(IPC_COMMANDS.OPEN_ADD_ACCOUNT_WINDOW);
         let parsed: {
           accountId: string;
           dataDirectory: string;
@@ -106,7 +107,7 @@ export function useAccounts() {
             unlistenDestroyed = null;
           };
 
-          listen<void>("account-login-complete", async () => {
+          listen<void>(IPC_EVENTS.ACCOUNT_LOGIN_COMPLETE, async () => {
             cleanup();
             await createAccountFromResult(
               accountId,
@@ -160,7 +161,7 @@ export function useAccounts() {
       );
       if (!confirmed) return;
 
-      await invoke("delete_account_data", {
+      await invoke(IPC_COMMANDS.DELETE_ACCOUNT_DATA, {
         dataDirectory: account.dataDirectory,
       });
       removeAccount(id);

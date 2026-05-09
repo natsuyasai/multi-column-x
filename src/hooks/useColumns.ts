@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAppStore } from "../store/useAppStore";
 import type { Column, PageType } from "../types";
+import { IPC_COMMANDS } from "../constants/ipc";
 
 export function getMobileTabLabel(column: Column): string {
   if (column.label) return column.label;
@@ -173,7 +174,7 @@ export function useColumns() {
     if (isMobile) {
       const activeCol = currentColumns.find((c) => c.id === id);
       if (activeCol) {
-        await invoke("set_column_cookies", {
+        await invoke(IPC_COMMANDS.SET_COLUMN_COOKIES, {
           accountId: activeCol.accountId,
         }).catch(console.error);
       }
@@ -182,7 +183,7 @@ export function useColumns() {
     await Promise.all(
       currentColumns.map((col) => {
         const isActive = col.id === id;
-        return invoke("resize_column_webview", {
+        return invoke(IPC_COMMANDS.RESIZE_COLUMN_WEBVIEW, {
           bounds: {
             columnId: col.id,
             x: isActive ? 0 : -99999,
@@ -225,7 +226,7 @@ export function useColumns() {
 
     await Promise.all(
       Object.entries(bounds).map(([columnId, b]) =>
-        invoke("resize_column_webview", {
+        invoke(IPC_COMMANDS.RESIZE_COLUMN_WEBVIEW, {
           bounds: { columnId, ...b },
         }).catch(console.error),
       ),
@@ -250,7 +251,7 @@ export function useColumns() {
         const account = currentAccounts.find((a) => a.id === column.accountId);
         if (!account) continue;
         const isFirst = column.id === firstColumn?.id;
-        await invoke("create_column_webview", {
+        await invoke(IPC_COMMANDS.CREATE_COLUMN_WEBVIEW, {
           args: {
             column,
             dataDirectory: account.dataDirectory,
@@ -302,7 +303,7 @@ export function useColumns() {
 
       const { isMobile } = useAppStore.getState();
       if (isMobile) {
-        await invoke("create_column_webview", {
+        await invoke(IPC_COMMANDS.CREATE_COLUMN_WEBVIEW, {
           args: {
             column,
             dataDirectory: account.dataDirectory,
@@ -350,7 +351,7 @@ export function useColumns() {
     const { columns: currentColumns, isMobile } = useAppStore.getState();
     await Promise.all(
       currentColumns.map((col) =>
-        invoke("resize_column_webview", {
+        invoke(IPC_COMMANDS.RESIZE_COLUMN_WEBVIEW, {
           bounds: isMobile
             ? { columnId: col.id, x: -99999, y: 0, width: window.innerWidth, height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT }
             : { columnId: col.id, x: -9999, y: HEADER_HEIGHT, width: col.width, height: 1 },
@@ -362,7 +363,7 @@ export function useColumns() {
   // カラム削除
   const handleRemoveColumn = useCallback(
     async (columnId: string) => {
-      await invoke("remove_column_webview", { columnId }).catch(console.error);
+      await invoke(IPC_COMMANDS.REMOVE_COLUMN_WEBVIEW, { columnId }).catch(console.error);
       removeColumn(columnId);
       const { isMobile, columns: remainingColumns } = useAppStore.getState();
       if (isMobile) {
