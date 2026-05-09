@@ -50,16 +50,14 @@ const defaultProps = {
   accounts: [acc1],
   activeColumnId: "col-1",
   onSelectColumn: vi.fn(),
-  onOpenSettings: vi.fn(),
   onMoveLeft: vi.fn(),
   onMoveRight: vi.fn(),
-  onRemoveColumn: vi.fn(),
   onAddColumn: vi.fn(),
   onAccountManager: vi.fn(),
   onAppSettings: vi.fn(),
   onOpenLinkPopup: vi.fn(),
   showSortButtons: true,
-  onContextMenuChange: vi.fn(),
+  onTabAction: vi.fn(),
 };
 
 describe("MobileTabBar", () => {
@@ -89,34 +87,32 @@ describe("MobileTabBar", () => {
     expect(screen.queryByText("ホーム")).not.toBeInTheDocument();
   });
 
-  it("長押し後に設定をタップすると onOpenSettings が列 ID で呼ばれる", async () => {
-    const onSettings = vi.fn();
+  it("長押しすると onTabAction が列 ID で呼ばれる", () => {
+    const onTabAction = vi.fn();
     render(
       <MobileTabBar
         {...defaultProps}
         columns={[col1]}
-        onOpenSettings={onSettings}
+        onTabAction={onTabAction}
       />,
     );
     fireEvent.contextMenu(screen.getByText("ホーム"));
-    await userEvent.click(screen.getByRole("button", { name: "設定" }));
-    expect(onSettings).toHaveBeenCalledWith("col-1");
+    expect(onTabAction).toHaveBeenCalledWith("col-1");
   });
 
-  it("設定操作では onSelectColumn が呼ばれない", async () => {
+  it("長押し時には onSelectColumn が呼ばれない", () => {
     const onSelect = vi.fn();
-    const onSettings = vi.fn();
+    const onTabAction = vi.fn();
     render(
       <MobileTabBar
         {...defaultProps}
         columns={[col1]}
         onSelectColumn={onSelect}
-        onOpenSettings={onSettings}
+        onTabAction={onTabAction}
       />,
     );
     fireEvent.contextMenu(screen.getByText("ホーム"));
-    await userEvent.click(screen.getByRole("button", { name: "設定" }));
-    expect(onSettings).toHaveBeenCalledWith("col-1");
+    expect(onTabAction).toHaveBeenCalledWith("col-1");
     expect(onSelect).not.toHaveBeenCalled();
   });
 

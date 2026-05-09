@@ -1,5 +1,4 @@
 import React, { useState, useRef } from "react";
-import { createPortal } from "react-dom";
 import type { Column, Account, PageType } from "../../types";
 import { useAutoReload } from "../../hooks/useAutoReload";
 import styles from "./MobileTabBar.module.scss";
@@ -23,7 +22,7 @@ interface TabItemProps {
   isFirst: boolean;
   isLast: boolean;
   onSelect: () => void;
-  onLongPress: (left: number) => void;
+  onLongPress: () => void;
   onMoveLeft: () => void;
   onMoveRight: () => void;
   showSortButtons: boolean;
@@ -48,19 +47,13 @@ const TabItem: React.FC<TabItemProps> = ({
   });
   const showCountdown =
     isActive && column.settings.showCountdown && remaining !== null;
-  const tabRef = useRef<HTMLDivElement>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressNextClick = useRef(false);
   const touchStartPos = useRef<{ x: number; y: number } | null>(null);
 
-  const fireContextMenu = () => {
-    const rect = tabRef.current?.getBoundingClientRect();
-    const screenW = window.innerWidth || 375;
-    const left = rect
-      ? Math.min(Math.max(rect.left, 8), screenW - 128 - 8)
-      : 8;
+  const fireLongPress = () => {
     suppressNextClick.current = true;
-    onLongPress(left);
+    onLongPress();
   };
 
   const clearLongPress = () => {
@@ -73,7 +66,6 @@ const TabItem: React.FC<TabItemProps> = ({
 
   return (
     <div
-      ref={tabRef}
       role="button"
       tabIndex={0}
       aria-current={isActive ? "true" : undefined}
@@ -87,12 +79,12 @@ const TabItem: React.FC<TabItemProps> = ({
       }}
       onContextMenu={(e) => {
         e.preventDefault();
-        fireContextMenu();
+        fireLongPress();
       }}
       onTouchStart={(e) => {
         const t = e.touches[0];
         touchStartPos.current = { x: t.clientX, y: t.clientY };
-        longPressTimer.current = setTimeout(fireContextMenu, 500);
+        longPressTimer.current = setTimeout(fireLongPress, 500);
       }}
       onTouchEnd={clearLongPress}
       onTouchMove={(e) => {
@@ -153,16 +145,14 @@ interface Props {
   accounts: Account[];
   activeColumnId: string | null;
   onSelectColumn: (id: string) => void;
-  onOpenSettings: (id: string) => void;
   onMoveLeft: (id: string) => void;
   onMoveRight: (id: string) => void;
-  onRemoveColumn: (id: string) => void;
   onAddColumn: () => void;
   onAccountManager: () => void;
   onAppSettings: () => void;
   onOpenLinkPopup: () => void;
   showSortButtons: boolean;
-  onContextMenuChange: (open: boolean) => void;
+  onTabAction: (columnId: string) => void;
 }
 
 export const MobileTabBar: React.FC<Props> = ({
@@ -170,73 +160,20 @@ export const MobileTabBar: React.FC<Props> = ({
   accounts,
   activeColumnId,
   onSelectColumn,
-  onOpenSettings,
   onMoveLeft,
   onMoveRight,
-  onRemoveColumn,
   onAddColumn,
   onAccountManager,
   onAppSettings,
   onOpenLinkPopup,
   showSortButtons,
-  onContextMenuChange,
+  onTabAction,
 }) => {
   const sorted = [...columns].sort((a, b) => a.order - b.order);
   const [expanded, setExpanded] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{
-    columnId: string;
-    left: number;
-  } | null>(null);
-
-  const openContextMenu = (columnId: string, left: number) => {
-    setContextMenu({ columnId, left });
-    onContextMenuChange(true);
-  };
-
-  const closeContextMenu = () => {
-    setContextMenu(null);
-    onContextMenuChange(false);
-  };
 
   return (
     <div className={styles.tabBar}>
-      {contextMenu &&
-        createPortal(
-          <>
-            <div
-              className={styles.contextMenuBackdrop}
-              onClick={closeContextMenu}
-            />
-            <div
-              className={styles.contextMenu}
-              style={{ left: contextMenu.left }}
-            >
-              <button
-                className={styles.contextMenuItem}
-                aria-label="設定"
-                onClick={() => {
-                  const id = contextMenu.columnId;
-                  closeContextMenu();
-                  onOpenSettings(id);
-                }}
-              >
-                ⚙ 設定
-              </button>
-              <button
-                className={`${styles.contextMenuItem} ${styles.contextMenuItemDanger}`}
-                aria-label="削除"
-                onClick={() => {
-                  const id = contextMenu.columnId;
-                  closeContextMenu();
-                  onRemoveColumn(id);
-                }}
-              >
-                ✕ 削除
-              </button>
-            </div>
-          </>,
-          document.body,
-        )}
       <div className={styles.tabs}>
         {sorted.map((col, idx) => {
           const account = accounts.find((a) => a.id === col.accountId);
@@ -250,7 +187,7 @@ export const MobileTabBar: React.FC<Props> = ({
               isFirst={idx === 0}
               isLast={idx === sorted.length - 1}
               onSelect={() => onSelectColumn(col.id)}
-              onLongPress={(left) => openContextMenu(col.id, left)}
+              onLongPress={() => onTabAction(col.id)}
               onMoveLeft={() => onMoveLeft(col.id)}
               onMoveRight={() => onMoveRight(col.id)}
               showSortButtons={showSortButtons}

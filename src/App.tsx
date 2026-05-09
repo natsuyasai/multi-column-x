@@ -15,6 +15,7 @@ import { SettingsPanel } from "./components/SettingsPanel/SettingsPanel";
 import { AppSettingsPanel } from "./components/AppSettingsPanel/AppSettingsPanel";
 import { Sidebar } from "./components/Sidebar/Sidebar";
 import { MobileTabBar } from "./components/MobileTabBar/MobileTabBar";
+import { TabActionDialog } from "./components/TabActionDialog/TabActionDialog";
 import { platform } from "@tauri-apps/plugin-os";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -76,8 +77,9 @@ const App: React.FC = () => {
   const [linkPopupAccountId, setLinkPopupAccountId] = useState("");
   const [showComposeTweetDialog, setShowComposeTweetDialog] = useState(false);
   const [composeTweetAccountId, setComposeTweetAccountId] = useState("");
-  const [mobileTabContextMenuOpen, setMobileTabContextMenuOpen] =
-    useState(false);
+  const [tabActionColumnId, setTabActionColumnId] = useState<string | null>(
+    null,
+  );
   // プラットフォーム検出は loadSettings より先に完了させる必要がある。
   // restoreColumns（isLoaded 後に呼ばれる）が isMobile を読むため、
   // setIsMobile は同期的に完了しなければならない。effect の順序を変えないこと。
@@ -144,7 +146,7 @@ const App: React.FC = () => {
     !!settingsColumnId ||
     showLinkPopupDialog ||
     showComposeTweetDialog ||
-    mobileTabContextMenuOpen;
+    !!tabActionColumnId;
   useEffect(() => {
     setDialogOpen(dialogOpen);
     if (dialogOpen) {
@@ -274,16 +276,14 @@ const App: React.FC = () => {
           accounts={accounts}
           activeColumnId={activeColumnId}
           onSelectColumn={setActiveColumn}
-          onOpenSettings={setSettingsColumnId}
           onMoveLeft={(id) => handleMoveColumn(id, "left")}
           onMoveRight={(id) => handleMoveColumn(id, "right")}
-          onRemoveColumn={handleRemoveColumn}
           onAddColumn={() => setShowAddColumn(true)}
           onAccountManager={() => setShowAccountManager(true)}
           onAppSettings={() => setShowAppSettings(true)}
           onOpenLinkPopup={handleOpenLinkPopup}
           showSortButtons={globalSettings.showSortButtons}
-          onContextMenuChange={setMobileTabContextMenuOpen}
+          onTabAction={setTabActionColumnId}
         />
       )}
 
@@ -485,6 +485,25 @@ const App: React.FC = () => {
               onApply={handleApplySettings}
               onClose={() => setSettingsColumnId(null)}
               isMobile={isMobile}
+            />
+          ) : null;
+        })()}
+
+      {tabActionColumnId &&
+        (() => {
+          const col = columns.find((c) => c.id === tabActionColumnId);
+          return col ? (
+            <TabActionDialog
+              columnLabel={col.label || col.pageType}
+              onSettings={() => {
+                setTabActionColumnId(null);
+                setSettingsColumnId(col.id);
+              }}
+              onRemove={() => {
+                setTabActionColumnId(null);
+                handleRemoveColumn(col.id);
+              }}
+              onClose={() => setTabActionColumnId(null)}
             />
           ) : null;
         })()}

@@ -1,0 +1,63 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+}
+
+.sheet {
+  width: 100%;
+  background: #1c1c1e;
+  border-radius: 12px 12px 0 0;
+  overflow: hidden;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.label {
+  padding: 12px 20px;
+  font-size: 12px;
+  color: #888;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 0;
+}
+
+.actionBtn {
+  display: block;
+  width: 100%;
+  padding: 16px 20px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 16px;
+  text-align: left;
+  cursor: pointer;
+
+  &:active {
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
+
+.dangerBtn {
+  color: #ff453a;
+}
+
+.cancelBtn {
+  display: block;
+  width: 100%;
+  padding: 16px;
+  background: none;
+  border: none;
+  border-top: 6px solid rgba(0, 0, 0, 0.4);
+  color: #1d9bf0;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+
+  &:active {
+    background: rgba(255, 255, 255, 0.05);
+  }
+}
