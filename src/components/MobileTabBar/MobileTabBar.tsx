@@ -51,10 +51,11 @@ const TabItem: React.FC<TabItemProps> = ({
   const tabRef = useRef<HTMLDivElement>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressNextClick = useRef(false);
+  const touchStartPos = useRef<{ x: number; y: number } | null>(null);
 
   const fireContextMenu = () => {
     const rect = tabRef.current?.getBoundingClientRect();
-    const screenW = window.innerWidth ?? 375;
+    const screenW = window.innerWidth || 375;
     const left = rect
       ? Math.min(Math.max(rect.left, 8), screenW - 128 - 8)
       : 8;
@@ -67,6 +68,7 @@ const TabItem: React.FC<TabItemProps> = ({
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
+    touchStartPos.current = null;
   };
 
   return (
@@ -87,11 +89,19 @@ const TabItem: React.FC<TabItemProps> = ({
         e.preventDefault();
         fireContextMenu();
       }}
-      onTouchStart={() => {
+      onTouchStart={(e) => {
+        const t = e.touches[0];
+        touchStartPos.current = { x: t.clientX, y: t.clientY };
         longPressTimer.current = setTimeout(fireContextMenu, 500);
       }}
       onTouchEnd={clearLongPress}
-      onTouchMove={clearLongPress}
+      onTouchMove={(e) => {
+        if (!touchStartPos.current) return;
+        const t = e.touches[0];
+        const dx = Math.abs(t.clientX - touchStartPos.current.x);
+        const dy = Math.abs(t.clientY - touchStartPos.current.y);
+        if (dx > 8 || dy > 8) clearLongPress();
+      }}
       onTouchCancel={clearLongPress}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {

@@ -34,6 +34,7 @@
   color: rgba(255, 255, 255, 0.55);
   min-width: 80px;
   user-select: none;
+  -webkit-touch-callout: none;
 
   &.active {
     color: #fff;
