@@ -220,6 +220,14 @@ const App: React.FC = () => {
     [accounts],
   );
 
+  const handleTabAction = useCallback(
+    async (columnId: string) => {
+      await hideColumnWebviews();
+      setTabActionColumnId(columnId);
+    },
+    [hideColumnWebviews],
+  );
+
   const handleComposeTweet = useCallback(() => {
     if (accounts.length === 0) return;
     if (accounts.length === 1) {
@@ -283,7 +291,7 @@ const App: React.FC = () => {
           onAppSettings={() => setShowAppSettings(true)}
           onOpenLinkPopup={handleOpenLinkPopup}
           showSortButtons={globalSettings.showSortButtons}
-          onTabAction={setTabActionColumnId}
+          onTabAction={handleTabAction}
         />
       )}
 
