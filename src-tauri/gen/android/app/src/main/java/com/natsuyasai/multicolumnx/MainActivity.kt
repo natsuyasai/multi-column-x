@@ -149,6 +149,14 @@ class MainActivity : TauriActivity() {
     val latch = CountDownLatch(1)
     runOnUiThread {
       try {
+        // React WebView がリロードされても native WebView は残存するため、
+        // 同一 id が既に存在する場合は再作成・再ロードをスキップする。
+        // 位置・表示は後続の resize_column_webview（setActiveColumn）が確定させる。
+        if (columnWebViews.containsKey(id)) {
+          Log.d(TAG, "createColumnWebView: $id already exists, skipping reload")
+          return@runOnUiThread
+        }
+
         val profileApiSupported = try {
           WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER")
         } catch (e: Exception) { false }

@@ -167,6 +167,8 @@ export function useColumns() {
 
   const setActiveColumn = useCallback(async (id: string) => {
     setActiveColumnIdState(id);
+    // バックグラウンド復帰後に React がリロードされても復元できるよう保存する
+    try { localStorage.setItem("mcx_activeColumnId", id); } catch {}
     const { columns: currentColumns, isMobile } = useAppStore.getState();
 
     // モバイル: resize_column_webview より先にアクティブカラムのクッキーを切り替える。
@@ -247,23 +249,28 @@ export function useColumns() {
     if (isMobile) {
       const sortedByOrder = [...currentColumns].sort((a, b) => a.order - b.order);
       const firstColumn = sortedByOrder[0];
+      // バックグラウンド復帰後の React リロード時に以前のアクティブカラムを復元する
+      let savedId: string | null = null;
+      try { savedId = localStorage.getItem("mcx_activeColumnId"); } catch {}
+      const targetColumn =
+        (savedId ? sortedByOrder.find((c) => c.id === savedId) : null) ?? firstColumn;
       for (const column of sortedByOrder) {
         const account = currentAccounts.find((a) => a.id === column.accountId);
         if (!account) continue;
-        const isFirst = column.id === firstColumn?.id;
+        const isActive = column.id === targetColumn?.id;
         await invoke(IPC_COMMANDS.CREATE_COLUMN_WEBVIEW, {
           args: {
             column,
             dataDirectory: account.dataDirectory,
-            x: isFirst ? 0 : -99999,
+            x: isActive ? 0 : -99999,
             y: 0,
             width: window.innerWidth,
             height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
           },
         }).catch(console.error);
       }
-      if (firstColumn) {
-        await setActiveColumn(firstColumn.id);
+      if (targetColumn) {
+        await setActiveColumn(targetColumn.id);
       }
       return;
     }
