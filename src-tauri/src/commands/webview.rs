@@ -365,7 +365,7 @@ pub async fn open_popup_window(
     #[cfg(target_os = "android")]
     {
         let _ = app;
-        return crate::android_bridge::create_popup_webview(&popup_label, &url, &popup_init);
+        return crate::android_bridge::create_popup_webview(&popup_label, &url, &popup_init, &current_account_id);
     }
 
     #[cfg(not(target_os = "android"))]
@@ -491,7 +491,7 @@ pub async fn open_link_popup_window(
     #[cfg(target_os = "android")]
     {
         let _ = (app, dataDirectory);
-        return crate::android_bridge::create_popup_webview(&popup_label, &url, &popup_init);
+        return crate::android_bridge::create_popup_webview(&popup_label, &url, &popup_init, &current_account_id);
     }
 
     #[cfg(not(target_os = "android"))]
@@ -703,6 +703,7 @@ pub async fn open_compose_window(
             &compose_label,
             "https://x.com/compose/post",
             &popup_init,
+            &accountId,
         );
     }
 

@@ -246,19 +246,21 @@ pub fn eval_in_column_webview(id: &str, script: &str) -> Result<(), String> {
 }
 
 /// MainActivity.createPopupWebView を呼び出して全画面ポップアップ WebView を生成する。
-pub fn create_popup_webview(id: &str, url: &str, init_script: &str) -> Result<(), String> {
+pub fn create_popup_webview(id: &str, url: &str, init_script: &str, account_id: &str) -> Result<(), String> {
     call_activity_method(|env, activity| {
         let j_id = env.new_string(id).map_err(|e| e.to_string())?;
         let j_url = env.new_string(url).map_err(|e| e.to_string())?;
         let j_script = env.new_string(init_script).map_err(|e| e.to_string())?;
+        let j_account_id = env.new_string(account_id).map_err(|e| e.to_string())?;
         env.call_method(
             activity,
             "createPopupWebView",
-            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
             &[
                 JValue::Object(&*j_id),
                 JValue::Object(&*j_url),
                 JValue::Object(&*j_script),
+                JValue::Object(&*j_account_id),
             ],
         )
         .map_err(|e| e.to_string())?;

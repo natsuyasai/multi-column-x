@@ -110,14 +110,29 @@ class MainActivity : TauriActivity() {
   // ポップアップ WebView を全画面オーバーレイとして追加する。
   // カラム WebView の上に重なり、戻るボタンで閉じられる。
   // JNI スレッドから呼ばれるため runOnUiThread + CountDownLatch で UI 操作を同期する。
-  fun createPopupWebView(id: String, url: String, initScript: String) {
+  // accountId が空でない場合はカラム WebView と同じプロファイルを使ってセッションを共有する。
+  fun createPopupWebView(id: String, url: String, initScript: String, accountId: String) {
     val latch = CountDownLatch(1)
     runOnUiThread {
       try {
+        val profileApiSupported = try {
+          WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER")
+        } catch (e: Exception) { false }
+
         val webView = WebView(this).also { wv ->
           wv.settings.javaScriptEnabled = true
           wv.settings.domStorageEnabled = true
           wv.webViewClient = WebViewClient()
+          if (profileApiSupported && accountId.isNotEmpty()) {
+            try {
+              ProfileStore.getInstance().getOrCreateProfile("account-$accountId")
+              WebViewCompat.setProfile(wv, "account-$accountId")
+            } catch (e: Exception) {
+              Log.w(TAG, "Profile API unavailable for popup $id: ${e.message}")
+            }
+          } else if (!profileApiSupported && accountId.isNotEmpty()) {
+            setCookieForAccount(accountId)
+          }
           if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
             WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
           }

@@ -228,17 +228,19 @@ const App: React.FC = () => {
 
   const handleComposeTweet = useCallback(() => {
     if (accounts.length === 0) return;
-    if (accounts.length === 1) {
+    if (accounts.length === 1 || isMobile) {
+      const defaultId = globalSettings.defaultAccountId ?? accounts[0].id;
+      const account = accounts.find((a) => a.id === defaultId) ?? accounts[0];
       invoke("open_compose_window", {
-        accountId: accounts[0].id,
-        dataDirectory: accounts[0].dataDirectory,
+        accountId: account.id,
+        dataDirectory: account.dataDirectory,
       }).catch(console.error);
       return;
     }
     const defaultId = globalSettings.defaultAccountId ?? accounts[0].id;
     setComposeTweetAccountId(defaultId);
     setShowComposeTweetDialog(true);
-  }, [accounts, globalSettings.defaultAccountId]);
+  }, [accounts, globalSettings.defaultAccountId, isMobile]);
 
   const handleSetDefaultAccount = useCallback(
     (id: string) => {
