@@ -197,6 +197,14 @@ export const MobileTabBar: React.FC<Props> = ({
           );
         })}
       </div>
+      <button
+        className={styles.actionBtn}
+        aria-label="ツイートを作成"
+        title="ツイートを作成"
+        onClick={onComposeTweet}
+      >
+        ✏
+      </button>
 
       <button
         className={styles.toggleBtn}
@@ -207,14 +215,6 @@ export const MobileTabBar: React.FC<Props> = ({
       </button>
       {expanded && (
         <div className={styles.actions}>
-          <button
-            className={styles.actionBtn}
-            aria-label="ツイートを作成"
-            title="ツイートを作成"
-            onClick={onComposeTweet}
-          >
-            ✏
-          </button>
           <button
             className={styles.actionBtn}
             aria-label="URLをポップアップで開く"
