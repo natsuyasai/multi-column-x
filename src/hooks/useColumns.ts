@@ -164,7 +164,10 @@ export function useColumns() {
     Record<string, ColumnBounds>
   >({});
   const [activeColumnId, setActiveColumnIdState] = useState<string | null>(null);
-  const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(null);
+  const [swipeState, setSwipeState] = useState<{
+    direction: "left" | "right";
+    phase: "progress" | "switching";
+  } | null>(null);
   // ダイアログが開いている間はリサイズによる WebView 再配置を抑制するためのフラグ
   const dialogOpenRef = useRef(false);
 
@@ -429,20 +432,31 @@ export function useColumns() {
   // カラムスワイプナビゲーション（モバイルのみ: Android ネイティブジェスチャー → Tauri イベント経由）
   useEffect(() => {
     if (!isMobile) return;
-    const unlisten = listen<string>(IPC_EVENTS.COLUMN_SWIPE_NAVIGATE, (e) => {
+    const unlistenProgress = listen<string>(IPC_EVENTS.COLUMN_SWIPE_PROGRESS, (e) => {
       if (dialogOpenRef.current) return;
-      const direction = e.payload as "left" | "right"; // "left" = 次のカラム, "right" = 前のカラム
+      setSwipeState({ direction: e.payload as "left" | "right", phase: "progress" });
+    });
+    const unlistenCancel = listen(IPC_EVENTS.COLUMN_SWIPE_CANCEL, () => {
+      setSwipeState(null);
+    });
+    const unlistenNavigate = listen<string>(IPC_EVENTS.COLUMN_SWIPE_NAVIGATE, (e) => {
+      if (dialogOpenRef.current) return;
+      const direction = e.payload as "left" | "right";
       const { columns: cols } = useAppStore.getState();
       const sorted = [...cols].sort((a, b) => a.order - b.order);
       const currentIdx = sorted.findIndex((c) => c.id === activeColumnId);
       if (currentIdx < 0) return;
       const targetIdx = direction === "left" ? currentIdx + 1 : currentIdx - 1;
       if (targetIdx < 0 || targetIdx >= sorted.length) return;
-      setSwipeDirection(direction);
-      setTimeout(() => setSwipeDirection(null), 400);
+      setSwipeState({ direction, phase: "switching" });
+      setTimeout(() => setSwipeState(null), 400);
       setActiveColumn(sorted[targetIdx].id);
     });
-    return () => { unlisten.then((fn) => fn()); };
+    return () => {
+      unlistenProgress.then((fn) => fn());
+      unlistenCancel.then((fn) => fn());
+      unlistenNavigate.then((fn) => fn());
+    };
   }, [isMobile, activeColumnId, setActiveColumn]);
 
   // 下部スクロールバー操作 → WebView 追従
@@ -468,7 +482,7 @@ export function useColumns() {
     hideColumnWebviews,
     handleScrollbarScroll,
     activeColumnId,
-    swipeDirection,
+    swipeState,
     setActiveColumn,
     setDialogOpen,
   };

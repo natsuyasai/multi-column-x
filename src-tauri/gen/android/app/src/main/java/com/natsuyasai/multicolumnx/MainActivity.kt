@@ -28,6 +28,8 @@ class MainActivity : TauriActivity() {
   // ポップアップ WebView スタック（表示順に積む）。UI スレッドからのみ操作する。
   private val popupWebViews = ArrayDeque<Pair<String, WebView>>()
   private lateinit var swipeGestureDetector: GestureDetectorCompat
+  private var activeSwipeDirection: String? = null
+  private var flingDetected = false
 
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
@@ -75,6 +77,22 @@ class MainActivity : TauriActivity() {
     swipeGestureDetector = GestureDetectorCompat(this, object : GestureDetector.SimpleOnGestureListener() {
       private val MIN_VELOCITY = 800f
       private val MIN_DISTANCE_DP = 50f
+      private val PROGRESS_MIN_DX_DP = 20f
+
+      override fun onScroll(e1: MotionEvent?, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
+        if (e1 == null || popupWebViews.isNotEmpty()) return false
+        val dx = e2.x - e1.x
+        val dy = e2.y - e1.y
+        val minDxPx = PROGRESS_MIN_DX_DP * resources.displayMetrics.density
+        if (Math.abs(dx) > Math.abs(dy) * 1.2f && Math.abs(dx) > minDxPx) {
+          val dir = if (dx < 0) "left" else "right"
+          if (dir != activeSwipeDirection) {
+            activeSwipeDirection = dir
+            AppBridge.onSwipeProgress(dir)
+          }
+        }
+        return false
+      }
 
       override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
         if (e1 == null) return false
@@ -88,6 +106,7 @@ class MainActivity : TauriActivity() {
 
         val direction = if (velocityX < 0) "left" else "right"
         Log.d(TAG, "swipe: direction=$direction vx=$velocityX e1x=${e1.x} e2x=${e2.x}")
+        flingDetected = true
         AppBridge.onSwipeNavigate(direction)
         return true
       }
@@ -95,7 +114,17 @@ class MainActivity : TauriActivity() {
   }
 
   override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+    if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
+      flingDetected = false
+      activeSwipeDirection = null
+    }
     swipeGestureDetector.onTouchEvent(ev)
+    if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) {
+      if (!flingDetected && activeSwipeDirection != null) {
+        AppBridge.onSwipeCancel()
+      }
+      activeSwipeDirection = null
+    }
     return super.dispatchTouchEvent(ev)
   }
 

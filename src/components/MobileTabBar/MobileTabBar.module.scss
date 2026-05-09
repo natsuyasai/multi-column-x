@@ -1,3 +1,13 @@
+// スワイプ進行中：矢印が左右にバウンスして操作中であることを示す
+@keyframes swipeProgressLeft {
+  0%, 100% { opacity: 0.6; transform: translateX(0); }
+  50% { opacity: 1; transform: translateX(4px); }
+}
+@keyframes swipeProgressRight {
+  0%, 100% { opacity: 0.6; transform: translateX(0); }
+  50% { opacity: 1; transform: translateX(-4px); }
+}
+// スワイプ完了：矢印がフェードアウト
 @keyframes swipeIndicatorFade {
   0% { opacity: 1; transform: scale(1.2); }
   100% { opacity: 0; transform: scale(0.8); }
@@ -195,15 +205,26 @@
   font-weight: bold;
   color: #fff;
   pointer-events: none;
-  animation: swipeIndicatorFade 0.4s ease-out forwards;
   z-index: 110;
 
   &.swipeIndicatorLeft {
     right: 0;
+
+    &.swipeIndicatorProgress {
+      animation: swipeProgressLeft 0.5s ease-in-out infinite;
+    }
   }
 
   &.swipeIndicatorRight {
     left: 0;
+
+    &.swipeIndicatorProgress {
+      animation: swipeProgressRight 0.5s ease-in-out infinite;
+    }
+  }
+
+  &.swipeIndicatorSwitching {
+    animation: swipeIndicatorFade 0.4s ease-out forwards;
   }
 }
 

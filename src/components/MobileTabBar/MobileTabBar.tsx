@@ -152,7 +152,7 @@ interface Props {
   columns: Column[];
   accounts: Account[];
   activeColumnId: string | null;
-  swipeDirection?: "left" | "right" | null;
+  swipeState?: { direction: "left" | "right"; phase: "progress" | "switching" } | null;
   onSelectColumn: (id: string) => void;
   onMoveLeft: (id: string) => void;
   onMoveRight: (id: string) => void;
@@ -169,7 +169,7 @@ export const MobileTabBar: React.FC<Props> = ({
   columns,
   accounts,
   activeColumnId,
-  swipeDirection,
+  swipeState,
   onSelectColumn,
   onMoveLeft,
   onMoveRight,
@@ -186,11 +186,15 @@ export const MobileTabBar: React.FC<Props> = ({
 
   return (
     <div className={styles.tabBar}>
-      {swipeDirection && (
+      {swipeState && (
         <div
-          className={`${styles.swipeIndicator} ${swipeDirection === "left" ? styles.swipeIndicatorLeft : styles.swipeIndicatorRight}`}
+          className={[
+            styles.swipeIndicator,
+            swipeState.direction === "left" ? styles.swipeIndicatorLeft : styles.swipeIndicatorRight,
+            swipeState.phase === "progress" ? styles.swipeIndicatorProgress : styles.swipeIndicatorSwitching,
+          ].join(" ")}
         >
-          {swipeDirection === "left" ? "›" : "‹"}
+          {swipeState.direction === "left" ? "›" : "‹"}
         </div>
       )}
       <div className={styles.tabs}>
@@ -205,7 +209,7 @@ export const MobileTabBar: React.FC<Props> = ({
               isActive={isActive}
               isFirst={idx === 0}
               isLast={idx === sorted.length - 1}
-              swipeActivated={isActive && !!swipeDirection}
+              swipeActivated={isActive && swipeState?.phase === "switching"}
               onSelect={() => onSelectColumn(col.id)}
               onLongPress={() => onTabAction(col.id)}
               onMoveLeft={() => onMoveLeft(col.id)}

@@ -14,6 +14,10 @@ pub mod events {
     pub const CLOSE_TOPMOST_POPUP: &str = "close-topmost-popup";
     /// カラムスワイプナビゲーション（Android JNI → TS listen）方向: "left"|"right"
     pub const COLUMN_SWIPE_NAVIGATE: &str = "column-swipe-navigate";
+    /// カラムスワイプ進行中（Android JNI → TS listen）方向: "left"|"right"
+    pub const COLUMN_SWIPE_PROGRESS: &str = "column-swipe-progress";
+    /// カラムスワイプキャンセル（Android JNI → TS listen）
+    pub const COLUMN_SWIPE_CANCEL: &str = "column-swipe-cancel";
 }
 
 /// WebView / ウィンドウラベルのプレフィックス

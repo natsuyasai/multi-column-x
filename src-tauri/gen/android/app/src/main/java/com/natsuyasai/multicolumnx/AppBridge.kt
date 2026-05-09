@@ -38,4 +38,17 @@ object AppBridge {
      */
     @JvmStatic
     external fun onSwipeNavigate(direction: String)
+
+    /**
+     * 水平スワイプ操作中（指が動いている間）に呼ぶ。
+     * direction: "left" または "right"
+     */
+    @JvmStatic
+    external fun onSwipeProgress(direction: String)
+
+    /**
+     * スワイプがフリングに至らず終了したときに呼ぶ（キャンセル）。
+     */
+    @JvmStatic
+    external fun onSwipeCancel()
 }

@@ -51,6 +51,10 @@ export const IPC_EVENTS = {
   CLOSE_TOPMOST_POPUP: "close-topmost-popup",
   /** カラムスワイプナビゲーション（Android JNI → TS listen）"left"|"right" */
   COLUMN_SWIPE_NAVIGATE: "column-swipe-navigate",
+  /** カラムスワイプ進行中（Android JNI → TS listen）"left"|"right" */
+  COLUMN_SWIPE_PROGRESS: "column-swipe-progress",
+  /** カラムスワイプキャンセル（Android JNI → TS listen） */
+  COLUMN_SWIPE_CANCEL: "column-swipe-cancel",
 } as const;
 
 /** WebView / ウィンドウラベルのプレフィックスと生成ヘルパー */
