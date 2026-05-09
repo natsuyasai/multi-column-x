@@ -164,6 +164,7 @@ export function useColumns() {
     Record<string, ColumnBounds>
   >({});
   const [activeColumnId, setActiveColumnIdState] = useState<string | null>(null);
+  const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(null);
   // ダイアログが開いている間はリサイズによる WebView 再配置を抑制するためのフラグ
   const dialogOpenRef = useRef(false);
 
@@ -430,13 +431,15 @@ export function useColumns() {
     if (!isMobile) return;
     const unlisten = listen<string>(IPC_EVENTS.COLUMN_SWIPE_NAVIGATE, (e) => {
       if (dialogOpenRef.current) return;
-      const direction = e.payload; // "left" = 次のカラム, "right" = 前のカラム
+      const direction = e.payload as "left" | "right"; // "left" = 次のカラム, "right" = 前のカラム
       const { columns: cols } = useAppStore.getState();
       const sorted = [...cols].sort((a, b) => a.order - b.order);
       const currentIdx = sorted.findIndex((c) => c.id === activeColumnId);
       if (currentIdx < 0) return;
       const targetIdx = direction === "left" ? currentIdx + 1 : currentIdx - 1;
       if (targetIdx < 0 || targetIdx >= sorted.length) return;
+      setSwipeDirection(direction);
+      setTimeout(() => setSwipeDirection(null), 400);
       setActiveColumn(sorted[targetIdx].id);
     });
     return () => { unlisten.then((fn) => fn()); };
@@ -465,6 +468,7 @@ export function useColumns() {
     hideColumnWebviews,
     handleScrollbarScroll,
     activeColumnId,
+    swipeDirection,
     setActiveColumn,
     setDialogOpen,
   };

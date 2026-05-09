@@ -21,6 +21,7 @@ interface TabItemProps {
   isActive: boolean;
   isFirst: boolean;
   isLast: boolean;
+  swipeActivated: boolean;
   onSelect: () => void;
   onLongPress: () => void;
   onMoveLeft: () => void;
@@ -34,6 +35,7 @@ const TabItem: React.FC<TabItemProps> = ({
   isActive,
   isFirst,
   isLast,
+  swipeActivated,
   onSelect,
   onLongPress,
   onMoveLeft,
@@ -64,12 +66,18 @@ const TabItem: React.FC<TabItemProps> = ({
     touchStartPos.current = null;
   };
 
+  const className = [
+    styles.tab,
+    isActive ? styles.active : "",
+    isActive && swipeActivated ? styles.swipeActivated : "",
+  ].filter(Boolean).join(" ");
+
   return (
     <div
       role="button"
       tabIndex={0}
       aria-current={isActive ? "true" : undefined}
-      className={`${styles.tab} ${isActive ? styles.active : ""}`}
+      className={className}
       onClick={() => {
         if (suppressNextClick.current) {
           suppressNextClick.current = false;
@@ -144,6 +152,7 @@ interface Props {
   columns: Column[];
   accounts: Account[];
   activeColumnId: string | null;
+  swipeDirection?: "left" | "right" | null;
   onSelectColumn: (id: string) => void;
   onMoveLeft: (id: string) => void;
   onMoveRight: (id: string) => void;
@@ -160,6 +169,7 @@ export const MobileTabBar: React.FC<Props> = ({
   columns,
   accounts,
   activeColumnId,
+  swipeDirection,
   onSelectColumn,
   onMoveLeft,
   onMoveRight,
@@ -176,6 +186,13 @@ export const MobileTabBar: React.FC<Props> = ({
 
   return (
     <div className={styles.tabBar}>
+      {swipeDirection && (
+        <div
+          className={`${styles.swipeIndicator} ${swipeDirection === "left" ? styles.swipeIndicatorLeft : styles.swipeIndicatorRight}`}
+        >
+          {swipeDirection === "left" ? "›" : "‹"}
+        </div>
+      )}
       <div className={styles.tabs}>
         {sorted.map((col, idx) => {
           const account = accounts.find((a) => a.id === col.accountId);
@@ -188,6 +205,7 @@ export const MobileTabBar: React.FC<Props> = ({
               isActive={isActive}
               isFirst={idx === 0}
               isLast={idx === sorted.length - 1}
+              swipeActivated={isActive && !!swipeDirection}
               onSelect={() => onSelectColumn(col.id)}
               onLongPress={() => onTabAction(col.id)}
               onMoveLeft={() => onMoveLeft(col.id)}

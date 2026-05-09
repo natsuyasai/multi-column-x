@@ -50,6 +50,7 @@ const App: React.FC = () => {
     hideColumnWebviews,
     handleScrollbarScroll,
     activeColumnId,
+    swipeDirection,
     setActiveColumn,
     setDialogOpen,
   } = useColumns();
@@ -293,6 +294,7 @@ const App: React.FC = () => {
           onComposeTweet={handleComposeTweet}
           showSortButtons={globalSettings.showSortButtons}
           onTabAction={handleTabAction}
+          swipeDirection={swipeDirection}
         />
       )}
 
