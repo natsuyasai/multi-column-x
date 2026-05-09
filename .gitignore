@@ -9,6 +9,6 @@ aidlc-docs/audit.md
 .claude/settings.local.json
 .claude/handoff/
 # inject scripts build artifacts
-src-tauri/src/inject/*.js
+src-tauri/src/inject/**/*.js
 src-tauri/src/inject/*.svg
 TODO.md
