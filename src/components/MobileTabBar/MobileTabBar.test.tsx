@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MobileTabBar } from "./MobileTabBar";
 import type { Column, Account } from "../../types";
@@ -88,7 +88,7 @@ describe("MobileTabBar", () => {
     expect(screen.queryByText("ホーム")).not.toBeInTheDocument();
   });
 
-  it("設定ボタンをクリックすると onOpenSettings が列 ID で呼ばれる", async () => {
+  it("長押し後に設定をタップすると onOpenSettings が列 ID で呼ばれる", async () => {
     const onSettings = vi.fn();
     render(
       <MobileTabBar
@@ -97,11 +97,12 @@ describe("MobileTabBar", () => {
         onOpenSettings={onSettings}
       />,
     );
-    await userEvent.click(screen.getByRole("button", { name: /設定$/ }));
+    fireEvent.contextMenu(screen.getByText("ホーム"));
+    await userEvent.click(screen.getByRole("button", { name: "設定" }));
     expect(onSettings).toHaveBeenCalledWith("col-1");
   });
 
-  it("設定ボタンのクリックでは onSelectColumn が呼ばれない", async () => {
+  it("設定操作では onSelectColumn が呼ばれない", async () => {
     const onSelect = vi.fn();
     const onSettings = vi.fn();
     render(
@@ -112,7 +113,8 @@ describe("MobileTabBar", () => {
         onOpenSettings={onSettings}
       />,
     );
-    await userEvent.click(screen.getByRole("button", { name: /設定$/ }));
+    fireEvent.contextMenu(screen.getByText("ホーム"));
+    await userEvent.click(screen.getByRole("button", { name: "設定" }));
     expect(onSettings).toHaveBeenCalledWith("col-1");
     expect(onSelect).not.toHaveBeenCalled();
   });
