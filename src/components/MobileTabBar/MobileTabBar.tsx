@@ -162,6 +162,7 @@ interface Props {
   onAppSettings: () => void;
   onOpenLinkPopup: () => void;
   showSortButtons: boolean;
+  onContextMenuChange: (open: boolean) => void;
 }
 
 export const MobileTabBar: React.FC<Props> = ({
@@ -178,6 +179,7 @@ export const MobileTabBar: React.FC<Props> = ({
   onAppSettings,
   onOpenLinkPopup,
   showSortButtons,
+  onContextMenuChange,
 }) => {
   const sorted = [...columns].sort((a, b) => a.order - b.order);
   const [expanded, setExpanded] = useState(false);
@@ -186,7 +188,15 @@ export const MobileTabBar: React.FC<Props> = ({
     left: number;
   } | null>(null);
 
-  const closeContextMenu = () => setContextMenu(null);
+  const openContextMenu = (columnId: string, left: number) => {
+    setContextMenu({ columnId, left });
+    onContextMenuChange(true);
+  };
+
+  const closeContextMenu = () => {
+    setContextMenu(null);
+    onContextMenuChange(false);
+  };
 
   return (
     <div className={styles.tabBar}>
@@ -240,9 +250,7 @@ export const MobileTabBar: React.FC<Props> = ({
               isFirst={idx === 0}
               isLast={idx === sorted.length - 1}
               onSelect={() => onSelectColumn(col.id)}
-              onLongPress={(left) =>
-                setContextMenu({ columnId: col.id, left })
-              }
+              onLongPress={(left) => openContextMenu(col.id, left)}
               onMoveLeft={() => onMoveLeft(col.id)}
               onMoveRight={() => onMoveRight(col.id)}
               showSortButtons={showSortButtons}

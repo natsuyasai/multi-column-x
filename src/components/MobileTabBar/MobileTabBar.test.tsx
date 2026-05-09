@@ -59,6 +59,7 @@ const defaultProps = {
   onAppSettings: vi.fn(),
   onOpenLinkPopup: vi.fn(),
   showSortButtons: true,
+  onContextMenuChange: vi.fn(),
 };
 
 describe("MobileTabBar", () => {

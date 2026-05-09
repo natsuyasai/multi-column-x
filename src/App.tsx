@@ -76,6 +76,8 @@ const App: React.FC = () => {
   const [linkPopupAccountId, setLinkPopupAccountId] = useState("");
   const [showComposeTweetDialog, setShowComposeTweetDialog] = useState(false);
   const [composeTweetAccountId, setComposeTweetAccountId] = useState("");
+  const [mobileTabContextMenuOpen, setMobileTabContextMenuOpen] =
+    useState(false);
   // プラットフォーム検出は loadSettings より先に完了させる必要がある。
   // restoreColumns（isLoaded 後に呼ばれる）が isMobile を読むため、
   // setIsMobile は同期的に完了しなければならない。effect の順序を変えないこと。
@@ -141,7 +143,8 @@ const App: React.FC = () => {
     showAppSettings ||
     !!settingsColumnId ||
     showLinkPopupDialog ||
-    showComposeTweetDialog;
+    showComposeTweetDialog ||
+    mobileTabContextMenuOpen;
   useEffect(() => {
     setDialogOpen(dialogOpen);
     if (dialogOpen) {
@@ -280,6 +283,7 @@ const App: React.FC = () => {
           onAppSettings={() => setShowAppSettings(true)}
           onOpenLinkPopup={handleOpenLinkPopup}
           showSortButtons={globalSettings.showSortButtons}
+          onContextMenuChange={setMobileTabContextMenuOpen}
         />
       )}
 
