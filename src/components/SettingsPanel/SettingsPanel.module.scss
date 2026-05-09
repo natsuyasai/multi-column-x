@@ -1,19 +1,25 @@
 .overlay {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100dvh;
   background: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 100;
+  padding: 16px;
+  box-sizing: border-box;
+  overflow-y: auto;
 }
 
 .panel {
   background: #1a1a1a;
   border: 1px solid #333;
   border-radius: 8px;
-  width: 420px;
-  max-height: 80vh;
+  width: min(420px, 100%);
+  max-height: min(80dvh, calc(100dvh - 32px));
   display: flex;
   flex-direction: column;
   overflow: hidden;

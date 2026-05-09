@@ -1,11 +1,17 @@
 .overlay {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100dvh;
   background: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  padding: 16px;
+  box-sizing: border-box;
+  overflow-y: auto;
 }
 
 .panel {
@@ -13,7 +19,9 @@
   border: 1px solid #333;
   border-radius: 8px;
   padding: 24px;
-  width: 360px;
+  width: min(360px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 16px;
