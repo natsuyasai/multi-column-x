@@ -1,5 +1,5 @@
 // src/App.tsx
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useCallback, useMemo } from "react";
 import { useAppStore } from "./store/useAppStore";
 import {
   useColumns,
@@ -18,6 +18,7 @@ import { MobileTabBar } from "./components/MobileTabBar/MobileTabBar";
 import { TabActionDialog } from "./components/TabActionDialog/TabActionDialog";
 import { LinkPopupDialog } from "./components/LinkPopupDialog/LinkPopupDialog";
 import { ComposeTweetDialog } from "./components/ComposeTweetDialog/ComposeTweetDialog";
+import { useDialogState } from "./hooks/useDialogState";
 import { platform } from "@tauri-apps/plugin-os";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -57,6 +58,23 @@ const App: React.FC = () => {
     setDialogOpen,
   } = useColumns();
   const { startAddAccount, removeAccount } = useAccounts();
+  const {
+    showAddColumn,
+    setShowAddColumn,
+    showAccountManager,
+    setShowAccountManager,
+    showAppSettings,
+    setShowAppSettings,
+    settingsColumnId,
+    setSettingsColumnId,
+    showLinkPopupDialog,
+    setShowLinkPopupDialog,
+    showComposeTweetDialog,
+    setShowComposeTweetDialog,
+    tabActionColumnId,
+    setTabActionColumnId,
+    dialogOpen,
+  } = useDialogState();
 
   const sidebarWidth = sidebarExpanded
     ? SIDEBAR_EXPANDED_WIDTH
@@ -72,15 +90,6 @@ const App: React.FC = () => {
     );
   }, [columnBounds, sidebarWidth, scrollbarRef]);
 
-  const [showAddColumn, setShowAddColumn] = useState(false);
-  const [showAccountManager, setShowAccountManager] = useState(false);
-  const [showAppSettings, setShowAppSettings] = useState(false);
-  const [settingsColumnId, setSettingsColumnId] = useState<string | null>(null);
-  const [showLinkPopupDialog, setShowLinkPopupDialog] = useState(false);
-  const [showComposeTweetDialog, setShowComposeTweetDialog] = useState(false);
-  const [tabActionColumnId, setTabActionColumnId] = useState<string | null>(
-    null,
-  );
   // プラットフォーム検出は loadSettings より先に完了させる必要がある。
   // restoreColumns（isLoaded 後に呼ばれる）が isMobile を読むため、
   // setIsMobile は同期的に完了しなければならない。effect の順序を変えないこと。
@@ -149,14 +158,6 @@ const App: React.FC = () => {
   );
 
   // ダイアログ表示中は列WebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
-  const dialogOpen =
-    showAddColumn ||
-    showAccountManager ||
-    showAppSettings ||
-    !!settingsColumnId ||
-    showLinkPopupDialog ||
-    showComposeTweetDialog ||
-    !!tabActionColumnId;
   useEffect(() => {
     setDialogOpen(dialogOpen);
     if (dialogOpen) {
