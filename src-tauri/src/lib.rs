@@ -13,7 +13,7 @@ use tauri_plugin_store::StoreExt;
 
 #[cfg(desktop)]
 fn save_window_bounds(window: &tauri::Window) {
-    use crate::commands::settings::{AppSettingsData, GlobalSettingsData, WindowBounds};
+    use crate::commands::settings::{AppSettingsData, WindowBounds};
     let Ok(pos) = window.outer_position() else {
         return;
     };
@@ -26,30 +26,7 @@ fn save_window_bounds(window: &tauri::Window) {
     let mut settings = store
         .get("appSettings")
         .and_then(|v| serde_json::from_value::<AppSettingsData>(v).ok())
-        .unwrap_or_else(|| AppSettingsData {
-            accounts: vec![],
-            columns: vec![],
-            global_settings: GlobalSettingsData {
-                theme: "dark".to_string(),
-                custom_css: String::new(),
-                window_bounds: WindowBounds {
-                    x: 0.0,
-                    y: 0.0,
-                    width: 1400.0,
-                    height: 900.0,
-                },
-                default_account_id: None,
-                default_auto_reload_enabled: true,
-                default_auto_reload_interval: 600,
-                popup_esc_close_enabled: true,
-                video_auto_play_stop_enabled: false,
-                show_sort_buttons: true,
-                small_image_enabled: false,
-                small_image_width: "50%".to_string(),
-                hide_ad_enabled: false,
-                zoom_level: 1.0,
-            },
-        });
+        .unwrap_or_default();
     settings.global_settings.window_bounds = WindowBounds {
         x: pos.x as f64,
         y: pos.y as f64,

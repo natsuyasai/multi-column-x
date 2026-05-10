@@ -50,6 +50,42 @@ fn default_zoom_level() -> f64 {
     1.0
 }
 
+impl Default for WindowBounds {
+    fn default() -> Self {
+        Self { x: 0.0, y: 0.0, width: 1400.0, height: 900.0 }
+    }
+}
+
+impl Default for GlobalSettingsData {
+    fn default() -> Self {
+        Self {
+            theme: "dark".to_string(),
+            custom_css: String::new(),
+            window_bounds: WindowBounds::default(),
+            default_account_id: None,
+            default_auto_reload_enabled: true,
+            default_auto_reload_interval: 600,
+            popup_esc_close_enabled: true,
+            video_auto_play_stop_enabled: false,
+            show_sort_buttons: true,
+            small_image_enabled: false,
+            small_image_width: "50%".to_string(),
+            hide_ad_enabled: false,
+            zoom_level: 1.0,
+        }
+    }
+}
+
+impl Default for AppSettingsData {
+    fn default() -> Self {
+        Self {
+            accounts: vec![],
+            columns: vec![],
+            global_settings: GlobalSettingsData::default(),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ColumnData {
     pub id: String,
@@ -145,30 +181,7 @@ pub async fn load_settings(app: AppHandle) -> Result<AppSettingsData, String> {
     let settings = store
         .get("appSettings")
         .and_then(|v| serde_json::from_value(v).ok())
-        .unwrap_or_else(|| AppSettingsData {
-            accounts: vec![],
-            columns: vec![],
-            global_settings: GlobalSettingsData {
-                theme: "dark".to_string(),
-                custom_css: String::new(),
-                window_bounds: WindowBounds {
-                    x: 0.0,
-                    y: 0.0,
-                    width: 1400.0,
-                    height: 900.0,
-                },
-                default_account_id: None,
-                default_auto_reload_enabled: true,
-                default_auto_reload_interval: 60,
-                popup_esc_close_enabled: true,
-                video_auto_play_stop_enabled: false,
-                show_sort_buttons: true,
-                small_image_enabled: false,
-                small_image_width: "50%".to_string(),
-                hide_ad_enabled: false,
-                zoom_level: 1.0,
-            },
-        });
+        .unwrap_or_default();
 
     Ok(settings)
 }
