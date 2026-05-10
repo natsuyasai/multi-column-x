@@ -244,7 +244,7 @@ const App: React.FC = () => {
     if (accounts.length === 1 || isMobile) {
       const defaultId = globalSettings.defaultAccountId ?? accounts[0].id;
       const account = accounts.find((a) => a.id === defaultId) ?? accounts[0];
-      invoke("open_compose_window", {
+      invoke(IPC_COMMANDS.OPEN_COMPOSE_WINDOW, {
         accountId: account.id,
         dataDirectory: account.dataDirectory,
       }).catch(console.error);
