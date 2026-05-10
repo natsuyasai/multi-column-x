@@ -18,6 +18,7 @@ const plainEntries = [
   "video_control",
   "small_image",
   "hide_ad",
+  "scroll_pos_restore",
 ];
 
 // React を含む header_customizer は IIFE + inlineDynamicImports で個別ビルド

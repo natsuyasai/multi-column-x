@@ -25,6 +25,11 @@ pub fn build_init_script(
     } else {
         include_str!("image_popup.js")
     };
+    let scroll_pos_restore = if is_mobile {
+        include_str!("scroll_pos_restore.js")
+    } else {
+        ""
+    };
     let context_menu = include_str!("context_menu.js");
     let scroll_event = include_str!("scroll_event.js");
     let video_control = include_str!("video_control.js");
@@ -59,7 +64,7 @@ pub fn build_init_script(
     };
 
     let mut script = format!(
-        "{}\n{}{}{}{}{}{}{}{}{}{}",
+        "{}\n{}{}{}{}{}{}{}{}{}{}{}",
         config,
         tab_selector,
         header_part,
@@ -69,6 +74,7 @@ pub fn build_init_script(
         hide_ad,
         custom_css_js,
         image_popup,
+        scroll_pos_restore,
         context_menu,
         scroll_event
     );
