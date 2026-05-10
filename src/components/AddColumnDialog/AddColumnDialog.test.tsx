@@ -24,6 +24,7 @@ const mockGlobalSettings: GlobalSettings = {
   showSortButtons: true,
   smallImageEnabled: false,
   smallImageWidth: "50%",
+  hideAdEnabled: false,
 };
 
 describe("AddColumnDialog", () => {

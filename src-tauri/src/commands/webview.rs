@@ -61,6 +61,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
 
     let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(&app);
     let (small_image_enabled, small_image_width) = load_small_image_settings(&app);
+    let hide_ad_enabled = load_hide_ad_enabled(&app);
     let init_script = build_init_script(
         false, // is_mobile
         args.column.settings.area_remove_enabled,
@@ -69,6 +70,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         video_auto_play_stop_enabled,
         small_image_enabled,
         &small_image_width,
+        hide_ad_enabled,
         &args.column.settings.custom_css,
         &args.column.settings.visible_links,
     );
@@ -105,6 +107,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
 
     let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(&app);
     let (small_image_enabled, small_image_width) = load_small_image_settings(&app);
+    let hide_ad_enabled = load_hide_ad_enabled(&app);
     let init_script = build_init_script(
         true, // is_mobile
         args.column.settings.area_remove_enabled,
@@ -113,6 +116,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         video_auto_play_stop_enabled,
         small_image_enabled,
         &small_image_width,
+        hide_ad_enabled,
         &args.column.settings.custom_css,
         &args.column.settings.visible_links,
     );
@@ -253,6 +257,15 @@ fn load_small_image_settings(app: &AppHandle) -> (bool, String) {
         .and_then(|g| g.get("smallImageWidth").and_then(|v| v.as_str()).map(str::to_owned))
         .unwrap_or_else(|| "50%".to_string());
     (enabled, width)
+}
+
+fn load_hide_ad_enabled(app: &AppHandle) -> bool {
+    app.store("settings.json")
+        .ok()
+        .and_then(|store| store.get("appSettings"))
+        .and_then(|v| v.get("globalSettings").cloned())
+        .and_then(|gs| gs.get("hideAdEnabled").and_then(|v| v.as_bool()))
+        .unwrap_or(false)
 }
 
 fn load_popup_esc_close_enabled(app: &AppHandle) -> bool {

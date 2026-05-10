@@ -55,6 +55,7 @@ describe("useAppStore", () => {
         showSortButtons: true,
         smallImageEnabled: false,
         smallImageWidth: "50%",
+        hideAdEnabled: false,
       },
       isLoaded: false,
       isMobile: false,

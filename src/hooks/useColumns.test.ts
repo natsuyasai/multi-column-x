@@ -191,6 +191,7 @@ describe("useColumns mobile", () => {
         showSortButtons: true,
         smallImageEnabled: false,
         smallImageWidth: "50%",
+        hideAdEnabled: false,
       },
       isLoaded: true,
       isMobile: true,

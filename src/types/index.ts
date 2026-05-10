@@ -49,6 +49,7 @@ export interface GlobalSettings {
   showSortButtons: boolean;
   smallImageEnabled: boolean;
   smallImageWidth: string;
+  hideAdEnabled: boolean;
 }
 
 export interface AppSettings {
@@ -78,6 +79,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   showSortButtons: true,
   smallImageEnabled: false,
   smallImageWidth: "50%",
+  hideAdEnabled: false,
 };
 
 interface ResolveColumnUrlInput {

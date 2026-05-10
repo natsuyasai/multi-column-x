@@ -46,6 +46,7 @@ fn save_window_bounds(window: &tauri::Window) {
                 show_sort_buttons: true,
                 small_image_enabled: false,
                 small_image_width: "50%".to_string(),
+                hide_ad_enabled: false,
             },
         });
     settings.global_settings.window_bounds = WindowBounds {

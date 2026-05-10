@@ -14,6 +14,7 @@ declare global {
     visibleLinks: string[];
     smallImageEnabled: boolean;
     smallImageWidth: string;
+    hideAdEnabled: boolean;
   }
 
   interface TauriCore {

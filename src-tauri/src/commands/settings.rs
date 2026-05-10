@@ -119,6 +119,9 @@ pub struct GlobalSettingsData {
     #[serde(rename = "smallImageWidth")]
     #[serde(default = "default_small_image_width")]
     pub small_image_width: String,
+    #[serde(rename = "hideAdEnabled")]
+    #[serde(default)]
+    pub hide_ad_enabled: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -156,6 +159,7 @@ pub async fn load_settings(app: AppHandle) -> Result<AppSettingsData, String> {
                 show_sort_buttons: true,
                 small_image_enabled: false,
                 small_image_width: "50%".to_string(),
+                hide_ad_enabled: false,
             },
         });
 

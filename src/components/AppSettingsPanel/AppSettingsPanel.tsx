@@ -42,6 +42,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   const [smallImageWidth, setSmallImageWidth] = useState(
     settings.smallImageWidth,
   );
+  const [hideAdEnabled, setHideAdEnabled] = useState(settings.hideAdEnabled);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,6 +54,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       showSortButtons: showSortButtons,
       smallImageEnabled: smallImageEnabled,
       smallImageWidth: smallImageWidth,
+      hideAdEnabled: hideAdEnabled,
     });
     onClose();
   };
@@ -156,6 +158,18 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                     }
                   />
                   動画の自動再生を停止する
+                </label>
+              </section>
+
+              <section className={styles.section}>
+                <h3 className={styles.sectionTitle}>広告</h3>
+                <label className={styles.checkLabel}>
+                  <input
+                    type="checkbox"
+                    checked={hideAdEnabled}
+                    onChange={(e) => setHideAdEnabled(e.target.checked)}
+                  />
+                  広告を非表示にする
                 </label>
               </section>
 
