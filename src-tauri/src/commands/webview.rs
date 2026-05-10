@@ -237,6 +237,25 @@ pub async fn resize_column_webview(_app: AppHandle, bounds: ResizeBounds) -> Res
     Ok(())
 }
 
+/// デスクトップ専用: メインウィンドウを基準にパディングを付けたポップアップの
+/// 位置とサイズを返す。ウィンドウが取得できない場合はフォールバック値を使う。
+#[cfg(desktop)]
+fn get_popup_bounds(app: &AppHandle) -> (LogicalPosition<f64>, LogicalSize<f64>) {
+    const FALLBACK: (LogicalPosition<f64>, LogicalSize<f64>) = (
+        LogicalPosition { x: 50.0, y: 50.0 },
+        LogicalSize { width: 800.0, height: 600.0 },
+    );
+    const PADDING: f64 = 50.0;
+    let Some(window) = app.get_window("main") else { return FALLBACK };
+    let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) else {
+        return FALLBACK;
+    };
+    (
+        LogicalPosition::new(pos.x as f64 + PADDING, pos.y as f64 + PADDING),
+        LogicalSize::new(size.width as f64 - PADDING * 2.0, size.height as f64 - PADDING * 2.0),
+    )
+}
+
 fn load_global_settings(app: &AppHandle) -> serde_json::Value {
     app.store("settings.json")
         .ok()
@@ -338,43 +357,20 @@ pub async fn open_popup_window(
     );
 
     let popup_label = format!("{}{}", labels::POPUP_PREFIX, uuid::Uuid::new_v4());
+    let (pos, size) = get_popup_bounds(&app);
 
-    let (window_pos, window_size) = if let Some(window) = app.get_window("main") {
-        if let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) {
-            (
-                LogicalPosition::new(pos.x as f64, pos.y as f64),
-                LogicalSize::new(size.width as f64, size.height as f64),
-            )
-        } else {
-            (
-                LogicalPosition::new(0.0, 0.0),
-                LogicalSize::new(800.0, 600.0),
-            )
-        }
-    } else {
-        (
-            LogicalPosition::new(0.0, 0.0),
-            LogicalSize::new(800.0, 600.0),
-        )
-    };
-
-    const PADDING: f64 = 50.0;
-
-    let builder = tauri::WebviewWindowBuilder::new(
+    tauri::WebviewWindowBuilder::new(
         &app,
         &popup_label,
         WebviewUrl::External(parse_url(&url)?),
     )
     .title("X - メディア")
-    .inner_size(
-        window_size.width - (PADDING * 2.0),
-        window_size.height - (PADDING * 2.0),
-    )
-    .position(window_pos.x + PADDING, window_pos.y + PADDING)
+    .inner_size(size.width, size.height)
+    .position(pos.x, pos.y)
     .initialization_script(&popup_init)
-    .data_directory(data_dir);
-
-    builder.build().map_err(|e| e.to_string())?;
+    .data_directory(data_dir)
+    .build()
+    .map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -463,26 +459,7 @@ pub async fn open_link_popup_window(
 
     let popup_label = format!("{}{}", labels::POPUP_PREFIX, uuid::Uuid::new_v4());
 
-    let (window_pos, window_size) = if let Some(window) = app.get_window("main") {
-        if let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) {
-            (
-                LogicalPosition::new(pos.x as f64, pos.y as f64),
-                LogicalSize::new(size.width as f64, size.height as f64),
-            )
-        } else {
-            (
-                LogicalPosition::new(0.0, 0.0),
-                LogicalSize::new(800.0, 600.0),
-            )
-        }
-    } else {
-        (
-            LogicalPosition::new(0.0, 0.0),
-            LogicalSize::new(800.0, 600.0),
-        )
-    };
-
-    const PADDING: f64 = 50.0;
+    let (pos, size) = get_popup_bounds(&app);
 
     let builder = tauri::WebviewWindowBuilder::new(
         &app,
@@ -490,11 +467,8 @@ pub async fn open_link_popup_window(
         WebviewUrl::External(parse_url(&url)?),
     )
     .title("X - リンク")
-    .inner_size(
-        window_size.width - (PADDING * 2.0),
-        window_size.height - (PADDING * 2.0),
-    )
-    .position(window_pos.x + PADDING, window_pos.y + PADDING)
+    .inner_size(size.width, size.height)
+    .position(pos.x, pos.y)
     .initialization_script(&popup_init)
     .data_directory(data_dir);
 
