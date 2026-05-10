@@ -54,6 +54,18 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_closeTopPopu
     }
 }
 
+fn emit_jstring_event<'local>(env: &mut JNIEnv<'local>, s: jni::objects::JString<'local>, event: &'static str) {
+    use tauri::Emitter;
+    let val: String = match env.get_string(&s) {
+        Ok(v) => v.into(),
+        Err(_) => return,
+    };
+    let guard = TAURI_APP.lock().unwrap();
+    if let Some(app) = guard.as_ref() {
+        let _ = app.emit(event, val);
+    }
+}
+
 /// AppBridge.onSwipeNavigate(direction) から呼ばれる JNI エントリポイント。
 /// 水平フリングを column-swipe-navigate イベントとして React に転送する。
 /// direction: "left"（次のカラム）または "right"（前のカラム）
@@ -63,15 +75,7 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onSwipeNavig
     _class: JClass<'local>,
     direction: jni::objects::JString<'local>,
 ) {
-    use tauri::Emitter;
-    let dir: String = match env.get_string(&direction) {
-        Ok(s) => s.into(),
-        Err(_) => return,
-    };
-    let guard = TAURI_APP.lock().unwrap();
-    if let Some(app) = guard.as_ref() {
-        let _ = app.emit(crate::ipc_constants::events::COLUMN_SWIPE_NAVIGATE, dir);
-    }
+    emit_jstring_event(&mut env, direction, crate::ipc_constants::events::COLUMN_SWIPE_NAVIGATE);
 }
 
 /// AppBridge.onSwipeProgress(direction) から呼ばれる JNI エントリポイント。
@@ -82,15 +86,7 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onSwipeProgr
     _class: JClass<'local>,
     direction: jni::objects::JString<'local>,
 ) {
-    use tauri::Emitter;
-    let dir: String = match env.get_string(&direction) {
-        Ok(s) => s.into(),
-        Err(_) => return,
-    };
-    let guard = TAURI_APP.lock().unwrap();
-    if let Some(app) = guard.as_ref() {
-        let _ = app.emit(crate::ipc_constants::events::COLUMN_SWIPE_PROGRESS, dir);
-    }
+    emit_jstring_event(&mut env, direction, crate::ipc_constants::events::COLUMN_SWIPE_PROGRESS);
 }
 
 /// AppBridge.onSwipeCancel() から呼ばれる JNI エントリポイント。
