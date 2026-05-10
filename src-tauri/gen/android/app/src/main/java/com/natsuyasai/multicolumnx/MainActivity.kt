@@ -206,65 +206,51 @@ class MainActivity : TauriActivity() {
   // JNI スレッドから呼ばれるため runOnUiThread + CountDownLatch で UI 操作を同期する。
   // accountId が空でない場合はカラム WebView と同じプロファイルを使ってセッションを共有する。
   fun createPopupWebView(id: String, url: String, initScript: String, accountId: String) {
-    val latch = CountDownLatch(1)
-    runOnUiThread {
-      try {
-        val profileApiSupported = try {
-          WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER")
-        } catch (e: Exception) { false }
+    runOnUiThreadSync {
+      val profileApiSupported = try {
+        WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER")
+      } catch (e: Exception) { false }
 
-        val webView = WebView(this).also { wv ->
-          wv.settings.javaScriptEnabled = true
-          wv.settings.domStorageEnabled = true
-          wv.settings.setSupportMultipleWindows(true)
-          wv.webViewClient = ExternalLinkWebViewClient()
-          wv.webChromeClient = ExternalLinkWebChromeClient()
-          if (profileApiSupported && accountId.isNotEmpty()) {
-            try {
-              ProfileStore.getInstance().getOrCreateProfile("account-$accountId")
-              WebViewCompat.setProfile(wv, "account-$accountId")
-            } catch (e: Exception) {
-              Log.w(TAG, "Profile API unavailable for popup $id: ${e.message}")
-            }
-          } else if (!profileApiSupported && accountId.isNotEmpty()) {
-            setCookieForAccount(accountId)
+      val webView = WebView(this).also { wv ->
+        wv.settings.javaScriptEnabled = true
+        wv.settings.domStorageEnabled = true
+        wv.settings.setSupportMultipleWindows(true)
+        wv.webViewClient = ExternalLinkWebViewClient()
+        wv.webChromeClient = ExternalLinkWebChromeClient()
+        if (profileApiSupported && accountId.isNotEmpty()) {
+          try {
+            ProfileStore.getInstance().getOrCreateProfile("account-$accountId")
+            WebViewCompat.setProfile(wv, "account-$accountId")
+          } catch (e: Exception) {
+            Log.w(TAG, "Profile API unavailable for popup $id: ${e.message}")
           }
-          if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
-            WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
-          }
+        } else if (!profileApiSupported && accountId.isNotEmpty()) {
+          setCookieForAccount(accountId)
         }
-        val contentRoot = contentRoot
-        val params = FrameLayout.LayoutParams(
-          FrameLayout.LayoutParams.MATCH_PARENT,
-          FrameLayout.LayoutParams.MATCH_PARENT
-        )
-        contentRoot.addView(webView, params)
-        popupWebViews.addLast(Pair(id, webView))
-        webView.loadUrl(url)
-      } finally {
-        latch.countDown()
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+          WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
+        }
       }
+      val params = FrameLayout.LayoutParams(
+        FrameLayout.LayoutParams.MATCH_PARENT,
+        FrameLayout.LayoutParams.MATCH_PARENT
+      )
+      contentRoot.addView(webView, params)
+      popupWebViews.addLast(Pair(id, webView))
+      webView.loadUrl(url)
     }
-    latch.await(5, TimeUnit.SECONDS)
   }
 
   // 指定 id のポップアップ WebView を削除する。JNI スレッドから呼ばれる。
   fun removePopupWebView(id: String) {
-    val latch = CountDownLatch(1)
-    runOnUiThread {
-      try {
-        val idx = popupWebViews.indexOfFirst { it.first == id }
-        if (idx >= 0) {
-          val wv = popupWebViews.removeAt(idx).second
-          val contentRoot = contentRoot
-          contentRoot.removeView(wv)
-          wv.destroy()
-        }
-      } finally {
-        latch.countDown()
+    runOnUiThreadSync {
+      val idx = popupWebViews.indexOfFirst { it.first == id }
+      if (idx >= 0) {
+        val wv = popupWebViews.removeAt(idx).second
+        contentRoot.removeView(wv)
+        wv.destroy()
       }
     }
-    latch.await(5, TimeUnit.SECONDS)
   }
 
   // 最前面のポップアップ WebView を閉じる。UI スレッド（OnBackPressedCallback）から呼ばれる。
@@ -272,7 +258,6 @@ class MainActivity : TauriActivity() {
   fun closeTopPopupWebView(): Boolean {
     if (popupWebViews.isEmpty()) return false
     val wv = popupWebViews.removeLast().second
-    val contentRoot = contentRoot
     contentRoot.removeView(wv)
     wv.destroy()
     return true
@@ -290,81 +275,67 @@ class MainActivity : TauriActivity() {
     visible: Boolean,
     accountId: String
   ) {
-    val latch = CountDownLatch(1)
-    runOnUiThread {
-      try {
-        // React WebView がリロードされても native WebView は残存するため、
-        // 同一 id が既に存在する場合は再作成・再ロードをスキップする。
-        // 位置・表示は後続の resize_column_webview（setActiveColumn）が確定させる。
-        if (columnWebViews.containsKey(id)) {
-          Log.d(TAG, "createColumnWebView: $id already exists, skipping reload")
-          return@runOnUiThread
-        }
-
-        val profileApiSupported = try {
-          WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER")
-        } catch (e: Exception) { false }
-
-        // Profile API 非対応端末では loadUrl 前に Cookie を設定してアカウントを確定する。
-        // createColumnWebView は直列 await で呼ばれるため Cookie の設定が干渉しない。
-        if (!profileApiSupported && accountId.isNotEmpty()) {
-          setCookieForAccount(accountId)
-        }
-
-        val webView = WebView(this).also { wv ->
-          wv.settings.javaScriptEnabled = true
-          wv.settings.domStorageEnabled = true
-          wv.settings.setSupportMultipleWindows(true)
-          wv.webViewClient = ExternalLinkWebViewClient()
-          wv.webChromeClient = ExternalLinkWebChromeClient()
-          if (profileApiSupported) {
-            try {
-              ProfileStore.getInstance().getOrCreateProfile("account-$accountId")
-              WebViewCompat.setProfile(wv, "account-$accountId")
-            } catch (e: Exception) {
-              Log.w(TAG, "Profile API unavailable for column $id: ${e.message}")
-            }
-          }
-          if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
-            WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
-          }
-          wv.visibility = if (visible) View.VISIBLE else View.GONE
-        }
-
-        val density = resources.displayMetrics.density
-        val params = FrameLayout.LayoutParams(
-          (widthDp * density).toInt(),
-          (heightDp * density).toInt()
-        )
-
-        val contentRoot = contentRoot
-        contentRoot.addView(webView, params)
-        columnWebViews[id] = webView
-
-        webView.loadUrl(url)
-      } finally {
-        latch.countDown()
+    runOnUiThreadSync {
+      // React WebView がリロードされても native WebView は残存するため、
+      // 同一 id が既に存在する場合は再作成・再ロードをスキップする。
+      // 位置・表示は後続の resize_column_webview（setActiveColumn）が確定させる。
+      if (columnWebViews.containsKey(id)) {
+        Log.d(TAG, "createColumnWebView: $id already exists, skipping reload")
+        return@runOnUiThreadSync
       }
+
+      val profileApiSupported = try {
+        WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER")
+      } catch (e: Exception) { false }
+
+      // Profile API 非対応端末では loadUrl 前に Cookie を設定してアカウントを確定する。
+      // createColumnWebView は直列 await で呼ばれるため Cookie の設定が干渉しない。
+      if (!profileApiSupported && accountId.isNotEmpty()) {
+        setCookieForAccount(accountId)
+      }
+
+      val webView = WebView(this).also { wv ->
+        wv.settings.javaScriptEnabled = true
+        wv.settings.domStorageEnabled = true
+        wv.settings.setSupportMultipleWindows(true)
+        wv.webViewClient = ExternalLinkWebViewClient()
+        wv.webChromeClient = ExternalLinkWebChromeClient()
+        if (profileApiSupported) {
+          try {
+            ProfileStore.getInstance().getOrCreateProfile("account-$accountId")
+            WebViewCompat.setProfile(wv, "account-$accountId")
+          } catch (e: Exception) {
+            Log.w(TAG, "Profile API unavailable for column $id: ${e.message}")
+          }
+        }
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+          WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
+        }
+        wv.visibility = if (visible) View.VISIBLE else View.GONE
+      }
+
+      val density = resources.displayMetrics.density
+      val params = FrameLayout.LayoutParams(
+        (widthDp * density).toInt(),
+        (heightDp * density).toInt()
+      )
+
+      contentRoot.addView(webView, params)
+      columnWebViews[id] = webView
+
+      webView.loadUrl(url)
     }
-    latch.await(5, TimeUnit.SECONDS)
   }
 
   // カラム WebView を削除する。
   fun removeColumnWebView(id: String) {
-    val latch = CountDownLatch(1)
-    runOnUiThread {
-      try {
-        columnWebViews[id]?.let { wv ->
-          val contentRoot = contentRoot
-          contentRoot.removeView(wv)
-          wv.destroy()
-          columnWebViews.remove(id)
-        }
-      } finally {
-        latch.countDown()
+    runOnUiThreadSync {
+      columnWebViews[id]?.let { wv ->
+        contentRoot.removeView(wv)
+        wv.destroy()
+        columnWebViews.remove(id)
       }
     }
-    latch.await(5, TimeUnit.SECONDS)
   }
 
   // カラム WebView を表示し、サイズを更新する（常に左上原点に配置）。
@@ -503,6 +474,18 @@ class MainActivity : TauriActivity() {
       resultMsg.sendToTarget()
       return true
     }
+  }
+
+  private fun runOnUiThreadSync(action: () -> Unit) {
+    val latch = CountDownLatch(1)
+    runOnUiThread {
+      try {
+        action()
+      } finally {
+        latch.countDown()
+      }
+    }
+    latch.await(5, TimeUnit.SECONDS)
   }
 
   companion object {
