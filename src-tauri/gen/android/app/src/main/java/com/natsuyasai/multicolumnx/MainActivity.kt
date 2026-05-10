@@ -23,11 +23,9 @@ import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 
 class MainActivity : TauriActivity() {
-  private val contentRoot: FrameLayout
+  internal val contentRoot: FrameLayout
     get() = window.decorView.findViewById(android.R.id.content)
 
   private val columnWebViews = ConcurrentHashMap<String, WebView>()
@@ -406,13 +404,7 @@ class MainActivity : TauriActivity() {
 
   // x.com / twitter.com のドメインに属する URL かどうかを判定する。
   // これらは WebView 内でそのまま表示し、外部 URL はシステムブラウザへ委譲する。
-  private fun isInternalUrl(url: String): Boolean {
-    return url.startsWith("https://x.com") ||
-      url.startsWith("https://twitter.com") ||
-      url.startsWith("http://localhost") ||
-      url.startsWith("about:") ||
-      url.startsWith("blob:")
-  }
+  internal fun isInternalUrl(url: String): Boolean = com.natsuyasai.multicolumnx.isInternalUrl(url)
 
   // 指定 URL をシステムデフォルトブラウザで開く。
   private fun openUrlInBrowser(url: String) {
@@ -466,7 +458,7 @@ class MainActivity : TauriActivity() {
     }
   }
 
-  private fun setupWebViewProfile(webView: WebView, accountId: String, contextName: String) {
+  internal fun setupWebViewProfile(webView: WebView, accountId: String, contextName: String) {
     try {
       ProfileStore.getInstance().getOrCreateProfile("account-$accountId")
       WebViewCompat.setProfile(webView, "account-$accountId")
@@ -475,16 +467,8 @@ class MainActivity : TauriActivity() {
     }
   }
 
-  private fun runOnUiThreadSync(action: () -> Unit) {
-    val latch = CountDownLatch(1)
-    runOnUiThread {
-      try {
-        action()
-      } finally {
-        latch.countDown()
-      }
-    }
-    latch.await(5, TimeUnit.SECONDS)
+  internal fun runOnUiThreadSync(action: () -> Unit) {
+    runSyncOnThread(::runOnUiThread, action)
   }
 
   companion object {
