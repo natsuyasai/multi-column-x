@@ -57,15 +57,15 @@
 
 | # | スメル | 手法 | 優先度 | 状態 |
 |---|--------|------|--------|------|
-| 1 | S1: マジックストリング | Replace Magic Literal | High | [ ] |
-| 2 | S2: 重複コード（ページラベル） | Extract Function + Move | High | [ ] |
-| 3 | S3: インラインIIFE（App.tsx） | Extract Variable | Medium | [ ] |
-| 4 | S4: 重複パース処理 | Extract Function | Medium | [ ] |
-| 5 | S5: サイドバー幅の重複計算 | Extract Function | Medium | [ ] |
-| 6 | S6: 長いrestoreColumns | Extract Function | Medium | [ ] |
-| 7 | S8: AddColumnDialog IIFE | Extract Variable | Low | [ ] |
-| 8 | S7: インラインダイアログ | Extract Component | Low | [ ] |
-| 9 | S9: ダイアログ状態のData Clumps | Extract Hook | Low | [ ] |
+| 1 | S1: マジックストリング | Replace Magic Literal | High | [x] |
+| 2 | S2: 重複コード（ページラベル） | Extract Function + Move | High | [x] |
+| 3 | S3: インラインIIFE（App.tsx） | Extract Variable | Medium | [x] |
+| 4 | S4: 重複パース処理 | Extract Function | Medium | [x] |
+| 5 | S5: サイドバー幅の重複計算 | Extract Function | Medium | [x] |
+| 6 | S6: 長いrestoreColumns | Extract Function | Medium | [x] |
+| 7 | S8: AddColumnDialog IIFE | Extract Variable | Low | [x] |
+| 8 | S7: インラインダイアログ | Extract Component | Low | [x] |
+| 9 | S9: ダイアログ状態のData Clumps | Extract Hook | Low | [x] |
 
 ## テストセット修正（前提）
 - `useColumns.test.ts`: `@tauri-apps/api/event` モック追加（完了）
