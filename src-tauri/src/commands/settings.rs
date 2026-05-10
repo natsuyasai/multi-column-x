@@ -29,6 +29,9 @@ pub struct ColumnSettings {
     pub show_custom_menu: bool,
     #[serde(rename = "customCSS")]
     pub custom_css: String,
+    #[serde(rename = "scrollPosRestoreEnabled")]
+    #[serde(default = "default_true")]
+    pub scroll_pos_restore_enabled: bool,
     #[serde(rename = "visibleLinks")]
     #[serde(default)]
     pub visible_links: Vec<String>,
@@ -195,4 +198,58 @@ pub async fn save_settings(app: AppHandle, settings: AppSettingsData) -> Result<
     );
     store.save().map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn window_bounds_default_values() {
+        let wb = WindowBounds::default();
+        assert_eq!(wb.x, 0.0);
+        assert_eq!(wb.y, 0.0);
+        assert_eq!(wb.width, 1400.0);
+        assert_eq!(wb.height, 900.0);
+    }
+
+    #[test]
+    fn global_settings_default_theme_is_dark() {
+        let gs = GlobalSettingsData::default();
+        assert_eq!(gs.theme, "dark");
+    }
+
+    #[test]
+    fn global_settings_default_zoom_level_is_one() {
+        let gs = GlobalSettingsData::default();
+        assert_eq!(gs.zoom_level, 1.0);
+    }
+
+    #[test]
+    fn global_settings_default_popup_esc_close_enabled() {
+        let gs = GlobalSettingsData::default();
+        assert!(gs.popup_esc_close_enabled);
+    }
+
+    #[test]
+    fn global_settings_default_auto_reload_interval() {
+        let gs = GlobalSettingsData::default();
+        assert_eq!(gs.default_auto_reload_interval, 600);
+    }
+
+    #[test]
+    fn app_settings_default_has_empty_collections() {
+        let settings = AppSettingsData::default();
+        assert!(settings.accounts.is_empty());
+        assert!(settings.columns.is_empty());
+    }
+
+    #[test]
+    fn app_settings_default_roundtrips_through_json() {
+        let settings = AppSettingsData::default();
+        let json = serde_json::to_value(&settings).unwrap();
+        let restored: AppSettingsData = serde_json::from_value(json).unwrap();
+        assert_eq!(restored.global_settings.theme, settings.global_settings.theme);
+        assert_eq!(restored.global_settings.zoom_level, settings.global_settings.zoom_level);
+    }
 }

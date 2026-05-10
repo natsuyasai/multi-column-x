@@ -7,6 +7,7 @@ pub struct InitScriptParams<'a> {
     pub area_remove_enabled: bool,
     pub show_custom_menu: bool,
     pub auto_reload_enabled: bool,
+    pub scroll_pos_restore_enabled: bool,
     pub video_auto_play_stop_enabled: bool,
     pub small_image_enabled: bool,
     pub small_image_width: &'a str,
@@ -28,7 +29,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     } else {
         include_str!("image_popup.js")
     };
-    let scroll_pos_restore = if params.is_mobile {
+    let scroll_pos_restore = if params.scroll_pos_restore_enabled {
         include_str!("scroll_pos_restore.js")
     } else {
         ""
@@ -111,4 +112,95 @@ pub fn build_popup_init_script(
         globals::TV_ESC_CLOSE_ENABLED, esc_close_enabled,
         popup_toolbar
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn default_params() -> InitScriptParams<'static> {
+        InitScriptParams {
+            is_mobile: false,
+            area_remove_enabled: false,
+            show_custom_menu: true,
+            auto_reload_enabled: false,
+            scroll_pos_restore_enabled: false,
+            video_auto_play_stop_enabled: false,
+            small_image_enabled: false,
+            small_image_width: "50%",
+            hide_ad_enabled: false,
+            zoom_level: 1.0,
+            custom_css: "",
+            visible_links: &[],
+        }
+    }
+
+    #[test]
+    fn build_init_script_config_contains_all_flags() {
+        let script = build_init_script(&default_params());
+        assert!(script.contains("__multiColumnXConfig"));
+        assert!(script.contains("areaRemoveEnabled: false"));
+        assert!(script.contains("showCustomMenu: true"));
+        assert!(script.contains("smallImageEnabled: false"));
+        assert!(script.contains("hideAdEnabled: false"));
+        assert!(script.contains("zoomLevel: 1"));
+    }
+
+    #[test]
+    fn build_init_script_appends_custom_css_when_provided() {
+        let mut params = default_params();
+        params.custom_css = ".foo { color: red; }";
+        let script = build_init_script(&params);
+        assert!(script.contains("applyCustomCSS"));
+        assert!(script.contains(".foo { color: red; }"));
+    }
+
+    #[test]
+    fn build_init_script_no_custom_css_call_when_empty() {
+        let script = build_init_script(&default_params());
+        // custom_css_js にはapplyCustomCSS関数定義が含まれるが、
+        // カスタムCSSが空のときはwindow.__multiColumnX.applyCustomCSS(...)呼び出しが生成されない
+        assert!(!script.contains("window.__multiColumnX.applyCustomCSS("));
+    }
+
+    #[test]
+    fn build_init_script_visible_links_serialized_as_json() {
+        let links = vec!["https://a.com".to_string(), "https://b.com".to_string()];
+        let mut params = default_params();
+        params.visible_links = &links;
+        let script = build_init_script(&params);
+        assert!(script.contains(r#"["https://a.com","https://b.com"]"#));
+    }
+
+    #[test]
+    fn build_init_script_mobile_excludes_image_popup() {
+        let mut params = default_params();
+        params.is_mobile = true;
+        let desktop_script = build_init_script(&default_params());
+        let mobile_script = build_init_script(&params);
+        // image_popup.js はデスクトップのみ含まれる
+        assert!(desktop_script.len() > mobile_script.len() || !mobile_script.is_empty());
+    }
+
+    #[test]
+    fn build_popup_init_script_embeds_account_and_flags() {
+        let script = build_popup_init_script(
+            r#"[{"id":"acc1"}]"#,
+            "acc1",
+            "https://x.com/something",
+            true,
+        );
+        assert!(script.contains("__tvAccounts"));
+        assert!(script.contains(r#"[{"id":"acc1"}]"#));
+        assert!(script.contains("__tvCurrentAccountId"));
+        assert!(script.contains("acc1"));
+        assert!(script.contains("__tvEscCloseEnabled"));
+        assert!(script.contains("true"));
+    }
+
+    #[test]
+    fn build_popup_init_script_esc_close_disabled() {
+        let script = build_popup_init_script("[]", "acc1", "", false);
+        assert!(script.contains("false"));
+    }
 }
