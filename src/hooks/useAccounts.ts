@@ -17,6 +17,20 @@ const ACCOUNT_COLORS = [
   "#abb2bf",
 ];
 
+interface AddAccountResult {
+  accountId: string;
+  dataDirectory: string;
+  windowLabel: string;
+}
+
+function parseAddAccountResult(raw: string): AddAccountResult {
+  try {
+    return JSON.parse(raw) as AddAccountResult;
+  } catch {
+    throw new Error("Failed to parse open_add_account_window response");
+  }
+}
+
 async function createAccountFromResult(
   accountId: string,
   dataDirectory: string,
@@ -60,17 +74,8 @@ export function useAccounts() {
         // AddAccount が finish() して MainActivity が前面に戻った時点で再開する。
         // 成功: resolve → アカウント名入力へ
         // キャンセル（バックボタン）: reject → 何もしない
-        const result = await invoke<string>(IPC_COMMANDS.OPEN_ADD_ACCOUNT_WINDOW);
-        let parsed: {
-          accountId: string;
-          dataDirectory: string;
-          windowLabel: string;
-        };
-        try {
-          parsed = JSON.parse(result);
-        } catch {
-          throw new Error("Failed to parse open_add_account_window response");
-        }
+        const raw = await invoke<string>(IPC_COMMANDS.OPEN_ADD_ACCOUNT_WINDOW);
+        const parsed = parseAddAccountResult(raw);
         await createAccountFromResult(
           parsed.accountId,
           parsed.dataDirectory,
@@ -83,18 +88,8 @@ export function useAccounts() {
         // -----------------------------------------------
         // open_add_account_window はウィンドウを開いて即座に返る。
         // Rust の URL ポーリングがログイン完了を検出して emit するイベントを listen する。
-        const result = await invoke<string>(IPC_COMMANDS.OPEN_ADD_ACCOUNT_WINDOW);
-        let parsed: {
-          accountId: string;
-          dataDirectory: string;
-          windowLabel: string;
-        };
-        try {
-          parsed = JSON.parse(result);
-        } catch {
-          throw new Error("Failed to parse open_add_account_window response");
-        }
-        const { accountId, dataDirectory, windowLabel } = parsed;
+        const raw = await invoke<string>(IPC_COMMANDS.OPEN_ADD_ACCOUNT_WINDOW);
+        const { accountId, dataDirectory, windowLabel } = parseAddAccountResult(raw);
 
         await new Promise<void>((resolve, reject) => {
           let unlistenLogin: (() => void) | null = null;
