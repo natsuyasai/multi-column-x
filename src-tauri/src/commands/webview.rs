@@ -62,6 +62,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
     let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(&app);
     let (small_image_enabled, small_image_width) = load_small_image_settings(&app);
     let hide_ad_enabled = load_hide_ad_enabled(&app);
+    let zoom_level = load_zoom_level(&app);
     let init_script = build_init_script(
         false, // is_mobile
         args.column.settings.area_remove_enabled,
@@ -71,6 +72,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         small_image_enabled,
         &small_image_width,
         hide_ad_enabled,
+        zoom_level,
         &args.column.settings.custom_css,
         &args.column.settings.visible_links,
     );
@@ -108,6 +110,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
     let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(&app);
     let (small_image_enabled, small_image_width) = load_small_image_settings(&app);
     let hide_ad_enabled = load_hide_ad_enabled(&app);
+    let zoom_level = load_zoom_level(&app);
     let init_script = build_init_script(
         true, // is_mobile
         args.column.settings.area_remove_enabled,
@@ -117,6 +120,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         small_image_enabled,
         &small_image_width,
         hide_ad_enabled,
+        zoom_level,
         &args.column.settings.custom_css,
         &args.column.settings.visible_links,
     );
@@ -266,6 +270,15 @@ fn load_hide_ad_enabled(app: &AppHandle) -> bool {
         .and_then(|v| v.get("globalSettings").cloned())
         .and_then(|gs| gs.get("hideAdEnabled").and_then(|v| v.as_bool()))
         .unwrap_or(false)
+}
+
+fn load_zoom_level(app: &AppHandle) -> f64 {
+    app.store("settings.json")
+        .ok()
+        .and_then(|store| store.get("appSettings"))
+        .and_then(|v| v.get("globalSettings").cloned())
+        .and_then(|gs| gs.get("zoomLevel").and_then(|v| v.as_f64()))
+        .unwrap_or(1.0)
 }
 
 fn load_popup_esc_close_enabled(app: &AppHandle) -> bool {

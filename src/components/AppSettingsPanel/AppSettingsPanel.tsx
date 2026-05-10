@@ -43,6 +43,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
     settings.smallImageWidth,
   );
   const [hideAdEnabled, setHideAdEnabled] = useState(settings.hideAdEnabled);
+  const [zoomLevel, setZoomLevel] = useState(settings.zoomLevel ?? 1);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,6 +56,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       smallImageEnabled: smallImageEnabled,
       smallImageWidth: smallImageWidth,
       hideAdEnabled: hideAdEnabled,
+      zoomLevel: zoomLevel,
     });
     onClose();
   };
@@ -90,7 +92,30 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
 
         <div className={styles.tabContent}>
           {activeTab === "general" && (
-            <form onSubmit={handleSubmit} className={styles.form}>
+            <form
+              id="app-settings-form"
+              onSubmit={handleSubmit}
+              className={styles.form}
+            >
+              <section className={styles.section}>
+                <h3 className={styles.sectionTitle}>表示</h3>
+                <div className={styles.sliderRow}>
+                  <span className={styles.sliderLabel}>表示サイズ</span>
+                  <input
+                    type="range"
+                    className={styles.rangeSlider}
+                    min={0.5}
+                    max={2.0}
+                    step={0.1}
+                    value={zoomLevel}
+                    onChange={(e) => setZoomLevel(Number(e.target.value))}
+                  />
+                  <span className={styles.sliderValue}>
+                    {Math.round(zoomLevel * 100)}%
+                  </span>
+                </div>
+              </section>
+
               <section className={styles.section}>
                 <h3 className={styles.sectionTitle}>
                   カラムのデフォルト設定
@@ -197,18 +222,6 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 )}
               </section>
 
-              <div className={styles.actions}>
-                <button
-                  type="button"
-                  className={styles.cancelBtn}
-                  onClick={onClose}
-                >
-                  キャンセル
-                </button>
-                <button type="submit" className={styles.applyBtn}>
-                  適用
-                </button>
-              </div>
             </form>
           )}
 
@@ -224,6 +237,25 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
             />
           )}
         </div>
+
+        {activeTab === "general" && (
+          <div className={styles.actions}>
+            <button
+              type="button"
+              className={styles.cancelBtn}
+              onClick={onClose}
+            >
+              キャンセル
+            </button>
+            <button
+              type="submit"
+              form="app-settings-form"
+              className={styles.applyBtn}
+            >
+              適用
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

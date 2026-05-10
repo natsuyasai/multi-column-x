@@ -192,6 +192,7 @@ describe("useColumns mobile", () => {
         smallImageEnabled: false,
         smallImageWidth: "50%",
         hideAdEnabled: false,
+        zoomLevel: 1,
       },
       isLoaded: true,
       isMobile: true,

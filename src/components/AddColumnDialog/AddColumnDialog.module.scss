@@ -3,7 +3,7 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 100dvh;
+  bottom: 0;
   background: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
@@ -20,7 +20,7 @@
   border-radius: 8px;
   padding: 24px;
   width: min(400px, 100%);
-  max-height: calc(100dvh - 32px);
+  max-height: calc(100% - 32px);
   overflow-y: auto;
   display: flex;
   flex-direction: column;

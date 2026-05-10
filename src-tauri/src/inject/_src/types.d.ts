@@ -15,6 +15,7 @@ declare global {
     smallImageEnabled: boolean;
     smallImageWidth: string;
     hideAdEnabled: boolean;
+    zoomLevel: number;
   }
 
   interface TauriCore {

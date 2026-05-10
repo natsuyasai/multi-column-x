@@ -50,6 +50,7 @@ export interface GlobalSettings {
   smallImageEnabled: boolean;
   smallImageWidth: string;
   hideAdEnabled: boolean;
+  zoomLevel: number;
 }
 
 export interface AppSettings {
@@ -80,6 +81,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   smallImageEnabled: false,
   smallImageWidth: "50%",
   hideAdEnabled: false,
+  zoomLevel: 1,
 };
 
 interface ResolveColumnUrlInput {

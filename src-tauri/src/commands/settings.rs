@@ -46,6 +46,9 @@ fn default_auto_reload_interval() -> u32 {
 fn default_small_image_width() -> String {
     "50%".to_string()
 }
+fn default_zoom_level() -> f64 {
+    1.0
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ColumnData {
@@ -122,6 +125,9 @@ pub struct GlobalSettingsData {
     #[serde(rename = "hideAdEnabled")]
     #[serde(default)]
     pub hide_ad_enabled: bool,
+    #[serde(rename = "zoomLevel")]
+    #[serde(default = "default_zoom_level")]
+    pub zoom_level: f64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -160,6 +166,7 @@ pub async fn load_settings(app: AppHandle) -> Result<AppSettingsData, String> {
                 small_image_enabled: false,
                 small_image_width: "50%".to_string(),
                 hide_ad_enabled: false,
+                zoom_level: 1.0,
             },
         });
 

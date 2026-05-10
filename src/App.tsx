@@ -105,6 +105,18 @@ const App: React.FC = () => {
     }
   }, [isLoaded]);
 
+  // ズームレベルをメインUIと実行中カラムWebViewに適用
+  useEffect(() => {
+    const zoom = globalSettings.zoomLevel ?? 1;
+    document.documentElement.style.zoom = String(zoom);
+    columns.forEach((column) => {
+      invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
+        label: WEBVIEW_LABELS.column(column.id),
+        script: `document.documentElement.style.zoom='${zoom}';`,
+      }).catch(() => {});
+    });
+  }, [globalSettings.zoomLevel]);
+
   // WebView 内の横ホイールを受け取ってスクロールバーを動かす
   useEffect(() => {
     const unlisten = listen<number>(IPC_EVENTS.WEBVIEW_SCROLL, (e) => {

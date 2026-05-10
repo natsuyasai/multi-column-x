@@ -56,6 +56,7 @@ describe("useAppStore", () => {
         smallImageEnabled: false,
         smallImageWidth: "50%",
         hideAdEnabled: false,
+        zoomLevel: 1,
       },
       isLoaded: false,
       isMobile: false,

@@ -25,6 +25,7 @@ const mockGlobalSettings: GlobalSettings = {
   smallImageEnabled: false,
   smallImageWidth: "50%",
   hideAdEnabled: false,
+  zoomLevel: 1,
 };
 
 describe("AddColumnDialog", () => {

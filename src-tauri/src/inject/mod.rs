@@ -11,6 +11,7 @@ pub fn build_init_script(
     small_image_enabled: bool,
     small_image_width: &str,
     hide_ad_enabled: bool,
+    zoom_level: f64,
     custom_css: &str,
     visible_links: &[String],
 ) -> String {
@@ -30,6 +31,7 @@ pub fn build_init_script(
     } else {
         ""
     };
+    let zoom = include_str!("zoom.js");
     let context_menu = include_str!("context_menu.js");
     let scroll_event = include_str!("scroll_event.js");
     let video_control = include_str!("video_control.js");
@@ -37,14 +39,15 @@ pub fn build_init_script(
     let visible_links_json =
         serde_json::to_string(visible_links).unwrap_or_else(|_| "[]".to_string());
     let config = format!(
-        "window.{} = {{ areaRemoveEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?}, hideAdEnabled: {} }};",
+        "window.{} = {{ areaRemoveEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?}, hideAdEnabled: {}, zoomLevel: {} }};",
         globals::MULTI_COLUMN_X_CONFIG,
         area_remove_enabled,
         show_custom_menu,
         visible_links_json,
         small_image_enabled,
         small_image_width,
-        hide_ad_enabled
+        hide_ad_enabled,
+        zoom_level
     );
 
     let header_part = if area_remove_enabled {
@@ -64,8 +67,9 @@ pub fn build_init_script(
     };
 
     let mut script = format!(
-        "{}\n{}{}{}{}{}{}{}{}{}{}{}",
+        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}",
         config,
+        zoom,
         tab_selector,
         header_part,
         auto_reload_part,
