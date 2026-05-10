@@ -28,6 +28,8 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const occupiedCols = existingColumns.map((c) => c.gridCol).filter((g) => g >= 1);
+    const nextGridCol = occupiedCols.length > 0 ? Math.max(...occupiedCols) + 1 : 1;
     const column: Column = {
       id: uuidv4(),
       accountId,
@@ -39,10 +41,7 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
       width: 350,
       order: 9999,
       gridRow: 1,
-      gridCol: (() => {
-        const occupied = existingColumns.map((c) => c.gridCol).filter((g) => g >= 1);
-        return occupied.length > 0 ? Math.max(...occupied) + 1 : 1;
-      })(),
+      gridCol: nextGridCol,
       heightMode: "auto",
       settings: {
         ...DEFAULT_COLUMN_SETTINGS,
