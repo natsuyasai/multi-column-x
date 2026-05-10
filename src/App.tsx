@@ -16,6 +16,8 @@ import { AppSettingsPanel } from "./components/AppSettingsPanel/AppSettingsPanel
 import { Sidebar } from "./components/Sidebar/Sidebar";
 import { MobileTabBar } from "./components/MobileTabBar/MobileTabBar";
 import { TabActionDialog } from "./components/TabActionDialog/TabActionDialog";
+import { LinkPopupDialog } from "./components/LinkPopupDialog/LinkPopupDialog";
+import { ComposeTweetDialog } from "./components/ComposeTweetDialog/ComposeTweetDialog";
 import { platform } from "@tauri-apps/plugin-os";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -75,10 +77,7 @@ const App: React.FC = () => {
   const [showAppSettings, setShowAppSettings] = useState(false);
   const [settingsColumnId, setSettingsColumnId] = useState<string | null>(null);
   const [showLinkPopupDialog, setShowLinkPopupDialog] = useState(false);
-  const [linkPopupUrl, setLinkPopupUrl] = useState("");
-  const [linkPopupAccountId, setLinkPopupAccountId] = useState("");
   const [showComposeTweetDialog, setShowComposeTweetDialog] = useState(false);
-  const [composeTweetAccountId, setComposeTweetAccountId] = useState("");
   const [tabActionColumnId, setTabActionColumnId] = useState<string | null>(
     null,
   );
@@ -129,15 +128,12 @@ const App: React.FC = () => {
   }, [scrollbarRef]);
 
   const handleOpenLinkPopup = useCallback(() => {
-    const defaultId = globalSettings.defaultAccountId ?? accounts[0]?.id ?? "";
-    setLinkPopupAccountId(defaultId);
     setShowLinkPopupDialog(true);
-  }, [accounts, globalSettings.defaultAccountId]);
+  }, []);
 
   const handleSubmitLinkPopup = useCallback(
     async (url: string, accountId: string) => {
       setShowLinkPopupDialog(false);
-      setLinkPopupUrl("");
       if (!url.trim()) return;
       const resolved = url.startsWith("http") ? url : "https://" + url;
       const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
@@ -230,6 +226,11 @@ const App: React.FC = () => {
     },
     [accounts],
   );
+
+  const linkPopupDefaultAccountId =
+    globalSettings.defaultAccountId ?? accounts[0]?.id ?? "";
+  const composeTweetDefaultAccountId =
+    globalSettings.defaultAccountId ?? accounts[0]?.id ?? "";
 
   const handleTabAction = useCallback(
     async (columnId: string) => {
@@ -365,93 +366,21 @@ const App: React.FC = () => {
       </div>
 
       {showLinkPopupDialog && (
-        <div className={styles.linkPopupOverlay}>
-          <div className={styles.linkPopupPanel}>
-            <h3>URLをポップアップウィンドウで開く</h3>
-            <input
-              type="text"
-              placeholder="https://x.com/..."
-              value={linkPopupUrl}
-              onChange={(e) => setLinkPopupUrl(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter")
-                  handleSubmitLinkPopup(linkPopupUrl, linkPopupAccountId);
-                if (e.key === "Escape") {
-                  setShowLinkPopupDialog(false);
-                  setLinkPopupUrl("");
-                }
-              }}
-              autoFocus
-            />
-            {accounts.length > 1 && (
-              <select
-                value={linkPopupAccountId}
-                onChange={(e) => setLinkPopupAccountId(e.target.value)}
-              >
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.label}
-                  </option>
-                ))}
-              </select>
-            )}
-            <div className={styles.linkPopupActions}>
-              <button
-                className={styles.cancelBtn}
-                onClick={() => {
-                  setShowLinkPopupDialog(false);
-                  setLinkPopupUrl("");
-                }}
-              >
-                キャンセル
-              </button>
-              <button
-                className={styles.okBtn}
-                onClick={() =>
-                  handleSubmitLinkPopup(linkPopupUrl, linkPopupAccountId)
-                }
-              >
-                開く
-              </button>
-            </div>
-          </div>
-        </div>
+        <LinkPopupDialog
+          accounts={accounts}
+          defaultAccountId={linkPopupDefaultAccountId}
+          onSubmit={handleSubmitLinkPopup}
+          onClose={() => setShowLinkPopupDialog(false)}
+        />
       )}
 
       {showComposeTweetDialog && (
-        <div className={styles.linkPopupOverlay}>
-          <div className={styles.linkPopupPanel}>
-            <h3>ツイートするアカウントを選択</h3>
-            <select
-              value={composeTweetAccountId}
-              onChange={(e) => setComposeTweetAccountId(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") setShowComposeTweetDialog(false);
-              }}
-              autoFocus
-            >
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.label}
-                </option>
-              ))}
-            </select>
-            <div className={styles.linkPopupActions}>
-              <button
-                className={styles.cancelBtn}
-                onClick={() => setShowComposeTweetDialog(false)}
-              >
-                キャンセル
-              </button>
-              <button
-                className={styles.okBtn}
-                onClick={() => handleSubmitComposeTweet(composeTweetAccountId)}
-              >
-                ツイート
-              </button>
-            </div>
-          </div>
-        </div>
+        <ComposeTweetDialog
+          accounts={accounts}
+          defaultAccountId={composeTweetDefaultAccountId}
+          onSubmit={handleSubmitComposeTweet}
+          onClose={() => setShowComposeTweetDialog(false)}
+        />
       )}
 
       {showAddColumn && accounts.length > 0 && (
