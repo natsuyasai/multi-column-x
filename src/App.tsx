@@ -252,8 +252,6 @@ const App: React.FC = () => {
       }).catch(console.error);
       return;
     }
-    const defaultId = globalSettings.defaultAccountId ?? accounts[0].id;
-    setComposeTweetAccountId(defaultId);
     setShowComposeTweetDialog(true);
   }, [accounts, globalSettings.defaultAccountId, isMobile]);
 
