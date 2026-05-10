@@ -5,7 +5,7 @@
     /^https:\/\/x\.com\/(.+)\/status\/(\d+)\/photo\/(\d+)/;
   const MAX_SCROLL_ATTEMPTS = 50;
   const SCROLL_STEP = 500;
-  const SCROLL_INTERVAL = 400;
+  const SCROLL_INTERVAL = 5;
 
   function isHomePage(): boolean {
     return HOME_URL_PATTERN.test(window.location.href);
@@ -39,7 +39,8 @@
   }
 
   function findLinkElementByHref(targetPath: string): HTMLAnchorElement | null {
-    const links = document.querySelectorAll<HTMLAnchorElement>('a[role="link"]');
+    const links =
+      document.querySelectorAll<HTMLAnchorElement>('a[role="link"]');
     for (const link of links) {
       const href = link.getAttribute("href");
       if (href && href === targetPath) return link;
