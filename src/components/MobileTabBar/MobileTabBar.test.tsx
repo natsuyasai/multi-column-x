@@ -10,6 +10,7 @@ const baseSettings = {
   showCountdown: true,
   areaRemoveEnabled: true,
   showCustomMenu: false,
+  scrollPosRestoreEnabled: true,
   customCSS: "",
   visibleLinks: [],
 };

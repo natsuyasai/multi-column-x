@@ -137,6 +137,19 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 カスタムメニューボタンを表示する
               </label>
             )}
+            <label className={styles.checkLabel}>
+              <input
+                type="checkbox"
+                checked={settings.scrollPosRestoreEnabled}
+                onChange={(e) =>
+                  setSettings((s) => ({
+                    ...s,
+                    scrollPosRestoreEnabled: e.target.checked,
+                  }))
+                }
+              />
+              写真閲覧後のスクロール位置を復元する
+            </label>
           </section>
 
           <section className={styles.section}>

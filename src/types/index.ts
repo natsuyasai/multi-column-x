@@ -14,6 +14,7 @@ export interface ColumnSettings {
   showCountdown: boolean;
   areaRemoveEnabled: boolean;
   showCustomMenu: boolean;
+  scrollPosRestoreEnabled: boolean;
   customCSS: string;
   visibleLinks: string[];
 }
@@ -65,6 +66,7 @@ export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
   showCountdown: true,
   areaRemoveEnabled: true,
   showCustomMenu: false,
+  scrollPosRestoreEnabled: true,
   customCSS: "",
   visibleLinks: [],
 };
