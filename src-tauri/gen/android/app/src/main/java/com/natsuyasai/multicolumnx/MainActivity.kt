@@ -26,6 +26,9 @@ class MainActivity : TauriActivity() {
   private val columnWebViews = ConcurrentHashMap<String, WebView>()
   // ポップアップ WebView スタック（表示順に積む）。UI スレッドからのみ操作する。
   private val popupWebViews = ArrayDeque<Pair<String, WebView>>()
+  // 現在表示中のカラム WebView の ID（showColumnWebView 呼び出し時に更新）。
+  // 戻るボタン時の canGoBack 判定に使う。UI スレッドからのみアクセスする。
+  private var activeColumnWebViewId: String? = null
 
   // 「↓ → 左右」L字ジェスチャーの状態マシン
   private enum class LGesturePhase { IDLE, DOWN, HORIZONTAL, CANCELLED }
@@ -70,10 +73,16 @@ class MainActivity : TauriActivity() {
 
     onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
       override fun handleOnBackPressed() {
-        if (!closeTopPopupWebView()) {
-          // ポップアップがない場合はアプリをバックグラウンドに送る（finish しない）
-          moveTaskToBack(true)
+        // 1. ポップアップが開いていれば最前面を閉じる
+        if (closeTopPopupWebView()) return
+        // 2. アクティブなカラム WebView が戻れる履歴を持っていれば戻る
+        val activeWv = activeColumnWebViewId?.let { columnWebViews[it] }
+        if (activeWv != null && activeWv.canGoBack()) {
+          activeWv.goBack()
+          return
         }
+        // 3. それ以外はアプリをバックグラウンドへ（終了しない）
+        moveTaskToBack(true)
       }
     })
 
@@ -348,6 +357,7 @@ class MainActivity : TauriActivity() {
   // onResume() で JS タイマーを再開してから表示する。
   fun showColumnWebView(id: String, widthDp: Int, heightDp: Int) {
     runOnUiThread {
+      activeColumnWebViewId = id
       columnWebViews[id]?.let { wv ->
         val density = resources.displayMetrics.density
         (wv.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
