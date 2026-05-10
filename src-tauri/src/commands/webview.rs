@@ -237,56 +237,50 @@ pub async fn resize_column_webview(_app: AppHandle, bounds: ResizeBounds) -> Res
     Ok(())
 }
 
-fn load_video_auto_play_stop_enabled(app: &AppHandle) -> bool {
+fn load_global_settings(app: &AppHandle) -> serde_json::Value {
     app.store("settings.json")
         .ok()
         .and_then(|store| store.get("appSettings"))
         .and_then(|v| v.get("globalSettings").cloned())
-        .and_then(|gs| gs.get("videoAutoPlayStopEnabled").and_then(|v| v.as_bool()))
+        .unwrap_or(serde_json::Value::Null)
+}
+
+fn load_video_auto_play_stop_enabled(app: &AppHandle) -> bool {
+    load_global_settings(app)
+        .get("videoAutoPlayStopEnabled")
+        .and_then(|v| v.as_bool())
         .unwrap_or(false)
 }
 
 fn load_small_image_settings(app: &AppHandle) -> (bool, String) {
-    let gs = app
-        .store("settings.json")
-        .ok()
-        .and_then(|store| store.get("appSettings"))
-        .and_then(|v| v.get("globalSettings").cloned());
-    let enabled = gs
-        .as_ref()
-        .and_then(|g| g.get("smallImageEnabled").and_then(|v| v.as_bool()))
-        .unwrap_or(false);
+    let gs = load_global_settings(app);
+    let enabled = gs.get("smallImageEnabled").and_then(|v| v.as_bool()).unwrap_or(false);
     let width = gs
-        .as_ref()
-        .and_then(|g| g.get("smallImageWidth").and_then(|v| v.as_str()).map(str::to_owned))
+        .get("smallImageWidth")
+        .and_then(|v| v.as_str())
+        .map(str::to_owned)
         .unwrap_or_else(|| "50%".to_string());
     (enabled, width)
 }
 
 fn load_hide_ad_enabled(app: &AppHandle) -> bool {
-    app.store("settings.json")
-        .ok()
-        .and_then(|store| store.get("appSettings"))
-        .and_then(|v| v.get("globalSettings").cloned())
-        .and_then(|gs| gs.get("hideAdEnabled").and_then(|v| v.as_bool()))
+    load_global_settings(app)
+        .get("hideAdEnabled")
+        .and_then(|v| v.as_bool())
         .unwrap_or(false)
 }
 
 fn load_zoom_level(app: &AppHandle) -> f64 {
-    app.store("settings.json")
-        .ok()
-        .and_then(|store| store.get("appSettings"))
-        .and_then(|v| v.get("globalSettings").cloned())
-        .and_then(|gs| gs.get("zoomLevel").and_then(|v| v.as_f64()))
+    load_global_settings(app)
+        .get("zoomLevel")
+        .and_then(|v| v.as_f64())
         .unwrap_or(1.0)
 }
 
 fn load_popup_esc_close_enabled(app: &AppHandle) -> bool {
-    app.store("settings.json")
-        .ok()
-        .and_then(|store| store.get("appSettings"))
-        .and_then(|v| v.get("globalSettings").cloned())
-        .and_then(|gs| gs.get("popupEscCloseEnabled").and_then(|v| v.as_bool()))
+    load_global_settings(app)
+        .get("popupEscCloseEnabled")
+        .and_then(|v| v.as_bool())
         .unwrap_or(true)
 }
 
