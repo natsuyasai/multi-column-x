@@ -267,6 +267,13 @@ const App: React.FC = () => {
     [columns],
   );
 
+  const settingsColumn = settingsColumnId
+    ? columns.find((c) => c.id === settingsColumnId)
+    : undefined;
+  const tabActionColumn = tabActionColumnId
+    ? columns.find((c) => c.id === tabActionColumnId)
+    : undefined;
+
   if (!isLoaded) {
     return (
       <div className={styles.loading}>
@@ -499,37 +506,29 @@ const App: React.FC = () => {
         />
       )}
 
-      {settingsColumnId &&
-        (() => {
-          const col = columns.find((c) => c.id === settingsColumnId);
-          return col ? (
-            <SettingsPanel
-              column={col}
-              onApply={handleApplySettings}
-              onClose={() => setSettingsColumnId(null)}
-              isMobile={isMobile}
-            />
-          ) : null;
-        })()}
+      {settingsColumn && (
+        <SettingsPanel
+          column={settingsColumn}
+          onApply={handleApplySettings}
+          onClose={() => setSettingsColumnId(null)}
+          isMobile={isMobile}
+        />
+      )}
 
-      {tabActionColumnId &&
-        (() => {
-          const col = columns.find((c) => c.id === tabActionColumnId);
-          return col ? (
-            <TabActionDialog
-              columnLabel={col.label || col.pageType}
-              onSettings={() => {
-                setTabActionColumnId(null);
-                setSettingsColumnId(col.id);
-              }}
-              onRemove={() => {
-                setTabActionColumnId(null);
-                handleRemoveColumn(col.id);
-              }}
-              onClose={() => setTabActionColumnId(null)}
-            />
-          ) : null;
-        })()}
+      {tabActionColumn && (
+        <TabActionDialog
+          columnLabel={tabActionColumn.label || tabActionColumn.pageType}
+          onSettings={() => {
+            setTabActionColumnId(null);
+            setSettingsColumnId(tabActionColumn.id);
+          }}
+          onRemove={() => {
+            setTabActionColumnId(null);
+            handleRemoveColumn(tabActionColumn.id);
+          }}
+          onClose={() => setTabActionColumnId(null)}
+        />
+      )}
     </div>
   );
 };
