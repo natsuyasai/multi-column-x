@@ -232,45 +232,44 @@ export function useColumns() {
   }, [activeColumnId, setActiveColumn]);
 
   // 全カラムのWebViewを作成（起動時に呼ぶ）
-  const restoreColumns = useCallback(async (sidebarWidth: number) => {
-    if (!containerRef.current) return;
-    const containerHeight = containerRef.current.clientHeight;
-    const scrollLeft = scrollbarRef.current?.scrollLeft ?? 0;
-    const {
-      columns: currentColumns,
-      accounts: currentAccounts,
-      isMobile,
-    } = useAppStore.getState();
-
-    if (isMobile) {
-      const sortedByOrder = [...currentColumns].sort((a, b) => a.order - b.order);
-      const firstColumn = sortedByOrder[0];
-      // バックグラウンド復帰後の React リロード時に以前のアクティブカラムを復元する
-      let savedId: string | null = null;
-      try { savedId = localStorage.getItem("mcx_activeColumnId"); } catch {}
-      const targetColumn =
-        (savedId ? sortedByOrder.find((c) => c.id === savedId) : null) ?? firstColumn;
-      for (const column of sortedByOrder) {
-        const account = currentAccounts.find((a) => a.id === column.accountId);
-        if (!account) continue;
-        const isActive = column.id === targetColumn?.id;
-        await invoke(IPC_COMMANDS.CREATE_COLUMN_WEBVIEW, {
-          args: {
-            column,
-            dataDirectory: account.dataDirectory,
-            x: isActive ? 0 : -99999,
-            y: 0,
-            width: window.innerWidth,
-            height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
-          },
-        }).catch(console.error);
-      }
-      if (targetColumn) {
-        await setActiveColumn(targetColumn.id);
-      }
-      return;
+  const restoreMobileColumns = useCallback(async (
+    currentColumns: Column[],
+    currentAccounts: ReturnType<typeof useAppStore.getState>["accounts"],
+  ) => {
+    const sortedByOrder = [...currentColumns].sort((a, b) => a.order - b.order);
+    const firstColumn = sortedByOrder[0];
+    // バックグラウンド復帰後の React リロード時に以前のアクティブカラムを復元する
+    let savedId: string | null = null;
+    try { savedId = localStorage.getItem("mcx_activeColumnId"); } catch {}
+    const targetColumn =
+      (savedId ? sortedByOrder.find((c) => c.id === savedId) : null) ?? firstColumn;
+    for (const column of sortedByOrder) {
+      const account = currentAccounts.find((a) => a.id === column.accountId);
+      if (!account) continue;
+      const isActive = column.id === targetColumn?.id;
+      await invoke(IPC_COMMANDS.CREATE_COLUMN_WEBVIEW, {
+        args: {
+          column,
+          dataDirectory: account.dataDirectory,
+          x: isActive ? 0 : -99999,
+          y: 0,
+          width: window.innerWidth,
+          height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
+        },
+      }).catch(console.error);
     }
+    if (targetColumn) {
+      await setActiveColumn(targetColumn.id);
+    }
+  }, [setActiveColumn]);
 
+  const restoreDesktopColumns = useCallback(async (
+    currentColumns: Column[],
+    currentAccounts: ReturnType<typeof useAppStore.getState>["accounts"],
+    containerHeight: number,
+    scrollLeft: number,
+    sidebarWidth: number,
+  ) => {
     const bounds = calculateGridBounds(currentColumns, {
       containerHeight,
       scrollLeft,
@@ -286,7 +285,7 @@ export function useColumns() {
       if (!account) continue;
       const b = bounds[column.id];
       if (!b) continue;
-      await invoke("create_column_webview", {
+      await invoke(IPC_COMMANDS.CREATE_COLUMN_WEBVIEW, {
         args: {
           column,
           dataDirectory: account.dataDirectory,
@@ -295,6 +294,24 @@ export function useColumns() {
       }).catch(console.error);
     }
   }, []);
+
+  const restoreColumns = useCallback(async (sidebarWidth: number) => {
+    if (!containerRef.current) return;
+    const containerHeight = containerRef.current.clientHeight;
+    const scrollLeft = scrollbarRef.current?.scrollLeft ?? 0;
+    const {
+      columns: currentColumns,
+      accounts: currentAccounts,
+      isMobile,
+    } = useAppStore.getState();
+
+    if (isMobile) {
+      await restoreMobileColumns(currentColumns, currentAccounts);
+      return;
+    }
+
+    await restoreDesktopColumns(currentColumns, currentAccounts, containerHeight, scrollLeft, sidebarWidth);
+  }, [restoreMobileColumns, restoreDesktopColumns]);
 
   // カラム追加
   const handleAddColumn = useCallback(
