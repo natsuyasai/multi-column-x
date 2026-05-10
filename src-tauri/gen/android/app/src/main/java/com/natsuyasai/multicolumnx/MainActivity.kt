@@ -146,9 +146,10 @@ class MainActivity : TauriActivity() {
             }
             if (enteredForward) {
               lGesturePhase = LGesturePhase.FORWARD
-              val dir = lGestureReverseDir ?: return super.dispatchTouchEvent(ev)
-              Log.d(TAG, "boomerang-gesture: progress dir=$dir")
-              AppBridge.onSwipeProgress(dir)
+              val reverseDir = lGestureReverseDir ?: return super.dispatchTouchEvent(ev)
+              val navDir = if (reverseDir == "left") "right" else "left"
+              Log.d(TAG, "boomerang-gesture: progress navDir=$navDir")
+              AppBridge.onSwipeProgress(navDir)
             }
           }
           LGesturePhase.FORWARD -> { /* 速度は ACTION_UP で判定 */ }
@@ -167,8 +168,9 @@ class MainActivity : TauriActivity() {
             else -> false
           }
           if (hasForwardVelocity && reverseDir != null) {
-            Log.d(TAG, "boomerang-gesture: navigate dir=$reverseDir vx=$vx")
-            AppBridge.onSwipeNavigate(reverseDir)
+            val navDir = if (reverseDir == "left") "right" else "left"
+            Log.d(TAG, "boomerang-gesture: navigate navDir=$navDir vx=$vx")
+            AppBridge.onSwipeNavigate(navDir)
           } else {
             AppBridge.onSwipeCancel()
           }
