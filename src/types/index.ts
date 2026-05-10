@@ -91,6 +91,31 @@ interface ResolveColumnUrlInput {
   listId?: string;
 }
 
+interface GetPageTypeLabelInput {
+  pageType: PageType;
+  homeTabName?: string;
+  searchQuery?: string;
+}
+
+export function getPageTypeLabel(input: GetPageTypeLabelInput): string {
+  switch (input.pageType) {
+    case "home":
+      return input.homeTabName ?? "ホーム";
+    case "notifications":
+      return "通知";
+    case "search":
+      return input.searchQuery ? `検索: ${input.searchQuery}` : "検索";
+    case "list":
+      return "リスト";
+    case "custom":
+      return "カスタム";
+  }
+}
+
+export function getColumnLabel(column: Column): string {
+  return column.label ?? getPageTypeLabel(column);
+}
+
 export function resolveColumnUrl(input: ResolveColumnUrlInput): string {
   switch (input.pageType) {
     case "home":

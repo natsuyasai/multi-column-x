@@ -3,20 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useAppStore } from "../store/useAppStore";
-import type { Column, PageType } from "../types";
+import type { Column } from "../types";
 import { IPC_COMMANDS, IPC_EVENTS } from "../constants/ipc";
-
-export function getMobileTabLabel(column: Column): string {
-  if (column.label) return column.label;
-  const labels: Record<PageType, string> = {
-    home: column.homeTabName ?? "ホーム",
-    notifications: "通知",
-    search: column.searchQuery ? `検索: ${column.searchQuery}` : "検索",
-    list: "リスト",
-    custom: "カスタム",
-  };
-  return labels[column.pageType];
-}
 
 
 export const HEADER_HEIGHT = 36; // ColumnHeader の高さ（px）

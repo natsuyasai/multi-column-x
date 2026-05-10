@@ -1,5 +1,6 @@
 import React from "react";
 import type { Account, Column } from "../../types";
+import { getPageTypeLabel } from "../../types";
 import { useAutoReload } from "../../hooks/useAutoReload";
 import styles from "./ColumnHeader.module.scss";
 
@@ -28,7 +29,7 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
   isLast,
   showSortButtons,
 }) => {
-  const label = column.label ?? `${account.label} - ${getPageLabel(column)}`;
+  const label = column.label ?? `${account.label} - ${getPageTypeLabel(column)}`;
   const { remaining, reset } = useAutoReload({
     columnId: column.id,
     enabled: column.settings.autoReloadEnabled,
@@ -101,17 +102,3 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
   );
 };
 
-function getPageLabel(column: Column): string {
-  switch (column.pageType) {
-    case "home":
-      return column.homeTabName ?? "ホーム";
-    case "notifications":
-      return "通知";
-    case "search":
-      return `検索: ${column.searchQuery ?? ""}`;
-    case "list":
-      return "リスト";
-    case "custom":
-      return "カスタム";
-  }
-}
