@@ -16,6 +16,7 @@
     "tauri:build": "npm run build:inject && tauri build",
     "tauri:build:debug": "tauri build --debug",
     "tauri:android:build": "tauri android build",
+    "tauri:android:build:debug": "tauri android build --debug",
     "tauri:android:dev": "tauri android dev",
     "tauri:android:dev:clear-cache": "tauri android dev -- --clear-cache"
   },
