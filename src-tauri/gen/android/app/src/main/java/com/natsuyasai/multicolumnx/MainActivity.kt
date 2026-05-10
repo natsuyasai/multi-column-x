@@ -27,6 +27,9 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 class MainActivity : TauriActivity() {
+  private val contentRoot: FrameLayout
+    get() = window.decorView.findViewById(android.R.id.content)
+
   private val columnWebViews = ConcurrentHashMap<String, WebView>()
   // ポップアップ WebView スタック（表示順に積む）。UI スレッドからのみ操作する。
   private val popupWebViews = ArrayDeque<Pair<String, WebView>>()
@@ -230,7 +233,7 @@ class MainActivity : TauriActivity() {
             WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
           }
         }
-        val contentRoot = window.decorView.findViewById<FrameLayout>(android.R.id.content)
+        val contentRoot = contentRoot
         val params = FrameLayout.LayoutParams(
           FrameLayout.LayoutParams.MATCH_PARENT,
           FrameLayout.LayoutParams.MATCH_PARENT
@@ -253,7 +256,7 @@ class MainActivity : TauriActivity() {
         val idx = popupWebViews.indexOfFirst { it.first == id }
         if (idx >= 0) {
           val wv = popupWebViews.removeAt(idx).second
-          val contentRoot = window.decorView.findViewById<FrameLayout>(android.R.id.content)
+          val contentRoot = contentRoot
           contentRoot.removeView(wv)
           wv.destroy()
         }
@@ -269,7 +272,7 @@ class MainActivity : TauriActivity() {
   fun closeTopPopupWebView(): Boolean {
     if (popupWebViews.isEmpty()) return false
     val wv = popupWebViews.removeLast().second
-    val contentRoot = window.decorView.findViewById<FrameLayout>(android.R.id.content)
+    val contentRoot = contentRoot
     contentRoot.removeView(wv)
     wv.destroy()
     return true
@@ -334,7 +337,7 @@ class MainActivity : TauriActivity() {
           (heightDp * density).toInt()
         )
 
-        val contentRoot = window.decorView.findViewById<FrameLayout>(android.R.id.content)
+        val contentRoot = contentRoot
         contentRoot.addView(webView, params)
         columnWebViews[id] = webView
 
@@ -352,7 +355,7 @@ class MainActivity : TauriActivity() {
     runOnUiThread {
       try {
         columnWebViews[id]?.let { wv ->
-          val contentRoot = window.decorView.findViewById<FrameLayout>(android.R.id.content)
+          val contentRoot = contentRoot
           contentRoot.removeView(wv)
           wv.destroy()
           columnWebViews.remove(id)
