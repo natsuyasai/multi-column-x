@@ -36,30 +36,38 @@
   }
 
   function trySelectWithObserver(tabName: string): void {
-    if (document.querySelector('div[role="tablist"]')) {
-      if (!selectTab(tabName)) {
-        setTimeout(function () {
-          selectTab(tabName);
-        }, 1000);
-      }
-      return;
-    }
-    const observer = new MutationObserver(function () {
-      if (document.querySelector('div[role="tablist"]')) {
+    // 既に選択できれば即終了
+    if (selectTab(tabName)) return;
+
+    let done = false;
+
+    function attempt(): void {
+      if (done) return;
+      if (selectTab(tabName)) {
+        done = true;
         observer.disconnect();
-        if (!selectTab(tabName)) {
-          setTimeout(function () {
-            selectTab(tabName);
-          }, 1000);
-        }
+        clearInterval(polling);
       }
-    });
+    }
+
+    // DOM 変化のたびに試行（タブリスト出現・内容更新を検知）
     const observeTarget = document.body || document.documentElement;
-    if (!observeTarget) return;
-    observer.observe(observeTarget, { childList: true, subtree: true });
+    const observer = new MutationObserver(attempt);
+    if (observeTarget) {
+      observer.observe(observeTarget, { childList: true, subtree: true });
+    }
+
+    // MutationObserver が拾えないケースへの 300ms ポーリングフォールバック
+    const polling = setInterval(attempt, 300);
+
+    // 10 秒経過で諦める
     setTimeout(function () {
-      observer.disconnect();
-    }, 5000);
+      if (!done) {
+        done = true;
+        observer.disconnect();
+        clearInterval(polling);
+      }
+    }, 10000);
   }
 
   function initializeTab(): void {
