@@ -30,14 +30,14 @@ class MainActivity : TauriActivity() {
   // 戻るボタン時の canGoBack 判定に使う。UI スレッドからのみアクセスする。
   private var activeColumnWebViewId: String? = null
 
-  // 「↓ → 左右」L字ジェスチャーの状態マシン
-  private enum class LGesturePhase { IDLE, DOWN, HORIZONTAL, CANCELLED }
+  // 「逆引き → 前進」ブーメランジェスチャーの状態マシン
+  // 右カラムへ: 左引き → 右リリース、左カラムへ: 右引き → 左リリース
+  private enum class LGesturePhase { IDLE, REVERSE, FORWARD, CANCELLED }
   private var lGesturePhase = LGesturePhase.IDLE
   private var lGestureStartX = 0f
   private var lGestureStartY = 0f
-  private var lGesturePivotX = 0f  // 下方向移動の最も低い点のX
-  private var lGesturePivotY = 0f  // 下方向移動の最も低い点のY
-  private var lGestureDirection: String? = null
+  private var lGestureExtremeX = 0f  // 逆方向移動の最端点X
+  private var lGestureReverseDir: String? = null  // 最初の引き方向: "left" or "right"
   private var lVelocityTracker: VelocityTracker? = null
 
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -88,13 +88,14 @@ class MainActivity : TauriActivity() {
 
   }
 
-  // 「↓ → 左右」L字ジェスチャーでカラムを切り替える。
-  // ↓: 縦方向に MIN_DOWN_DP 以上移動してから、横方向に MIN_HORIZ_DP 以上移動すると発動。
-  // コンテンツ内の横スワイプ（画像カルーセル等）や縦スクロールとは区別される。
+  // 「逆引き → 前進」ブーメランジェスチャーでカラムを切り替える。
+  // 右カラムへ移動したい場合: 左に引いてから右へリリース（reverseDir="left" → navigate "left"）
+  // 左カラムへ移動したい場合: 右に引いてから左へリリース（reverseDir="right" → navigate "right"）
+  // 縦スクロールや単純な横スワイプとは区別される。
   override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
     val density = resources.displayMetrics.density
-    val MIN_DOWN_PX = 40f * density
-    val MIN_HORIZ_PX = 40f * density
+    val MIN_REVERSE_PX = 30f * density  // 逆引きの最小距離
+    val MIN_FORWARD_PX = 30f * density  // 最端点からの最小前進距離
     val MIN_VELOCITY_PX = 300f
 
     lVelocityTracker?.addMovement(ev)
@@ -107,9 +108,8 @@ class MainActivity : TauriActivity() {
         lGesturePhase = LGesturePhase.IDLE
         lGestureStartX = ev.x
         lGestureStartY = ev.y
-        lGesturePivotX = ev.x
-        lGesturePivotY = ev.y
-        lGestureDirection = null
+        lGestureExtremeX = ev.x
+        lGestureReverseDir = null
       }
       MotionEvent.ACTION_MOVE -> {
         if (popupWebViews.isNotEmpty()) {
@@ -119,64 +119,65 @@ class MainActivity : TauriActivity() {
             val dx = ev.x - lGestureStartX
             val dy = ev.y - lGestureStartY
             when {
-              // 下方向に十分移動したら DOWN フェーズへ
-              dy > MIN_DOWN_PX && dy > Math.abs(dx) * 1.2f -> {
-                lGesturePhase = LGesturePhase.DOWN
-                lGesturePivotX = ev.x
-                lGesturePivotY = ev.y
+              // 水平方向に十分移動したら REVERSE フェーズへ
+              Math.abs(dx) > MIN_REVERSE_PX && Math.abs(dx) > Math.abs(dy) * 1.5f -> {
+                lGesturePhase = LGesturePhase.REVERSE
+                lGestureReverseDir = if (dx < 0) "left" else "right"
+                lGestureExtremeX = ev.x
               }
-              // 最初から横方向に動いたらキャンセル（コンテンツスワイプ）
-              Math.abs(dx) > MIN_HORIZ_PX * 0.4f && Math.abs(dx) > dy * 2f -> {
+              // 最初から縦方向に動いたらキャンセル（スクロール）
+              Math.abs(dy) > MIN_REVERSE_PX && Math.abs(dy) > Math.abs(dx) * 1.5f -> {
                 lGesturePhase = LGesturePhase.CANCELLED
               }
             }
           }
-          LGesturePhase.DOWN -> {
-            // ピボット（最下点）を更新
-            if (ev.y > lGesturePivotY) {
-              lGesturePivotX = ev.x
-              lGesturePivotY = ev.y
+          LGesturePhase.REVERSE -> {
+            // 逆引き方向の最端点を更新
+            when (lGestureReverseDir) {
+              "left" -> if (ev.x < lGestureExtremeX) lGestureExtremeX = ev.x
+              "right" -> if (ev.x > lGestureExtremeX) lGestureExtremeX = ev.x
             }
-            val dxFromPivot = ev.x - lGesturePivotX
-            val dyFromPivot = ev.y - lGesturePivotY
-            // ピボットから横方向に十分移動したら HORIZONTAL フェーズへ
-            if (Math.abs(dxFromPivot) > MIN_HORIZ_PX && Math.abs(dxFromPivot) > Math.abs(dyFromPivot)) {
-              lGesturePhase = LGesturePhase.HORIZONTAL
-              val dir = if (dxFromPivot < 0) "left" else "right"
-              lGestureDirection = dir
-              Log.d(TAG, "L-gesture: progress dir=$dir")
+            // 最端点から逆方向（前進方向）へ MIN_FORWARD_PX 以上戻ったら FORWARD フェーズへ
+            val dxFromExtreme = ev.x - lGestureExtremeX
+            val enteredForward = when (lGestureReverseDir) {
+              "left"  -> dxFromExtreme > MIN_FORWARD_PX   // 左引き後、右へ折り返した
+              "right" -> dxFromExtreme < -MIN_FORWARD_PX  // 右引き後、左へ折り返した
+              else -> false
+            }
+            if (enteredForward) {
+              lGesturePhase = LGesturePhase.FORWARD
+              val dir = lGestureReverseDir ?: return super.dispatchTouchEvent(ev)
+              Log.d(TAG, "boomerang-gesture: progress dir=$dir")
               AppBridge.onSwipeProgress(dir)
             }
           }
-          LGesturePhase.HORIZONTAL -> {
-            val dxFromPivot = ev.x - lGesturePivotX
-            val dir = if (dxFromPivot < 0) "left" else "right"
-            if (dir != lGestureDirection) {
-              lGestureDirection = dir
-              AppBridge.onSwipeProgress(dir)
-            }
-          }
+          LGesturePhase.FORWARD -> { /* 速度は ACTION_UP で判定 */ }
           LGesturePhase.CANCELLED -> {}
         }
       }
       MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-        if (lGesturePhase == LGesturePhase.HORIZONTAL) {
+        if (lGesturePhase == LGesturePhase.FORWARD) {
           lVelocityTracker?.computeCurrentVelocity(1000)
           val vx = lVelocityTracker?.xVelocity ?: 0f
-          if (Math.abs(vx) >= MIN_VELOCITY_PX) {
-            val dir = if (vx < 0) "left" else "right"
-            Log.d(TAG, "L-gesture: navigate dir=$dir vx=$vx")
-            AppBridge.onSwipeNavigate(dir)
+          val reverseDir = lGestureReverseDir
+          // 前進方向（逆引きの逆）への速度が十分あれば切り替え
+          val hasForwardVelocity = when (reverseDir) {
+            "left"  -> vx > MIN_VELOCITY_PX   // 左引き → 右への速度
+            "right" -> vx < -MIN_VELOCITY_PX  // 右引き → 左への速度
+            else -> false
+          }
+          if (hasForwardVelocity && reverseDir != null) {
+            Log.d(TAG, "boomerang-gesture: navigate dir=$reverseDir vx=$vx")
+            AppBridge.onSwipeNavigate(reverseDir)
           } else {
             AppBridge.onSwipeCancel()
           }
-        } else if (lGesturePhase == LGesturePhase.DOWN && lGestureDirection != null) {
-          AppBridge.onSwipeCancel()
         }
+        // REVERSE フェーズで離した場合は progress 未発行のためキャンセル不要
         lVelocityTracker?.recycle()
         lVelocityTracker = null
         lGesturePhase = LGesturePhase.IDLE
-        lGestureDirection = null
+        lGestureReverseDir = null
       }
     }
 
