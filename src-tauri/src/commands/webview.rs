@@ -1,5 +1,5 @@
 use super::settings::ColumnData;
-use crate::inject::build_init_script;
+use crate::inject::{build_init_script, InitScriptParams};
 use crate::ipc_constants::{events, labels};
 use crate::state::AppState;
 use std::path::PathBuf;
@@ -63,19 +63,19 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
     let (small_image_enabled, small_image_width) = load_small_image_settings(&app);
     let hide_ad_enabled = load_hide_ad_enabled(&app);
     let zoom_level = load_zoom_level(&app);
-    let init_script = build_init_script(
-        false, // is_mobile
-        args.column.settings.area_remove_enabled,
-        args.column.settings.show_custom_menu,
-        args.column.settings.auto_reload_enabled,
+    let init_script = build_init_script(&InitScriptParams {
+        is_mobile: false,
+        area_remove_enabled: args.column.settings.area_remove_enabled,
+        show_custom_menu: args.column.settings.show_custom_menu,
+        auto_reload_enabled: args.column.settings.auto_reload_enabled,
         video_auto_play_stop_enabled,
         small_image_enabled,
-        &small_image_width,
+        small_image_width: &small_image_width,
         hide_ad_enabled,
         zoom_level,
-        &args.column.settings.custom_css,
-        &args.column.settings.visible_links,
-    );
+        custom_css: &args.column.settings.custom_css,
+        visible_links: &args.column.settings.visible_links,
+    });
 
     let window = app.get_window("main").ok_or("main window not found")?;
 
@@ -111,19 +111,19 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
     let (small_image_enabled, small_image_width) = load_small_image_settings(&app);
     let hide_ad_enabled = load_hide_ad_enabled(&app);
     let zoom_level = load_zoom_level(&app);
-    let init_script = build_init_script(
-        true, // is_mobile
-        args.column.settings.area_remove_enabled,
-        args.column.settings.show_custom_menu,
-        args.column.settings.auto_reload_enabled,
+    let init_script = build_init_script(&InitScriptParams {
+        is_mobile: true,
+        area_remove_enabled: args.column.settings.area_remove_enabled,
+        show_custom_menu: args.column.settings.show_custom_menu,
+        auto_reload_enabled: args.column.settings.auto_reload_enabled,
         video_auto_play_stop_enabled,
         small_image_enabled,
-        &small_image_width,
+        small_image_width: &small_image_width,
         hide_ad_enabled,
         zoom_level,
-        &args.column.settings.custom_css,
-        &args.column.settings.visible_links,
-    );
+        custom_css: &args.column.settings.custom_css,
+        visible_links: &args.column.settings.visible_links,
+    });
 
     // Android では Tauri WebviewWindowBuilder を使わず、
     // ネイティブ Android WebView を content FrameLayout のオーバーレイとして追加する。
