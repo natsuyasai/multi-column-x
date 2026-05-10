@@ -218,12 +218,7 @@ class MainActivity : TauriActivity() {
         wv.webViewClient = ExternalLinkWebViewClient()
         wv.webChromeClient = ExternalLinkWebChromeClient()
         if (profileApiSupported && accountId.isNotEmpty()) {
-          try {
-            ProfileStore.getInstance().getOrCreateProfile("account-$accountId")
-            WebViewCompat.setProfile(wv, "account-$accountId")
-          } catch (e: Exception) {
-            Log.w(TAG, "Profile API unavailable for popup $id: ${e.message}")
-          }
+          setupWebViewProfile(wv, accountId, "popup $id")
         } else if (!profileApiSupported && accountId.isNotEmpty()) {
           setCookieForAccount(accountId)
         }
@@ -301,12 +296,7 @@ class MainActivity : TauriActivity() {
         wv.webViewClient = ExternalLinkWebViewClient()
         wv.webChromeClient = ExternalLinkWebChromeClient()
         if (profileApiSupported) {
-          try {
-            ProfileStore.getInstance().getOrCreateProfile("account-$accountId")
-            WebViewCompat.setProfile(wv, "account-$accountId")
-          } catch (e: Exception) {
-            Log.w(TAG, "Profile API unavailable for column $id: ${e.message}")
-          }
+          setupWebViewProfile(wv, accountId, "column $id")
         }
         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
           WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
@@ -473,6 +463,15 @@ class MainActivity : TauriActivity() {
       transport.webView = helper
       resultMsg.sendToTarget()
       return true
+    }
+  }
+
+  private fun setupWebViewProfile(webView: WebView, accountId: String, contextName: String) {
+    try {
+      ProfileStore.getInstance().getOrCreateProfile("account-$accountId")
+      WebViewCompat.setProfile(webView, "account-$accountId")
+    } catch (e: Exception) {
+      Log.w(TAG, "Profile API unavailable for $contextName: ${e.message}")
     }
   }
 
