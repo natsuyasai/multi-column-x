@@ -1,12 +1,16 @@
 package com.natsuyasai.multicolumnx
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.os.Message
 import android.util.Log
 import android.view.MotionEvent
 import android.view.VelocityTracker
 import android.view.View
 import android.webkit.CookieManager
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
@@ -209,7 +213,9 @@ class MainActivity : TauriActivity() {
         val webView = WebView(this).also { wv ->
           wv.settings.javaScriptEnabled = true
           wv.settings.domStorageEnabled = true
-          wv.webViewClient = WebViewClient()
+          wv.settings.setSupportMultipleWindows(true)
+          wv.webViewClient = ExternalLinkWebViewClient()
+          wv.webChromeClient = ExternalLinkWebChromeClient()
           if (profileApiSupported && accountId.isNotEmpty()) {
             try {
               ProfileStore.getInstance().getOrCreateProfile("account-$accountId")
@@ -305,7 +311,9 @@ class MainActivity : TauriActivity() {
         val webView = WebView(this).also { wv ->
           wv.settings.javaScriptEnabled = true
           wv.settings.domStorageEnabled = true
-          wv.webViewClient = WebViewClient()
+          wv.settings.setSupportMultipleWindows(true)
+          wv.webViewClient = ExternalLinkWebViewClient()
+          wv.webChromeClient = ExternalLinkWebChromeClient()
           if (profileApiSupported) {
             try {
               ProfileStore.getInstance().getOrCreateProfile("account-$accountId")
@@ -430,6 +438,68 @@ class MainActivity : TauriActivity() {
     }
     cookieManager.flush()
     Log.d(TAG, "setCookieForAccount: set cookies for $accountId")
+  }
+
+  // x.com / twitter.com のドメインに属する URL かどうかを判定する。
+  // これらは WebView 内でそのまま表示し、外部 URL はシステムブラウザへ委譲する。
+  private fun isInternalUrl(url: String): Boolean {
+    return url.startsWith("https://x.com") ||
+      url.startsWith("https://twitter.com") ||
+      url.startsWith("http://localhost") ||
+      url.startsWith("about:") ||
+      url.startsWith("blob:")
+  }
+
+  // 指定 URL をシステムデフォルトブラウザで開く。
+  private fun openUrlInBrowser(url: String) {
+    try {
+      val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+      startActivity(intent)
+    } catch (e: Exception) {
+      Log.w(TAG, "openUrlInBrowser: failed to open $url: ${e.message}")
+    }
+  }
+
+  // カラム / ポップアップ WebView 用 WebViewClient。
+  // x.com 内のナビゲーションはそのまま WebView に委ね、外部 URL はシステムブラウザへ転送する。
+  private inner class ExternalLinkWebViewClient : WebViewClient() {
+    override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+      val url = request.url.toString()
+      if (isInternalUrl(url)) return false
+      openUrlInBrowser(url)
+      return true
+    }
+  }
+
+  // target="_blank" / window.open() によるリンク遷移を処理する WebChromeClient。
+  // ユーザー操作起因の場合のみ対応し、x.com リンクは元 WebView 内でナビゲート、
+  // 外部リンクはシステムブラウザへ転送する。
+  private inner class ExternalLinkWebChromeClient : WebChromeClient() {
+    override fun onCreateWindow(
+      view: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message
+    ): Boolean {
+      if (!isUserGesture) return false
+      // ヘルパー WebView を使って新しいウィンドウのリクエスト URL を取得する。
+      val helper = WebView(this@MainActivity)
+      helper.webViewClient = object : WebViewClient() {
+        override fun shouldOverrideUrlLoading(
+          helperView: WebView, request: WebResourceRequest
+        ): Boolean {
+          val url = request.url.toString()
+          if (isInternalUrl(url)) {
+            // x.com リンク: 元の WebView でそのまま遷移する
+            view.loadUrl(url)
+          } else {
+            openUrlInBrowser(url)
+          }
+          return true
+        }
+      }
+      val transport = resultMsg.obj as WebView.WebViewTransport
+      transport.webView = helper
+      resultMsg.sendToTarget()
+      return true
+    }
   }
 
   companion object {
