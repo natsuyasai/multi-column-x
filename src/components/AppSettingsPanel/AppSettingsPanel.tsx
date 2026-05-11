@@ -246,7 +246,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 <button
                   type="button"
                   className={styles.applyAllBtn}
-                  onClick={onReloadAllWebviews}
+                  onClick={() => { onReloadAllWebviews(); onClose(); }}
                 >
                   全WebViewを再生成
                 </button>
