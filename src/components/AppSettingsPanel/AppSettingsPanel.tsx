@@ -10,6 +10,7 @@ interface AppSettingsPanelProps {
   onApply: (patch: Partial<GlobalSettings>) => void;
   onApplyLayout: (columns: Column[]) => void;
   onApplyColumnDefaults: (patch: Pick<ColumnSettings, "autoReloadEnabled" | "autoReloadInterval">) => void;
+  onReloadAllWebviews: () => void;
   onClose: () => void;
 }
 
@@ -20,6 +21,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   onApply,
   onApplyLayout,
   onApplyColumnDefaults,
+  onReloadAllWebviews,
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<"general" | "layout">("general");
@@ -234,6 +236,20 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                     />
                   </label>
                 )}
+              </section>
+
+              <section className={styles.section}>
+                <h3 className={styles.sectionTitle}>WebView</h3>
+                <p className={styles.hint}>
+                  全カラムのWebViewを順番に再生成します。設定は維持されます。
+                </p>
+                <button
+                  type="button"
+                  className={styles.applyAllBtn}
+                  onClick={onReloadAllWebviews}
+                >
+                  全WebViewを再生成
+                </button>
               </section>
 
             </form>

@@ -56,6 +56,7 @@ const App: React.FC = () => {
     swipeState,
     setActiveColumn,
     setDialogOpen,
+    recreateAllWebviews,
   } = useColumns();
   const { startAddAccount, removeAccount } = useAccounts();
   const {
@@ -438,6 +439,7 @@ const App: React.FC = () => {
               })),
             );
           }}
+          onReloadAllWebviews={recreateAllWebviews}
           onClose={() => setShowAppSettings(false)}
         />
       )}

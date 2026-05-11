@@ -473,6 +473,14 @@ export function useColumns() {
     dialogOpenRef.current = open;
   }, []);
 
+  const recreateAllWebviews = useCallback(async () => {
+    const { columns: currentColumns, sidebarExpanded } = useAppStore.getState();
+    for (const column of currentColumns) {
+      await invoke(IPC_COMMANDS.REMOVE_COLUMN_WEBVIEW, { columnId: column.id }).catch(console.error);
+    }
+    await restoreColumns(getSidebarWidth(sidebarExpanded));
+  }, [restoreColumns]);
+
   return {
     columns,
     columnBounds,
@@ -490,5 +498,6 @@ export function useColumns() {
     swipeState,
     setActiveColumn,
     setDialogOpen,
+    recreateAllWebviews,
   };
 }
