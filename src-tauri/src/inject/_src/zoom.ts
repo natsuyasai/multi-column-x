@@ -1,4 +1,6 @@
 (function () {
   const zoom = window.__multiColumnXConfig?.zoomLevel ?? 1;
-  document.documentElement.style.zoom = String(zoom);
+  if (document.documentElement) {
+    document.documentElement.style.zoom = String(zoom);
+  }
 })();
