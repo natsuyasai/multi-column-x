@@ -438,14 +438,11 @@ export function useColumns() {
 
   // Linux: カラム WebView は独立したウィンドウのため、メインウィンドウ移動時に位置を再計算する
   useEffect(() => {
-    if (isMobile) return;
+    if (isMobile || platform() !== "linux") return;
     let unlisten: (() => void) | undefined;
-    platform().then((p) => {
-      if (p !== "linux") return;
-      getCurrentWindow()
-        .onMoved(() => { recalculateAllBounds(); })
-        .then((fn) => { unlisten = fn; });
-    });
+    getCurrentWindow()
+      .onMoved(() => { recalculateAllBounds(); })
+      .then((fn) => { unlisten = fn; });
     return () => { unlisten?.(); };
   }, [isMobile, recalculateAllBounds]);
 
