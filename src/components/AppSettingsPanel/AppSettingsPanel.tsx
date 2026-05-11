@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import type { GlobalSettings, Column, Account } from "../../types";
+import type { GlobalSettings, Column, Account, ColumnSettings } from "../../types";
 import { ColumnLayoutTab } from "./ColumnLayoutTab";
 import styles from "./AppSettingsPanel.module.scss";
 
@@ -9,6 +9,7 @@ interface AppSettingsPanelProps {
   accounts: Account[];
   onApply: (patch: Partial<GlobalSettings>) => void;
   onApplyLayout: (columns: Column[]) => void;
+  onApplyColumnDefaults: (patch: Pick<ColumnSettings, "autoReloadEnabled" | "autoReloadInterval">) => void;
   onClose: () => void;
 }
 
@@ -18,6 +19,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   accounts,
   onApply,
   onApplyLayout,
+  onApplyColumnDefaults,
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<"general" | "layout">("general");
@@ -154,6 +156,18 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 <p className={styles.hint}>
                   新しく追加するカラムに適用されます
                 </p>
+                <button
+                  type="button"
+                  className={styles.applyAllBtn}
+                  onClick={() =>
+                    onApplyColumnDefaults({
+                      autoReloadEnabled,
+                      autoReloadInterval,
+                    })
+                  }
+                >
+                  既存の全カラムに適用
+                </button>
               </section>
 
               <section className={styles.section}>

@@ -430,6 +430,14 @@ const App: React.FC = () => {
             replaceColumns(updatedColumns);
             recalculateAllBounds();
           }}
+          onApplyColumnDefaults={(patch) => {
+            replaceColumns(
+              columns.map((col) => ({
+                ...col,
+                settings: { ...col.settings, ...patch },
+              })),
+            );
+          }}
           onClose={() => setShowAppSettings(false)}
         />
       )}

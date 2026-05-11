@@ -167,6 +167,22 @@
   margin: 0;
 }
 
+.applyAllBtn {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #aaa;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 5px 12px;
+  align-self: flex-start;
+
+  &:hover {
+    background: #333;
+    color: #ccc;
+  }
+}
+
 .actions {
   display: flex;
   justify-content: flex-end;
