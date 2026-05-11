@@ -167,6 +167,28 @@
   margin: 0;
 }
 
+.cssTextarea {
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: #eee;
+  font-family: "Consolas", "Monaco", monospace;
+  font-size: 12px;
+  height: 120px;
+  padding: 8px;
+  resize: vertical;
+  width: 100%;
+
+  &:focus {
+    outline: none;
+    border-color: #1d9bf0;
+  }
+
+  &::placeholder {
+    color: #444;
+  }
+}
+
 .applyAllBtn {
   background: #2a2a2a;
   border: 1px solid #444;

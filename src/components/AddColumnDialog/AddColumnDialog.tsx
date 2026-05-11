@@ -47,6 +47,13 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
         ...DEFAULT_COLUMN_SETTINGS,
         autoReloadEnabled: globalSettings.defaultAutoReloadEnabled,
         autoReloadInterval: globalSettings.defaultAutoReloadInterval,
+        showCountdown: globalSettings.defaultShowCountdown,
+        areaRemoveEnabled: globalSettings.defaultAreaRemoveEnabled,
+        showCustomMenu: globalSettings.defaultShowCustomMenu,
+        scrollPosRestoreEnabled: globalSettings.defaultScrollPosRestoreEnabled,
+        customCSS: globalSettings.defaultColumnCustomCSS,
+        smallImageEnabled: globalSettings.smallImageEnabled,
+        smallImageWidth: globalSettings.smallImageWidth,
       },
     };
     onAdd(column);

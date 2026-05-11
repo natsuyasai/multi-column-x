@@ -9,7 +9,7 @@ interface AppSettingsPanelProps {
   accounts: Account[];
   onApply: (patch: Partial<GlobalSettings>) => void;
   onApplyLayout: (columns: Column[]) => void;
-  onApplyColumnDefaults: (patch: Pick<ColumnSettings, "autoReloadEnabled" | "autoReloadInterval">) => void;
+  onApplyColumnDefaults: (patch: Omit<ColumnSettings, "visibleLinks">) => void;
   onReloadAllWebviews: () => void;
   onClose: () => void;
 }
@@ -25,27 +25,30 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<"general" | "layout">("general");
-  const [autoReloadEnabled, setAutoReloadEnabled] = useState(
-    settings.defaultAutoReloadEnabled,
+
+  // カラムデフォルト - 自動更新
+  const [autoReloadEnabled, setAutoReloadEnabled] = useState(settings.defaultAutoReloadEnabled);
+  const [autoReloadInterval, setAutoReloadInterval] = useState(settings.defaultAutoReloadInterval);
+  const [defaultShowCountdown, setDefaultShowCountdown] = useState(settings.defaultShowCountdown);
+
+  // カラムデフォルト - 表示
+  const [defaultAreaRemoveEnabled, setDefaultAreaRemoveEnabled] = useState(settings.defaultAreaRemoveEnabled);
+  const [defaultShowCustomMenu, setDefaultShowCustomMenu] = useState(settings.defaultShowCustomMenu);
+  const [defaultScrollPosRestoreEnabled, setDefaultScrollPosRestoreEnabled] = useState(
+    settings.defaultScrollPosRestoreEnabled,
   );
-  const [autoReloadInterval, setAutoReloadInterval] = useState(
-    settings.defaultAutoReloadInterval,
-  );
-  const [popupEscCloseEnabled, setPopupEscCloseEnabled] = useState(
-    settings.popupEscCloseEnabled,
-  );
-  const [videoAutoPlayStopEnabled, setVideoAutoPlayStopEnabled] = useState(
-    settings.videoAutoPlayStopEnabled,
-  );
-  const [showSortButtons, setShowSortButtons] = useState(
-    settings.showSortButtons,
-  );
-  const [smallImageEnabled, setSmallImageEnabled] = useState(
-    settings.smallImageEnabled,
-  );
-  const [smallImageWidth, setSmallImageWidth] = useState(
-    settings.smallImageWidth,
-  );
+
+  // カラムデフォルト - 画像
+  const [smallImageEnabled, setSmallImageEnabled] = useState(settings.smallImageEnabled);
+  const [smallImageWidth, setSmallImageWidth] = useState(settings.smallImageWidth);
+
+  // カラムデフォルト - カスタムCSS
+  const [defaultColumnCustomCSS, setDefaultColumnCustomCSS] = useState(settings.defaultColumnCustomCSS);
+
+  // グローバル設定
+  const [popupEscCloseEnabled, setPopupEscCloseEnabled] = useState(settings.popupEscCloseEnabled);
+  const [videoAutoPlayStopEnabled, setVideoAutoPlayStopEnabled] = useState(settings.videoAutoPlayStopEnabled);
+  const [showSortButtons, setShowSortButtons] = useState(settings.showSortButtons);
   const [hideAdEnabled, setHideAdEnabled] = useState(settings.hideAdEnabled);
   const [zoomLevel, setZoomLevel] = useState(settings.zoomLevel ?? 1);
 
@@ -54,15 +57,34 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
     onApply({
       defaultAutoReloadEnabled: autoReloadEnabled,
       defaultAutoReloadInterval: autoReloadInterval,
-      popupEscCloseEnabled: popupEscCloseEnabled,
-      videoAutoPlayStopEnabled: videoAutoPlayStopEnabled,
-      showSortButtons: showSortButtons,
-      smallImageEnabled: smallImageEnabled,
-      smallImageWidth: smallImageWidth,
-      hideAdEnabled: hideAdEnabled,
-      zoomLevel: zoomLevel,
+      defaultShowCountdown,
+      defaultAreaRemoveEnabled,
+      defaultShowCustomMenu,
+      defaultScrollPosRestoreEnabled,
+      defaultColumnCustomCSS,
+      popupEscCloseEnabled,
+      videoAutoPlayStopEnabled,
+      showSortButtons,
+      smallImageEnabled,
+      smallImageWidth,
+      hideAdEnabled,
+      zoomLevel,
     });
     onClose();
+  };
+
+  const handleApplyColumnDefaults = () => {
+    onApplyColumnDefaults({
+      autoReloadEnabled,
+      autoReloadInterval,
+      showCountdown: defaultShowCountdown,
+      areaRemoveEnabled: defaultAreaRemoveEnabled,
+      showCustomMenu: defaultShowCustomMenu,
+      scrollPosRestoreEnabled: defaultScrollPosRestoreEnabled,
+      customCSS: defaultColumnCustomCSS,
+      smallImageEnabled,
+      smallImageWidth,
+    });
   };
 
   return (
@@ -121,9 +143,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
               </section>
 
               <section className={styles.section}>
-                <h3 className={styles.sectionTitle}>
-                  カラムのデフォルト設定
-                </h3>
+                <h3 className={styles.sectionTitle}>カラムデフォルト - 自動更新</h3>
                 <label className={styles.checkLabel}>
                   <input
                     type="checkbox"
@@ -133,20 +153,109 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                   自動更新を有効にする
                 </label>
                 {autoReloadEnabled && (
-                  <label className={styles.fieldLabel}>
-                    更新間隔（秒）
+                  <>
+                    <label className={styles.fieldLabel}>
+                      更新間隔（秒）
+                      <input
+                        type="number"
+                        className={styles.numberInput}
+                        min={10}
+                        max={3600}
+                        value={autoReloadInterval}
+                        onChange={(e) =>
+                          setAutoReloadInterval(Number(e.target.value))
+                        }
+                      />
+                    </label>
+                    <label className={styles.checkLabel}>
+                      <input
+                        type="checkbox"
+                        checked={defaultShowCountdown}
+                        onChange={(e) => setDefaultShowCountdown(e.target.checked)}
+                      />
+                      カウントダウンを表示する
+                    </label>
+                  </>
+                )}
+              </section>
+
+              <section className={styles.section}>
+                <h3 className={styles.sectionTitle}>カラムデフォルト - 表示</h3>
+                <label className={styles.checkLabel}>
+                  <input
+                    type="checkbox"
+                    checked={defaultAreaRemoveEnabled}
+                    onChange={(e) => setDefaultAreaRemoveEnabled(e.target.checked)}
+                  />
+                  ヘッダー・投稿欄を非表示にする
+                </label>
+                {defaultAreaRemoveEnabled && (
+                  <label className={styles.checkLabel}>
                     <input
-                      type="number"
-                      className={styles.numberInput}
-                      min={10}
-                      max={3600}
-                      value={autoReloadInterval}
-                      onChange={(e) =>
-                        setAutoReloadInterval(Number(e.target.value))
-                      }
+                      type="checkbox"
+                      checked={defaultShowCustomMenu}
+                      onChange={(e) => setDefaultShowCustomMenu(e.target.checked)}
+                    />
+                    カスタムメニューボタンを表示する
+                  </label>
+                )}
+                <label className={styles.checkLabel}>
+                  <input
+                    type="checkbox"
+                    checked={defaultScrollPosRestoreEnabled}
+                    onChange={(e) =>
+                      setDefaultScrollPosRestoreEnabled(e.target.checked)
+                    }
+                  />
+                  写真閲覧後のスクロール位置を復元する
+                </label>
+              </section>
+
+              <section className={styles.section}>
+                <h3 className={styles.sectionTitle}>カラムデフォルト - 画像</h3>
+                <label className={styles.checkLabel}>
+                  <input
+                    type="checkbox"
+                    checked={smallImageEnabled}
+                    onChange={(e) => setSmallImageEnabled(e.target.checked)}
+                  />
+                  画像を縮小表示する
+                </label>
+                {smallImageEnabled && (
+                  <label className={styles.fieldLabel}>
+                    幅（例: 50%, 200px）
+                    <input
+                      type="text"
+                      className={styles.textInput}
+                      value={smallImageWidth}
+                      onChange={(e) => setSmallImageWidth(e.target.value)}
+                      placeholder="50%"
                     />
                   </label>
                 )}
+              </section>
+
+              <section className={styles.section}>
+                <h3 className={styles.sectionTitle}>カラムデフォルト - カスタムCSS</h3>
+                <textarea
+                  className={styles.cssTextarea}
+                  value={defaultColumnCustomCSS}
+                  onChange={(e) => setDefaultColumnCustomCSS(e.target.value)}
+                  placeholder="/* カスタムCSSを入力 */"
+                  spellCheck={false}
+                />
+                <p className={styles.hint}>新しく追加するカラムに適用されます</p>
+                <button
+                  type="button"
+                  className={styles.applyAllBtn}
+                  onClick={handleApplyColumnDefaults}
+                >
+                  既存の全カラムに適用
+                </button>
+              </section>
+
+              <section className={styles.section}>
+                <h3 className={styles.sectionTitle}>カラム</h3>
                 <label className={styles.checkLabel}>
                   <input
                     type="checkbox"
@@ -155,27 +264,10 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                   />
                   並び替えボタンを表示する
                 </label>
-                <p className={styles.hint}>
-                  新しく追加するカラムに適用されます
-                </p>
-                <button
-                  type="button"
-                  className={styles.applyAllBtn}
-                  onClick={() =>
-                    onApplyColumnDefaults({
-                      autoReloadEnabled,
-                      autoReloadInterval,
-                    })
-                  }
-                >
-                  既存の全カラムに適用
-                </button>
               </section>
 
               <section className={styles.section}>
-                <h3 className={styles.sectionTitle}>
-                  ポップアップウィンドウ
-                </h3>
+                <h3 className={styles.sectionTitle}>ポップアップウィンドウ</h3>
                 <label className={styles.checkLabel}>
                   <input
                     type="checkbox"
@@ -212,30 +304,6 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                   />
                   広告を非表示にする
                 </label>
-              </section>
-
-              <section className={styles.section}>
-                <h3 className={styles.sectionTitle}>画像</h3>
-                <label className={styles.checkLabel}>
-                  <input
-                    type="checkbox"
-                    checked={smallImageEnabled}
-                    onChange={(e) => setSmallImageEnabled(e.target.checked)}
-                  />
-                  画像を縮小表示する
-                </label>
-                {smallImageEnabled && (
-                  <label className={styles.fieldLabel}>
-                    幅（例: 50%, 200px）
-                    <input
-                      type="text"
-                      className={styles.textInput}
-                      value={smallImageWidth}
-                      onChange={(e) => setSmallImageWidth(e.target.value)}
-                      placeholder="50%"
-                    />
-                  </label>
-                )}
               </section>
 
               <section className={styles.section}>

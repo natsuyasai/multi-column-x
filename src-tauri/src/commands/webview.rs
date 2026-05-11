@@ -60,7 +60,6 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
     let data_dir = PathBuf::from(&args.data_directory);
 
     let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(&app);
-    let (small_image_enabled, small_image_width) = load_small_image_settings(&app);
     let hide_ad_enabled = load_hide_ad_enabled(&app);
     let zoom_level = load_zoom_level(&app);
     let init_script = build_init_script(&InitScriptParams {
@@ -70,8 +69,8 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         auto_reload_enabled: args.column.settings.auto_reload_enabled,
         scroll_pos_restore_enabled: args.column.settings.scroll_pos_restore_enabled,
         video_auto_play_stop_enabled,
-        small_image_enabled,
-        small_image_width: &small_image_width,
+        small_image_enabled: args.column.settings.small_image_enabled,
+        small_image_width: &args.column.settings.small_image_width,
         hide_ad_enabled,
         zoom_level,
         custom_css: &args.column.settings.custom_css,
@@ -109,7 +108,6 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
     let label = webview_label(&args.column.id);
 
     let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(&app);
-    let (small_image_enabled, small_image_width) = load_small_image_settings(&app);
     let hide_ad_enabled = load_hide_ad_enabled(&app);
     let zoom_level = load_zoom_level(&app);
     let init_script = build_init_script(&InitScriptParams {
@@ -119,8 +117,8 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         auto_reload_enabled: args.column.settings.auto_reload_enabled,
         scroll_pos_restore_enabled: args.column.settings.scroll_pos_restore_enabled,
         video_auto_play_stop_enabled,
-        small_image_enabled,
-        small_image_width: &small_image_width,
+        small_image_enabled: args.column.settings.small_image_enabled,
+        small_image_width: &args.column.settings.small_image_width,
         hide_ad_enabled,
         zoom_level,
         custom_css: &args.column.settings.custom_css,
@@ -271,17 +269,6 @@ fn load_video_auto_play_stop_enabled(app: &AppHandle) -> bool {
         .get("videoAutoPlayStopEnabled")
         .and_then(|v| v.as_bool())
         .unwrap_or(false)
-}
-
-fn load_small_image_settings(app: &AppHandle) -> (bool, String) {
-    let gs = load_global_settings(app);
-    let enabled = gs.get("smallImageEnabled").and_then(|v| v.as_bool()).unwrap_or(false);
-    let width = gs
-        .get("smallImageWidth")
-        .and_then(|v| v.as_str())
-        .map(str::to_owned)
-        .unwrap_or_else(|| "50%".to_string());
-    (enabled, width)
 }
 
 fn load_hide_ad_enabled(app: &AppHandle) -> bool {

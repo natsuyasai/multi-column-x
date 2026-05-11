@@ -17,6 +17,8 @@ export interface ColumnSettings {
   scrollPosRestoreEnabled: boolean;
   customCSS: string;
   visibleLinks: string[];
+  smallImageEnabled: boolean;
+  smallImageWidth: string;
 }
 
 export interface Column {
@@ -45,6 +47,11 @@ export interface GlobalSettings {
   defaultAccountId?: string;
   defaultAutoReloadEnabled: boolean;
   defaultAutoReloadInterval: number; // 秒
+  defaultShowCountdown: boolean;
+  defaultAreaRemoveEnabled: boolean;
+  defaultShowCustomMenu: boolean;
+  defaultScrollPosRestoreEnabled: boolean;
+  defaultColumnCustomCSS: string;
   popupEscCloseEnabled: boolean;
   videoAutoPlayStopEnabled: boolean;
   showSortButtons: boolean;
@@ -69,6 +76,8 @@ export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
   scrollPosRestoreEnabled: true,
   customCSS: "",
   visibleLinks: [],
+  smallImageEnabled: false,
+  smallImageWidth: "50%",
 };
 
 export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
@@ -77,6 +86,11 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   windowBounds: { x: 0, y: 0, width: 1400, height: 900 },
   defaultAutoReloadEnabled: true,
   defaultAutoReloadInterval: 600,
+  defaultShowCountdown: true,
+  defaultAreaRemoveEnabled: true,
+  defaultShowCustomMenu: false,
+  defaultScrollPosRestoreEnabled: true,
+  defaultColumnCustomCSS: "",
   popupEscCloseEnabled: true,
   videoAutoPlayStopEnabled: false,
   showSortButtons: true,

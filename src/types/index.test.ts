@@ -20,6 +20,8 @@ const baseColumn: Column = {
     scrollPosRestoreEnabled: true,
     customCSS: "",
     visibleLinks: [],
+    smallImageEnabled: false,
+    smallImageWidth: "50%",
   },
 };
 

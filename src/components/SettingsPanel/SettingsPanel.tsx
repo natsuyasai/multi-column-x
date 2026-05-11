@@ -153,6 +153,40 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </section>
 
           <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>画像</h3>
+            <label className={styles.checkLabel}>
+              <input
+                type="checkbox"
+                checked={settings.smallImageEnabled}
+                onChange={(e) =>
+                  setSettings((s) => ({
+                    ...s,
+                    smallImageEnabled: e.target.checked,
+                  }))
+                }
+              />
+              画像を縮小表示する
+            </label>
+            {settings.smallImageEnabled && (
+              <label className={styles.fieldLabel}>
+                幅（例: 50%, 200px）
+                <input
+                  type="text"
+                  className={styles.numberInput}
+                  value={settings.smallImageWidth}
+                  onChange={(e) =>
+                    setSettings((s) => ({
+                      ...s,
+                      smallImageWidth: e.target.value,
+                    }))
+                  }
+                  placeholder="50%"
+                />
+              </label>
+            )}
+          </section>
+
+          <section className={styles.section}>
             <h3 className={styles.sectionTitle}>カスタム CSS</h3>
             <textarea
               className={styles.cssTextarea}

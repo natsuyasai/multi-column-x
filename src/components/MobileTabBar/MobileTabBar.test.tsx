@@ -13,6 +13,8 @@ const baseSettings = {
   scrollPosRestoreEnabled: true,
   customCSS: "",
   visibleLinks: [],
+  smallImageEnabled: false,
+  smallImageWidth: "50%",
 };
 
 const acc1: Account = {

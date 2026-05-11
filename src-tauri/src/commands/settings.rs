@@ -35,6 +35,12 @@ pub struct ColumnSettings {
     #[serde(rename = "visibleLinks")]
     #[serde(default)]
     pub visible_links: Vec<String>,
+    #[serde(rename = "smallImageEnabled")]
+    #[serde(default)]
+    pub small_image_enabled: bool,
+    #[serde(rename = "smallImageWidth")]
+    #[serde(default = "default_small_image_width")]
+    pub small_image_width: String,
 }
 
 fn default_true() -> bool {
@@ -68,6 +74,11 @@ impl Default for GlobalSettingsData {
             default_account_id: None,
             default_auto_reload_enabled: true,
             default_auto_reload_interval: 600,
+            default_show_countdown: true,
+            default_area_remove_enabled: true,
+            default_show_custom_menu: false,
+            default_scroll_pos_restore_enabled: true,
+            default_column_custom_css: String::new(),
             popup_esc_close_enabled: true,
             video_auto_play_stop_enabled: false,
             show_sort_buttons: true,
@@ -155,6 +166,21 @@ pub struct GlobalSettingsData {
     #[serde(rename = "showSortButtons")]
     #[serde(default = "default_true")]
     pub show_sort_buttons: bool,
+    #[serde(rename = "defaultShowCountdown")]
+    #[serde(default = "default_true")]
+    pub default_show_countdown: bool,
+    #[serde(rename = "defaultAreaRemoveEnabled")]
+    #[serde(default = "default_true")]
+    pub default_area_remove_enabled: bool,
+    #[serde(rename = "defaultShowCustomMenu")]
+    #[serde(default)]
+    pub default_show_custom_menu: bool,
+    #[serde(rename = "defaultScrollPosRestoreEnabled")]
+    #[serde(default = "default_true")]
+    pub default_scroll_pos_restore_enabled: bool,
+    #[serde(rename = "defaultColumnCustomCSS")]
+    #[serde(default)]
+    pub default_column_custom_css: String,
     #[serde(rename = "smallImageEnabled")]
     #[serde(default)]
     pub small_image_enabled: bool,

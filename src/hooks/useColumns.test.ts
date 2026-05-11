@@ -22,6 +22,8 @@ const baseSettings = {
   scrollPosRestoreEnabled: true,
   customCSS: "",
   visibleLinks: [],
+  smallImageEnabled: false,
+  smallImageWidth: "50%",
 };
 
 function makeCol(
@@ -163,6 +165,8 @@ describe("useColumns mobile", () => {
             scrollPosRestoreEnabled: true,
             customCSS: "",
             visibleLinks: [],
+            smallImageEnabled: false,
+            smallImageWidth: "50%",
           },
         },
         {
@@ -184,6 +188,8 @@ describe("useColumns mobile", () => {
             scrollPosRestoreEnabled: true,
             customCSS: "",
             visibleLinks: [],
+            smallImageEnabled: false,
+            smallImageWidth: "50%",
           },
         },
       ],
@@ -193,6 +199,11 @@ describe("useColumns mobile", () => {
         windowBounds: { x: 0, y: 0, width: 1400, height: 900 },
         defaultAutoReloadEnabled: true,
         defaultAutoReloadInterval: 60,
+        defaultShowCountdown: true,
+        defaultAreaRemoveEnabled: true,
+        defaultShowCustomMenu: false,
+        defaultScrollPosRestoreEnabled: true,
+        defaultColumnCustomCSS: "",
         popupEscCloseEnabled: true,
         videoAutoPlayStopEnabled: false,
         showSortButtons: true,
