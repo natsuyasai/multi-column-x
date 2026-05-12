@@ -80,7 +80,9 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         visible_links: &args.column.settings.visible_links,
     });
 
-    let window = app.get_window("main").ok_or("main window not found")?;
+    // parent() は &WebviewWindow を要求するため get_webview_window を使う。
+    // WebviewWindow は Deref<Target=Window> なので add_child 等もそのまま動く。
+    let window = app.get_webview_window("main").ok_or("main window not found")?;
 
     // On Linux, window.add_child() places WebViews into a GTK VBox which ignores
     // position/size parameters. Instead, create an undecorated WebviewWindow at the
