@@ -24,6 +24,8 @@ const baseSettings = {
   visibleLinks: [],
   smallImageEnabled: false,
   smallImageWidth: "50%",
+  blurImageEnabled: false,
+  blurImageAmount: "10px",
 };
 
 function makeCol(
@@ -167,6 +169,8 @@ describe("useColumns mobile", () => {
             visibleLinks: [],
             smallImageEnabled: false,
             smallImageWidth: "50%",
+            blurImageEnabled: false,
+            blurImageAmount: "10px",
           },
         },
         {
@@ -190,6 +194,8 @@ describe("useColumns mobile", () => {
             visibleLinks: [],
             smallImageEnabled: false,
             smallImageWidth: "50%",
+            blurImageEnabled: false,
+            blurImageAmount: "10px",
           },
         },
       ],
@@ -209,6 +215,8 @@ describe("useColumns mobile", () => {
         showSortButtons: true,
         smallImageEnabled: false,
         smallImageWidth: "50%",
+        blurImageEnabled: false,
+        blurImageAmount: "10px",
         hideAdEnabled: false,
         zoomLevel: 1,
       },

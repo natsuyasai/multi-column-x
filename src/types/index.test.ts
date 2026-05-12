@@ -22,6 +22,8 @@ const baseColumn: Column = {
     visibleLinks: [],
     smallImageEnabled: false,
     smallImageWidth: "50%",
+    blurImageEnabled: false,
+    blurImageAmount: "10px",
   },
 };
 

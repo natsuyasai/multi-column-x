@@ -14,6 +14,8 @@ const baseSettings = {
   visibleLinks: [],
   smallImageEnabled: false,
   smallImageWidth: "50%",
+  blurImageEnabled: false,
+  blurImageAmount: "10px",
 };
 
 const mockAccounts: Account[] = [

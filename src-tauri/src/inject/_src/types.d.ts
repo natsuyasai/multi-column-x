@@ -14,6 +14,8 @@ declare global {
     visibleLinks: string[];
     smallImageEnabled: boolean;
     smallImageWidth: string;
+    blurImageEnabled: boolean;
+    blurImageAmount: string;
     hideAdEnabled: boolean;
     zoomLevel: number;
   }

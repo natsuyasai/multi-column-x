@@ -19,6 +19,8 @@ export interface ColumnSettings {
   visibleLinks: string[];
   smallImageEnabled: boolean;
   smallImageWidth: string;
+  blurImageEnabled: boolean;
+  blurImageAmount: string;
 }
 
 export interface Column {
@@ -57,6 +59,8 @@ export interface GlobalSettings {
   showSortButtons: boolean;
   smallImageEnabled: boolean;
   smallImageWidth: string;
+  blurImageEnabled: boolean;
+  blurImageAmount: string;
   hideAdEnabled: boolean;
   zoomLevel: number;
 }
@@ -78,6 +82,8 @@ export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
   visibleLinks: [],
   smallImageEnabled: false,
   smallImageWidth: "50%",
+  blurImageEnabled: false,
+  blurImageAmount: "10px",
 };
 
 export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
@@ -96,6 +102,8 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   showSortButtons: true,
   smallImageEnabled: false,
   smallImageWidth: "50%",
+  blurImageEnabled: false,
+  blurImageAmount: "10px",
   hideAdEnabled: false,
   zoomLevel: 1,
 };

@@ -41,6 +41,8 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   // カラムデフォルト - 画像
   const [smallImageEnabled, setSmallImageEnabled] = useState(settings.smallImageEnabled);
   const [smallImageWidth, setSmallImageWidth] = useState(settings.smallImageWidth);
+  const [blurImageEnabled, setBlurImageEnabled] = useState(settings.blurImageEnabled);
+  const [blurImageAmount, setBlurImageAmount] = useState(settings.blurImageAmount);
 
   // カラムデフォルト - カスタムCSS
   const [defaultColumnCustomCSS, setDefaultColumnCustomCSS] = useState(settings.defaultColumnCustomCSS);
@@ -67,6 +69,8 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       showSortButtons,
       smallImageEnabled,
       smallImageWidth,
+      blurImageEnabled,
+      blurImageAmount,
       hideAdEnabled,
       zoomLevel,
     });
@@ -84,6 +88,8 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       customCSS: defaultColumnCustomCSS,
       smallImageEnabled,
       smallImageWidth,
+      blurImageEnabled,
+      blurImageAmount,
     });
   };
 
@@ -230,6 +236,26 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                       value={smallImageWidth}
                       onChange={(e) => setSmallImageWidth(e.target.value)}
                       placeholder="50%"
+                    />
+                  </label>
+                )}
+                <label className={styles.checkLabel}>
+                  <input
+                    type="checkbox"
+                    checked={blurImageEnabled}
+                    onChange={(e) => setBlurImageEnabled(e.target.checked)}
+                  />
+                  画像をぼかして表示する
+                </label>
+                {blurImageEnabled && (
+                  <label className={styles.fieldLabel}>
+                    ブラー量（例: 10px）
+                    <input
+                      type="text"
+                      className={styles.textInput}
+                      value={blurImageAmount}
+                      onChange={(e) => setBlurImageAmount(e.target.value)}
+                      placeholder="10px"
                     />
                   </label>
                 )}

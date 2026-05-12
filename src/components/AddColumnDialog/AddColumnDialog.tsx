@@ -54,6 +54,8 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
         customCSS: globalSettings.defaultColumnCustomCSS,
         smallImageEnabled: globalSettings.smallImageEnabled,
         smallImageWidth: globalSettings.smallImageWidth,
+        blurImageEnabled: globalSettings.blurImageEnabled,
+        blurImageAmount: globalSettings.blurImageAmount,
       },
     };
     onAdd(column);

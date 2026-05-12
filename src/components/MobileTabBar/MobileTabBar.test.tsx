@@ -15,6 +15,8 @@ const baseSettings = {
   visibleLinks: [],
   smallImageEnabled: false,
   smallImageWidth: "50%",
+  blurImageEnabled: false,
+  blurImageAmount: "10px",
 };
 
 const acc1: Account = {

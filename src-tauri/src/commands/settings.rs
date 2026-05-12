@@ -41,6 +41,12 @@ pub struct ColumnSettings {
     #[serde(rename = "smallImageWidth")]
     #[serde(default = "default_small_image_width")]
     pub small_image_width: String,
+    #[serde(rename = "blurImageEnabled")]
+    #[serde(default)]
+    pub blur_image_enabled: bool,
+    #[serde(rename = "blurImageAmount")]
+    #[serde(default = "default_blur_image_amount")]
+    pub blur_image_amount: String,
 }
 
 fn default_true() -> bool {
@@ -54,6 +60,9 @@ fn default_auto_reload_interval() -> u32 {
 }
 fn default_small_image_width() -> String {
     "50%".to_string()
+}
+fn default_blur_image_amount() -> String {
+    "10px".to_string()
 }
 fn default_zoom_level() -> f64 {
     1.0
@@ -84,6 +93,8 @@ impl Default for GlobalSettingsData {
             show_sort_buttons: true,
             small_image_enabled: false,
             small_image_width: "50%".to_string(),
+            blur_image_enabled: false,
+            blur_image_amount: "10px".to_string(),
             hide_ad_enabled: false,
             zoom_level: 1.0,
         }
@@ -187,6 +198,12 @@ pub struct GlobalSettingsData {
     #[serde(rename = "smallImageWidth")]
     #[serde(default = "default_small_image_width")]
     pub small_image_width: String,
+    #[serde(rename = "blurImageEnabled")]
+    #[serde(default)]
+    pub blur_image_enabled: bool,
+    #[serde(rename = "blurImageAmount")]
+    #[serde(default = "default_blur_image_amount")]
+    pub blur_image_amount: String,
     #[serde(rename = "hideAdEnabled")]
     #[serde(default)]
     pub hide_ad_enabled: bool,

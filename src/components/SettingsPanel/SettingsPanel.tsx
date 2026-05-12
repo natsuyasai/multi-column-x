@@ -187,6 +187,43 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </section>
 
           <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>画像ブラー</h3>
+            <label className={styles.checkLabel}>
+              <input
+                type="checkbox"
+                checked={settings.blurImageEnabled}
+                onChange={(e) =>
+                  setSettings((s) => ({
+                    ...s,
+                    blurImageEnabled: e.target.checked,
+                  }))
+                }
+              />
+              画像をぼかして表示する
+            </label>
+            {settings.blurImageEnabled && (
+              <label className={styles.fieldLabel}>
+                ブラー量（例: 10px）
+                <input
+                  type="text"
+                  className={styles.textInput}
+                  value={settings.blurImageAmount}
+                  onChange={(e) =>
+                    setSettings((s) => ({
+                      ...s,
+                      blurImageAmount: e.target.value,
+                    }))
+                  }
+                  placeholder="10px"
+                />
+              </label>
+            )}
+            <p className={styles.hint}>
+              右クリック（PC）または長押し（モバイル）でブラーを解除できます
+            </p>
+          </section>
+
+          <section className={styles.section}>
             <h3 className={styles.sectionTitle}>カスタム CSS</h3>
             <textarea
               className={styles.cssTextarea}

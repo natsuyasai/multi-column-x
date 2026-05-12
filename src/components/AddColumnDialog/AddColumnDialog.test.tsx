@@ -29,6 +29,8 @@ const mockGlobalSettings: GlobalSettings = {
   showSortButtons: true,
   smallImageEnabled: false,
   smallImageWidth: "50%",
+  blurImageEnabled: false,
+  blurImageAmount: "10px",
   hideAdEnabled: false,
   zoomLevel: 1,
 };

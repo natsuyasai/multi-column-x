@@ -11,6 +11,8 @@ pub struct InitScriptParams<'a> {
     pub video_auto_play_stop_enabled: bool,
     pub small_image_enabled: bool,
     pub small_image_width: &'a str,
+    pub blur_image_enabled: bool,
+    pub blur_image_amount: &'a str,
     pub hide_ad_enabled: bool,
     pub zoom_level: f64,
     pub custom_css: &'a str,
@@ -23,6 +25,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     let auto_reload = include_str!("auto_reload.js");
     let custom_css_js = include_str!("custom_css.js");
     let small_image = include_str!("small_image.js");
+    let blur_image = include_str!("blur_image.js");
     let hide_ad = include_str!("hide_ad.js");
     let image_popup = if params.is_mobile {
         ""
@@ -35,20 +38,26 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         ""
     };
     let zoom = include_str!("zoom.js");
-    let context_menu = include_str!("context_menu.js");
+    let context_menu = if params.is_mobile {
+        ""
+    } else {
+        include_str!("context_menu.js")
+    };
     let scroll_event = include_str!("scroll_event.js");
     let video_control = include_str!("video_control.js");
 
     let visible_links_json =
         serde_json::to_string(params.visible_links).unwrap_or_else(|_| "[]".to_string());
     let config = format!(
-        "window.{} = {{ areaRemoveEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?}, hideAdEnabled: {}, zoomLevel: {} }};",
+        "window.{} = {{ areaRemoveEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?}, blurImageEnabled: {}, blurImageAmount: {:?}, hideAdEnabled: {}, zoomLevel: {} }};",
         globals::MULTI_COLUMN_X_CONFIG,
         params.area_remove_enabled,
         params.show_custom_menu,
         visible_links_json,
         params.small_image_enabled,
         params.small_image_width,
+        params.blur_image_enabled,
+        params.blur_image_amount,
         params.hide_ad_enabled,
         params.zoom_level
     );
@@ -70,7 +79,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     };
 
     let mut script = format!(
-        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}",
+        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}",
         config,
         zoom,
         tab_selector,
@@ -78,6 +87,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         auto_reload_part,
         video_control_part,
         small_image,
+        blur_image,
         hide_ad,
         custom_css_js,
         image_popup,
@@ -106,10 +116,14 @@ pub fn build_popup_init_script(
     let popup_toolbar = include_str!("popup_toolbar.js");
     format!(
         "window.{}={};window.{}={:?};window.{}={:?};window.{}={};\n{}",
-        globals::TV_ACCOUNTS, accounts_json,
-        globals::TV_CURRENT_ACCOUNT_ID, current_account_id,
-        globals::TV_TARGET_HREF, target_href,
-        globals::TV_ESC_CLOSE_ENABLED, esc_close_enabled,
+        globals::TV_ACCOUNTS,
+        accounts_json,
+        globals::TV_CURRENT_ACCOUNT_ID,
+        current_account_id,
+        globals::TV_TARGET_HREF,
+        target_href,
+        globals::TV_ESC_CLOSE_ENABLED,
+        esc_close_enabled,
         popup_toolbar
     )
 }
@@ -128,6 +142,8 @@ mod tests {
             video_auto_play_stop_enabled: false,
             small_image_enabled: false,
             small_image_width: "50%",
+            blur_image_enabled: false,
+            blur_image_amount: "10px",
             hide_ad_enabled: false,
             zoom_level: 1.0,
             custom_css: "",

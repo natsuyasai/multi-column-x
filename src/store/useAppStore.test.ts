@@ -37,6 +37,8 @@ const mockColumn: Column = {
     visibleLinks: [],
     smallImageEnabled: false,
     smallImageWidth: "50%",
+    blurImageEnabled: false,
+    blurImageAmount: "10px",
   },
 };
 
@@ -63,6 +65,8 @@ describe("useAppStore", () => {
         showSortButtons: true,
         smallImageEnabled: false,
         smallImageWidth: "50%",
+        blurImageEnabled: false,
+        blurImageAmount: "10px",
         hideAdEnabled: false,
         zoomLevel: 1,
       },
