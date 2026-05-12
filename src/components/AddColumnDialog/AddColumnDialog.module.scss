@@ -56,6 +56,11 @@
   box-sizing: border-box;
 }
 
+.select option {
+  background: #0d0d0d;
+  color: #eee;
+}
+
 .actions {
   display: flex;
   justify-content: flex-end;
