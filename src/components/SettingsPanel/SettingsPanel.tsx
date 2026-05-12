@@ -218,7 +218,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 />
               </label>
             )}
-            <p className={styles.hint}>
+            <p className={styles.fieldLabel}>
               右クリック（PC）または長押し（モバイル）でブラーを解除できます
             </p>
           </section>
