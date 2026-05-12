@@ -15,17 +15,26 @@
     unblurred.add(root);
   }
 
+  function toggleBlur(root: HTMLElement): void {
+    if (unblurred.has(root)) {
+      applyBlur(root);
+      unblurred.delete(root);
+    } else {
+      removeBlur(root);
+    }
+  }
+
   function attachInteraction(root: HTMLElement): void {
     root.addEventListener("contextmenu", (e) => {
       e.preventDefault();
-      removeBlur(root);
+      toggleBlur(root);
     });
     let longPressTimer: ReturnType<typeof setTimeout> | null = null;
     root.addEventListener(
       "touchstart",
       () => {
         longPressTimer = setTimeout(() => {
-          removeBlur(root);
+          toggleBlur(root);
           longPressTimer = null;
         }, 500);
       },
