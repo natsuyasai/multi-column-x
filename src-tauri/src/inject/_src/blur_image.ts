@@ -6,14 +6,6 @@
   const unblurred = new WeakSet<Element>();
   const processed = new WeakSet<Element>();
 
-  function getImageRoot(element: Element): Element | null {
-    if (element.parentElement === null) return null;
-    if (element.parentElement.getAttribute("aria-labelledby")) {
-      return element.parentElement;
-    }
-    return getImageRoot(element.parentElement);
-  }
-
   function applyBlur(root: HTMLElement): void {
     root.style.filter = `blur(${BLUR_AMOUNT})`;
   }
@@ -29,12 +21,16 @@
       removeBlur(root);
     });
     let longPressTimer: ReturnType<typeof setTimeout> | null = null;
-    root.addEventListener("touchstart", () => {
-      longPressTimer = setTimeout(() => {
-        removeBlur(root);
-        longPressTimer = null;
-      }, 500);
-    }, { passive: true });
+    root.addEventListener(
+      "touchstart",
+      () => {
+        longPressTimer = setTimeout(() => {
+          removeBlur(root);
+          longPressTimer = null;
+        }, 500);
+      },
+      { passive: true },
+    );
     const cancelLongPress = () => {
       if (longPressTimer !== null) {
         clearTimeout(longPressTimer);
@@ -46,16 +42,16 @@
   }
 
   function setBlurImage(): void {
-    const images = document.body.querySelectorAll("div[data-testid='tweetPhoto']");
+    const images = document.body.querySelectorAll(
+      "div[data-testid='tweetPhoto']",
+    );
     images.forEach((image) => {
-      const root = getImageRoot(image);
-      if (root === null) return;
-      if (unblurred.has(root)) return;
-      if (!processed.has(root)) {
-        processed.add(root);
-        attachInteraction(root as HTMLElement);
+      if (unblurred.has(image)) return;
+      if (!processed.has(image)) {
+        processed.add(image);
+        attachInteraction(image as HTMLElement);
       }
-      applyBlur(root as HTMLElement);
+      applyBlur(image as HTMLElement);
     });
   }
 
