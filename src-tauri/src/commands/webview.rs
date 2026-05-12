@@ -91,6 +91,8 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         let inner_pos = window.inner_position().map_err(|e| e.to_string())?;
         let screen_x = inner_pos.x as f64 / scale + args.x;
         let screen_y = inner_pos.y as f64 / scale + args.y;
+        // parent() で transient-for を設定すると、GTK/X11 がカラムウィンドウを
+        // 常にメインウィンドウより前面に維持する。
         tauri::WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(parse_url(&url)?))
             .initialization_script(&init_script)
             .data_directory(data_dir)
@@ -98,6 +100,8 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
             .skip_taskbar(true)
             .position(screen_x, screen_y)
             .inner_size(args.width.max(1.0), args.height.max(1.0))
+            .parent(&window)
+            .map_err(|e| e.to_string())?
             .build()
             .map_err(|e| e.to_string())?;
     }
