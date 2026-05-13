@@ -11,8 +11,6 @@ export interface DialogState {
   setSettingsColumnId: (id: string | null) => void;
   showLinkPopupDialog: boolean;
   setShowLinkPopupDialog: (v: boolean) => void;
-  showComposeTweetDialog: boolean;
-  setShowComposeTweetDialog: (v: boolean) => void;
   tabActionColumnId: string | null;
   setTabActionColumnId: (id: string | null) => void;
   dialogOpen: boolean;
@@ -24,7 +22,6 @@ export function useDialogState(): DialogState {
   const [showAppSettings, setShowAppSettings] = useState(false);
   const [settingsColumnId, setSettingsColumnId] = useState<string | null>(null);
   const [showLinkPopupDialog, setShowLinkPopupDialog] = useState(false);
-  const [showComposeTweetDialog, setShowComposeTweetDialog] = useState(false);
   const [tabActionColumnId, setTabActionColumnId] = useState<string | null>(null);
 
   const dialogOpen =
@@ -33,7 +30,6 @@ export function useDialogState(): DialogState {
     showAppSettings ||
     !!settingsColumnId ||
     showLinkPopupDialog ||
-    showComposeTweetDialog ||
     !!tabActionColumnId;
 
   return {
@@ -47,8 +43,6 @@ export function useDialogState(): DialogState {
     setSettingsColumnId,
     showLinkPopupDialog,
     setShowLinkPopupDialog,
-    showComposeTweetDialog,
-    setShowComposeTweetDialog,
     tabActionColumnId,
     setTabActionColumnId,
     dialogOpen,

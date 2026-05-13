@@ -17,7 +17,6 @@ import { Sidebar } from "./components/Sidebar/Sidebar";
 import { MobileTabBar } from "./components/MobileTabBar/MobileTabBar";
 import { TabActionDialog } from "./components/TabActionDialog/TabActionDialog";
 import { LinkPopupDialog } from "./components/LinkPopupDialog/LinkPopupDialog";
-import { ComposeTweetDialog } from "./components/ComposeTweetDialog/ComposeTweetDialog";
 import { useDialogState } from "./hooks/useDialogState";
 import { platform } from "@tauri-apps/plugin-os";
 import { invoke } from "@tauri-apps/api/core";
@@ -70,8 +69,6 @@ const App: React.FC = () => {
     setSettingsColumnId,
     showLinkPopupDialog,
     setShowLinkPopupDialog,
-    showComposeTweetDialog,
-    setShowComposeTweetDialog,
     tabActionColumnId,
     setTabActionColumnId,
     dialogOpen,
@@ -216,22 +213,7 @@ const App: React.FC = () => {
     [handleUpdateColumn],
   );
 
-  const handleSubmitComposeTweet = useCallback(
-    async (accountId: string) => {
-      setShowComposeTweetDialog(false);
-      const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
-      if (!account) return;
-      await invoke(IPC_COMMANDS.OPEN_COMPOSE_WINDOW, {
-        accountId: account.id,
-        dataDirectory: account.dataDirectory,
-      }).catch(console.error);
-    },
-    [accounts],
-  );
-
   const linkPopupDefaultAccountId =
-    globalSettings.defaultAccountId ?? accounts[0]?.id ?? "";
-  const composeTweetDefaultAccountId =
     globalSettings.defaultAccountId ?? accounts[0]?.id ?? "";
 
   const handleTabAction = useCallback(
@@ -244,17 +226,13 @@ const App: React.FC = () => {
 
   const handleComposeTweet = useCallback(() => {
     if (accounts.length === 0) return;
-    if (accounts.length === 1 || isMobile) {
-      const defaultId = globalSettings.defaultAccountId ?? accounts[0].id;
-      const account = accounts.find((a) => a.id === defaultId) ?? accounts[0];
-      invoke(IPC_COMMANDS.OPEN_COMPOSE_WINDOW, {
-        accountId: account.id,
-        dataDirectory: account.dataDirectory,
-      }).catch(console.error);
-      return;
-    }
-    setShowComposeTweetDialog(true);
-  }, [accounts, globalSettings.defaultAccountId, isMobile]);
+    const defaultId = globalSettings.defaultAccountId ?? accounts[0].id;
+    const account = accounts.find((a) => a.id === defaultId) ?? accounts[0];
+    invoke(IPC_COMMANDS.OPEN_COMPOSE_WINDOW, {
+      accountId: account.id,
+      dataDirectory: account.dataDirectory,
+    }).catch(console.error);
+  }, [accounts, globalSettings.defaultAccountId]);
 
   const handleSetDefaultAccount = useCallback(
     (id: string) => {
@@ -371,15 +349,6 @@ const App: React.FC = () => {
           defaultAccountId={linkPopupDefaultAccountId}
           onSubmit={handleSubmitLinkPopup}
           onClose={() => setShowLinkPopupDialog(false)}
-        />
-      )}
-
-      {showComposeTweetDialog && (
-        <ComposeTweetDialog
-          accounts={accounts}
-          defaultAccountId={composeTweetDefaultAccountId}
-          onSubmit={handleSubmitComposeTweet}
-          onClose={() => setShowComposeTweetDialog(false)}
         />
       )}
 

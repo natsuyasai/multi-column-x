@@ -10,7 +10,6 @@ describe("useDialogState", () => {
     expect(result.current.showAppSettings).toBe(false);
     expect(result.current.settingsColumnId).toBeNull();
     expect(result.current.showLinkPopupDialog).toBe(false);
-    expect(result.current.showComposeTweetDialog).toBe(false);
     expect(result.current.tabActionColumnId).toBeNull();
   });
 
