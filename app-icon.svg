@@ -1,118 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0.3" y2="1">
-      <stop offset="0%" stop-color="#1e3a6e"/>
-      <stop offset="100%" stop-color="#0a1e3d"/>
-    </linearGradient>
-    <linearGradient id="win" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#2a4a80"/>
-      <stop offset="100%" stop-color="#1a3260"/>
-    </linearGradient>
-    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#f0f4fc"/>
-      <stop offset="100%" stop-color="#dce6f8"/>
-    </linearGradient>
-  </defs>
-
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
   <!-- Background -->
-  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <rect width="1024" height="1024" fill="#0f2040"/>
 
-  <!-- Window frame -->
-  <rect x="128" y="148" width="768" height="728" rx="44" fill="url(#win)"/>
+  <!-- Bubble 1 (back, dark blue) + tail -->
+  <rect x="142" y="280" width="520" height="340" rx="48" fill="#1d4e89"/>
+  <polygon points="182,620 142,706 242,620" fill="#1d4e89"/>
 
-  <!-- Title bar separator -->
-  <rect x="128" y="236" width="768" height="2" fill="white" opacity="0.12"/>
+  <!-- Bubble 2 (middle, medium blue) + tail -->
+  <rect x="252" y="280" width="520" height="340" rx="48" fill="#2e86c1"/>
+  <polygon points="292,620 252,706 352,620" fill="#2e86c1"/>
 
-  <!-- Title bar: window control dots -->
-  <circle cx="192" cy="192" r="14" fill="white" opacity="0.55"/>
-  <circle cx="236" cy="192" r="14" fill="white" opacity="0.35"/>
-  <circle cx="280" cy="192" r="14" fill="white" opacity="0.20"/>
-
-  <!-- Title bar: 3 small column-indicator marks (right side) -->
-  <rect x="680" y="180" width="10" height="24" rx="3" fill="white" opacity="0.45"/>
-  <rect x="698" y="180" width="10" height="24" rx="3" fill="white" opacity="0.45"/>
-  <rect x="716" y="180" width="10" height="24" rx="3" fill="white" opacity="0.45"/>
-
-  <!-- 3 panels inside window -->
-  <!-- gap between panels: 14px, padding: 20px, total inner width: 768-40=728, panel width=(728-28)/3=233 -->
-  <!-- Panel 1: x=148 -->
-  <rect x="148" y="256" width="233" height="600" rx="10" fill="url(#panel)"/>
-  <rect x="168" y="284" width="160" height="13" rx="6" fill="#0a1e3d" opacity="0.20"/>
-  <rect x="168" y="305" width="120" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="168" y="323" width="172" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="168" y="353" width="160" height="13" rx="6" fill="#0a1e3d" opacity="0.20"/>
-  <rect x="168" y="374" width="148" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="168" y="392" width="104" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="168" y="422" width="160" height="13" rx="6" fill="#0a1e3d" opacity="0.20"/>
-  <rect x="168" y="443" width="136" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="168" y="461" width="160" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="168" y="491" width="160" height="13" rx="6" fill="#0a1e3d" opacity="0.20"/>
-  <rect x="168" y="512" width="100" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="168" y="530" width="152" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="168" y="560" width="160" height="13" rx="6" fill="#0a1e3d" opacity="0.20"/>
-  <rect x="168" y="581" width="128" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="168" y="599" width="172" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="168" y="629" width="160" height="13" rx="6" fill="#0a1e3d" opacity="0.20"/>
-  <rect x="168" y="650" width="144" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="168" y="668" width="112" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="168" y="698" width="160" height="13" rx="6" fill="#0a1e3d" opacity="0.20"/>
-  <rect x="168" y="719" width="88"  height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="168" y="737" width="160" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="168" y="767" width="160" height="13" rx="6" fill="#0a1e3d" opacity="0.20"/>
-  <rect x="168" y="788" width="136" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="168" y="806" width="104" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-
-  <!-- Panel 2: x=395 -->
-  <rect x="395" y="256" width="233" height="600" rx="10" fill="url(#panel)"/>
-  <rect x="415" y="284" width="160" height="13" rx="6" fill="#0a1e3d" opacity="0.20"/>
-  <rect x="415" y="305" width="136" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="415" y="323" width="100" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="415" y="353" width="160" height="13" rx="6" fill="#0a1e3d" opacity="0.20"/>
-  <rect x="415" y="374" width="156" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="415" y="392" width="116" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="415" y="422" width="160" height="13" rx="6" fill="#0a1e3d" opacity="0.20"/>
-  <rect x="415" y="443" width="80"  height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="415" y="461" width="148" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="415" y="491" width="160" height="13" rx="6" fill="#0a1e3d" opacity="0.20"/>
-  <rect x="415" y="512" width="120" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="415" y="530" width="172" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="415" y="560" width="160" height="13" rx="6" fill="#0a1e3d" opacity="0.20"/>
-  <rect x="415" y="581" width="96"  height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="415" y="599" width="140" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="415" y="629" width="160" height="13" rx="6" fill="#0a1e3d" opacity="0.20"/>
-  <rect x="415" y="650" width="152" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="415" y="668" width="108" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="415" y="698" width="160" height="13" rx="6" fill="#0a1e3d" opacity="0.20"/>
-  <rect x="415" y="719" width="128" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="415" y="737" width="88"  height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="415" y="767" width="160" height="13" rx="6" fill="#0a1e3d" opacity="0.20"/>
-  <rect x="415" y="788" width="112" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="415" y="806" width="148" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-
-  <!-- Panel 3: x=642 -->
-  <rect x="642" y="256" width="233" height="600" rx="10" fill="url(#panel)"/>
-  <rect x="662" y="284" width="160" height="13" rx="6" fill="#0a1e3d" opacity="0.20"/>
-  <rect x="662" y="305" width="112" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="662" y="323" width="164" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="662" y="353" width="160" height="13" rx="6" fill="#0a1e3d" opacity="0.20"/>
-  <rect x="662" y="374" width="124" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="662" y="392" width="152" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="662" y="422" width="160" height="13" rx="6" fill="#0a1e3d" opacity="0.20"/>
-  <rect x="662" y="443" width="144" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="662" y="461" width="96"  height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="662" y="491" width="160" height="13" rx="6" fill="#0a1e3d" opacity="0.20"/>
-  <rect x="662" y="512" width="172" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="662" y="530" width="120" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="662" y="560" width="160" height="13" rx="6" fill="#0a1e3d" opacity="0.20"/>
-  <rect x="662" y="581" width="104" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="662" y="599" width="148" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="662" y="629" width="160" height="13" rx="6" fill="#0a1e3d" opacity="0.20"/>
-  <rect x="662" y="650" width="136" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="662" y="668" width="160" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="662" y="698" width="160" height="13" rx="6" fill="#0a1e3d" opacity="0.20"/>
-  <rect x="662" y="719" width="100" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="662" y="737" width="156" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="662" y="767" width="160" height="13" rx="6" fill="#0a1e3d" opacity="0.20"/>
-  <rect x="662" y="788" width="128" height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
-  <rect x="662" y="806" width="80"  height="10" rx="5" fill="#0a1e3d" opacity="0.12"/>
+  <!-- Bubble 3 (front, light blue) + tail -->
+  <rect x="362" y="280" width="520" height="340" rx="48" fill="#aed6f1"/>
+  <polygon points="402,620 362,706 512,620" fill="#aed6f1"/>
 </svg>
