@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { calculateGridBounds, MOBILE_TAB_BAR_HEIGHT, useColumns } from "./useColumns";
+import {
+  calculateGridBounds,
+  MOBILE_TAB_BAR_HEIGHT,
+  useColumns,
+} from "./useColumns";
 import { useAppStore } from "../store/useAppStore";
 import { renderHook, act } from "@testing-library/react";
 import { invoke } from "@tauri-apps/api/core";
@@ -219,6 +223,7 @@ describe("useColumns mobile", () => {
         blurImageAmount: "10px",
         hideAdEnabled: false,
         zoomLevel: 1,
+        useXAppForCompose: false,
       },
       isLoaded: true,
       isMobile: true,

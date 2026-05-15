@@ -33,6 +33,7 @@ const mockGlobalSettings: GlobalSettings = {
   blurImageAmount: "10px",
   hideAdEnabled: false,
   zoomLevel: 1,
+  useXAppForCompose: false,
 };
 
 describe("AddColumnDialog", () => {
