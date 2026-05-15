@@ -97,6 +97,7 @@ impl Default for GlobalSettingsData {
             blur_image_amount: "10px".to_string(),
             hide_ad_enabled: false,
             zoom_level: 1.0,
+            use_x_app_for_compose: false,
         }
     }
 }
@@ -210,6 +211,9 @@ pub struct GlobalSettingsData {
     #[serde(rename = "zoomLevel")]
     #[serde(default = "default_zoom_level")]
     pub zoom_level: f64,
+    #[serde(rename = "useXAppForCompose")]
+    #[serde(default)]
+    pub use_x_app_for_compose: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

@@ -157,6 +157,18 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_initContext<
 
 /// MainActivity.launchAddAccount(accountId) 経由で AddAccount Activity を起動する。
 /// accountId は AddAccount Activity に Intent Extra として渡され、WebView Profile の分離に使われる。
+/// MainActivity.launchComposeTweet() 経由で X アプリのツイート画面を Intent で起動する。
+/// X アプリが未インストールの場合はブラウザの x.com にフォールバックする。
+pub fn launch_compose_tweet_intent() -> Result<(), String> {
+    call_activity_method(|env, activity| {
+        env.call_method(activity, "launchComposeTweet", "()V", &[])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
+/// MainActivity.launchAddAccount(accountId) 経由で AddAccount Activity を起動する。
+/// accountId は AddAccount Activity に Intent Extra として渡され、WebView Profile の分離に使われる。
 pub fn launch_add_account_activity(account_id: &str) -> Result<(), String> {
     call_activity_method(|env, activity| {
         let j_account_id = env.new_string(account_id).map_err(|e| e.to_string())?;

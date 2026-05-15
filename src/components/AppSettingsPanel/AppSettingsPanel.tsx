@@ -53,6 +53,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   const [showSortButtons, setShowSortButtons] = useState(settings.showSortButtons);
   const [hideAdEnabled, setHideAdEnabled] = useState(settings.hideAdEnabled);
   const [zoomLevel, setZoomLevel] = useState(settings.zoomLevel ?? 1);
+  const [useXAppForCompose, setUseXAppForCompose] = useState(settings.useXAppForCompose ?? false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,6 +74,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       blurImageAmount,
       hideAdEnabled,
       zoomLevel,
+      useXAppForCompose,
     });
     onClose();
   };
@@ -329,6 +331,18 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                     onChange={(e) => setHideAdEnabled(e.target.checked)}
                   />
                   広告を非表示にする
+                </label>
+              </section>
+
+              <section className={styles.section}>
+                <h3 className={styles.sectionTitle}>ツイート（Android）</h3>
+                <label className={styles.checkLabel}>
+                  <input
+                    type="checkbox"
+                    checked={useXAppForCompose}
+                    onChange={(e) => setUseXAppForCompose(e.target.checked)}
+                  />
+                  ツイートボタンでXアプリを起動する
                 </label>
               </section>
 

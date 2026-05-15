@@ -63,6 +63,7 @@ export interface GlobalSettings {
   blurImageAmount: string;
   hideAdEnabled: boolean;
   zoomLevel: number;
+  useXAppForCompose: boolean;
 }
 
 export interface AppSettings {
@@ -106,6 +107,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   blurImageAmount: "10px",
   hideAdEnabled: false,
   zoomLevel: 1,
+  useXAppForCompose: false,
 };
 
 interface ResolveColumnUrlInput {

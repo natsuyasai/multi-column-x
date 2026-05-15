@@ -193,6 +193,22 @@ class MainActivity : TauriActivity() {
 
   // AddAccount Activity を account_id を Intent Extra として渡して起動する。
   // AddAccount は "account-{accountId}" WebView Profile を使って独立したセッションでログインする。
+  // X アプリのツイート画面を Intent で起動する。
+  // X アプリ未インストール時はブラウザの x.com にフォールバックする。
+  fun launchComposeTweet() {
+    val xAppUri = Uri.parse("twitter://post")
+    val fallbackUri = Uri.parse("https://x.com/compose/post")
+    try {
+      startActivity(Intent(Intent.ACTION_VIEW, xAppUri))
+    } catch (e: Exception) {
+      try {
+        startActivity(Intent(Intent.ACTION_VIEW, fallbackUri))
+      } catch (ex: Exception) {
+        Log.w(TAG, "launchComposeTweet: failed to open compose screen: ${ex.message}")
+      }
+    }
+  }
+
   fun launchAddAccount(accountId: String) {
     val intent = Intent(this, AddAccount::class.java)
     intent.putExtra("accountId", accountId)
@@ -213,6 +229,7 @@ class MainActivity : TauriActivity() {
         wv.settings.javaScriptEnabled = true
         wv.settings.domStorageEnabled = true
         wv.settings.setSupportMultipleWindows(true)
+        wv.settings.cacheMode = android.webkit.WebSettings.LOAD_CACHE_ELSE_NETWORK
         wv.webViewClient = ExternalLinkWebViewClient()
         wv.webChromeClient = ExternalLinkWebChromeClient()
         if (profileApiSupported && accountId.isNotEmpty()) {
@@ -291,6 +308,7 @@ class MainActivity : TauriActivity() {
         wv.settings.javaScriptEnabled = true
         wv.settings.domStorageEnabled = true
         wv.settings.setSupportMultipleWindows(true)
+        wv.settings.cacheMode = android.webkit.WebSettings.LOAD_CACHE_ELSE_NETWORK
         wv.webViewClient = ExternalLinkWebViewClient()
         wv.webChromeClient = ExternalLinkWebChromeClient()
         if (profileApiSupported) {

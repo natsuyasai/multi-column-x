@@ -296,6 +296,13 @@ fn load_popup_esc_close_enabled(app: &AppHandle) -> bool {
         .unwrap_or(true)
 }
 
+fn load_use_x_app_for_compose(app: &AppHandle) -> bool {
+    load_global_settings(app)
+        .get("useXAppForCompose")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+}
+
 fn load_accounts_json(app: &AppHandle) -> String {
     app.store("settings.json")
         .ok()
@@ -708,7 +715,10 @@ pub async fn open_compose_window(
 
     #[cfg(target_os = "android")]
     {
-        let _ = (app, dataDirectory);
+        let _ = (dataDirectory,);
+        if load_use_x_app_for_compose(&app) {
+            return crate::android_bridge::launch_compose_tweet_intent();
+        }
         return crate::android_bridge::create_popup_webview(
             &compose_label,
             "https://x.com/compose/post",
