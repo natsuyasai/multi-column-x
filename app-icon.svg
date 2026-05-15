@@ -1,16 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <!-- Background -->
   <rect width="1024" height="1024" fill="#0f2040"/>
 
-  <!-- Bubble 1 (back, dark blue) + tail -->
-  <rect x="142" y="280" width="520" height="340" rx="48" fill="#1d4e89"/>
-  <polygon points="182,620 142,706 242,620" fill="#1d4e89"/>
+  <!-- Bubble 1 (back): coral -->
+  <rect x="142" y="280" width="520" height="340" rx="48" fill="#D4685A"/>
+  <polygon points="182,620 142,706 242,620" fill="#D4685A"/>
 
-  <!-- Bubble 2 (middle, medium blue) + tail -->
-  <rect x="252" y="280" width="520" height="340" rx="48" fill="#2e86c1"/>
-  <polygon points="292,620 252,706 352,620" fill="#2e86c1"/>
+  <!-- Bubble 2 (middle): teal -->
+  <rect x="252" y="280" width="520" height="340" rx="48" fill="#3DBFAD"/>
+  <polygon points="292,620 252,706 352,620" fill="#3DBFAD"/>
 
-  <!-- Bubble 3 (front, light blue) + tail -->
-  <rect x="362" y="280" width="520" height="340" rx="48" fill="#aed6f1"/>
-  <polygon points="402,620 362,706 512,620" fill="#aed6f1"/>
+  <!-- Bubble 3 (front): blue -->
+  <rect x="362" y="280" width="520" height="340" rx="48" fill="#4B9CF5"/>
+  <polygon points="402,620 362,706 512,620" fill="#4B9CF5"/>
 </svg>
