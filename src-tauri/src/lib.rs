@@ -110,6 +110,21 @@ pub fn run() {
         if let tauri::WindowEvent::CloseRequested { .. } = event {
             if window.label() == "main" {
                 save_window_bounds(window);
+                // Linux ではカラム/ポップアップ WebView が独立ウィンドウのため明示的に閉じる。
+                // 他の OS では子 WebView として管理されるため不要。
+                #[cfg(target_os = "linux")]
+                {
+                    use crate::ipc_constants::labels;
+                    let app = window.app_handle();
+                    for (label, ww) in app.webview_windows() {
+                        if label.starts_with(labels::COLUMN_PREFIX)
+                            || label.starts_with(labels::POPUP_PREFIX)
+                            || label.starts_with(labels::COMPOSE_PREFIX)
+                        {
+                            let _ = ww.close();
+                        }
+                    }
+                }
             }
         }
     });

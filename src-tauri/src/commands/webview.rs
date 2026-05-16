@@ -7,7 +7,10 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewUrl};
 use tauri_plugin_store::StoreExt;
 
-#[cfg(desktop)]
+// On Linux, column WebViews are created as separate undecorated WebviewWindows
+// (window.add_child puts them in a GTK VBox which ignores position/size).
+// WebviewBuilder is only needed on non-Linux desktop.
+#[cfg(all(desktop, not(target_os = "linux")))]
 use tauri::WebviewBuilder;
 
 fn webview_label(column_id: &str) -> String {
@@ -79,8 +82,35 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         visible_links: &args.column.settings.visible_links,
     });
 
-    let window = app.get_window("main").ok_or("main window not found")?;
+    // parent() は &WebviewWindow を要求するため get_webview_window を使う。
+    // WebviewWindow は Deref<Target=Window> なので add_child 等もそのまま動く。
+    let window = app.get_webview_window("main").ok_or("main window not found")?;
 
+    // On Linux, window.add_child() places WebViews into a GTK VBox which ignores
+    // position/size parameters. Instead, create an undecorated WebviewWindow at the
+    // correct screen coordinates (main window inner position + column logical offset).
+    #[cfg(target_os = "linux")]
+    {
+        let scale = window.scale_factor().unwrap_or(1.0);
+        let inner_pos = window.inner_position().map_err(|e| e.to_string())?;
+        let screen_x = inner_pos.x as f64 / scale + args.x;
+        let screen_y = inner_pos.y as f64 / scale + args.y;
+        // parent() で transient-for を設定すると、GTK/X11 がカラムウィンドウを
+        // 常にメインウィンドウより前面に維持する。
+        tauri::WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(parse_url(&url)?))
+            .initialization_script(&init_script)
+            .data_directory(data_dir)
+            .decorations(false)
+            .skip_taskbar(true)
+            .position(screen_x, screen_y)
+            .inner_size(args.width.max(1.0), args.height.max(1.0))
+            .parent(&window)
+            .map_err(|e| e.to_string())?
+            .build()
+            .map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(not(target_os = "linux"))]
     window
         .add_child(
             WebviewBuilder::new(&label, WebviewUrl::External(parse_url(&url)?))
@@ -164,7 +194,10 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
 pub async fn remove_column_webview(app: AppHandle, column_id: String) -> Result<(), String> {
     let label = webview_label(&column_id);
 
-    if let Some(webview) = app.get_webview(&label) {
+    // On Linux, column WebViews are WebviewWindows; on other platforms they are child Webviews.
+    if let Some(window) = app.get_webview_window(&label) {
+        window.close().map_err(|e| e.to_string())?;
+    } else if let Some(webview) = app.get_webview(&label) {
         webview.close().map_err(|e| e.to_string())?;
     }
 
@@ -207,6 +240,25 @@ pub struct ResizeBounds {
 pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Result<(), String> {
     let label = webview_label(&bounds.column_id);
 
+    // On Linux, column WebViews are undecorated WebviewWindows. Reposition by computing
+    // screen coordinates from the main window's current inner position each time,
+    // so columns stay in sync even after the main window is moved.
+    #[cfg(target_os = "linux")]
+    if let Some(webview_window) = app.get_webview_window(&label) {
+        let window = app.get_window("main").ok_or("main window not found")?;
+        let scale = window.scale_factor().unwrap_or(1.0);
+        let inner_pos = window.inner_position().map_err(|e| e.to_string())?;
+        let screen_x = inner_pos.x as f64 / scale + bounds.x;
+        let screen_y = inner_pos.y as f64 / scale + bounds.y;
+        webview_window
+            .set_position(LogicalPosition::new(screen_x, screen_y))
+            .map_err(|e| e.to_string())?;
+        webview_window
+            .set_size(LogicalSize::new(bounds.width.max(1.0), bounds.height.max(1.0)))
+            .map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(not(target_os = "linux"))]
     if let Some(webview) = app.get_webview(&label) {
         webview
             .set_bounds(tauri::Rect {

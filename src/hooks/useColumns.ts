@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { platform } from "@tauri-apps/plugin-os";
 import { useAppStore } from "../store/useAppStore";
 import type { Column } from "../types";
 import { IPC_COMMANDS, IPC_EVENTS } from "../constants/ipc";
@@ -433,6 +435,16 @@ export function useColumns() {
       window.removeEventListener("resize", handleResize);
     };
   }, [recalculateAllBounds]);
+
+  // Linux: カラム WebView は独立したウィンドウのため、メインウィンドウ移動時に位置を再計算する
+  useEffect(() => {
+    if (isMobile || platform() !== "linux") return;
+    let unlisten: (() => void) | undefined;
+    getCurrentWindow()
+      .onMoved(() => { recalculateAllBounds(); })
+      .then((fn) => { unlisten = fn; });
+    return () => { unlisten?.(); };
+  }, [isMobile, recalculateAllBounds]);
 
   // カラムスワイプナビゲーション（モバイルのみ: Android ネイティブジェスチャー → Tauri イベント経由）
   useEffect(() => {
