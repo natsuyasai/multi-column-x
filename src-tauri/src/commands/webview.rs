@@ -248,6 +248,17 @@ pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Resu
         let window = app.get_window("main").ok_or("main window not found")?;
         let scale = window.scale_factor().unwrap_or(1.0);
         let inner_pos = window.inner_position().map_err(|e| e.to_string())?;
+        let inner_size = window.inner_size().map_err(|e| e.to_string())?;
+        let win_logical_width = inner_size.width as f64 / scale;
+
+        // Column is fully outside the viewport (scrolled left or right).
+        // GTK does not clip child windows to the parent, so move the window
+        // far off-screen to hide it instead of leaving it stuck at the edge.
+        if bounds.x + bounds.width <= 0.0 || bounds.x >= win_logical_width {
+            let _ = webview_window.set_position(LogicalPosition::new(-10000.0, 0.0));
+            return Ok(());
+        }
+
         let screen_x = inner_pos.x as f64 / scale + bounds.x;
         let screen_y = inner_pos.y as f64 / scale + bounds.y;
         webview_window
