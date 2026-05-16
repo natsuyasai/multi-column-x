@@ -41,6 +41,7 @@
     public void createPopupWebView(java.lang.String, java.lang.String, java.lang.String, java.lang.String);
     public void removePopupWebView(java.lang.String);
     public void setAccountCookies(java.lang.String);
+    public void launchComposeTweet();
 }
 
 # wry (main_pipe.rs) が env.call_method() で呼び出す RustWebView のカスタムメソッド。

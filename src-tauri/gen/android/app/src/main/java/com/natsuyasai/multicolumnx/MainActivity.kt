@@ -194,17 +194,22 @@ class MainActivity : TauriActivity() {
   // AddAccount Activity を account_id を Intent Extra として渡して起動する。
   // AddAccount は "account-{accountId}" WebView Profile を使って独立したセッションでログインする。
   // X アプリのツイート画面を Intent で起動する。
-  // X アプリ未インストール時はブラウザの x.com にフォールバックする。
+  // X アプリが入っていれば X アプリで開き、未インストール時はブラウザにフォールバックする。
   fun launchComposeTweet() {
-    val xAppUri = Uri.parse("twitter://post")
-    val fallbackUri = Uri.parse("https://x.com/compose/post")
-    try {
-      startActivity(Intent(Intent.ACTION_VIEW, xAppUri))
-    } catch (e: Exception) {
+    runOnUiThread {
+      val composeUri = Uri.parse("https://x.com/intent/tweet")
       try {
-        startActivity(Intent(Intent.ACTION_VIEW, fallbackUri))
-      } catch (ex: Exception) {
-        Log.w(TAG, "launchComposeTweet: failed to open compose screen: ${ex.message}")
+        val intent = Intent(Intent.ACTION_VIEW, composeUri).apply {
+          setPackage("com.twitter.android")
+          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        startActivity(intent)
+      } catch (e: Exception) {
+        try {
+          startActivity(Intent(Intent.ACTION_VIEW, composeUri))
+        } catch (ex: Exception) {
+          Log.w(TAG, "launchComposeTweet: failed to open compose screen: ${ex.message}")
+        }
       }
     }
   }
