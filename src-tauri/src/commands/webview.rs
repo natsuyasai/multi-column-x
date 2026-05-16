@@ -233,6 +233,10 @@ pub struct ResizeBounds {
     pub y: f64,
     pub width: f64,
     pub height: f64,
+    /// Linux のビューポート左端チェックに使うサイドバー幅（論理 px）。
+    /// 省略時は 0 として扱う（x=-9999 のような明示的 hide 呼び出しでは不要）。
+    #[serde(rename = "sidebarWidth", default)]
+    pub sidebar_width: f64,
 }
 
 #[cfg(desktop)]
@@ -254,7 +258,10 @@ pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Resu
         // Column is fully outside the viewport: hide the window.
         // Moving to a far-off coordinate (e.g. -10000) gets clamped by GTK/WM
         // to the screen edge, causing visible overlap. hide()/show() avoids this.
-        if bounds.x + bounds.width <= 0.0 || bounds.x >= win_logical_width {
+        // Left threshold is sidebarWidth (not 0) because bounds.x starts from the
+        // sidebar's right edge; a column is only truly hidden when its right edge
+        // is at or before the sidebar's right edge.
+        if bounds.x + bounds.width <= bounds.sidebar_width || bounds.x >= win_logical_width {
             let _ = webview_window.hide();
             return Ok(());
         }

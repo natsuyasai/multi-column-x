@@ -227,7 +227,7 @@ export function useColumns() {
     await Promise.all(
       Object.entries(bounds).map(([columnId, b]) =>
         invoke(IPC_COMMANDS.RESIZE_COLUMN_WEBVIEW, {
-          bounds: { columnId, ...b },
+          bounds: { columnId, ...b, sidebarWidth },
         }).catch(console.error),
       ),
     );
