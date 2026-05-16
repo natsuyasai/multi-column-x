@@ -255,21 +255,42 @@ pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Resu
         let inner_size = window.inner_size().map_err(|e| e.to_string())?;
         let win_logical_width = inner_size.width as f64 / scale;
 
-        // Column is fully outside the viewport: hide the window.
-        // Moving to a far-off coordinate (e.g. -10000) gets clamped by GTK/WM
-        // to the screen edge, causing visible overlap. hide()/show() avoids this.
-        // Left threshold is sidebarWidth (not 0) because bounds.x starts from the
-        // sidebar's right edge; a column is only truly hidden when its right edge
-        // is at or before the sidebar's right edge.
-        if bounds.x + bounds.width <= bounds.sidebar_width || bounds.x >= win_logical_width {
+        let screen_x = inner_pos.x as f64 / scale + bounds.x;
+        let screen_y = inner_pos.y as f64 / scale + bounds.y;
+
+        // GTK/WM clamps window positions to stay within the monitor.
+        // When screen_x + width > monitor_right (or screen_x < monitor_left),
+        // the window is shifted inward, causing it to overlap other column windows.
+        // Use monitor bounds as the definitive hide boundary instead of relying on
+        // window-relative checks alone.
+        let (monitor_left, monitor_right) = window
+            .current_monitor()
+            .ok()
+            .flatten()
+            .map(|m| {
+                let mx = m.position().x as f64 / scale;
+                let mw = m.size().width as f64 / scale;
+                (mx, mx + mw)
+            })
+            .unwrap_or((f64::NEG_INFINITY, f64::INFINITY));
+
+        let should_hide =
+            // Completely behind sidebar (left side)
+            bounds.x + bounds.width <= bounds.sidebar_width
+            // Completely past window right edge
+            || bounds.x >= win_logical_width
+            // Right edge overflows monitor → GTK clamps inward, causing overlap
+            || screen_x + bounds.width > monitor_right
+            // Left edge past monitor left boundary → GTK clamps, may cause overlap
+            || screen_x < monitor_left;
+
+        if should_hide {
             let _ = webview_window.hide();
             return Ok(());
         }
 
         // Column is in viewport: reposition first (to avoid a flash at the old
         // position), then ensure the window is visible.
-        let screen_x = inner_pos.x as f64 / scale + bounds.x;
-        let screen_y = inner_pos.y as f64 / scale + bounds.y;
         webview_window
             .set_position(LogicalPosition::new(screen_x, screen_y))
             .map_err(|e| e.to_string())?;
