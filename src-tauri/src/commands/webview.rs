@@ -251,14 +251,16 @@ pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Resu
         let inner_size = window.inner_size().map_err(|e| e.to_string())?;
         let win_logical_width = inner_size.width as f64 / scale;
 
-        // Column is fully outside the viewport (scrolled left or right).
-        // GTK does not clip child windows to the parent, so move the window
-        // far off-screen to hide it instead of leaving it stuck at the edge.
+        // Column is fully outside the viewport: hide the window.
+        // Moving to a far-off coordinate (e.g. -10000) gets clamped by GTK/WM
+        // to the screen edge, causing visible overlap. hide()/show() avoids this.
         if bounds.x + bounds.width <= 0.0 || bounds.x >= win_logical_width {
-            let _ = webview_window.set_position(LogicalPosition::new(-10000.0, 0.0));
+            let _ = webview_window.hide();
             return Ok(());
         }
 
+        // Column is in viewport: reposition first (to avoid a flash at the old
+        // position), then ensure the window is visible.
         let screen_x = inner_pos.x as f64 / scale + bounds.x;
         let screen_y = inner_pos.y as f64 / scale + bounds.y;
         webview_window
@@ -267,6 +269,7 @@ pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Resu
         webview_window
             .set_size(LogicalSize::new(bounds.width.max(1.0), bounds.height.max(1.0)))
             .map_err(|e| e.to_string())?;
+        let _ = webview_window.show();
     }
 
     #[cfg(not(target_os = "linux"))]
