@@ -12,3 +12,6 @@ aidlc-docs/audit.md
 src-tauri/src/inject/**/*.js
 src-tauri/src/inject/*.svg
 TODO.md
+
+keystore.properties
+upload-keystore.jks
