@@ -1,5 +1,10 @@
 import React from "react";
 import type { Account, Column, PageType } from "../../types";
+import HomeIcon from "../../assets/icons/home.svg?react";
+import NotificationsIcon from "../../assets/icons/notifications.svg?react";
+import SearchIcon from "../../assets/icons/search.svg?react";
+import ListIcon from "../../assets/icons/list.svg?react";
+import CustomIcon from "../../assets/icons/custom.svg?react";
 import styles from "./TopBar.module.scss";
 
 interface TopBarProps {
@@ -15,18 +20,23 @@ interface TopBarProps {
   onJumpToColumn: (columnId: string) => void;
 }
 
-function getColumnIcon(pageType: PageType): string {
+function getColumnIcon(pageType: PageType): React.ReactElement {
+  const props = {
+    width: 16,
+    height: 16,
+    "data-testid": `icon-${pageType}`,
+  } as const;
   switch (pageType) {
     case "home":
-      return "🏠";
+      return <HomeIcon {...props} />;
     case "notifications":
-      return "🔔";
+      return <NotificationsIcon {...props} />;
     case "search":
-      return "🔍";
+      return <SearchIcon {...props} />;
     case "list":
-      return "📄";
+      return <ListIcon {...props} />;
     case "custom":
-      return "🌐";
+      return <CustomIcon {...props} />;
   }
 }
 
