@@ -7,8 +7,27 @@
   const AD_TEXTS = ["Ad", "Promoted", "広告"];
   const TIMELINE_SELECTOR = 'main[role="main"]';
 
-  function hideElement(element: HTMLElement): void {
-    element.style.setProperty("display", "none", "important");
+  function removeAdCell(el: HTMLElement): void {
+    let current: HTMLElement | null = el.parentElement;
+    while (current) {
+      if (
+        current.tagName === "SECTION" &&
+        current.getAttribute("role") === "region"
+      ) {
+        break;
+      }
+      if (
+        current.tagName === "DIV" &&
+        current.dataset.testid === "cellInnerDiv" &&
+        current.style.transform !== "" &&
+        current.style.position === "absolute"
+      ) {
+        current.remove();
+        return;
+      }
+      current = current.parentElement;
+    }
+    el.style.setProperty("display", "none", "important");
   }
 
   function checkAndHideAd(tweetElement: Element): void {
@@ -16,7 +35,7 @@
     if (el.style.display === "none") return;
 
     if (el.querySelector(AD_DATA_TESTID_SELECTOR)) {
-      hideElement(el);
+      removeAdCell(el);
       return;
     }
 
@@ -28,7 +47,7 @@
         AD_TEXTS.some((t) => t.toLowerCase() === text.toLowerCase()) &&
         span.offsetParent !== null
       ) {
-        hideElement(el);
+        removeAdCell(el);
         return;
       }
     }
