@@ -289,10 +289,23 @@ pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Resu
 
     #[cfg(not(target_os = "linux"))]
     if let Some(webview) = app.get_webview(&label) {
+        // Windows の WebView2 / macOS の WKWebView は HTML より手前に描画されるため、
+        // 横スクロールでカラムが Sidebar の領域に入り込むと Sidebar が裏に隠れてしまう。
+        // bounds.x が sidebar_width より小さいときは左側をクリップする。
+        // ただし x が大きく負（hideColumnWebviews による画面外退避）の場合はクリップを
+        // 適用せずそのままオフスクリーンに置く（再レイアウト抑制のため）。
+        let (vis_x, vis_width) = if bounds.x < 0.0
+            && bounds.x + bounds.width <= bounds.sidebar_width
+        {
+            (bounds.x, bounds.width.max(1.0))
+        } else {
+            let clip_left = (bounds.sidebar_width - bounds.x).max(0.0);
+            (bounds.x + clip_left, (bounds.width - clip_left).max(1.0))
+        };
         webview
             .set_bounds(tauri::Rect {
-                position: LogicalPosition::new(bounds.x, bounds.y).into(),
-                size: LogicalSize::new(bounds.width, bounds.height).into(),
+                position: LogicalPosition::new(vis_x, bounds.y).into(),
+                size: LogicalSize::new(vis_width, bounds.height).into(),
             })
             .map_err(|e| e.to_string())?;
     }
