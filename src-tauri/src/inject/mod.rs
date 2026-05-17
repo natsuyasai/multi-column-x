@@ -43,7 +43,11 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     } else {
         include_str!("context_menu.js")
     };
-    let scroll_event = include_str!("scroll_event.js");
+    let scroll_event = if params.is_mobile {
+        ""
+    } else {
+        include_str!("scroll_event.js")
+    };
     let video_control = include_str!("video_control.js");
 
     let visible_links_json =

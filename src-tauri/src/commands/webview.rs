@@ -82,9 +82,14 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         visible_links: &args.column.settings.visible_links,
     });
 
-    // parent() は &WebviewWindow を要求するため get_webview_window を使う。
-    // WebviewWindow は Deref<Target=Window> なので add_child 等もそのまま動く。
-    let window = app.get_webview_window("main").ok_or("main window not found")?;
+    // parent() は &WebviewWindow を要求するため、Linux では get_webview_window を使う。
+    // 非Linux の場合は一般の Window を取得して add_child を呼び出す。
+    #[cfg(target_os = "linux")]
+    let window = app
+        .get_webview_window("main")
+        .ok_or("main window not found")?;
+    #[cfg(not(target_os = "linux"))]
+    let window = app.get_window("main").ok_or("main window not found")?;
 
     // On Linux, window.add_child() places WebViews into a GTK VBox which ignores
     // position/size parameters. Instead, create an undecorated WebviewWindow at the
@@ -323,16 +328,24 @@ pub async fn resize_column_webview(_app: AppHandle, bounds: ResizeBounds) -> Res
 fn get_popup_bounds(app: &AppHandle) -> (LogicalPosition<f64>, LogicalSize<f64>) {
     const FALLBACK: (LogicalPosition<f64>, LogicalSize<f64>) = (
         LogicalPosition { x: 50.0, y: 50.0 },
-        LogicalSize { width: 800.0, height: 600.0 },
+        LogicalSize {
+            width: 800.0,
+            height: 600.0,
+        },
     );
     const PADDING: f64 = 50.0;
-    let Some(window) = app.get_window("main") else { return FALLBACK };
+    let Some(window) = app.get_window("main") else {
+        return FALLBACK;
+    };
     let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) else {
         return FALLBACK;
     };
     (
         LogicalPosition::new(pos.x as f64 + PADDING, pos.y as f64 + PADDING),
-        LogicalSize::new(size.width as f64 - PADDING * 2.0, size.height as f64 - PADDING * 2.0),
+        LogicalSize::new(
+            size.width as f64 - PADDING * 2.0,
+            size.height as f64 - PADDING * 2.0,
+        ),
     )
 }
 
@@ -435,18 +448,14 @@ pub async fn open_popup_window(
     let popup_label = format!("{}{}", labels::POPUP_PREFIX, uuid::Uuid::new_v4());
     let (pos, size) = get_popup_bounds(&app);
 
-    tauri::WebviewWindowBuilder::new(
-        &app,
-        &popup_label,
-        WebviewUrl::External(parse_url(&url)?),
-    )
-    .title("X - メディア")
-    .inner_size(size.width, size.height)
-    .position(pos.x, pos.y)
-    .initialization_script(&popup_init)
-    .data_directory(data_dir)
-    .build()
-    .map_err(|e| e.to_string())?;
+    tauri::WebviewWindowBuilder::new(&app, &popup_label, WebviewUrl::External(parse_url(&url)?))
+        .title("X - メディア")
+        .inner_size(size.width, size.height)
+        .position(pos.x, pos.y)
+        .initialization_script(&popup_init)
+        .data_directory(data_dir)
+        .build()
+        .map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -480,7 +489,12 @@ pub async fn open_popup_window(
     #[cfg(target_os = "android")]
     {
         let _ = app;
-        return crate::android_bridge::create_popup_webview(&popup_label, &url, &popup_init, &current_account_id);
+        return crate::android_bridge::create_popup_webview(
+            &popup_label,
+            &url,
+            &popup_init,
+            &current_account_id,
+        );
     }
 
     #[cfg(not(target_os = "android"))]
@@ -492,11 +506,15 @@ pub async fn open_popup_window(
                 .map(PathBuf::from)
                 .unwrap_or_default()
         };
-        tauri::WebviewWindowBuilder::new(&app, &popup_label, WebviewUrl::External(parse_url(&url)?))
-            .initialization_script(&popup_init)
-            .data_directory(data_dir)
-            .build()
-            .map_err(|e| e.to_string())?;
+        tauri::WebviewWindowBuilder::new(
+            &app,
+            &popup_label,
+            WebviewUrl::External(parse_url(&url)?),
+        )
+        .initialization_script(&popup_init)
+        .data_directory(data_dir)
+        .build()
+        .map_err(|e| e.to_string())?;
         Ok(())
     }
 }
@@ -584,7 +602,12 @@ pub async fn open_link_popup_window(
     #[cfg(target_os = "android")]
     {
         let _ = (app, dataDirectory);
-        return crate::android_bridge::create_popup_webview(&popup_label, &url, &popup_init, &current_account_id);
+        return crate::android_bridge::create_popup_webview(
+            &popup_label,
+            &url,
+            &popup_init,
+            &current_account_id,
+        );
     }
 
     #[cfg(not(target_os = "android"))]
@@ -600,11 +623,15 @@ pub async fn open_link_popup_window(
                 .map(PathBuf::from)
                 .unwrap_or_default()
         };
-        tauri::WebviewWindowBuilder::new(&app, &popup_label, WebviewUrl::External(parse_url(&url)?))
-            .initialization_script(&popup_init)
-            .data_directory(data_dir)
-            .build()
-            .map_err(|e| e.to_string())?;
+        tauri::WebviewWindowBuilder::new(
+            &app,
+            &popup_label,
+            WebviewUrl::External(parse_url(&url)?),
+        )
+        .initialization_script(&popup_init)
+        .data_directory(data_dir)
+        .build()
+        .map_err(|e| e.to_string())?;
         Ok(())
     }
 }
@@ -612,9 +639,7 @@ pub async fn open_link_popup_window(
 /// アクティブカラムのアカウントに CookieManager を切り替える（Android / Profile API 非対応端末のみ）。
 /// setActiveColumn から resize_column_webview より先に呼ばれ、正しいアカウントで WebView が動作する。
 #[tauri::command]
-pub async fn set_column_cookies(
-    #[allow(non_snake_case)] accountId: String,
-) -> Result<(), String> {
+pub async fn set_column_cookies(#[allow(non_snake_case)] accountId: String) -> Result<(), String> {
     #[cfg(target_os = "android")]
     {
         crate::android_bridge::set_account_cookies(&accountId)?;
@@ -656,7 +681,8 @@ pub async fn eval_in_webview(app: AppHandle, label: String, script: String) -> R
 
 #[tauri::command]
 pub async fn report_webview_scroll(app: AppHandle, delta: f64) -> Result<(), String> {
-    app.emit(events::WEBVIEW_SCROLL, delta).map_err(|e| e.to_string())
+    app.emit(events::WEBVIEW_SCROLL, delta)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
