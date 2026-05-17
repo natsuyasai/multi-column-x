@@ -10,12 +10,14 @@ import { IPC_COMMANDS, IPC_EVENTS } from "../constants/ipc";
 
 export const HEADER_HEIGHT = 36; // ColumnHeader の高さ（px）
 export const SCROLLBAR_HEIGHT = 12; // 下部スクロールバーの高さ（px）
-export const SIDEBAR_COLLAPSED_WIDTH = 40; // サイドバー折りたたみ時の幅（px）
-export const SIDEBAR_EXPANDED_WIDTH = 200; // サイドバー展開時の幅（px）
+export const SIDEBAR_COLLAPSED_WIDTH = 40; // 互換用（横方向ツールバー化以降は使用しない）
+export const SIDEBAR_EXPANDED_WIDTH = 200; // 互換用（横方向ツールバー化以降は使用しない）
 export const MOBILE_TAB_BAR_HEIGHT = 56; // モバイルタブバーの高さ（px）
+export const TOPBAR_COLLAPSED_HEIGHT = 32; // TopBar 折りたたみ時の高さ（px）
+export const TOPBAR_EXPANDED_HEIGHT = 64; // TopBar 展開時の高さ（px、2行レイアウト）
 
-function getSidebarWidth(sidebarExpanded: boolean): number {
-  return sidebarExpanded ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
+export function getTopBarHeight(topBarExpanded: boolean): number {
+  return topBarExpanded ? TOPBAR_EXPANDED_HEIGHT : TOPBAR_COLLAPSED_HEIGHT;
 }
 
 // Kotlin の WindowInsetsCompat から取得したシステムバーの高さ（dp）を返す。
@@ -230,14 +232,15 @@ export function useColumns() {
     const containerHeight = containerRef.current.clientHeight;
     const scrollLeft = scrollbarRef.current?.scrollLeft ?? 0;
     const { columns: currentColumns, sidebarExpanded } = useAppStore.getState();
-    const sidebarWidth = getSidebarWidth(sidebarExpanded);
+    const topBarHeight = getTopBarHeight(sidebarExpanded);
 
     const bounds = calculateGridBounds(currentColumns, {
       containerHeight,
       scrollLeft,
-      sidebarWidth,
+      sidebarWidth: 0,
       headerHeight: HEADER_HEIGHT,
       scrollbarHeight: SCROLLBAR_HEIGHT,
+      topBarHeight,
     });
 
     setColumnBounds(bounds);
@@ -245,7 +248,7 @@ export function useColumns() {
     await Promise.all(
       Object.entries(bounds).map(([columnId, b]) =>
         invoke(IPC_COMMANDS.RESIZE_COLUMN_WEBVIEW, {
-          bounds: { columnId, ...b, sidebarWidth },
+          bounds: { columnId, ...b, sidebarWidth: 0 },
         }).catch(console.error),
       ),
     );
@@ -297,14 +300,15 @@ export function useColumns() {
       currentAccounts: ReturnType<typeof useAppStore.getState>["accounts"],
       containerHeight: number,
       scrollLeft: number,
-      sidebarWidth: number,
+      topBarHeight: number,
     ) => {
       const bounds = calculateGridBounds(currentColumns, {
         containerHeight,
         scrollLeft,
-        sidebarWidth,
+        sidebarWidth: 0,
         headerHeight: HEADER_HEIGHT,
         scrollbarHeight: SCROLLBAR_HEIGHT,
+        topBarHeight,
       });
 
       setColumnBounds(bounds);
@@ -327,7 +331,7 @@ export function useColumns() {
   );
 
   const restoreColumns = useCallback(
-    async (sidebarWidth: number) => {
+    async (topBarHeight: number) => {
       if (!containerRef.current) return;
       const containerHeight = containerRef.current.clientHeight;
       const scrollLeft = scrollbarRef.current?.scrollLeft ?? 0;
@@ -347,7 +351,7 @@ export function useColumns() {
         currentAccounts,
         containerHeight,
         scrollLeft,
-        sidebarWidth,
+        topBarHeight,
       );
     },
     [restoreMobileColumns, restoreDesktopColumns],
@@ -383,14 +387,15 @@ export function useColumns() {
       const scrollLeft = scrollbarRef.current?.scrollLeft ?? 0;
       const { sidebarExpanded, columns: updatedColumns } =
         useAppStore.getState();
-      const sidebarWidth = getSidebarWidth(sidebarExpanded);
+      const topBarHeight = getTopBarHeight(sidebarExpanded);
 
       const bounds = calculateGridBounds(updatedColumns, {
         containerHeight,
         scrollLeft,
-        sidebarWidth,
+        sidebarWidth: 0,
         headerHeight: HEADER_HEIGHT,
         scrollbarHeight: SCROLLBAR_HEIGHT,
+        topBarHeight,
       });
 
       setColumnBounds(bounds);
@@ -421,7 +426,8 @@ export function useColumns() {
             : {
                 columnId: col.id,
                 x: -9999,
-                y: HEADER_HEIGHT,
+                y: getTopBarHeight(useAppStore.getState().sidebarExpanded) +
+                  HEADER_HEIGHT,
                 width: col.width,
                 height: 1,
               },
@@ -562,7 +568,7 @@ export function useColumns() {
         columnId: column.id,
       }).catch(console.error);
     }
-    await restoreColumns(getSidebarWidth(sidebarExpanded));
+    await restoreColumns(getTopBarHeight(sidebarExpanded));
   }, [restoreColumns]);
 
   return {

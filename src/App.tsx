@@ -4,8 +4,7 @@ import { useAppStore } from "./store/useAppStore";
 import {
   useColumns,
   HEADER_HEIGHT,
-  SIDEBAR_COLLAPSED_WIDTH,
-  SIDEBAR_EXPANDED_WIDTH,
+  getTopBarHeight,
 } from "./hooks/useColumns";
 import { useAccounts } from "./hooks/useAccounts";
 import { ColumnHeader } from "./components/ColumnHeader/ColumnHeader";
@@ -13,7 +12,7 @@ import { AddColumnDialog } from "./components/AddColumnDialog/AddColumnDialog";
 import { AccountManager } from "./components/AccountManager/AccountManager";
 import { SettingsPanel } from "./components/SettingsPanel/SettingsPanel";
 import { AppSettingsPanel } from "./components/AppSettingsPanel/AppSettingsPanel";
-import { Sidebar } from "./components/Sidebar/Sidebar";
+import { TopBar } from "./components/TopBar/TopBar";
 import { MobileTabBar } from "./components/MobileTabBar/MobileTabBar";
 import { TabActionDialog } from "./components/TabActionDialog/TabActionDialog";
 import { LinkPopupDialog } from "./components/LinkPopupDialog/LinkPopupDialog";
@@ -79,19 +78,15 @@ const App: React.FC = () => {
     dialogOpen,
   } = useDialogState();
 
-  const sidebarWidth = sidebarExpanded
-    ? SIDEBAR_EXPANDED_WIDTH
-    : SIDEBAR_COLLAPSED_WIDTH;
+  const topBarHeight = getTopBarHeight(sidebarExpanded);
 
   const scrollbarWidth = useMemo(() => {
     const scrollLeft = scrollbarRef.current?.scrollLeft ?? 0;
-    return (
-      Object.values(columnBounds).reduce(
-        (max, b) => Math.max(max, b.x + b.width + scrollLeft),
-        0,
-      ) - sidebarWidth
+    return Object.values(columnBounds).reduce(
+      (max, b) => Math.max(max, b.x + b.width + scrollLeft),
+      0,
     );
-  }, [columnBounds, sidebarWidth, scrollbarRef]);
+  }, [columnBounds, scrollbarRef]);
 
   // プラットフォーム検出は loadSettings より先に完了させる必要がある。
   // restoreColumns（isLoaded 後に呼ばれる）が isMobile を読むため、
@@ -112,7 +107,7 @@ const App: React.FC = () => {
   // isLoaded が true になった（= DOM レンダリング完了後）タイミングで WebView を復元
   useEffect(() => {
     if (isLoaded) {
-      restoreColumns(sidebarWidth);
+      restoreColumns(topBarHeight);
     }
   }, [isLoaded]);
 
@@ -170,7 +165,7 @@ const App: React.FC = () => {
     }
   }, [dialogOpen]);
 
-  const handleToggleSidebar = useCallback(() => {
+  const handleToggleTopBar = useCallback(() => {
     setSidebarExpanded(!sidebarExpanded);
     setTimeout(() => recalculateAllBounds(), 220);
   }, [sidebarExpanded, setSidebarExpanded, recalculateAllBounds]);
@@ -182,12 +177,9 @@ const App: React.FC = () => {
       const bounds = columnBounds[columnId];
       if (!bounds) return;
       const currentScroll = el.scrollLeft ?? 0;
-      el.scrollLeft =
-        currentScroll +
-        bounds.x -
-        (sidebarExpanded ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH);
+      el.scrollLeft = currentScroll + bounds.x;
     },
-    [columnBounds, scrollbarRef, sidebarExpanded],
+    [columnBounds, scrollbarRef],
   );
 
   const handleReload = useCallback(async (columnId: string) => {
@@ -269,11 +261,11 @@ const App: React.FC = () => {
   return (
     <div className={styles.app}>
       {!isMobile && (
-        <Sidebar
+        <TopBar
           columns={columns}
           accounts={accounts}
           expanded={sidebarExpanded}
-          onToggleExpand={handleToggleSidebar}
+          onToggleExpand={handleToggleTopBar}
           onAddColumn={() => setShowAddColumn(true)}
           onAccountManager={() => setShowAccountManager(true)}
           onAppSettings={() => setShowAppSettings(true)}
@@ -313,8 +305,8 @@ const App: React.FC = () => {
               key={column.id}
               className={styles.columnHeaderWrapper}
               style={{
-                left: bounds.x - sidebarWidth,
-                top: bounds.y - HEADER_HEIGHT,
+                left: bounds.x,
+                top: bounds.y - HEADER_HEIGHT - topBarHeight,
                 width: bounds.width,
               }}
             >
