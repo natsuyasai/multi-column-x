@@ -12,27 +12,28 @@
 
 ## File Structure
 
-| File | Action | Responsibility |
-| --- | --- | --- |
-| `src-tauri/Cargo.toml` | Modify | Add tauri-plugin-os dependency |
-| `src-tauri/tauri.conf.json` | Modify | Add Android minSdkVersion |
-| `src-tauri/src/lib.rs` | Modify | Guard window bounds logic with `#[cfg(desktop)]`, register OS plugin |
-| `src-tauri/src/commands/account.rs` | Modify | Split `open_add_account_window` and `close_window` for desktop/mobile |
-| `src-tauri/src/commands/webview.rs` | Modify | Split popup commands for desktop/mobile, fix `close_popup_window` |
-| `src/store/useAppStore.ts` | Modify | Add `isMobile: boolean` and `setIsMobile` |
-| `src/store/useAppStore.test.ts` | Modify | Test `isMobile` default and setter |
-| `src/hooks/useColumns.ts` | Modify | Add `MOBILE_TAB_BAR_HEIGHT`, `activeColumnId`, `setActiveColumn`; mobile paths in `restoreColumns`, `handleAddColumn`, `recalculateAllBounds`, `handleRemoveColumn` |
-| `src/components/MobileTabBar/MobileTabBar.tsx` | Create | Android tab bar component |
-| `src/components/MobileTabBar/MobileTabBar.module.scss` | Create | Tab bar styles |
-| `src/components/MobileTabBar/MobileTabBar.test.tsx` | Create | Render and interaction tests |
-| `src/App.tsx` | Modify | Platform detection, conditional Sidebar/MobileTabBar/ColumnHeader rendering |
-| `package.json` | Modify | Add `@tauri-apps/plugin-os` |
+| File                                                   | Action | Responsibility                                                                                                                                                      |
+| ------------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src-tauri/Cargo.toml`                                 | Modify | Add tauri-plugin-os dependency                                                                                                                                      |
+| `src-tauri/tauri.conf.json`                            | Modify | Add Android minSdkVersion                                                                                                                                           |
+| `src-tauri/src/lib.rs`                                 | Modify | Guard window bounds logic with `#[cfg(desktop)]`, register OS plugin                                                                                                |
+| `src-tauri/src/commands/account.rs`                    | Modify | Split `open_add_account_window` and `close_window` for desktop/mobile                                                                                               |
+| `src-tauri/src/commands/webview.rs`                    | Modify | Split popup commands for desktop/mobile, fix `close_popup_window`                                                                                                   |
+| `src/store/useAppStore.ts`                             | Modify | Add `isMobile: boolean` and `setIsMobile`                                                                                                                           |
+| `src/store/useAppStore.test.ts`                        | Modify | Test `isMobile` default and setter                                                                                                                                  |
+| `src/hooks/useColumns.ts`                              | Modify | Add `MOBILE_TAB_BAR_HEIGHT`, `activeColumnId`, `setActiveColumn`; mobile paths in `restoreColumns`, `handleAddColumn`, `recalculateAllBounds`, `handleRemoveColumn` |
+| `src/components/MobileTabBar/MobileTabBar.tsx`         | Create | Android tab bar component                                                                                                                                           |
+| `src/components/MobileTabBar/MobileTabBar.module.scss` | Create | Tab bar styles                                                                                                                                                      |
+| `src/components/MobileTabBar/MobileTabBar.test.tsx`    | Create | Render and interaction tests                                                                                                                                        |
+| `src/App.tsx`                                          | Modify | Platform detection, conditional Sidebar/MobileTabBar/ColumnHeader rendering                                                                                         |
+| `package.json`                                         | Modify | Add `@tauri-apps/plugin-os`                                                                                                                                         |
 
 ---
 
 ### Task 1: Build Configuration
 
 **Files:**
+
 - Modify: `src-tauri/Cargo.toml`
 - Modify: `src-tauri/tauri.conf.json`
 - Modify: `package.json`
@@ -85,6 +86,7 @@
 ### Task 2: Guard Desktop-Only Code in lib.rs
 
 **Files:**
+
 - Modify: `src-tauri/src/lib.rs`
 
 - [ ] **Step 1: Wrap save_window_bounds with `#[cfg(desktop)]`**
@@ -248,6 +250,7 @@
 ### Task 3: Fix close Commands for Mobile Compatibility
 
 **Files:**
+
 - Modify: `src-tauri/src/commands/webview.rs`
 - Modify: `src-tauri/src/commands/account.rs`
 
@@ -301,6 +304,7 @@
 ### Task 4: Mobile Popup and Compose Commands (Rust)
 
 **Files:**
+
 - Modify: `src-tauri/src/commands/webview.rs`
 
 - [ ] **Step 1: Split open_popup_window into desktop/mobile**
@@ -484,6 +488,7 @@
 ### Task 5: Mobile Account Login Command (Rust)
 
 **Files:**
+
 - Modify: `src-tauri/src/commands/account.rs`
 
 - [ ] **Step 1: Wrap existing open_add_account_window with `#[cfg(desktop)]`**
@@ -582,6 +587,7 @@
 ### Task 6: Add isMobile to useAppStore
 
 **Files:**
+
 - Modify: `src/store/useAppStore.ts`
 - Modify: `src/store/useAppStore.test.ts`
 
@@ -610,9 +616,11 @@
   useAppStore.setState({
     accounts: [],
     columns: [],
-    globalSettings: { /* existing values */ },
+    globalSettings: {
+      /* existing values */
+    },
     isLoaded: false,
-    isMobile: false,  // add this line
+    isMobile: false, // add this line
   });
   ```
 
@@ -678,6 +686,7 @@
 ### Task 7: Add Mobile Column Management to useColumns
 
 **Files:**
+
 - Modify: `src/hooks/useColumns.ts`
 - Modify: `src/hooks/useColumns.test.ts`
 
@@ -716,7 +725,9 @@
   Inside `useColumns()`, after the existing `useState` for `columnBounds`:
 
   ```typescript
-  const [activeColumnId, setActiveColumnIdState] = useState<string | null>(null);
+  const [activeColumnId, setActiveColumnIdState] = useState<string | null>(
+    null,
+  );
   ```
 
 - [ ] **Step 4: Add setActiveColumn function**
@@ -760,7 +771,9 @@
     } = useAppStore.getState();
 
     if (isMobile) {
-      const sortedByOrder = [...currentColumns].sort((a, b) => a.order - b.order);
+      const sortedByOrder = [...currentColumns].sort(
+        (a, b) => a.order - b.order,
+      );
       const firstColumn = sortedByOrder[0];
       for (const column of sortedByOrder) {
         const account = currentAccounts.find((a) => a.id === column.accountId);
@@ -841,7 +854,8 @@
 
       const containerHeight = containerRef.current.clientHeight;
       const scrollLeft = scrollbarRef.current?.scrollLeft ?? 0;
-      const { sidebarExpanded, columns: updatedColumns } = useAppStore.getState();
+      const { sidebarExpanded, columns: updatedColumns } =
+        useAppStore.getState();
       const sidebarWidth = sidebarExpanded
         ? SIDEBAR_EXPANDED_WIDTH
         : SIDEBAR_COLLAPSED_WIDTH;
@@ -978,6 +992,7 @@
 ### Task 8: Create MobileTabBar Component
 
 **Files:**
+
 - Create: `src/components/MobileTabBar/MobileTabBar.tsx`
 - Create: `src/components/MobileTabBar/MobileTabBar.module.scss`
 - Create: `src/components/MobileTabBar/MobileTabBar.test.tsx`
@@ -1271,6 +1286,7 @@
 ### Task 9: Wire Up App.tsx
 
 **Files:**
+
 - Modify: `src/App.tsx`
 
 - [ ] **Step 1: Add isMobile detection on startup**
@@ -1323,7 +1339,9 @@
 
   ```typescript
   useEffect(() => {
-    platform().then((p) => setIsMobile(p === "android")).catch(() => {});
+    platform()
+      .then((p) => setIsMobile(p === "android"))
+      .catch(() => {});
   }, []);
   ```
 
@@ -1338,29 +1356,33 @@
   In the JSX `return`, replace `<Sidebar ... />` with:
 
   ```tsx
-  {!isMobile && (
-    <Sidebar
-      columns={columns}
-      accounts={accounts}
-      expanded={sidebarExpanded}
-      onToggleExpand={handleToggleSidebar}
-      onAddColumn={() => setShowAddColumn(true)}
-      onAccountManager={() => setShowAccountManager(true)}
-      onAppSettings={() => setShowAppSettings(true)}
-      onComposeTweet={handleComposeTweet}
-      onOpenLinkPopup={handleOpenLinkPopup}
-      onJumpToColumn={handleJumpToColumn}
-    />
-  )}
-  {isMobile && (
-    <MobileTabBar
-      columns={columns}
-      accounts={accounts}
-      activeColumnId={activeColumnId}
-      onSelectColumn={setActiveColumn}
-      onOpenSettings={setSettingsColumnId}
-    />
-  )}
+  {
+    !isMobile && (
+      <Sidebar
+        columns={columns}
+        accounts={accounts}
+        expanded={sidebarExpanded}
+        onToggleExpand={handleToggleSidebar}
+        onAddColumn={() => setShowAddColumn(true)}
+        onAccountManager={() => setShowAccountManager(true)}
+        onAppSettings={() => setShowAppSettings(true)}
+        onComposeTweet={handleComposeTweet}
+        onOpenLinkPopup={handleOpenLinkPopup}
+        onJumpToColumn={handleJumpToColumn}
+      />
+    );
+  }
+  {
+    isMobile && (
+      <MobileTabBar
+        columns={columns}
+        accounts={accounts}
+        activeColumnId={activeColumnId}
+        onSelectColumn={setActiveColumn}
+        onOpenSettings={setSettingsColumnId}
+      />
+    );
+  }
   ```
 
 - [ ] **Step 4: Hide ColumnHeader on mobile**
@@ -1368,18 +1390,20 @@
   In the `columns.map(...)` section, wrap the `<div className={styles.columnHeaderWrapper}>` with a mobile check:
 
   ```tsx
-  {columns.map((column) => {
-    if (isMobile) return null;  // タブバーが代替するため非表示
-    const account = accounts.find((a) => a.id === column.accountId);
-    const bounds = columnBounds[column.id];
-    if (!account || !bounds) return null;
-    const idx = sortedColumns.findIndex((c) => c.id === column.id);
-    return (
-      <div key={column.id} /* ... */ >
-        <ColumnHeader /* ... */ />
-      </div>
-    );
-  })}
+  {
+    columns.map((column) => {
+      if (isMobile) return null; // タブバーが代替するため非表示
+      const account = accounts.find((a) => a.id === column.accountId);
+      const bounds = columnBounds[column.id];
+      if (!account || !bounds) return null;
+      const idx = sortedColumns.findIndex((c) => c.id === column.id);
+      return (
+        <div key={column.id} /* ... */>
+          <ColumnHeader /* ... */ />
+        </div>
+      );
+    });
+  }
   ```
 
 - [ ] **Step 5: Verify TypeScript compiles**

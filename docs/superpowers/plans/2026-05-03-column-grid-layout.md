@@ -12,26 +12,27 @@
 
 ## File Structure
 
-| ファイル | 変更内容 |
-|---------|---------|
-| `src/types/index.ts` | `Column` に gridRow/gridCol/heightMode/heightValue/heightUnit を追加 |
-| `src/store/useAppStore.ts` | `loadSettings` で既存カラムへのデフォルト値補完を追加 |
-| `src/hooks/useColumns.ts` | bounds 計算をグリッド対応に全面書き換え。`columnBounds` state を追加 |
-| `src/App.tsx` | ヘッダーを絶対配置に変更。`columnBounds` を `useColumns` から受け取る |
-| `src/App.module.scss` | `.headerRow` 廃止・絶対配置用スタイルを追加 |
-| `src/components/AppSettingsPanel/AppSettingsPanel.tsx` | タブUI追加。既存コンテンツを「一般」タブに移動 |
-| `src/components/AppSettingsPanel/AppSettingsPanel.module.scss` | タブ用スタイル追加 |
-| `src/components/AppSettingsPanel/ColumnLayoutTab.tsx` | 新規作成。グリッドプレビュー＋クリック割り当てUI |
-| `src/components/AppSettingsPanel/ColumnLayoutTab.module.scss` | 新規作成 |
-| `src/store/useAppStore.test.ts` | マイグレーション処理のテストを追加 |
-| `src/hooks/useColumns.test.ts` | 新規作成。グリッド bounds 計算のテスト |
-| `src/components/AppSettingsPanel/ColumnLayoutTab.test.tsx` | 新規作成 |
+| ファイル                                                       | 変更内容                                                              |
+| -------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `src/types/index.ts`                                           | `Column` に gridRow/gridCol/heightMode/heightValue/heightUnit を追加  |
+| `src/store/useAppStore.ts`                                     | `loadSettings` で既存カラムへのデフォルト値補完を追加                 |
+| `src/hooks/useColumns.ts`                                      | bounds 計算をグリッド対応に全面書き換え。`columnBounds` state を追加  |
+| `src/App.tsx`                                                  | ヘッダーを絶対配置に変更。`columnBounds` を `useColumns` から受け取る |
+| `src/App.module.scss`                                          | `.headerRow` 廃止・絶対配置用スタイルを追加                           |
+| `src/components/AppSettingsPanel/AppSettingsPanel.tsx`         | タブUI追加。既存コンテンツを「一般」タブに移動                        |
+| `src/components/AppSettingsPanel/AppSettingsPanel.module.scss` | タブ用スタイル追加                                                    |
+| `src/components/AppSettingsPanel/ColumnLayoutTab.tsx`          | 新規作成。グリッドプレビュー＋クリック割り当てUI                      |
+| `src/components/AppSettingsPanel/ColumnLayoutTab.module.scss`  | 新規作成                                                              |
+| `src/store/useAppStore.test.ts`                                | マイグレーション処理のテストを追加                                    |
+| `src/hooks/useColumns.test.ts`                                 | 新規作成。グリッド bounds 計算のテスト                                |
+| `src/components/AppSettingsPanel/ColumnLayoutTab.test.tsx`     | 新規作成                                                              |
 
 ---
 
 ## Task 1: Column 型にグリッドフィールドを追加
 
 **Files:**
+
 - Modify: `src/types/index.ts`
 - Test: `src/types/index.test.ts`
 
@@ -108,6 +109,7 @@ git commit -m "feat: add grid layout fields to Column type"
 ## Task 2: loadSettings でのマイグレーション処理
 
 **Files:**
+
 - Modify: `src/store/useAppStore.ts`
 - Test: `src/store/useAppStore.test.ts`
 
@@ -176,7 +178,13 @@ Expected: FAIL（`migrateColumn` が未定義）
 `src/store/useAppStore.ts` に追加:
 
 ```typescript
-export function migrateColumn(col: Partial<Column> & Pick<Column, "id" | "accountId" | "pageType" | "width" | "order" | "settings">): Column {
+export function migrateColumn(
+  col: Partial<Column> &
+    Pick<
+      Column,
+      "id" | "accountId" | "pageType" | "width" | "order" | "settings"
+    >,
+): Column {
   return {
     gridRow: 1,
     gridCol: (col.order ?? 0) + 1,
@@ -212,6 +220,7 @@ git commit -m "feat: migrate existing columns to add grid layout defaults"
 ## Task 3: useColumns のグリッド対応 bounds 計算
 
 **Files:**
+
 - Modify: `src/hooks/useColumns.ts`
 - Create: `src/hooks/useColumns.test.ts`
 
@@ -233,7 +242,9 @@ const baseSettings = {
   visibleLinks: [],
 };
 
-function makeCol(overrides: Partial<Column> & Pick<Column, "id" | "gridCol" | "gridRow">): Column {
+function makeCol(
+  overrides: Partial<Column> & Pick<Column, "id" | "gridCol" | "gridRow">,
+): Column {
   return {
     accountId: "acc-1",
     pageType: "home",
@@ -276,7 +287,14 @@ describe("calculateGridBounds", () => {
 
   it("heightMode=fixed px のカラムは指定高さで、残りは均等割り", () => {
     const cols = [
-      makeCol({ id: "c1", gridCol: 1, gridRow: 1, heightMode: "fixed", heightValue: 300, heightUnit: "px" }),
+      makeCol({
+        id: "c1",
+        gridCol: 1,
+        gridRow: 1,
+        heightMode: "fixed",
+        heightValue: 300,
+        heightUnit: "px",
+      }),
       makeCol({ id: "c2", gridCol: 1, gridRow: 2 }),
     ];
     const result = calculateGridBounds(cols, opts);
@@ -287,7 +305,14 @@ describe("calculateGridBounds", () => {
 
   it("heightMode=fixed % のカラムはコンテナ高さに対する割合", () => {
     const cols = [
-      makeCol({ id: "c1", gridCol: 1, gridRow: 1, heightMode: "fixed", heightValue: 50, heightUnit: "%" }),
+      makeCol({
+        id: "c1",
+        gridCol: 1,
+        gridRow: 1,
+        heightMode: "fixed",
+        heightValue: 50,
+        heightUnit: "%",
+      }),
       makeCol({ id: "c2", gridCol: 1, gridRow: 2 }),
     ];
     const result = calculateGridBounds(cols, opts);
@@ -346,7 +371,13 @@ export function calculateGridBounds(
   columns: Column[],
   opts: GridBoundsOptions,
 ): Record<string, ColumnBounds> {
-  const { containerHeight, scrollLeft, sidebarWidth, headerHeight, scrollbarHeight } = opts;
+  const {
+    containerHeight,
+    scrollLeft,
+    sidebarWidth,
+    headerHeight,
+    scrollbarHeight,
+  } = opts;
   const availableHeight = containerHeight - headerHeight - scrollbarHeight;
 
   // gridCol でグループ化
@@ -363,7 +394,10 @@ export function calculateGridBounds(
   let xOffset = sidebarWidth;
 
   for (const colNum of sortedCols) {
-    const colGroup = byCol.get(colNum)!.slice().sort((a, b) => a.gridRow - b.gridRow);
+    const colGroup = byCol
+      .get(colNum)!
+      .slice()
+      .sort((a, b) => a.gridRow - b.gridRow);
 
     // fixed 高さの合計を計算
     let fixedTotal = 0;
@@ -371,7 +405,7 @@ export function calculateGridBounds(
     for (const col of colGroup) {
       if (col.heightMode === "fixed" && col.heightValue != null) {
         if (col.heightUnit === "%") {
-          fixedTotal += availableHeight * col.heightValue / 100;
+          fixedTotal += (availableHeight * col.heightValue) / 100;
         } else {
           fixedTotal += col.heightValue;
         }
@@ -379,13 +413,17 @@ export function calculateGridBounds(
         autoCount++;
       }
     }
-    const autoHeight = autoCount > 0 ? Math.max(0, availableHeight - fixedTotal) / autoCount : 0;
+    const autoHeight =
+      autoCount > 0 ? Math.max(0, availableHeight - fixedTotal) / autoCount : 0;
 
     let yOffset = headerHeight;
     for (const col of colGroup) {
       let height: number;
       if (col.heightMode === "fixed" && col.heightValue != null) {
-        height = col.heightUnit === "%" ? availableHeight * col.heightValue / 100 : col.heightValue;
+        height =
+          col.heightUnit === "%"
+            ? (availableHeight * col.heightValue) / 100
+            : col.heightValue;
       } else {
         height = autoHeight;
       }
@@ -428,7 +466,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 2. `useColumns` 関数内に state を追加:
 
 ```typescript
-const [columnBounds, setColumnBounds] = useState<Record<string, ColumnBounds>>({});
+const [columnBounds, setColumnBounds] = useState<Record<string, ColumnBounds>>(
+  {},
+);
 ```
 
 3. `recalculateAllBounds` を書き換え（`calculateBounds` は削除して `calculateGridBounds` を使う）:
@@ -440,7 +480,9 @@ const recalculateAllBounds = useCallback(async () => {
   const containerWidth = containerRef.current.clientWidth;
   const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
   const { columns: currentColumns, sidebarExpanded } = useAppStore.getState();
-  const sidebarWidth = sidebarExpanded ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
+  const sidebarWidth = sidebarExpanded
+    ? SIDEBAR_EXPANDED_WIDTH
+    : SIDEBAR_COLLAPSED_WIDTH;
 
   const bounds = calculateGridBounds(currentColumns, {
     containerWidth,
@@ -466,41 +508,39 @@ const recalculateAllBounds = useCallback(async () => {
 4. `restoreColumns` を書き換え:
 
 ```typescript
-const restoreColumns = useCallback(
-  async (sidebarWidth: number) => {
-    if (!containerRef.current) return;
-    const containerWidth = containerRef.current.clientWidth;
-    const containerHeight = containerRef.current.clientHeight;
-    const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
-    const { columns: currentColumns, accounts: currentAccounts } = useAppStore.getState();
+const restoreColumns = useCallback(async (sidebarWidth: number) => {
+  if (!containerRef.current) return;
+  const containerWidth = containerRef.current.clientWidth;
+  const containerHeight = containerRef.current.clientHeight;
+  const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
+  const { columns: currentColumns, accounts: currentAccounts } =
+    useAppStore.getState();
 
-    const bounds = calculateGridBounds(currentColumns, {
-      containerWidth,
-      containerHeight,
-      scrollLeft,
-      sidebarWidth,
-      headerHeight: HEADER_HEIGHT,
-      scrollbarHeight: SCROLLBAR_HEIGHT,
-    });
+  const bounds = calculateGridBounds(currentColumns, {
+    containerWidth,
+    containerHeight,
+    scrollLeft,
+    sidebarWidth,
+    headerHeight: HEADER_HEIGHT,
+    scrollbarHeight: SCROLLBAR_HEIGHT,
+  });
 
-    setColumnBounds(bounds);
+  setColumnBounds(bounds);
 
-    for (const column of currentColumns) {
-      const account = currentAccounts.find((a) => a.id === column.accountId);
-      if (!account) continue;
-      const b = bounds[column.id];
-      if (!b) continue;
-      await invoke("create_column_webview", {
-        args: {
-          column,
-          dataDirectory: account.dataDirectory,
-          ...b,
-        },
-      }).catch(console.error);
-    }
-  },
-  [],
-);
+  for (const column of currentColumns) {
+    const account = currentAccounts.find((a) => a.id === column.accountId);
+    if (!account) continue;
+    const b = bounds[column.id];
+    if (!b) continue;
+    await invoke("create_column_webview", {
+      args: {
+        column,
+        dataDirectory: account.dataDirectory,
+        ...b,
+      },
+    }).catch(console.error);
+  }
+}, []);
 ```
 
 5. `handleAddColumn` を書き換え（`calculateBounds` の呼び出しを `calculateGridBounds` に変更）:
@@ -517,7 +557,9 @@ const handleAddColumn = useCallback(
     const containerWidth = containerRef.current.clientWidth;
     const scrollLeft = scrollRef.current?.scrollLeft ?? 0;
     const { sidebarExpanded, columns: updatedColumns } = useAppStore.getState();
-    const sidebarWidth = sidebarExpanded ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
+    const sidebarWidth = sidebarExpanded
+      ? SIDEBAR_EXPANDED_WIDTH
+      : SIDEBAR_COLLAPSED_WIDTH;
 
     // addColumn 後のストアから最新カラムリストを取得して bounds を計算
     const allColumns = [...updatedColumns];
@@ -583,6 +625,7 @@ git commit -m "feat: rewrite bounds calculation to support grid layout"
 ## Task 4: App.tsx のヘッダー絶対配置対応
 
 **Files:**
+
 - Modify: `src/App.tsx`
 - Modify: `src/App.module.scss`
 
@@ -607,7 +650,7 @@ git commit -m "feat: rewrite bounds calculation to support grid layout"
 ```typescript
 const {
   columns,
-  columnBounds,   // 追加
+  columnBounds, // 追加
   containerRef,
   // ... 残りは変更なし
 } = useColumns();
@@ -617,54 +660,61 @@ const {
 
 ```typescript
 const scrollbarWidth = useMemo(() => {
-  return Object.values(columnBounds).reduce((max, b) => Math.max(max, b.x + b.width), 0);
+  return Object.values(columnBounds).reduce(
+    (max, b) => Math.max(max, b.x + b.width),
+    0,
+  );
 }, [columnBounds]);
 ```
 
 ヘッダーレンダリング部分を以下に変更（`<div className={styles.headerRow}>` ブロック全体を置き換え）:
 
 ```tsx
-{columns.map((column) => {
-  const account = accounts.find((a) => a.id === column.accountId);
-  const bounds = columnBounds[column.id];
-  if (!account || !bounds) return null;
-  const sorted = [...columns].sort((a, b) => a.order - b.order);
-  const idx = sorted.findIndex((c) => c.id === column.id);
-  return (
-    <div
-      key={column.id}
-      className={styles.columnHeaderWrapper}
-      style={{
-        left: bounds.x,
-        top: bounds.y - HEADER_HEIGHT,
-        width: bounds.width,
-      }}
-    >
-      <ColumnHeader
-        column={column}
-        account={account}
-        onReload={handleReload}
-        onMoveLeft={(id) => handleMoveColumn(id, "left")}
-        onMoveRight={(id) => handleMoveColumn(id, "right")}
-        onSettings={setSettingsColumnId}
-        onClose={handleRemoveColumn}
-        isFirst={idx === 0}
-        isLast={idx === sorted.length - 1}
-      />
-    </div>
-  );
-})}
+{
+  columns.map((column) => {
+    const account = accounts.find((a) => a.id === column.accountId);
+    const bounds = columnBounds[column.id];
+    if (!account || !bounds) return null;
+    const sorted = [...columns].sort((a, b) => a.order - b.order);
+    const idx = sorted.findIndex((c) => c.id === column.id);
+    return (
+      <div
+        key={column.id}
+        className={styles.columnHeaderWrapper}
+        style={{
+          left: bounds.x,
+          top: bounds.y - HEADER_HEIGHT,
+          width: bounds.width,
+        }}
+      >
+        <ColumnHeader
+          column={column}
+          account={account}
+          onReload={handleReload}
+          onMoveLeft={(id) => handleMoveColumn(id, "left")}
+          onMoveRight={(id) => handleMoveColumn(id, "right")}
+          onSettings={setSettingsColumnId}
+          onClose={handleRemoveColumn}
+          isFirst={idx === 0}
+          isLast={idx === sorted.length - 1}
+        />
+      </div>
+    );
+  });
+}
 ```
 
 `HEADER_HEIGHT` を import するため、`useColumns.ts` からも export する:
 
 `src/hooks/useColumns.ts` の定数を export:
+
 ```typescript
 export const HEADER_HEIGHT = 36;
 export const SCROLLBAR_HEIGHT = 12;
 ```
 
 `App.tsx` の import を更新:
+
 ```typescript
 import {
   useColumns,
@@ -686,7 +736,10 @@ const handleJumpToColumn = useCallback(
     // scrollLeft を加算して実際のオフセットを算出
     const scrollEl = scrollbarRef.current;
     const currentScroll = scrollEl?.scrollLeft ?? 0;
-    el.scrollLeft = currentScroll + bounds.x - (sidebarExpanded ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH);
+    el.scrollLeft =
+      currentScroll +
+      bounds.x -
+      (sidebarExpanded ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH);
   },
   [columnBounds, scrollRef, scrollbarRef, sidebarExpanded],
 );
@@ -699,6 +752,7 @@ npm run tauri:dev
 ```
 
 確認項目:
+
 - カラムのヘッダーが正しい位置に表示される
 - スクロールするとヘッダーが追従する
 - ダイアログを開くと WebView が退避し、閉じると戻る
@@ -715,6 +769,7 @@ git commit -m "feat: change column headers to absolute positioning for grid layo
 ## Task 5: AppSettingsPanel にタブUIを追加
 
 **Files:**
+
 - Modify: `src/components/AppSettingsPanel/AppSettingsPanel.tsx`
 - Modify: `src/components/AppSettingsPanel/AppSettingsPanel.module.scss`
 
@@ -785,9 +840,15 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<"general" | "layout">("general");
-  const [autoReloadEnabled, setAutoReloadEnabled] = useState(settings.defaultAutoReloadEnabled);
-  const [autoReloadInterval, setAutoReloadInterval] = useState(settings.defaultAutoReloadInterval);
-  const [popupEscCloseEnabled, setPopupEscCloseEnabled] = useState(settings.popupEscCloseEnabled);
+  const [autoReloadEnabled, setAutoReloadEnabled] = useState(
+    settings.defaultAutoReloadEnabled,
+  );
+  const [autoReloadInterval, setAutoReloadInterval] = useState(
+    settings.defaultAutoReloadInterval,
+  );
+  const [popupEscCloseEnabled, setPopupEscCloseEnabled] = useState(
+    settings.popupEscCloseEnabled,
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -804,7 +865,13 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       <div className={styles.panel}>
         <div className={styles.header}>
           <h2 className={styles.title}>アプリ設定</h2>
-          <button className={styles.closeBtn} onClick={onClose} aria-label="閉じる">✕</button>
+          <button
+            className={styles.closeBtn}
+            onClick={onClose}
+            aria-label="閉じる"
+          >
+            ✕
+          </button>
         </div>
 
         <div className={styles.tabs}>
@@ -844,11 +911,15 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                       min={10}
                       max={3600}
                       value={autoReloadInterval}
-                      onChange={(e) => setAutoReloadInterval(Number(e.target.value))}
+                      onChange={(e) =>
+                        setAutoReloadInterval(Number(e.target.value))
+                      }
                     />
                   </label>
                 )}
-                <p className={styles.hint}>新しく追加するカラムに適用されます</p>
+                <p className={styles.hint}>
+                  新しく追加するカラムに適用されます
+                </p>
               </section>
 
               <section className={styles.section}>
@@ -864,8 +935,16 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
               </section>
 
               <div className={styles.actions}>
-                <button type="button" className={styles.cancelBtn} onClick={onClose}>キャンセル</button>
-                <button type="submit" className={styles.applyBtn}>適用</button>
+                <button
+                  type="button"
+                  className={styles.cancelBtn}
+                  onClick={onClose}
+                >
+                  キャンセル
+                </button>
+                <button type="submit" className={styles.applyBtn}>
+                  適用
+                </button>
               </div>
             </form>
           )}
@@ -892,18 +971,20 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
 `App.tsx` 内の `<AppSettingsPanel>` の呼び出しを変更:
 
 ```tsx
-{showAppSettings && (
-  <AppSettingsPanel
-    settings={globalSettings}
-    columns={columns}
-    onApply={updateGlobalSettings}
-    onApplyLayout={(updatedColumns) => {
-      updatedColumns.forEach((col) => handleUpdateColumn(col.id, col));
-      recalculateAllBounds();
-    }}
-    onClose={() => setShowAppSettings(false)}
-  />
-)}
+{
+  showAppSettings && (
+    <AppSettingsPanel
+      settings={globalSettings}
+      columns={columns}
+      onApply={updateGlobalSettings}
+      onApplyLayout={(updatedColumns) => {
+        updatedColumns.forEach((col) => handleUpdateColumn(col.id, col));
+        recalculateAllBounds();
+      }}
+      onClose={() => setShowAppSettings(false)}
+    />
+  );
+}
 ```
 
 - [ ] **Step 4: テストを実行してエラーがないことを確認する**
@@ -926,6 +1007,7 @@ git commit -m "feat: add tab UI to AppSettingsPanel"
 ## Task 6: ColumnLayoutTab コンポーネントの実装
 
 **Files:**
+
 - Create: `src/components/AppSettingsPanel/ColumnLayoutTab.tsx`
 - Create: `src/components/AppSettingsPanel/ColumnLayoutTab.module.scss`
 - Create: `src/components/AppSettingsPanel/ColumnLayoutTab.test.tsx`
@@ -951,41 +1033,77 @@ const baseSettings = {
 
 const mockColumns: Column[] = [
   {
-    id: "c1", accountId: "acc-1", pageType: "home",
-    width: 350, order: 0, gridRow: 1, gridCol: 1, heightMode: "auto",
+    id: "c1",
+    accountId: "acc-1",
+    pageType: "home",
+    width: 350,
+    order: 0,
+    gridRow: 1,
+    gridCol: 1,
+    heightMode: "auto",
     settings: baseSettings,
   },
   {
-    id: "c2", accountId: "acc-1", pageType: "notifications",
-    width: 350, order: 1, gridRow: 1, gridCol: 2, heightMode: "auto",
+    id: "c2",
+    accountId: "acc-1",
+    pageType: "notifications",
+    width: 350,
+    order: 1,
+    gridRow: 1,
+    gridCol: 2,
+    heightMode: "auto",
     settings: baseSettings,
   },
 ];
 
 describe("ColumnLayoutTab", () => {
   it("グリッドプレビューにカラムが表示される", () => {
-    render(<ColumnLayoutTab columns={mockColumns} onApply={vi.fn()} onCancel={vi.fn()} />);
+    render(
+      <ColumnLayoutTab
+        columns={mockColumns}
+        onApply={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
     expect(screen.getByText("home")).toBeInTheDocument();
     expect(screen.getByText("notifications")).toBeInTheDocument();
   });
 
   it("セルをクリックして高さ設定が表示される", () => {
-    render(<ColumnLayoutTab columns={mockColumns} onApply={vi.fn()} onCancel={vi.fn()} />);
+    render(
+      <ColumnLayoutTab
+        columns={mockColumns}
+        onApply={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
     fireEvent.click(screen.getByText("home"));
     expect(screen.getByText("高さ設定")).toBeInTheDocument();
   });
 
   it("適用ボタンでonApplyが呼ばれる", () => {
     const onApply = vi.fn();
-    render(<ColumnLayoutTab columns={mockColumns} onApply={onApply} onCancel={vi.fn()} />);
+    render(
+      <ColumnLayoutTab
+        columns={mockColumns}
+        onApply={onApply}
+        onCancel={vi.fn()}
+      />,
+    );
     fireEvent.click(screen.getByText("適用"));
-    expect(onApply).toHaveBeenCalledWith(expect.arrayContaining([
-      expect.objectContaining({ id: "c1" }),
-    ]));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ id: "c1" })]),
+    );
   });
 
   it("×ボタンで割り当てを解除すると未割当リストに移動する", () => {
-    render(<ColumnLayoutTab columns={mockColumns} onApply={vi.fn()} onCancel={vi.fn()} />);
+    render(
+      <ColumnLayoutTab
+        columns={mockColumns}
+        onApply={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
     // c1 セルの × ボタンをクリック
     const removeButtons = screen.getAllByLabelText("割り当て解除");
     fireEvent.click(removeButtons[0]);
@@ -1294,15 +1412,33 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
   onCancel,
 }) => {
   const [draft, setDraft] = useState<Column[]>(() =>
-    columns.map((c) => ({ ...c }))
+    columns.map((c) => ({ ...c })),
   );
-  const [rows, setRows] = useState(() => Math.max(...columns.map((c) => c.gridRow), 1));
-  const [cols, setCols] = useState(() => Math.max(...columns.map((c) => c.gridCol), 1));
+  const [rows, setRows] = useState(() =>
+    Math.max(...columns.map((c) => c.gridRow), 1),
+  );
+  const [cols, setCols] = useState(() =>
+    Math.max(...columns.map((c) => c.gridCol), 1),
+  );
   const [selectedCellKey, setSelectedCellKey] = useState<CellKey | null>(null);
   const [pendingCell, setPendingCell] = useState<CellKey | null>(null);
 
-  const assigned = draft.filter((c) => c.gridRow >= 1 && c.gridCol >= 1 && c.gridRow <= rows && c.gridCol <= cols);
-  const unassigned = draft.filter((c) => !(c.gridRow >= 1 && c.gridCol >= 1 && c.gridRow <= rows && c.gridCol <= cols));
+  const assigned = draft.filter(
+    (c) =>
+      c.gridRow >= 1 &&
+      c.gridCol >= 1 &&
+      c.gridRow <= rows &&
+      c.gridCol <= cols,
+  );
+  const unassigned = draft.filter(
+    (c) =>
+      !(
+        c.gridRow >= 1 &&
+        c.gridCol >= 1 &&
+        c.gridRow <= rows &&
+        c.gridCol <= cols
+      ),
+  );
 
   const getCellColumn = (row: number, col: number) =>
     assigned.find((c) => c.gridRow === row && c.gridCol === col) ?? null;
@@ -1311,49 +1447,60 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
     ? getCellColumn(selectedCellKey.row, selectedCellKey.col)
     : null;
 
-  const handleCellClick = useCallback((row: number, col: number) => {
-    const colAtCell = getCellColumn(row, col);
-    if (colAtCell) {
-      setSelectedCellKey({ row, col });
-      setPendingCell(null);
-    } else {
-      setPendingCell({ row, col });
-      setSelectedCellKey(null);
-    }
-  }, [assigned]);
+  const handleCellClick = useCallback(
+    (row: number, col: number) => {
+      const colAtCell = getCellColumn(row, col);
+      if (colAtCell) {
+        setSelectedCellKey({ row, col });
+        setPendingCell(null);
+      } else {
+        setPendingCell({ row, col });
+        setSelectedCellKey(null);
+      }
+    },
+    [assigned],
+  );
 
-  const handleAssign = useCallback((columnId: string) => {
-    if (!pendingCell) return;
-    setDraft((prev) =>
-      prev.map((c) =>
-        c.id === columnId
-          ? { ...c, gridRow: pendingCell.row, gridCol: pendingCell.col }
-          : c
-      )
-    );
-    setPendingCell(null);
-  }, [pendingCell]);
+  const handleAssign = useCallback(
+    (columnId: string) => {
+      if (!pendingCell) return;
+      setDraft((prev) =>
+        prev.map((c) =>
+          c.id === columnId
+            ? { ...c, gridRow: pendingCell.row, gridCol: pendingCell.col }
+            : c,
+        ),
+      );
+      setPendingCell(null);
+    },
+    [pendingCell],
+  );
 
   const handleRemove = useCallback((columnId: string) => {
     setDraft((prev) =>
       prev.map((c) =>
-        c.id === columnId ? { ...c, gridRow: 9999, gridCol: 9999 } : c
-      )
+        c.id === columnId ? { ...c, gridRow: 9999, gridCol: 9999 } : c,
+      ),
     );
     setSelectedCellKey(null);
   }, []);
 
   const handleHeightChange = useCallback(
-    (columnId: string, mode: "auto" | "fixed", value?: number, unit?: "px" | "%") => {
+    (
+      columnId: string,
+      mode: "auto" | "fixed",
+      value?: number,
+      unit?: "px" | "%",
+    ) => {
       setDraft((prev) =>
         prev.map((c) =>
           c.id === columnId
             ? { ...c, heightMode: mode, heightValue: value, heightUnit: unit }
-            : c
-        )
+            : c,
+        ),
       );
     },
-    []
+    [],
   );
 
   const getColumnLabel = (col: Column) => col.label ?? col.pageType;
@@ -1389,8 +1536,10 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
                 const r = rIdx + 1;
                 const c = cIdx + 1;
                 const colAtCell = getCellColumn(r, c);
-                const isSelected = selectedCellKey?.row === r && selectedCellKey?.col === c;
-                const isPending = pendingCell?.row === r && pendingCell?.col === c;
+                const isSelected =
+                  selectedCellKey?.row === r && selectedCellKey?.col === c;
+                const isPending =
+                  pendingCell?.row === r && pendingCell?.col === c;
 
                 if (colAtCell) {
                   return (
@@ -1399,8 +1548,12 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
                       className={`${styles.cell} ${styles.cellAssigned} ${isSelected ? styles.cellSelected : ""}`}
                       onClick={() => handleCellClick(r, c)}
                     >
-                      <span className={styles.cellLabel}>{r},{c}</span>
-                      <span className={styles.cellName}>{getColumnLabel(colAtCell)}</span>
+                      <span className={styles.cellLabel}>
+                        {r},{c}
+                      </span>
+                      <span className={styles.cellName}>
+                        {getColumnLabel(colAtCell)}
+                      </span>
                       <span className={styles.cellHeight}>
                         {colAtCell.heightMode === "fixed"
                           ? `${colAtCell.heightValue}${colAtCell.heightUnit}`
@@ -1409,7 +1562,10 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
                       <button
                         className={styles.removeBtn}
                         aria-label="割り当て解除"
-                        onClick={(e) => { e.stopPropagation(); handleRemove(colAtCell.id); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemove(colAtCell.id);
+                        }}
                       >
                         ×
                       </button>
@@ -1466,7 +1622,12 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
                 name="heightMode"
                 checked={selectedColumn.heightMode === "fixed"}
                 onChange={() =>
-                  handleHeightChange(selectedColumn.id, "fixed", selectedColumn.heightValue ?? 400, selectedColumn.heightUnit ?? "px")
+                  handleHeightChange(
+                    selectedColumn.id,
+                    "fixed",
+                    selectedColumn.heightValue ?? 400,
+                    selectedColumn.heightUnit ?? "px",
+                  )
                 }
               />
               固定:
@@ -1479,14 +1640,24 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
                   min={1}
                   value={selectedColumn.heightValue ?? 400}
                   onChange={(e) =>
-                    handleHeightChange(selectedColumn.id, "fixed", Number(e.target.value), selectedColumn.heightUnit ?? "px")
+                    handleHeightChange(
+                      selectedColumn.id,
+                      "fixed",
+                      Number(e.target.value),
+                      selectedColumn.heightUnit ?? "px",
+                    )
                   }
                 />
                 <select
                   className={styles.unitSelect}
                   value={selectedColumn.heightUnit ?? "px"}
                   onChange={(e) =>
-                    handleHeightChange(selectedColumn.id, "fixed", selectedColumn.heightValue ?? 400, e.target.value as "px" | "%")
+                    handleHeightChange(
+                      selectedColumn.id,
+                      "fixed",
+                      selectedColumn.heightValue ?? 400,
+                      e.target.value as "px" | "%",
+                    )
                   }
                 >
                   <option value="px">px</option>
@@ -1499,8 +1670,12 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
       )}
 
       <div className={styles.actions}>
-        <button className={styles.cancelBtn} onClick={onCancel}>キャンセル</button>
-        <button className={styles.applyBtn} onClick={() => onApply(draft)}>適用</button>
+        <button className={styles.cancelBtn} onClick={onCancel}>
+          キャンセル
+        </button>
+        <button className={styles.applyBtn} onClick={() => onApply(draft)}>
+          適用
+        </button>
       </div>
     </div>
   );
@@ -1535,6 +1710,7 @@ git commit -m "feat: implement ColumnLayoutTab for grid placement settings"
 ## Task 7: AddColumnDialog で gridRow/gridCol のデフォルト値を設定
 
 **Files:**
+
 - Modify: `src/components/AddColumnDialog/AddColumnDialog.tsx`
 
 新しいカラムを追加するとき、未使用の gridCol に自動配置する。
@@ -1549,9 +1725,10 @@ git commit -m "feat: implement ColumnLayoutTab for grid placement settings"
 onAdd({
   ...columnData,
   gridRow: 1,
-  gridCol: existingColumns.length > 0
-    ? Math.max(...existingColumns.map((c) => c.gridCol)) + 1
-    : 1,
+  gridCol:
+    existingColumns.length > 0
+      ? Math.max(...existingColumns.map((c) => c.gridCol)) + 1
+      : 1,
   heightMode: "auto",
 });
 ```
@@ -1561,18 +1738,20 @@ onAdd({
 `App.tsx` の `<AddColumnDialog>` を更新:
 
 ```tsx
-{showAddColumn && accounts.length > 0 && (
-  <AddColumnDialog
-    accounts={accounts}
-    globalSettings={globalSettings}
-    existingColumns={columns}
-    onAdd={(column) => {
-      handleAddColumn(column);
-      setShowAddColumn(false);
-    }}
-    onCancel={() => setShowAddColumn(false)}
-  />
-)}
+{
+  showAddColumn && accounts.length > 0 && (
+    <AddColumnDialog
+      accounts={accounts}
+      globalSettings={globalSettings}
+      existingColumns={columns}
+      onAdd={(column) => {
+        handleAddColumn(column);
+        setShowAddColumn(false);
+      }}
+      onCancel={() => setShowAddColumn(false)}
+    />
+  );
+}
 ```
 
 - [ ] **Step 2: テストを実行してエラーがないことを確認する**
@@ -1590,6 +1769,7 @@ npm run tauri:dev
 ```
 
 確認項目:
+
 - 新規カラムを追加すると既存カラムの右隣（gridCol が最大値+1）に配置される
 - AppSettings → カラム配置タブが開く
 - グリッドセルをクリック → 未割当カラムをクリックで割り当てができる
@@ -1609,6 +1789,7 @@ git commit -m "feat: set default grid position for newly added columns"
 ## Self-Review
 
 **Spec coverage:**
+
 - ✅ Column 型拡張 (Task 1)
 - ✅ 既存データのマイグレーション (Task 2)
 - ✅ WebView グリッド bounds 計算 (Task 3)
@@ -1622,6 +1803,7 @@ git commit -m "feat: set default grid position for newly added columns"
 **Placeholder scan:** なし
 
 **Type consistency:**
+
 - `calculateGridBounds` は Task 3 で定義・export → Task 4 (useColumns 本体) で使用 ✅
 - `ColumnBounds` は Task 3 で定義・export → Task 4 (App.tsx) で使用 ✅
 - `HEADER_HEIGHT` は Task 4 で export 追加 ✅

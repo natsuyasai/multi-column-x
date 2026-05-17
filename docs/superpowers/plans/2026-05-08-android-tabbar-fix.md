@@ -12,21 +12,22 @@
 
 ## File Structure
 
-| ファイル | 変更種別 | 内容 |
-|---|---|---|
-| `src-tauri/src/inject/mod.rs` | Modify | `build_mobile_column_init_script` を削除 |
-| `src-tauri/src/commands/webview.rs` | Modify | `CreateWebviewArgs` を簡略化、`switch_mobile_column`・`open_mobile_dialog` を削除 |
-| `src-tauri/src/lib.rs` | Modify | invoke_handler から 2 コマンドを削除 |
-| `src-tauri/src/inject/_src/mobile_tab_bar.ts` | Delete | column への注入廃止 |
-| `src-tauri/src/inject/mobile_tab_bar.js` | Delete | 同上（ビルド成果物） |
-| `src/hooks/useColumns.ts` | Modify | height 修正・注入タブバー関連ロジック削除 |
-| `src/App.tsx` | Modify | MobileTabBar 常時表示・不要イベントリスナー削除 |
+| ファイル                                      | 変更種別 | 内容                                                                              |
+| --------------------------------------------- | -------- | --------------------------------------------------------------------------------- |
+| `src-tauri/src/inject/mod.rs`                 | Modify   | `build_mobile_column_init_script` を削除                                          |
+| `src-tauri/src/commands/webview.rs`           | Modify   | `CreateWebviewArgs` を簡略化、`switch_mobile_column`・`open_mobile_dialog` を削除 |
+| `src-tauri/src/lib.rs`                        | Modify   | invoke_handler から 2 コマンドを削除                                              |
+| `src-tauri/src/inject/_src/mobile_tab_bar.ts` | Delete   | column への注入廃止                                                               |
+| `src-tauri/src/inject/mobile_tab_bar.js`      | Delete   | 同上（ビルド成果物）                                                              |
+| `src/hooks/useColumns.ts`                     | Modify   | height 修正・注入タブバー関連ロジック削除                                         |
+| `src/App.tsx`                                 | Modify   | MobileTabBar 常時表示・不要イベントリスナー削除                                   |
 
 ---
 
 ### Task 1: Rust — inject スクリプトと不要コマンドを削除
 
 **Files:**
+
 - Modify: `src-tauri/src/inject/mod.rs`
 - Modify: `src-tauri/src/commands/webview.rs`
 - Modify: `src-tauri/src/lib.rs`
@@ -212,6 +213,7 @@
 ### Task 2: inject ファイルを削除する
 
 **Files:**
+
 - Delete: `src-tauri/src/inject/_src/mobile_tab_bar.ts`
 - Delete: `src-tauri/src/inject/mobile_tab_bar.js`
 
@@ -242,6 +244,7 @@
 ### Task 3: useColumns.ts — 高さ修正と注入タブバーロジックを削除する
 
 **Files:**
+
 - Modify: `src/hooks/useColumns.ts`
 
 - [ ] **Step 1: `buildMobileTabsJson` 関数を削除する**
@@ -396,6 +399,7 @@
 ### Task 4: App.tsx — MobileTabBar を常時表示し不要リスナーを削除する
 
 **Files:**
+
 - Modify: `src/App.tsx`
 
 - [ ] **Step 1: `mobile-switch-column` イベントリスナーを削除する**
@@ -430,7 +434,10 @@
           setShowAddColumn(true);
         } else if (e.payload.dialog === "account_manager") {
           setShowAccountManager(true);
-        } else if (e.payload.dialog === "column_settings" && e.payload.columnId) {
+        } else if (
+          e.payload.dialog === "column_settings" &&
+          e.payload.columnId
+        ) {
           setSettingsColumnId(e.payload.columnId);
         }
       },
@@ -447,30 +454,34 @@
 
   ```tsx
   // Before
-  {isMobile && columns.length === 0 && (
-    <MobileTabBar
-      columns={columns}
-      accounts={accounts}
-      activeColumnId={activeColumnId}
-      onSelectColumn={setActiveColumn}
-      onOpenSettings={setSettingsColumnId}
-      onAddColumn={() => setShowAddColumn(true)}
-      onAccountManager={() => setShowAccountManager(true)}
-    />
-  )}
+  {
+    isMobile && columns.length === 0 && (
+      <MobileTabBar
+        columns={columns}
+        accounts={accounts}
+        activeColumnId={activeColumnId}
+        onSelectColumn={setActiveColumn}
+        onOpenSettings={setSettingsColumnId}
+        onAddColumn={() => setShowAddColumn(true)}
+        onAccountManager={() => setShowAccountManager(true)}
+      />
+    );
+  }
 
   // After
-  {isMobile && (
-    <MobileTabBar
-      columns={columns}
-      accounts={accounts}
-      activeColumnId={activeColumnId}
-      onSelectColumn={setActiveColumn}
-      onOpenSettings={setSettingsColumnId}
-      onAddColumn={() => setShowAddColumn(true)}
-      onAccountManager={() => setShowAccountManager(true)}
-    />
-  )}
+  {
+    isMobile && (
+      <MobileTabBar
+        columns={columns}
+        accounts={accounts}
+        activeColumnId={activeColumnId}
+        onSelectColumn={setActiveColumn}
+        onOpenSettings={setSettingsColumnId}
+        onAddColumn={() => setShowAddColumn(true)}
+        onAccountManager={() => setShowAccountManager(true)}
+      />
+    );
+  }
   ```
 
 - [ ] **Step 4: `listen` のインポートが不要になった場合は削除する**
@@ -509,11 +520,13 @@
 - [ ] **Step 1: Android ビルドが通ることを確認する**
 
   Android ビルド環境がある場合:
+
   ```powershell
   npm run tauri:android:build
   ```
 
   環境がない場合は `cargo check` で代替（`#[cfg(mobile)]` ブロックは通常のデスクトップ向けチェックでは検証されないため、ビルド環境が必須）:
+
   ```powershell
   cd src-tauri && cargo check
   ```

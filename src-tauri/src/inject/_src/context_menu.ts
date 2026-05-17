@@ -16,8 +16,11 @@ const OPEN_LINK_POPUP_WINDOW = "open_link_popup_window";
 
   function getCallerLabel(): string {
     return (
-      (window.__TAURI_INTERNALS__ as { metadata?: { currentWebview?: { label?: string } } })
-        ?.metadata?.currentWebview?.label ?? "unknown"
+      (
+        window.__TAURI_INTERNALS__ as {
+          metadata?: { currentWebview?: { label?: string } };
+        }
+      )?.metadata?.currentWebview?.label ?? "unknown"
     );
   }
 

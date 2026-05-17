@@ -19,15 +19,16 @@
 ```typescript
 export interface Column {
   // ... 既存フィールド（id, accountId, pageType, width, order, ...）
-  gridRow: number;       // グリッド上の行位置（1始まり）
-  gridCol: number;       // グリッド上の列位置（1始まり）
+  gridRow: number; // グリッド上の行位置（1始まり）
+  gridCol: number; // グリッド上の列位置（1始まり）
   heightMode: "auto" | "fixed";
-  heightValue?: number;  // heightMode === "fixed" のときのみ使用
+  heightValue?: number; // heightMode === "fixed" のときのみ使用
   heightUnit?: "px" | "%"; // heightMode === "fixed" のときのみ使用
 }
 ```
 
 **既存フィールドとの関係:**
+
 - `width` と `order` は引き続き使用する
 - `order` はグリッド内での同列内ソート順として使い続ける（gridRow で代替可能だが後方互換のため残す）
 - 既存データの移行: `gridRow = 1`, `gridCol = order + 1`（横一列）, `heightMode = "auto"` をデフォルトとする
@@ -44,10 +45,10 @@ export interface Column {
 
 現在の `AppSettingsPanel` はタブなし（セクション形式）。タブUIを新規追加し、既存コンテンツを「一般」タブに移動した上で「カラム配置」タブを追加する。
 
-| タブ名 | 内容 |
-|--------|------|
-| 一般 | 既存のセクション（カラムデフォルト設定・ポップアップ設定）をそのまま移動 |
-| カラム配置 | **今回追加** |
+| タブ名     | 内容                                                                     |
+| ---------- | ------------------------------------------------------------------------ |
+| 一般       | 既存のセクション（カラムデフォルト設定・ポップアップ設定）をそのまま移動 |
+| カラム配置 | **今回追加**                                                             |
 
 ### カラム配置タブの構成
 
@@ -114,6 +115,7 @@ export interface Column {
 現在のヘッダー行は横一列のスクロールコンテナ。縦積みを追加しても **ヘッダーは各カラムの上端に固定表示** のまま変えない（各 WebView の y = そのカラムの y、ヘッダーは React 側で同じ位置に描画）。
 
 縦積みカラムのヘッダーはそれぞれの WebView の上端に表示する必要があるため：
+
 - 現在の `headerRow`（横スクロールコンテナ内の固定高さ行）を廃止し、各カラムヘッダーを `position: absolute` で `appContent` に対して配置する
 - ヘッダーの top 座標 = そのカラムの WebView の y 座標（= `calculateBounds` で求めた y 値）
 - ヘッダーの left 座標 = そのカラムの WebView の x 座標（= scrollLeft を反映済みの値）

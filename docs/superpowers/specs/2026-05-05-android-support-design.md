@@ -36,21 +36,21 @@ Android:
 
 ## 変更ファイル一覧
 
-| ファイル | 変更内容 |
-| --- | --- |
-| `src-tauri/tauri.conf.json` | Android minSdkVersion 設定追加 |
-| `src-tauri/Cargo.toml` | `tauri-plugin-os = "2"` 追加 |
-| `src-tauri/src/lib.rs` | ウィンドウイベント・初期化を `#[cfg(desktop)]` で囲む、OS プラグイン登録、`LoginCompleteFlag` 管理 |
-| `src-tauri/src/commands/account.rs` | `open_add_account_window` を desktop/mobile 実装に分岐、`mark_login_complete`・`check_login_complete` 追加 |
-| `src-tauri/src/commands/webview.rs` | ポップアップ系コマンドを desktop/mobile 実装に分岐、`close_popup_window` を共通化 |
-| `src-tauri/gen/android/app/src/main/AndroidManifest.xml` | AddAccount Activity 登録 |
-| `src-tauri/gen/android/app/src/main/java/.../AddAccount.kt` | AddAccount Activity（sentinel ファイル監視で自己クローズ） |
-| `src/hooks/useColumns.ts` | `activeColumnId` 管理・WebView 表示/非表示切り替え追加 |
-| `src/hooks/useAccounts.ts` | mobile 向け `visibilitychange` + `check_login_complete` パス追加 |
-| `src/store/useAppStore.ts` | `isMobile: boolean` フラグ追加 |
-| `src/App.tsx` | プラットフォーム判定・MobileTabBar 表示・ハンドラ分岐 |
-| `src/components/MobileTabBar/` | 新規コンポーネント（Android 専用タブバー） |
-| `package.json` | `@tauri-apps/plugin-os` 追加 |
+| ファイル                                                    | 変更内容                                                                                                   |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `src-tauri/tauri.conf.json`                                 | Android minSdkVersion 設定追加                                                                             |
+| `src-tauri/Cargo.toml`                                      | `tauri-plugin-os = "2"` 追加                                                                               |
+| `src-tauri/src/lib.rs`                                      | ウィンドウイベント・初期化を `#[cfg(desktop)]` で囲む、OS プラグイン登録、`LoginCompleteFlag` 管理         |
+| `src-tauri/src/commands/account.rs`                         | `open_add_account_window` を desktop/mobile 実装に分岐、`mark_login_complete`・`check_login_complete` 追加 |
+| `src-tauri/src/commands/webview.rs`                         | ポップアップ系コマンドを desktop/mobile 実装に分岐、`close_popup_window` を共通化                          |
+| `src-tauri/gen/android/app/src/main/AndroidManifest.xml`    | AddAccount Activity 登録                                                                                   |
+| `src-tauri/gen/android/app/src/main/java/.../AddAccount.kt` | AddAccount Activity（sentinel ファイル監視で自己クローズ）                                                 |
+| `src/hooks/useColumns.ts`                                   | `activeColumnId` 管理・WebView 表示/非表示切り替え追加                                                     |
+| `src/hooks/useAccounts.ts`                                  | mobile 向け `visibilitychange` + `check_login_complete` パス追加                                           |
+| `src/store/useAppStore.ts`                                  | `isMobile: boolean` フラグ追加                                                                             |
+| `src/App.tsx`                                               | プラットフォーム判定・MobileTabBar 表示・ハンドラ分岐                                                      |
+| `src/components/MobileTabBar/`                              | 新規コンポーネント（Android 専用タブバー）                                                                 |
+| `package.json`                                              | `@tauri-apps/plugin-os` 追加                                                                               |
 
 ---
 
@@ -92,19 +92,22 @@ Rust 側のポーリングではログイン完了を検知できない。
 `WebviewWindowBuilder::initialization_script()` で AddAccount の WebView に JavaScript を注入する。`location.pathname` は SPA の pushState でも即座に更新されるため、正確にログイン完了を検知できる。
 
 ```javascript
-(function() {
-    var invoked = false;
-    function checkLoginComplete() {
-        if (!invoked && location.pathname === '/home') {
-            if (window.__TAURI_INTERNALS__) {
-                invoked = true;
-                window.__TAURI_INTERNALS__.invoke('mark_login_complete')
-                    .catch(function() { invoked = false; });
-            }
-        }
-        setTimeout(checkLoginComplete, 500);
+(function () {
+  var invoked = false;
+  function checkLoginComplete() {
+    if (!invoked && location.pathname === "/home") {
+      if (window.__TAURI_INTERNALS__) {
+        invoked = true;
+        window.__TAURI_INTERNALS__
+          .invoke("mark_login_complete")
+          .catch(function () {
+            invoked = false;
+          });
+      }
     }
     setTimeout(checkLoginComplete, 500);
+  }
+  setTimeout(checkLoginComplete, 500);
 })();
 ```
 
@@ -268,8 +271,10 @@ class AddAccount : TauriActivity() {
 `App.tsx` の初期化時に `platform()` を呼び出し、`useAppStore` の `isMobile` にセットする:
 
 ```typescript
-import { platform } from '@tauri-apps/plugin-os';
-platform().then((p) => setIsMobile(p === 'android')).catch(() => {});
+import { platform } from "@tauri-apps/plugin-os";
+platform()
+  .then((p) => setIsMobile(p === "android"))
+  .catch(() => {});
 ```
 
 ### useAccounts.ts のアカウント追加フロー

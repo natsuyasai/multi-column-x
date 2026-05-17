@@ -12,8 +12,8 @@
 
 ## File Map
 
-| File | Action | 内容 |
-|------|--------|------|
+| File                   | Action | 内容                                      |
+| ---------------------- | ------ | ----------------------------------------- |
 | `src-tauri/src/lib.rs` | Modify | `.setup()` と `.on_window_event()` を追加 |
 
 ---
@@ -21,6 +21,7 @@
 ### Task 1: 起動時にウィンドウ位置・サイズを復元する
 
 **Files:**
+
 - Modify: `src-tauri/src/lib.rs`
 
 - [ ] **Step 1: `.setup()` ハンドラを追加する**
@@ -120,6 +121,7 @@ git commit -m "feat: restore window position and size on startup"
 ### Task 2: ウィンドウを閉じるときに位置・サイズを保存する
 
 **Files:**
+
 - Modify: `src-tauri/src/lib.rs`
 
 - [ ] **Step 1: `.on_window_event()` を追加する**

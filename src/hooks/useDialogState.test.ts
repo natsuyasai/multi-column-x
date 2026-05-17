@@ -20,27 +20,37 @@ describe("useDialogState", () => {
 
   it("showAddColumn を true にすると dialogOpen が true になる", () => {
     const { result } = renderHook(() => useDialogState());
-    act(() => { result.current.setShowAddColumn(true); });
+    act(() => {
+      result.current.setShowAddColumn(true);
+    });
     expect(result.current.dialogOpen).toBe(true);
   });
 
   it("settingsColumnId をセットすると dialogOpen が true になる", () => {
     const { result } = renderHook(() => useDialogState());
-    act(() => { result.current.setSettingsColumnId("col-1"); });
+    act(() => {
+      result.current.setSettingsColumnId("col-1");
+    });
     expect(result.current.dialogOpen).toBe(true);
   });
 
   it("tabActionColumnId をセットすると dialogOpen が true になる", () => {
     const { result } = renderHook(() => useDialogState());
-    act(() => { result.current.setTabActionColumnId("col-1"); });
+    act(() => {
+      result.current.setTabActionColumnId("col-1");
+    });
     expect(result.current.dialogOpen).toBe(true);
   });
 
   it("全ダイアログを閉じると dialogOpen が false に戻る", () => {
     const { result } = renderHook(() => useDialogState());
-    act(() => { result.current.setShowAccountManager(true); });
+    act(() => {
+      result.current.setShowAccountManager(true);
+    });
     expect(result.current.dialogOpen).toBe(true);
-    act(() => { result.current.setShowAccountManager(false); });
+    act(() => {
+      result.current.setShowAccountManager(false);
+    });
     expect(result.current.dialogOpen).toBe(false);
   });
 });

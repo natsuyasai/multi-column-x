@@ -64,17 +64,23 @@ git -C $projectRoot log --oneline -15
 
 ### 現在のブランチ
 ```
+
 {gitBranch}
+
 ```
 
 ### 変更ファイル (git status --short)
 ```
+
 {gitStatus}
+
 ```
 
 ### 直近 15 コミット
 ```
+
 {gitLog}
+
 ```
 
 ---

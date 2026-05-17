@@ -29,7 +29,8 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
   isLast,
   showSortButtons,
 }) => {
-  const label = column.label ?? `${account.label} - ${getPageTypeLabel(column)}`;
+  const label =
+    column.label ?? `${account.label} - ${getPageTypeLabel(column)}`;
   const { remaining, reset } = useAutoReload({
     columnId: column.id,
     enabled: column.settings.autoReloadEnabled,
@@ -101,4 +102,3 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
     </div>
   );
 };
-

@@ -66,7 +66,9 @@ describe("getPageTypeLabel", () => {
   });
 
   it("homeはhomeTabNameがある場合それを返す", () => {
-    expect(getPageTypeLabel({ pageType: "home", homeTabName: "フォロー中" })).toBe("フォロー中");
+    expect(
+      getPageTypeLabel({ pageType: "home", homeTabName: "フォロー中" }),
+    ).toBe("フォロー中");
   });
 
   it("notificationsは「通知」を返す", () => {
@@ -74,7 +76,9 @@ describe("getPageTypeLabel", () => {
   });
 
   it("searchはクエリがある場合「検索: クエリ」を返す", () => {
-    expect(getPageTypeLabel({ pageType: "search", searchQuery: "tauri" })).toBe("検索: tauri");
+    expect(getPageTypeLabel({ pageType: "search", searchQuery: "tauri" })).toBe(
+      "検索: tauri",
+    );
   });
 
   it("searchはクエリがない場合「検索」を返す", () => {

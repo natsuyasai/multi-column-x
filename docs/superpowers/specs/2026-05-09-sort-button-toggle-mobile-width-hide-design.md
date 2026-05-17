@@ -19,25 +19,30 @@
 ### 変更ファイル
 
 #### `src/types/index.ts`
+
 - `GlobalSettings` インターフェースに `showSortButtons: boolean` を追加
 - `DEFAULT_GLOBAL_SETTINGS` に `showSortButtons: true` を追加
 
 #### `src/components/AppSettingsPanel/AppSettingsPanel.tsx`
+
 - `useState` で `showSortButtons` を管理
 - 「カラムのデフォルト設定」セクション内にチェックボックスを追加:
   - ラベル: 「並び替えボタンを表示する」
 - `handleSubmit` に `showSortButtons` を含める
 
 #### `src/components/ColumnHeader/ColumnHeader.tsx`
+
 - `ColumnHeaderProps` に `showSortButtons: boolean` を追加
 - ← → ボタン2つを `showSortButtons` で条件付きレンダリング
 
 #### `src/components/MobileTabBar/MobileTabBar.tsx`
+
 - `TabItemProps` と `Props` に `showSortButtons: boolean` を追加
 - `TabItem` 内の ← → ボタン2つを `showSortButtons` で条件付きレンダリング
 - `MobileTabBar` から `TabItem` へ `showSortButtons` を渡す
 
 #### `src/App.tsx`
+
 - `ColumnHeader` へ `showSortButtons={globalSettings.showSortButtons}` を渡す
 - `MobileTabBar` へ `showSortButtons={globalSettings.showSortButtons}` を渡す
 
@@ -48,10 +53,12 @@
 ### 変更ファイル
 
 #### `src/components/SettingsPanel/SettingsPanel.tsx`
+
 - `SettingsPanelProps` に `isMobile: boolean` を追加
 - 「カラム」セクション（幅（px）の `<section>`）を `!isMobile` のときのみ表示
 
 #### `src/App.tsx`
+
 - `SettingsPanel` へ `isMobile={isMobile}` を渡す
 
 ---

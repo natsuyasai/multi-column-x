@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { IPC_COMMANDS, WEBVIEW_LABELS, WEBVIEW_SCRIPTS } from "../constants/ipc";
+import {
+  IPC_COMMANDS,
+  WEBVIEW_LABELS,
+  WEBVIEW_SCRIPTS,
+} from "../constants/ipc";
 
 interface UseAutoReloadOptions {
   columnId: string;

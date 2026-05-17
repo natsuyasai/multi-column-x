@@ -8,7 +8,6 @@ import { useAppStore } from "../store/useAppStore";
 import type { Column } from "../types";
 import { IPC_COMMANDS, IPC_EVENTS } from "../constants/ipc";
 
-
 export const HEADER_HEIGHT = 36; // ColumnHeader の高さ（px）
 export const SCROLLBAR_HEIGHT = 12; // 下部スクロールバーの高さ（px）
 export const SIDEBAR_COLLAPSED_WIDTH = 40; // サイドバー折りたたみ時の幅（px）
@@ -22,11 +21,23 @@ function getSidebarWidth(sidebarExpanded: boolean): number {
 // Kotlin の WindowInsetsCompat から取得したシステムバーの高さ（dp）を返す。
 // CSS env(safe-area-inset-*) は Android では notch 領域のみを表すため使用しない。
 // 値が 0 の場合は Kotlin 側がまだ値を設定していない可能性があるためリトライする。
-export async function getMobileInsets(): Promise<{ top: number; bottom: number }> {
+export async function getMobileInsets(): Promise<{
+  top: number;
+  bottom: number;
+}> {
   for (let attempt = 0; attempt < 10; attempt++) {
     try {
-      const result = await invoke<{ top: number; bottom: number }>("get_mobile_insets");
-      console.log(`[getMobileInsets attempt=${attempt}]`, JSON.stringify(result), "innerHeight:", window.innerHeight, "innerWidth:", window.innerWidth);
+      const result = await invoke<{ top: number; bottom: number }>(
+        "get_mobile_insets",
+      );
+      console.log(
+        `[getMobileInsets attempt=${attempt}]`,
+        JSON.stringify(result),
+        "innerHeight:",
+        window.innerHeight,
+        "innerWidth:",
+        window.innerWidth,
+      );
       if (result.top > 0 || result.bottom > 0) {
         return result;
       }
@@ -157,7 +168,9 @@ export function useColumns() {
   const [columnBounds, setColumnBounds] = useState<
     Record<string, ColumnBounds>
   >({});
-  const [activeColumnId, setActiveColumnIdState] = useState<string | null>(null);
+  const [activeColumnId, setActiveColumnIdState] = useState<string | null>(
+    null,
+  );
   const [swipeState, setSwipeState] = useState<{
     direction: "left" | "right";
     phase: "progress" | "switching";
@@ -168,7 +181,9 @@ export function useColumns() {
   const setActiveColumn = useCallback(async (id: string) => {
     setActiveColumnIdState(id);
     // バックグラウンド復帰後に React がリロードされても復元できるよう保存する
-    try { localStorage.setItem("mcx_activeColumnId", id); } catch {}
+    try {
+      localStorage.setItem("mcx_activeColumnId", id);
+    } catch {}
     const { columns: currentColumns, isMobile } = useAppStore.getState();
 
     // モバイル: resize_column_webview より先にアクティブカラムのクッキーを切り替える。
@@ -234,86 +249,106 @@ export function useColumns() {
   }, [activeColumnId, setActiveColumn]);
 
   // 全カラムのWebViewを作成（起動時に呼ぶ）
-  const restoreMobileColumns = useCallback(async (
-    currentColumns: Column[],
-    currentAccounts: ReturnType<typeof useAppStore.getState>["accounts"],
-  ) => {
-    const sortedByOrder = [...currentColumns].sort((a, b) => a.order - b.order);
-    const firstColumn = sortedByOrder[0];
-    // バックグラウンド復帰後の React リロード時に以前のアクティブカラムを復元する
-    let savedId: string | null = null;
-    try { savedId = localStorage.getItem("mcx_activeColumnId"); } catch {}
-    const targetColumn =
-      (savedId ? sortedByOrder.find((c) => c.id === savedId) : null) ?? firstColumn;
-    for (const column of sortedByOrder) {
-      const account = currentAccounts.find((a) => a.id === column.accountId);
-      if (!account) continue;
-      const isActive = column.id === targetColumn?.id;
-      await invoke(IPC_COMMANDS.CREATE_COLUMN_WEBVIEW, {
-        args: {
-          column,
-          dataDirectory: account.dataDirectory,
-          x: isActive ? 0 : -99999,
-          y: 0,
-          width: window.innerWidth,
-          height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
-        },
-      }).catch(console.error);
-    }
-    if (targetColumn) {
-      await setActiveColumn(targetColumn.id);
-    }
-  }, [setActiveColumn]);
+  const restoreMobileColumns = useCallback(
+    async (
+      currentColumns: Column[],
+      currentAccounts: ReturnType<typeof useAppStore.getState>["accounts"],
+    ) => {
+      const sortedByOrder = [...currentColumns].sort(
+        (a, b) => a.order - b.order,
+      );
+      const firstColumn = sortedByOrder[0];
+      // バックグラウンド復帰後の React リロード時に以前のアクティブカラムを復元する
+      let savedId: string | null = null;
+      try {
+        savedId = localStorage.getItem("mcx_activeColumnId");
+      } catch {}
+      const targetColumn =
+        (savedId ? sortedByOrder.find((c) => c.id === savedId) : null) ??
+        firstColumn;
+      for (const column of sortedByOrder) {
+        const account = currentAccounts.find((a) => a.id === column.accountId);
+        if (!account) continue;
+        const isActive = column.id === targetColumn?.id;
+        await invoke(IPC_COMMANDS.CREATE_COLUMN_WEBVIEW, {
+          args: {
+            column,
+            dataDirectory: account.dataDirectory,
+            x: isActive ? 0 : -99999,
+            y: 0,
+            width: window.innerWidth,
+            height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
+          },
+        }).catch(console.error);
+      }
+      if (targetColumn) {
+        await setActiveColumn(targetColumn.id);
+      }
+    },
+    [setActiveColumn],
+  );
 
-  const restoreDesktopColumns = useCallback(async (
-    currentColumns: Column[],
-    currentAccounts: ReturnType<typeof useAppStore.getState>["accounts"],
-    containerHeight: number,
-    scrollLeft: number,
-    sidebarWidth: number,
-  ) => {
-    const bounds = calculateGridBounds(currentColumns, {
-      containerHeight,
-      scrollLeft,
-      sidebarWidth,
-      headerHeight: HEADER_HEIGHT,
-      scrollbarHeight: SCROLLBAR_HEIGHT,
-    });
+  const restoreDesktopColumns = useCallback(
+    async (
+      currentColumns: Column[],
+      currentAccounts: ReturnType<typeof useAppStore.getState>["accounts"],
+      containerHeight: number,
+      scrollLeft: number,
+      sidebarWidth: number,
+    ) => {
+      const bounds = calculateGridBounds(currentColumns, {
+        containerHeight,
+        scrollLeft,
+        sidebarWidth,
+        headerHeight: HEADER_HEIGHT,
+        scrollbarHeight: SCROLLBAR_HEIGHT,
+      });
 
-    setColumnBounds(bounds);
+      setColumnBounds(bounds);
 
-    for (const column of currentColumns) {
-      const account = currentAccounts.find((a) => a.id === column.accountId);
-      if (!account) continue;
-      const b = bounds[column.id];
-      if (!b) continue;
-      await invoke(IPC_COMMANDS.CREATE_COLUMN_WEBVIEW, {
-        args: {
-          column,
-          dataDirectory: account.dataDirectory,
-          ...b,
-        },
-      }).catch(console.error);
-    }
-  }, []);
+      for (const column of currentColumns) {
+        const account = currentAccounts.find((a) => a.id === column.accountId);
+        if (!account) continue;
+        const b = bounds[column.id];
+        if (!b) continue;
+        await invoke(IPC_COMMANDS.CREATE_COLUMN_WEBVIEW, {
+          args: {
+            column,
+            dataDirectory: account.dataDirectory,
+            ...b,
+          },
+        }).catch(console.error);
+      }
+    },
+    [],
+  );
 
-  const restoreColumns = useCallback(async (sidebarWidth: number) => {
-    if (!containerRef.current) return;
-    const containerHeight = containerRef.current.clientHeight;
-    const scrollLeft = scrollbarRef.current?.scrollLeft ?? 0;
-    const {
-      columns: currentColumns,
-      accounts: currentAccounts,
-      isMobile,
-    } = useAppStore.getState();
+  const restoreColumns = useCallback(
+    async (sidebarWidth: number) => {
+      if (!containerRef.current) return;
+      const containerHeight = containerRef.current.clientHeight;
+      const scrollLeft = scrollbarRef.current?.scrollLeft ?? 0;
+      const {
+        columns: currentColumns,
+        accounts: currentAccounts,
+        isMobile,
+      } = useAppStore.getState();
 
-    if (isMobile) {
-      await restoreMobileColumns(currentColumns, currentAccounts);
-      return;
-    }
+      if (isMobile) {
+        await restoreMobileColumns(currentColumns, currentAccounts);
+        return;
+      }
 
-    await restoreDesktopColumns(currentColumns, currentAccounts, containerHeight, scrollLeft, sidebarWidth);
-  }, [restoreMobileColumns, restoreDesktopColumns]);
+      await restoreDesktopColumns(
+        currentColumns,
+        currentAccounts,
+        containerHeight,
+        scrollLeft,
+        sidebarWidth,
+      );
+    },
+    [restoreMobileColumns, restoreDesktopColumns],
+  );
 
   // カラム追加
   const handleAddColumn = useCallback(
@@ -373,8 +408,20 @@ export function useColumns() {
       currentColumns.map((col) =>
         invoke(IPC_COMMANDS.RESIZE_COLUMN_WEBVIEW, {
           bounds: isMobile
-            ? { columnId: col.id, x: -99999, y: 0, width: window.innerWidth, height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT }
-            : { columnId: col.id, x: -9999, y: HEADER_HEIGHT, width: col.width, height: 1 },
+            ? {
+                columnId: col.id,
+                x: -99999,
+                y: 0,
+                width: window.innerWidth,
+                height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
+              }
+            : {
+                columnId: col.id,
+                x: -9999,
+                y: HEADER_HEIGHT,
+                width: col.width,
+                height: 1,
+              },
         }).catch(() => {}),
       ),
     );
@@ -383,12 +430,16 @@ export function useColumns() {
   // カラム削除
   const handleRemoveColumn = useCallback(
     async (columnId: string) => {
-      await invoke(IPC_COMMANDS.REMOVE_COLUMN_WEBVIEW, { columnId }).catch(console.error);
+      await invoke(IPC_COMMANDS.REMOVE_COLUMN_WEBVIEW, { columnId }).catch(
+        console.error,
+      );
       removeColumn(columnId);
       const { isMobile, columns: remainingColumns } = useAppStore.getState();
       if (isMobile) {
         if (activeColumnId === columnId) {
-          const next = [...remainingColumns].sort((a, b) => a.order - b.order)[0];
+          const next = [...remainingColumns].sort(
+            (a, b) => a.order - b.order,
+          )[0];
           if (next) {
             await setActiveColumn(next.id);
           } else {
@@ -441,34 +492,50 @@ export function useColumns() {
     if (isMobile || platform() !== "linux") return;
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
-      .onMoved(() => { recalculateAllBounds(); })
-      .then((fn) => { unlisten = fn; });
-    return () => { unlisten?.(); };
+      .onMoved(() => {
+        recalculateAllBounds();
+      })
+      .then((fn) => {
+        unlisten = fn;
+      });
+    return () => {
+      unlisten?.();
+    };
   }, [isMobile, recalculateAllBounds]);
 
   // カラムスワイプナビゲーション（モバイルのみ: Android ネイティブジェスチャー → Tauri イベント経由）
   useEffect(() => {
     if (!isMobile) return;
-    const unlistenProgress = listen<string>(IPC_EVENTS.COLUMN_SWIPE_PROGRESS, (e) => {
-      if (dialogOpenRef.current) return;
-      setSwipeState({ direction: e.payload as "left" | "right", phase: "progress" });
-    });
+    const unlistenProgress = listen<string>(
+      IPC_EVENTS.COLUMN_SWIPE_PROGRESS,
+      (e) => {
+        if (dialogOpenRef.current) return;
+        setSwipeState({
+          direction: e.payload as "left" | "right",
+          phase: "progress",
+        });
+      },
+    );
     const unlistenCancel = listen(IPC_EVENTS.COLUMN_SWIPE_CANCEL, () => {
       setSwipeState(null);
     });
-    const unlistenNavigate = listen<string>(IPC_EVENTS.COLUMN_SWIPE_NAVIGATE, (e) => {
-      if (dialogOpenRef.current) return;
-      const direction = e.payload as "left" | "right";
-      const { columns: cols } = useAppStore.getState();
-      const sorted = [...cols].sort((a, b) => a.order - b.order);
-      const currentIdx = sorted.findIndex((c) => c.id === activeColumnId);
-      if (currentIdx < 0) return;
-      const targetIdx = direction === "left" ? currentIdx + 1 : currentIdx - 1;
-      if (targetIdx < 0 || targetIdx >= sorted.length) return;
-      setSwipeState({ direction, phase: "switching" });
-      setTimeout(() => setSwipeState(null), 400);
-      setActiveColumn(sorted[targetIdx].id);
-    });
+    const unlistenNavigate = listen<string>(
+      IPC_EVENTS.COLUMN_SWIPE_NAVIGATE,
+      (e) => {
+        if (dialogOpenRef.current) return;
+        const direction = e.payload as "left" | "right";
+        const { columns: cols } = useAppStore.getState();
+        const sorted = [...cols].sort((a, b) => a.order - b.order);
+        const currentIdx = sorted.findIndex((c) => c.id === activeColumnId);
+        if (currentIdx < 0) return;
+        const targetIdx =
+          direction === "left" ? currentIdx + 1 : currentIdx - 1;
+        if (targetIdx < 0 || targetIdx >= sorted.length) return;
+        setSwipeState({ direction, phase: "switching" });
+        setTimeout(() => setSwipeState(null), 400);
+        setActiveColumn(sorted[targetIdx].id);
+      },
+    );
     return () => {
       unlistenProgress.then((fn) => fn());
       unlistenCancel.then((fn) => fn());
@@ -488,7 +555,9 @@ export function useColumns() {
   const recreateAllWebviews = useCallback(async () => {
     const { columns: currentColumns, sidebarExpanded } = useAppStore.getState();
     for (const column of currentColumns) {
-      await invoke(IPC_COMMANDS.REMOVE_COLUMN_WEBVIEW, { columnId: column.id }).catch(console.error);
+      await invoke(IPC_COMMANDS.REMOVE_COLUMN_WEBVIEW, {
+        columnId: column.id,
+      }).catch(console.error);
     }
     await restoreColumns(getSidebarWidth(sidebarExpanded));
   }, [restoreColumns]);

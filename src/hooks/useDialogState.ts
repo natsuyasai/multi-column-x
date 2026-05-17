@@ -22,7 +22,9 @@ export function useDialogState(): DialogState {
   const [showAppSettings, setShowAppSettings] = useState(false);
   const [settingsColumnId, setSettingsColumnId] = useState<string | null>(null);
   const [showLinkPopupDialog, setShowLinkPopupDialog] = useState(false);
-  const [tabActionColumnId, setTabActionColumnId] = useState<string | null>(null);
+  const [tabActionColumnId, setTabActionColumnId] = useState<string | null>(
+    null,
+  );
 
   const dialogOpen =
     showAddColumn ||

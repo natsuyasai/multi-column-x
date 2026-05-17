@@ -88,10 +88,10 @@ invoke_handler から `switch_mobile_column`・`open_mobile_dialog` の登録を
 
 ### 削除ファイル
 
-| ファイル | 理由 |
-|---|---|
-| `src-tauri/src/inject/_src/mobile_tab_bar.ts` | column への注入廃止 |
-| `src-tauri/src/inject/mobile_tab_bar.js` | 同上（ビルド成果物） |
+| ファイル                                      | 理由                 |
+| --------------------------------------------- | -------------------- |
+| `src-tauri/src/inject/_src/mobile_tab_bar.ts` | column への注入廃止  |
+| `src-tauri/src/inject/mobile_tab_bar.js`      | 同上（ビルド成果物） |
 
 ### 変更しないもの
 

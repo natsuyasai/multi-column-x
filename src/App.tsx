@@ -22,7 +22,12 @@ import { platform } from "@tauri-apps/plugin-os";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { ColumnSettings } from "./types";
-import { IPC_COMMANDS, IPC_EVENTS, WEBVIEW_LABELS, WEBVIEW_SCRIPTS } from "./constants/ipc";
+import {
+  IPC_COMMANDS,
+  IPC_EVENTS,
+  WEBVIEW_LABELS,
+  WEBVIEW_SCRIPTS,
+} from "./constants/ipc";
 import styles from "./App.module.scss";
 
 const App: React.FC = () => {

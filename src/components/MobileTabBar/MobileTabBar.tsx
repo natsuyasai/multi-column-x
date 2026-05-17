@@ -70,7 +70,9 @@ const TabItem: React.FC<TabItemProps> = ({
     styles.tab,
     isActive ? styles.active : "",
     isActive && swipeActivated ? styles.swipeActivated : "",
-  ].filter(Boolean).join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div
@@ -152,7 +154,10 @@ interface Props {
   columns: Column[];
   accounts: Account[];
   activeColumnId: string | null;
-  swipeState?: { direction: "left" | "right"; phase: "progress" | "switching" } | null;
+  swipeState?: {
+    direction: "left" | "right";
+    phase: "progress" | "switching";
+  } | null;
   onSelectColumn: (id: string) => void;
   onMoveLeft: (id: string) => void;
   onMoveRight: (id: string) => void;
@@ -190,8 +195,12 @@ export const MobileTabBar: React.FC<Props> = ({
         <div
           className={[
             styles.swipeIndicator,
-            swipeState.direction === "left" ? styles.swipeIndicatorLeft : styles.swipeIndicatorRight,
-            swipeState.phase === "progress" ? styles.swipeIndicatorProgress : styles.swipeIndicatorSwitching,
+            swipeState.direction === "left"
+              ? styles.swipeIndicatorLeft
+              : styles.swipeIndicatorRight,
+            swipeState.phase === "progress"
+              ? styles.swipeIndicatorProgress
+              : styles.swipeIndicatorSwitching,
           ].join(" ")}
         >
           {swipeState.direction === "left" ? "›" : "‹"}

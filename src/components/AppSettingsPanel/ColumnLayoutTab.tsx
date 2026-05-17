@@ -16,11 +16,16 @@ interface CellKey {
 
 function getPageLabel(col: Column): string {
   switch (col.pageType) {
-    case "home": return col.homeTabName ?? "ホーム";
-    case "notifications": return "通知";
-    case "search": return `検索: ${col.searchQuery ?? ""}`;
-    case "list": return "リスト";
-    case "custom": return "カスタム";
+    case "home":
+      return col.homeTabName ?? "ホーム";
+    case "notifications":
+      return "通知";
+    case "search":
+      return `検索: ${col.searchQuery ?? ""}`;
+    case "list":
+      return "リスト";
+    case "custom":
+      return "カスタム";
   }
 }
 
@@ -31,30 +36,50 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
   onCancel,
 }) => {
   const [draft, setDraft] = useState<Column[]>(() =>
-    columns.map((c) => ({ ...c }))
+    columns.map((c) => ({ ...c })),
   );
-  const [cols, setCols] = useState(() => Math.max(...columns.map((c) => c.gridCol).filter((g) => g >= 1), 1));
+  const [cols, setCols] = useState(() =>
+    Math.max(...columns.map((c) => c.gridCol).filter((g) => g >= 1), 1),
+  );
   const [selectedCellKey, setSelectedCellKey] = useState<CellKey | null>(null);
   const [pendingCell, setPendingCell] = useState<CellKey | null>(null);
 
   // 列ごとの行数（各列の最大gridRowを使用）
-  const rowCountForCol = useCallback((colNum: number): number => {
-    const assigned = draft.filter((c) => c.gridCol === colNum && c.gridRow >= 1 && c.gridCol >= 1);
-    return Math.max(...assigned.map((c) => c.gridRow), 1);
-  }, [draft]);
+  const rowCountForCol = useCallback(
+    (colNum: number): number => {
+      const assigned = draft.filter(
+        (c) => c.gridCol === colNum && c.gridRow >= 1 && c.gridCol >= 1,
+      );
+      return Math.max(...assigned.map((c) => c.gridRow), 1);
+    },
+    [draft],
+  );
 
-  const assigned = draft.filter((c) => c.gridRow >= 1 && c.gridCol >= 1 && c.gridCol <= cols);
-  const unassigned = draft.filter((c) => !(c.gridRow >= 1 && c.gridCol >= 1 && c.gridCol <= cols));
+  const assigned = draft.filter(
+    (c) => c.gridRow >= 1 && c.gridCol >= 1 && c.gridCol <= cols,
+  );
+  const unassigned = draft.filter(
+    (c) => !(c.gridRow >= 1 && c.gridCol >= 1 && c.gridCol <= cols),
+  );
 
   const selectedColumn = selectedCellKey
-    ? assigned.find((c) => c.gridRow === selectedCellKey.row && c.gridCol === selectedCellKey.col) ?? null
+    ? (assigned.find(
+        (c) =>
+          c.gridRow === selectedCellKey.row &&
+          c.gridCol === selectedCellKey.col,
+      ) ?? null)
     : null;
 
   const handleCellClick = useCallback((row: number, col: number) => {
     setDraft((prev) => {
-      const colAtCell = prev.find(
-        (c) => c.gridRow === row && c.gridCol === col && c.gridRow >= 1 && c.gridCol >= 1
-      ) ?? null;
+      const colAtCell =
+        prev.find(
+          (c) =>
+            c.gridRow === row &&
+            c.gridCol === col &&
+            c.gridRow >= 1 &&
+            c.gridCol >= 1,
+        ) ?? null;
       if (colAtCell) {
         setSelectedCellKey({ row, col });
         setPendingCell(null);
@@ -66,43 +91,53 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
     });
   }, []);
 
-  const handleAssign = useCallback((columnId: string) => {
-    if (!pendingCell) return;
-    setDraft((prev) =>
-      prev.map((c) =>
-        c.id === columnId
-          ? { ...c, gridRow: pendingCell.row, gridCol: pendingCell.col }
-          : c
-      )
-    );
-    setPendingCell(null);
-  }, [pendingCell]);
+  const handleAssign = useCallback(
+    (columnId: string) => {
+      if (!pendingCell) return;
+      setDraft((prev) =>
+        prev.map((c) =>
+          c.id === columnId
+            ? { ...c, gridRow: pendingCell.row, gridCol: pendingCell.col }
+            : c,
+        ),
+      );
+      setPendingCell(null);
+    },
+    [pendingCell],
+  );
 
   const handleRemove = useCallback((columnId: string) => {
     setDraft((prev) =>
       prev.map((c) =>
-        c.id === columnId ? { ...c, gridRow: 0, gridCol: 0 } : c
-      )
+        c.id === columnId ? { ...c, gridRow: 0, gridCol: 0 } : c,
+      ),
     );
     setSelectedCellKey(null);
   }, []);
 
   const handleHeightChange = useCallback(
-    (columnId: string, mode: "auto" | "fixed", value?: number, unit?: "px" | "%") => {
+    (
+      columnId: string,
+      mode: "auto" | "fixed",
+      value?: number,
+      unit?: "px" | "%",
+    ) => {
       setDraft((prev) =>
         prev.map((c) =>
           c.id === columnId
             ? { ...c, heightMode: mode, heightValue: value, heightUnit: unit }
-            : c
-        )
+            : c,
+        ),
       );
     },
-    []
+    [],
   );
 
   const getColumnLabel = (col: Column) => {
     const account = accounts.find((a) => a.id === col.accountId);
-    return col.label ?? `${account?.label ?? col.accountId} - ${getPageLabel(col)}`;
+    return (
+      col.label ?? `${account?.label ?? col.accountId} - ${getPageLabel(col)}`
+    );
   };
 
   return (
@@ -119,7 +154,9 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
             setCols(newCols);
             // 範囲外に出たカラムを未割当に戻す
             setDraft((prev) =>
-              prev.map((c) => c.gridCol > newCols ? { ...c, gridRow: 0, gridCol: 0 } : c)
+              prev.map((c) =>
+                c.gridCol > newCols ? { ...c, gridRow: 0, gridCol: 0 } : c,
+              ),
             );
             setSelectedCellKey(null);
             setPendingCell(null);
@@ -138,9 +175,15 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
                 <div className={styles.gridColCells}>
                   {Array.from({ length: rows }, (_, rIdx) => {
                     const r = rIdx + 1;
-                    const colAtCell = assigned.find((col) => col.gridRow === r && col.gridCol === colNum) ?? null;
-                    const isSelected = selectedCellKey?.row === r && selectedCellKey?.col === colNum;
-                    const isPending = pendingCell?.row === r && pendingCell?.col === colNum;
+                    const colAtCell =
+                      assigned.find(
+                        (col) => col.gridRow === r && col.gridCol === colNum,
+                      ) ?? null;
+                    const isSelected =
+                      selectedCellKey?.row === r &&
+                      selectedCellKey?.col === colNum;
+                    const isPending =
+                      pendingCell?.row === r && pendingCell?.col === colNum;
 
                     if (colAtCell) {
                       return (
@@ -149,7 +192,9 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
                           className={`${styles.cell} ${styles.cellAssigned} ${isSelected ? styles.cellSelected : ""}`}
                           onClick={() => handleCellClick(r, colNum)}
                         >
-                          <span className={styles.cellName}>{getColumnLabel(colAtCell)}</span>
+                          <span className={styles.cellName}>
+                            {getColumnLabel(colAtCell)}
+                          </span>
                           <span className={styles.cellHeight}>
                             {colAtCell.heightMode === "fixed"
                               ? `${colAtCell.heightValue}${colAtCell.heightUnit}`
@@ -158,7 +203,10 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
                           <button
                             className={styles.removeBtn}
                             aria-label="割り当て解除"
-                            onClick={(e) => { e.stopPropagation(); handleRemove(colAtCell.id); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemove(colAtCell.id);
+                            }}
                           >
                             ×
                           </button>
@@ -236,7 +284,12 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
                 name="heightMode"
                 checked={selectedColumn.heightMode === "fixed"}
                 onChange={() =>
-                  handleHeightChange(selectedColumn.id, "fixed", selectedColumn.heightValue ?? 400, selectedColumn.heightUnit ?? "px")
+                  handleHeightChange(
+                    selectedColumn.id,
+                    "fixed",
+                    selectedColumn.heightValue ?? 400,
+                    selectedColumn.heightUnit ?? "px",
+                  )
                 }
               />
               固定:
@@ -249,14 +302,24 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
                   min={1}
                   value={selectedColumn.heightValue ?? 400}
                   onChange={(e) =>
-                    handleHeightChange(selectedColumn.id, "fixed", Number(e.target.value), selectedColumn.heightUnit ?? "px")
+                    handleHeightChange(
+                      selectedColumn.id,
+                      "fixed",
+                      Number(e.target.value),
+                      selectedColumn.heightUnit ?? "px",
+                    )
                   }
                 />
                 <select
                   className={styles.unitSelect}
                   value={selectedColumn.heightUnit ?? "px"}
                   onChange={(e) =>
-                    handleHeightChange(selectedColumn.id, "fixed", selectedColumn.heightValue ?? 400, e.target.value as "px" | "%")
+                    handleHeightChange(
+                      selectedColumn.id,
+                      "fixed",
+                      selectedColumn.heightValue ?? 400,
+                      e.target.value as "px" | "%",
+                    )
                   }
                 >
                   <option value="px">px</option>
@@ -269,8 +332,12 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
       )}
 
       <div className={styles.actions}>
-        <button className={styles.cancelBtn} onClick={onCancel}>キャンセル</button>
-        <button className={styles.applyBtn} onClick={() => onApply(draft)}>適用</button>
+        <button className={styles.cancelBtn} onClick={onCancel}>
+          キャンセル
+        </button>
+        <button className={styles.applyBtn} onClick={() => onApply(draft)}>
+          適用
+        </button>
       </div>
     </div>
   );

@@ -41,8 +41,7 @@ async function createAccountFromResult(
   const label =
     prompt("このアカウントの名前を入力してください") ??
     `アカウント ${currentAccounts.length + 1}`;
-  const color =
-    ACCOUNT_COLORS[currentAccounts.length % ACCOUNT_COLORS.length];
+  const color = ACCOUNT_COLORS[currentAccounts.length % ACCOUNT_COLORS.length];
 
   const account: Account = {
     id: accountId,
@@ -53,7 +52,9 @@ async function createAccountFromResult(
   };
 
   addAccount(account);
-  await invoke(IPC_COMMANDS.CLOSE_WINDOW, { label: windowLabel }).catch(() => {});
+  await invoke(IPC_COMMANDS.CLOSE_WINDOW, { label: windowLabel }).catch(
+    () => {},
+  );
 }
 
 export function useAccounts() {
@@ -89,7 +90,8 @@ export function useAccounts() {
         // open_add_account_window はウィンドウを開いて即座に返る。
         // Rust の URL ポーリングがログイン完了を検出して emit するイベントを listen する。
         const raw = await invoke<string>(IPC_COMMANDS.OPEN_ADD_ACCOUNT_WINDOW);
-        const { accountId, dataDirectory, windowLabel } = parseAddAccountResult(raw);
+        const { accountId, dataDirectory, windowLabel } =
+          parseAddAccountResult(raw);
 
         await new Promise<void>((resolve, reject) => {
           let unlistenLogin: (() => void) | null = null;

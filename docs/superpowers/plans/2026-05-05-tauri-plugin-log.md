@@ -13,16 +13,19 @@
 ### Task 1: Rust ログプラグインのターゲット設定
 
 **Files:**
+
 - Modify: `src-tauri/src/lib.rs:66`
 
 - [ ] **Step 1: `lib.rs` のプラグイン登録を更新する**
 
 現在:
+
 ```rust
 .plugin(tauri_plugin_log::Builder::new().build())
 ```
 
 以下に置き換える（`lib.rs` の `run()` 関数内）:
+
 ```rust
 .plugin(
     tauri_plugin_log::Builder::new()
@@ -37,6 +40,7 @@
 - [ ] **Step 2: `eprintln!` を `log::error!` に置き換える**
 
 `lib.rs` 56行目の `save_window_bounds` 関数内:
+
 ```rust
 // Before
 eprintln!("[MultiColumnX] failed to save window bounds: {e}");
@@ -66,6 +70,7 @@ git commit -m "feat: configure tauri-plugin-log with stdout target"
 ### Task 2: フロントエンド用 npm パッケージのインストールと logger ラッパー作成
 
 **Files:**
+
 - Modify: `package.json`（npm install で自動更新）
 - Create: `src/lib/logger.ts`
 
@@ -80,6 +85,7 @@ npm install @tauri-apps/plugin-log
 - [ ] **Step 2: `src/lib/` ディレクトリを作成し `logger.ts` を新規作成する**
 
 `src/lib/logger.ts`:
+
 ```ts
 export { error, warn, info, debug, trace } from "@tauri-apps/plugin-log";
 ```
@@ -118,6 +124,7 @@ npm run tauri:dev
 - [ ] **Step 2: フロントエンドからのログ呼び出しを手動確認する（任意）**
 
 アプリの適当なコンポーネントで一時的にインポートして動作確認:
+
 ```ts
 import { info } from "../lib/logger";
 info("logger test");

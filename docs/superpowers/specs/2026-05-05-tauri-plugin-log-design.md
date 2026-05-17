@@ -50,11 +50,11 @@ export { error, warn, info, debug, trace } from "@tauri-apps/plugin-log";
 
 ## 変更ファイル一覧
 
-| ファイル | 変更内容 |
-|---|---|
+| ファイル               | 変更内容                                         |
+| ---------------------- | ------------------------------------------------ |
 | `src-tauri/src/lib.rs` | ログターゲット・レベル設定、`eprintln!` 置き換え |
-| `package.json` | `@tauri-apps/plugin-log` 追加 |
-| `src/lib/logger.ts` | 新規作成（ログラッパー） |
+| `package.json`         | `@tauri-apps/plugin-log` 追加                    |
+| `src/lib/logger.ts`    | 新規作成（ログラッパー）                         |
 
 ## スコープ外
 

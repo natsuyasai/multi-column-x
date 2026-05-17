@@ -1,5 +1,10 @@
 import React, { useState } from "react";
-import type { GlobalSettings, Column, Account, ColumnSettings } from "../../types";
+import type {
+  GlobalSettings,
+  Column,
+  Account,
+  ColumnSettings,
+} from "../../types";
 import { ColumnLayoutTab } from "./ColumnLayoutTab";
 import styles from "./AppSettingsPanel.module.scss";
 
@@ -27,33 +32,60 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   const [activeTab, setActiveTab] = useState<"general" | "layout">("general");
 
   // カラムデフォルト - 自動更新
-  const [autoReloadEnabled, setAutoReloadEnabled] = useState(settings.defaultAutoReloadEnabled);
-  const [autoReloadInterval, setAutoReloadInterval] = useState(settings.defaultAutoReloadInterval);
-  const [defaultShowCountdown, setDefaultShowCountdown] = useState(settings.defaultShowCountdown);
-
-  // カラムデフォルト - 表示
-  const [defaultAreaRemoveEnabled, setDefaultAreaRemoveEnabled] = useState(settings.defaultAreaRemoveEnabled);
-  const [defaultShowCustomMenu, setDefaultShowCustomMenu] = useState(settings.defaultShowCustomMenu);
-  const [defaultScrollPosRestoreEnabled, setDefaultScrollPosRestoreEnabled] = useState(
-    settings.defaultScrollPosRestoreEnabled,
+  const [autoReloadEnabled, setAutoReloadEnabled] = useState(
+    settings.defaultAutoReloadEnabled,
+  );
+  const [autoReloadInterval, setAutoReloadInterval] = useState(
+    settings.defaultAutoReloadInterval,
+  );
+  const [defaultShowCountdown, setDefaultShowCountdown] = useState(
+    settings.defaultShowCountdown,
   );
 
+  // カラムデフォルト - 表示
+  const [defaultAreaRemoveEnabled, setDefaultAreaRemoveEnabled] = useState(
+    settings.defaultAreaRemoveEnabled,
+  );
+  const [defaultShowCustomMenu, setDefaultShowCustomMenu] = useState(
+    settings.defaultShowCustomMenu,
+  );
+  const [defaultScrollPosRestoreEnabled, setDefaultScrollPosRestoreEnabled] =
+    useState(settings.defaultScrollPosRestoreEnabled);
+
   // カラムデフォルト - 画像
-  const [smallImageEnabled, setSmallImageEnabled] = useState(settings.smallImageEnabled);
-  const [smallImageWidth, setSmallImageWidth] = useState(settings.smallImageWidth);
-  const [blurImageEnabled, setBlurImageEnabled] = useState(settings.blurImageEnabled);
-  const [blurImageAmount, setBlurImageAmount] = useState(settings.blurImageAmount);
+  const [smallImageEnabled, setSmallImageEnabled] = useState(
+    settings.smallImageEnabled,
+  );
+  const [smallImageWidth, setSmallImageWidth] = useState(
+    settings.smallImageWidth,
+  );
+  const [blurImageEnabled, setBlurImageEnabled] = useState(
+    settings.blurImageEnabled,
+  );
+  const [blurImageAmount, setBlurImageAmount] = useState(
+    settings.blurImageAmount,
+  );
 
   // カラムデフォルト - カスタムCSS
-  const [defaultColumnCustomCSS, setDefaultColumnCustomCSS] = useState(settings.defaultColumnCustomCSS);
+  const [defaultColumnCustomCSS, setDefaultColumnCustomCSS] = useState(
+    settings.defaultColumnCustomCSS,
+  );
 
   // グローバル設定
-  const [popupEscCloseEnabled, setPopupEscCloseEnabled] = useState(settings.popupEscCloseEnabled);
-  const [videoAutoPlayStopEnabled, setVideoAutoPlayStopEnabled] = useState(settings.videoAutoPlayStopEnabled);
-  const [showSortButtons, setShowSortButtons] = useState(settings.showSortButtons);
+  const [popupEscCloseEnabled, setPopupEscCloseEnabled] = useState(
+    settings.popupEscCloseEnabled,
+  );
+  const [videoAutoPlayStopEnabled, setVideoAutoPlayStopEnabled] = useState(
+    settings.videoAutoPlayStopEnabled,
+  );
+  const [showSortButtons, setShowSortButtons] = useState(
+    settings.showSortButtons,
+  );
   const [hideAdEnabled, setHideAdEnabled] = useState(settings.hideAdEnabled);
   const [zoomLevel, setZoomLevel] = useState(settings.zoomLevel ?? 1);
-  const [useXAppForCompose, setUseXAppForCompose] = useState(settings.useXAppForCompose ?? false);
+  const [useXAppForCompose, setUseXAppForCompose] = useState(
+    settings.useXAppForCompose ?? false,
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,7 +183,9 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
               </section>
 
               <section className={styles.section}>
-                <h3 className={styles.sectionTitle}>カラムデフォルト - 自動更新</h3>
+                <h3 className={styles.sectionTitle}>
+                  カラムデフォルト - 自動更新
+                </h3>
                 <label className={styles.checkLabel}>
                   <input
                     type="checkbox"
@@ -179,7 +213,9 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                       <input
                         type="checkbox"
                         checked={defaultShowCountdown}
-                        onChange={(e) => setDefaultShowCountdown(e.target.checked)}
+                        onChange={(e) =>
+                          setDefaultShowCountdown(e.target.checked)
+                        }
                       />
                       カウントダウンを表示する
                     </label>
@@ -193,7 +229,9 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                   <input
                     type="checkbox"
                     checked={defaultAreaRemoveEnabled}
-                    onChange={(e) => setDefaultAreaRemoveEnabled(e.target.checked)}
+                    onChange={(e) =>
+                      setDefaultAreaRemoveEnabled(e.target.checked)
+                    }
                   />
                   ヘッダー・投稿欄を非表示にする
                 </label>
@@ -202,7 +240,9 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                     <input
                       type="checkbox"
                       checked={defaultShowCustomMenu}
-                      onChange={(e) => setDefaultShowCustomMenu(e.target.checked)}
+                      onChange={(e) =>
+                        setDefaultShowCustomMenu(e.target.checked)
+                      }
                     />
                     カスタムメニューボタンを表示する
                   </label>
@@ -264,7 +304,9 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
               </section>
 
               <section className={styles.section}>
-                <h3 className={styles.sectionTitle}>カラムデフォルト - カスタムCSS</h3>
+                <h3 className={styles.sectionTitle}>
+                  カラムデフォルト - カスタムCSS
+                </h3>
                 <textarea
                   className={styles.cssTextarea}
                   value={defaultColumnCustomCSS}
@@ -272,7 +314,9 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                   placeholder="/* カスタムCSSを入力 */"
                   spellCheck={false}
                 />
-                <p className={styles.hint}>新しく追加するカラムに適用されます</p>
+                <p className={styles.hint}>
+                  新しく追加するカラムに適用されます
+                </p>
                 <button
                   type="button"
                   className={styles.applyAllBtn}
@@ -300,9 +344,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                   <input
                     type="checkbox"
                     checked={popupEscCloseEnabled}
-                    onChange={(e) =>
-                      setPopupEscCloseEnabled(e.target.checked)
-                    }
+                    onChange={(e) => setPopupEscCloseEnabled(e.target.checked)}
                   />
                   Escキーで閉じる
                 </label>
@@ -354,12 +396,14 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 <button
                   type="button"
                   className={styles.applyAllBtn}
-                  onClick={() => { onReloadAllWebviews(); onClose(); }}
+                  onClick={() => {
+                    onReloadAllWebviews();
+                    onClose();
+                  }}
                 >
                   全WebViewを再生成
                 </button>
               </section>
-
             </form>
           )}
 
