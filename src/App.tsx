@@ -36,8 +36,8 @@ const App: React.FC = () => {
     accounts,
     globalSettings,
     updateGlobalSettings,
-    sidebarExpanded,
-    setSidebarExpanded,
+    topBarExpanded,
+    setTopBarExpanded,
     replaceColumns,
     isMobile,
     setIsMobile,
@@ -78,7 +78,7 @@ const App: React.FC = () => {
     dialogOpen,
   } = useDialogState();
 
-  const topBarHeight = getTopBarHeight(sidebarExpanded);
+  const topBarHeight = getTopBarHeight(topBarExpanded);
 
   const scrollbarWidth = useMemo(() => {
     const scrollLeft = scrollbarRef.current?.scrollLeft ?? 0;
@@ -166,9 +166,9 @@ const App: React.FC = () => {
   }, [dialogOpen]);
 
   const handleToggleTopBar = useCallback(() => {
-    setSidebarExpanded(!sidebarExpanded);
+    setTopBarExpanded(!topBarExpanded);
     setTimeout(() => recalculateAllBounds(), 220);
-  }, [sidebarExpanded, setSidebarExpanded, recalculateAllBounds]);
+  }, [topBarExpanded, setTopBarExpanded, recalculateAllBounds]);
 
   const handleJumpToColumn = useCallback(
     (columnId: string) => {
@@ -264,7 +264,7 @@ const App: React.FC = () => {
         <TopBar
           columns={columns}
           accounts={accounts}
-          expanded={sidebarExpanded}
+          expanded={topBarExpanded}
           onToggleExpand={handleToggleTopBar}
           onAddColumn={() => setShowAddColumn(true)}
           onAccountManager={() => setShowAccountManager(true)}

@@ -29,8 +29,8 @@ interface AppStore {
   columns: Column[];
   globalSettings: GlobalSettings;
   isLoaded: boolean;
-  sidebarExpanded: boolean;
-  setSidebarExpanded: (v: boolean) => void;
+  topBarExpanded: boolean;
+  setTopBarExpanded: (v: boolean) => void;
   isMobile: boolean;
   setIsMobile: (v: boolean) => void;
   loadSettings: () => Promise<void>;
@@ -50,8 +50,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   columns: [],
   globalSettings: DEFAULT_GLOBAL_SETTINGS,
   isLoaded: false,
-  sidebarExpanded: false,
-  setSidebarExpanded: (v) => set({ sidebarExpanded: v }),
+  topBarExpanded: false,
+  setTopBarExpanded: (v) => set({ topBarExpanded: v }),
   isMobile: false,
   setIsMobile: (v) => set({ isMobile: v }),
 

@@ -50,23 +50,22 @@ describe("calculateGridBounds", () => {
   const opts = {
     containerHeight: 800,
     scrollLeft: 0,
-    sidebarWidth: 40,
     headerHeight: 36,
     scrollbarHeight: 12,
   };
 
   // 1カラム: headersTotal=36, available=800-12-36=752
-  it("横一列（gridCol=1 のみ）の場合、y=headerHeight でheight=available", () => {
+  it("横一列（gridCol=1 のみ）の場合、x=0, y=headerHeight でheight=available", () => {
     const cols = [makeCol({ id: "c1", gridCol: 1, gridRow: 1 })];
     const result = calculateGridBounds(cols, opts);
-    expect(result["c1"]).toEqual({ x: 40, y: 36, width: 350, height: 752 });
+    expect(result["c1"]).toEqual({ x: 0, y: 36, width: 350, height: 752 });
   });
 
   // topBarHeight 指定時、bounds.y に topBarHeight が加算される
   it("topBarHeight が指定されたとき、bounds.y は topBarHeight+headerHeight からスタート", () => {
     const cols = [makeCol({ id: "c1", gridCol: 1, gridRow: 1 })];
     const result = calculateGridBounds(cols, { ...opts, topBarHeight: 32 });
-    expect(result["c1"]).toEqual({ x: 40, y: 32 + 36, width: 350, height: 752 });
+    expect(result["c1"]).toEqual({ x: 0, y: 32 + 36, width: 350, height: 752 });
   });
 
   it("topBarHeight が省略された場合は 0 として扱う（後方互換）", () => {
@@ -142,14 +141,14 @@ describe("calculateGridBounds", () => {
       makeCol({ id: "c2", gridCol: 2, gridRow: 1 }),
     ];
     const result = calculateGridBounds(cols, opts);
-    expect(result["c1"].x).toBe(40);
-    expect(result["c2"].x).toBe(40 + 350); // sidebarWidth + c1.width
+    expect(result["c1"].x).toBe(0);
+    expect(result["c2"].x).toBe(350); // c1.width
   });
 
   it("scrollLeft が x 座標に反映される", () => {
     const cols = [makeCol({ id: "c1", gridCol: 1, gridRow: 1 })];
     const result = calculateGridBounds(cols, { ...opts, scrollLeft: 100 });
-    expect(result["c1"].x).toBe(40 - 100);
+    expect(result["c1"].x).toBe(-100);
   });
 });
 

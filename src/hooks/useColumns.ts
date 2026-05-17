@@ -10,8 +10,6 @@ import { IPC_COMMANDS, IPC_EVENTS } from "../constants/ipc";
 
 export const HEADER_HEIGHT = 36; // ColumnHeader の高さ（px）
 export const SCROLLBAR_HEIGHT = 12; // 下部スクロールバーの高さ（px）
-export const SIDEBAR_COLLAPSED_WIDTH = 40; // 互換用（横方向ツールバー化以降は使用しない）
-export const SIDEBAR_EXPANDED_WIDTH = 200; // 互換用（横方向ツールバー化以降は使用しない）
 export const MOBILE_TAB_BAR_HEIGHT = 56; // モバイルタブバーの高さ（px）
 export const TOPBAR_COLLAPSED_HEIGHT = 32; // TopBar 折りたたみ時の高さ（px）
 export const TOPBAR_EXPANDED_HEIGHT = 64; // TopBar 展開時の高さ（px、2行レイアウト）
@@ -65,7 +63,6 @@ export interface ColumnBounds {
 interface GridBoundsOptions {
   containerHeight: number;
   scrollLeft: number;
-  sidebarWidth: number;
   headerHeight: number;
   scrollbarHeight: number;
   /** 横方向ツールバーの高さ（省略時は 0）。bounds.y のオフセットに使う。 */
@@ -79,7 +76,6 @@ export function calculateGridBounds(
   const {
     containerHeight,
     scrollLeft,
-    sidebarWidth,
     headerHeight,
     scrollbarHeight,
     topBarHeight = 0,
@@ -98,7 +94,7 @@ export function calculateGridBounds(
   const sortedCols = [...byCol.keys()].sort((a, b) => a - b);
 
   const result: Record<string, ColumnBounds> = {};
-  let xOffset = sidebarWidth;
+  let xOffset = 0;
 
   for (const colNum of sortedCols) {
     const colGroup = byCol
@@ -231,13 +227,12 @@ export function useColumns() {
     if (!containerRef.current) return;
     const containerHeight = containerRef.current.clientHeight;
     const scrollLeft = scrollbarRef.current?.scrollLeft ?? 0;
-    const { columns: currentColumns, sidebarExpanded } = useAppStore.getState();
-    const topBarHeight = getTopBarHeight(sidebarExpanded);
+    const { columns: currentColumns, topBarExpanded } = useAppStore.getState();
+    const topBarHeight = getTopBarHeight(topBarExpanded);
 
     const bounds = calculateGridBounds(currentColumns, {
       containerHeight,
       scrollLeft,
-      sidebarWidth: 0,
       headerHeight: HEADER_HEIGHT,
       scrollbarHeight: SCROLLBAR_HEIGHT,
       topBarHeight,
@@ -248,7 +243,7 @@ export function useColumns() {
     await Promise.all(
       Object.entries(bounds).map(([columnId, b]) =>
         invoke(IPC_COMMANDS.RESIZE_COLUMN_WEBVIEW, {
-          bounds: { columnId, ...b, sidebarWidth: 0 },
+          bounds: { columnId, ...b },
         }).catch(console.error),
       ),
     );
@@ -305,7 +300,6 @@ export function useColumns() {
       const bounds = calculateGridBounds(currentColumns, {
         containerHeight,
         scrollLeft,
-        sidebarWidth: 0,
         headerHeight: HEADER_HEIGHT,
         scrollbarHeight: SCROLLBAR_HEIGHT,
         topBarHeight,
@@ -385,14 +379,13 @@ export function useColumns() {
 
       const containerHeight = containerRef.current.clientHeight;
       const scrollLeft = scrollbarRef.current?.scrollLeft ?? 0;
-      const { sidebarExpanded, columns: updatedColumns } =
+      const { topBarExpanded, columns: updatedColumns } =
         useAppStore.getState();
-      const topBarHeight = getTopBarHeight(sidebarExpanded);
+      const topBarHeight = getTopBarHeight(topBarExpanded);
 
       const bounds = calculateGridBounds(updatedColumns, {
         containerHeight,
         scrollLeft,
-        sidebarWidth: 0,
         headerHeight: HEADER_HEIGHT,
         scrollbarHeight: SCROLLBAR_HEIGHT,
         topBarHeight,
@@ -426,7 +419,7 @@ export function useColumns() {
             : {
                 columnId: col.id,
                 x: -9999,
-                y: getTopBarHeight(useAppStore.getState().sidebarExpanded) +
+                y: getTopBarHeight(useAppStore.getState().topBarExpanded) +
                   HEADER_HEIGHT,
                 width: col.width,
                 height: 1,
@@ -562,13 +555,13 @@ export function useColumns() {
   }, []);
 
   const recreateAllWebviews = useCallback(async () => {
-    const { columns: currentColumns, sidebarExpanded } = useAppStore.getState();
+    const { columns: currentColumns, topBarExpanded } = useAppStore.getState();
     for (const column of currentColumns) {
       await invoke(IPC_COMMANDS.REMOVE_COLUMN_WEBVIEW, {
         columnId: column.id,
       }).catch(console.error);
     }
-    await restoreColumns(getTopBarHeight(sidebarExpanded));
+    await restoreColumns(getTopBarHeight(topBarExpanded));
   }, [restoreColumns]);
 
   return {
