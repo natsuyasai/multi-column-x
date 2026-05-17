@@ -238,10 +238,6 @@ pub struct ResizeBounds {
     pub y: f64,
     pub width: f64,
     pub height: f64,
-    /// Linux のビューポート左端チェックに使うサイドバー幅（論理 px）。
-    /// 省略時は 0 として扱う（x=-9999 のような明示的 hide 呼び出しでは不要）。
-    #[serde(rename = "sidebarWidth", default)]
-    pub sidebar_width: f64,
 }
 
 #[cfg(desktop)]
@@ -262,14 +258,15 @@ pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Resu
 
         let screen_y = inner_pos.y as f64 / scale + bounds.y;
 
-        // Completely behind sidebar or completely past window right edge: hide.
-        if bounds.x + bounds.width <= bounds.sidebar_width || bounds.x >= win_logical_width {
+        // Completely off-screen (left or right): hide.
+        if bounds.x + bounds.width <= 0.0 || bounds.x >= win_logical_width {
             let _ = webview_window.hide();
             return Ok(());
         }
 
-        // Clip left: if the column overlaps the sidebar, shift x right and shrink width.
-        let clip_left = (bounds.sidebar_width - bounds.x).max(0.0);
+        // Clip left when x<0 to prevent GTK/WM から負座標へのクランプ。
+        // 右端も win_logical_width でクリップして右側のはみ出しを抑制する。
+        let clip_left = (-bounds.x).max(0.0);
         let vis_x = bounds.x + clip_left;
         let vis_width = (win_logical_width - vis_x)
             .min(bounds.width - clip_left)
@@ -289,23 +286,13 @@ pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Resu
 
     #[cfg(not(target_os = "linux"))]
     if let Some(webview) = app.get_webview(&label) {
-        // Windows の WebView2 / macOS の WKWebView は HTML より手前に描画されるため、
-        // 横スクロールでカラムが Sidebar の領域に入り込むと Sidebar が裏に隠れてしまう。
-        // bounds.x が sidebar_width より小さいときは左側をクリップする。
-        // ただし x が大きく負（hideColumnWebviews による画面外退避）の場合はクリップを
-        // 適用せずそのままオフスクリーンに置く（再レイアウト抑制のため）。
-        let (vis_x, vis_width) = if bounds.x < 0.0
-            && bounds.x + bounds.width <= bounds.sidebar_width
-        {
-            (bounds.x, bounds.width.max(1.0))
-        } else {
-            let clip_left = (bounds.sidebar_width - bounds.x).max(0.0);
-            (bounds.x + clip_left, (bounds.width - clip_left).max(1.0))
-        };
+        // Windows / macOS: WebView は親ウィンドウの add_child で配置されるため、
+        // 親ウィンドウのクライアント領域でクリップされる。Sidebar は廃止され
+        // 横方向 TopBar に置き換わったため、左端クリップは不要。
         webview
             .set_bounds(tauri::Rect {
-                position: LogicalPosition::new(vis_x, bounds.y).into(),
-                size: LogicalSize::new(vis_width, bounds.height).into(),
+                position: LogicalPosition::new(bounds.x, bounds.y).into(),
+                size: LogicalSize::new(bounds.width.max(1.0), bounds.height.max(1.0)).into(),
             })
             .map_err(|e| e.to_string())?;
     }
