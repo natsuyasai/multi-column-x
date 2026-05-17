@@ -212,9 +212,7 @@ describe("TopBar", () => {
       "custom",
     ] as const)("pageType=%s のとき expanded 行2内に SVG アイコンが表示される", (pageType) => {
       const col: Column = { ...col1, pageType };
-      const { container } = render(
-        <TopBar {...defaultProps} columns={[col]} expanded={true} />,
-      );
+      render(<TopBar {...defaultProps} columns={[col]} expanded={true} />);
       const row2 = screen.getByTestId("topbar-row2");
       expect(
         row2.querySelector(`[data-testid="icon-${pageType}"]`),

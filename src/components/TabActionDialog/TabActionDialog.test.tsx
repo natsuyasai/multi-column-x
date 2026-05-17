@@ -30,7 +30,7 @@ describe("TabActionDialog", () => {
   });
 
   it("設定ボタンに settings SVG が表示される", () => {
-    const { container } = render(<TabActionDialog {...defaultProps} />);
+    render(<TabActionDialog {...defaultProps} />);
     const settingsBtn = screen.getByText(/設定/).closest("button");
     expect(
       settingsBtn?.querySelector('[data-testid="icon-settings"]'),
@@ -38,7 +38,7 @@ describe("TabActionDialog", () => {
   });
 
   it("削除ボタンに close SVG が表示される", () => {
-    const { container } = render(<TabActionDialog {...defaultProps} />);
+    render(<TabActionDialog {...defaultProps} />);
     const removeBtn = screen.getByText(/削除/).closest("button");
     expect(
       removeBtn?.querySelector('[data-testid="icon-close"]'),
