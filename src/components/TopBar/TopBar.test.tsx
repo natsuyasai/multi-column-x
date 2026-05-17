@@ -138,6 +138,53 @@ describe("TopBar", () => {
     expect(screen.getByTitle("マイホーム")).toBeInTheDocument();
   });
 
+  describe("アクションボタンの SVG アイコン", () => {
+    it("ツイートボタンに pencil SVG が表示される", () => {
+      const { container } = render(<TopBar {...defaultProps} />);
+      expect(
+        container
+          .querySelector('[title="ツイートを作成"]')
+          ?.querySelector('[data-testid="icon-pencil"]'),
+      ).toBeInTheDocument();
+    });
+
+    it("URL ポップアップボタンに link SVG が表示される", () => {
+      const { container } = render(<TopBar {...defaultProps} />);
+      expect(
+        container
+          .querySelector('[title="URLをポップアップで開く"]')
+          ?.querySelector('[data-testid="icon-link"]'),
+      ).toBeInTheDocument();
+    });
+
+    it("カラム追加ボタンに plus SVG が表示される", () => {
+      const { container } = render(<TopBar {...defaultProps} />);
+      expect(
+        container
+          .querySelector('[title="カラムを追加"]')
+          ?.querySelector('[data-testid="icon-plus"]'),
+      ).toBeInTheDocument();
+    });
+
+    it("アカウント管理ボタンに person SVG が表示される", () => {
+      const { container } = render(<TopBar {...defaultProps} />);
+      expect(
+        container
+          .querySelector('[title="アカウント管理"]')
+          ?.querySelector('[data-testid="icon-person"]'),
+      ).toBeInTheDocument();
+    });
+
+    it("アプリ設定ボタンに settings SVG が表示される", () => {
+      const { container } = render(<TopBar {...defaultProps} />);
+      expect(
+        container
+          .querySelector('[title="アプリ設定"]')
+          ?.querySelector('[data-testid="icon-settings"]'),
+      ).toBeInTheDocument();
+    });
+  });
+
   describe("カラム種別アイコン（collapsed）", () => {
     it.each([
       "home",

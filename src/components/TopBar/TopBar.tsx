@@ -5,6 +5,11 @@ import NotificationsIcon from "../../assets/icons/notifications.svg?react";
 import SearchIcon from "../../assets/icons/search.svg?react";
 import ListIcon from "../../assets/icons/list.svg?react";
 import CustomIcon from "../../assets/icons/custom.svg?react";
+import PencilIcon from "../../assets/icons/pencil.svg?react";
+import LinkIcon from "../../assets/icons/link.svg?react";
+import PlusIcon from "../../assets/icons/plus.svg?react";
+import PersonIcon from "../../assets/icons/person.svg?react";
+import SettingsIcon from "../../assets/icons/settings.svg?react";
 import styles from "./TopBar.module.scss";
 
 interface TopBarProps {
@@ -87,7 +92,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             onClick={onComposeTweet}
             title="ツイートを作成"
           >
-            <span className={styles.icon}>✏️</span>
+            <PencilIcon width={16} height={16} data-testid="icon-pencil" className={styles.icon} />
             {expanded && <span className={styles.label}>ツイート</span>}
           </button>
           <button
@@ -95,7 +100,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             onClick={onOpenLinkPopup}
             title="URLをポップアップで開く"
           >
-            <span className={styles.icon}>🔗</span>
+            <LinkIcon width={16} height={16} data-testid="icon-link" className={styles.icon} />
             {expanded && <span className={styles.label}>URLを開く</span>}
           </button>
           <button
@@ -103,7 +108,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             onClick={onAddColumn}
             title="カラムを追加"
           >
-            <span className={styles.icon}>＋</span>
+            <PlusIcon width={16} height={16} data-testid="icon-plus" className={styles.icon} />
             {expanded && <span className={styles.label}>カラム追加</span>}
           </button>
           <button
@@ -111,7 +116,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             onClick={onAccountManager}
             title="アカウント管理"
           >
-            <span className={styles.icon}>👤</span>
+            <PersonIcon width={16} height={16} data-testid="icon-person" className={styles.icon} />
             {expanded && <span className={styles.label}>アカウント</span>}
           </button>
           <button
@@ -119,7 +124,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             onClick={onAppSettings}
             title="アプリ設定"
           >
-            <span className={styles.icon}>⚙</span>
+            <SettingsIcon width={16} height={16} data-testid="icon-settings" className={styles.icon} />
             {expanded && <span className={styles.label}>設定</span>}
           </button>
         </div>

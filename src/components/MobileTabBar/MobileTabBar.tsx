@@ -1,6 +1,11 @@
 import React, { useState, useRef } from "react";
 import type { Column, Account, PageType } from "../../types";
 import { useAutoReload } from "../../hooks/useAutoReload";
+import PencilIcon from "../../assets/icons/pencil.svg?react";
+import LinkIcon from "../../assets/icons/link.svg?react";
+import PlusIcon from "../../assets/icons/plus.svg?react";
+import PersonIcon from "../../assets/icons/person.svg?react";
+import SettingsIcon from "../../assets/icons/settings.svg?react";
 import styles from "./MobileTabBar.module.scss";
 
 function getTabLabel(column: Column): string {
@@ -234,7 +239,7 @@ export const MobileTabBar: React.FC<Props> = ({
         title="ツイートを作成"
         onClick={onComposeTweet}
       >
-        ✏
+        <PencilIcon width={18} height={18} data-testid="icon-pencil" />
       </button>
 
       <button
@@ -252,7 +257,7 @@ export const MobileTabBar: React.FC<Props> = ({
             title="URLをポップアップで開く"
             onClick={onOpenLinkPopup}
           >
-            🔗
+            <LinkIcon width={18} height={18} data-testid="icon-link" />
           </button>
           <button
             className={styles.actionBtn}
@@ -260,7 +265,7 @@ export const MobileTabBar: React.FC<Props> = ({
             title="アプリ設定"
             onClick={onAppSettings}
           >
-            ⚙
+            <SettingsIcon width={18} height={18} data-testid="icon-settings" />
           </button>
           <button
             className={styles.actionBtn}
@@ -268,7 +273,7 @@ export const MobileTabBar: React.FC<Props> = ({
             title="アカウント管理"
             onClick={onAccountManager}
           >
-            👤
+            <PersonIcon width={18} height={18} data-testid="icon-person" />
           </button>
           <button
             className={styles.actionBtn}
@@ -276,7 +281,7 @@ export const MobileTabBar: React.FC<Props> = ({
             title="カラムを追加"
             onClick={onAddColumn}
           >
-            ＋
+            <PlusIcon width={18} height={18} data-testid="icon-plus" />
           </button>
         </div>
       )}

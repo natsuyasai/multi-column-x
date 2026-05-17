@@ -178,4 +178,65 @@ describe("MobileTabBar", () => {
     expect(screen.getByLabelText("左に移動")).toBeInTheDocument();
     expect(screen.getByLabelText("右に移動")).toBeInTheDocument();
   });
+
+  describe("アクションボタンの SVG アイコン", () => {
+    it("ツイートボタンに pencil SVG が表示される", () => {
+      const { container } = render(
+        <MobileTabBar {...defaultProps} columns={[]} />,
+      );
+      expect(
+        container
+          .querySelector('[title="ツイートを作成"]')
+          ?.querySelector('[data-testid="icon-pencil"]'),
+      ).toBeInTheDocument();
+    });
+
+    it("展開後の URL ポップアップボタンに link SVG が表示される", async () => {
+      const { container } = render(
+        <MobileTabBar {...defaultProps} columns={[]} />,
+      );
+      await userEvent.click(screen.getByTitle("メニュー表示の切り替え"));
+      expect(
+        container
+          .querySelector('[title="URLをポップアップで開く"]')
+          ?.querySelector('[data-testid="icon-link"]'),
+      ).toBeInTheDocument();
+    });
+
+    it("展開後の設定ボタンに settings SVG が表示される", async () => {
+      const { container } = render(
+        <MobileTabBar {...defaultProps} columns={[]} />,
+      );
+      await userEvent.click(screen.getByTitle("メニュー表示の切り替え"));
+      expect(
+        container
+          .querySelector('[title="アプリ設定"]')
+          ?.querySelector('[data-testid="icon-settings"]'),
+      ).toBeInTheDocument();
+    });
+
+    it("展開後のアカウント管理ボタンに person SVG が表示される", async () => {
+      const { container } = render(
+        <MobileTabBar {...defaultProps} columns={[]} />,
+      );
+      await userEvent.click(screen.getByTitle("メニュー表示の切り替え"));
+      expect(
+        container
+          .querySelector('[title="アカウント管理"]')
+          ?.querySelector('[data-testid="icon-person"]'),
+      ).toBeInTheDocument();
+    });
+
+    it("展開後のカラム追加ボタンに plus SVG が表示される", async () => {
+      const { container } = render(
+        <MobileTabBar {...defaultProps} columns={[]} />,
+      );
+      await userEvent.click(screen.getByTitle("メニュー表示の切り替え"));
+      expect(
+        container
+          .querySelector('[title="カラムを追加"]')
+          ?.querySelector('[data-testid="icon-plus"]'),
+      ).toBeInTheDocument();
+    });
+  });
 });

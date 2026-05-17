@@ -2,6 +2,8 @@ import React from "react";
 import type { Account, Column } from "../../types";
 import { getPageTypeLabel } from "../../types";
 import { useAutoReload } from "../../hooks/useAutoReload";
+import SettingsIcon from "../../assets/icons/settings.svg?react";
+import CloseIcon from "../../assets/icons/close.svg?react";
 import styles from "./ColumnHeader.module.scss";
 
 interface ColumnHeaderProps {
@@ -88,7 +90,7 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
           aria-label="設定"
           title="設定"
         >
-          ⚙
+          <SettingsIcon width={14} height={14} data-testid="icon-settings" />
         </button>
         <button
           className={styles.actionBtn}
@@ -96,7 +98,7 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
           aria-label="カラムを閉じる"
           title="カラムを閉じる"
         >
-          ✕
+          <CloseIcon width={14} height={14} data-testid="icon-close" />
         </button>
       </div>
     </div>

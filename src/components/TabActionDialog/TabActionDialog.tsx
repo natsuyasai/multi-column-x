@@ -1,4 +1,6 @@
 import React from "react";
+import SettingsIcon from "../../assets/icons/settings.svg?react";
+import CloseIcon from "../../assets/icons/close.svg?react";
 import styles from "./TabActionDialog.module.scss";
 
 interface Props {
@@ -19,13 +21,15 @@ export const TabActionDialog: React.FC<Props> = ({
       <div className={styles.sheet} onClick={(e) => e.stopPropagation()}>
         <p className={styles.label}>{columnLabel}</p>
         <button className={styles.actionBtn} onClick={onSettings}>
-          ⚙ 設定
+          <SettingsIcon width={16} height={16} data-testid="icon-settings" />
+          設定
         </button>
         <button
           className={`${styles.actionBtn} ${styles.dangerBtn}`}
           onClick={onRemove}
         >
-          ✕ 削除
+          <CloseIcon width={16} height={16} data-testid="icon-close" />
+          削除
         </button>
         <button className={styles.cancelBtn} onClick={onClose}>
           キャンセル

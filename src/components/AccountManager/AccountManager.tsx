@@ -1,5 +1,8 @@
 import React from "react";
 import type { Account } from "../../types";
+import StarIcon from "../../assets/icons/star.svg?react";
+import StarOutlineIcon from "../../assets/icons/star-outline.svg?react";
+import CloseIcon from "../../assets/icons/close.svg?react";
 import styles from "./AccountManager.module.scss";
 
 interface AccountManagerProps {
@@ -29,7 +32,7 @@ export const AccountManager: React.FC<AccountManagerProps> = ({
             onClick={onClose}
             aria-label="閉じる"
           >
-            ✕
+            <CloseIcon width={16} height={16} data-testid="icon-close" />
           </button>
         </div>
 
@@ -54,7 +57,11 @@ export const AccountManager: React.FC<AccountManagerProps> = ({
                   title="ツイート時のデフォルトアカウントに設定"
                   aria-label={`${account.label} をデフォルトに設定`}
                 >
-                  {isDefault ? "★" : "☆"}
+                  {isDefault ? (
+                    <StarIcon width={16} height={16} data-testid="icon-star" />
+                  ) : (
+                    <StarOutlineIcon width={16} height={16} data-testid="icon-star-outline" />
+                  )}
                 </button>
                 <button
                   className={styles.removeBtn}

@@ -107,4 +107,22 @@ describe("ColumnHeader", () => {
     expect(screen.getByLabelText("左に移動")).toBeInTheDocument();
     expect(screen.getByLabelText("右に移動")).toBeInTheDocument();
   });
+
+  it("設定ボタンに settings SVG が表示される", () => {
+    const { container } = render(<ColumnHeader {...defaultProps} />);
+    expect(
+      container
+        .querySelector('[title="設定"]')
+        ?.querySelector('[data-testid="icon-settings"]'),
+    ).toBeInTheDocument();
+  });
+
+  it("閉じるボタンに close SVG が表示される", () => {
+    const { container } = render(<ColumnHeader {...defaultProps} />);
+    expect(
+      container
+        .querySelector('[title="カラムを閉じる"]')
+        ?.querySelector('[data-testid="icon-close"]'),
+    ).toBeInTheDocument();
+  });
 });
