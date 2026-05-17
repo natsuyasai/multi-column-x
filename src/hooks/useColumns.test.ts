@@ -62,6 +62,30 @@ describe("calculateGridBounds", () => {
     expect(result["c1"]).toEqual({ x: 40, y: 36, width: 350, height: 752 });
   });
 
+  // topBarHeight 指定時、bounds.y に topBarHeight が加算される
+  it("topBarHeight が指定されたとき、bounds.y は topBarHeight+headerHeight からスタート", () => {
+    const cols = [makeCol({ id: "c1", gridCol: 1, gridRow: 1 })];
+    const result = calculateGridBounds(cols, { ...opts, topBarHeight: 32 });
+    expect(result["c1"]).toEqual({ x: 40, y: 32 + 36, width: 350, height: 752 });
+  });
+
+  it("topBarHeight が省略された場合は 0 として扱う（後方互換）", () => {
+    const cols = [makeCol({ id: "c1", gridCol: 1, gridRow: 1 })];
+    const result = calculateGridBounds(cols, opts);
+    expect(result["c1"].y).toBe(36);
+  });
+
+  // 2カラム縦積み + topBarHeight: c2.y には topBar も加算される
+  it("縦積みカラムでも topBarHeight が全行の y に正しく加算される", () => {
+    const cols = [
+      makeCol({ id: "c1", gridCol: 1, gridRow: 1 }),
+      makeCol({ id: "c2", gridCol: 1, gridRow: 2 }),
+    ];
+    const result = calculateGridBounds(cols, { ...opts, topBarHeight: 32 });
+    expect(result["c1"].y).toBe(32 + 36);
+    expect(result["c2"].y).toBe(32 + 36 + 358 + 36);
+  });
+
   // 2カラム縦積み: headersTotal=72, available=800-12-72=716, autoHeight=358
   it("同じ gridCol に2つのカラムがある場合、縦に積む（autoは均等分割、各行にヘッダー分を含む）", () => {
     const cols = [

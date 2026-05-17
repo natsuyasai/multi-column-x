@@ -66,6 +66,8 @@ interface GridBoundsOptions {
   sidebarWidth: number;
   headerHeight: number;
   scrollbarHeight: number;
+  /** 横方向ツールバーの高さ（省略時は 0）。bounds.y のオフセットに使う。 */
+  topBarHeight?: number;
 }
 
 export function calculateGridBounds(
@@ -78,6 +80,7 @@ export function calculateGridBounds(
     sidebarWidth,
     headerHeight,
     scrollbarHeight,
+    topBarHeight = 0,
   } = opts;
   // 縦に積まれたカラムはそれぞれヘッダーを持つため、列ごとに可用高さが異なる
   const totalHeight = containerHeight - scrollbarHeight;
@@ -138,7 +141,7 @@ export function calculateGridBounds(
       // y = ヘッダー上端、bounds.height = WebView高さのみ（ヘッダー除く）
       result[col.id] = {
         x: xOffset - scrollLeft,
-        y: Math.round(yOffset) + headerHeight,
+        y: topBarHeight + Math.round(yOffset) + headerHeight,
         width: col.width,
         height: webviewHeightRounded,
       };
