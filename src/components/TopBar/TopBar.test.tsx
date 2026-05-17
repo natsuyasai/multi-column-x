@@ -137,4 +137,35 @@ describe("TopBar", () => {
     render(<TopBar {...defaultProps} columns={[labeled]} />);
     expect(screen.getByTitle("マイホーム")).toBeInTheDocument();
   });
+
+  describe("カラム種別アイコン（collapsed）", () => {
+    it.each([
+      ["home", "🏠"],
+      ["notifications", "🔔"],
+      ["search", "🔍"],
+      ["list", "📄"],
+      ["custom", "🌐"],
+    ] as const)("pageType=%s のとき collapsed アイコンが %s", (pageType, icon) => {
+      const col: Column = { ...col1, pageType };
+      render(<TopBar {...defaultProps} columns={[col]} expanded={false} />);
+      const btns = screen.getAllByRole("button");
+      const jumpBtn = btns.find((b) => b.textContent?.includes(icon));
+      expect(jumpBtn).toBeDefined();
+    });
+  });
+
+  describe("カラム種別アイコン（expanded）", () => {
+    it.each([
+      ["home", "🏠"],
+      ["notifications", "🔔"],
+      ["search", "🔍"],
+      ["list", "📄"],
+      ["custom", "🌐"],
+    ] as const)("pageType=%s のとき expanded アイコンが %s", (pageType, icon) => {
+      const col: Column = { ...col1, pageType };
+      render(<TopBar {...defaultProps} columns={[col]} expanded={true} />);
+      const row2 = screen.getByTestId("topbar-row2");
+      expect(row2.textContent).toContain(icon);
+    });
+  });
 });

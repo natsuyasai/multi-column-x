@@ -1,5 +1,5 @@
 import React from "react";
-import type { Account, Column } from "../../types";
+import type { Account, Column, PageType } from "../../types";
 import styles from "./TopBar.module.scss";
 
 interface TopBarProps {
@@ -13,6 +13,21 @@ interface TopBarProps {
   onComposeTweet: () => void;
   onOpenLinkPopup: () => void;
   onJumpToColumn: (columnId: string) => void;
+}
+
+function getColumnIcon(pageType: PageType): string {
+  switch (pageType) {
+    case "home":
+      return "🏠";
+    case "notifications":
+      return "🔔";
+    case "search":
+      return "🔍";
+    case "list":
+      return "📄";
+    case "custom":
+      return "🌐";
+  }
 }
 
 function getPageLabel(column: Column): string {
@@ -110,7 +125,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                   onClick={() => onJumpToColumn(col.id)}
                   title={columnDisplayName(col, accounts)}
                 >
-                  📋
+                  {getColumnIcon(col.pageType)}
                 </button>
               ))}
             </div>
@@ -137,7 +152,7 @@ export const TopBar: React.FC<TopBarProps> = ({
               onClick={() => onJumpToColumn(col.id)}
               title={columnDisplayName(col, accounts)}
             >
-              <span className={styles.icon}>📋</span>
+              <span className={styles.icon}>{getColumnIcon(col.pageType)}</span>
               <span className={styles.label}>
                 {columnDisplayName(col, accounts)}
               </span>
