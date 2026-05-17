@@ -3,14 +3,14 @@
   <!-- 吹き出しをAndroid円形セーフゾーン（半径340px）内に収める -->
 
   <!-- Bubble 1 (back): coral -->
-  <rect x="267" y="370" width="320" height="200" rx="32" fill="#D4685A"/>
-  <polygon points="297,570 267,630 347,570" fill="#D4685A"/>
+  <rect x="267" y="342" width="320" height="280" rx="32" fill="#D4685A"/>
+  <polygon points="297,622 267,682 347,622" fill="#D4685A"/>
 
   <!-- Bubble 2 (middle): teal -->
-  <rect x="352" y="370" width="320" height="200" rx="32" fill="#3DBFAD"/>
-  <polygon points="382,570 352,630 432,570" fill="#3DBFAD"/>
+  <rect x="352" y="342" width="320" height="280" rx="32" fill="#3DBFAD"/>
+  <polygon points="382,622 352,682 432,622" fill="#3DBFAD"/>
 
   <!-- Bubble 3 (front): blue -->
-  <rect x="437" y="370" width="320" height="200" rx="32" fill="#4B9CF5"/>
-  <polygon points="467,570 437,630 517,570" fill="#4B9CF5"/>
+  <rect x="437" y="342" width="320" height="280" rx="32" fill="#4B9CF5"/>
+  <polygon points="467,622 437,682 517,622" fill="#4B9CF5"/>
 </svg>
