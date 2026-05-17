@@ -258,44 +258,26 @@ pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Resu
         let screen_x = inner_pos.x as f64 / scale + bounds.x;
         let screen_y = inner_pos.y as f64 / scale + bounds.y;
 
-        // GTK/WM clamps window positions to stay within the monitor.
-        // When screen_x + width > monitor_right (or screen_x < monitor_left),
-        // the window is shifted inward, causing it to overlap other column windows.
-        // Use monitor bounds as the definitive hide boundary instead of relying on
-        // window-relative checks alone.
-        let (monitor_left, monitor_right) = window
-            .current_monitor()
-            .ok()
-            .flatten()
-            .map(|m| {
-                let mx = m.position().x as f64 / scale;
-                let mw = m.size().width as f64 / scale;
-                (mx, mx + mw)
-            })
-            .unwrap_or((f64::NEG_INFINITY, f64::INFINITY));
-
-        let should_hide =
-            // Completely behind sidebar (left side)
-            bounds.x + bounds.width <= bounds.sidebar_width
-            // Completely past window right edge
-            || bounds.x >= win_logical_width
-            // Right edge overflows monitor → GTK clamps inward, causing overlap
-            || screen_x + bounds.width > monitor_right
-            // Left edge past monitor left boundary → GTK clamps, may cause overlap
-            || screen_x < monitor_left;
-
-        if should_hide {
+        // Completely behind sidebar or completely past window right edge: hide.
+        if bounds.x + bounds.width <= bounds.sidebar_width || bounds.x >= win_logical_width {
             let _ = webview_window.hide();
             return Ok(());
         }
 
-        // Column is in viewport: reposition first (to avoid a flash at the old
-        // position), then ensure the window is visible.
+        // Clip the column's width to the main window's right edge.
+        // This prevents GTK/WM from clamping the window position when the column
+        // extends past the screen boundary (e.g. when the main window is near the
+        // right edge of the monitor). current_monitor() is intentionally avoided
+        // here because calling it during resize/move events causes GTK re-entrancy
+        // crashes; clamping to win_logical_width is sufficient.
+        let visible_width = (win_logical_width - bounds.x).min(bounds.width).max(1.0);
+
+        // Reposition before show() to avoid a flash at the old position.
         webview_window
             .set_position(LogicalPosition::new(screen_x, screen_y))
             .map_err(|e| e.to_string())?;
         webview_window
-            .set_size(LogicalSize::new(bounds.width.max(1.0), bounds.height.max(1.0)))
+            .set_size(LogicalSize::new(visible_width, bounds.height.max(1.0)))
             .map_err(|e| e.to_string())?;
         let _ = webview_window.show();
     }
