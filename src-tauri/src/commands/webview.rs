@@ -255,7 +255,6 @@ pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Resu
         let inner_size = window.inner_size().map_err(|e| e.to_string())?;
         let win_logical_width = inner_size.width as f64 / scale;
 
-        let screen_x = inner_pos.x as f64 / scale + bounds.x;
         let screen_y = inner_pos.y as f64 / scale + bounds.y;
 
         // Completely behind sidebar or completely past window right edge: hide.
@@ -264,20 +263,21 @@ pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Resu
             return Ok(());
         }
 
-        // Clip the column's width to the main window's right edge.
-        // This prevents GTK/WM from clamping the window position when the column
-        // extends past the screen boundary (e.g. when the main window is near the
-        // right edge of the monitor). current_monitor() is intentionally avoided
-        // here because calling it during resize/move events causes GTK re-entrancy
-        // crashes; clamping to win_logical_width is sufficient.
-        let visible_width = (win_logical_width - bounds.x).min(bounds.width).max(1.0);
+        // Clip left: if the column overlaps the sidebar, shift x right and shrink width.
+        let clip_left = (bounds.sidebar_width - bounds.x).max(0.0);
+        let vis_x = bounds.x + clip_left;
+        let vis_width = (win_logical_width - vis_x)
+            .min(bounds.width - clip_left)
+            .max(1.0);
+
+        let screen_x = inner_pos.x as f64 / scale + vis_x;
 
         // Reposition before show() to avoid a flash at the old position.
         webview_window
             .set_position(LogicalPosition::new(screen_x, screen_y))
             .map_err(|e| e.to_string())?;
         webview_window
-            .set_size(LogicalSize::new(visible_width, bounds.height.max(1.0)))
+            .set_size(LogicalSize::new(vis_width, bounds.height.max(1.0)))
             .map_err(|e| e.to_string())?;
         let _ = webview_window.show();
     }
