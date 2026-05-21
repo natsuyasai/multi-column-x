@@ -45,6 +45,11 @@ class MainActivity : TauriActivity() {
   private var lGestureReverseDir: String? = null  // 最初の引き方向: "left" or "right"
   private var lVelocityTracker: VelocityTracker? = null
 
+  // ダブルタップ検出用
+  private var lastTapTime = 0L
+  private var lastTapX = 0f
+  private var lastTapY = 0f
+
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
@@ -178,6 +183,24 @@ class MainActivity : TauriActivity() {
             AppBridge.onSwipeNavigate(navDir)
           } else {
             AppBridge.onSwipeCancel()
+          }
+        } else if (ev.actionMasked == MotionEvent.ACTION_UP && lGesturePhase == LGesturePhase.IDLE
+            && popupWebViews.isEmpty()) {
+          // タップ（指がほとんど動かなかった）の場合にダブルタップを検出する
+          val DOUBLE_TAP_MAX_MS = 300L
+          val DOUBLE_TAP_MAX_PX = 50f * density
+          val now = System.currentTimeMillis()
+          val dx = ev.x - lastTapX
+          val dy = ev.y - lastTapY
+          val distSq = dx * dx + dy * dy
+          if (now - lastTapTime < DOUBLE_TAP_MAX_MS && distSq < DOUBLE_TAP_MAX_PX * DOUBLE_TAP_MAX_PX) {
+            Log.d(TAG, "double-tap detected")
+            AppBridge.onDoubleTap()
+            lastTapTime = 0L
+          } else {
+            lastTapTime = now
+            lastTapX = ev.x
+            lastTapY = ev.y
           }
         }
         // REVERSE フェーズで離した場合は progress 未発行のためキャンセル不要

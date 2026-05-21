@@ -103,6 +103,20 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onSwipeCance
     }
 }
 
+/// AppBridge.onDoubleTap() から呼ばれる JNI エントリポイント。
+/// アクティブカラムのダブルタップを column-double-tap イベントとして React に通知する。
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onDoubleTap<'local>(
+    _env: JNIEnv<'local>,
+    _class: JClass<'local>,
+) {
+    use tauri::Emitter;
+    let guard = TAURI_APP.lock().unwrap();
+    if let Some(app) = guard.as_ref() {
+        let _ = app.emit(crate::ipc_constants::events::COLUMN_DOUBLE_TAP, ());
+    }
+}
+
 /// Kotlin から受け取ったシステムバーの高さ（dp）。
 static STATUS_BAR_HEIGHT_DP: AtomicI32 = AtomicI32::new(0);
 static NAV_BAR_HEIGHT_DP: AtomicI32 = AtomicI32::new(0);

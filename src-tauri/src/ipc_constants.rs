@@ -18,6 +18,8 @@ pub mod events {
     pub const COLUMN_SWIPE_PROGRESS: &str = "column-swipe-progress";
     /// カラムスワイプキャンセル（Android JNI → TS listen）
     pub const COLUMN_SWIPE_CANCEL: &str = "column-swipe-cancel";
+    /// アクティブカラムのダブルタップ（Android JNI → TS listen）
+    pub const COLUMN_DOUBLE_TAP: &str = "column-double-tap";
 }
 
 /// WebView / ウィンドウラベルのプレフィックス

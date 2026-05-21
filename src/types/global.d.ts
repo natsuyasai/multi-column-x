@@ -6,8 +6,8 @@
 
 /** カラム WebView に inject される API オブジェクト (window.__multiColumnX) */
 interface MultiColumnXAPI {
-  /** ページをリロードする */
-  triggerReload: () => void;
+  /** ページをリロードする。scrollToTop=true の場合はスクロール位置を先頭に戻してからリロードする */
+  triggerReload: (scrollToTop?: boolean) => void;
   /** カスタム CSS を適用する */
   applyCustomCSS: (css: string) => void;
   /** ヘッダーカスタマイズ（エリア除去）の有効/無効を切り替える */

@@ -51,4 +51,11 @@ object AppBridge {
      */
     @JvmStatic
     external fun onSwipeCancel()
+
+    /**
+     * アクティブカラム領域でダブルタップを検出したときに呼ぶ。
+     * column-double-tap イベントを emit してページリロードをトリガーする。
+     */
+    @JvmStatic
+    external fun onDoubleTap()
 }

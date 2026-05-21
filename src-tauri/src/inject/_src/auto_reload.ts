@@ -71,7 +71,10 @@
     }
   }
 
-  function triggerReload(): void {
+  function triggerReload(scrollToTop?: boolean): void {
+    if (scrollToTop && document.scrollingElement) {
+      document.scrollingElement.scrollTop = 0;
+    }
     if (isScrolling()) return;
     if (isFollowingTabActive()) {
       triggerFollowingRefresh();

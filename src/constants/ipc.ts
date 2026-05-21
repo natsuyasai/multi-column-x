@@ -55,6 +55,8 @@ export const IPC_EVENTS = {
   COLUMN_SWIPE_PROGRESS: "column-swipe-progress",
   /** カラムスワイプキャンセル（Android JNI → TS listen） */
   COLUMN_SWIPE_CANCEL: "column-swipe-cancel",
+  /** アクティブカラムのダブルタップ（Android JNI → TS listen） */
+  COLUMN_DOUBLE_TAP: "column-double-tap",
 } as const;
 
 /** WebView / ウィンドウラベルのプレフィックスと生成ヘルパー */
@@ -76,6 +78,10 @@ export const WEBVIEW_SCRIPTS = {
   /** ページをリロードする */
   TRIGGER_RELOAD:
     "window.__multiColumnX && window.__multiColumnX.triggerReload();",
+
+  /** スクロール位置を先頭に戻してからページをリロードする（ダブルタップ用） */
+  SCROLL_TOP_AND_RELOAD:
+    "window.__multiColumnX && window.__multiColumnX.triggerReload(true);",
 
   /** ヘッダーカスタマイズ（エリア除去）の有効/無効を切り替える */
   applyAreaRemove: (enabled: boolean) =>
