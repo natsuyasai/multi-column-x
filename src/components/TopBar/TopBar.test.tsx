@@ -120,7 +120,9 @@ describe("TopBar", () => {
     const { container, rerender } = render(
       <TopBar {...defaultProps} expanded={false} />,
     );
-    const collapsedRow2 = container.querySelector('[data-testid="topbar-row2"]');
+    const collapsedRow2 = container.querySelector(
+      '[data-testid="topbar-row2"]',
+    );
     expect(collapsedRow2).toBeNull();
     rerender(<TopBar {...defaultProps} expanded={true} />);
     const expandedRow2 = container.querySelector('[data-testid="topbar-row2"]');
@@ -186,37 +188,31 @@ describe("TopBar", () => {
   });
 
   describe("カラム種別アイコン（collapsed）", () => {
-    it.each([
-      "home",
-      "notifications",
-      "search",
-      "list",
-      "custom",
-    ] as const)("pageType=%s のとき collapsed ボタン内に SVG アイコンが表示される", (pageType) => {
-      const col: Column = { ...col1, pageType };
-      const { container } = render(
-        <TopBar {...defaultProps} columns={[col]} expanded={false} />,
-      );
-      expect(
-        container.querySelector(`[data-testid="icon-${pageType}"]`),
-      ).toBeInTheDocument();
-    });
+    it.each(["home", "notifications", "search", "list", "custom"] as const)(
+      "pageType=%s のとき collapsed ボタン内に SVG アイコンが表示される",
+      (pageType) => {
+        const col: Column = { ...col1, pageType };
+        const { container } = render(
+          <TopBar {...defaultProps} columns={[col]} expanded={false} />,
+        );
+        expect(
+          container.querySelector(`[data-testid="icon-${pageType}"]`),
+        ).toBeInTheDocument();
+      },
+    );
   });
 
   describe("カラム種別アイコン（expanded）", () => {
-    it.each([
-      "home",
-      "notifications",
-      "search",
-      "list",
-      "custom",
-    ] as const)("pageType=%s のとき expanded 行2内に SVG アイコンが表示される", (pageType) => {
-      const col: Column = { ...col1, pageType };
-      render(<TopBar {...defaultProps} columns={[col]} expanded={true} />);
-      const row2 = screen.getByTestId("topbar-row2");
-      expect(
-        row2.querySelector(`[data-testid="icon-${pageType}"]`),
-      ).toBeInTheDocument();
-    });
+    it.each(["home", "notifications", "search", "list", "custom"] as const)(
+      "pageType=%s のとき expanded 行2内に SVG アイコンが表示される",
+      (pageType) => {
+        const col: Column = { ...col1, pageType };
+        render(<TopBar {...defaultProps} columns={[col]} expanded={true} />);
+        const row2 = screen.getByTestId("topbar-row2");
+        expect(
+          row2.querySelector(`[data-testid="icon-${pageType}"]`),
+        ).toBeInTheDocument();
+      },
+    );
   });
 });

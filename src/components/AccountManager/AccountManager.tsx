@@ -60,7 +60,11 @@ export const AccountManager: React.FC<AccountManagerProps> = ({
                   {isDefault ? (
                     <StarIcon width={16} height={16} data-testid="icon-star" />
                   ) : (
-                    <StarOutlineIcon width={16} height={16} data-testid="icon-star-outline" />
+                    <StarOutlineIcon
+                      width={16}
+                      height={16}
+                      data-testid="icon-star-outline"
+                    />
                   )}
                 </button>
                 <button

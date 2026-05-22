@@ -53,7 +53,9 @@ describe("AccountManager", () => {
         onClose={vi.fn()}
       />,
     );
-    expect(container.querySelector('[data-testid="icon-star"]')).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-testid="icon-star"]'),
+    ).toBeInTheDocument();
   });
 
   it("非デフォルトアカウントのスターボタンに star-outline SVG が表示される", () => {
@@ -74,7 +76,9 @@ describe("AccountManager", () => {
         onClose={vi.fn()}
       />,
     );
-    expect(container.querySelector('[data-testid="icon-star-outline"]')).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-testid="icon-star-outline"]'),
+    ).toBeInTheDocument();
   });
 
   it("パネル閉じるボタンに close SVG が表示される", () => {

@@ -6,7 +6,12 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { platform } from "@tauri-apps/plugin-os";
 import { useAppStore } from "../store/useAppStore";
 import type { Column } from "../types";
-import { IPC_COMMANDS, IPC_EVENTS, WEBVIEW_LABELS, WEBVIEW_SCRIPTS } from "../constants/ipc";
+import {
+  IPC_COMMANDS,
+  IPC_EVENTS,
+  WEBVIEW_LABELS,
+  WEBVIEW_SCRIPTS,
+} from "../constants/ipc";
 
 export const HEADER_HEIGHT = 36; // ColumnHeader の高さ（px）
 export const SCROLLBAR_HEIGHT = 12; // 下部スクロールバーの高さ（px）
@@ -419,7 +424,8 @@ export function useColumns() {
             : {
                 columnId: col.id,
                 x: -9999,
-                y: getTopBarHeight(useAppStore.getState().topBarExpanded) +
+                y:
+                  getTopBarHeight(useAppStore.getState().topBarExpanded) +
                   HEADER_HEIGHT,
                 width: col.width,
                 height: 1,

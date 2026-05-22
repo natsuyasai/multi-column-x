@@ -1,11 +1,7 @@
 // src/App.tsx
 import React, { useEffect, useCallback, useMemo } from "react";
 import { useAppStore } from "./store/useAppStore";
-import {
-  useColumns,
-  HEADER_HEIGHT,
-  getTopBarHeight,
-} from "./hooks/useColumns";
+import { useColumns, HEADER_HEIGHT, getTopBarHeight } from "./hooks/useColumns";
 import { useAccounts } from "./hooks/useAccounts";
 import { ColumnHeader } from "./components/ColumnHeader/ColumnHeader";
 import { AddColumnDialog } from "./components/AddColumnDialog/AddColumnDialog";

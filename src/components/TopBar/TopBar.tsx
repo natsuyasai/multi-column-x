@@ -82,9 +82,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   const sorted = [...columns].sort((a, b) => a.order - b.order);
 
   return (
-    <div
-      className={`${styles.topbar}${expanded ? ` ${styles.expanded}` : ""}`}
-    >
+    <div className={`${styles.topbar}${expanded ? ` ${styles.expanded}` : ""}`}>
       <div className={styles.row1}>
         <div className={styles.actions}>
           <button
@@ -92,7 +90,12 @@ export const TopBar: React.FC<TopBarProps> = ({
             onClick={onComposeTweet}
             title="ツイートを作成"
           >
-            <PencilIcon width={16} height={16} data-testid="icon-pencil" className={styles.icon} />
+            <PencilIcon
+              width={16}
+              height={16}
+              data-testid="icon-pencil"
+              className={styles.icon}
+            />
             {expanded && <span className={styles.label}>ツイート</span>}
           </button>
           <button
@@ -100,7 +103,12 @@ export const TopBar: React.FC<TopBarProps> = ({
             onClick={onOpenLinkPopup}
             title="URLをポップアップで開く"
           >
-            <LinkIcon width={16} height={16} data-testid="icon-link" className={styles.icon} />
+            <LinkIcon
+              width={16}
+              height={16}
+              data-testid="icon-link"
+              className={styles.icon}
+            />
             {expanded && <span className={styles.label}>URLを開く</span>}
           </button>
           <button
@@ -108,7 +116,12 @@ export const TopBar: React.FC<TopBarProps> = ({
             onClick={onAddColumn}
             title="カラムを追加"
           >
-            <PlusIcon width={16} height={16} data-testid="icon-plus" className={styles.icon} />
+            <PlusIcon
+              width={16}
+              height={16}
+              data-testid="icon-plus"
+              className={styles.icon}
+            />
             {expanded && <span className={styles.label}>カラム追加</span>}
           </button>
           <button
@@ -116,7 +129,12 @@ export const TopBar: React.FC<TopBarProps> = ({
             onClick={onAccountManager}
             title="アカウント管理"
           >
-            <PersonIcon width={16} height={16} data-testid="icon-person" className={styles.icon} />
+            <PersonIcon
+              width={16}
+              height={16}
+              data-testid="icon-person"
+              className={styles.icon}
+            />
             {expanded && <span className={styles.label}>アカウント</span>}
           </button>
           <button
@@ -124,7 +142,12 @@ export const TopBar: React.FC<TopBarProps> = ({
             onClick={onAppSettings}
             title="アプリ設定"
           >
-            <SettingsIcon width={16} height={16} data-testid="icon-settings" className={styles.icon} />
+            <SettingsIcon
+              width={16}
+              height={16}
+              data-testid="icon-settings"
+              className={styles.icon}
+            />
             {expanded && <span className={styles.label}>設定</span>}
           </button>
         </div>
