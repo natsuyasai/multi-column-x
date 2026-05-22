@@ -10,3 +10,7 @@ end_of_line = lf
 charset = utf-8
 trim_trailing_whitespace = false
 insert_final_newline = false
+
+# Tauri が自動生成するファイルはワイルドカードインポートを許可する
+[src/main/java/**/generated/**.kt]
+ktlint_standard_no-wildcard-imports = disabled
