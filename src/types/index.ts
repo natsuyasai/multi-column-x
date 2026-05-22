@@ -133,16 +133,16 @@ export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
  * | defaultShowCountdown           | default_show_countdown              | true                |
  * | defaultAreaRemoveEnabled       | default_area_remove_enabled         | true                |
  * | defaultShowCustomMenu          | default_show_custom_menu            | false               |
- * | defaultScrollPosRestoreEnabled | default_scroll_pos_restore_enabled  | true                |
+ * | defaultScrollPosRestoreEnabled | default_scroll_pos_restore_enabled  | false               |
  * | defaultColumnCustomCSS         | default_column_custom_css           | ""                  |
  * | popupEscCloseEnabled           | popup_esc_close_enabled             | true                |
- * | videoAutoPlayStopEnabled       | video_auto_play_stop_enabled        | false               |
- * | showSortButtons                | show_sort_buttons                   | true                |
+ * | videoAutoPlayStopEnabled       | video_auto_play_stop_enabled        | true                |
+ * | showSortButtons                | show_sort_buttons                   | false               |
  * | smallImageEnabled              | small_image_enabled                 | false               |
  * | smallImageWidth                | small_image_width                   | "50%"               |
  * | blurImageEnabled               | blur_image_enabled                  | false               |
  * | blurImageAmount                | blur_image_amount                   | "10px"              |
- * | hideAdEnabled                  | hide_ad_enabled                     | false               |
+ * | hideAdEnabled                  | hide_ad_enabled                     | true                |
  * | zoomLevel                      | zoom_level                          | 1                   |
  * | useXAppForCompose              | use_x_app_for_compose               | false               |
  */
@@ -155,16 +155,16 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   defaultShowCountdown: true,
   defaultAreaRemoveEnabled: true,
   defaultShowCustomMenu: false,
-  defaultScrollPosRestoreEnabled: true,
+  defaultScrollPosRestoreEnabled: false,
   defaultColumnCustomCSS: "",
   popupEscCloseEnabled: true,
-  videoAutoPlayStopEnabled: false,
-  showSortButtons: true,
+  videoAutoPlayStopEnabled: true,
+  showSortButtons: false,
   smallImageEnabled: false,
   smallImageWidth: "50%",
   blurImageEnabled: false,
   blurImageAmount: "10px",
-  hideAdEnabled: false,
+  hideAdEnabled: true,
   zoomLevel: 1,
   useXAppForCompose: false,
 };
