@@ -13,6 +13,9 @@ pub struct AccountData {
     pub created_at: String,
 }
 
+// ColumnSettings の #[serde(default)] はカラム設定 JSON にフィールドが存在しない場合のフォールバック値。
+// TypeScript 側の対応定義: src/types/index.ts の DEFAULT_COLUMN_SETTINGS
+// 値を変更するときは TypeScript 側も必ず合わせること。
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ColumnSettings {
     #[serde(rename = "autoReloadEnabled")]
@@ -49,6 +52,9 @@ pub struct ColumnSettings {
     pub blur_image_amount: String,
 }
 
+// デシリアライズ時のデフォルト値ヘルパー関数。
+// TypeScript 側の対応定義: src/types/index.ts の DEFAULT_COLUMN_SETTINGS / DEFAULT_GLOBAL_SETTINGS
+// 値を変更するときは TypeScript 側の対応定数も必ず合わせること。
 fn default_true() -> bool {
     true
 }
@@ -74,6 +80,9 @@ impl Default for WindowBounds {
     }
 }
 
+// GlobalSettingsData のデフォルト値。
+// TypeScript 側の対応定義: src/types/index.ts の DEFAULT_GLOBAL_SETTINGS
+// 値を変更するときは TypeScript 側も必ず合わせること。
 impl Default for GlobalSettingsData {
     fn default() -> Self {
         Self {

@@ -72,6 +72,32 @@ export interface AppSettings {
   globalSettings: GlobalSettings;
 }
 
+/**
+ * カラム設定のデフォルト値。
+ *
+ * NOTE: Rust 側にも同等のデフォルト値が定義されている。
+ *   src-tauri/src/commands/settings.rs の ColumnSettings 構造体に付与された
+ *   #[serde(default)] / #[serde(default = "default_xxx")] アトリビュートおよび
+ *   default_* ヘルパー関数がそれにあたる。
+ *
+ * ここの値を変更するときは Rust 側の対応箇所も必ず合わせること。
+ *
+ * フィールド対応表:
+ * | TS フィールド            | Rust フィールド             | デフォルト値 |
+ * |-------------------------|-----------------------------|-------------|
+ * | autoReloadEnabled       | auto_reload_enabled         | true        |
+ * | autoReloadInterval      | auto_reload_interval        | 600         |
+ * | showCountdown           | show_countdown              | true        |
+ * | areaRemoveEnabled       | area_remove_enabled         | true        |
+ * | showCustomMenu          | show_custom_menu            | false       |
+ * | scrollPosRestoreEnabled | scroll_pos_restore_enabled  | true        |
+ * | customCSS               | custom_css                  | ""          |
+ * | visibleLinks            | visible_links               | []          |
+ * | smallImageEnabled       | small_image_enabled         | false       |
+ * | smallImageWidth         | small_image_width           | "50%"       |
+ * | blurImageEnabled        | blur_image_enabled          | false       |
+ * | blurImageAmount         | blur_image_amount           | "10px"      |
+ */
 export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
   autoReloadEnabled: true,
   autoReloadInterval: 600,
@@ -87,6 +113,39 @@ export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
   blurImageAmount: "10px",
 };
 
+/**
+ * グローバル設定のデフォルト値。
+ *
+ * NOTE: Rust 側にも同等のデフォルト値が定義されている。
+ *   src-tauri/src/commands/settings.rs の GlobalSettingsData の
+ *   impl Default および #[serde(default)] アトリビュートがそれにあたる。
+ *
+ * ここの値を変更するときは Rust 側の対応箇所も必ず合わせること。
+ *
+ * フィールド対応表:
+ * | TS フィールド                    | Rust フィールド                     | デフォルト値          |
+ * |--------------------------------|-------------------------------------|---------------------|
+ * | theme                          | theme                               | "dark"              |
+ * | customCSS                      | custom_css                          | ""                  |
+ * | windowBounds                   | window_bounds                       | x:0,y:0,w:1400,h:900|
+ * | defaultAutoReloadEnabled       | default_auto_reload_enabled         | true                |
+ * | defaultAutoReloadInterval      | default_auto_reload_interval        | 600                 |
+ * | defaultShowCountdown           | default_show_countdown              | true                |
+ * | defaultAreaRemoveEnabled       | default_area_remove_enabled         | true                |
+ * | defaultShowCustomMenu          | default_show_custom_menu            | false               |
+ * | defaultScrollPosRestoreEnabled | default_scroll_pos_restore_enabled  | true                |
+ * | defaultColumnCustomCSS         | default_column_custom_css           | ""                  |
+ * | popupEscCloseEnabled           | popup_esc_close_enabled             | true                |
+ * | videoAutoPlayStopEnabled       | video_auto_play_stop_enabled        | false               |
+ * | showSortButtons                | show_sort_buttons                   | true                |
+ * | smallImageEnabled              | small_image_enabled                 | false               |
+ * | smallImageWidth                | small_image_width                   | "50%"               |
+ * | blurImageEnabled               | blur_image_enabled                  | false               |
+ * | blurImageAmount                | blur_image_amount                   | "10px"              |
+ * | hideAdEnabled                  | hide_ad_enabled                     | false               |
+ * | zoomLevel                      | zoom_level                          | 1                   |
+ * | useXAppForCompose              | use_x_app_for_compose               | false               |
+ */
 export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   theme: "dark",
   customCSS: "",
