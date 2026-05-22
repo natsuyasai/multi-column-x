@@ -4,8 +4,8 @@
 use jni::objects::{GlobalRef, JClass, JObject, JValue};
 use jni::sys::jboolean;
 use jni::{JNIEnv, JavaVM};
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::Mutex;
 
 static MAIN_ACTIVITY: Mutex<Option<(JavaVM, GlobalRef)>> = Mutex::new(None);
 
@@ -54,7 +54,11 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_closeTopPopu
     }
 }
 
-fn emit_jstring_event<'local>(env: &mut JNIEnv<'local>, s: jni::objects::JString<'local>, event: &'static str) {
+fn emit_jstring_event<'local>(
+    env: &mut JNIEnv<'local>,
+    s: jni::objects::JString<'local>,
+    event: &'static str,
+) {
     use tauri::Emitter;
     let val: String = match env.get_string(&s) {
         Ok(v) => v.into(),
@@ -75,7 +79,11 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onSwipeNavig
     _class: JClass<'local>,
     direction: jni::objects::JString<'local>,
 ) {
-    emit_jstring_event(&mut env, direction, crate::ipc_constants::events::COLUMN_SWIPE_NAVIGATE);
+    emit_jstring_event(
+        &mut env,
+        direction,
+        crate::ipc_constants::events::COLUMN_SWIPE_NAVIGATE,
+    );
 }
 
 /// AppBridge.onSwipeProgress(direction) から呼ばれる JNI エントリポイント。
@@ -86,7 +94,11 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onSwipeProgr
     _class: JClass<'local>,
     direction: jni::objects::JString<'local>,
 ) {
-    emit_jstring_event(&mut env, direction, crate::ipc_constants::events::COLUMN_SWIPE_PROGRESS);
+    emit_jstring_event(
+        &mut env,
+        direction,
+        crate::ipc_constants::events::COLUMN_SWIPE_PROGRESS,
+    );
 }
 
 /// AppBridge.onSwipeCancel() から呼ばれる JNI エントリポイント。
@@ -301,7 +313,12 @@ pub fn eval_in_column_webview(id: &str, script: &str) -> Result<(), String> {
 }
 
 /// MainActivity.createPopupWebView を呼び出して全画面ポップアップ WebView を生成する。
-pub fn create_popup_webview(id: &str, url: &str, init_script: &str, account_id: &str) -> Result<(), String> {
+pub fn create_popup_webview(
+    id: &str,
+    url: &str,
+    init_script: &str,
+    account_id: &str,
+) -> Result<(), String> {
     call_activity_method(|env, activity| {
         let j_id = env.new_string(id).map_err(|e| e.to_string())?;
         let j_url = env.new_string(url).map_err(|e| e.to_string())?;
@@ -362,9 +379,7 @@ where
     let guard = MAIN_ACTIVITY
         .lock()
         .map_err(|e| format!("mutex lock: {e}"))?;
-    let (vm, activity_ref) = guard
-        .as_ref()
-        .ok_or("android context not initialized")?;
+    let (vm, activity_ref) = guard.as_ref().ok_or("android context not initialized")?;
     let mut env = vm
         .attach_current_thread()
         .map_err(|e| format!("attach_current_thread: {e}"))?;

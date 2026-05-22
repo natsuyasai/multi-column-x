@@ -29,12 +29,21 @@ impl AppState {
 }
 
 impl WebviewRegistry {
-    pub fn register(&mut self, label: String, column_id: String, account_id: String, data_directory: String) {
-        self.entries.insert(label, WebviewEntry {
-            column_id,
-            account_id,
-            data_directory,
-        });
+    pub fn register(
+        &mut self,
+        label: String,
+        column_id: String,
+        account_id: String,
+        data_directory: String,
+    ) {
+        self.entries.insert(
+            label,
+            WebviewEntry {
+                column_id,
+                account_id,
+                data_directory,
+            },
+        );
     }
 
     pub fn unregister(&mut self, label: &str) {

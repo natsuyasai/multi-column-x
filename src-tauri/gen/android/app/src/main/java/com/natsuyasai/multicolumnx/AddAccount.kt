@@ -17,167 +17,187 @@ import androidx.webkit.WebViewFeature
 import java.io.File
 
 class AddAccount : AppCompatActivity() {
-    private val handler = Handler(Looper.getMainLooper())
-    private var polling = false
-    private var finished = false
-    private var webViewRef: WebView? = null
-    private var pollCount = 0
-    private var accountId = "unknown"
-    // ページ遷移中フラグ（shouldOverrideUrlLoading / onPageStarted で true、onPageFinished で false）
-    private var isPageLoading = false
-    // バック操作のデバウンス用。ナビゲーションが開始されたらキャンセルする。
-    private var pendingClose: Runnable? = null
+  private val handler = Handler(Looper.getMainLooper())
+  private var polling = false
+  private var finished = false
+  private var webViewRef: WebView? = null
+  private var pollCount = 0
+  private var accountId = "unknown"
 
-    @SuppressLint("SetJavaScriptEnabled")
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        accountId = intent.getStringExtra("accountId") ?: "unknown"
-        Log.d(TAG, "onCreate: accountId=$accountId dataDir=${dataDir.absolutePath}")
+  // ページ遷移中フラグ（shouldOverrideUrlLoading / onPageStarted で true、onPageFinished で false）
+  private var isPageLoading = false
 
-        val wv = WebView(this).apply {
-            settings.javaScriptEnabled = true
-            settings.domStorageEnabled = true
-            settings.databaseEnabled = true
-            settings.mediaPlaybackRequiresUserGesture = false
-            webViewClient = object : WebViewClient() {
-                override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
-                    super.onPageStarted(view, url, favicon)
-                    isPageLoading = true
-                }
-                override fun onPageFinished(view: WebView, url: String) {
-                    super.onPageFinished(view, url)
-                    isPageLoading = false
-                }
+  // バック操作のデバウンス用。ナビゲーションが開始されたらキャンセルする。
+  private var pendingClose: Runnable? = null
+
+  @SuppressLint("SetJavaScriptEnabled")
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+    accountId = intent.getStringExtra("accountId") ?: "unknown"
+    Log.d(TAG, "onCreate: accountId=$accountId dataDir=${dataDir.absolutePath}")
+
+    val wv =
+      WebView(this).apply {
+        settings.javaScriptEnabled = true
+        settings.domStorageEnabled = true
+        settings.databaseEnabled = true
+        settings.mediaPlaybackRequiresUserGesture = false
+        webViewClient =
+          object : WebViewClient() {
+            override fun onPageStarted(
+              view: WebView,
+              url: String,
+              favicon: Bitmap?,
+            ) {
+              super.onPageStarted(view, url, favicon)
+              isPageLoading = true
             }
 
-            // アカウントごとに独立した WebView Profile を割り当て、セッションを分離する。
-            // Profile API 非対応の場合は Cookie をクリアして新鮮なセッションで開始する。
-            val profileSet = try {
-                WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER") &&
-                    run { WebViewCompat.setProfile(this, "account-$accountId"); true }
-            } catch (e: Exception) {
-                Log.w(TAG, "Profile API unavailable: ${e.message}")
-                false
+            override fun onPageFinished(
+              view: WebView,
+              url: String,
+            ) {
+              super.onPageFinished(view, url)
+              isPageLoading = false
             }
-            if (!profileSet) {
-                CookieManager.getInstance().removeAllCookies(null)
-                CookieManager.getInstance().flush()
-            }
+          }
 
-            loadUrl("https://x.com/login")
-        }
-        webViewRef = wv
-        setContentView(wv)
-
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                // ページ遷移中は IME 降下など Android 14+ システム起因のバックイベントが
-                // 誤発火することがあるため無視する
-                if (isPageLoading) {
-                    Log.d(TAG, "onBackPressed: ignored during page load")
-                    return
-                }
-                val wv = webViewRef
-                if (wv != null && wv.canGoBack()) {
-                    // ログイン途中ページ（パスワード入力など）の場合は WebView 内を戻る
-                    wv.goBack()
-                } else {
-                    Log.d(TAG, "onBackPressed: cancel")
-                    finishWithResult(success = false)
-                }
-            }
-        })
-    }
-
-    override fun onResume() {
-        super.onResume()
-        Log.d(TAG, "onResume: finished=$finished")
-        if (!finished) {
-            polling = true
-            pollCount = 0
-            handler.removeCallbacksAndMessages(null)
-            schedulePoll()
-        }
-    }
-
-    override fun onPause() {
-        super.onPause()
-        Log.d(TAG, "onPause")
-        polling = false
-        handler.removeCallbacksAndMessages(null)
-    }
-
-    private fun finishWithResult(success: Boolean) {
-        if (finished) return
-        finished = true
-        polling = false
-        handler.removeCallbacksAndMessages(null)
-
-        if (success) {
-            saveCookies()
+        // アカウントごとに独立した WebView Profile を割り当て、セッションを分離する。
+        // Profile API 非対応の場合は Cookie をクリアして新鮮なセッションで開始する。
+        val profileSet =
+          try {
+            WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER") &&
+              run {
+                WebViewCompat.setProfile(this, "account-$accountId")
+                true
+              }
+          } catch (e: Exception) {
+            Log.w(TAG, "Profile API unavailable: ${e.message}")
+            false
+          }
+        if (!profileSet) {
+          CookieManager.getInstance().removeAllCookies(null)
+          CookieManager.getInstance().flush()
         }
 
-        val fileName = if (success) "add_account_login_complete" else "add_account_login_cancelled"
-        // dataDir = /data/user/0/<package> — Rust の app_data_dir() と一致する
-        val sentinelFile = File(dataDir, fileName)
-        try {
-            sentinelFile.writeText("")
-            Log.d(TAG, "finishWithResult: wrote sentinel ${sentinelFile.absolutePath}")
-        } catch (e: Exception) {
-            Log.e(TAG, "finishWithResult: failed to write sentinel: $e")
+        loadUrl("https://x.com/login")
+      }
+    webViewRef = wv
+    setContentView(wv)
+
+    onBackPressedDispatcher.addCallback(
+      this,
+      object : OnBackPressedCallback(true) {
+        override fun handleOnBackPressed() {
+          // ページ遷移中は IME 降下など Android 14+ システム起因のバックイベントが
+          // 誤発火することがあるため無視する
+          if (isPageLoading) {
+            Log.d(TAG, "onBackPressed: ignored during page load")
+            return
+          }
+          val wv = webViewRef
+          if (wv != null && wv.canGoBack()) {
+            // ログイン途中ページ（パスワード入力など）の場合は WebView 内を戻る
+            wv.goBack()
+          } else {
+            Log.d(TAG, "onBackPressed: cancel")
+            finishWithResult(success = false)
+          }
+        }
+      },
+    )
+  }
+
+  override fun onResume() {
+    super.onResume()
+    Log.d(TAG, "onResume: finished=$finished")
+    if (!finished) {
+      polling = true
+      pollCount = 0
+      handler.removeCallbacksAndMessages(null)
+      schedulePoll()
+    }
+  }
+
+  override fun onPause() {
+    super.onPause()
+    Log.d(TAG, "onPause")
+    polling = false
+    handler.removeCallbacksAndMessages(null)
+  }
+
+  private fun finishWithResult(success: Boolean) {
+    if (finished) return
+    finished = true
+    polling = false
+    handler.removeCallbacksAndMessages(null)
+
+    if (success) {
+      saveCookies()
+    }
+
+    val fileName = if (success) "add_account_login_complete" else "add_account_login_cancelled"
+    // dataDir = /data/user/0/<package> — Rust の app_data_dir() と一致する
+    val sentinelFile = File(dataDir, fileName)
+    try {
+      sentinelFile.writeText("")
+      Log.d(TAG, "finishWithResult: wrote sentinel ${sentinelFile.absolutePath}")
+    } catch (e: Exception) {
+      Log.e(TAG, "finishWithResult: failed to write sentinel: $e")
+    }
+
+    Log.d(TAG, "finishWithResult: starting MainActivity, success=$success")
+    startActivity(Intent(this, MainActivity::class.java))
+    finish()
+  }
+
+  // ログイン成功後の x.com Cookie をアカウントのデータディレクトリに保存する。
+  // MainActivity.setCookieForAccount でカラム表示時に復元する。
+  private fun saveCookies() {
+    val cookieString = CookieManager.getInstance().getCookie("https://x.com") ?: return
+    if (cookieString.isEmpty()) return
+
+    val accountDataDir = File(filesDir, "accounts/account-$accountId")
+    if (!accountDataDir.exists()) accountDataDir.mkdirs()
+
+    val cookieFile = File(accountDataDir, "x_cookies.txt")
+    try {
+      cookieFile.writeText(cookieString)
+      Log.d(TAG, "saveCookies: saved ${cookieString.length} chars for account $accountId")
+    } catch (e: Exception) {
+      Log.e(TAG, "saveCookies: failed: $e")
+    }
+  }
+
+  private fun schedulePoll() {
+    handler.postDelayed({
+      if (!polling) return@postDelayed
+      pollCount++
+
+      val wv =
+        webViewRef ?: run {
+          if (pollCount % 10 == 0) Log.d(TAG, "schedulePoll #$pollCount: webViewRef null")
+          schedulePoll()
+          return@postDelayed
         }
 
-        Log.d(TAG, "finishWithResult: starting MainActivity, success=$success")
-        startActivity(Intent(this, MainActivity::class.java))
-        finish()
-    }
-
-    // ログイン成功後の x.com Cookie をアカウントのデータディレクトリに保存する。
-    // MainActivity.setCookieForAccount でカラム表示時に復元する。
-    private fun saveCookies() {
-        val cookieString = CookieManager.getInstance().getCookie("https://x.com") ?: return
-        if (cookieString.isEmpty()) return
-
-        val accountDataDir = File(filesDir, "accounts/account-$accountId")
-        if (!accountDataDir.exists()) accountDataDir.mkdirs()
-
-        val cookieFile = File(accountDataDir, "x_cookies.txt")
-        try {
-            cookieFile.writeText(cookieString)
-            Log.d(TAG, "saveCookies: saved ${cookieString.length} chars for account $accountId")
-        } catch (e: Exception) {
-            Log.e(TAG, "saveCookies: failed: $e")
+      wv.evaluateJavascript("(function(){return location.pathname;})()") { result ->
+        if (!polling) return@evaluateJavascript
+        val path = result?.removeSurrounding("\"")
+        if (pollCount % 10 == 0) {
+          Log.d(TAG, "schedulePoll #$pollCount: path=$path")
         }
-    }
+        if (path == "/home") {
+          Log.d(TAG, "schedulePoll: /home detected! finishing with success")
+          handler.post { finishWithResult(success = true) }
+        } else {
+          schedulePoll()
+        }
+      }
+    }, 500)
+  }
 
-    private fun schedulePoll() {
-        handler.postDelayed({
-            if (!polling) return@postDelayed
-            pollCount++
-
-            val wv = webViewRef ?: run {
-                if (pollCount % 10 == 0) Log.d(TAG, "schedulePoll #$pollCount: webViewRef null")
-                schedulePoll()
-                return@postDelayed
-            }
-
-            wv.evaluateJavascript("(function(){return location.pathname;})()") { result ->
-                if (!polling) return@evaluateJavascript
-                val path = result?.removeSurrounding("\"")
-                if (pollCount % 10 == 0) {
-                    Log.d(TAG, "schedulePoll #$pollCount: path=$path")
-                }
-                if (path == "/home") {
-                    Log.d(TAG, "schedulePoll: /home detected! finishing with success")
-                    handler.post { finishWithResult(success = true) }
-                } else {
-                    schedulePoll()
-                }
-            }
-        }, 500)
-    }
-
-    companion object {
-        private const val TAG = "AddAccount"
-    }
+  companion object {
+    private const val TAG = "AddAccount"
+  }
 }

@@ -1,9 +1,9 @@
+#[cfg(target_os = "android")]
+mod android_bridge;
 mod commands;
 mod inject;
 mod ipc_constants;
 mod state;
-#[cfg(target_os = "android")]
-mod android_bridge;
 
 use state::AppState;
 #[cfg(desktop)]
@@ -48,16 +48,17 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_store::Builder::new().build())
-        .plugin(tauri_plugin_log::Builder::new()
-            .target(tauri_plugin_log::Target::new(
-                tauri_plugin_log::TargetKind::Stdout,
-            ))
-            .level(if cfg!(debug_assertions) {
-                log::LevelFilter::Debug
-            } else {
-                log::LevelFilter::Warn
-            })
-            .build()
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .target(tauri_plugin_log::Target::new(
+                    tauri_plugin_log::TargetKind::Stdout,
+                ))
+                .level(if cfg!(debug_assertions) {
+                    log::LevelFilter::Debug
+                } else {
+                    log::LevelFilter::Warn
+                })
+                .build(),
         )
         .manage(AppState::new())
         .manage(commands::account::LoginCompleteFlag::new())
@@ -87,10 +88,8 @@ pub fn run() {
                                 && wb.y < my + mh
                         });
                         if on_screen {
-                            let _ = window.set_position(PhysicalPosition::new(
-                                wb.x as i32,
-                                wb.y as i32,
-                            ));
+                            let _ = window
+                                .set_position(PhysicalPosition::new(wb.x as i32, wb.y as i32));
                         }
                         let clamped_w = wb.width.max(600.0) as u32;
                         let clamped_h = wb.height.max(400.0) as u32;

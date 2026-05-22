@@ -29,8 +29,10 @@ class MainActivity : TauriActivity() {
     get() = window.decorView.findViewById(android.R.id.content)
 
   private val columnWebViews = ConcurrentHashMap<String, WebView>()
+
   // ポップアップ WebView スタック（表示順に積む）。UI スレッドからのみ操作する。
   private val popupWebViews = ArrayDeque<Pair<String, WebView>>()
+
   // 現在表示中のカラム WebView の ID（showColumnWebView 呼び出し時に更新）。
   // 戻るボタン時の canGoBack 判定に使う。UI スレッドからのみアクセスする。
   private var activeColumnWebViewId: String? = null
@@ -38,11 +40,12 @@ class MainActivity : TauriActivity() {
   // 「逆引き → 前進」ブーメランジェスチャーの状態マシン
   // 右カラムへ: 左引き → 右リリース、左カラムへ: 右引き → 左リリース
   private enum class LGesturePhase { IDLE, REVERSE, FORWARD, CANCELLED }
+
   private var lGesturePhase = LGesturePhase.IDLE
   private var lGestureStartX = 0f
   private var lGestureStartY = 0f
-  private var lGestureExtremeX = 0f  // 逆方向移動の最端点X
-  private var lGestureReverseDir: String? = null  // 最初の引き方向: "left" or "right"
+  private var lGestureExtremeX = 0f // 逆方向移動の最端点X
+  private var lGestureReverseDir: String? = null // 最初の引き方向: "left" or "right"
   private var lVelocityTracker: VelocityTracker? = null
 
   // ダブルタップ検出用
@@ -67,7 +70,7 @@ class MainActivity : TauriActivity() {
         systemBars.left,
         systemBars.top,
         systemBars.right,
-        maxOf(systemBars.bottom, ime.bottom)
+        maxOf(systemBars.bottom, ime.bottom),
       )
 
       // カラム WebView の CSS 処理（オーバーレイ・タブバー位置）のために
@@ -81,21 +84,23 @@ class MainActivity : TauriActivity() {
     }
     ViewCompat.requestApplyInsets(window.decorView)
 
-    onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-      override fun handleOnBackPressed() {
-        // 1. ポップアップが開いていれば最前面を閉じる
-        if (closeTopPopupWebView()) return
-        // 2. アクティブなカラム WebView が戻れる履歴を持っていれば戻る
-        val activeWv = activeColumnWebViewId?.let { columnWebViews[it] }
-        if (activeWv != null && activeWv.canGoBack()) {
-          activeWv.goBack()
-          return
+    onBackPressedDispatcher.addCallback(
+      this,
+      object : OnBackPressedCallback(true) {
+        override fun handleOnBackPressed() {
+          // 1. ポップアップが開いていれば最前面を閉じる
+          if (closeTopPopupWebView()) return
+          // 2. アクティブなカラム WebView が戻れる履歴を持っていれば戻る
+          val activeWv = activeColumnWebViewId?.let { columnWebViews[it] }
+          if (activeWv != null && activeWv.canGoBack()) {
+            activeWv.goBack()
+            return
+          }
+          // 3. それ以外はアプリをバックグラウンドへ（終了しない）
+          moveTaskToBack(true)
         }
-        // 3. それ以外はアプリをバックグラウンドへ（終了しない）
-        moveTaskToBack(true)
-      }
-    })
-
+      },
+    )
   }
 
   // 「逆引き → 前進」ブーメランジェスチャーでカラムを切り替える。
@@ -104,9 +109,9 @@ class MainActivity : TauriActivity() {
   // 縦スクロールや単純な横スワイプとは区別される。
   override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
     val density = resources.displayMetrics.density
-    val MIN_REVERSE_PX = 30f * density  // 逆引きの最小距離
-    val MIN_FORWARD_PX = 30f * density  // 最端点からの最小前進距離
-    val MIN_VELOCITY_PX = 300f
+    val minReversePx = 30f * density // 逆引きの最小距離
+    val minForwardPx = 30f * density // 最端点からの最小前進距離
+    val minVelocityPx = 300f
 
     lVelocityTracker?.addMovement(ev)
 
@@ -124,46 +129,49 @@ class MainActivity : TauriActivity() {
       MotionEvent.ACTION_MOVE -> {
         if (popupWebViews.isNotEmpty()) {
           lGesturePhase = LGesturePhase.CANCELLED
-        } else when (lGesturePhase) {
-          LGesturePhase.IDLE -> {
-            val dx = ev.x - lGestureStartX
-            val dy = ev.y - lGestureStartY
-            when {
-              // 水平方向に十分移動したら REVERSE フェーズへ
-              Math.abs(dx) > MIN_REVERSE_PX && Math.abs(dx) > Math.abs(dy) * 1.5f -> {
-                lGesturePhase = LGesturePhase.REVERSE
-                lGestureReverseDir = if (dx < 0) "left" else "right"
-                lGestureExtremeX = ev.x
+        } else {
+          when (lGesturePhase) {
+            LGesturePhase.IDLE -> {
+              val dx = ev.x - lGestureStartX
+              val dy = ev.y - lGestureStartY
+              when {
+                // 水平方向に十分移動したら REVERSE フェーズへ
+                Math.abs(dx) > minReversePx && Math.abs(dx) > Math.abs(dy) * 1.5f -> {
+                  lGesturePhase = LGesturePhase.REVERSE
+                  lGestureReverseDir = if (dx < 0) "left" else "right"
+                  lGestureExtremeX = ev.x
+                }
+                // 最初から縦方向に動いたらキャンセル（スクロール）
+                Math.abs(dy) > minReversePx && Math.abs(dy) > Math.abs(dx) * 1.5f -> {
+                  lGesturePhase = LGesturePhase.CANCELLED
+                }
               }
-              // 最初から縦方向に動いたらキャンセル（スクロール）
-              Math.abs(dy) > MIN_REVERSE_PX && Math.abs(dy) > Math.abs(dx) * 1.5f -> {
-                lGesturePhase = LGesturePhase.CANCELLED
+            }
+            LGesturePhase.REVERSE -> {
+              // 逆引き方向の最端点を更新
+              when (lGestureReverseDir) {
+                "left" -> if (ev.x < lGestureExtremeX) lGestureExtremeX = ev.x
+                "right" -> if (ev.x > lGestureExtremeX) lGestureExtremeX = ev.x
+              }
+              // 最端点から逆方向（前進方向）へ minForwardPx 以上戻ったら FORWARD フェーズへ
+              val dxFromExtreme = ev.x - lGestureExtremeX
+              val enteredForward =
+                when (lGestureReverseDir) {
+                  "left" -> dxFromExtreme > minForwardPx // 左引き後、右へ折り返した
+                  "right" -> dxFromExtreme < -minForwardPx // 右引き後、左へ折り返した
+                  else -> false
+                }
+              if (enteredForward) {
+                lGesturePhase = LGesturePhase.FORWARD
+                val reverseDir = lGestureReverseDir ?: return super.dispatchTouchEvent(ev)
+                val navDir = if (reverseDir == "left") "right" else "left"
+                Log.d(TAG, "boomerang-gesture: progress navDir=$navDir")
+                AppBridge.onSwipeProgress(navDir)
               }
             }
+            LGesturePhase.FORWARD -> { /* 速度は ACTION_UP で判定 */ }
+            LGesturePhase.CANCELLED -> {}
           }
-          LGesturePhase.REVERSE -> {
-            // 逆引き方向の最端点を更新
-            when (lGestureReverseDir) {
-              "left" -> if (ev.x < lGestureExtremeX) lGestureExtremeX = ev.x
-              "right" -> if (ev.x > lGestureExtremeX) lGestureExtremeX = ev.x
-            }
-            // 最端点から逆方向（前進方向）へ MIN_FORWARD_PX 以上戻ったら FORWARD フェーズへ
-            val dxFromExtreme = ev.x - lGestureExtremeX
-            val enteredForward = when (lGestureReverseDir) {
-              "left"  -> dxFromExtreme > MIN_FORWARD_PX   // 左引き後、右へ折り返した
-              "right" -> dxFromExtreme < -MIN_FORWARD_PX  // 右引き後、左へ折り返した
-              else -> false
-            }
-            if (enteredForward) {
-              lGesturePhase = LGesturePhase.FORWARD
-              val reverseDir = lGestureReverseDir ?: return super.dispatchTouchEvent(ev)
-              val navDir = if (reverseDir == "left") "right" else "left"
-              Log.d(TAG, "boomerang-gesture: progress navDir=$navDir")
-              AppBridge.onSwipeProgress(navDir)
-            }
-          }
-          LGesturePhase.FORWARD -> { /* 速度は ACTION_UP で判定 */ }
-          LGesturePhase.CANCELLED -> {}
         }
       }
       MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
@@ -172,11 +180,12 @@ class MainActivity : TauriActivity() {
           val vx = lVelocityTracker?.xVelocity ?: 0f
           val reverseDir = lGestureReverseDir
           // 前進方向（逆引きの逆）への速度が十分あれば切り替え
-          val hasForwardVelocity = when (reverseDir) {
-            "left"  -> vx > MIN_VELOCITY_PX   // 左引き → 右への速度
-            "right" -> vx < -MIN_VELOCITY_PX  // 右引き → 左への速度
-            else -> false
-          }
+          val hasForwardVelocity =
+            when (reverseDir) {
+              "left" -> vx > minVelocityPx // 左引き → 右への速度
+              "right" -> vx < -minVelocityPx // 右引き → 左への速度
+              else -> false
+            }
           if (hasForwardVelocity && reverseDir != null) {
             val navDir = if (reverseDir == "left") "right" else "left"
             Log.d(TAG, "boomerang-gesture: navigate navDir=$navDir vx=$vx")
@@ -184,16 +193,17 @@ class MainActivity : TauriActivity() {
           } else {
             AppBridge.onSwipeCancel()
           }
-        } else if (ev.actionMasked == MotionEvent.ACTION_UP && lGesturePhase == LGesturePhase.IDLE
-            && popupWebViews.isEmpty()) {
+        } else if (ev.actionMasked == MotionEvent.ACTION_UP && lGesturePhase == LGesturePhase.IDLE &&
+          popupWebViews.isEmpty()
+        ) {
           // タップ（指がほとんど動かなかった）の場合にダブルタップを検出する
-          val DOUBLE_TAP_MAX_MS = 300L
-          val DOUBLE_TAP_MAX_PX = 50f * density
+          val doubleTapMaxMs = 300L
+          val doubleTapMaxPx = 50f * density
           val now = System.currentTimeMillis()
           val dx = ev.x - lastTapX
           val dy = ev.y - lastTapY
           val distSq = dx * dx + dy * dy
-          if (now - lastTapTime < DOUBLE_TAP_MAX_MS && distSq < DOUBLE_TAP_MAX_PX * DOUBLE_TAP_MAX_PX) {
+          if (now - lastTapTime < doubleTapMaxMs && distSq < doubleTapMaxPx * doubleTapMaxPx) {
             Log.d(TAG, "double-tap detected")
             AppBridge.onDoubleTap()
             lastTapTime = 0L
@@ -222,10 +232,11 @@ class MainActivity : TauriActivity() {
     runOnUiThread {
       val composeUri = Uri.parse("https://x.com/intent/tweet")
       try {
-        val intent = Intent(Intent.ACTION_VIEW, composeUri).apply {
-          setPackage("com.twitter.android")
-          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
+        val intent =
+          Intent(Intent.ACTION_VIEW, composeUri).apply {
+            setPackage("com.twitter.android")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+          }
         startActivity(intent)
       } catch (e: Exception) {
         try {
@@ -247,32 +258,42 @@ class MainActivity : TauriActivity() {
   // カラム WebView の上に重なり、戻るボタンで閉じられる。
   // JNI スレッドから呼ばれるため runOnUiThread + CountDownLatch で UI 操作を同期する。
   // accountId が空でない場合はカラム WebView と同じプロファイルを使ってセッションを共有する。
-  fun createPopupWebView(id: String, url: String, initScript: String, accountId: String) {
+  fun createPopupWebView(
+    id: String,
+    url: String,
+    initScript: String,
+    accountId: String,
+  ) {
     runOnUiThreadSync {
-      val profileApiSupported = try {
-        WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER")
-      } catch (e: Exception) { false }
+      val profileApiSupported =
+        try {
+          WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER")
+        } catch (e: Exception) {
+          false
+        }
 
-      val webView = WebView(this).also { wv ->
-        wv.settings.javaScriptEnabled = true
-        wv.settings.domStorageEnabled = true
-        wv.settings.setSupportMultipleWindows(true)
-        wv.settings.cacheMode = android.webkit.WebSettings.LOAD_CACHE_ELSE_NETWORK
-        wv.webViewClient = ExternalLinkWebViewClient()
-        wv.webChromeClient = ExternalLinkWebChromeClient()
-        if (profileApiSupported && accountId.isNotEmpty()) {
-          setupWebViewProfile(wv, accountId, "popup $id")
-        } else if (!profileApiSupported && accountId.isNotEmpty()) {
-          setCookieForAccount(accountId)
+      val webView =
+        WebView(this).also { wv ->
+          wv.settings.javaScriptEnabled = true
+          wv.settings.domStorageEnabled = true
+          wv.settings.setSupportMultipleWindows(true)
+          wv.settings.cacheMode = android.webkit.WebSettings.LOAD_CACHE_ELSE_NETWORK
+          wv.webViewClient = ExternalLinkWebViewClient()
+          wv.webChromeClient = ExternalLinkWebChromeClient()
+          if (profileApiSupported && accountId.isNotEmpty()) {
+            setupWebViewProfile(wv, accountId, "popup $id")
+          } else if (!profileApiSupported && accountId.isNotEmpty()) {
+            setCookieForAccount(accountId)
+          }
+          if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
+          }
         }
-        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
-          WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
-        }
-      }
-      val params = FrameLayout.LayoutParams(
-        FrameLayout.LayoutParams.MATCH_PARENT,
-        FrameLayout.LayoutParams.MATCH_PARENT
-      )
+      val params =
+        FrameLayout.LayoutParams(
+          FrameLayout.LayoutParams.MATCH_PARENT,
+          FrameLayout.LayoutParams.MATCH_PARENT,
+        )
       contentRoot.addView(webView, params)
       popupWebViews.addLast(Pair(id, webView))
       webView.loadUrl(url)
@@ -311,7 +332,7 @@ class MainActivity : TauriActivity() {
     heightDp: Int,
     initScript: String,
     visible: Boolean,
-    accountId: String
+    accountId: String,
   ) {
     runOnUiThreadSync {
       // React WebView がリロードされても native WebView は残存するため、
@@ -322,9 +343,12 @@ class MainActivity : TauriActivity() {
         return@runOnUiThreadSync
       }
 
-      val profileApiSupported = try {
-        WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER")
-      } catch (e: Exception) { false }
+      val profileApiSupported =
+        try {
+          WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER")
+        } catch (e: Exception) {
+          false
+        }
 
       // Profile API 非対応端末では loadUrl 前に Cookie を設定してアカウントを確定する。
       // createColumnWebView は直列 await で呼ばれるため Cookie の設定が干渉しない。
@@ -332,27 +356,29 @@ class MainActivity : TauriActivity() {
         setCookieForAccount(accountId)
       }
 
-      val webView = WebView(this).also { wv ->
-        wv.settings.javaScriptEnabled = true
-        wv.settings.domStorageEnabled = true
-        wv.settings.setSupportMultipleWindows(true)
-        wv.settings.cacheMode = android.webkit.WebSettings.LOAD_CACHE_ELSE_NETWORK
-        wv.webViewClient = ExternalLinkWebViewClient()
-        wv.webChromeClient = ExternalLinkWebChromeClient()
-        if (profileApiSupported) {
-          setupWebViewProfile(wv, accountId, "column $id")
+      val webView =
+        WebView(this).also { wv ->
+          wv.settings.javaScriptEnabled = true
+          wv.settings.domStorageEnabled = true
+          wv.settings.setSupportMultipleWindows(true)
+          wv.settings.cacheMode = android.webkit.WebSettings.LOAD_CACHE_ELSE_NETWORK
+          wv.webViewClient = ExternalLinkWebViewClient()
+          wv.webChromeClient = ExternalLinkWebChromeClient()
+          if (profileApiSupported) {
+            setupWebViewProfile(wv, accountId, "column $id")
+          }
+          if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
+          }
+          wv.visibility = if (visible) View.VISIBLE else View.GONE
         }
-        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
-          WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
-        }
-        wv.visibility = if (visible) View.VISIBLE else View.GONE
-      }
 
       val density = resources.displayMetrics.density
-      val params = FrameLayout.LayoutParams(
-        (widthDp * density).toInt(),
-        (heightDp * density).toInt()
-      )
+      val params =
+        FrameLayout.LayoutParams(
+          (widthDp * density).toInt(),
+          (heightDp * density).toInt(),
+        )
 
       contentRoot.addView(webView, params)
       columnWebViews[id] = webView
@@ -374,7 +400,11 @@ class MainActivity : TauriActivity() {
 
   // カラム WebView を表示し、サイズを更新する（常に左上原点に配置）。
   // onResume() で JS タイマーを再開してから表示する。
-  fun showColumnWebView(id: String, widthDp: Int, heightDp: Int) {
+  fun showColumnWebView(
+    id: String,
+    widthDp: Int,
+    heightDp: Int,
+  ) {
     runOnUiThread {
       activeColumnWebViewId = id
       columnWebViews[id]?.let { wv ->
@@ -405,7 +435,10 @@ class MainActivity : TauriActivity() {
   }
 
   // カラム WebView で JavaScript を評価する。
-  fun evalInColumnWebView(id: String, script: String) {
+  fun evalInColumnWebView(
+    id: String,
+    script: String,
+  ) {
     runOnUiThread {
       columnWebViews[id]?.evaluateJavascript(script, null)
     }
@@ -414,9 +447,12 @@ class MainActivity : TauriActivity() {
   // Profile API 非対応端末で、アクティブカラムのアカウントに CookieManager を切り替える。
   // showColumnWebView とは独立して呼び出せるため WebView の表示状態に影響しない。
   fun setAccountCookies(accountId: String) {
-    val profileApiSupported = try {
-      WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER")
-    } catch (e: Exception) { false }
+    val profileApiSupported =
+      try {
+        WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER")
+      } catch (e: Exception) {
+        false
+      }
     if (profileApiSupported || accountId.isEmpty()) return
     setCookieForAccount(accountId)
   }
@@ -465,7 +501,10 @@ class MainActivity : TauriActivity() {
   // カラム / ポップアップ WebView 用 WebViewClient。
   // x.com 内のナビゲーションはそのまま WebView に委ね、外部 URL はシステムブラウザへ転送する。
   private inner class ExternalLinkWebViewClient : WebViewClient() {
-    override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+    override fun shouldOverrideUrlLoading(
+      view: WebView,
+      request: WebResourceRequest,
+    ): Boolean {
       val url = request.url.toString()
       if (isInternalUrl(url)) return false
       openUrlInBrowser(url)
@@ -478,25 +517,30 @@ class MainActivity : TauriActivity() {
   // 外部リンクはシステムブラウザへ転送する。
   private inner class ExternalLinkWebChromeClient : WebChromeClient() {
     override fun onCreateWindow(
-      view: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message
+      view: WebView,
+      isDialog: Boolean,
+      isUserGesture: Boolean,
+      resultMsg: Message,
     ): Boolean {
       if (!isUserGesture) return false
       // ヘルパー WebView を使って新しいウィンドウのリクエスト URL を取得する。
       val helper = WebView(this@MainActivity)
-      helper.webViewClient = object : WebViewClient() {
-        override fun shouldOverrideUrlLoading(
-          helperView: WebView, request: WebResourceRequest
-        ): Boolean {
-          val url = request.url.toString()
-          if (isInternalUrl(url)) {
-            // x.com リンク: 元の WebView でそのまま遷移する
-            view.loadUrl(url)
-          } else {
-            openUrlInBrowser(url)
+      helper.webViewClient =
+        object : WebViewClient() {
+          override fun shouldOverrideUrlLoading(
+            helperView: WebView,
+            request: WebResourceRequest,
+          ): Boolean {
+            val url = request.url.toString()
+            if (isInternalUrl(url)) {
+              // x.com リンク: 元の WebView でそのまま遷移する
+              view.loadUrl(url)
+            } else {
+              openUrlInBrowser(url)
+            }
+            return true
           }
-          return true
         }
-      }
       val transport = resultMsg.obj as WebView.WebViewTransport
       transport.webView = helper
       resultMsg.sendToTarget()
@@ -504,7 +548,11 @@ class MainActivity : TauriActivity() {
     }
   }
 
-  internal fun setupWebViewProfile(webView: WebView, accountId: String, contextName: String) {
+  internal fun setupWebViewProfile(
+    webView: WebView,
+    accountId: String,
+    contextName: String,
+  ) {
     try {
       ProfileStore.getInstance().getOrCreateProfile("account-$accountId")
       WebViewCompat.setProfile(webView, "account-$accountId")

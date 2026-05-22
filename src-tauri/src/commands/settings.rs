@@ -76,7 +76,12 @@ fn default_zoom_level() -> f64 {
 
 impl Default for WindowBounds {
     fn default() -> Self {
-        Self { x: 0.0, y: 0.0, width: 1400.0, height: 900.0 }
+        Self {
+            x: 0.0,
+            y: 0.0,
+            width: 1400.0,
+            height: 900.0,
+        }
     }
 }
 
@@ -305,7 +310,13 @@ mod tests {
         let settings = AppSettingsData::default();
         let json = serde_json::to_value(&settings).unwrap();
         let restored: AppSettingsData = serde_json::from_value(json).unwrap();
-        assert_eq!(restored.global_settings.theme, settings.global_settings.theme);
-        assert_eq!(restored.global_settings.zoom_level, settings.global_settings.zoom_level);
+        assert_eq!(
+            restored.global_settings.theme,
+            settings.global_settings.theme
+        );
+        assert_eq!(
+            restored.global_settings.zoom_level,
+            settings.global_settings.zoom_level
+        );
     }
 }
