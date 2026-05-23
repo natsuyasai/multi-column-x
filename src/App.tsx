@@ -268,6 +268,10 @@ const App: React.FC = () => {
           onComposeTweet={handleComposeTweet}
           onOpenLinkPopup={handleOpenLinkPopup}
           onJumpToColumn={handleJumpToColumn}
+          onReorderColumns={(reordered) => {
+            replaceColumns(reordered);
+            recalculateAllBounds();
+          }}
         />
       )}
       {isMobile && (

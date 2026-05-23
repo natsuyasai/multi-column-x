@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useRef } from "react";
 import type { Account, Column, PageType } from "../../types";
 import HomeIcon from "../../assets/icons/home.svg?react";
 import NotificationsIcon from "../../assets/icons/notifications.svg?react";
@@ -23,6 +23,7 @@ interface TopBarProps {
   onComposeTweet: () => void;
   onOpenLinkPopup: () => void;
   onJumpToColumn: (columnId: string) => void;
+  onReorderColumns: (columns: Column[]) => void;
 }
 
 function getColumnIcon(pageType: PageType): React.ReactElement {
@@ -78,8 +79,50 @@ export const TopBar: React.FC<TopBarProps> = ({
   onComposeTweet,
   onOpenLinkPopup,
   onJumpToColumn,
+  onReorderColumns,
 }) => {
   const sorted = [...columns].sort((a, b) => a.order - b.order);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const draggedIdRef = useRef<string | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, colId: string) => {
+    draggedIdRef.current = colId;
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent, colId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (colId !== draggedIdRef.current) setDragOverId(colId);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) {
+      setDragOverId(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    const fromId = draggedIdRef.current;
+    if (!fromId || fromId === targetId) {
+      setDragOverId(null);
+      return;
+    }
+    const reordered = [...sorted];
+    const fromIdx = reordered.findIndex((c) => c.id === fromId);
+    const toIdx = reordered.findIndex((c) => c.id === targetId);
+    const [removed] = reordered.splice(fromIdx, 1);
+    reordered.splice(toIdx, 0, removed);
+    onReorderColumns(reordered.map((c, i) => ({ ...c, order: i })));
+    draggedIdRef.current = null;
+    setDragOverId(null);
+  };
+
+  const handleDragEnd = () => {
+    draggedIdRef.current = null;
+    setDragOverId(null);
+  };
 
   return (
     <div className={`${styles.topbar}${expanded ? ` ${styles.expanded}` : ""}`}>
@@ -159,7 +202,13 @@ export const TopBar: React.FC<TopBarProps> = ({
               {sorted.map((col) => (
                 <button
                   key={col.id}
-                  className={styles.btn}
+                  className={`${styles.btn}${dragOverId === col.id ? ` ${styles.dragOver}` : ""}`}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, col.id)}
+                  onDragOver={(e) => handleDragOver(e, col.id)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, col.id)}
+                  onDragEnd={handleDragEnd}
                   onClick={() => onJumpToColumn(col.id)}
                   title={columnDisplayName(col, accounts)}
                 >
@@ -186,7 +235,13 @@ export const TopBar: React.FC<TopBarProps> = ({
           {sorted.map((col) => (
             <button
               key={col.id}
-              className={`${styles.btn} ${styles.btnExpanded}`}
+              className={`${styles.btn} ${styles.btnExpanded}${dragOverId === col.id ? ` ${styles.dragOver}` : ""}`}
+              draggable
+              onDragStart={(e) => handleDragStart(e, col.id)}
+              onDragOver={(e) => handleDragOver(e, col.id)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, col.id)}
+              onDragEnd={handleDragEnd}
               onClick={() => onJumpToColumn(col.id)}
               title={columnDisplayName(col, accounts)}
             >
