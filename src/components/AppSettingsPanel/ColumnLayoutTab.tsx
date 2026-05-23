@@ -38,6 +38,38 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
   const [draft, setDraft] = useState<Column[]>(() =>
     columns.map((c) => ({ ...c })),
   );
+
+  const orderedDraft = [...draft].sort((a, b) => a.order - b.order);
+
+  const handleMoveUp = useCallback((columnId: string) => {
+    setDraft((prev) => {
+      const sorted = [...prev].sort((a, b) => a.order - b.order);
+      const idx = sorted.findIndex((c) => c.id === columnId);
+      if (idx <= 0) return prev;
+      const above = sorted[idx - 1];
+      const current = sorted[idx];
+      return prev.map((c) => {
+        if (c.id === current.id) return { ...c, order: above.order };
+        if (c.id === above.id) return { ...c, order: current.order };
+        return c;
+      });
+    });
+  }, []);
+
+  const handleMoveDown = useCallback((columnId: string) => {
+    setDraft((prev) => {
+      const sorted = [...prev].sort((a, b) => a.order - b.order);
+      const idx = sorted.findIndex((c) => c.id === columnId);
+      if (idx < 0 || idx >= sorted.length - 1) return prev;
+      const below = sorted[idx + 1];
+      const current = sorted[idx];
+      return prev.map((c) => {
+        if (c.id === current.id) return { ...c, order: below.order };
+        if (c.id === below.id) return { ...c, order: current.order };
+        return c;
+      });
+    });
+  }, []);
   const [cols, setCols] = useState(() =>
     Math.max(...columns.map((c) => c.gridCol).filter((g) => g >= 1), 1),
   );
@@ -165,7 +197,7 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
       </div>
 
       <div className={styles.body}>
-        <div className={styles.gridPreview}>
+        <div className={styles.gridPreview} data-testid="grid-preview">
           {Array.from({ length: cols }, (_, cIdx) => {
             const colNum = cIdx + 1;
             const rows = rowCountForCol(colNum);
@@ -330,6 +362,37 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
           </div>
         </div>
       )}
+
+      <div className={styles.orderSection}>
+        <div className={styles.orderLabel}>表示順序</div>
+        <ul className={styles.orderList} data-testid="order-list">
+          {orderedDraft.map((col, idx) => (
+            <li key={col.id} className={styles.orderItem}>
+              <span className={styles.orderItemName}>
+                {getColumnLabel(col)}
+              </span>
+              <div className={styles.orderBtns}>
+                <button
+                  className={styles.orderBtn}
+                  aria-label="上へ"
+                  disabled={idx === 0}
+                  onClick={() => handleMoveUp(col.id)}
+                >
+                  ▲
+                </button>
+                <button
+                  className={styles.orderBtn}
+                  aria-label="下へ"
+                  disabled={idx === orderedDraft.length - 1}
+                  onClick={() => handleMoveDown(col.id)}
+                >
+                  ▼
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
 
       <div className={styles.actions}>
         <button className={styles.cancelBtn} onClick={onCancel}>

@@ -65,7 +65,10 @@ describe("AppSettingsPanel グローバルNGワード", () => {
   });
 
   it("既存のglobalNgWordsが入力エリアに表示される", () => {
-    const settings = { ...baseGlobalSettings, ngWords: ["グローバルスパム", "宣伝"] };
+    const settings = {
+      ...baseGlobalSettings,
+      ngWords: ["グローバルスパム", "宣伝"],
+    };
     render(<AppSettingsPanel {...defaultProps} settings={settings} />);
     const textarea = screen.getByPlaceholderText(
       "1行に1ワードで入力（全カラムに適用）",
