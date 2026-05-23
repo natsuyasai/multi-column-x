@@ -5,6 +5,7 @@ import type {
   Account,
   ColumnSettings,
 } from "../../types";
+import { useAppStore } from "../../store/useAppStore";
 import { ColumnLayoutTab } from "./ColumnLayoutTab";
 import styles from "./AppSettingsPanel.module.scss";
 
@@ -29,6 +30,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   onReloadAllWebviews,
   onClose,
 }) => {
+  const isMobile = useAppStore((s) => s.isMobile);
   const [activeTab, setActiveTab] = useState<"general" | "layout">("general");
 
   // カラムデフォルト - 自動更新
@@ -148,12 +150,14 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
           >
             一般
           </button>
-          <button
-            className={`${styles.tab} ${activeTab === "layout" ? styles.tabActive : ""}`}
-            onClick={() => setActiveTab("layout")}
-          >
-            カラム配置
-          </button>
+          {!isMobile && (
+            <button
+              className={`${styles.tab} ${activeTab === "layout" ? styles.tabActive : ""}`}
+              onClick={() => setActiveTab("layout")}
+            >
+              カラム配置
+            </button>
+          )}
         </div>
 
         <div className={styles.tabContent}>
@@ -376,17 +380,19 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 </label>
               </section>
 
-              <section className={styles.section}>
-                <h3 className={styles.sectionTitle}>ツイート（Android）</h3>
-                <label className={styles.checkLabel}>
-                  <input
-                    type="checkbox"
-                    checked={useXAppForCompose}
-                    onChange={(e) => setUseXAppForCompose(e.target.checked)}
-                  />
-                  ツイートボタンでXアプリを起動する
-                </label>
-              </section>
+              {isMobile && (
+                <section className={styles.section}>
+                  <h3 className={styles.sectionTitle}>ツイート（Android）</h3>
+                  <label className={styles.checkLabel}>
+                    <input
+                      type="checkbox"
+                      checked={useXAppForCompose}
+                      onChange={(e) => setUseXAppForCompose(e.target.checked)}
+                    />
+                    ツイートボタンでXアプリを起動する
+                  </label>
+                </section>
+              )}
 
               <section className={styles.section}>
                 <h3 className={styles.sectionTitle}>WebView</h3>
@@ -407,7 +413,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
             </form>
           )}
 
-          {activeTab === "layout" && (
+          {!isMobile && activeTab === "layout" && (
             <ColumnLayoutTab
               columns={columns}
               accounts={accounts}
