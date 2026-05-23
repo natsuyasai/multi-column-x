@@ -33,6 +33,9 @@ interface AppStore {
   setTopBarExpanded: (v: boolean) => void;
   isMobile: boolean;
   setIsMobile: (v: boolean) => void;
+  unreadCounts: Record<string, number>;
+  setUnreadCount: (columnId: string, count: number) => void;
+  clearUnreadCount: (columnId: string) => void;
   loadSettings: () => Promise<void>;
   saveSettings: () => Promise<void>;
   addAccount: (account: Account) => void;
@@ -54,6 +57,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
   setTopBarExpanded: (v) => set({ topBarExpanded: v }),
   isMobile: false,
   setIsMobile: (v) => set({ isMobile: v }),
+  unreadCounts: {},
+  setUnreadCount: (columnId, count) =>
+    set((state) => ({
+      unreadCounts: { ...state.unreadCounts, [columnId]: count },
+    })),
+  clearUnreadCount: (columnId) =>
+    set((state) => ({
+      unreadCounts: { ...state.unreadCounts, [columnId]: 0 },
+    })),
 
   loadSettings: async () => {
     try {

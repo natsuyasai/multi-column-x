@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { ColumnHeader } from "./ColumnHeader";
 import type { Column, Account } from "../../types";
 
@@ -124,5 +125,29 @@ describe("ColumnHeader", () => {
         .querySelector('[title="カラムを閉じる"]')
         ?.querySelector('[data-testid="icon-close"]'),
     ).toBeInTheDocument();
+  });
+
+  it("unreadCount が 0 のとき未読バッジは表示されない", () => {
+    render(<ColumnHeader {...defaultProps} unreadCount={0} />);
+    expect(screen.queryByTestId("unread-badge")).not.toBeInTheDocument();
+  });
+
+  it("unreadCount が 1 以上のとき未読バッジが表示される", () => {
+    render(<ColumnHeader {...defaultProps} unreadCount={5} />);
+    expect(screen.getByTestId("unread-badge")).toBeInTheDocument();
+    expect(screen.getByTestId("unread-badge").textContent).toBe("5");
+  });
+
+  it("バッジをクリックすると onClearUnread が呼ばれる", async () => {
+    const onClearUnread = vi.fn();
+    render(
+      <ColumnHeader
+        {...defaultProps}
+        unreadCount={3}
+        onClearUnread={onClearUnread}
+      />,
+    );
+    await userEvent.click(screen.getByTestId("unread-badge"));
+    expect(onClearUnread).toHaveBeenCalledWith("col-1");
   });
 });

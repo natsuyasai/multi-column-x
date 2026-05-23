@@ -17,6 +17,8 @@ interface ColumnHeaderProps {
   isFirst: boolean;
   isLast: boolean;
   showSortButtons: boolean;
+  unreadCount?: number;
+  onClearUnread?: (columnId: string) => void;
 }
 
 export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
@@ -30,6 +32,8 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
   isFirst,
   isLast,
   showSortButtons,
+  unreadCount = 0,
+  onClearUnread,
 }) => {
   const label =
     column.label ?? `${account.label} - ${getPageTypeLabel(column)}`;
@@ -45,6 +49,16 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
     <div className={styles.header} style={{ borderTopColor: account.color }}>
       <span className={styles.dot} style={{ backgroundColor: account.color }} />
       <span className={styles.label}>{label}</span>
+      {unreadCount > 0 && (
+        <button
+          className={styles.unreadBadge}
+          data-testid="unread-badge"
+          onClick={() => onClearUnread?.(column.id)}
+          title="未読をクリア"
+        >
+          {unreadCount}
+        </button>
+      )}
       {showCountdown && (
         <span className={styles.countdown} title="次の自動更新まで">
           {remaining}s

@@ -141,6 +141,7 @@ pub fn run() {
             commands::webview::switch_popup_session,
             commands::webview::eval_in_webview,
             commands::webview::report_webview_scroll,
+            commands::webview::report_new_posts_count,
             commands::webview::get_mobile_insets,
             commands::webview::set_column_cookies,
             commands::webview::open_in_browser,

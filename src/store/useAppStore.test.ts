@@ -73,6 +73,7 @@ describe("useAppStore", () => {
       },
       isLoaded: false,
       isMobile: false,
+      unreadCounts: {},
     });
   });
 
@@ -130,6 +131,30 @@ describe("useAppStore", () => {
       result.current.setIsMobile(true);
     });
     expect(result.current.isMobile).toBe(true);
+  });
+
+  it("setUnreadCount でカラムの未読数をセットできる", () => {
+    const { result } = renderHook(() => useAppStore());
+    act(() => {
+      result.current.addColumn(mockColumn);
+      result.current.setUnreadCount("col-1", 5);
+    });
+    expect(result.current.unreadCounts["col-1"]).toBe(5);
+  });
+
+  it("clearUnreadCount でカラムの未読数を0にリセットできる", () => {
+    const { result } = renderHook(() => useAppStore());
+    act(() => {
+      result.current.addColumn(mockColumn);
+      result.current.setUnreadCount("col-1", 5);
+      result.current.clearUnreadCount("col-1");
+    });
+    expect(result.current.unreadCounts["col-1"]).toBe(0);
+  });
+
+  it("unreadCounts の初期値は空オブジェクト", () => {
+    const { result } = renderHook(() => useAppStore());
+    expect(result.current.unreadCounts).toEqual({});
   });
 });
 

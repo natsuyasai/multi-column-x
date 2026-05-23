@@ -37,6 +37,9 @@ const App: React.FC = () => {
     replaceColumns,
     isMobile,
     setIsMobile,
+    unreadCounts,
+    setUnreadCount,
+    clearUnreadCount,
   } = useAppStore();
   const {
     columns,
@@ -129,6 +132,36 @@ const App: React.FC = () => {
       unlisten.then((fn) => fn());
     };
   }, [scrollbarRef]);
+
+  // inject script からの新着カウントを受け取ってバッジを更新、通知カラムはデスクトップ通知
+  useEffect(() => {
+    const unlisten = listen<{ label: string; count: number }>(
+      IPC_EVENTS.WEBVIEW_NEW_POSTS_COUNT,
+      (e) => {
+        const { label, count } = e.payload;
+        const columnId = label.replace(WEBVIEW_LABELS.COLUMN_PREFIX, "");
+        setUnreadCount(columnId, count);
+
+        const col = useAppStore
+          .getState()
+          .columns.find((c) => c.id === columnId);
+        if (
+          col?.pageType === "notifications" &&
+          col.settings.autoReloadEnabled &&
+          count > 0 &&
+          "Notification" in window &&
+          Notification.permission === "granted"
+        ) {
+          new Notification("新着通知", {
+            body: `${count}件の新しい通知があります`,
+          });
+        }
+      },
+    );
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [setUnreadCount]);
 
   const handleOpenLinkPopup = useCallback(() => {
     setShowLinkPopupDialog(true);
@@ -321,6 +354,8 @@ const App: React.FC = () => {
                 isFirst={idx === 0}
                 isLast={idx === sortedColumns.length - 1}
                 showSortButtons={globalSettings.showSortButtons}
+                unreadCount={unreadCounts[column.id] ?? 0}
+                onClearUnread={clearUnreadCount}
               />
             </div>
           );

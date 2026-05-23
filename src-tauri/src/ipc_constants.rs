@@ -20,6 +20,8 @@ pub mod events {
     pub const COLUMN_SWIPE_CANCEL: &str = "column-swipe-cancel";
     /// アクティブカラムのダブルタップ（Android JNI → TS listen）
     pub const COLUMN_DOUBLE_TAP: &str = "column-double-tap";
+    /// 新着投稿カウント（inject script invoke → TS listen）{ label, count }
+    pub const WEBVIEW_NEW_POSTS_COUNT: &str = "webview-new-posts-count";
 }
 
 /// WebView / ウィンドウラベルのプレフィックス

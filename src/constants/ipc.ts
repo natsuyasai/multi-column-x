@@ -39,6 +39,9 @@ export const IPC_COMMANDS = {
   REPORT_WEBVIEW_SCROLL: "report_webview_scroll",
   GET_MOBILE_INSETS: "get_mobile_insets",
   SET_COLUMN_COOKIES: "set_column_cookies",
+
+  // 未読カウント
+  REPORT_NEW_POSTS_COUNT: "report_new_posts_count",
 } as const;
 
 /** Tauri イベント名 */
@@ -57,6 +60,8 @@ export const IPC_EVENTS = {
   COLUMN_SWIPE_CANCEL: "column-swipe-cancel",
   /** アクティブカラムのダブルタップ（Android JNI → TS listen） */
   COLUMN_DOUBLE_TAP: "column-double-tap",
+  /** 新着投稿カウント（inject script invoke → TS listen）{ label, count } */
+  WEBVIEW_NEW_POSTS_COUNT: "webview-new-posts-count",
 } as const;
 
 /** WebView / ウィンドウラベルのプレフィックスと生成ヘルパー */

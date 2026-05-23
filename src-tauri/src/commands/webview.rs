@@ -688,6 +688,19 @@ pub async fn report_webview_scroll(app: AppHandle, delta: f64) -> Result<(), Str
 }
 
 #[tauri::command]
+pub async fn report_new_posts_count(
+    app: AppHandle,
+    label: String,
+    count: u32,
+) -> Result<(), String> {
+    app.emit(
+        events::WEBVIEW_NEW_POSTS_COUNT,
+        serde_json::json!({ "label": label, "count": count }),
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn switch_popup_session(
     app: AppHandle,
     #[allow(non_snake_case)] popupLabel: String,

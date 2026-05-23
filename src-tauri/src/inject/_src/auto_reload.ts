@@ -33,9 +33,36 @@
     return null;
   }
 
+  function extractNewPostsCount(btn: HTMLButtonElement): number {
+    const text = btn.textContent ?? "";
+    const match = text.match(/\d+/);
+    return match ? parseInt(match[0], 10) : 1;
+  }
+
+  function getWebviewLabel(): string {
+    return (
+      window.__TAURI_INTERNALS__?.metadata?.currentWebview?.label ??
+      window.__TAURI__?.core?.invoke?.name ??
+      ""
+    );
+  }
+
+  function reportNewPostsCount(count: number): void {
+    const label = getWebviewLabel();
+    if (!label) return;
+    const invoke =
+      window.__TAURI_INTERNALS__?.invoke ??
+      window.__TAURI__?.core?.invoke ??
+      window.__TAURI__?.invoke;
+    if (!invoke) return;
+    invoke("report_new_posts_count", { label, count }).catch(() => {});
+  }
+
   function waitAndClickNewPostsButton(): void {
     const btn = findNewPostsButton();
     if (btn) {
+      const count = extractNewPostsCount(btn);
+      reportNewPostsCount(count);
       btn.click();
       return;
     }
@@ -45,6 +72,8 @@
       const found = findNewPostsButton();
       if (found) {
         observer.disconnect();
+        const count = extractNewPostsCount(found);
+        reportNewPostsCount(count);
         found.click();
       }
     });

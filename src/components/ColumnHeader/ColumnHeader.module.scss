@@ -55,3 +55,20 @@
     background: #222;
   }
 }
+
+.unreadBadge {
+  background: #1d9bf0;
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 1px 5px;
+  flex-shrink: 0;
+  line-height: 1.4;
+
+  &:hover {
+    background: #1a8cd8;
+  }
+}
