@@ -21,6 +21,7 @@ export interface ColumnSettings {
   smallImageWidth: string;
   blurImageEnabled: boolean;
   blurImageAmount: string;
+  ngWords: string[];
 }
 
 export interface Column {
@@ -111,6 +112,7 @@ export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
   smallImageWidth: "50%",
   blurImageEnabled: false,
   blurImageAmount: "10px",
+  ngWords: [],
 };
 
 /**

@@ -80,6 +80,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         zoom_level,
         custom_css: &args.column.settings.custom_css,
         visible_links: &args.column.settings.visible_links,
+        ng_words: &args.column.settings.ng_words,
     });
 
     // parent() は &WebviewWindow を要求するため、Linux では get_webview_window を使う。
@@ -162,6 +163,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         zoom_level,
         custom_css: &args.column.settings.custom_css,
         visible_links: &args.column.settings.visible_links,
+        ng_words: &args.column.settings.ng_words,
     });
 
     // Android では Tauri WebviewWindowBuilder を使わず、

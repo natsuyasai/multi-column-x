@@ -50,6 +50,9 @@ pub struct ColumnSettings {
     #[serde(rename = "blurImageAmount")]
     #[serde(default = "default_blur_image_amount")]
     pub blur_image_amount: String,
+    #[serde(rename = "ngWords")]
+    #[serde(default)]
+    pub ng_words: Vec<String>,
 }
 
 // デシリアライズ時のデフォルト値ヘルパー関数。

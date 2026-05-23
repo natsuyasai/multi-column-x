@@ -19,10 +19,17 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     ...column.settings,
   });
   const [width, setWidth] = useState<number>(column.width);
+  const [ngWordsText, setNgWordsText] = useState<string>(
+    (column.settings.ngWords ?? []).join("\n"),
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onApply(column.id, settings, width);
+    const ngWords = ngWordsText
+      .split("\n")
+      .map((w) => w.trim())
+      .filter((w) => w.length > 0);
+    onApply(column.id, { ...settings, ngWords }, width);
   };
 
   return (
@@ -221,6 +228,17 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <p className={styles.fieldLabel}>
               右クリック（PC）または長押し（モバイル）でブラーを解除できます
             </p>
+          </section>
+
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>NGワード</h3>
+            <textarea
+              className={styles.cssTextarea}
+              value={ngWordsText}
+              onChange={(e) => setNgWordsText(e.target.value)}
+              placeholder="1行に1ワードで入力"
+              spellCheck={false}
+            />
           </section>
 
           <section className={styles.section}>

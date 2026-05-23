@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { resolveColumnUrl, getPageTypeLabel, getColumnLabel } from "./index";
+import {
+  resolveColumnUrl,
+  getPageTypeLabel,
+  getColumnLabel,
+  DEFAULT_COLUMN_SETTINGS,
+} from "./index";
 import type { Column } from "./index";
 
 const baseColumn: Column = {
@@ -108,5 +113,11 @@ describe("getColumnLabel", () => {
   it("homeはhomeTabNameを反映する", () => {
     const col = { ...baseColumn, homeTabName: "フォロー中" };
     expect(getColumnLabel(col)).toBe("フォロー中");
+  });
+});
+
+describe("DEFAULT_COLUMN_SETTINGS", () => {
+  it("ngWordsのデフォルト値は空配列", () => {
+    expect(DEFAULT_COLUMN_SETTINGS.ngWords).toEqual([]);
   });
 });

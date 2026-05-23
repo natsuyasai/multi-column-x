@@ -18,6 +18,7 @@ const plainEntries = [
   "video_control",
   "small_image",
   "hide_ad",
+  "ng_word",
   "scroll_pos_restore",
   "zoom",
   "blur_image",

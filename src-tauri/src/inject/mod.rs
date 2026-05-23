@@ -17,6 +17,7 @@ pub struct InitScriptParams<'a> {
     pub zoom_level: f64,
     pub custom_css: &'a str,
     pub visible_links: &'a [String],
+    pub ng_words: &'a [String],
 }
 
 pub fn build_init_script(params: &InitScriptParams) -> String {
@@ -27,6 +28,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     let small_image = include_str!("small_image.js");
     let blur_image = include_str!("blur_image.js");
     let hide_ad = include_str!("hide_ad.js");
+    let ng_word = include_str!("ng_word.js");
     let image_popup = if params.is_mobile {
         ""
     } else {
@@ -52,8 +54,10 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
 
     let visible_links_json =
         serde_json::to_string(params.visible_links).unwrap_or_else(|_| "[]".to_string());
+    let ng_words_json =
+        serde_json::to_string(params.ng_words).unwrap_or_else(|_| "[]".to_string());
     let config = format!(
-        "window.{} = {{ areaRemoveEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?}, blurImageEnabled: {}, blurImageAmount: {:?}, hideAdEnabled: {}, zoomLevel: {} }};",
+        "window.{} = {{ areaRemoveEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?}, blurImageEnabled: {}, blurImageAmount: {:?}, hideAdEnabled: {}, zoomLevel: {}, ngWords: {} }};",
         globals::MULTI_COLUMN_X_CONFIG,
         params.area_remove_enabled,
         params.show_custom_menu,
@@ -63,7 +67,8 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         params.blur_image_enabled,
         params.blur_image_amount,
         params.hide_ad_enabled,
-        params.zoom_level
+        params.zoom_level,
+        ng_words_json
     );
 
     let header_part = if params.area_remove_enabled {
@@ -83,7 +88,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     };
 
     let mut script = format!(
-        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}",
+        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
         config,
         zoom,
         tab_selector,
@@ -93,6 +98,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         small_image,
         blur_image,
         hide_ad,
+        ng_word,
         custom_css_js,
         image_popup,
         scroll_pos_restore,
@@ -152,7 +158,24 @@ mod tests {
             zoom_level: 1.0,
             custom_css: "",
             visible_links: &[],
+            ng_words: &[],
         }
+    }
+
+    #[test]
+    fn build_init_script_config_contains_ng_words() {
+        let words = vec!["spam".to_string(), "bot".to_string()];
+        let mut params = default_params();
+        params.ng_words = &words;
+        let script = build_init_script(&params);
+        assert!(script.contains("ngWords"));
+        assert!(script.contains(r#"["spam","bot"]"#));
+    }
+
+    #[test]
+    fn build_init_script_config_ng_words_empty_by_default() {
+        let script = build_init_script(&default_params());
+        assert!(script.contains("ngWords: []"));
     }
 
     #[test]
