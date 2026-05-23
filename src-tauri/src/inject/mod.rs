@@ -18,6 +18,7 @@ pub struct InitScriptParams<'a> {
     pub custom_css: &'a str,
     pub visible_links: &'a [String],
     pub ng_words: &'a [String],
+    pub global_ng_words: &'a [String],
 }
 
 pub fn build_init_script(params: &InitScriptParams) -> String {
@@ -56,8 +57,10 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         serde_json::to_string(params.visible_links).unwrap_or_else(|_| "[]".to_string());
     let ng_words_json =
         serde_json::to_string(params.ng_words).unwrap_or_else(|_| "[]".to_string());
+    let global_ng_words_json =
+        serde_json::to_string(params.global_ng_words).unwrap_or_else(|_| "[]".to_string());
     let config = format!(
-        "window.{} = {{ areaRemoveEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?}, blurImageEnabled: {}, blurImageAmount: {:?}, hideAdEnabled: {}, zoomLevel: {}, ngWords: {} }};",
+        "window.{} = {{ areaRemoveEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?}, blurImageEnabled: {}, blurImageAmount: {:?}, hideAdEnabled: {}, zoomLevel: {}, ngWords: {}, globalNgWords: {} }};",
         globals::MULTI_COLUMN_X_CONFIG,
         params.area_remove_enabled,
         params.show_custom_menu,
@@ -68,7 +71,8 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         params.blur_image_amount,
         params.hide_ad_enabled,
         params.zoom_level,
-        ng_words_json
+        ng_words_json,
+        global_ng_words_json
     );
 
     let header_part = if params.area_remove_enabled {
@@ -159,6 +163,7 @@ mod tests {
             custom_css: "",
             visible_links: &[],
             ng_words: &[],
+            global_ng_words: &[],
         }
     }
 
@@ -176,6 +181,22 @@ mod tests {
     fn build_init_script_config_ng_words_empty_by_default() {
         let script = build_init_script(&default_params());
         assert!(script.contains("ngWords: []"));
+    }
+
+    #[test]
+    fn build_init_script_config_contains_global_ng_words() {
+        let words = vec!["global_spam".to_string()];
+        let mut params = default_params();
+        params.global_ng_words = &words;
+        let script = build_init_script(&params);
+        assert!(script.contains("globalNgWords"));
+        assert!(script.contains(r#"["global_spam"]"#));
+    }
+
+    #[test]
+    fn build_init_script_config_global_ng_words_empty_by_default() {
+        let script = build_init_script(&default_params());
+        assert!(script.contains("globalNgWords: []"));
     }
 
     #[test]

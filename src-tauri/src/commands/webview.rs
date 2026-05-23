@@ -65,6 +65,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
     let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(&app);
     let hide_ad_enabled = load_hide_ad_enabled(&app);
     let zoom_level = load_zoom_level(&app);
+    let global_ng_words = load_global_ng_words(&app);
     let init_script = build_init_script(&InitScriptParams {
         is_mobile: false,
         area_remove_enabled: args.column.settings.area_remove_enabled,
@@ -81,6 +82,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         custom_css: &args.column.settings.custom_css,
         visible_links: &args.column.settings.visible_links,
         ng_words: &args.column.settings.ng_words,
+        global_ng_words: &global_ng_words,
     });
 
     // parent() は &WebviewWindow を要求するため、Linux では get_webview_window を使う。
@@ -148,6 +150,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
     let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(&app);
     let hide_ad_enabled = load_hide_ad_enabled(&app);
     let zoom_level = load_zoom_level(&app);
+    let global_ng_words = load_global_ng_words(&app);
     let init_script = build_init_script(&InitScriptParams {
         is_mobile: true,
         area_remove_enabled: args.column.settings.area_remove_enabled,
@@ -164,6 +167,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         custom_css: &args.column.settings.custom_css,
         visible_links: &args.column.settings.visible_links,
         ng_words: &args.column.settings.ng_words,
+        global_ng_words: &global_ng_words,
     });
 
     // Android では Tauri WebviewWindowBuilder を使わず、
@@ -385,6 +389,18 @@ fn load_popup_esc_close_enabled(app: &AppHandle) -> bool {
         .get("popupEscCloseEnabled")
         .and_then(|v| v.as_bool())
         .unwrap_or(true)
+}
+
+fn load_global_ng_words(app: &AppHandle) -> Vec<String> {
+    load_global_settings(app)
+        .get("ngWords")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn load_use_x_app_for_compose(app: &AppHandle) -> bool {

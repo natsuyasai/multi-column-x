@@ -71,6 +71,7 @@ describe("useAppStore", () => {
         zoomLevel: 1,
         useXAppForCompose: false,
         presets: [],
+        ngWords: [],
       },
       isLoaded: false,
       isMobile: false,

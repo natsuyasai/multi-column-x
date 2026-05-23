@@ -66,6 +66,7 @@ export interface GlobalSettings {
   zoomLevel: number;
   useXAppForCompose: boolean;
   presets: ColumnPreset[];
+  ngWords: string[];
 }
 
 export interface ColumnPreset {
@@ -177,6 +178,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   zoomLevel: 1,
   useXAppForCompose: false,
   presets: [],
+  ngWords: [],
 };
 
 interface ResolveColumnUrlInput {

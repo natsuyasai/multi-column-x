@@ -127,4 +127,8 @@ describe("DEFAULT_GLOBAL_SETTINGS", () => {
   it("presetsのデフォルト値は空配列", () => {
     expect(DEFAULT_GLOBAL_SETTINGS.presets).toEqual([]);
   });
+
+  it("ngWordsのデフォルト値は空配列", () => {
+    expect(DEFAULT_GLOBAL_SETTINGS.ngWords).toEqual([]);
+  });
 });

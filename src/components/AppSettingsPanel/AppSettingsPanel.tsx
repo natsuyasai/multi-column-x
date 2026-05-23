@@ -37,6 +37,10 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
     "general",
   );
 
+  const [globalNgWordsText, setGlobalNgWordsText] = useState(
+    (settings.ngWords ?? []).join("\n"),
+  );
+
   // カラムデフォルト - 自動更新
   const [autoReloadEnabled, setAutoReloadEnabled] = useState(
     settings.defaultAutoReloadEnabled,
@@ -95,6 +99,10 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const ngWords = globalNgWordsText
+      .split("\n")
+      .map((w) => w.trim())
+      .filter((w) => w.length > 0);
     onApply({
       defaultAutoReloadEnabled: autoReloadEnabled,
       defaultAutoReloadInterval: autoReloadInterval,
@@ -113,6 +121,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       hideAdEnabled,
       zoomLevel,
       useXAppForCompose,
+      ngWords,
     });
     onClose();
   };
@@ -405,6 +414,20 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                   </label>
                 </section>
               )}
+
+              <section className={styles.section}>
+                <h3 className={styles.sectionTitle}>グローバルNGワード</h3>
+                <textarea
+                  className={styles.cssTextarea}
+                  value={globalNgWordsText}
+                  onChange={(e) => setGlobalNgWordsText(e.target.value)}
+                  placeholder="1行に1ワードで入力（全カラムに適用）"
+                  spellCheck={false}
+                />
+                <p className={styles.hint}>
+                  全カラムのタイムラインに適用されます。各カラムのNGワードと合わせて使用されます。
+                </p>
+              </section>
 
               <section className={styles.section}>
                 <h3 className={styles.sectionTitle}>WebView</h3>

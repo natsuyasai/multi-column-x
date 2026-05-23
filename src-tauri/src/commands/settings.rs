@@ -116,6 +116,7 @@ impl Default for GlobalSettingsData {
             zoom_level: 1.0,
             use_x_app_for_compose: false,
             presets: vec![],
+            ng_words: vec![],
         }
     }
 }
@@ -241,6 +242,9 @@ pub struct GlobalSettingsData {
     pub use_x_app_for_compose: bool,
     #[serde(default)]
     pub presets: Vec<ColumnPresetData>,
+    #[serde(rename = "ngWords")]
+    #[serde(default)]
+    pub ng_words: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

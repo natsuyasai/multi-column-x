@@ -1,9 +1,12 @@
 (function () {
   const config = window.__multiColumnXConfig;
-  const ngWords = config?.ngWords;
-  if (!ngWords || ngWords.length === 0) return;
+  const combined = [
+    ...(config?.ngWords ?? []),
+    ...(config?.globalNgWords ?? []),
+  ];
+  if (combined.length === 0) return;
 
-  const lowerWords = ngWords.map((w) => w.toLowerCase());
+  const lowerWords = combined.map((w) => w.toLowerCase());
   const TWEET_SELECTOR = 'article[role="article"]';
   const TIMELINE_SELECTOR = 'main[role="main"]';
 
