@@ -115,6 +115,7 @@ impl Default for GlobalSettingsData {
             hide_ad_enabled: true,
             zoom_level: 1.0,
             use_x_app_for_compose: false,
+            presets: vec![],
         }
     }
 }
@@ -169,6 +170,13 @@ pub struct WindowBounds {
     pub y: f64,
     pub width: f64,
     pub height: f64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ColumnPresetData {
+    pub id: String,
+    pub name: String,
+    pub columns: Vec<ColumnData>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -231,6 +239,8 @@ pub struct GlobalSettingsData {
     #[serde(rename = "useXAppForCompose")]
     #[serde(default)]
     pub use_x_app_for_compose: bool,
+    #[serde(default)]
+    pub presets: Vec<ColumnPresetData>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

@@ -4,6 +4,7 @@ import {
   getPageTypeLabel,
   getColumnLabel,
   DEFAULT_COLUMN_SETTINGS,
+  DEFAULT_GLOBAL_SETTINGS,
 } from "./index";
 import type { Column } from "./index";
 
@@ -119,5 +120,11 @@ describe("getColumnLabel", () => {
 describe("DEFAULT_COLUMN_SETTINGS", () => {
   it("ngWordsのデフォルト値は空配列", () => {
     expect(DEFAULT_COLUMN_SETTINGS.ngWords).toEqual([]);
+  });
+});
+
+describe("DEFAULT_GLOBAL_SETTINGS", () => {
+  it("presetsのデフォルト値は空配列", () => {
+    expect(DEFAULT_GLOBAL_SETTINGS.presets).toEqual([]);
   });
 });

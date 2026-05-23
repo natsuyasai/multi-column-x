@@ -1,6 +1,12 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
-import type { Account, Column, GlobalSettings, AppSettings } from "../types";
+import type {
+  Account,
+  Column,
+  ColumnPreset,
+  GlobalSettings,
+  AppSettings,
+} from "../types";
 import { DEFAULT_GLOBAL_SETTINGS } from "../types";
 import { IPC_COMMANDS } from "../constants/ipc";
 
@@ -46,6 +52,9 @@ interface AppStore {
   updateGlobalSettings: (patch: Partial<GlobalSettings>) => void;
   moveColumn: (columnId: string, direction: "left" | "right") => void;
   replaceColumns: (columns: Column[]) => void;
+  savePreset: (name: string) => void;
+  loadPreset: (id: string) => void;
+  deletePreset: (id: string) => void;
 }
 
 export const useAppStore = create<AppStore>((set, get) => ({
@@ -140,6 +149,38 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   replaceColumns: (columns) => {
     set({ columns });
+    get().saveSettings();
+  },
+
+  savePreset: (name) => {
+    const { columns, globalSettings } = get();
+    const preset: ColumnPreset = {
+      id: crypto.randomUUID(),
+      name,
+      columns: columns.map((c) => ({ ...c })),
+    };
+    const presets = [...globalSettings.presets, preset];
+    set((state) => ({
+      globalSettings: { ...state.globalSettings, presets },
+    }));
+    get().saveSettings();
+  },
+
+  loadPreset: (id) => {
+    const { globalSettings } = get();
+    const preset = globalSettings.presets.find((p) => p.id === id);
+    if (!preset) return;
+    set({ columns: preset.columns.map((c) => ({ ...c })) });
+    get().saveSettings();
+  },
+
+  deletePreset: (id) => {
+    set((state) => ({
+      globalSettings: {
+        ...state.globalSettings,
+        presets: state.globalSettings.presets.filter((p) => p.id !== id),
+      },
+    }));
     get().saveSettings();
   },
 }));

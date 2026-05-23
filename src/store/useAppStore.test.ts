@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useAppStore, migrateColumn } from "./useAppStore";
-import type { Account, Column } from "../types";
+import type { Account, Column, ColumnPreset } from "../types";
 
 // Mock invoke from @tauri-apps/api/core
 vi.mock("@tauri-apps/api/core", () => ({
@@ -70,6 +70,7 @@ describe("useAppStore", () => {
         hideAdEnabled: false,
         zoomLevel: 1,
         useXAppForCompose: false,
+        presets: [],
       },
       isLoaded: false,
       isMobile: false,
@@ -155,6 +156,67 @@ describe("useAppStore", () => {
   it("unreadCounts の初期値は空オブジェクト", () => {
     const { result } = renderHook(() => useAppStore());
     expect(result.current.unreadCounts).toEqual({});
+  });
+
+  it("savePreset で現在のカラムをプリセットとして保存できる", () => {
+    const { result } = renderHook(() => useAppStore());
+    act(() => {
+      result.current.addColumn(mockColumn);
+      result.current.savePreset("マイレイアウト");
+    });
+    const presets = result.current.globalSettings.presets;
+    expect(presets).toHaveLength(1);
+    expect(presets[0].name).toBe("マイレイアウト");
+    expect(presets[0].columns).toHaveLength(1);
+    expect(presets[0].id).toBeTruthy();
+  });
+
+  it("savePreset を複数回呼ぶと複数のプリセットが保存される", () => {
+    const { result } = renderHook(() => useAppStore());
+    act(() => {
+      result.current.addColumn(mockColumn);
+      result.current.savePreset("レイアウトA");
+      result.current.savePreset("レイアウトB");
+    });
+    expect(result.current.globalSettings.presets).toHaveLength(2);
+  });
+
+  it("loadPreset で指定IDのプリセットのカラムに差し替えられる", () => {
+    const { result } = renderHook(() => useAppStore());
+    act(() => {
+      result.current.addColumn(mockColumn);
+      result.current.savePreset("テストレイアウト");
+      result.current.removeColumn(mockColumn.id);
+    });
+    const preset = result.current.globalSettings.presets[0];
+    expect(result.current.columns).toHaveLength(0);
+    act(() => {
+      result.current.loadPreset(preset.id);
+    });
+    expect(result.current.columns).toHaveLength(1);
+    expect(result.current.columns[0].id).toBe(mockColumn.id);
+  });
+
+  it("loadPreset で存在しないIDを指定してもカラムは変わらない", () => {
+    const { result } = renderHook(() => useAppStore());
+    act(() => {
+      result.current.addColumn(mockColumn);
+      result.current.loadPreset("non-existent-id");
+    });
+    expect(result.current.columns).toHaveLength(1);
+  });
+
+  it("deletePreset で指定IDのプリセットを削除できる", () => {
+    const { result } = renderHook(() => useAppStore());
+    act(() => {
+      result.current.addColumn(mockColumn);
+      result.current.savePreset("削除対象");
+    });
+    const presetId = result.current.globalSettings.presets[0].id;
+    act(() => {
+      result.current.deletePreset(presetId);
+    });
+    expect(result.current.globalSettings.presets).toHaveLength(0);
   });
 });
 

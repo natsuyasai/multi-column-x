@@ -65,6 +65,13 @@ export interface GlobalSettings {
   hideAdEnabled: boolean;
   zoomLevel: number;
   useXAppForCompose: boolean;
+  presets: ColumnPreset[];
+}
+
+export interface ColumnPreset {
+  id: string;
+  name: string;
+  columns: Column[];
 }
 
 export interface AppSettings {
@@ -169,6 +176,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   hideAdEnabled: true,
   zoomLevel: 1,
   useXAppForCompose: false,
+  presets: [],
 };
 
 interface ResolveColumnUrlInput {

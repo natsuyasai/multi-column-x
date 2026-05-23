@@ -7,6 +7,7 @@ import type {
 } from "../../types";
 import { useAppStore } from "../../store/useAppStore";
 import { ColumnLayoutTab } from "./ColumnLayoutTab";
+import { PresetsTab } from "./PresetsTab";
 import styles from "./AppSettingsPanel.module.scss";
 
 interface AppSettingsPanelProps {
@@ -31,7 +32,10 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   onClose,
 }) => {
   const isMobile = useAppStore((s) => s.isMobile);
-  const [activeTab, setActiveTab] = useState<"general" | "layout">("general");
+  const { savePreset, loadPreset, deletePreset } = useAppStore();
+  const [activeTab, setActiveTab] = useState<"general" | "layout" | "presets">(
+    "general",
+  );
 
   // カラムデフォルト - 自動更新
   const [autoReloadEnabled, setAutoReloadEnabled] = useState(
@@ -156,6 +160,14 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
               onClick={() => setActiveTab("layout")}
             >
               カラム配置
+            </button>
+          )}
+          {!isMobile && (
+            <button
+              className={`${styles.tab} ${activeTab === "presets" ? styles.tabActive : ""}`}
+              onClick={() => setActiveTab("presets")}
+            >
+              プリセット
             </button>
           )}
         </div>
@@ -422,6 +434,18 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 onClose();
               }}
               onCancel={onClose}
+            />
+          )}
+
+          {!isMobile && activeTab === "presets" && (
+            <PresetsTab
+              presets={settings.presets ?? []}
+              onSave={(name) => savePreset(name)}
+              onLoad={(id) => {
+                loadPreset(id);
+                onClose();
+              }}
+              onDelete={(id) => deletePreset(id)}
             />
           )}
         </div>
