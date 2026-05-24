@@ -10,13 +10,8 @@ interface ColumnHeaderProps {
   column: Column;
   account: Account;
   onReload: (columnId: string) => void;
-  onMoveLeft: (columnId: string) => void;
-  onMoveRight: (columnId: string) => void;
   onSettings: (columnId: string) => void;
   onClose: (columnId: string) => void;
-  isFirst: boolean;
-  isLast: boolean;
-  showSortButtons: boolean;
   unreadCount?: number;
   onClearUnread?: (columnId: string) => void;
 }
@@ -25,13 +20,8 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
   column,
   account,
   onReload,
-  onMoveLeft,
-  onMoveRight,
   onSettings,
   onClose,
-  isFirst,
-  isLast,
-  showSortButtons,
   unreadCount = 0,
   onClearUnread,
 }) => {
@@ -76,28 +66,6 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
         >
           ↺
         </button>
-        {showSortButtons && (
-          <>
-            <button
-              className={styles.actionBtn}
-              onClick={() => onMoveLeft(column.id)}
-              disabled={isFirst}
-              aria-label="左に移動"
-              title="左に移動"
-            >
-              ←
-            </button>
-            <button
-              className={styles.actionBtn}
-              onClick={() => onMoveRight(column.id)}
-              disabled={isLast}
-              aria-label="右に移動"
-              title="右に移動"
-            >
-              →
-            </button>
-          </>
-        )}
         <button
           className={styles.actionBtn}
           onClick={() => onSettings(column.id)}

@@ -267,11 +267,6 @@ const App: React.FC = () => {
     [updateGlobalSettings],
   );
 
-  const sortedColumns = useMemo(
-    () => [...columns].sort((a, b) => a.order - b.order),
-    [columns],
-  );
-
   const settingsColumn = settingsColumnId
     ? columns.find((c) => c.id === settingsColumnId)
     : undefined;
@@ -328,7 +323,6 @@ const App: React.FC = () => {
           const account = accounts.find((a) => a.id === column.accountId);
           const bounds = columnBounds[column.id];
           if (!account || !bounds) return null;
-          const idx = sortedColumns.findIndex((c) => c.id === column.id);
           return (
             <div
               key={column.id}
@@ -343,13 +337,8 @@ const App: React.FC = () => {
                 column={column}
                 account={account}
                 onReload={handleReload}
-                onMoveLeft={(id) => handleMoveColumn(id, "left")}
-                onMoveRight={(id) => handleMoveColumn(id, "right")}
                 onSettings={setSettingsColumnId}
                 onClose={handleRemoveColumn}
-                isFirst={idx === 0}
-                isLast={idx === sortedColumns.length - 1}
-                showSortButtons={globalSettings.showSortButtons}
                 unreadCount={unreadCounts[column.id] ?? 0}
                 onClearUnread={clearUnreadCount}
               />
