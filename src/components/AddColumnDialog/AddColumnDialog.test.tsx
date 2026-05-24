@@ -66,6 +66,21 @@ describe("AddColumnDialog", () => {
     ).toBeInTheDocument();
   });
 
+  it("EscキーでonCancelが呼ばれる", () => {
+    const onCancel = vi.fn();
+    render(
+      <AddColumnDialog
+        accounts={mockAccounts}
+        globalSettings={mockGlobalSettings}
+        existingColumns={[]}
+        onAdd={vi.fn()}
+        onCancel={onCancel}
+      />,
+    );
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onCancel).toHaveBeenCalled();
+  });
+
   it("キャンセルボタンでonCancelが呼ばれる", () => {
     const onCancel = vi.fn();
     render(

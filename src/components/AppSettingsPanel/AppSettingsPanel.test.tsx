@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { AppSettingsPanel } from "./AppSettingsPanel";
 import type { GlobalSettings, Column, Account } from "../../types";
@@ -93,6 +93,15 @@ const defaultProps = {
 
 beforeEach(() => {
   mockStoreState.isMobile = false;
+});
+
+describe("AppSettingsPanel", () => {
+  it("EscキーでonCloseが呼ばれる", () => {
+    const onClose = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onClose={onClose} />);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalled();
+  });
 });
 
 describe("AppSettingsPanel グローバルNGワード", () => {

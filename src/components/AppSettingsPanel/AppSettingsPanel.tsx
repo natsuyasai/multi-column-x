@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
 import type {
   GlobalSettings,
   Column,
@@ -33,6 +34,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
 }) => {
   const isMobile = useAppStore((s) => s.isMobile);
   const { savePreset, loadPreset, deletePreset } = useAppStore();
+  useEscapeKey(onClose);
   const [activeTab, setActiveTab] = useState<"general" | "layout" | "presets">(
     "general",
   );

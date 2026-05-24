@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import type { Column, ColumnSettings } from "../../types";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
 import styles from "./SettingsPanel.module.scss";
 
 interface SettingsPanelProps {
@@ -15,6 +16,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   onClose,
   isMobile,
 }) => {
+  useEscapeKey(onClose);
+
   const [settings, setSettings] = useState<ColumnSettings>({
     ...column.settings,
   });

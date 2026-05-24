@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Column } from "../../types";
 import { SettingsPanel } from "./SettingsPanel";
@@ -38,6 +38,15 @@ const defaultProps = {
   onClose: vi.fn(),
   isMobile: false,
 };
+
+describe("SettingsPanel", () => {
+  it("EscキーでonCloseが呼ばれる", () => {
+    const onClose = vi.fn();
+    render(<SettingsPanel {...defaultProps} onClose={onClose} />);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalled();
+  });
+});
 
 describe("SettingsPanel NGワード", () => {
   it("NGワードセクションが表示される", () => {

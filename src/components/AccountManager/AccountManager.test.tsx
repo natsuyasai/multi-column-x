@@ -81,6 +81,21 @@ describe("AccountManager", () => {
     ).toBeInTheDocument();
   });
 
+  it("Escキーでoncloseが呼ばれる", () => {
+    const onClose = vi.fn();
+    render(
+      <AccountManager
+        accounts={mockAccounts}
+        onAddAccount={vi.fn()}
+        onRemoveAccount={vi.fn()}
+        onSetDefault={vi.fn()}
+        onClose={onClose}
+      />,
+    );
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalled();
+  });
+
   it("パネル閉じるボタンに close SVG が表示される", () => {
     const { container } = render(
       <AccountManager

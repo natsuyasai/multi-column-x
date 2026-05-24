@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import type { Account, Column, GlobalSettings, PageType } from "../../types";
 import { DEFAULT_COLUMN_SETTINGS } from "../../types";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
 import styles from "./AddColumnDialog.module.scss";
 
 interface AddColumnDialogProps {
@@ -19,6 +20,8 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
   onAdd,
   onCancel,
 }) => {
+  useEscapeKey(onCancel);
+
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
   const [pageType, setPageType] = useState<PageType>("home");
   const [homeTabName, setHomeTabName] = useState("");

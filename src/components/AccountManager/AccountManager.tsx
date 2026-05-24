@@ -1,5 +1,6 @@
 import React from "react";
 import type { Account } from "../../types";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
 import StarIcon from "../../assets/icons/star.svg?react";
 import StarOutlineIcon from "../../assets/icons/star-outline.svg?react";
 import CloseIcon from "../../assets/icons/close.svg?react";
@@ -22,6 +23,8 @@ export const AccountManager: React.FC<AccountManagerProps> = ({
   onSetDefault,
   onClose,
 }) => {
+  useEscapeKey(onClose);
+
   return (
     <div className={styles.overlay}>
       <div className={styles.panel}>
