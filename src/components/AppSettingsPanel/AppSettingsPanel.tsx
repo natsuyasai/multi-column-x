@@ -159,14 +159,12 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
           >
             一般
           </button>
-          {!isMobile && (
-            <button
-              className={`${styles.tab} ${activeTab === "layout" ? styles.tabActive : ""}`}
-              onClick={() => setActiveTab("layout")}
-            >
-              カラム配置
-            </button>
-          )}
+          <button
+            className={`${styles.tab} ${activeTab === "layout" ? styles.tabActive : ""}`}
+            onClick={() => setActiveTab("layout")}
+          >
+            カラム配置
+          </button>
           {!isMobile && (
             <button
               className={`${styles.tab} ${activeTab === "presets" ? styles.tabActive : ""}`}
@@ -432,7 +430,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
             </form>
           )}
 
-          {!isMobile && activeTab === "layout" && (
+          {activeTab === "layout" && (
             <ColumnLayoutTab
               columns={columns}
               accounts={accounts}
@@ -441,6 +439,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 onClose();
               }}
               onCancel={onClose}
+              isMobile={isMobile}
             />
           )}
 
