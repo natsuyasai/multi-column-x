@@ -53,6 +53,44 @@ const mockColumns: Column[] = [
   },
 ];
 
+// 縦積みグループのテスト用データ: c1, c2 が gridCol=1 に縦積み、c3 が gridCol=2
+const mockColumnsWithStack: Column[] = [
+  {
+    id: "c1",
+    accountId: "acc-1",
+    pageType: "home",
+    width: 350,
+    order: 0,
+    gridRow: 1,
+    gridCol: 1,
+    heightMode: "auto",
+    settings: baseSettings,
+  },
+  {
+    id: "c2",
+    accountId: "acc-1",
+    pageType: "notifications",
+    width: 350,
+    order: 1,
+    gridRow: 2,
+    gridCol: 1,
+    heightMode: "auto",
+    settings: baseSettings,
+  },
+  {
+    id: "c3",
+    accountId: "acc-1",
+    pageType: "search",
+    searchQuery: "test",
+    width: 350,
+    order: 2,
+    gridRow: 1,
+    gridCol: 2,
+    heightMode: "auto",
+    settings: baseSettings,
+  },
+];
+
 describe("ColumnLayoutTab", () => {
   it("グリッドプレビューにカラムが表示される", () => {
     render(
@@ -130,7 +168,7 @@ describe("ColumnLayoutTab カラム順序", () => {
     expect(screen.getByText("表示順序")).toBeInTheDocument();
   });
 
-  it("順序リストに全カラムが表示される", () => {
+  it("縦積みのないケースでは各カラムが個別エントリとして表示される", () => {
     render(
       <ColumnLayoutTab
         columns={mockColumns}
@@ -143,7 +181,22 @@ describe("ColumnLayoutTab カラム順序", () => {
     expect(within(list).getAllByRole("listitem")).toHaveLength(2);
   });
 
-  it("先頭カラムの上へボタンは無効", () => {
+  it("縦積みグループが1エントリとして表示される", () => {
+    // c1, c2 が gridCol=1 に縦積み → グループ1、c3 が gridCol=2 → グループ2
+    render(
+      <ColumnLayoutTab
+        columns={mockColumnsWithStack}
+        accounts={mockAccounts}
+        onApply={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    const list = screen.getByTestId("order-list");
+    // グループ数 = 2（gridCol=1 のグループ、gridCol=2 のグループ）
+    expect(within(list).getAllByRole("listitem")).toHaveLength(2);
+  });
+
+  it("先頭グループの上へボタンは無効", () => {
     render(
       <ColumnLayoutTab
         columns={mockColumns}
@@ -156,7 +209,7 @@ describe("ColumnLayoutTab カラム順序", () => {
     expect(upButtons[0]).toBeDisabled();
   });
 
-  it("末尾カラムの下へボタンは無効", () => {
+  it("末尾グループの下へボタンは無効", () => {
     render(
       <ColumnLayoutTab
         columns={mockColumns}
@@ -169,7 +222,7 @@ describe("ColumnLayoutTab カラム順序", () => {
     expect(downButtons[downButtons.length - 1]).toBeDisabled();
   });
 
-  it("下へボタンで順序が入れ替わり適用するとonApplyに反映される", () => {
+  it("下へボタンでgridCol値が入れ替わり適用するとonApplyに反映される", () => {
     const onApply = vi.fn();
     render(
       <ColumnLayoutTab
@@ -185,10 +238,11 @@ describe("ColumnLayoutTab カラム順序", () => {
     const calledWith = onApply.mock.calls[0][0] as Column[];
     const c1 = calledWith.find((c) => c.id === "c1")!;
     const c2 = calledWith.find((c) => c.id === "c2")!;
-    expect(c1.order).toBeGreaterThan(c2.order);
+    // c1 が後ろに移動 → c1.gridCol > c2.gridCol
+    expect(c1.gridCol).toBeGreaterThan(c2.gridCol);
   });
 
-  it("上へボタンで順序が入れ替わり適用するとonApplyに反映される", () => {
+  it("上へボタンでgridCol値が入れ替わり適用するとonApplyに反映される", () => {
     const onApply = vi.fn();
     render(
       <ColumnLayoutTab
@@ -204,6 +258,52 @@ describe("ColumnLayoutTab カラム順序", () => {
     const calledWith = onApply.mock.calls[0][0] as Column[];
     const c1 = calledWith.find((c) => c.id === "c1")!;
     const c2 = calledWith.find((c) => c.id === "c2")!;
+    // c2 が前に移動 → c2.gridCol < c1.gridCol
+    expect(c2.gridCol).toBeLessThan(c1.gridCol);
+  });
+
+  it("グループ移動後にorder値がgridCol順に正規化される", () => {
+    const onApply = vi.fn();
+    render(
+      <ColumnLayoutTab
+        columns={mockColumns}
+        accounts={mockAccounts}
+        onApply={onApply}
+        onCancel={vi.fn()}
+      />,
+    );
+    const downButtons = screen.getAllByLabelText("下へ");
+    fireEvent.click(downButtons[0]);
+    fireEvent.click(screen.getByText("適用"));
+    const calledWith = onApply.mock.calls[0][0] as Column[];
+    const c1 = calledWith.find((c) => c.id === "c1")!;
+    const c2 = calledWith.find((c) => c.id === "c2")!;
+    // c2 が先頭 → order が小さい
     expect(c2.order).toBeLessThan(c1.order);
+  });
+
+  it("縦積みグループを下へ移動すると全メンバーのgridColが変わる", () => {
+    const onApply = vi.fn();
+    render(
+      <ColumnLayoutTab
+        columns={mockColumnsWithStack}
+        accounts={mockAccounts}
+        onApply={onApply}
+        onCancel={vi.fn()}
+      />,
+    );
+    // グループ1（gridCol=1, c1+c2）を下へ移動
+    const downButtons = screen.getAllByLabelText("下へ");
+    fireEvent.click(downButtons[0]);
+    fireEvent.click(screen.getByText("適用"));
+    const calledWith = onApply.mock.calls[0][0] as Column[];
+    const c1 = calledWith.find((c) => c.id === "c1")!;
+    const c2 = calledWith.find((c) => c.id === "c2")!;
+    const c3 = calledWith.find((c) => c.id === "c3")!;
+    // c1, c2 はグループとして一緒に移動 → c1, c2 の gridCol > c3 の gridCol
+    expect(c1.gridCol).toBeGreaterThan(c3.gridCol);
+    expect(c2.gridCol).toBeGreaterThan(c3.gridCol);
+    // c1 と c2 は同じ gridCol
+    expect(c1.gridCol).toBe(c2.gridCol);
   });
 });
