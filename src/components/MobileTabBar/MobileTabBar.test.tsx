@@ -17,6 +17,7 @@ const baseSettings = {
   smallImageWidth: "50%",
   blurImageEnabled: false,
   blurImageAmount: "10px",
+  ngWords: [],
 };
 
 const acc1: Account = {

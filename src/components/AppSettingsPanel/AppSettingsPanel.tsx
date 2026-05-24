@@ -17,7 +17,9 @@ interface AppSettingsPanelProps {
   accounts: Account[];
   onApply: (patch: Partial<GlobalSettings>) => void;
   onApplyLayout: (columns: Column[]) => void;
-  onApplyColumnDefaults: (patch: Omit<ColumnSettings, "visibleLinks">) => void;
+  onApplyColumnDefaults: (
+    patch: Omit<ColumnSettings, "visibleLinks" | "ngWords">,
+  ) => void;
   onReloadAllWebviews: () => void;
   onClose: () => void;
 }

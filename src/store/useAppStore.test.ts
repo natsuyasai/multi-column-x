@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useAppStore, migrateColumn } from "./useAppStore";
-import type { Account, Column, ColumnPreset } from "../types";
+import type { Account, Column } from "../types";
 
 // Mock invoke from @tauri-apps/api/core
 vi.mock("@tauri-apps/api/core", () => ({
@@ -39,6 +39,7 @@ const mockColumn: Column = {
     smallImageWidth: "50%",
     blurImageEnabled: false,
     blurImageAmount: "10px",
+    ngWords: [],
   },
 };
 

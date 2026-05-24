@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { AppSettingsPanel } from "./AppSettingsPanel";
 import type { GlobalSettings, Column, Account } from "../../types";
@@ -54,6 +54,7 @@ const baseSettings = {
   smallImageWidth: "50%",
   blurImageEnabled: false,
   blurImageAmount: "10px",
+  ngWords: [],
 };
 
 const mockAccounts: Account[] = [

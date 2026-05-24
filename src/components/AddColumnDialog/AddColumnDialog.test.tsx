@@ -34,6 +34,8 @@ const mockGlobalSettings: GlobalSettings = {
   hideAdEnabled: false,
   zoomLevel: 1,
   useXAppForCompose: false,
+  presets: [],
+  ngWords: [],
 };
 
 describe("AddColumnDialog", () => {

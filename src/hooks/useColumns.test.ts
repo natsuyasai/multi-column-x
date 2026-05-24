@@ -30,6 +30,7 @@ const baseSettings = {
   smallImageWidth: "50%",
   blurImageEnabled: false,
   blurImageAmount: "10px",
+  ngWords: [],
 };
 
 function makeCol(
@@ -198,6 +199,7 @@ describe("useColumns mobile", () => {
             smallImageWidth: "50%",
             blurImageEnabled: false,
             blurImageAmount: "10px",
+            ngWords: [],
           },
         },
         {
@@ -223,6 +225,7 @@ describe("useColumns mobile", () => {
             smallImageWidth: "50%",
             blurImageEnabled: false,
             blurImageAmount: "10px",
+            ngWords: [],
           },
         },
       ],
@@ -247,6 +250,8 @@ describe("useColumns mobile", () => {
         hideAdEnabled: false,
         zoomLevel: 1,
         useXAppForCompose: false,
+        presets: [],
+        ngWords: [],
       },
       isLoaded: true,
       isMobile: true,

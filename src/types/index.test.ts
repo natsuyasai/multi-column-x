@@ -30,6 +30,7 @@ const baseColumn: Column = {
     smallImageWidth: "50%",
     blurImageEnabled: false,
     blurImageAmount: "10px",
+    ngWords: [],
   },
 };
 

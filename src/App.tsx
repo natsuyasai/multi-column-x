@@ -49,7 +49,6 @@ const App: React.FC = () => {
     restoreColumns,
     handleAddColumn,
     handleRemoveColumn,
-    handleMoveColumn,
     handleUpdateColumn,
     recalculateAllBounds,
     hideColumnWebviews,
