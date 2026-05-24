@@ -24,28 +24,18 @@ interface TabItemProps {
   column: Column;
   account: Account | undefined;
   isActive: boolean;
-  isFirst: boolean;
-  isLast: boolean;
   swipeActivated: boolean;
   onSelect: () => void;
   onLongPress: () => void;
-  onMoveLeft: () => void;
-  onMoveRight: () => void;
-  showSortButtons: boolean;
 }
 
 const TabItem: React.FC<TabItemProps> = ({
   column,
   account,
   isActive,
-  isFirst,
-  isLast,
   swipeActivated,
   onSelect,
   onLongPress,
-  onMoveLeft,
-  onMoveRight,
-  showSortButtons,
 }) => {
   const { remaining } = useAutoReload({
     columnId: column.id,
@@ -123,34 +113,6 @@ const TabItem: React.FC<TabItemProps> = ({
       />
       <span className={styles.label}>{getTabLabel(column)}</span>
       {showCountdown && <span className={styles.countdown}>{remaining}s</span>}
-      {isActive && showSortButtons && (
-        <>
-          <button
-            className={styles.tabBtn}
-            aria-label="左に移動"
-            title="左に移動"
-            disabled={isFirst}
-            onClick={(e) => {
-              e.stopPropagation();
-              onMoveLeft();
-            }}
-          >
-            ←
-          </button>
-          <button
-            className={styles.tabBtn}
-            aria-label="右に移動"
-            title="右に移動"
-            disabled={isLast}
-            onClick={(e) => {
-              e.stopPropagation();
-              onMoveRight();
-            }}
-          >
-            →
-          </button>
-        </>
-      )}
     </div>
   );
 };
@@ -164,14 +126,11 @@ interface Props {
     phase: "progress" | "switching";
   } | null;
   onSelectColumn: (id: string) => void;
-  onMoveLeft: (id: string) => void;
-  onMoveRight: (id: string) => void;
   onAddColumn: () => void;
   onAccountManager: () => void;
   onAppSettings: () => void;
   onOpenLinkPopup: () => void;
   onComposeTweet: () => void;
-  showSortButtons: boolean;
   onTabAction: (columnId: string) => void;
 }
 
@@ -181,14 +140,11 @@ export const MobileTabBar: React.FC<Props> = ({
   activeColumnId,
   swipeState,
   onSelectColumn,
-  onMoveLeft,
-  onMoveRight,
   onAddColumn,
   onAccountManager,
   onAppSettings,
   onOpenLinkPopup,
   onComposeTweet,
-  showSortButtons,
   onTabAction,
 }) => {
   const sorted = [...columns].sort((a, b) => a.order - b.order);
@@ -212,7 +168,7 @@ export const MobileTabBar: React.FC<Props> = ({
         </div>
       )}
       <div className={styles.tabs}>
-        {sorted.map((col, idx) => {
+        {sorted.map((col) => {
           const account = accounts.find((a) => a.id === col.accountId);
           const isActive = col.id === activeColumnId;
           return (
@@ -221,14 +177,9 @@ export const MobileTabBar: React.FC<Props> = ({
               column={col}
               account={account}
               isActive={isActive}
-              isFirst={idx === 0}
-              isLast={idx === sorted.length - 1}
               swipeActivated={isActive && swipeState?.phase === "switching"}
               onSelect={() => onSelectColumn(col.id)}
               onLongPress={() => onTabAction(col.id)}
-              onMoveLeft={() => onMoveLeft(col.id)}
-              onMoveRight={() => onMoveRight(col.id)}
-              showSortButtons={showSortButtons}
             />
           );
         })}

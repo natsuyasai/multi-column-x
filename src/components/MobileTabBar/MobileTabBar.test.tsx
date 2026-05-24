@@ -55,14 +55,11 @@ const defaultProps = {
   accounts: [acc1],
   activeColumnId: "col-1",
   onSelectColumn: vi.fn(),
-  onMoveLeft: vi.fn(),
-  onMoveRight: vi.fn(),
   onAddColumn: vi.fn(),
   onAccountManager: vi.fn(),
   onAppSettings: vi.fn(),
   onOpenLinkPopup: vi.fn(),
   onComposeTweet: vi.fn(),
-  showSortButtons: true,
   onTabAction: vi.fn(),
 };
 
@@ -129,6 +126,12 @@ describe("MobileTabBar", () => {
     expect(screen.queryByText("ホーム")).not.toBeInTheDocument();
   });
 
+  it("タブに並び替えボタンが存在しない", () => {
+    render(<MobileTabBar {...defaultProps} columns={[col1, col2]} />);
+    expect(screen.queryByLabelText("左に移動")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("右に移動")).not.toBeInTheDocument();
+  });
+
   it("アカウント管理ボタンをクリックすると onAccountManager が呼ばれる", async () => {
     const onAccountManager = vi.fn();
     render(
@@ -153,30 +156,6 @@ describe("MobileTabBar", () => {
     await userEvent.click(screen.getByTitle("メニュー表示の切り替え"));
     await userEvent.click(screen.getByRole("button", { name: "カラムを追加" }));
     expect(onAddColumn).toHaveBeenCalled();
-  });
-
-  it("showSortButtons=false のとき TabItem の左右移動ボタンが非表示になる", () => {
-    render(
-      <MobileTabBar
-        {...defaultProps}
-        columns={[col1]}
-        showSortButtons={false}
-      />,
-    );
-    expect(screen.queryByLabelText("左に移動")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("右に移動")).not.toBeInTheDocument();
-  });
-
-  it("showSortButtons=true のとき TabItem の左右移動ボタンが表示される", () => {
-    render(
-      <MobileTabBar
-        {...defaultProps}
-        columns={[col1]}
-        showSortButtons={true}
-      />,
-    );
-    expect(screen.getByLabelText("左に移動")).toBeInTheDocument();
-    expect(screen.getByLabelText("右に移動")).toBeInTheDocument();
   });
 
   describe("アクションボタンの SVG アイコン", () => {

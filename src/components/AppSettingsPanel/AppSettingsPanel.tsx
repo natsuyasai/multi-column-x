@@ -88,9 +88,6 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   const [videoAutoPlayStopEnabled, setVideoAutoPlayStopEnabled] = useState(
     settings.videoAutoPlayStopEnabled,
   );
-  const [showSortButtons, setShowSortButtons] = useState(
-    settings.showSortButtons,
-  );
   const [hideAdEnabled, setHideAdEnabled] = useState(settings.hideAdEnabled);
   const [zoomLevel, setZoomLevel] = useState(settings.zoomLevel ?? 1);
   const [useXAppForCompose, setUseXAppForCompose] = useState(
@@ -113,7 +110,6 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       defaultColumnCustomCSS,
       popupEscCloseEnabled,
       videoAutoPlayStopEnabled,
-      showSortButtons,
       smallImageEnabled,
       smallImageWidth,
       blurImageEnabled,
@@ -349,18 +345,6 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 >
                   既存の全カラムに適用
                 </button>
-              </section>
-
-              <section className={styles.section}>
-                <h3 className={styles.sectionTitle}>カラム</h3>
-                <label className={styles.checkLabel}>
-                  <input
-                    type="checkbox"
-                    checked={showSortButtons}
-                    onChange={(e) => setShowSortButtons(e.target.checked)}
-                  />
-                  並び替えボタンを表示する
-                </label>
               </section>
 
               <section className={styles.section}>

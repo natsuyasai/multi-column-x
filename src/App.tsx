@@ -304,14 +304,11 @@ const App: React.FC = () => {
           accounts={accounts}
           activeColumnId={activeColumnId}
           onSelectColumn={setActiveColumn}
-          onMoveLeft={(id) => handleMoveColumn(id, "left")}
-          onMoveRight={(id) => handleMoveColumn(id, "right")}
           onAddColumn={() => setShowAddColumn(true)}
           onAccountManager={() => setShowAccountManager(true)}
           onAppSettings={() => setShowAppSettings(true)}
           onOpenLinkPopup={handleOpenLinkPopup}
           onComposeTweet={handleComposeTweet}
-          showSortButtons={globalSettings.showSortButtons}
           onTabAction={handleTabAction}
           swipeState={swipeState}
         />
