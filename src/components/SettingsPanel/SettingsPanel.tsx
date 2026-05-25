@@ -7,6 +7,7 @@ interface SettingsPanelProps {
   column: Column;
   onApply: (columnId: string, settings: ColumnSettings, width: number) => void;
   onClose: () => void;
+  onReload?: (columnId: string) => void;
   isMobile: boolean;
 }
 
@@ -14,6 +15,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   column,
   onApply,
   onClose,
+  onReload,
   isMobile,
 }) => {
   useEscapeKey(onClose);
@@ -258,6 +260,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </section>
 
           <div className={styles.actions}>
+            {onReload && (
+              <button
+                type="button"
+                className={styles.reloadBtn}
+                onClick={() => onReload(column.id)}
+              >
+                再読み込み
+              </button>
+            )}
             <button
               type="button"
               className={styles.cancelBtn}

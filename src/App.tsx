@@ -431,6 +431,7 @@ const App: React.FC = () => {
           column={settingsColumn}
           onApply={handleApplySettings}
           onClose={() => setSettingsColumnId(null)}
+          onReload={handleReload}
           isMobile={isMobile}
         />
       )}

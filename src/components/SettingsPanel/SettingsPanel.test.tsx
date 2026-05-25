@@ -46,6 +46,29 @@ describe("SettingsPanel", () => {
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).toHaveBeenCalled();
   });
+
+  it("再読み込みボタンが表示される", () => {
+    render(<SettingsPanel {...defaultProps} onReload={vi.fn()} />);
+    expect(
+      screen.getByRole("button", { name: "再読み込み" }),
+    ).toBeInTheDocument();
+  });
+
+  it("再読み込みボタンをクリックするとonReloadが列IDで呼ばれる", async () => {
+    const onReload = vi.fn();
+    render(<SettingsPanel {...defaultProps} onReload={onReload} />);
+    await userEvent.click(screen.getByRole("button", { name: "再読み込み" }));
+    expect(onReload).toHaveBeenCalledWith("col-1");
+  });
+
+  it("再読み込みボタンをクリックしてもパネルは閉じない", async () => {
+    const onClose = vi.fn();
+    render(
+      <SettingsPanel {...defaultProps} onClose={onClose} onReload={vi.fn()} />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "再読み込み" }));
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });
 
 describe("SettingsPanel NGワード", () => {

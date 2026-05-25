@@ -166,6 +166,21 @@
   flex-shrink: 0;
 }
 
+.reloadBtn {
+  background: #2a2a2a;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: #aaa;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 7px 16px;
+  margin-right: auto;
+
+  &:hover {
+    background: #333;
+  }
+}
+
 .cancelBtn {
   background: #2a2a2a;
   border: 1px solid #333;
