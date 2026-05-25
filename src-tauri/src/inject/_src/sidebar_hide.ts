@@ -5,7 +5,6 @@
 
   function expandChildren(
     root: HTMLElement,
-    targetMaxWidth: string,
     state: { stopped: boolean },
   ): void {
     if (state.stopped) return;
@@ -16,10 +15,13 @@
         return;
       }
       const el = child as HTMLElement;
-      if (getComputedStyle(el).maxWidth === targetMaxWidth) {
+      if (
+        el.tagName === "DIV" &&
+        getComputedStyle(el).maxWidth.endsWith("px")
+      ) {
         el.style.maxWidth = "100%";
       }
-      expandChildren(el, targetMaxWidth, state);
+      expandChildren(el, state);
     }
   }
 
@@ -45,12 +47,8 @@
     const primary = document.body.querySelector<HTMLElement>(PRIMARY_SELECTOR);
     if (!primary) return;
 
-    const originalMaxWidth = getComputedStyle(primary).maxWidth;
     primary.style.maxWidth = "100%";
-
-    if (originalMaxWidth && originalMaxWidth !== "none") {
-      expandChildren(primary, originalMaxWidth, { stopped: false });
-    }
+    expandChildren(primary, { stopped: false });
 
     expandParents(primary);
   }
