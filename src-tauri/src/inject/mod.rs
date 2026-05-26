@@ -52,6 +52,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     };
     let video_control = include_str!("video_control.js");
     let sidebar_hide = include_str!("sidebar_hide.js");
+    let top_nav_hide = include_str!("top_nav_hide.js");
 
     let visible_links_json =
         serde_json::to_string(params.visible_links).unwrap_or_else(|_| "[]".to_string());
@@ -88,7 +89,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     };
 
     let mut script = format!(
-        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
+        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
         config,
         zoom,
         tab_selector,
@@ -104,7 +105,8 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         scroll_pos_restore,
         context_menu,
         scroll_event,
-        sidebar_hide
+        sidebar_hide,
+        top_nav_hide
     );
 
     if !params.custom_css.is_empty() {
