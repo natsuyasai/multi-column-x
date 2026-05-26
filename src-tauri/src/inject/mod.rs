@@ -6,7 +6,6 @@ pub struct InitScriptParams<'a> {
     pub is_mobile: bool,
     pub area_remove_enabled: bool,
     pub show_custom_menu: bool,
-    pub auto_reload_enabled: bool,
     pub scroll_pos_restore_enabled: bool,
     pub video_auto_play_stop_enabled: bool,
     pub small_image_enabled: bool,
@@ -81,11 +80,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     } else {
         String::new()
     };
-    let auto_reload_part = if params.auto_reload_enabled {
-        format!("\n{}", auto_reload)
-    } else {
-        String::new()
-    };
+    let auto_reload_part = format!("\n{}", auto_reload);
     let video_control_part = if params.video_auto_play_stop_enabled {
         format!("\n{}", video_control)
     } else {
@@ -153,7 +148,6 @@ mod tests {
             is_mobile: false,
             area_remove_enabled: false,
             show_custom_menu: true,
-            auto_reload_enabled: false,
             scroll_pos_restore_enabled: false,
             video_auto_play_stop_enabled: false,
             small_image_enabled: false,
