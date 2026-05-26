@@ -1,5 +1,6 @@
 (function () {
-  function apply(): void {
+  // TopNavBar 配下で DashButton を含む div を非表示にする
+  function applyTopNavHide(): void {
     const navBar = document.querySelector<HTMLElement>(
       "div[data-testid='TopNavBar']",
     );
@@ -26,6 +27,28 @@
       }
       current = current.parentElement;
     }
+  }
+
+  // #layers 配下の div のうち position:absolute の子要素を複数持つものを非表示にする
+  function applyLayersHide(): void {
+    const layers = document.getElementById("layers");
+    if (!layers) return;
+
+    for (const child of Array.from(layers.children)) {
+      if (child.tagName !== "DIV") continue;
+      const el = child as HTMLElement;
+      const absoluteChildren = Array.from(el.children).filter(
+        (c) => getComputedStyle(c as HTMLElement).position === "absolute",
+      );
+      if (absoluteChildren.length >= 2 && el.style.display !== "none") {
+        el.style.setProperty("display", "none", "important");
+      }
+    }
+  }
+
+  function apply(): void {
+    applyTopNavHide();
+    applyLayersHide();
   }
 
   let applyTimer: ReturnType<typeof setTimeout> | undefined;

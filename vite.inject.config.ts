@@ -23,7 +23,7 @@ const plainEntries = [
   "zoom",
   "blur_image",
   "sidebar_hide",
-  "top_nav_hide",
+  "mobile_area_hide",
 ];
 
 // React を含む header_customizer は IIFE + inlineDynamicImports で個別ビルド
