@@ -11,21 +11,26 @@
     );
     if (!dashButton) return;
 
-    // ダッシュボタンから親を辿り、div 同士が兄弟になっている最初の階層を探す
-    let current: HTMLElement | null = dashButton.parentElement;
-    while (current && current !== navBar) {
-      if (current.tagName === "DIV" && current.parentElement) {
-        const siblingDivs = Array.from(current.parentElement.children).filter(
-          (el) => el.tagName === "DIV",
-        );
-        if (siblingDivs.length >= 2) {
-          if (current.style.display !== "none") {
-            current.style.setProperty("display", "none", "important");
-          }
-          return;
+    // BFS で TopNavBar 直下から探索し、div が複数並ぶ最初の階層を見つける
+    const queue: HTMLElement[] = [navBar];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const divChildren = Array.from(current.children).filter(
+        (el) => el.tagName === "DIV",
+      ) as HTMLElement[];
+
+      if (divChildren.length >= 2) {
+        // div が並んでいる階層が見つかった。dashButton を含む方を非表示にする
+        const target = divChildren.find((div) => div.contains(dashButton));
+        if (target && target.style.display !== "none") {
+          target.style.setProperty("display", "none", "important");
         }
+        return;
       }
-      current = current.parentElement;
+
+      for (const child of divChildren) {
+        queue.push(child);
+      }
     }
   }
 
@@ -42,6 +47,7 @@
       );
       if (absoluteChildren.length >= 2 && el.style.display !== "none") {
         el.style.setProperty("display", "none", "important");
+        return;
       }
     }
   }
