@@ -69,7 +69,7 @@ describe("TopBar", () => {
   it("ツイート作成ボタンをクリックすると onComposeTweet が呼ばれる", async () => {
     const onComposeTweet = vi.fn();
     render(<TopBar {...defaultProps} onComposeTweet={onComposeTweet} />);
-    await userEvent.click(screen.getByTitle("ツイートを作成"));
+    await userEvent.click(screen.getByTitle("ツイートを作成 (Ctrl+T)"));
     expect(onComposeTweet).toHaveBeenCalled();
   });
 
@@ -85,35 +85,37 @@ describe("TopBar", () => {
   it("URLを開くボタンをクリックすると onOpenLinkPopup が呼ばれる", async () => {
     const onOpen = vi.fn();
     render(<TopBar {...defaultProps} onOpenLinkPopup={onOpen} />);
-    await userEvent.click(screen.getByTitle("URLをポップアップで開く"));
+    await userEvent.click(
+      screen.getByTitle("URLをポップアップで開く (Ctrl+L)"),
+    );
     expect(onOpen).toHaveBeenCalled();
   });
 
   it("カラム追加ボタンをクリックすると onAddColumn が呼ばれる", async () => {
     const onAdd = vi.fn();
     render(<TopBar {...defaultProps} onAddColumn={onAdd} />);
-    await userEvent.click(screen.getByTitle("カラムを追加"));
+    await userEvent.click(screen.getByTitle("カラムを追加 (Ctrl+N)"));
     expect(onAdd).toHaveBeenCalled();
   });
 
   it("アカウント管理ボタンをクリックすると onAccountManager が呼ばれる", async () => {
     const onAcc = vi.fn();
     render(<TopBar {...defaultProps} onAccountManager={onAcc} />);
-    await userEvent.click(screen.getByTitle("アカウント管理"));
+    await userEvent.click(screen.getByTitle("アカウント管理 (Ctrl+Shift+A)"));
     expect(onAcc).toHaveBeenCalled();
   });
 
   it("設定ボタンをクリックすると onAppSettings が呼ばれる", async () => {
     const onSet = vi.fn();
     render(<TopBar {...defaultProps} onAppSettings={onSet} />);
-    await userEvent.click(screen.getByTitle("アプリ設定"));
+    await userEvent.click(screen.getByTitle("アプリ設定 (Ctrl+,)"));
     expect(onSet).toHaveBeenCalled();
   });
 
   it("展開トグルをクリックすると onToggleExpand が呼ばれる", async () => {
     const onToggle = vi.fn();
     render(<TopBar {...defaultProps} onToggleExpand={onToggle} />);
-    await userEvent.click(screen.getByTitle("ツールバーを展開"));
+    await userEvent.click(screen.getByTitle("ツールバーを展開 (Ctrl+B)"));
     expect(onToggle).toHaveBeenCalled();
   });
 
@@ -132,13 +134,15 @@ describe("TopBar", () => {
 
   it("expanded=true のとき展開トグルのタイトルが「折りたたむ」になる", () => {
     render(<TopBar {...defaultProps} expanded={true} />);
-    expect(screen.getByTitle("ツールバーを折りたたむ")).toBeInTheDocument();
+    expect(
+      screen.getByTitle("ツールバーを折りたたむ (Ctrl+B)"),
+    ).toBeInTheDocument();
   });
 
   it("カラムにカスタムラベルがある場合はそれが title 属性に出る", () => {
     const labeled: Column = { ...col1, label: "マイホーム" };
     render(<TopBar {...defaultProps} columns={[labeled]} />);
-    expect(screen.getByTitle("マイホーム")).toBeInTheDocument();
+    expect(screen.getByTitle("マイホーム (Ctrl+1)")).toBeInTheDocument();
   });
 
   describe("アクションボタンの SVG アイコン", () => {
@@ -146,7 +150,7 @@ describe("TopBar", () => {
       const { container } = render(<TopBar {...defaultProps} />);
       expect(
         container
-          .querySelector('[title="ツイートを作成"]')
+          .querySelector('[title="ツイートを作成 (Ctrl+T)"]')
           ?.querySelector('[data-testid="icon-pencil"]'),
       ).toBeInTheDocument();
     });
@@ -155,7 +159,7 @@ describe("TopBar", () => {
       const { container } = render(<TopBar {...defaultProps} />);
       expect(
         container
-          .querySelector('[title="URLをポップアップで開く"]')
+          .querySelector('[title="URLをポップアップで開く (Ctrl+L)"]')
           ?.querySelector('[data-testid="icon-link"]'),
       ).toBeInTheDocument();
     });
@@ -164,7 +168,7 @@ describe("TopBar", () => {
       const { container } = render(<TopBar {...defaultProps} />);
       expect(
         container
-          .querySelector('[title="カラムを追加"]')
+          .querySelector('[title="カラムを追加 (Ctrl+N)"]')
           ?.querySelector('[data-testid="icon-plus"]'),
       ).toBeInTheDocument();
     });
@@ -173,7 +177,7 @@ describe("TopBar", () => {
       const { container } = render(<TopBar {...defaultProps} />);
       expect(
         container
-          .querySelector('[title="アカウント管理"]')
+          .querySelector('[title="アカウント管理 (Ctrl+Shift+A)"]')
           ?.querySelector('[data-testid="icon-person"]'),
       ).toBeInTheDocument();
     });
@@ -182,7 +186,7 @@ describe("TopBar", () => {
       const { container } = render(<TopBar {...defaultProps} />);
       expect(
         container
-          .querySelector('[title="アプリ設定"]')
+          .querySelector('[title="アプリ設定 (Ctrl+,)"]')
           ?.querySelector('[data-testid="icon-settings"]'),
       ).toBeInTheDocument();
     });

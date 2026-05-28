@@ -88,7 +88,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           <button
             className={`${styles.composeBtn}${expanded ? ` ${styles.btnExpanded}` : ""}`}
             onClick={onComposeTweet}
-            title="ツイートを作成"
+            title="ツイートを作成 (Ctrl+T)"
           >
             <PencilIcon
               width={16}
@@ -101,7 +101,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           <button
             className={`${styles.btn}${expanded ? ` ${styles.btnExpanded}` : ""}`}
             onClick={onOpenLinkPopup}
-            title="URLをポップアップで開く"
+            title="URLをポップアップで開く (Ctrl+L)"
           >
             <LinkIcon
               width={16}
@@ -114,7 +114,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           <button
             className={`${styles.btn}${expanded ? ` ${styles.btnExpanded}` : ""}`}
             onClick={onAddColumn}
-            title="カラムを追加"
+            title="カラムを追加 (Ctrl+N)"
           >
             <PlusIcon
               width={16}
@@ -127,7 +127,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           <button
             className={`${styles.btn}${expanded ? ` ${styles.btnExpanded}` : ""}`}
             onClick={onAccountManager}
-            title="アカウント管理"
+            title="アカウント管理 (Ctrl+Shift+A)"
           >
             <PersonIcon
               width={16}
@@ -140,7 +140,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           <button
             className={`${styles.btn}${expanded ? ` ${styles.btnExpanded}` : ""}`}
             onClick={onAppSettings}
-            title="アプリ設定"
+            title="アプリ設定 (Ctrl+,)"
           >
             <SettingsIcon
               width={16}
@@ -156,12 +156,16 @@ export const TopBar: React.FC<TopBarProps> = ({
           <>
             <div className={styles.divider} />
             <div className={styles.columnList}>
-              {sorted.map((col) => (
+              {sorted.map((col, index) => (
                 <button
                   key={col.id}
                   className={styles.btn}
                   onClick={() => onJumpToColumn(col.id)}
-                  title={columnDisplayName(col, accounts)}
+                  title={
+                    index < 9
+                      ? `${columnDisplayName(col, accounts)} (Ctrl+${index + 1})`
+                      : columnDisplayName(col, accounts)
+                  }
                 >
                   {getColumnIcon(col.pageType)}
                 </button>
@@ -175,7 +179,11 @@ export const TopBar: React.FC<TopBarProps> = ({
         <button
           className={styles.toggleBtn}
           onClick={onToggleExpand}
-          title={expanded ? "ツールバーを折りたたむ" : "ツールバーを展開"}
+          title={
+            expanded
+              ? "ツールバーを折りたたむ (Ctrl+B)"
+              : "ツールバーを展開 (Ctrl+B)"
+          }
         >
           {expanded ? "▲" : "▼"}
         </button>
@@ -183,12 +191,16 @@ export const TopBar: React.FC<TopBarProps> = ({
 
       {expanded && (
         <div className={styles.row2} data-testid="topbar-row2">
-          {sorted.map((col) => (
+          {sorted.map((col, index) => (
             <button
               key={col.id}
               className={`${styles.btn} ${styles.btnExpanded}`}
               onClick={() => onJumpToColumn(col.id)}
-              title={columnDisplayName(col, accounts)}
+              title={
+                index < 9
+                  ? `${columnDisplayName(col, accounts)} (Ctrl+${index + 1})`
+                  : columnDisplayName(col, accounts)
+              }
             >
               <span className={styles.icon}>{getColumnIcon(col.pageType)}</span>
               <span className={styles.label}>
