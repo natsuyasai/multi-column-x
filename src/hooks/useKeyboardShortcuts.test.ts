@@ -13,11 +13,33 @@ vi.mock("@tauri-apps/api/event", () => ({
   }),
 }));
 
-describe("useKeyboardShortcuts", () => {
-  let onComposeTweet: ReturnType<typeof vi.fn>;
+function makeProps(
+  overrides: Partial<{
+    onComposeTweet: () => void;
+    onOpenLinkPopup: () => void;
+    onAddColumn: () => void;
+    onAccountManager: () => void;
+    onAppSettings: () => void;
+    onToggleTopBar: () => void;
+    onJumpToColumn: (index: number) => void;
+    disabled: boolean;
+  }> = {},
+) {
+  return {
+    onComposeTweet: vi.fn(),
+    onOpenLinkPopup: vi.fn(),
+    onAddColumn: vi.fn(),
+    onAccountManager: vi.fn(),
+    onAppSettings: vi.fn(),
+    onToggleTopBar: vi.fn(),
+    onJumpToColumn: vi.fn(),
+    disabled: false,
+    ...overrides,
+  };
+}
 
+describe("useKeyboardShortcuts", () => {
   beforeEach(() => {
-    onComposeTweet = vi.fn();
     capturedListenCallback = null;
     mockUnlisten.mockReset();
   });
@@ -27,64 +49,85 @@ describe("useKeyboardShortcuts", () => {
   });
 
   it("Ctrl+T を押すと onComposeTweet が呼ばれる", () => {
-    renderHook(() => useKeyboardShortcuts({ onComposeTweet }));
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
     window.dispatchEvent(
       new KeyboardEvent("keydown", { key: "t", ctrlKey: true }),
     );
-    expect(onComposeTweet).toHaveBeenCalledOnce();
+    expect(props.onComposeTweet).toHaveBeenCalledOnce();
   });
 
   it("Ctrl+T（大文字T）を押すと onComposeTweet が呼ばれる", () => {
-    renderHook(() => useKeyboardShortcuts({ onComposeTweet }));
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
     window.dispatchEvent(
       new KeyboardEvent("keydown", { key: "T", ctrlKey: true }),
     );
-    expect(onComposeTweet).toHaveBeenCalledOnce();
+    expect(props.onComposeTweet).toHaveBeenCalledOnce();
   });
 
   it("T キーだけでは onComposeTweet が呼ばれない", () => {
-    renderHook(() => useKeyboardShortcuts({ onComposeTweet }));
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
     window.dispatchEvent(
       new KeyboardEvent("keydown", { key: "t", ctrlKey: false }),
     );
-    expect(onComposeTweet).not.toHaveBeenCalled();
+    expect(props.onComposeTweet).not.toHaveBeenCalled();
   });
 
   it("Ctrl+A では onComposeTweet が呼ばれない", () => {
-    renderHook(() => useKeyboardShortcuts({ onComposeTweet }));
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
     window.dispatchEvent(
       new KeyboardEvent("keydown", { key: "a", ctrlKey: true }),
     );
-    expect(onComposeTweet).not.toHaveBeenCalled();
+    expect(props.onComposeTweet).not.toHaveBeenCalled();
   });
 
   it("アンマウント後は Ctrl+T を押しても onComposeTweet が呼ばれない", () => {
-    const { unmount } = renderHook(() =>
-      useKeyboardShortcuts({ onComposeTweet }),
-    );
+    const props = makeProps();
+    const { unmount } = renderHook(() => useKeyboardShortcuts(props));
     unmount();
     window.dispatchEvent(
       new KeyboardEvent("keydown", { key: "t", ctrlKey: true }),
     );
-    expect(onComposeTweet).not.toHaveBeenCalled();
+    expect(props.onComposeTweet).not.toHaveBeenCalled();
   });
 
   it("WebView から webview-keyboard-shortcut イベントを受信すると onComposeTweet が呼ばれる", async () => {
-    renderHook(() => useKeyboardShortcuts({ onComposeTweet }));
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
     await act(async () => {
       capturedListenCallback?.({ payload: "compose_tweet" });
     });
-    expect(onComposeTweet).toHaveBeenCalledOnce();
+    expect(props.onComposeTweet).toHaveBeenCalledOnce();
   });
 
   it("アンマウント後は webview-keyboard-shortcut イベントを受信しても onComposeTweet が呼ばれない", async () => {
-    const { unmount } = renderHook(() =>
-      useKeyboardShortcuts({ onComposeTweet }),
-    );
+    const props = makeProps();
+    const { unmount } = renderHook(() => useKeyboardShortcuts(props));
     unmount();
     await act(async () => {
       capturedListenCallback?.({ payload: "compose_tweet" });
     });
-    expect(onComposeTweet).not.toHaveBeenCalled();
+    expect(props.onComposeTweet).not.toHaveBeenCalled();
+  });
+
+  it("disabled=true のとき Ctrl+T を押しても onComposeTweet が呼ばれない", () => {
+    const props = makeProps({ disabled: true });
+    renderHook(() => useKeyboardShortcuts(props));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "t", ctrlKey: true }),
+    );
+    expect(props.onComposeTweet).not.toHaveBeenCalled();
+  });
+
+  it("disabled=true のとき webview イベントを受信しても onComposeTweet が呼ばれない", async () => {
+    const props = makeProps({ disabled: true });
+    renderHook(() => useKeyboardShortcuts(props));
+    await act(async () => {
+      capturedListenCallback?.({ payload: "compose_tweet" });
+    });
+    expect(props.onComposeTweet).not.toHaveBeenCalled();
   });
 });

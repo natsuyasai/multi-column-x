@@ -4,22 +4,49 @@ import { IPC_EVENTS } from "../constants/ipc";
 
 interface KeyboardShortcutsOptions {
   onComposeTweet: () => void;
+  onOpenLinkPopup: () => void;
+  onAddColumn: () => void;
+  onAccountManager: () => void;
+  onAppSettings: () => void;
+  onToggleTopBar: () => void;
+  onJumpToColumn: (index: number) => void;
+  disabled?: boolean;
 }
 
 export function useKeyboardShortcuts({
   onComposeTweet,
+  onOpenLinkPopup,
+  onAddColumn,
+  onAccountManager,
+  onAppSettings,
+  onToggleTopBar,
+  onJumpToColumn,
+  disabled = false,
 }: KeyboardShortcutsOptions): void {
   useEffect(() => {
+    if (disabled) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key.toLowerCase() === "t") {
+      if (!e.ctrlKey) return;
+      const key = e.key.toLowerCase();
+      if (key === "t") {
         onComposeTweet();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onComposeTweet]);
+  }, [
+    onComposeTweet,
+    onOpenLinkPopup,
+    onAddColumn,
+    onAccountManager,
+    onAppSettings,
+    onToggleTopBar,
+    onJumpToColumn,
+    disabled,
+  ]);
 
   useEffect(() => {
+    if (disabled) return;
     let active = true;
     const unlisten = listen<string>(
       IPC_EVENTS.WEBVIEW_KEYBOARD_SHORTCUT,
@@ -34,5 +61,13 @@ export function useKeyboardShortcuts({
       active = false;
       unlisten.then((fn) => fn());
     };
-  }, [onComposeTweet]);
+  }, [
+    onComposeTweet,
+    onOpenLinkPopup,
+    onAddColumn,
+    onAccountManager,
+    onAppSettings,
+    onToggleTopBar,
+    disabled,
+  ]);
 }
