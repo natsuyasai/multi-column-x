@@ -13,6 +13,7 @@ import { MobileTabBar } from "./components/MobileTabBar/MobileTabBar";
 import { TabActionDialog } from "./components/TabActionDialog/TabActionDialog";
 import { LinkPopupDialog } from "./components/LinkPopupDialog/LinkPopupDialog";
 import { useDialogState } from "./hooks/useDialogState";
+import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { platform } from "@tauri-apps/plugin-os";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -258,6 +259,8 @@ const App: React.FC = () => {
       dataDirectory: account.dataDirectory,
     }).catch(console.error);
   }, [accounts, globalSettings.defaultAccountId]);
+
+  useKeyboardShortcuts({ onComposeTweet: handleComposeTweet });
 
   const handleSetDefaultAccount = useCallback(
     (id: string) => {

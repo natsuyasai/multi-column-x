@@ -42,6 +42,9 @@ export const IPC_COMMANDS = {
 
   // 未読カウント
   REPORT_NEW_POSTS_COUNT: "report_new_posts_count",
+
+  // キーボードショートカット
+  REPORT_KEYBOARD_SHORTCUT: "report_keyboard_shortcut",
 } as const;
 
 /** Tauri イベント名 */
@@ -62,6 +65,8 @@ export const IPC_EVENTS = {
   COLUMN_DOUBLE_TAP: "column-double-tap",
   /** 新着投稿カウント（inject script invoke → TS listen）{ label, count } */
   WEBVIEW_NEW_POSTS_COUNT: "webview-new-posts-count",
+  /** キーボードショートカット（inject script invoke → TS listen）キー種別文字列 */
+  WEBVIEW_KEYBOARD_SHORTCUT: "webview-keyboard-shortcut",
 } as const;
 
 /** WebView / ウィンドウラベルのプレフィックスと生成ヘルパー */

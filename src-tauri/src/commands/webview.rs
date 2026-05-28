@@ -715,6 +715,12 @@ pub async fn report_new_posts_count(
 }
 
 #[tauri::command]
+pub async fn report_keyboard_shortcut(app: AppHandle, key: String) -> Result<(), String> {
+    app.emit(events::WEBVIEW_KEYBOARD_SHORTCUT, key)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn switch_popup_session(
     app: AppHandle,
     #[allow(non_snake_case)] popupLabel: String,

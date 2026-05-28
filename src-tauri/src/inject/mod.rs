@@ -50,6 +50,11 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     } else {
         include_str!("scroll_event.js")
     };
+    let keyboard_shortcut = if params.is_mobile {
+        ""
+    } else {
+        include_str!("keyboard_shortcut.js")
+    };
     let video_control = include_str!("video_control.js");
     let sidebar_hide = include_str!("sidebar_hide.js");
     let mobile_area_hide = include_str!("mobile_area_hide.js");
@@ -89,7 +94,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     };
 
     let mut script = format!(
-        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
+        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
         config,
         zoom,
         tab_selector,
@@ -105,6 +110,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         scroll_pos_restore,
         context_menu,
         scroll_event,
+        keyboard_shortcut,
         sidebar_hide,
         mobile_area_hide
     );

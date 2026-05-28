@@ -22,6 +22,8 @@ pub mod events {
     pub const COLUMN_DOUBLE_TAP: &str = "column-double-tap";
     /// 新着投稿カウント（inject script invoke → TS listen）{ label, count }
     pub const WEBVIEW_NEW_POSTS_COUNT: &str = "webview-new-posts-count";
+    /// キーボードショートカット（inject script invoke → TS listen）キー種別文字列
+    pub const WEBVIEW_KEYBOARD_SHORTCUT: &str = "webview-keyboard-shortcut";
 }
 
 /// WebView / ウィンドウラベルのプレフィックス
