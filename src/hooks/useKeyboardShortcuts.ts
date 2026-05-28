@@ -4,23 +4,23 @@ import { IPC_EVENTS } from "../constants/ipc";
 
 interface KeyboardShortcutsOptions {
   onComposeTweet: () => void;
-  onOpenLinkPopup: () => void;
-  onAddColumn: () => void;
-  onAccountManager: () => void;
-  onAppSettings: () => void;
-  onToggleTopBar: () => void;
-  onJumpToColumn: (index: number) => void;
+  onOpenLinkPopup?: () => void;
+  onAddColumn?: () => void;
+  onAccountManager?: () => void;
+  onAppSettings?: () => void;
+  onToggleTopBar?: () => void;
+  onJumpToColumn?: (index: number) => void;
   disabled?: boolean;
 }
 
 export function useKeyboardShortcuts({
   onComposeTweet,
-  onOpenLinkPopup,
-  onAddColumn,
-  onAccountManager,
-  onAppSettings,
-  onToggleTopBar,
-  onJumpToColumn,
+  onOpenLinkPopup = () => {},
+  onAddColumn = () => {},
+  onAccountManager = () => {},
+  onAppSettings = () => {},
+  onToggleTopBar = () => {},
+  onJumpToColumn = () => {},
   disabled = false,
 }: KeyboardShortcutsOptions): void {
   useEffect(() => {
@@ -68,6 +68,7 @@ export function useKeyboardShortcuts({
     onAccountManager,
     onAppSettings,
     onToggleTopBar,
+    onJumpToColumn,
     disabled,
   ]);
 }
