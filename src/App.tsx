@@ -211,6 +211,27 @@ const App: React.FC = () => {
     [columnBounds, scrollbarRef],
   );
 
+  const handleJumpToColumnByIndex = useCallback(
+    (index: number) => {
+      const sorted = [...columns].sort((a, b) => a.order - b.order);
+      const col = sorted[index];
+      if (col) handleJumpToColumn(col.id);
+    },
+    [columns, handleJumpToColumn],
+  );
+
+  const handleOpenAddColumnDialog = useCallback(() => {
+    setShowAddColumn(true);
+  }, [setShowAddColumn]);
+
+  const handleOpenAccountManager = useCallback(() => {
+    setShowAccountManager(true);
+  }, [setShowAccountManager]);
+
+  const handleOpenAppSettings = useCallback(() => {
+    setShowAppSettings(true);
+  }, [setShowAppSettings]);
+
   const handleReload = useCallback(async (columnId: string) => {
     await invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
       label: WEBVIEW_LABELS.column(columnId),
@@ -260,7 +281,16 @@ const App: React.FC = () => {
     }).catch(console.error);
   }, [accounts, globalSettings.defaultAccountId]);
 
-  useKeyboardShortcuts({ onComposeTweet: handleComposeTweet });
+  useKeyboardShortcuts({
+    onComposeTweet: handleComposeTweet,
+    onOpenLinkPopup: handleOpenLinkPopup,
+    onAddColumn: handleOpenAddColumnDialog,
+    onAccountManager: handleOpenAccountManager,
+    onAppSettings: handleOpenAppSettings,
+    onToggleTopBar: handleToggleTopBar,
+    onJumpToColumn: handleJumpToColumnByIndex,
+    disabled: dialogOpen,
+  });
 
   const handleSetDefaultAccount = useCallback(
     (id: string) => {
