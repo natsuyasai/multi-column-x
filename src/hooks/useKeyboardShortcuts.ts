@@ -34,16 +34,7 @@ export function useKeyboardShortcuts({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    onComposeTweet,
-    onOpenLinkPopup,
-    onAddColumn,
-    onAccountManager,
-    onAppSettings,
-    onToggleTopBar,
-    onJumpToColumn,
-    disabled,
-  ]);
+  }, [onComposeTweet, disabled]);
 
   useEffect(() => {
     if (disabled) return;
@@ -61,14 +52,5 @@ export function useKeyboardShortcuts({
       active = false;
       unlisten.then((fn) => fn());
     };
-  }, [
-    onComposeTweet,
-    onOpenLinkPopup,
-    onAddColumn,
-    onAccountManager,
-    onAppSettings,
-    onToggleTopBar,
-    onJumpToColumn,
-    disabled,
-  ]);
+  }, [onComposeTweet, disabled]);
 }
