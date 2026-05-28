@@ -233,4 +233,40 @@ describe("useKeyboardShortcuts", () => {
     });
     expect(props.onToggleTopBar).toHaveBeenCalledOnce();
   });
+
+  it("Ctrl+1 を押すと onJumpToColumn(0) が呼ばれる", () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "1", ctrlKey: true }),
+    );
+    expect(props.onJumpToColumn).toHaveBeenCalledWith(0);
+  });
+
+  it("Ctrl+5 を押すと onJumpToColumn(4) が呼ばれる", () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "5", ctrlKey: true }),
+    );
+    expect(props.onJumpToColumn).toHaveBeenCalledWith(4);
+  });
+
+  it("Ctrl+9 を押すと onJumpToColumn(8) が呼ばれる", () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "9", ctrlKey: true }),
+    );
+    expect(props.onJumpToColumn).toHaveBeenCalledWith(8);
+  });
+
+  it("Ctrl+0 では onJumpToColumn が呼ばれない", () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "0", ctrlKey: true }),
+    );
+    expect(props.onJumpToColumn).not.toHaveBeenCalled();
+  });
 });

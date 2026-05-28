@@ -55,6 +55,10 @@ export function useKeyboardShortcuts({
         onToggleTopBar();
         return;
       }
+      const digit = parseInt(e.key, 10);
+      if (digit >= 1 && digit <= 9) {
+        onJumpToColumn(digit - 1);
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -65,6 +69,7 @@ export function useKeyboardShortcuts({
     onAccountManager,
     onAppSettings,
     onToggleTopBar,
+    onJumpToColumn,
     disabled,
   ]);
 
