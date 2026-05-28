@@ -30,11 +30,20 @@ export function useKeyboardShortcuts({
       const key = e.key.toLowerCase();
       if (key === "t") {
         onComposeTweet();
+        return;
+      }
+      if (key === "l") {
+        onOpenLinkPopup();
+        return;
+      }
+      if (key === "n") {
+        onAddColumn();
+        return;
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onComposeTweet, disabled]);
+  }, [onComposeTweet, onOpenLinkPopup, onAddColumn, disabled]);
 
   useEffect(() => {
     if (disabled) return;
@@ -43,8 +52,16 @@ export function useKeyboardShortcuts({
       IPC_EVENTS.WEBVIEW_KEYBOARD_SHORTCUT,
       (e) => {
         if (!active) return;
-        if (e.payload === "compose_tweet") {
-          onComposeTweet();
+        switch (e.payload) {
+          case "compose_tweet":
+            onComposeTweet();
+            break;
+          case "open_link_popup":
+            onOpenLinkPopup();
+            break;
+          case "add_column":
+            onAddColumn();
+            break;
         }
       },
     );
@@ -52,5 +69,5 @@ export function useKeyboardShortcuts({
       active = false;
       unlisten.then((fn) => fn());
     };
-  }, [onComposeTweet, disabled]);
+  }, [onComposeTweet, onOpenLinkPopup, onAddColumn, disabled]);
 }

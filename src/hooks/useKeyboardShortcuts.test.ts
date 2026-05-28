@@ -130,4 +130,40 @@ describe("useKeyboardShortcuts", () => {
     });
     expect(props.onComposeTweet).not.toHaveBeenCalled();
   });
+
+  it("Ctrl+L を押すと onOpenLinkPopup が呼ばれる", () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "l", ctrlKey: true }),
+    );
+    expect(props.onOpenLinkPopup).toHaveBeenCalledOnce();
+  });
+
+  it("WebView から open_link_popup イベントを受信すると onOpenLinkPopup が呼ばれる", async () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    await act(async () => {
+      capturedListenCallback?.({ payload: "open_link_popup" });
+    });
+    expect(props.onOpenLinkPopup).toHaveBeenCalledOnce();
+  });
+
+  it("Ctrl+N を押すと onAddColumn が呼ばれる", () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "n", ctrlKey: true }),
+    );
+    expect(props.onAddColumn).toHaveBeenCalledOnce();
+  });
+
+  it("WebView から add_column イベントを受信すると onAddColumn が呼ばれる", async () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    await act(async () => {
+      capturedListenCallback?.({ payload: "add_column" });
+    });
+    expect(props.onAddColumn).toHaveBeenCalledOnce();
+  });
 });
