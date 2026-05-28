@@ -43,10 +43,30 @@ export function useKeyboardShortcuts({
         onAddColumn();
         return;
       }
+      if (key === "a" && e.shiftKey) {
+        onAccountManager();
+        return;
+      }
+      if (key === ",") {
+        onAppSettings();
+        return;
+      }
+      if (key === "b") {
+        onToggleTopBar();
+        return;
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onComposeTweet, onOpenLinkPopup, onAddColumn, disabled]);
+  }, [
+    onComposeTweet,
+    onOpenLinkPopup,
+    onAddColumn,
+    onAccountManager,
+    onAppSettings,
+    onToggleTopBar,
+    disabled,
+  ]);
 
   useEffect(() => {
     if (disabled) return;
@@ -65,6 +85,15 @@ export function useKeyboardShortcuts({
           case "add_column":
             onAddColumn();
             break;
+          case "account_manager":
+            onAccountManager();
+            break;
+          case "app_settings":
+            onAppSettings();
+            break;
+          case "toggle_top_bar":
+            onToggleTopBar();
+            break;
         }
       },
     );
@@ -72,5 +101,13 @@ export function useKeyboardShortcuts({
       active = false;
       unlisten.then((fn) => fn());
     };
-  }, [onComposeTweet, onOpenLinkPopup, onAddColumn, disabled]);
+  }, [
+    onComposeTweet,
+    onOpenLinkPopup,
+    onAddColumn,
+    onAccountManager,
+    onAppSettings,
+    onToggleTopBar,
+    disabled,
+  ]);
 }

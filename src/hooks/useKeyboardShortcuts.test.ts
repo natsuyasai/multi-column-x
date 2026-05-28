@@ -166,4 +166,71 @@ describe("useKeyboardShortcuts", () => {
     });
     expect(props.onAddColumn).toHaveBeenCalledOnce();
   });
+
+  it("Ctrl+Shift+A を押すと onAccountManager が呼ばれる", () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "a", ctrlKey: true, shiftKey: true }),
+    );
+    expect(props.onAccountManager).toHaveBeenCalledOnce();
+  });
+
+  it("Ctrl+A（Shift なし）では onAccountManager が呼ばれない", () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "a",
+        ctrlKey: true,
+        shiftKey: false,
+      }),
+    );
+    expect(props.onAccountManager).not.toHaveBeenCalled();
+  });
+
+  it("WebView から account_manager イベントを受信すると onAccountManager が呼ばれる", async () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    await act(async () => {
+      capturedListenCallback?.({ payload: "account_manager" });
+    });
+    expect(props.onAccountManager).toHaveBeenCalledOnce();
+  });
+
+  it("Ctrl+, を押すと onAppSettings が呼ばれる", () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: ",", ctrlKey: true }),
+    );
+    expect(props.onAppSettings).toHaveBeenCalledOnce();
+  });
+
+  it("WebView から app_settings イベントを受信すると onAppSettings が呼ばれる", async () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    await act(async () => {
+      capturedListenCallback?.({ payload: "app_settings" });
+    });
+    expect(props.onAppSettings).toHaveBeenCalledOnce();
+  });
+
+  it("Ctrl+B を押すと onToggleTopBar が呼ばれる", () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "b", ctrlKey: true }),
+    );
+    expect(props.onToggleTopBar).toHaveBeenCalledOnce();
+  });
+
+  it("WebView から toggle_top_bar イベントを受信すると onToggleTopBar が呼ばれる", async () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    await act(async () => {
+      capturedListenCallback?.({ payload: "toggle_top_bar" });
+    });
+    expect(props.onToggleTopBar).toHaveBeenCalledOnce();
+  });
 });
