@@ -2,6 +2,9 @@ import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { IPC_EVENTS } from "../constants/ipc";
 
+const NOOP = () => {};
+const NOOP_INDEX = (_index: number) => {};
+
 interface KeyboardShortcutsOptions {
   onComposeTweet: () => void;
   onOpenLinkPopup?: () => void;
@@ -15,12 +18,12 @@ interface KeyboardShortcutsOptions {
 
 export function useKeyboardShortcuts({
   onComposeTweet,
-  onOpenLinkPopup = () => {},
-  onAddColumn = () => {},
-  onAccountManager = () => {},
-  onAppSettings = () => {},
-  onToggleTopBar = () => {},
-  onJumpToColumn = () => {},
+  onOpenLinkPopup = NOOP,
+  onAddColumn = NOOP,
+  onAccountManager = NOOP,
+  onAppSettings = NOOP,
+  onToggleTopBar = NOOP,
+  onJumpToColumn = NOOP_INDEX,
   disabled = false,
 }: KeyboardShortcutsOptions): void {
   useEffect(() => {
