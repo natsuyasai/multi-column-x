@@ -102,4 +102,11 @@ export const WEBVIEW_SCRIPTS = {
     const escaped = css.replace(/`/g, "\\`");
     return `(function(){var el=document.getElementById('__custom_css__');if(!el){el=document.createElement('style');el.id='__custom_css__';document.head.appendChild(el);}el.textContent=\`${escaped}\`;})();`;
   },
+
+  /** NGワードを動的に更新し、表示中のツイートにも即時適用する */
+  applyNgWords: (ngWords: string[], globalNgWords: string[]) => {
+    const ng = JSON.stringify(ngWords);
+    const global = JSON.stringify(globalNgWords);
+    return `if(window.__multiColumnXConfig){window.__multiColumnXConfig.ngWords=${ng};window.__multiColumnXConfig.globalNgWords=${global};}window.__multiColumnX&&window.__multiColumnX.recheckNgWords&&window.__multiColumnX.recheckNgWords();`;
+  },
 } as const;

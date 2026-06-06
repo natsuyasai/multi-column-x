@@ -1,18 +1,20 @@
 (function () {
-  const config = window.__multiColumnXConfig;
-  const combined = [
-    ...(config?.ngWords ?? []),
-    ...(config?.globalNgWords ?? []),
-  ];
-  if (combined.length === 0) return;
-
-  const lowerWords = combined.map((w) => w.toLowerCase());
   const TWEET_SELECTOR = 'article[role="article"]';
   const TIMELINE_SELECTOR = 'main[role="main"]';
 
+  // WebView 起動後に設定が変わった場合も反映されるよう毎回動的に参照する
+  function getWords(): string[] {
+    const config = window.__multiColumnXConfig;
+    return [...(config?.ngWords ?? []), ...(config?.globalNgWords ?? [])].map(
+      (w) => w.toLowerCase(),
+    );
+  }
+
   function containsNgWord(el: HTMLElement): boolean {
+    const words = getWords();
+    if (words.length === 0) return false;
     const text = el.textContent?.toLowerCase() ?? "";
-    return lowerWords.some((w) => text.includes(w));
+    return words.some((w) => text.includes(w));
   }
 
   function hideTweet(el: HTMLElement): void {
@@ -65,6 +67,12 @@
       subtree: true,
     });
   }
+
+  // eval 経由で既存ツイートを再チェックできるよう公開する
+  window.__multiColumnX = window.__multiColumnX || ({} as MultiColumnXAPI);
+  window.__multiColumnX.recheckNgWords = function () {
+    document.querySelectorAll(TWEET_SELECTOR).forEach(checkTweet);
+  };
 
   if (document.body) {
     setTimeout(startObserver, 1000);

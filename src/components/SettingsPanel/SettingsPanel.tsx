@@ -264,7 +264,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <button
                 type="button"
                 className={styles.reloadBtn}
-                onClick={() => onReload(column.id)}
+                onClick={() => {
+                  onClose();
+                  onReload(column.id);
+                }}
               >
                 再読み込み
               </button>

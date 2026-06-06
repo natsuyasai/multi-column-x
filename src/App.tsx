@@ -17,7 +17,7 @@ import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { platform } from "@tauri-apps/plugin-os";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { ColumnSettings } from "./types";
+import type { ColumnSettings, GlobalSettings } from "./types";
 import {
   IPC_COMMANDS,
   IPC_EVENTS,
@@ -244,6 +244,7 @@ const App: React.FC = () => {
       handleUpdateColumn(columnId, { settings, width });
       setSettingsColumnId(null);
       const webviewLabel = WEBVIEW_LABELS.column(columnId);
+      const globalNgWords = useAppStore.getState().globalSettings.ngWords ?? [];
       await invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
         label: webviewLabel,
         script: WEBVIEW_SCRIPTS.applyAreaRemove(settings.areaRemoveEnabled),
@@ -254,10 +255,34 @@ const App: React.FC = () => {
       }).catch(console.error);
       await invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
         label: webviewLabel,
+        script: WEBVIEW_SCRIPTS.applyNgWords(settings.ngWords, globalNgWords),
+      }).catch(console.error);
+      await invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
+        label: webviewLabel,
         script: WEBVIEW_SCRIPTS.TRIGGER_RELOAD,
       }).catch(console.error);
     },
     [handleUpdateColumn],
+  );
+
+  const handleApplyGlobalSettings = useCallback(
+    (patch: Partial<GlobalSettings>) => {
+      updateGlobalSettings(patch);
+      if ("ngWords" in patch) {
+        const newGlobalNgWords = patch.ngWords ?? [];
+        const { columns: currentColumns } = useAppStore.getState();
+        currentColumns.forEach((col) => {
+          invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
+            label: WEBVIEW_LABELS.column(col.id),
+            script: WEBVIEW_SCRIPTS.applyNgWords(
+              col.settings.ngWords,
+              newGlobalNgWords,
+            ),
+          }).catch(console.error);
+        });
+      }
+    },
+    [updateGlobalSettings],
   );
 
   const linkPopupDefaultAccountId =
@@ -441,7 +466,7 @@ const App: React.FC = () => {
           settings={globalSettings}
           columns={columns}
           accounts={accounts}
-          onApply={updateGlobalSettings}
+          onApply={handleApplyGlobalSettings}
           onApplyLayout={(updatedColumns) => {
             replaceColumns(updatedColumns);
             recalculateAllBounds();

@@ -6,6 +6,7 @@ declare global {
     applyCustomCSS: (css: string) => void;
     triggerReload: (scrollToTop?: boolean) => void;
     applyAreaRemove: (enabled: boolean) => void;
+    recheckNgWords: () => void;
   }
 
   interface MultiColumnXConfig {
@@ -18,6 +19,8 @@ declare global {
     blurImageAmount: string;
     hideAdEnabled: boolean;
     zoomLevel: number;
+    ngWords?: string[];
+    globalNgWords?: string[];
   }
 
   interface TauriCore {

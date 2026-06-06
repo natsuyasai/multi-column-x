@@ -106,12 +106,28 @@
         longPressTimer = null;
       }
     };
-    root.addEventListener("touchend", (e) => {
+    root.addEventListener("touchend", () => {
       if (longPressFired) {
-        e.preventDefault();
+        // touchend.preventDefault() は passive な touchstart の後では
+        // Android WebView のジェスチャー追跡を壊す場合があるため使わない。
+        // 代わりに capture フェーズで click を一度だけ吸収する。
+        root.addEventListener(
+          "click",
+          (e) => {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+          },
+          { once: true, capture: true },
+        );
         longPressFired = false;
       }
       cancelLongPress();
+    });
+    // touchcancel: Android の長押し検出自体が ~500ms で touchcancel を発火するため
+    // cancelLongPress() を呼ぶとタイマーが正規の長押し判定前にキャンセルされてしまう。
+    // スワイプは touchmove の 10px 判定で保護されているため、ここはフラグのリセットのみ行う。
+    root.addEventListener("touchcancel", () => {
+      longPressFired = false;
     });
     root.addEventListener(
       "touchmove",
