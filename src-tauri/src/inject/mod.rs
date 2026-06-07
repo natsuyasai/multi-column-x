@@ -39,7 +39,11 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     } else {
         ""
     };
-    let zoom = include_str!("zoom.js");
+    let zoom = if params.is_mobile {
+        "" // モバイルは textZoom で対応するため CSS zoom は使わない
+    } else {
+        include_str!("zoom.js")
+    };
     let context_menu = if params.is_mobile {
         ""
     } else {

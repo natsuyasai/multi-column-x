@@ -111,16 +111,26 @@ const App: React.FC = () => {
   }, [isLoaded]);
 
   // ズームレベルをメインUIと実行中カラムWebViewに適用
+  // モバイルは CSS zoom が x.com 仮想スクロールの座標計算を崩すため textZoom を使う
   useEffect(() => {
     const zoom = globalSettings.zoomLevel ?? 1;
     document.documentElement.style.zoom = String(zoom);
-    columns.forEach((column) => {
-      invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
-        label: WEBVIEW_LABELS.column(column.id),
-        script: `document.documentElement.style.zoom='${zoom}';`,
-      }).catch(() => {});
-    });
-  }, [globalSettings.zoomLevel]);
+    if (isMobile) {
+      columns.forEach((column) => {
+        invoke(IPC_COMMANDS.UPDATE_COLUMN_WEBVIEW_ZOOM, {
+          columnId: column.id,
+          zoomLevel: zoom,
+        }).catch(() => {});
+      });
+    } else {
+      columns.forEach((column) => {
+        invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
+          label: WEBVIEW_LABELS.column(column.id),
+          script: `document.documentElement.style.zoom='${zoom}';`,
+        }).catch(() => {});
+      });
+    }
+  }, [globalSettings.zoomLevel, isMobile]);
 
   // WebView 内の横ホイールを受け取ってスクロールバーを動かす
   useEffect(() => {

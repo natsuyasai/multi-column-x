@@ -333,6 +333,7 @@ class MainActivity : TauriActivity() {
     initScript: String,
     visible: Boolean,
     accountId: String,
+    textZoomPercent: Int,
   ) {
     runOnUiThreadSync {
       // React WebView がリロードされても native WebView は残存するため、
@@ -370,6 +371,7 @@ class MainActivity : TauriActivity() {
           if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
             WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
           }
+          wv.settings.textZoom = textZoomPercent
           wv.visibility = if (visible) View.VISIBLE else View.GONE
         }
 
@@ -395,6 +397,13 @@ class MainActivity : TauriActivity() {
         wv.destroy()
         columnWebViews.remove(id)
       }
+    }
+  }
+
+  // カラム WebView の textZoom を動的に更新する。
+  fun updateColumnWebViewZoom(id: String, textZoomPercent: Int) {
+    runOnUiThread {
+      columnWebViews[id]?.settings?.textZoom = textZoomPercent
     }
   }
 

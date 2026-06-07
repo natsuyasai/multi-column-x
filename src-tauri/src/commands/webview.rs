@@ -183,6 +183,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
             &init_script,
             visible,
             &args.column.account_id,
+            zoom_level,
         )?;
     }
 
@@ -791,6 +792,26 @@ pub async fn close_popup_window(app: AppHandle, label: String) -> Result<(), Str
 #[tauri::command]
 pub async fn open_in_browser(url: String) -> Result<(), String> {
     tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn update_column_webview_zoom(
+    #[allow(non_snake_case)] columnId: String,
+    #[allow(non_snake_case)] zoomLevel: f64,
+) -> Result<(), String> {
+    #[cfg(target_os = "android")]
+    crate::android_bridge::update_column_webview_zoom(&columnId, zoomLevel)?;
+    Ok(())
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn update_column_webview_zoom(
+    _column_id: String,
+    _zoom_level: f64,
+) -> Result<(), String> {
+    Ok(())
 }
 
 #[cfg(desktop)]
