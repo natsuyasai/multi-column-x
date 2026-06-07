@@ -112,9 +112,11 @@ const App: React.FC = () => {
 
   // ズームレベルをメインUIと実行中カラムWebViewに適用
   // モバイルは CSS zoom が x.com 仮想スクロールの座標計算を崩すため textZoom を使う
+  // isLoaded 後のみ実行し、WebView 作成前に呼び出されることを防ぐ
   useEffect(() => {
     const zoom = globalSettings.zoomLevel ?? 1;
     document.documentElement.style.zoom = String(zoom);
+    if (!isLoaded) return;
     if (isMobile) {
       columns.forEach((column) => {
         invoke(IPC_COMMANDS.UPDATE_COLUMN_WEBVIEW_ZOOM, {
@@ -130,7 +132,7 @@ const App: React.FC = () => {
         }).catch(() => {});
       });
     }
-  }, [globalSettings.zoomLevel, isMobile]);
+  }, [globalSettings.zoomLevel, isMobile, isLoaded]);
 
   // WebView 内の横ホイールを受け取ってスクロールバーを動かす
   useEffect(() => {

@@ -402,5 +402,13 @@ where
     let mut env = vm
         .attach_current_thread()
         .map_err(|e| format!("attach_current_thread: {e}"))?;
-    f(&mut env, activity_ref.as_obj())
+    // pending exception をクリアしてから呼び出し、後続 JNI 呼び出しへの影響を防ぐ
+    if env.exception_check().unwrap_or(false) {
+        let _ = env.exception_clear();
+    }
+    let result = f(&mut env, activity_ref.as_obj());
+    if env.exception_check().unwrap_or(false) {
+        let _ = env.exception_clear();
+    }
+    result
 }
