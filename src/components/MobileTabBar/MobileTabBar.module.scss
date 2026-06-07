@@ -141,7 +141,7 @@
 
 .actionBtn {
   height: 100%;
-  padding: 0 14px;
+  padding: 0 18px;
   background: none;
   border: none;
   color: rgba(255, 255, 255, 0.7);
@@ -254,6 +254,7 @@
 
 .toggleBtn {
   composes: btn;
+  width: 40px;
   height: 100%;
   border-left: 1px solid rgba(255, 255, 255, 0.12);
   margin-top: 2px;
