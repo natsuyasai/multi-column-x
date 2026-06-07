@@ -272,26 +272,50 @@ export function useColumns() {
       const targetColumn =
         (savedId ? sortedByOrder.find((c) => c.id === savedId) : null) ??
         firstColumn;
-      for (const column of sortedByOrder) {
-        const account = currentAccounts.find((a) => a.id === column.accountId);
-        if (!account) continue;
-        const isActive = column.id === targetColumn?.id;
-        await invoke(IPC_COMMANDS.CREATE_COLUMN_WEBVIEW, {
-          args: {
-            column,
-            dataDirectory: account.dataDirectory,
-            x: isActive ? 0 : -99999,
-            y: 0,
+      // 全カラムを並列作成して loadUrl を一斉に開始する
+      await Promise.all(
+        sortedByOrder.map(async (column) => {
+          const account = currentAccounts.find(
+            (a) => a.id === column.accountId,
+          );
+          if (!account) return;
+          const isActive = column.id === targetColumn?.id;
+          await invoke(IPC_COMMANDS.CREATE_COLUMN_WEBVIEW, {
+            args: {
+              column,
+              dataDirectory: account.dataDirectory,
+              x: isActive ? 0 : -99999,
+              y: 0,
+              width: window.innerWidth,
+              height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
+            },
+          }).catch(console.error);
+        }),
+      );
+      if (targetColumn) {
+        // activeColumnId を保存（バックグラウンド復帰後の復元用）
+        setActiveColumnIdState(targetColumn.id);
+        try {
+          localStorage.setItem("mcx_activeColumnId", targetColumn.id);
+        } catch {}
+        // Cookie 設定（認証に必要）
+        await invoke(IPC_COMMANDS.SET_COLUMN_COOKIES, {
+          accountId: targetColumn.accountId,
+        }).catch(console.error);
+        // アクティブカラムのみ表示。非アクティブカラムには RESIZE を送らず
+        // onPause() を呼ばせないことでバックグラウンド読み込みを継続させる。
+        await invoke(IPC_COMMANDS.RESIZE_COLUMN_WEBVIEW, {
+          bounds: {
+            columnId: targetColumn.id,
+            x: 0,
+            y: MOBILE_TAB_BAR_HEIGHT,
             width: window.innerWidth,
             height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
           },
         }).catch(console.error);
       }
-      if (targetColumn) {
-        await setActiveColumn(targetColumn.id);
-      }
     },
-    [setActiveColumn],
+    [],
   );
 
   const restoreDesktopColumns = useCallback(
