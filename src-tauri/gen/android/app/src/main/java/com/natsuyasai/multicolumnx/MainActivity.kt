@@ -366,7 +366,7 @@ class MainActivity : TauriActivity() {
           // api.x.com は x.com とは別ホストのため、サードパーティ Cookie 送信を許可する。
           // デフォルト false のままだと account/settings.json 等の v1.1 REST API が 401 になる。
           CookieManager.getInstance().setAcceptThirdPartyCookies(wv, true)
-          wv.webViewClient = ExternalLinkWebViewClient()
+          wv.webViewClient = ColumnWebViewClient(url)
           wv.webChromeClient = ExternalLinkWebChromeClient()
           if (profileApiSupported) {
             setupWebViewProfile(wv, accountId, "column $id")
@@ -513,6 +513,32 @@ class MainActivity : TauriActivity() {
       if (isInternalUrl(url)) return false
       openUrlInBrowser(url)
       return true
+    }
+  }
+
+  // カラム WebView 専用 WebViewClient。
+  // Profile API のプロファイル読み込みタイミングにより Cookie が一時的に利用できず
+  // ログイン画面が表示される場合がある。検知したら遅延後に元 URL へリカバリする（1回限り）。
+  private inner class ColumnWebViewClient(private val recoveryUrl: String) : WebViewClient() {
+    private var loginRetried = false
+
+    override fun shouldOverrideUrlLoading(
+      view: WebView,
+      request: WebResourceRequest,
+    ): Boolean {
+      val url = request.url.toString()
+      if (isInternalUrl(url)) return false
+      openUrlInBrowser(url)
+      return true
+    }
+
+    override fun onPageFinished(view: WebView, url: String) {
+      super.onPageFinished(view, url)
+      if (!loginRetried && (url.contains("x.com/login") || url.contains("x.com/i/flow/login"))) {
+        loginRetried = true
+        Log.w(TAG, "ColumnWebViewClient: login page detected, recovering to $recoveryUrl")
+        view.postDelayed({ view.loadUrl(recoveryUrl) }, 1500)
+      }
     }
   }
 
