@@ -153,7 +153,6 @@ pub fn run() {
             commands::account::delete_account_data,
             commands::account::close_window,
             commands::webview::open_compose_window,
-            commands::webview::update_column_webview_zoom,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

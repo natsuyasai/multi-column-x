@@ -13,7 +13,6 @@ pub struct InitScriptParams<'a> {
     pub blur_image_enabled: bool,
     pub blur_image_amount: &'a str,
     pub hide_ad_enabled: bool,
-    pub zoom_level: f64,
     pub custom_css: &'a str,
     pub visible_links: &'a [String],
     pub ng_words: &'a [String],
@@ -39,11 +38,8 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     } else {
         ""
     };
-    let zoom = if params.is_mobile {
-        "" // モバイルは textZoom で対応するため CSS zoom は使わない
-    } else {
-        include_str!("zoom.js")
-    };
+    // 表示サイズは x.com 自身の設定 (IndexedDB device:rweb:settings.scale) で管理するため
+    // CSS zoom inject は使用しない
     let context_menu = if params.is_mobile {
         ""
     } else {
@@ -70,7 +66,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     let global_ng_words_json =
         serde_json::to_string(params.global_ng_words).unwrap_or_else(|_| "[]".to_string());
     let config = format!(
-        "window.{} = {{ areaRemoveEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?}, blurImageEnabled: {}, blurImageAmount: {:?}, hideAdEnabled: {}, zoomLevel: {}, ngWords: {}, globalNgWords: {} }};",
+        "window.{} = {{ areaRemoveEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?}, blurImageEnabled: {}, blurImageAmount: {:?}, hideAdEnabled: {}, ngWords: {}, globalNgWords: {} }};",
         globals::MULTI_COLUMN_X_CONFIG,
         params.area_remove_enabled,
         params.show_custom_menu,
@@ -80,7 +76,6 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         params.blur_image_enabled,
         params.blur_image_amount,
         params.hide_ad_enabled,
-        params.zoom_level,
         ng_words_json,
         global_ng_words_json
     );
@@ -98,9 +93,8 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     };
 
     let mut script = format!(
-        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
+        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
         config,
-        zoom,
         tab_selector,
         header_part,
         auto_reload_part,

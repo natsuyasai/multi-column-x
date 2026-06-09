@@ -35,7 +35,7 @@ const baseGlobalSettings: GlobalSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   hideAdEnabled: true,
-  zoomLevel: 1,
+  columnScale: "default",
   useXAppForCompose: false,
   presets: [],
   ngWords: [],

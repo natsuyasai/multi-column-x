@@ -42,6 +42,7 @@ class AddAccount : AppCompatActivity() {
         settings.domStorageEnabled = true
         settings.databaseEnabled = true
         settings.mediaPlaybackRequiresUserGesture = false
+        CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
         webViewClient =
           object : WebViewClient() {
             override fun onPageStarted(

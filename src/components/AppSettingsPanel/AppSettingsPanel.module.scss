@@ -136,29 +136,43 @@
   }
 }
 
-.sliderRow {
+.scaleRow {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
-.sliderLabel {
+.scaleLabel {
   font-size: 13px;
   color: #ccc;
   flex-shrink: 0;
 }
 
-.rangeSlider {
-  flex: 1;
-  accent-color: #1d9bf0;
-  cursor: pointer;
+.scaleOptions {
+  display: flex;
+  gap: 4px;
 }
 
-.sliderValue {
-  font-size: 13px;
-  color: #eee;
-  min-width: 38px;
-  text-align: right;
+.scaleBtn {
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid #555;
+  background: transparent;
+  color: #ccc;
+  font-size: 12px;
+  cursor: pointer;
+
+  &:hover {
+    border-color: #1d9bf0;
+    color: #fff;
+  }
+}
+
+.scaleBtnActive {
+  background: #1d9bf0;
+  border-color: #1d9bf0;
+  color: #fff;
 }
 
 .hint {

@@ -1,4 +1,5 @@
 export type PageType = "home" | "notifications" | "search" | "list" | "custom";
+export type ColumnScale = "small" | "default" | "normal" | "large" | "xLarge";
 
 export interface Account {
   id: string;
@@ -63,7 +64,7 @@ export interface GlobalSettings {
   blurImageEnabled: boolean;
   blurImageAmount: string;
   hideAdEnabled: boolean;
-  zoomLevel: number;
+  columnScale: ColumnScale;
   useXAppForCompose: boolean;
   presets: ColumnPreset[];
   ngWords: string[];
@@ -175,7 +176,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   hideAdEnabled: true,
-  zoomLevel: 1,
+  columnScale: "default",
   useXAppForCompose: false,
   presets: [],
   ngWords: [],

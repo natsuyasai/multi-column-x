@@ -14,7 +14,6 @@ export const IPC_COMMANDS = {
   REMOVE_COLUMN_WEBVIEW: "remove_column_webview",
   RESIZE_COLUMN_WEBVIEW: "resize_column_webview",
   EVAL_IN_WEBVIEW: "eval_in_webview",
-  UPDATE_COLUMN_WEBVIEW_ZOOM: "update_column_webview_zoom",
 
   // ポップアップ
   OPEN_POPUP_WINDOW: "open_popup_window",
@@ -102,6 +101,15 @@ export const WEBVIEW_SCRIPTS = {
   applyCustomCSS: (css: string) => {
     const escaped = css.replace(/`/g, "\\`");
     return `(function(){var el=document.getElementById('__custom_css__');if(!el){el=document.createElement('style');el.id='__custom_css__';document.head.appendChild(el);}el.textContent=\`${escaped}\`;})();`;
+  },
+
+  /**
+   * x.com の localforage (IndexedDB "localforage" / store "keyvaluepairs") の
+   * "device:rweb.settings" エントリの local.scale を更新し、値が変化した場合のみリロードする。
+   */
+  applyColumnScale: (scale: string): string => {
+    const s = JSON.stringify(scale);
+    return `(function(){var s=${s};var r=indexedDB.open('localforage');r.onsuccess=function(e){var tx=e.target.result.transaction('keyvaluepairs','readwrite'),st=tx.objectStore('keyvaluepairs'),g=st.get('device:rweb.settings');g.onsuccess=function(e){var d=e.target.result;if(!d){d={local:{scale:s,_lastPersisted:Date.now()}};}else{if(!d.local)d.local={};if(d.local.scale===s)return;d.local.scale=s;d.local._lastPersisted=Date.now();}st.put(d,'device:rweb.settings').onsuccess=function(){location.reload();};};};})();`;
   },
 
   /** NGワードを動的に更新し、表示中のツイートにも即時適用する */

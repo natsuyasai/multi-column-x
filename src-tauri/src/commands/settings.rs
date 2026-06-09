@@ -73,8 +73,8 @@ fn default_small_image_width() -> String {
 fn default_blur_image_amount() -> String {
     "10px".to_string()
 }
-fn default_zoom_level() -> f64 {
-    1.0
+fn default_column_scale() -> String {
+    "default".to_string()
 }
 
 impl Default for WindowBounds {
@@ -113,7 +113,7 @@ impl Default for GlobalSettingsData {
             blur_image_enabled: false,
             blur_image_amount: "10px".to_string(),
             hide_ad_enabled: true,
-            zoom_level: 1.0,
+            column_scale: default_column_scale(),
             use_x_app_for_compose: false,
             presets: vec![],
             ng_words: vec![],
@@ -234,9 +234,9 @@ pub struct GlobalSettingsData {
     #[serde(rename = "hideAdEnabled")]
     #[serde(default)]
     pub hide_ad_enabled: bool,
-    #[serde(rename = "zoomLevel")]
-    #[serde(default = "default_zoom_level")]
-    pub zoom_level: f64,
+    #[serde(rename = "columnScale")]
+    #[serde(default = "default_column_scale")]
+    pub column_scale: String,
     #[serde(rename = "useXAppForCompose")]
     #[serde(default)]
     pub use_x_app_for_compose: bool,
@@ -298,9 +298,9 @@ mod tests {
     }
 
     #[test]
-    fn global_settings_default_zoom_level_is_one() {
+    fn global_settings_default_column_scale_is_default() {
         let gs = GlobalSettingsData::default();
-        assert_eq!(gs.zoom_level, 1.0);
+        assert_eq!(gs.column_scale, "default");
     }
 
     #[test]
@@ -332,8 +332,8 @@ mod tests {
             settings.global_settings.theme
         );
         assert_eq!(
-            restored.global_settings.zoom_level,
-            settings.global_settings.zoom_level
+            restored.global_settings.column_scale,
+            settings.global_settings.column_scale
         );
     }
 }

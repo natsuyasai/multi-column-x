@@ -222,18 +222,16 @@ pub fn create_column_webview(
     init_script: &str,
     visible: bool,
     account_id: &str,
-    zoom_level: f64,
 ) -> Result<(), String> {
     call_activity_method(|env, activity| {
         let j_id = env.new_string(id).map_err(|e| e.to_string())?;
         let j_url = env.new_string(url).map_err(|e| e.to_string())?;
         let j_script = env.new_string(init_script).map_err(|e| e.to_string())?;
         let j_account_id = env.new_string(account_id).map_err(|e| e.to_string())?;
-        let zoom_percent = (zoom_level * 100.0) as i32;
         env.call_method(
             activity,
             "createColumnWebView",
-            "(Ljava/lang/String;Ljava/lang/String;IILjava/lang/String;ZLjava/lang/String;I)V",
+            "(Ljava/lang/String;Ljava/lang/String;IILjava/lang/String;ZLjava/lang/String;)V",
             &[
                 JValue::Object(&*j_id),
                 JValue::Object(&*j_url),
@@ -242,24 +240,7 @@ pub fn create_column_webview(
                 JValue::Object(&*j_script),
                 JValue::Bool(visible as u8),
                 JValue::Object(&*j_account_id),
-                JValue::Int(zoom_percent),
             ],
-        )
-        .map_err(|e| e.to_string())?;
-        Ok(())
-    })
-}
-
-/// カラム WebView の textZoom を動的に更新する。
-pub fn update_column_webview_zoom(id: &str, zoom_level: f64) -> Result<(), String> {
-    call_activity_method(|env, activity| {
-        let j_id = env.new_string(id).map_err(|e| e.to_string())?;
-        let zoom_percent = (zoom_level * 100.0) as i32;
-        env.call_method(
-            activity,
-            "updateColumnWebViewZoom",
-            "(Ljava/lang/String;I)V",
-            &[JValue::Object(&*j_id), JValue::Int(zoom_percent)],
         )
         .map_err(|e| e.to_string())?;
         Ok(())

@@ -248,7 +248,7 @@ describe("useColumns mobile", () => {
         blurImageEnabled: false,
         blurImageAmount: "10px",
         hideAdEnabled: false,
-        zoomLevel: 1,
+        columnScale: "default",
         useXAppForCompose: false,
         presets: [],
         ngWords: [],

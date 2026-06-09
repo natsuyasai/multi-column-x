@@ -64,7 +64,6 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
 
     let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(&app);
     let hide_ad_enabled = load_hide_ad_enabled(&app);
-    let zoom_level = load_zoom_level(&app);
     let global_ng_words = load_global_ng_words(&app);
     let init_script = build_init_script(&InitScriptParams {
         is_mobile: false,
@@ -77,7 +76,6 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         blur_image_enabled: args.column.settings.blur_image_enabled,
         blur_image_amount: &args.column.settings.blur_image_amount,
         hide_ad_enabled,
-        zoom_level,
         custom_css: &args.column.settings.custom_css,
         visible_links: &args.column.settings.visible_links,
         ng_words: &args.column.settings.ng_words,
@@ -148,7 +146,6 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
 
     let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(&app);
     let hide_ad_enabled = load_hide_ad_enabled(&app);
-    let zoom_level = load_zoom_level(&app);
     let global_ng_words = load_global_ng_words(&app);
     let init_script = build_init_script(&InitScriptParams {
         is_mobile: true,
@@ -161,7 +158,6 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         blur_image_enabled: args.column.settings.blur_image_enabled,
         blur_image_amount: &args.column.settings.blur_image_amount,
         hide_ad_enabled,
-        zoom_level,
         custom_css: &args.column.settings.custom_css,
         visible_links: &args.column.settings.visible_links,
         ng_words: &args.column.settings.ng_words,
@@ -183,7 +179,6 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
             &init_script,
             visible,
             &args.column.account_id,
-            zoom_level,
         )?;
     }
 
@@ -374,13 +369,6 @@ fn load_hide_ad_enabled(app: &AppHandle) -> bool {
         .get("hideAdEnabled")
         .and_then(|v| v.as_bool())
         .unwrap_or(false)
-}
-
-fn load_zoom_level(app: &AppHandle) -> f64 {
-    load_global_settings(app)
-        .get("zoomLevel")
-        .and_then(|v| v.as_f64())
-        .unwrap_or(1.0)
 }
 
 fn load_popup_esc_close_enabled(app: &AppHandle) -> bool {
@@ -792,26 +780,6 @@ pub async fn close_popup_window(app: AppHandle, label: String) -> Result<(), Str
 #[tauri::command]
 pub async fn open_in_browser(url: String) -> Result<(), String> {
     tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())
-}
-
-#[cfg(mobile)]
-#[tauri::command]
-pub async fn update_column_webview_zoom(
-    #[allow(non_snake_case)] columnId: String,
-    #[allow(non_snake_case)] zoomLevel: f64,
-) -> Result<(), String> {
-    #[cfg(target_os = "android")]
-    crate::android_bridge::update_column_webview_zoom(&columnId, zoomLevel)?;
-    Ok(())
-}
-
-#[cfg(desktop)]
-#[tauri::command]
-pub async fn update_column_webview_zoom(
-    _column_id: String,
-    _zoom_level: f64,
-) -> Result<(), String> {
-    Ok(())
 }
 
 #[cfg(desktop)]

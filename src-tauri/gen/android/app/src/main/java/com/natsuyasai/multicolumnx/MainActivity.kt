@@ -278,6 +278,7 @@ class MainActivity : TauriActivity() {
           wv.settings.domStorageEnabled = true
           wv.settings.setSupportMultipleWindows(true)
           wv.settings.cacheMode = android.webkit.WebSettings.LOAD_CACHE_ELSE_NETWORK
+          CookieManager.getInstance().setAcceptThirdPartyCookies(wv, true)
           wv.webViewClient = ExternalLinkWebViewClient()
           wv.webChromeClient = ExternalLinkWebChromeClient()
           if (profileApiSupported && accountId.isNotEmpty()) {
@@ -333,7 +334,6 @@ class MainActivity : TauriActivity() {
     initScript: String,
     visible: Boolean,
     accountId: String,
-    textZoomPercent: Int,
   ) {
     runOnUiThreadSync {
       // React WebView がリロードされても native WebView は残存するため、
@@ -363,6 +363,9 @@ class MainActivity : TauriActivity() {
           wv.settings.domStorageEnabled = true
           wv.settings.setSupportMultipleWindows(true)
           wv.settings.cacheMode = android.webkit.WebSettings.LOAD_CACHE_ELSE_NETWORK
+          // api.x.com は x.com とは別ホストのため、サードパーティ Cookie 送信を許可する。
+          // デフォルト false のままだと account/settings.json 等の v1.1 REST API が 401 になる。
+          CookieManager.getInstance().setAcceptThirdPartyCookies(wv, true)
           wv.webViewClient = ExternalLinkWebViewClient()
           wv.webChromeClient = ExternalLinkWebChromeClient()
           if (profileApiSupported) {
@@ -371,7 +374,6 @@ class MainActivity : TauriActivity() {
           if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
             WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
           }
-          wv.settings.textZoom = textZoomPercent
           wv.visibility = if (visible) View.VISIBLE else View.GONE
         }
 
@@ -397,13 +399,6 @@ class MainActivity : TauriActivity() {
         wv.destroy()
         columnWebViews.remove(id)
       }
-    }
-  }
-
-  // カラム WebView の textZoom を動的に更新する。
-  fun updateColumnWebViewZoom(id: String, textZoomPercent: Int) {
-    runOnUiThread {
-      columnWebViews[id]?.settings?.textZoom = textZoomPercent
     }
   }
 

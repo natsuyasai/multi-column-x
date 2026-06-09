@@ -5,6 +5,7 @@ import type {
   Column,
   Account,
   ColumnSettings,
+  ColumnScale,
 } from "../../types";
 import { useAppStore } from "../../store/useAppStore";
 import { ColumnLayoutTab } from "./ColumnLayoutTab";
@@ -93,7 +94,9 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
     settings.videoAutoPlayStopEnabled,
   );
   const [hideAdEnabled, setHideAdEnabled] = useState(settings.hideAdEnabled);
-  const [zoomLevel, setZoomLevel] = useState(settings.zoomLevel ?? 1);
+  const [columnScale, setColumnScale] = useState<ColumnScale>(
+    settings.columnScale ?? "default",
+  );
   const [useXAppForCompose, setUseXAppForCompose] = useState(
     settings.useXAppForCompose ?? false,
   );
@@ -119,7 +122,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       blurImageEnabled,
       blurImageAmount,
       hideAdEnabled,
-      zoomLevel,
+      columnScale,
       useXAppForCompose,
       ngWords,
     });
@@ -188,20 +191,28 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
             >
               <section className={styles.section}>
                 <h3 className={styles.sectionTitle}>表示</h3>
-                <div className={styles.sliderRow}>
-                  <span className={styles.sliderLabel}>表示サイズ</span>
-                  <input
-                    type="range"
-                    className={styles.rangeSlider}
-                    min={0.5}
-                    max={2.0}
-                    step={0.1}
-                    value={zoomLevel}
-                    onChange={(e) => setZoomLevel(Number(e.target.value))}
-                  />
-                  <span className={styles.sliderValue}>
-                    {Math.round(zoomLevel * 100)}%
-                  </span>
+                <div className={styles.scaleRow}>
+                  <span className={styles.scaleLabel}>表示サイズ</span>
+                  <div className={styles.scaleOptions}>
+                    {(
+                      [
+                        { value: "small", label: "小" },
+                        { value: "default", label: "標準" },
+                        { value: "normal", label: "普通" },
+                        { value: "large", label: "大" },
+                        { value: "xLarge", label: "特大" },
+                      ] as { value: ColumnScale; label: string }[]
+                    ).map(({ value, label }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        className={`${styles.scaleBtn} ${columnScale === value ? styles.scaleBtnActive : ""}`}
+                        onClick={() => setColumnScale(value)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </section>
 
