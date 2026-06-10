@@ -154,7 +154,7 @@ export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
  * | blurImageEnabled               | blur_image_enabled                  | false               |
  * | blurImageAmount                | blur_image_amount                   | "10px"              |
  * | hideAdEnabled                  | hide_ad_enabled                     | true                |
- * | zoomLevel                      | zoom_level                          | 1                   |
+ * | columnScale                    | column_scale                        | "default"           |
  * | useXAppForCompose              | use_x_app_for_compose               | false               |
  */
 export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
