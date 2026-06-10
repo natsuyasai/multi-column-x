@@ -25,6 +25,10 @@ import {
   WEBVIEW_LABELS,
   WEBVIEW_SCRIPTS,
 } from "./constants/ipc";
+import {
+  applyColumnSettingsScripts,
+  evalInColumn,
+} from "./services/columnWebview";
 import styles from "./App.module.scss";
 
 const App: React.FC = () => {
@@ -118,10 +122,7 @@ const App: React.FC = () => {
     const scale = globalSettings.columnScale ?? "default";
     if (!isLoaded) return;
     columns.forEach((column) => {
-      invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
-        label: WEBVIEW_LABELS.column(column.id),
-        script: WEBVIEW_SCRIPTS.applyColumnScale(scale),
-      }).catch(() => {});
+      evalInColumn(column.id, WEBVIEW_SCRIPTS.applyColumnScale(scale));
     });
   }, [globalSettings.columnScale, isLoaded]);
 
@@ -236,34 +237,15 @@ const App: React.FC = () => {
   }, [setShowAppSettings]);
 
   const handleReload = useCallback(async (columnId: string) => {
-    await invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
-      label: WEBVIEW_LABELS.column(columnId),
-      script: WEBVIEW_SCRIPTS.TRIGGER_RELOAD,
-    }).catch(console.error);
+    await evalInColumn(columnId, WEBVIEW_SCRIPTS.TRIGGER_RELOAD);
   }, []);
 
   const handleApplySettings = useCallback(
     async (columnId: string, settings: ColumnSettings, width: number) => {
       handleUpdateColumn(columnId, { settings, width });
       setSettingsColumnId(null);
-      const webviewLabel = WEBVIEW_LABELS.column(columnId);
       const globalNgWords = useAppStore.getState().globalSettings.ngWords ?? [];
-      await invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
-        label: webviewLabel,
-        script: WEBVIEW_SCRIPTS.applyAreaRemove(settings.areaRemoveEnabled),
-      }).catch(console.error);
-      await invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
-        label: webviewLabel,
-        script: WEBVIEW_SCRIPTS.applyCustomCSS(settings.customCSS),
-      }).catch(console.error);
-      await invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
-        label: webviewLabel,
-        script: WEBVIEW_SCRIPTS.applyNgWords(settings.ngWords, globalNgWords),
-      }).catch(console.error);
-      await invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
-        label: webviewLabel,
-        script: WEBVIEW_SCRIPTS.TRIGGER_RELOAD,
-      }).catch(console.error);
+      await applyColumnSettingsScripts(columnId, settings, globalNgWords);
     },
     [handleUpdateColumn],
   );
@@ -275,13 +257,13 @@ const App: React.FC = () => {
         const newGlobalNgWords = patch.ngWords ?? [];
         const { columns: currentColumns } = useAppStore.getState();
         currentColumns.forEach((col) => {
-          invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
-            label: WEBVIEW_LABELS.column(col.id),
-            script: WEBVIEW_SCRIPTS.applyNgWords(
+          evalInColumn(
+            col.id,
+            WEBVIEW_SCRIPTS.applyNgWords(
               col.settings.ngWords,
               newGlobalNgWords,
             ),
-          }).catch(console.error);
+          );
         });
       }
     },

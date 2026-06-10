@@ -1,19 +1,23 @@
 // src/hooks/useColumns.ts
 import { useCallback, useEffect, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { platform } from "@tauri-apps/plugin-os";
 import { useAppStore } from "../store/useAppStore";
 import type { Column } from "../types";
 import {
-  IPC_COMMANDS,
   IPC_EVENTS,
   OFFSCREEN,
   STORAGE_KEYS,
-  WEBVIEW_LABELS,
   WEBVIEW_SCRIPTS,
 } from "../constants/ipc";
+import {
+  createColumnWebview,
+  evalInColumn,
+  removeColumnWebview,
+  resizeColumnWebview,
+  setColumnCookies,
+} from "../services/columnWebview";
 
 import {
   HEADER_HEIGHT,
@@ -74,23 +78,18 @@ export function useColumns() {
     if (isMobile) {
       const activeCol = currentColumns.find((c) => c.id === id);
       if (activeCol) {
-        await invoke(IPC_COMMANDS.SET_COLUMN_COOKIES, {
-          accountId: activeCol.accountId,
-        }).catch(console.error);
+        await setColumnCookies(activeCol.accountId).catch(console.error);
       }
     }
 
     await Promise.all(
       currentColumns.map((col) => {
         const isActive = col.id === id;
-        return invoke(IPC_COMMANDS.RESIZE_COLUMN_WEBVIEW, {
-          bounds: {
-            columnId: col.id,
-            x: isActive ? 0 : OFFSCREEN.MOBILE_X,
-            y: isActive ? MOBILE_TAB_BAR_HEIGHT : 0,
-            width: window.innerWidth,
-            height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
-          },
+        return resizeColumnWebview(col.id, {
+          x: isActive ? 0 : OFFSCREEN.MOBILE_X,
+          y: isActive ? MOBILE_TAB_BAR_HEIGHT : 0,
+          width: window.innerWidth,
+          height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
         }).catch(console.error);
       }),
     );
@@ -124,9 +123,7 @@ export function useColumns() {
 
     await Promise.all(
       Object.entries(bounds).map(([columnId, b]) =>
-        invoke(IPC_COMMANDS.RESIZE_COLUMN_WEBVIEW, {
-          bounds: { columnId, ...b },
-        }).catch(console.error),
+        resizeColumnWebview(columnId, b).catch(console.error),
       ),
     );
   }, [activeColumnId, setActiveColumn]);
@@ -157,15 +154,11 @@ export function useColumns() {
           );
           if (!account) return;
           const isActive = column.id === targetColumn?.id;
-          await invoke(IPC_COMMANDS.CREATE_COLUMN_WEBVIEW, {
-            args: {
-              column,
-              dataDirectory: account.dataDirectory,
-              x: isActive ? 0 : OFFSCREEN.MOBILE_X,
-              y: 0,
-              width: window.innerWidth,
-              height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
-            },
+          await createColumnWebview(column, account.dataDirectory, {
+            x: isActive ? 0 : OFFSCREEN.MOBILE_X,
+            y: 0,
+            width: window.innerWidth,
+            height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
           }).catch(console.error);
         }),
       );
@@ -176,19 +169,14 @@ export function useColumns() {
           localStorage.setItem(STORAGE_KEYS.ACTIVE_COLUMN_ID, targetColumn.id);
         } catch {}
         // Cookie 設定（認証に必要）
-        await invoke(IPC_COMMANDS.SET_COLUMN_COOKIES, {
-          accountId: targetColumn.accountId,
-        }).catch(console.error);
+        await setColumnCookies(targetColumn.accountId).catch(console.error);
         // アクティブカラムのみ表示。非アクティブカラムには RESIZE を送らず
         // onPause() を呼ばせないことでバックグラウンド読み込みを継続させる。
-        await invoke(IPC_COMMANDS.RESIZE_COLUMN_WEBVIEW, {
-          bounds: {
-            columnId: targetColumn.id,
-            x: 0,
-            y: MOBILE_TAB_BAR_HEIGHT,
-            width: window.innerWidth,
-            height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
-          },
+        await resizeColumnWebview(targetColumn.id, {
+          x: 0,
+          y: MOBILE_TAB_BAR_HEIGHT,
+          width: window.innerWidth,
+          height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
         }).catch(console.error);
       }
     },
@@ -218,13 +206,9 @@ export function useColumns() {
         if (!account) continue;
         const b = bounds[column.id];
         if (!b) continue;
-        await invoke(IPC_COMMANDS.CREATE_COLUMN_WEBVIEW, {
-          args: {
-            column,
-            dataDirectory: account.dataDirectory,
-            ...b,
-          },
-        }).catch(console.error);
+        await createColumnWebview(column, account.dataDirectory, b).catch(
+          console.error,
+        );
       }
     },
     [],
@@ -267,15 +251,11 @@ export function useColumns() {
 
       const { isMobile } = useAppStore.getState();
       if (isMobile) {
-        await invoke(IPC_COMMANDS.CREATE_COLUMN_WEBVIEW, {
-          args: {
-            column,
-            dataDirectory: account.dataDirectory,
-            x: OFFSCREEN.MOBILE_X,
-            y: 0,
-            width: window.innerWidth,
-            height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
-          },
+        await createColumnWebview(column, account.dataDirectory, {
+          x: OFFSCREEN.MOBILE_X,
+          y: 0,
+          width: window.innerWidth,
+          height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
         }).catch(console.error);
         if (activeColumnId === null) {
           await setActiveColumn(column.id);
@@ -301,9 +281,9 @@ export function useColumns() {
       const b = bounds[column.id];
       if (!b) return;
 
-      await invoke(IPC_COMMANDS.CREATE_COLUMN_WEBVIEW, {
-        args: { column, dataDirectory: account.dataDirectory, ...b },
-      }).catch(console.error);
+      await createColumnWebview(column, account.dataDirectory, b).catch(
+        console.error,
+      );
     },
     [accounts, addColumn, activeColumnId, setActiveColumn],
   );
@@ -313,17 +293,16 @@ export function useColumns() {
     const { columns: currentColumns, isMobile } = useAppStore.getState();
     await Promise.all(
       currentColumns.map((col) =>
-        invoke(IPC_COMMANDS.RESIZE_COLUMN_WEBVIEW, {
-          bounds: isMobile
+        resizeColumnWebview(
+          col.id,
+          isMobile
             ? {
-                columnId: col.id,
                 x: OFFSCREEN.MOBILE_X,
                 y: 0,
                 width: window.innerWidth,
                 height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
               }
             : {
-                columnId: col.id,
                 x: OFFSCREEN.DESKTOP_X,
                 y:
                   getTopBarHeight(useAppStore.getState().topBarExpanded) +
@@ -331,7 +310,7 @@ export function useColumns() {
                 width: col.width,
                 height: 1,
               },
-        }).catch(() => {}),
+        ).catch(() => {}),
       ),
     );
   }, []);
@@ -339,9 +318,7 @@ export function useColumns() {
   // カラム削除
   const handleRemoveColumn = useCallback(
     async (columnId: string) => {
-      await invoke(IPC_COMMANDS.REMOVE_COLUMN_WEBVIEW, { columnId }).catch(
-        console.error,
-      );
+      await removeColumnWebview(columnId).catch(console.error);
       removeColumn(columnId);
       const { isMobile, columns: remainingColumns } = useAppStore.getState();
       if (isMobile) {
@@ -448,10 +425,7 @@ export function useColumns() {
     const unlistenDoubleTap = listen(IPC_EVENTS.COLUMN_DOUBLE_TAP, () => {
       if (dialogOpenRef.current) return;
       if (!activeColumnId) return;
-      invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
-        label: WEBVIEW_LABELS.column(activeColumnId),
-        script: WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD,
-      }).catch(console.error);
+      evalInColumn(activeColumnId, WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD);
     });
     return () => {
       unlistenProgress.then((fn) => fn());
@@ -473,9 +447,7 @@ export function useColumns() {
   const recreateAllWebviews = useCallback(async () => {
     const { columns: currentColumns, topBarExpanded } = useAppStore.getState();
     for (const column of currentColumns) {
-      await invoke(IPC_COMMANDS.REMOVE_COLUMN_WEBVIEW, {
-        columnId: column.id,
-      }).catch(console.error);
+      await removeColumnWebview(column.id).catch(console.error);
     }
     await restoreColumns(getTopBarHeight(topBarExpanded));
   }, [restoreColumns]);
