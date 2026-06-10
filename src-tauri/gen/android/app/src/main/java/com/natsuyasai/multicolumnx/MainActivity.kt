@@ -532,7 +532,10 @@ class MainActivity : TauriActivity() {
       return true
     }
 
-    override fun onPageFinished(view: WebView, url: String) {
+    override fun onPageFinished(
+      view: WebView,
+      url: String,
+    ) {
       super.onPageFinished(view, url)
       if (!loginRetried && (url.contains("x.com/login") || url.contains("x.com/i/flow/login"))) {
         loginRetried = true

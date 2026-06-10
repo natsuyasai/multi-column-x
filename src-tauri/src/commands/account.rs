@@ -176,7 +176,7 @@ pub async fn mark_login_complete(
 /// フラグが false でもセンチネルファイルを確認する。
 #[tauri::command]
 pub async fn check_login_complete(
-    app: AppHandle,
+    #[allow(unused_variables)] app: AppHandle,
     state: tauri::State<'_, LoginCompleteFlag>,
 ) -> Result<bool, String> {
     let mut flag = state.0.lock().unwrap();
