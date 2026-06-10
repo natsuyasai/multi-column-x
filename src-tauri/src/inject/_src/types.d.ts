@@ -18,7 +18,6 @@ declare global {
     blurImageEnabled: boolean;
     blurImageAmount: string;
     hideAdEnabled: boolean;
-    zoomLevel: number;
     ngWords?: string[];
     globalNgWords?: string[];
   }

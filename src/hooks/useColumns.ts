@@ -23,41 +23,6 @@ export function getTopBarHeight(topBarExpanded: boolean): number {
   return topBarExpanded ? TOPBAR_EXPANDED_HEIGHT : TOPBAR_COLLAPSED_HEIGHT;
 }
 
-// Kotlin の WindowInsetsCompat から取得したシステムバーの高さ（dp）を返す。
-// CSS env(safe-area-inset-*) は Android では notch 領域のみを表すため使用しない。
-// 値が 0 の場合は Kotlin 側がまだ値を設定していない可能性があるためリトライする。
-export async function getMobileInsets(): Promise<{
-  top: number;
-  bottom: number;
-}> {
-  for (let attempt = 0; attempt < 10; attempt++) {
-    try {
-      const result = await invoke<{ top: number; bottom: number }>(
-        "get_mobile_insets",
-      );
-      console.log(
-        `[getMobileInsets attempt=${attempt}]`,
-        JSON.stringify(result),
-        "innerHeight:",
-        window.innerHeight,
-        "innerWidth:",
-        window.innerWidth,
-      );
-      if (result.top > 0 || result.bottom > 0) {
-        return result;
-      }
-      if (attempt < 9) {
-        await new Promise((r) => setTimeout(r, 100));
-      }
-    } catch (e) {
-      console.error("[getMobileInsets] error:", e);
-      break;
-    }
-  }
-  console.warn("[getMobileInsets] all attempts returned {top:0,bottom:0}");
-  return { top: 0, bottom: 0 };
-}
-
 export interface ColumnBounds {
   x: number;
   y: number;

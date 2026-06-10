@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { v4 as uuidv4 } from "uuid";
 import type { Account, Column, GlobalSettings, PageType } from "../../types";
 import { DEFAULT_COLUMN_SETTINGS } from "../../types";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
@@ -37,7 +36,7 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
     const nextGridCol =
       occupiedCols.length > 0 ? Math.max(...occupiedCols) + 1 : 1;
     const column: Column = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       accountId,
       pageType,
       homeTabName: pageType === "home" && homeTabName ? homeTabName : undefined,

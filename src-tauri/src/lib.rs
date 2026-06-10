@@ -61,7 +61,6 @@ pub fn run() {
                 .build(),
         )
         .manage(AppState::new())
-        .manage(commands::account::LoginCompleteFlag::new())
         .setup(|app| {
             #[cfg(desktop)]
             {
@@ -147,9 +146,6 @@ pub fn run() {
             commands::webview::set_column_cookies,
             commands::webview::open_in_browser,
             commands::account::open_add_account_window,
-            commands::account::notify_account_logged_in,
-            commands::account::mark_login_complete,
-            commands::account::check_login_complete,
             commands::account::delete_account_data,
             commands::account::close_window,
             commands::webview::open_compose_window,

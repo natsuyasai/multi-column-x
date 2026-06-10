@@ -29,9 +29,6 @@ export const IPC_COMMANDS = {
 
   // アカウント管理
   OPEN_ADD_ACCOUNT_WINDOW: "open_add_account_window",
-  NOTIFY_ACCOUNT_LOGGED_IN: "notify_account_logged_in",
-  MARK_LOGIN_COMPLETE: "mark_login_complete",
-  CHECK_LOGIN_COMPLETE: "check_login_complete",
   DELETE_ACCOUNT_DATA: "delete_account_data",
   CLOSE_WINDOW: "close_window",
 

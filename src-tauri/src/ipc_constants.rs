@@ -37,8 +37,6 @@ pub mod labels {
     pub const COMPOSE_PREFIX: &str = "compose-";
     /// アカウント追加ウィンドウラベルプレフィックス（例: "add-account-<uuid8>"）
     pub const ADD_ACCOUNT_PREFIX: &str = "add-account-";
-    /// アカウント追加ウィンドウラベル（モバイル固定値）
-    pub const ADD_ACCOUNT_MOBILE: &str = "add-account";
 }
 
 /// inject スクリプトが参照する window グローバル変数名
