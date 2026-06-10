@@ -182,13 +182,6 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   ngWords: [],
 };
 
-interface ResolveColumnUrlInput {
-  pageType: PageType;
-  customUrl?: string;
-  searchQuery?: string;
-  listId?: string;
-}
-
 interface GetPageTypeLabelInput {
   pageType: PageType;
   homeTabName?: string;
@@ -212,19 +205,4 @@ export function getPageTypeLabel(input: GetPageTypeLabelInput): string {
 
 export function getColumnLabel(column: Column): string {
   return column.label ?? getPageTypeLabel(column);
-}
-
-export function resolveColumnUrl(input: ResolveColumnUrlInput): string {
-  switch (input.pageType) {
-    case "home":
-      return "https://x.com/home";
-    case "notifications":
-      return "https://x.com/notifications";
-    case "search":
-      return `https://x.com/search?q=${encodeURIComponent(input.searchQuery ?? "")}`;
-    case "list":
-      return `https://x.com/i/lists/${input.listId ?? ""}`;
-    case "custom":
-      return input.customUrl ?? "https://x.com/home";
-  }
 }
