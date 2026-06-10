@@ -116,3 +116,17 @@ export const WEBVIEW_SCRIPTS = {
     return `if(window.__multiColumnXConfig){window.__multiColumnXConfig.ngWords=${ng};window.__multiColumnXConfig.globalNgWords=${global};}window.__multiColumnX&&window.__multiColumnX.recheckNgWords&&window.__multiColumnX.recheckNgWords();`;
   },
 } as const;
+
+/** WebView を画面外へ退避させる座標 */
+export const OFFSCREEN = {
+  /** モバイル: 非アクティブカラムの退避位置 */
+  MOBILE_X: -99999,
+  /** デスクトップ: ダイアログ表示中の退避位置 */
+  DESKTOP_X: -9999,
+} as const;
+
+/** localStorage キー */
+export const STORAGE_KEYS = {
+  /** モバイルのアクティブカラム ID（バックグラウンド復帰後の復元用） */
+  ACTIVE_COLUMN_ID: "mcx_activeColumnId",
+} as const;

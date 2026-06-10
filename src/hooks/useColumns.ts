@@ -9,6 +9,8 @@ import type { Column } from "../types";
 import {
   IPC_COMMANDS,
   IPC_EVENTS,
+  OFFSCREEN,
+  STORAGE_KEYS,
   WEBVIEW_LABELS,
   WEBVIEW_SCRIPTS,
 } from "../constants/ipc";
@@ -153,7 +155,7 @@ export function useColumns() {
     setActiveColumnIdState(id);
     // バックグラウンド復帰後に React がリロードされても復元できるよう保存する
     try {
-      localStorage.setItem("mcx_activeColumnId", id);
+      localStorage.setItem(STORAGE_KEYS.ACTIVE_COLUMN_ID, id);
     } catch {}
     const { columns: currentColumns, isMobile } = useAppStore.getState();
 
@@ -174,7 +176,7 @@ export function useColumns() {
         return invoke(IPC_COMMANDS.RESIZE_COLUMN_WEBVIEW, {
           bounds: {
             columnId: col.id,
-            x: isActive ? 0 : -99999,
+            x: isActive ? 0 : OFFSCREEN.MOBILE_X,
             y: isActive ? MOBILE_TAB_BAR_HEIGHT : 0,
             width: window.innerWidth,
             height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
@@ -232,7 +234,7 @@ export function useColumns() {
       // バックグラウンド復帰後の React リロード時に以前のアクティブカラムを復元する
       let savedId: string | null = null;
       try {
-        savedId = localStorage.getItem("mcx_activeColumnId");
+        savedId = localStorage.getItem(STORAGE_KEYS.ACTIVE_COLUMN_ID);
       } catch {}
       const targetColumn =
         (savedId ? sortedByOrder.find((c) => c.id === savedId) : null) ??
@@ -249,7 +251,7 @@ export function useColumns() {
             args: {
               column,
               dataDirectory: account.dataDirectory,
-              x: isActive ? 0 : -99999,
+              x: isActive ? 0 : OFFSCREEN.MOBILE_X,
               y: 0,
               width: window.innerWidth,
               height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
@@ -261,7 +263,7 @@ export function useColumns() {
         // activeColumnId を保存（バックグラウンド復帰後の復元用）
         setActiveColumnIdState(targetColumn.id);
         try {
-          localStorage.setItem("mcx_activeColumnId", targetColumn.id);
+          localStorage.setItem(STORAGE_KEYS.ACTIVE_COLUMN_ID, targetColumn.id);
         } catch {}
         // Cookie 設定（認証に必要）
         await invoke(IPC_COMMANDS.SET_COLUMN_COOKIES, {
@@ -359,7 +361,7 @@ export function useColumns() {
           args: {
             column,
             dataDirectory: account.dataDirectory,
-            x: -99999,
+            x: OFFSCREEN.MOBILE_X,
             y: 0,
             width: window.innerWidth,
             height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
@@ -389,7 +391,7 @@ export function useColumns() {
       const b = bounds[column.id];
       if (!b) return;
 
-      await invoke("create_column_webview", {
+      await invoke(IPC_COMMANDS.CREATE_COLUMN_WEBVIEW, {
         args: { column, dataDirectory: account.dataDirectory, ...b },
       }).catch(console.error);
     },
@@ -405,14 +407,14 @@ export function useColumns() {
           bounds: isMobile
             ? {
                 columnId: col.id,
-                x: -99999,
+                x: OFFSCREEN.MOBILE_X,
                 y: 0,
                 width: window.innerWidth,
                 height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
               }
             : {
                 columnId: col.id,
-                x: -9999,
+                x: OFFSCREEN.DESKTOP_X,
                 y:
                   getTopBarHeight(useAppStore.getState().topBarExpanded) +
                   HEADER_HEIGHT,
