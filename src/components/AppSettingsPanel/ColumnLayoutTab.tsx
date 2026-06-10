@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from "react";
-import type { Account, Column } from "../../types";
+import { getPageTypeLabel, type Account, type Column } from "../../types";
 import styles from "./ColumnLayoutTab.module.scss";
 
 interface ColumnLayoutTabProps {
@@ -20,25 +20,10 @@ interface ColumnGroup {
   columns: Column[];
 }
 
-function getPageLabel(col: Column): string {
-  switch (col.pageType) {
-    case "home":
-      return col.homeTabName ?? "ホーム";
-    case "notifications":
-      return "通知";
-    case "search":
-      return `検索: ${col.searchQuery ?? ""}`;
-    case "list":
-      return "リスト";
-    case "custom":
-      return "カスタム";
-  }
-}
-
 function getColumnLabel(col: Column, accounts: Account[]): string {
   const account = accounts.find((a) => a.id === col.accountId);
   return (
-    col.label ?? `${account?.label ?? col.accountId} - ${getPageLabel(col)}`
+    col.label ?? `${account?.label ?? col.accountId} - ${getPageTypeLabel(col)}`
   );
 }
 
