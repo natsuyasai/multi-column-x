@@ -390,6 +390,7 @@ fn load_global_ng_words(app: &AppHandle) -> Vec<String> {
         .unwrap_or_default()
 }
 
+#[cfg(target_os = "android")]
 fn load_use_x_app_for_compose(app: &AppHandle) -> bool {
     load_global_settings(app)
         .get("useXAppForCompose")
@@ -644,7 +645,9 @@ pub async fn open_link_popup_window(
 /// アクティブカラムのアカウントに CookieManager を切り替える（Android / Profile API 非対応端末のみ）。
 /// setActiveColumn から resize_column_webview より先に呼ばれ、正しいアカウントで WebView が動作する。
 #[tauri::command]
-pub async fn set_column_cookies(#[allow(non_snake_case)] accountId: String) -> Result<(), String> {
+pub async fn set_column_cookies(
+    #[allow(non_snake_case, unused_variables)] accountId: String,
+) -> Result<(), String> {
     #[cfg(target_os = "android")]
     {
         crate::android_bridge::set_account_cookies(&accountId)?;
