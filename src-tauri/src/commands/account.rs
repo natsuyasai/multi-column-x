@@ -2,15 +2,6 @@ use crate::ipc_constants::{events, labels};
 use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl};
 
-/// ログイン完了フラグ（Activity 切り替えをまたいで状態を保持する）
-pub struct LoginCompleteFlag(pub std::sync::Mutex<bool>);
-
-impl LoginCompleteFlag {
-    pub fn new() -> Self {
-        Self(std::sync::Mutex::new(false))
-    }
-}
-
 #[cfg(desktop)]
 #[tauri::command]
 pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
@@ -133,73 +124,6 @@ pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
 
     println!("[open_add_account] timeout");
     Err("timeout".to_string())
-}
-
-/// AddAccount WebView の init script から呼ばれる。
-/// フラグとセンチネルファイルをセットし、AddAccount.kt の finish() を促す。
-#[tauri::command]
-pub async fn mark_login_complete(
-    app: AppHandle,
-    state: tauri::State<'_, LoginCompleteFlag>,
-) -> Result<(), String> {
-    *state.0.lock().unwrap() = true;
-
-    #[cfg(mobile)]
-    {
-        if let Ok(dir) = app.path().app_data_dir() {
-            let _ = std::fs::write(dir.join("add_account_login_complete"), "");
-        }
-        // AddAccount.kt の finish() が来る前に Tauri 側でも閉じを試みる
-        if let Some(window) = app.get_webview_window(labels::ADD_ACCOUNT_MOBILE) {
-            let _ = window.close();
-        }
-    }
-
-    // desktop のみ: main WebView は常にアクティブなので emit で通知できる。
-    // mobile は main WebView が suspend 中のため emit を受信できない。
-    // mobile では visibilitychange → check_login_complete で通知する（useAccounts.ts 参照）。
-    #[cfg(not(mobile))]
-    {
-        let app_clone = app.clone();
-        tokio::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
-            let _ = app_clone.emit(events::ACCOUNT_LOGIN_COMPLETE, ());
-        });
-    }
-
-    Ok(())
-}
-
-/// メイン WebView が visibilitychange でフォアグラウンド復帰した際に呼ぶ。
-/// フラグを取得してクリアする（一度だけ true を返す）。
-/// Android では AddAccount.kt のネイティブ検出パスがセンチネルファイルを書く場合もあるため、
-/// フラグが false でもセンチネルファイルを確認する。
-#[tauri::command]
-pub async fn check_login_complete(
-    #[allow(unused_variables)] app: AppHandle,
-    state: tauri::State<'_, LoginCompleteFlag>,
-) -> Result<bool, String> {
-    let mut flag = state.0.lock().unwrap();
-    if *flag {
-        *flag = false;
-        return Ok(true);
-    }
-    #[cfg(mobile)]
-    if let Ok(dir) = app.path().app_data_dir() {
-        let sentinel = dir.join("add_account_login_complete");
-        if sentinel.exists() {
-            let _ = std::fs::remove_file(&sentinel);
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
-#[tauri::command]
-pub async fn notify_account_logged_in(app: AppHandle) -> Result<(), String> {
-    app.emit(events::ACCOUNT_LOGIN_COMPLETE, ())
-        .map_err(|e| e.to_string())?;
-    Ok(())
 }
 
 #[tauri::command]
