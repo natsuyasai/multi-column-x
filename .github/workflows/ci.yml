@@ -40,4 +40,8 @@ jobs:
       - run: npm ci
       - run: npm run build:inject
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+      - name: cargo check (deny warnings)
+        run: cargo check --manifest-path src-tauri/Cargo.toml
+        env:
+          RUSTFLAGS: "-D warnings"
       - run: cargo test --manifest-path src-tauri/Cargo.toml
