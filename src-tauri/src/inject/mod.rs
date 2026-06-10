@@ -161,7 +161,6 @@ mod tests {
             blur_image_enabled: false,
             blur_image_amount: "10px",
             hide_ad_enabled: false,
-            zoom_level: 1.0,
             custom_css: "",
             visible_links: &[],
             ng_words: &[],
@@ -209,7 +208,6 @@ mod tests {
         assert!(script.contains("showCustomMenu: true"));
         assert!(script.contains("smallImageEnabled: false"));
         assert!(script.contains("hideAdEnabled: false"));
-        assert!(script.contains("zoomLevel: 1"));
     }
 
     #[test]
