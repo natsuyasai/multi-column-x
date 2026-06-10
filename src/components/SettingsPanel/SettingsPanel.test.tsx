@@ -61,13 +61,15 @@ describe("SettingsPanel", () => {
     expect(onReload).toHaveBeenCalledWith("col-1");
   });
 
-  it("再読み込みボタンをクリックしてもパネルは閉じない", async () => {
+  it("再読み込みボタンをクリックするとパネルが閉じてからリロードされる", async () => {
     const onClose = vi.fn();
+    const onReload = vi.fn();
     render(
-      <SettingsPanel {...defaultProps} onClose={onClose} onReload={vi.fn()} />,
+      <SettingsPanel {...defaultProps} onClose={onClose} onReload={onReload} />,
     );
     await userEvent.click(screen.getByRole("button", { name: "再読み込み" }));
-    expect(onClose).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+    expect(onReload).toHaveBeenCalledWith("col-1");
   });
 });
 
