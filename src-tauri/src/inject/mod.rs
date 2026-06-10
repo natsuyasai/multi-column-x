@@ -61,8 +61,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
 
     let visible_links_json =
         serde_json::to_string(params.visible_links).unwrap_or_else(|_| "[]".to_string());
-    let ng_words_json =
-        serde_json::to_string(params.ng_words).unwrap_or_else(|_| "[]".to_string());
+    let ng_words_json = serde_json::to_string(params.ng_words).unwrap_or_else(|_| "[]".to_string());
     let global_ng_words_json =
         serde_json::to_string(params.global_ng_words).unwrap_or_else(|_| "[]".to_string());
     let config = format!(
