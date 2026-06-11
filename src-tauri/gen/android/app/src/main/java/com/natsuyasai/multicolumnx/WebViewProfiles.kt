@@ -11,6 +11,15 @@ import java.io.File
 /** アカウント ID から WebView Profile / Cookie 保存ディレクトリ共通のプロファイル名を生成する。 */
 fun getCookieProfileName(accountId: String): String = "account-$accountId"
 
+/**
+ * loadUrl の前にグローバル CookieManager へのアカウント Cookie 設定（フォールバック）が
+ * 必要かどうかを判定する。プロファイル適用済み、またはアカウント指定なしの場合は不要。
+ */
+fun needsCookieFallback(
+  profileApplied: Boolean,
+  accountId: String,
+): Boolean = !profileApplied && accountId.isNotEmpty()
+
 /** "k=v; k2=v2" 形式の Cookie 文字列を空白・空要素を除いた個別 Cookie のリストに分解する。 */
 fun parseCookieString(cookieString: String): List<String> =
   cookieString

@@ -152,8 +152,8 @@ class MainActivity : TauriActivity() {
     accountId: String,
   ) {
     runOnUiThreadSync {
-      val webView =
-        newConfiguredWebView(initScript, accountId, "popup $id").also { wv ->
+      val (webView, profileApplied) =
+        newConfiguredWebView(initScript, accountId, "popup $id").also { (wv, _) ->
           wv.webViewClient = ExternalLinkWebViewClient(url)
           wv.webChromeClient = ExternalLinkWebChromeClient()
         }
@@ -164,7 +164,7 @@ class MainActivity : TauriActivity() {
         )
       contentRoot.addView(webView, params)
       popupWebViews.addLast(Pair(id, webView))
-      webView.loadUrl(url)
+      loadUrlForAccount(webView, url, accountId, profileApplied)
     }
   }
 
@@ -211,8 +211,8 @@ class MainActivity : TauriActivity() {
         return@runOnUiThreadSync
       }
 
-      val webView =
-        newConfiguredWebView(initScript, accountId, "column $id").also { wv ->
+      val (webView, profileApplied) =
+        newConfiguredWebView(initScript, accountId, "column $id").also { (wv, _) ->
           wv.webViewClient = ExternalLinkWebViewClient(url)
           wv.webChromeClient = ExternalLinkWebChromeClient()
           wv.visibility = if (visible) View.VISIBLE else View.GONE
@@ -228,7 +228,7 @@ class MainActivity : TauriActivity() {
       contentRoot.addView(webView, params)
       columnWebViews[id] = webView
 
-      webView.loadUrl(url)
+      loadUrlForAccount(webView, url, accountId, profileApplied)
     }
   }
 
@@ -296,65 +296,92 @@ class MainActivity : TauriActivity() {
     setCookieForAccount(accountId)
   }
 
+  // newConfiguredWebView の結果。loadUrl 時の Cookie フォールバック要否判定に
+  // プロファイル適用結果が必要なため、WebView と合わせて返す。
+  private data class ConfiguredWebView(
+    val webView: WebView,
+    val profileApplied: Boolean,
+  )
+
   // カラム/ポップアップ共通の WebView 初期化。
   // webViewClient / webChromeClient は呼び出し側で用途別に設定する。
-  // Profile API 対応端末はプロファイルで分離し、非対応端末は loadUrl 前に
-  // Cookie を設定してアカウントを確定する（このメソッドは loadUrl より先に呼ばれる）。
+  // Profile API 対応端末はプロファイルで分離し、非対応端末は loadUrlForAccount が
+  // loadUrl 前に Cookie を設定してアカウントを確定する。
   private fun newConfiguredWebView(
     initScript: String,
     accountId: String,
     contextName: String,
-  ): WebView =
-    WebView(this).also { wv ->
-      // setProfile は「WebView 使用前」に呼ぶ制約があるため、settings 変更や
-      // Cookie 操作より先に WebView 生成直後の最初の操作として適用する。
-      val profileApplied =
-        WebViewProfiles.isSupported &&
-          accountId.isNotEmpty() &&
-          WebViewProfiles.apply(wv, accountId, contextName, filesDir)
-      wv.settings.javaScriptEnabled = true
-      wv.settings.domStorageEnabled = true
-      wv.settings.setSupportMultipleWindows(true)
-      wv.settings.cacheMode = android.webkit.WebSettings.LOAD_CACHE_ELSE_NETWORK
-      if (!profileApplied) {
-        // api.x.com は x.com とは別ホストのため、サードパーティ Cookie 送信を許可する。
-        // デフォルト false のままだと account/settings.json 等の v1.1 REST API が 401 になる。
-        // プロファイル適用時は WebViewProfiles.apply がプロファイルの CookieManager に設定済み。
-        CookieManager.getInstance().setAcceptThirdPartyCookies(wv, true)
-        if (accountId.isNotEmpty()) {
-          setCookieForAccount(accountId)
-        }
-      }
-      if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
-        WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
-      }
+  ): ConfiguredWebView {
+    val wv = WebView(this)
+    // setProfile は「WebView 使用前」に呼ぶ制約があるため、settings 変更や
+    // Cookie 操作より先に WebView 生成直後の最初の操作として適用する。
+    val profileApplied =
+      WebViewProfiles.isSupported &&
+        accountId.isNotEmpty() &&
+        WebViewProfiles.apply(wv, accountId, contextName, filesDir)
+    wv.settings.javaScriptEnabled = true
+    wv.settings.domStorageEnabled = true
+    wv.settings.setSupportMultipleWindows(true)
+    wv.settings.cacheMode = android.webkit.WebSettings.LOAD_CACHE_ELSE_NETWORK
+    if (!profileApplied) {
+      // api.x.com は x.com とは別ホストのため、サードパーティ Cookie 送信を許可する。
+      // デフォルト false のままだと account/settings.json 等の v1.1 REST API が 401 になる。
+      // プロファイル適用時は WebViewProfiles.apply がプロファイルの CookieManager に設定済み。
+      CookieManager.getInstance().setAcceptThirdPartyCookies(wv, true)
     }
+    if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+      WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
+    }
+    return ConfiguredWebView(wv, profileApplied)
+  }
+
+  // アカウントのセッションを確定してから URL をロードする。
+  // Cookie フォールバックが必要な場合は removeAllCookies の完了コールバック →
+  // setCookie → loadUrl の順序を保証し、Cookie 未設定のままロードが始まる競合を防ぐ。
+  private fun loadUrlForAccount(
+    wv: WebView,
+    url: String,
+    accountId: String,
+    profileApplied: Boolean,
+  ) {
+    if (needsCookieFallback(profileApplied, accountId)) {
+      setCookieForAccount(accountId) { wv.loadUrl(url) }
+    } else {
+      wv.loadUrl(url)
+    }
+  }
 
   // 保存済みの Cookie をアカウントのデータディレクトリから読み込み CookieManager に設定する。
   // Profile API が使えない環境での複数アカウント切り替えに使う。
-  private fun setCookieForAccount(accountId: String) {
-    val cookieFile = File(filesDir, "accounts/account-$accountId/x_cookies.txt")
+  // removeAllCookies は非同期のため、完了コールバック内で setCookie してから onComplete を
+  // 呼ぶことで「古い Cookie の削除 → 新しい Cookie の設定 → 後続処理」の順序を保証する。
+  private fun setCookieForAccount(
+    accountId: String,
+    onComplete: () -> Unit = {},
+  ) {
+    val cookieFile = File(filesDir, "accounts/${getCookieProfileName(accountId)}/x_cookies.txt")
     if (!cookieFile.exists()) {
       Log.w(TAG, "setCookieForAccount: cookie file not found for $accountId")
+      onComplete()
       return
     }
 
-    val cookieString = cookieFile.readText()
-    if (cookieString.isEmpty()) return
+    val cookies = parseCookieString(cookieFile.readText())
+    if (cookies.isEmpty()) {
+      onComplete()
+      return
+    }
 
     val cookieManager = CookieManager.getInstance()
-    cookieManager.removeAllCookies(null)
-    cookieManager.flush()
-
-    for (cookie in cookieString.split(";")) {
-      val trimmed = cookie.trim()
-      if (trimmed.isNotEmpty()) {
-        cookieManager.setCookie("https://x.com", trimmed)
-        cookieManager.setCookie("https://twitter.com", trimmed)
+    cookieManager.removeAllCookies {
+      for (cookie in cookies) {
+        cookieManager.setCookie("https://x.com", cookie)
+        cookieManager.setCookie("https://twitter.com", cookie)
       }
+      cookieManager.flush()
+      Log.d(TAG, "setCookieForAccount: set cookies for $accountId")
+      onComplete()
     }
-    cookieManager.flush()
-    Log.d(TAG, "setCookieForAccount: set cookies for $accountId")
   }
 
   // x.com / twitter.com のドメインに属する URL かどうかを判定する。

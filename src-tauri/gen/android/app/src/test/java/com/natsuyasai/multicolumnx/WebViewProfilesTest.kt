@@ -2,6 +2,8 @@ package com.natsuyasai.multicolumnx
 
 import androidx.webkit.WebViewFeature
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** getCookieProfileName（アカウント ID → プロファイル名変換）の純粋ロジックテスト。 */
@@ -14,6 +16,24 @@ class CookieProfileNameTest {
   @Test
   fun `空のaccountIdはaccount-プレフィックスのみになる`() {
     assertEquals("account-", getCookieProfileName(""))
+  }
+}
+
+/** needsCookieFallback（ロード前の Cookie フォールバック要否判定）の純粋ロジックテスト。 */
+class CookieFallbackDecisionTest {
+  @Test
+  fun `プロファイル適用済みならフォールバック不要`() {
+    assertFalse(needsCookieFallback(profileApplied = true, accountId = "123"))
+  }
+
+  @Test
+  fun `プロファイル未適用でaccountIdがあればフォールバックが必要`() {
+    assertTrue(needsCookieFallback(profileApplied = false, accountId = "123"))
+  }
+
+  @Test
+  fun `accountIdが空ならプロファイル未適用でもフォールバック不要`() {
+    assertFalse(needsCookieFallback(profileApplied = false, accountId = ""))
   }
 }
 
