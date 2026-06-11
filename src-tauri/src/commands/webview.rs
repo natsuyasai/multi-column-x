@@ -354,6 +354,32 @@ fn get_popup_bounds(app: &AppHandle) -> (LogicalPosition<f64>, LogicalSize<f64>)
     )
 }
 
+/// ポップアップ系ウィンドウ共通の初期化情報。
+struct PopupInit {
+    label: String,
+    init_script: String,
+}
+
+/// accounts_json / esc 設定を読み込んでポップアップ init script とラベルを生成する。
+fn build_popup_init(
+    app: &AppHandle,
+    label_prefix: &str,
+    current_account_id: &str,
+    target_href: &str,
+) -> PopupInit {
+    let accounts_json = load_accounts_json(app);
+    let esc_close_enabled = load_popup_esc_close_enabled(app);
+    PopupInit {
+        label: format!("{}{}", label_prefix, uuid::Uuid::new_v4()),
+        init_script: crate::inject::build_popup_init_script(
+            &accounts_json,
+            current_account_id,
+            target_href,
+            esc_close_enabled,
+        ),
+    }
+}
+
 #[cfg(desktop)]
 #[tauri::command]
 pub async fn open_popup_window(
@@ -375,16 +401,10 @@ pub async fn open_popup_window(
         (data_dir, account_id)
     };
 
-    let accounts_json = load_accounts_json(&app);
-    let esc_close_enabled = load_popup_esc_close_enabled(&app);
-    let popup_init = crate::inject::build_popup_init_script(
-        &accounts_json,
-        &current_account_id,
-        &url,
-        esc_close_enabled,
-    );
-
-    let popup_label = format!("{}{}", labels::POPUP_PREFIX, uuid::Uuid::new_v4());
+    let PopupInit {
+        label: popup_label,
+        init_script: popup_init,
+    } = build_popup_init(&app, labels::POPUP_PREFIX, &current_account_id, &url);
     let (pos, size) = get_popup_bounds(&app);
 
     tauri::WebviewWindowBuilder::new(&app, &popup_label, WebviewUrl::External(parse_url(&url)?))
@@ -415,15 +435,10 @@ pub async fn open_popup_window(
             .to_string()
     };
 
-    let accounts_json = load_accounts_json(&app);
-    let esc_close_enabled = load_popup_esc_close_enabled(&app);
-    let popup_init = crate::inject::build_popup_init_script(
-        &accounts_json,
-        &current_account_id,
-        &url,
-        esc_close_enabled,
-    );
-    let popup_label = format!("{}{}", labels::POPUP_PREFIX, uuid::Uuid::new_v4());
+    let PopupInit {
+        label: popup_label,
+        init_script: popup_init,
+    } = build_popup_init(&app, labels::POPUP_PREFIX, &current_account_id, &url);
 
     #[cfg(target_os = "android")]
     {
@@ -481,16 +496,10 @@ pub async fn open_link_popup_window(
         (dd, aid)
     };
 
-    let accounts_json = load_accounts_json(&app);
-    let esc_close_enabled = load_popup_esc_close_enabled(&app);
-    let popup_init = crate::inject::build_popup_init_script(
-        &accounts_json,
-        &current_account_id,
-        "",
-        esc_close_enabled,
-    );
-
-    let popup_label = format!("{}{}", labels::POPUP_PREFIX, uuid::Uuid::new_v4());
+    let PopupInit {
+        label: popup_label,
+        init_script: popup_init,
+    } = build_popup_init(&app, labels::POPUP_PREFIX, &current_account_id, "");
 
     let (pos, size) = get_popup_bounds(&app);
 
@@ -528,15 +537,10 @@ pub async fn open_link_popup_window(
         registry.get_account_id(&label).unwrap_or("").to_string()
     };
 
-    let accounts_json = load_accounts_json(&app);
-    let esc_close_enabled = load_popup_esc_close_enabled(&app);
-    let popup_init = crate::inject::build_popup_init_script(
-        &accounts_json,
-        &current_account_id,
-        "",
-        esc_close_enabled,
-    );
-    let popup_label = format!("{}{}", labels::POPUP_PREFIX, uuid::Uuid::new_v4());
+    let PopupInit {
+        label: popup_label,
+        init_script: popup_init,
+    } = build_popup_init(&app, labels::POPUP_PREFIX, &current_account_id, "");
 
     #[cfg(target_os = "android")]
     {
@@ -663,13 +667,11 @@ pub async fn switch_popup_session(
         (None, None)
     };
 
-    let new_label = format!("popup-{}", uuid::Uuid::new_v4());
+    let PopupInit {
+        label: new_label,
+        init_script: popup_init,
+    } = build_popup_init(&app, labels::POPUP_PREFIX, &accountId, &url);
     let data_dir = PathBuf::from(&dataDirectory);
-
-    let accounts_json = load_accounts_json(&app);
-    let esc_close_enabled = load_popup_esc_close_enabled(&app);
-    let popup_init =
-        crate::inject::build_popup_init_script(&accounts_json, &accountId, &url, esc_close_enabled);
 
     let mut builder =
         tauri::WebviewWindowBuilder::new(&app, &new_label, WebviewUrl::External(parse_url(&url)?))
@@ -727,12 +729,10 @@ pub async fn open_compose_window(
 ) -> Result<(), String> {
     let data_dir = std::path::PathBuf::from(&dataDirectory);
 
-    let accounts_json = load_accounts_json(&app);
-    let esc_close_enabled = load_popup_esc_close_enabled(&app);
-    let popup_init =
-        crate::inject::build_popup_init_script(&accounts_json, &accountId, "", esc_close_enabled);
-
-    let compose_label = format!("{}{}", labels::COMPOSE_PREFIX, uuid::Uuid::new_v4());
+    let PopupInit {
+        label: compose_label,
+        init_script: popup_init,
+    } = build_popup_init(&app, labels::COMPOSE_PREFIX, &accountId, "");
 
     const COMPOSE_WIDTH: f64 = 600.0;
     const COMPOSE_WINDOW_HEIGHT: f64 = 580.0; // コンテンツ 540px + ツールバー 40px
@@ -769,11 +769,10 @@ pub async fn open_compose_window(
     #[allow(non_snake_case)] accountId: String,
     #[allow(non_snake_case)] dataDirectory: String,
 ) -> Result<(), String> {
-    let accounts_json = load_accounts_json(&app);
-    let esc_close_enabled = load_popup_esc_close_enabled(&app);
-    let popup_init =
-        crate::inject::build_popup_init_script(&accounts_json, &accountId, "", esc_close_enabled);
-    let compose_label = format!("{}{}", labels::COMPOSE_PREFIX, uuid::Uuid::new_v4());
+    let PopupInit {
+        label: compose_label,
+        init_script: popup_init,
+    } = build_popup_init(&app, labels::COMPOSE_PREFIX, &accountId, "");
 
     #[cfg(target_os = "android")]
     {
