@@ -154,7 +154,7 @@ class MainActivity : TauriActivity() {
     runOnUiThreadSync {
       val webView =
         newConfiguredWebView(initScript, accountId, "popup $id").also { wv ->
-          wv.webViewClient = ExternalLinkWebViewClient()
+          wv.webViewClient = ExternalLinkWebViewClient(url)
           wv.webChromeClient = ExternalLinkWebChromeClient()
         }
       val params =
@@ -213,7 +213,7 @@ class MainActivity : TauriActivity() {
 
       val webView =
         newConfiguredWebView(initScript, accountId, "column $id").also { wv ->
-          wv.webViewClient = ColumnWebViewClient(url)
+          wv.webViewClient = ExternalLinkWebViewClient(url)
           wv.webChromeClient = ExternalLinkWebChromeClient()
           wv.visibility = if (visible) View.VISIBLE else View.GONE
         }
@@ -371,24 +371,11 @@ class MainActivity : TauriActivity() {
     }
   }
 
-  // カラム / ポップアップ WebView 用 WebViewClient。
+  // カラム / ポップアップ WebView 共通の WebViewClient。
   // x.com 内のナビゲーションはそのまま WebView に委ね、外部 URL はシステムブラウザへ転送する。
-  private inner class ExternalLinkWebViewClient : WebViewClient() {
-    override fun shouldOverrideUrlLoading(
-      view: WebView,
-      request: WebResourceRequest,
-    ): Boolean {
-      val url = request.url.toString()
-      if (isInternalUrl(url)) return false
-      openUrlInBrowser(url)
-      return true
-    }
-  }
-
-  // カラム WebView 専用 WebViewClient。
-  // Profile API のプロファイル読み込みタイミングにより Cookie が一時的に利用できず
-  // ログイン画面が表示される場合がある。検知したら遅延後に元 URL へリカバリする（1回限り）。
-  private inner class ColumnWebViewClient(private val recoveryUrl: String) : WebViewClient() {
+  // Profile API のプロファイル読み込みや Cookie 設定のタイミングにより Cookie が一時的に
+  // 利用できずログイン画面が表示される場合がある。検知したら遅延後に元 URL へリカバリする（1回限り）。
+  private inner class ExternalLinkWebViewClient(private val recoveryUrl: String) : WebViewClient() {
     private var loginRetried = false
 
     override fun shouldOverrideUrlLoading(
@@ -406,10 +393,10 @@ class MainActivity : TauriActivity() {
       url: String,
     ) {
       super.onPageFinished(view, url)
-      if (!loginRetried && (url.contains("x.com/login") || url.contains("x.com/i/flow/login"))) {
+      if (!loginRetried && isLoginUrl(url) && !isLoginUrl(recoveryUrl)) {
         loginRetried = true
-        Log.w(TAG, "ColumnWebViewClient: login page detected, recovering to $recoveryUrl")
-        view.postDelayed({ view.loadUrl(recoveryUrl) }, 1500)
+        Log.w(TAG, "ExternalLinkWebViewClient: login page detected, recovering to $recoveryUrl")
+        view.postDelayed({ view.loadUrl(recoveryUrl) }, LOGIN_RECOVERY_DELAY_MS)
       }
     }
   }
@@ -456,5 +443,9 @@ class MainActivity : TauriActivity() {
 
   companion object {
     private const val TAG = "MainActivity"
+
+    // ログイン画面検知からリカバリ用リロードまでの遅延。
+    // プロファイル/Cookie の反映完了を待つための経験的な値。
+    private const val LOGIN_RECOVERY_DELAY_MS = 1500L
   }
 }
