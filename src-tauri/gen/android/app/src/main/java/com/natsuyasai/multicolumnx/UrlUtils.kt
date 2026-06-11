@@ -7,3 +7,13 @@ fun isInternalUrl(url: String): Boolean {
     url.startsWith("about:") ||
     url.startsWith("blob:")
 }
+
+/**
+ * x.com / twitter.com のログイン画面 URL かどうかを判定する。
+ * Cookie が利用できない状態でロードされたときのリカバリ判定に使う。
+ */
+fun isLoginUrl(url: String): Boolean {
+  return url.contains("x.com/login") ||
+    url.contains("x.com/i/flow/login") ||
+    url.contains("twitter.com/login")
+}

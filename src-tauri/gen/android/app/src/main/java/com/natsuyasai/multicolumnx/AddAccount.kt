@@ -36,11 +36,24 @@ class AddAccount : AppCompatActivity() {
 
     val wv =
       WebView(this).apply {
+        // アカウントごとに独立した WebView Profile を割り当て、セッションを分離する。
+        // setProfile は「WebView 使用前」に呼ぶ制約があるため、settings 変更や
+        // Cookie 操作より先に WebView 生成直後の最初の操作として適用する。
+        val profileSet =
+          WebViewProfiles.isSupported &&
+            WebViewProfiles.apply(this, accountId, "add-account", filesDir)
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
         settings.databaseEnabled = true
         settings.mediaPlaybackRequiresUserGesture = false
-        CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+        if (!profileSet) {
+          // Profile API 非対応の場合は共有 CookieManager をクリアして新鮮なセッションで開始する。
+          // プロファイル適用時は WebViewProfiles.apply がプロファイルの CookieManager に
+          // サードパーティ Cookie 許可を設定済み。
+          CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+          CookieManager.getInstance().removeAllCookies(null)
+          CookieManager.getInstance().flush()
+        }
         webViewClient =
           object : WebViewClient() {
             override fun onPageStarted(
@@ -60,16 +73,6 @@ class AddAccount : AppCompatActivity() {
               isPageLoading = false
             }
           }
-
-        // アカウントごとに独立した WebView Profile を割り当て、セッションを分離する。
-        // Profile API 非対応の場合は Cookie をクリアして新鮮なセッションで開始する。
-        val profileSet =
-          WebViewProfiles.isSupported &&
-            WebViewProfiles.apply(this, accountId, "add-account")
-        if (!profileSet) {
-          CookieManager.getInstance().removeAllCookies(null)
-          CookieManager.getInstance().flush()
-        }
 
         loadUrl("https://x.com/login")
       }
