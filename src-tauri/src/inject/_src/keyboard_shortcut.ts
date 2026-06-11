@@ -15,6 +15,7 @@ const REPORT_KEYBOARD_SHORTCUT = "report_keyboard_shortcut";
       else if (key === "a" && e.shiftKey) shortcutKey = "account_manager";
       else if (key === ",") shortcutKey = "app_settings";
       else if (key === "b") shortcutKey = "toggle_top_bar";
+      else if (key >= "1" && key <= "9") shortcutKey = "jump_column_" + key;
       if (!shortcutKey) return;
       e.preventDefault();
       const invoke = window.__TAURI__?.core?.invoke ?? window.__TAURI__?.invoke;
