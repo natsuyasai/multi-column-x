@@ -306,17 +306,24 @@ class MainActivity : TauriActivity() {
     contextName: String,
   ): WebView =
     WebView(this).also { wv ->
+      // setProfile は「WebView 使用前」に呼ぶ制約があるため、settings 変更や
+      // Cookie 操作より先に WebView 生成直後の最初の操作として適用する。
+      val profileApplied =
+        WebViewProfiles.isSupported &&
+          accountId.isNotEmpty() &&
+          WebViewProfiles.apply(wv, accountId, contextName)
       wv.settings.javaScriptEnabled = true
       wv.settings.domStorageEnabled = true
       wv.settings.setSupportMultipleWindows(true)
       wv.settings.cacheMode = android.webkit.WebSettings.LOAD_CACHE_ELSE_NETWORK
-      // api.x.com は x.com とは別ホストのため、サードパーティ Cookie 送信を許可する。
-      // デフォルト false のままだと account/settings.json 等の v1.1 REST API が 401 になる。
-      CookieManager.getInstance().setAcceptThirdPartyCookies(wv, true)
-      if (WebViewProfiles.isSupported && accountId.isNotEmpty()) {
-        WebViewProfiles.apply(wv, accountId, contextName)
-      } else if (accountId.isNotEmpty()) {
-        setCookieForAccount(accountId)
+      if (!profileApplied) {
+        // api.x.com は x.com とは別ホストのため、サードパーティ Cookie 送信を許可する。
+        // デフォルト false のままだと account/settings.json 等の v1.1 REST API が 401 になる。
+        // プロファイル適用時は WebViewProfiles.apply がプロファイルの CookieManager に設定済み。
+        CookieManager.getInstance().setAcceptThirdPartyCookies(wv, true)
+        if (accountId.isNotEmpty()) {
+          setCookieForAccount(accountId)
+        }
       }
       if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
         WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
