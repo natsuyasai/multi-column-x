@@ -132,13 +132,13 @@ pub fn build_popup_init_script(
     let popup_toolbar = include_str!("popup_toolbar.js");
     format!(
         "window.{}={};window.{}={:?};window.{}={:?};window.{}={};\n{}",
-        globals::TV_ACCOUNTS,
+        globals::MCX_ACCOUNTS,
         accounts_json,
-        globals::TV_CURRENT_ACCOUNT_ID,
+        globals::MCX_CURRENT_ACCOUNT_ID,
         current_account_id,
-        globals::TV_TARGET_HREF,
+        globals::MCX_TARGET_HREF,
         target_href,
-        globals::TV_ESC_CLOSE_ENABLED,
+        globals::MCX_ESC_CLOSE_ENABLED,
         esc_close_enabled,
         popup_toolbar
     )
@@ -253,11 +253,11 @@ mod tests {
             "https://x.com/something",
             true,
         );
-        assert!(script.contains("__tvAccounts"));
+        assert!(script.contains("__mcxAccounts"));
         assert!(script.contains(r#"[{"id":"acc1"}]"#));
-        assert!(script.contains("__tvCurrentAccountId"));
+        assert!(script.contains("__mcxCurrentAccountId"));
         assert!(script.contains("acc1"));
-        assert!(script.contains("__tvEscCloseEnabled"));
+        assert!(script.contains("__mcxEscCloseEnabled"));
         assert!(script.contains("true"));
     }
 

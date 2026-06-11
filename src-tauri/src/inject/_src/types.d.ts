@@ -53,10 +53,10 @@ declare global {
     __multiColumnXConfig?: MultiColumnXConfig;
     __TAURI__?: TauriGlobal;
     __TAURI_INTERNALS__?: TauriInternals;
-    __tvAccounts?: TvAccountInfo[];
-    __tvCurrentAccountId?: string;
-    __tvTargetHref?: string;
-    __tvEscCloseEnabled?: boolean;
+    __mcxAccounts?: TvAccountInfo[];
+    __mcxCurrentAccountId?: string;
+    __mcxTargetHref?: string;
+    __mcxEscCloseEnabled?: boolean;
     __mobileTopInset?: number;
     __mobileBottomInset?: number;
   }
