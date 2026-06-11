@@ -6,7 +6,6 @@ import android.os.Bundle
 import android.os.Message
 import android.util.Log
 import android.view.MotionEvent
-import android.view.VelocityTracker
 import android.view.View
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
@@ -36,21 +35,24 @@ class MainActivity : TauriActivity() {
   // 戻るボタン時の canGoBack 判定に使う。UI スレッドからのみアクセスする。
   private var activeColumnWebViewId: String? = null
 
-  // 「逆引き → 前進」ブーメランジェスチャーの状態マシン
-  // 右カラムへ: 左引き → 右リリース、左カラムへ: 右引き → 左リリース
-  private enum class LGesturePhase { IDLE, REVERSE, FORWARD, CANCELLED }
+  // 「逆引き → 前進」ブーメランジェスチャーとダブルタップの検出器。
+  // 確定時のコールバックを AppBridge へ転送し、ポップアップ表示中はジェスチャーを無効化する。
+  private val gestureDetector by lazy {
+    BoomerangGestureDetector(
+      resources.displayMetrics.density,
+      object : BoomerangGestureDetector.Callbacks {
+        override fun onSwipeProgress(navDir: String) = AppBridge.onSwipeProgress(navDir)
 
-  private var lGesturePhase = LGesturePhase.IDLE
-  private var lGestureStartX = 0f
-  private var lGestureStartY = 0f
-  private var lGestureExtremeX = 0f // 逆方向移動の最端点X
-  private var lGestureReverseDir: String? = null // 最初の引き方向: "left" or "right"
-  private var lVelocityTracker: VelocityTracker? = null
+        override fun onSwipeNavigate(navDir: String) = AppBridge.onSwipeNavigate(navDir)
 
-  // ダブルタップ検出用
-  private var lastTapTime = 0L
-  private var lastTapX = 0f
-  private var lastTapY = 0f
+        override fun onSwipeCancel() = AppBridge.onSwipeCancel()
+
+        override fun onDoubleTap() = AppBridge.onDoubleTap()
+
+        override fun isGestureBlocked(): Boolean = popupWebViews.isNotEmpty()
+      },
+    )
+  }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
@@ -103,123 +105,9 @@ class MainActivity : TauriActivity() {
   }
 
   // 「逆引き → 前進」ブーメランジェスチャーでカラムを切り替える。
-  // 右カラムへ移動したい場合: 左に引いてから右へリリース（reverseDir="left" → navigate "left"）
-  // 左カラムへ移動したい場合: 右に引いてから左へリリース（reverseDir="right" → navigate "right"）
-  // 縦スクロールや単純な横スワイプとは区別される。
+  // 検出ロジックは BoomerangGestureDetector に委譲する。
   override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-    val density = resources.displayMetrics.density
-    val minReversePx = 30f * density // 逆引きの最小距離
-    val minForwardPx = 30f * density // 最端点からの最小前進距離
-    val minVelocityPx = 300f
-
-    lVelocityTracker?.addMovement(ev)
-
-    when (ev.actionMasked) {
-      MotionEvent.ACTION_DOWN -> {
-        lVelocityTracker?.recycle()
-        lVelocityTracker = VelocityTracker.obtain()
-        lVelocityTracker?.addMovement(ev)
-        lGesturePhase = LGesturePhase.IDLE
-        lGestureStartX = ev.x
-        lGestureStartY = ev.y
-        lGestureExtremeX = ev.x
-        lGestureReverseDir = null
-      }
-      MotionEvent.ACTION_MOVE -> {
-        if (popupWebViews.isNotEmpty()) {
-          lGesturePhase = LGesturePhase.CANCELLED
-        } else {
-          when (lGesturePhase) {
-            LGesturePhase.IDLE -> {
-              val dx = ev.x - lGestureStartX
-              val dy = ev.y - lGestureStartY
-              when {
-                // 水平方向に十分移動したら REVERSE フェーズへ
-                Math.abs(dx) > minReversePx && Math.abs(dx) > Math.abs(dy) * 1.5f -> {
-                  lGesturePhase = LGesturePhase.REVERSE
-                  lGestureReverseDir = if (dx < 0) "left" else "right"
-                  lGestureExtremeX = ev.x
-                }
-                // 最初から縦方向に動いたらキャンセル（スクロール）
-                Math.abs(dy) > minReversePx && Math.abs(dy) > Math.abs(dx) * 1.5f -> {
-                  lGesturePhase = LGesturePhase.CANCELLED
-                }
-              }
-            }
-            LGesturePhase.REVERSE -> {
-              // 逆引き方向の最端点を更新
-              when (lGestureReverseDir) {
-                "left" -> if (ev.x < lGestureExtremeX) lGestureExtremeX = ev.x
-                "right" -> if (ev.x > lGestureExtremeX) lGestureExtremeX = ev.x
-              }
-              // 最端点から逆方向（前進方向）へ minForwardPx 以上戻ったら FORWARD フェーズへ
-              val dxFromExtreme = ev.x - lGestureExtremeX
-              val enteredForward =
-                when (lGestureReverseDir) {
-                  "left" -> dxFromExtreme > minForwardPx // 左引き後、右へ折り返した
-                  "right" -> dxFromExtreme < -minForwardPx // 右引き後、左へ折り返した
-                  else -> false
-                }
-              if (enteredForward) {
-                lGesturePhase = LGesturePhase.FORWARD
-                val reverseDir = lGestureReverseDir ?: return super.dispatchTouchEvent(ev)
-                val navDir = if (reverseDir == "left") "right" else "left"
-                Log.d(TAG, "boomerang-gesture: progress navDir=$navDir")
-                AppBridge.onSwipeProgress(navDir)
-              }
-            }
-            LGesturePhase.FORWARD -> { /* 速度は ACTION_UP で判定 */ }
-            LGesturePhase.CANCELLED -> {}
-          }
-        }
-      }
-      MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-        if (lGesturePhase == LGesturePhase.FORWARD) {
-          lVelocityTracker?.computeCurrentVelocity(1000)
-          val vx = lVelocityTracker?.xVelocity ?: 0f
-          val reverseDir = lGestureReverseDir
-          // 前進方向（逆引きの逆）への速度が十分あれば切り替え
-          val hasForwardVelocity =
-            when (reverseDir) {
-              "left" -> vx > minVelocityPx // 左引き → 右への速度
-              "right" -> vx < -minVelocityPx // 右引き → 左への速度
-              else -> false
-            }
-          if (hasForwardVelocity && reverseDir != null) {
-            val navDir = if (reverseDir == "left") "right" else "left"
-            Log.d(TAG, "boomerang-gesture: navigate navDir=$navDir vx=$vx")
-            AppBridge.onSwipeNavigate(navDir)
-          } else {
-            AppBridge.onSwipeCancel()
-          }
-        } else if (ev.actionMasked == MotionEvent.ACTION_UP && lGesturePhase == LGesturePhase.IDLE &&
-          popupWebViews.isEmpty()
-        ) {
-          // タップ（指がほとんど動かなかった）の場合にダブルタップを検出する
-          val doubleTapMaxMs = 300L
-          val doubleTapMaxPx = 50f * density
-          val now = System.currentTimeMillis()
-          val dx = ev.x - lastTapX
-          val dy = ev.y - lastTapY
-          val distSq = dx * dx + dy * dy
-          if (now - lastTapTime < doubleTapMaxMs && distSq < doubleTapMaxPx * doubleTapMaxPx) {
-            Log.d(TAG, "double-tap detected")
-            AppBridge.onDoubleTap()
-            lastTapTime = 0L
-          } else {
-            lastTapTime = now
-            lastTapX = ev.x
-            lastTapY = ev.y
-          }
-        }
-        // REVERSE フェーズで離した場合は progress 未発行のためキャンセル不要
-        lVelocityTracker?.recycle()
-        lVelocityTracker = null
-        lGesturePhase = LGesturePhase.IDLE
-        lGestureReverseDir = null
-      }
-    }
-
+    gestureDetector.onTouchEvent(ev)
     return super.dispatchTouchEvent(ev)
   }
 
