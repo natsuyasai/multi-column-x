@@ -127,35 +127,13 @@ export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
 /**
  * グローバル設定のデフォルト値。
  *
- * NOTE: Rust 側にも同等のデフォルト値が定義されている。
- *   src-tauri/src/commands/settings.rs の GlobalSettingsData の
- *   impl Default および #[serde(default)] アトリビュートがそれにあたる。
+ * NOTE: Rust 側（src-tauri/src/commands/settings.rs の GlobalSettingsData impl Default）と
+ * 二重定義になっており、ドリフトは契約テストで検出する:
+ * - fixture: contracts/default-settings.json
+ * - TS 側テスト: src/types/defaults.contract.test.ts
+ * - Rust 側テスト: settings.rs の default_settings_match_contract_fixture
  *
- * ここの値を変更するときは Rust 側の対応箇所も必ず合わせること。
- *
- * フィールド対応表:
- * | TS フィールド                    | Rust フィールド                     | デフォルト値          |
- * |--------------------------------|-------------------------------------|---------------------|
- * | theme                          | theme                               | "dark"              |
- * | customCSS                      | custom_css                          | ""                  |
- * | windowBounds                   | window_bounds                       | x:0,y:0,w:1400,h:900|
- * | defaultAutoReloadEnabled       | default_auto_reload_enabled         | true                |
- * | defaultAutoReloadInterval      | default_auto_reload_interval        | 600                 |
- * | defaultShowCountdown           | default_show_countdown              | true                |
- * | defaultAreaRemoveEnabled       | default_area_remove_enabled         | true                |
- * | defaultShowCustomMenu          | default_show_custom_menu            | false               |
- * | defaultScrollPosRestoreEnabled | default_scroll_pos_restore_enabled  | false               |
- * | defaultColumnCustomCSS         | default_column_custom_css           | ""                  |
- * | popupEscCloseEnabled           | popup_esc_close_enabled             | true                |
- * | videoAutoPlayStopEnabled       | video_auto_play_stop_enabled        | true                |
- * | showSortButtons                | show_sort_buttons                   | false               |
- * | smallImageEnabled              | small_image_enabled                 | false               |
- * | smallImageWidth                | small_image_width                   | "50%"               |
- * | blurImageEnabled               | blur_image_enabled                  | false               |
- * | blurImageAmount                | blur_image_amount                   | "10px"              |
- * | hideAdEnabled                  | hide_ad_enabled                     | true                |
- * | columnScale                    | column_scale                        | "default"           |
- * | useXAppForCompose              | use_x_app_for_compose               | false               |
+ * 値を変更したら両側を更新し、fixture を再生成すること。
  */
 export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   theme: "dark",

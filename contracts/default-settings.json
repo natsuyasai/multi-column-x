@@ -1,0 +1,34 @@
+{
+  "accounts": [],
+  "columns": [],
+  "globalSettings": {
+    "theme": "dark",
+    "customCSS": "",
+    "windowBounds": {
+      "x": 0.0,
+      "y": 0.0,
+      "width": 1400.0,
+      "height": 900.0
+    },
+    "defaultAccountId": null,
+    "defaultAutoReloadEnabled": true,
+    "defaultAutoReloadInterval": 600,
+    "popupEscCloseEnabled": true,
+    "videoAutoPlayStopEnabled": true,
+    "showSortButtons": false,
+    "defaultShowCountdown": true,
+    "defaultAreaRemoveEnabled": true,
+    "defaultShowCustomMenu": false,
+    "defaultScrollPosRestoreEnabled": false,
+    "defaultColumnCustomCSS": "",
+    "smallImageEnabled": false,
+    "smallImageWidth": "50%",
+    "blurImageEnabled": false,
+    "blurImageAmount": "10px",
+    "hideAdEnabled": true,
+    "columnScale": "default",
+    "useXAppForCompose": false,
+    "presets": [],
+    "ngWords": []
+  }
+}
