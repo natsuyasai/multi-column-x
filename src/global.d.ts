@@ -7,8 +7,8 @@ interface TvAccountInfo {
 
 declare global {
   interface Window {
-    __tvAccounts?: TvAccountInfo[];
-    __tvCurrentAccountId?: string;
+    __mcxAccounts?: TvAccountInfo[];
+    __mcxCurrentAccountId?: string;
   }
 }
 

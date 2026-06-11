@@ -322,6 +322,16 @@ mod tests {
         assert!(settings.columns.is_empty());
     }
 
+    /// TS 側（src/types/defaults.contract.test.ts）と同じ fixture を参照する契約テスト。
+    /// デフォルト値を変更したら contracts/default-settings.json を再生成すること。
+    #[test]
+    fn default_settings_match_contract_fixture() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../../../contracts/default-settings.json")).unwrap();
+        let actual = serde_json::to_value(AppSettingsData::default()).unwrap();
+        assert_eq!(actual, fixture);
+    }
+
     #[test]
     fn app_settings_default_roundtrips_through_json() {
         let settings = AppSettingsData::default();

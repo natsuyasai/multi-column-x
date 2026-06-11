@@ -4,10 +4,10 @@ const SWITCH_POPUP_SESSION = "switch_popup_session";
 const CLOSE_POPUP_WINDOW = "close_popup_window";
 
 (function () {
-  const accounts: TvAccountInfo[] = window.__tvAccounts ?? [];
-  const currentAccountId: string = window.__tvCurrentAccountId ?? "";
-  const targetHref: string = window.__tvTargetHref ?? "";
-  const escCloseEnabled: boolean = window.__tvEscCloseEnabled ?? true;
+  const accounts: TvAccountInfo[] = window.__mcxAccounts ?? [];
+  const currentAccountId: string = window.__mcxCurrentAccountId ?? "";
+  const targetHref: string = window.__mcxTargetHref ?? "";
+  const escCloseEnabled: boolean = window.__mcxEscCloseEnabled ?? true;
 
   if (document.getElementById("tv-popup-toolbar")) return;
 

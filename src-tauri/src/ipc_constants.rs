@@ -29,6 +29,8 @@ pub mod events {
 /// WebView / ウィンドウラベルのプレフィックス
 #[allow(dead_code)]
 pub mod labels {
+    /// メインウィンドウのラベル
+    pub const MAIN: &str = "main";
     /// カラム WebView ラベルプレフィックス（例: "column-<uuid>"）
     pub const COLUMN_PREFIX: &str = "column-";
     /// ポップアップウィンドウラベルプレフィックス（例: "popup-<uuid>"）
@@ -47,11 +49,11 @@ pub mod globals {
     /// カラム WebView に注入される設定オブジェクト
     pub const MULTI_COLUMN_X_CONFIG: &str = "__multiColumnXConfig";
     /// ポップアップ WebView に注入されるアカウント配列
-    pub const TV_ACCOUNTS: &str = "__tvAccounts";
+    pub const MCX_ACCOUNTS: &str = "__mcxAccounts";
     /// ポップアップ WebView に注入される現在アカウント ID
-    pub const TV_CURRENT_ACCOUNT_ID: &str = "__tvCurrentAccountId";
+    pub const MCX_CURRENT_ACCOUNT_ID: &str = "__mcxCurrentAccountId";
     /// ポップアップ WebView に注入されるターゲット href
-    pub const TV_TARGET_HREF: &str = "__tvTargetHref";
+    pub const MCX_TARGET_HREF: &str = "__mcxTargetHref";
     /// ポップアップ WebView に注入される Esc 閉じる設定
-    pub const TV_ESC_CLOSE_ENABLED: &str = "__tvEscCloseEnabled";
+    pub const MCX_ESC_CLOSE_ENABLED: &str = "__mcxEscCloseEnabled";
 }

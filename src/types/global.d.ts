@@ -41,13 +41,13 @@ declare global {
     /** カラム WebView 内の設定オブジェクト */
     __multiColumnXConfig?: MultiColumnXConfig;
     /** ポップアップ WebView 内のアカウント一覧 */
-    __tvAccounts?: TvAccountInfo[];
+    __mcxAccounts?: TvAccountInfo[];
     /** ポップアップ WebView 内の現在のアカウント ID */
-    __tvCurrentAccountId?: string;
+    __mcxCurrentAccountId?: string;
     /** ポップアップ WebView 内の自動クリック対象 href */
-    __tvTargetHref?: string;
+    __mcxTargetHref?: string;
     /** ポップアップ WebView 内の Esc キーで閉じる設定 */
-    __tvEscCloseEnabled?: boolean;
+    __mcxEscCloseEnabled?: boolean;
     /** モバイル: ステータスバー高さ (dp) */
     __mobileTopInset?: number;
     /** モバイル: ナビゲーションバー高さ (dp) */

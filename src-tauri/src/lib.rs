@@ -71,7 +71,8 @@ pub fn run() {
                     .and_then(|v| serde_json::from_value::<AppSettingsData>(v).ok())
                 {
                     let wb = &settings.global_settings.window_bounds;
-                    if let Some(window) = app.get_webview_window("main") {
+                    if let Some(window) = app.get_webview_window(crate::ipc_constants::labels::MAIN)
+                    {
                         let monitors = window.available_monitors().unwrap_or_default();
                         let min_visible = 100.0_f64;
                         let on_screen = monitors.iter().any(|m| {
@@ -106,7 +107,7 @@ pub fn run() {
     #[cfg(desktop)]
     let builder = builder.on_window_event(|window, event| {
         if let tauri::WindowEvent::CloseRequested { .. } = event {
-            if window.label() == "main" {
+            if window.label() == crate::ipc_constants::labels::MAIN {
                 save_window_bounds(window);
                 // Linux ではカラム/ポップアップ WebView が独立ウィンドウのため明示的に閉じる。
                 // 他の OS では子 WebView として管理されるため不要。
