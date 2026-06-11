@@ -3,6 +3,7 @@ import React, { useEffect, useCallback, useMemo } from "react";
 import { useAppStore } from "./store/useAppStore";
 import { useColumns } from "./hooks/useColumns";
 import { HEADER_HEIGHT, getTopBarHeight } from "./lib/gridLayout";
+import { logError } from "./lib/log";
 import { useAccounts } from "./hooks/useAccounts";
 import { ColumnHeader } from "./components/ColumnHeader/ColumnHeader";
 import { AddColumnDialog } from "./components/AddColumnDialog/AddColumnDialog";
@@ -98,7 +99,7 @@ const App: React.FC = () => {
       const mobile = platform() === "android";
       setIsMobile(mobile);
     } catch (e) {
-      console.error("platform() failed:", e);
+      logError("platform()")(e);
     }
   }, [setIsMobile]);
 
@@ -144,7 +145,7 @@ const App: React.FC = () => {
         accountId: account.id,
         dataDirectory: account.dataDirectory,
         url: resolved,
-      }).catch(console.error);
+      }).catch(logError("handleSubmitLinkPopup:openLinkPopupWindow"));
     },
     [accounts],
   );
@@ -249,7 +250,7 @@ const App: React.FC = () => {
     invoke(IPC_COMMANDS.OPEN_COMPOSE_WINDOW, {
       accountId: account.id,
       dataDirectory: account.dataDirectory,
-    }).catch(console.error);
+    }).catch(logError("handleComposeTweet:openComposeWindow"));
   }, [accounts, globalSettings.defaultAccountId]);
 
   useKeyboardShortcuts({
