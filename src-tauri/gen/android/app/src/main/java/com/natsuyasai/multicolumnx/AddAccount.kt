@@ -41,7 +41,7 @@ class AddAccount : AppCompatActivity() {
         // Cookie 操作より先に WebView 生成直後の最初の操作として適用する。
         val profileSet =
           WebViewProfiles.isSupported &&
-            WebViewProfiles.apply(this, accountId, "add-account")
+            WebViewProfiles.apply(this, accountId, "add-account", filesDir)
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
         settings.databaseEnabled = true

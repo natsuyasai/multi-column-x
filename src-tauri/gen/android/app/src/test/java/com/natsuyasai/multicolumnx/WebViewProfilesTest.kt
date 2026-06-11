@@ -17,6 +17,35 @@ class CookieProfileNameTest {
   }
 }
 
+/** parseCookieString（"k=v; k2=v2" 形式の Cookie 文字列分解）の純粋ロジックテスト。 */
+class CookieStringParseTest {
+  @Test
+  fun `セミコロン区切りのCookie文字列を個別のCookieに分解する`() {
+    assertEquals(
+      listOf("auth_token=abc", "ct0=def"),
+      parseCookieString("auth_token=abc; ct0=def"),
+    )
+  }
+
+  @Test
+  fun `空文字列は空リストを返す`() {
+    assertEquals(emptyList<String>(), parseCookieString(""))
+  }
+
+  @Test
+  fun `空要素と前後の空白は除去される`() {
+    assertEquals(
+      listOf("a=1", "b=2"),
+      parseCookieString(" a=1 ;; b=2 ; "),
+    )
+  }
+
+  @Test
+  fun `単一Cookieも分解できる`() {
+    assertEquals(listOf("auth_token=abc"), parseCookieString("auth_token=abc"))
+  }
+}
+
 /** WebViewProfiles の feature 判定に使う定数のテスト。 */
 class WebViewProfilesFeatureTest {
   @Test

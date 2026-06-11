@@ -311,7 +311,7 @@ class MainActivity : TauriActivity() {
       val profileApplied =
         WebViewProfiles.isSupported &&
           accountId.isNotEmpty() &&
-          WebViewProfiles.apply(wv, accountId, contextName)
+          WebViewProfiles.apply(wv, accountId, contextName, filesDir)
       wv.settings.javaScriptEnabled = true
       wv.settings.domStorageEnabled = true
       wv.settings.setSupportMultipleWindows(true)
