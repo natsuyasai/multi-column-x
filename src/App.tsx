@@ -1,7 +1,8 @@
 // src/App.tsx
 import React, { useEffect, useCallback, useMemo } from "react";
 import { useAppStore } from "./store/useAppStore";
-import { useColumns, HEADER_HEIGHT, getTopBarHeight } from "./hooks/useColumns";
+import { useColumns } from "./hooks/useColumns";
+import { HEADER_HEIGHT, getTopBarHeight } from "./lib/gridLayout";
 import { useAccounts } from "./hooks/useAccounts";
 import { ColumnHeader } from "./components/ColumnHeader/ColumnHeader";
 import { AddColumnDialog } from "./components/AddColumnDialog/AddColumnDialog";
@@ -14,16 +15,18 @@ import { TabActionDialog } from "./components/TabActionDialog/TabActionDialog";
 import { LinkPopupDialog } from "./components/LinkPopupDialog/LinkPopupDialog";
 import { useDialogState } from "./hooks/useDialogState";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import {
+  useNewPostsNotification,
+  useWebviewScrollRelay,
+} from "./hooks/useWebviewEvents";
 import { platform } from "@tauri-apps/plugin-os";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import type { ColumnSettings, GlobalSettings } from "./types";
+import { IPC_COMMANDS, WEBVIEW_SCRIPTS } from "./constants/ipc";
 import {
-  IPC_COMMANDS,
-  IPC_EVENTS,
-  WEBVIEW_LABELS,
-  WEBVIEW_SCRIPTS,
-} from "./constants/ipc";
+  applyColumnSettingsScripts,
+  evalInColumn,
+} from "./services/columnWebview";
 import styles from "./App.module.scss";
 
 const App: React.FC = () => {
@@ -117,53 +120,13 @@ const App: React.FC = () => {
     const scale = globalSettings.columnScale ?? "default";
     if (!isLoaded) return;
     columns.forEach((column) => {
-      invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
-        label: WEBVIEW_LABELS.column(column.id),
-        script: WEBVIEW_SCRIPTS.applyColumnScale(scale),
-      }).catch(() => {});
+      evalInColumn(column.id, WEBVIEW_SCRIPTS.applyColumnScale(scale));
     });
   }, [globalSettings.columnScale, isLoaded]);
 
-  // WebView 内の横ホイールを受け取ってスクロールバーを動かす
-  useEffect(() => {
-    const unlisten = listen<number>(IPC_EVENTS.WEBVIEW_SCROLL, (e) => {
-      const el = scrollbarRef.current;
-      if (el) el.scrollLeft += e.payload;
-    });
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, [scrollbarRef]);
-
-  // inject script からの新着カウントを受け取ってバッジを更新、通知カラムはデスクトップ通知
-  useEffect(() => {
-    const unlisten = listen<{ label: string; count: number }>(
-      IPC_EVENTS.WEBVIEW_NEW_POSTS_COUNT,
-      (e) => {
-        const { label, count } = e.payload;
-        const columnId = label.replace(WEBVIEW_LABELS.COLUMN_PREFIX, "");
-        setUnreadCount(columnId, count);
-
-        const col = useAppStore
-          .getState()
-          .columns.find((c) => c.id === columnId);
-        if (
-          col?.pageType === "notifications" &&
-          col.settings.autoReloadEnabled &&
-          count > 0 &&
-          "Notification" in window &&
-          Notification.permission === "granted"
-        ) {
-          new Notification("新着通知", {
-            body: `${count}件の新しい通知があります`,
-          });
-        }
-      },
-    );
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, [setUnreadCount]);
+  // WebView 内の横ホイール → スクロールバー追従、新着カウント → バッジ・デスクトップ通知
+  useWebviewScrollRelay(scrollbarRef);
+  useNewPostsNotification(setUnreadCount);
 
   const handleOpenLinkPopup = useCallback(() => {
     setShowLinkPopupDialog(true);
@@ -235,34 +198,15 @@ const App: React.FC = () => {
   }, [setShowAppSettings]);
 
   const handleReload = useCallback(async (columnId: string) => {
-    await invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
-      label: WEBVIEW_LABELS.column(columnId),
-      script: WEBVIEW_SCRIPTS.TRIGGER_RELOAD,
-    }).catch(console.error);
+    await evalInColumn(columnId, WEBVIEW_SCRIPTS.TRIGGER_RELOAD);
   }, []);
 
   const handleApplySettings = useCallback(
     async (columnId: string, settings: ColumnSettings, width: number) => {
       handleUpdateColumn(columnId, { settings, width });
       setSettingsColumnId(null);
-      const webviewLabel = WEBVIEW_LABELS.column(columnId);
       const globalNgWords = useAppStore.getState().globalSettings.ngWords ?? [];
-      await invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
-        label: webviewLabel,
-        script: WEBVIEW_SCRIPTS.applyAreaRemove(settings.areaRemoveEnabled),
-      }).catch(console.error);
-      await invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
-        label: webviewLabel,
-        script: WEBVIEW_SCRIPTS.applyCustomCSS(settings.customCSS),
-      }).catch(console.error);
-      await invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
-        label: webviewLabel,
-        script: WEBVIEW_SCRIPTS.applyNgWords(settings.ngWords, globalNgWords),
-      }).catch(console.error);
-      await invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
-        label: webviewLabel,
-        script: WEBVIEW_SCRIPTS.TRIGGER_RELOAD,
-      }).catch(console.error);
+      await applyColumnSettingsScripts(columnId, settings, globalNgWords);
     },
     [handleUpdateColumn],
   );
@@ -274,13 +218,13 @@ const App: React.FC = () => {
         const newGlobalNgWords = patch.ngWords ?? [];
         const { columns: currentColumns } = useAppStore.getState();
         currentColumns.forEach((col) => {
-          invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
-            label: WEBVIEW_LABELS.column(col.id),
-            script: WEBVIEW_SCRIPTS.applyNgWords(
+          evalInColumn(
+            col.id,
+            WEBVIEW_SCRIPTS.applyNgWords(
               col.settings.ngWords,
               newGlobalNgWords,
             ),
-          }).catch(console.error);
+          );
         });
       }
     },
