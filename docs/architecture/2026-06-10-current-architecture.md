@@ -2,6 +2,10 @@
 
 リファクタリング計画の前提となる、コードベースの現状構造・依存関係・問題点の棚卸し。
 
+> **2026-06-11 追記**: 全面リファクタリング（`docs/superpowers/plans/2026-06-10-full-refactoring.md`）の Phase 0〜6 が完了。
+> 「5. 問題点インベントリ」の各項目に解消状況を追記した。行数・構造の記述は 2026-06-10 時点のスナップショットであり、
+> 現在の構造は `README.md` のプロジェクト構成を参照。
+
 ## 1. システム全体像
 
 Multi Column X は「メイン WebView（React UI シェル）+ カラムごとのネイティブ WebView（x.com 表示）」という二層 WebView 構成の Tauri v2 アプリ。
@@ -130,73 +134,73 @@ Kotlin → Rust: AppBridge.onSwipeNavigate 等 → #[no_mangle] JNI fn → app.e
 
 ### A. 壊れているもの（最優先）
 
-| #   | 内容                                             | 場所                        |
-| --- | ------------------------------------------------ | --------------------------- |
-| A1  | Rust テストがコンパイル不能（`zoom_level` 残骸） | `inject/mod.rs:164,212`     |
-| A2  | Vitest 1 件失敗（仕様とテストの不一致）          | `SettingsPanel.test.tsx:70` |
-| A3  | CI 不在のため A1/A2 が長期間検出されなかった     | —                           |
+| #   | 内容                                                                                                               | 場所                        |
+| --- | ------------------------------------------------------------------------------------------------------------------ | --------------------------- |
+| A1  | Rust テストがコンパイル不能（`zoom_level` 残骸）✅ Phase 0 で解消                                                  | `inject/mod.rs:164,212`     |
+| A2  | Vitest 1 件失敗（仕様とテストの不一致）✅ Phase 0 で解消                                                           | `SettingsPanel.test.tsx:70` |
+| A3  | CI 不在のため A1/A2 が長期間検出されなかった ✅ Phase 0 で解消（vitest/cargo test/フォーマットチェックの CI 導入） | —                           |
 
 ### B. デッドコード
 
-| #   | 内容                                                                                                                                                                                | 場所                                                      |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| B1  | IPC コマンド `notify_account_logged_in` / `mark_login_complete` / `check_login_complete` と `LoginCompleteFlag` state。呼び出し元ゼロ（Android はセンチネルファイル方式に移行済み） | `account.rs:140-203`, `lib.rs:64,150-152`, `ipc.ts:32-34` |
-| B2  | `getMobileInsets()`：エクスポートされているが呼び出し元ゼロ。内部で生文字列 invoke                                                                                                  | `useColumns.ts:29-59`                                     |
-| B3  | `src/lib/logger.ts`：plugin-log の再エクスポートのみ、import 元ゼロ                                                                                                                 | `src/lib/logger.ts`                                       |
-| B4  | `zoom.ts` / `zoom.js`：ビルドエントリに残るが `mod.rs` はもう include しない（columnScale 方式に移行済み）                                                                          | `_src/zoom.ts`, `vite.inject.config.ts:23`                |
-| B5  | `window_fullscreen.js` / `assets/constants-DF8PymUN.js` / `tauri.svg` / `vite.svg`：ソースなし・参照なしの残骸                                                                      | `src-tauri/src/inject/`                                   |
-| B6  | `load_use_x_app_for_compose`：desktop ビルドで dead（cfg 漏れ）                                                                                                                     | `webview.rs:393`                                          |
-| B7  | `uuid` パッケージ + `@types/uuid`：使用箇所は AddColumnDialog の 1 か所のみ（他は `crypto.randomUUID()`）                                                                           | `package.json`, `AddColumnDialog.tsx:2`                   |
+| #   | 内容                                                                                                                                                                                                 | 場所                                                      |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| B1  | IPC コマンド `notify_account_logged_in` / `mark_login_complete` / `check_login_complete` と `LoginCompleteFlag` state。呼び出し元ゼロ（Android はセンチネルファイル方式に移行済み）✅ Phase 1 で解消 | `account.rs:140-203`, `lib.rs:64,150-152`, `ipc.ts:32-34` |
+| B2  | `getMobileInsets()`：エクスポートされているが呼び出し元ゼロ。内部で生文字列 invoke ✅ Phase 1 で解消                                                                                                 | `useColumns.ts:29-59`                                     |
+| B3  | `src/lib/logger.ts`：plugin-log の再エクスポートのみ、import 元ゼロ ✅ Phase 1 で解消（Phase 6 で文脈名付き `log.ts` として再導入）                                                                  | `src/lib/logger.ts`                                       |
+| B4  | `zoom.ts` / `zoom.js`：ビルドエントリに残るが `mod.rs` はもう include しない（columnScale 方式に移行済み）✅ Phase 1 で解消                                                                          | `_src/zoom.ts`, `vite.inject.config.ts:23`                |
+| B5  | `window_fullscreen.js` / `assets/constants-DF8PymUN.js` / `tauri.svg` / `vite.svg`：ソースなし・参照なしの残骸 ✅ Phase 1 で解消                                                                     | `src-tauri/src/inject/`                                   |
+| B6  | `load_use_x_app_for_compose`：desktop ビルドで dead（cfg 漏れ）✅ Phase 0 で解消（cargo 警告解消の一環）                                                                                             | `webview.rs:393`                                          |
+| B7  | `uuid` パッケージ + `@types/uuid`：使用箇所は AddColumnDialog の 1 か所のみ（他は `crypto.randomUUID()`）✅ Phase 1 で解消                                                                           | `package.json`, `AddColumnDialog.tsx:2`                   |
 
 ### C. 二重実装・ドリフト（TS ↔ Rust ↔ Kotlin）
 
-| #   | 内容                                                                                                                                                                            | 場所                                              |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| C1  | デフォルト設定値が TS（`DEFAULT_COLUMN_SETTINGS`/`DEFAULT_GLOBAL_SETTINGS`）と Rust（serde default + `impl Default`）に二重定義。コメントによる手動同期規約のみで、自動検証なし | `types/index.ts:111-183`, `settings.rs:58-132`    |
-| C2  | カラム URL 解決が二重実装、かつ**既にドリフト**：Rust `resolve_url` は `home_tab_name` をクエリに付与するが TS `resolveColumnUrl` は付与しない                                  | `webview.rs:20-41`, `types/index.ts:217-230`      |
-| C3  | ページ種別ラベル変換が再び二重化（過去のリファクタリングで共通化した `getPageTypeLabel` があるのに `ColumnLayoutTab.getPageLabel` が別実装）                                    | `types/index.ts:198`, `ColumnLayoutTab.tsx:23-36` |
-| C4  | IPC 定数が TS/Rust に二重定義（設計上の判断だが、整合性の自動検証なし）                                                                                                         | `ipc.ts`, `ipc_constants.rs`                      |
-| C5  | `types/index.ts` のフィールド対応表コメントに削除済みの `zoomLevel` 行が残存                                                                                                    | `types/index.ts:157`                              |
+| #   | 内容                                                                                                                                                                                                                                | 場所                                              |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| C1  | デフォルト設定値が TS（`DEFAULT_COLUMN_SETTINGS`/`DEFAULT_GLOBAL_SETTINGS`）と Rust（serde default + `impl Default`）に二重定義。コメントによる手動同期規約のみで、自動検証なし ✅ Phase 4 で解消（ドリフト検出の契約テストを追加） | `types/index.ts:111-183`, `settings.rs:58-132`    |
+| C2  | カラム URL 解決が二重実装、かつ**既にドリフト**：Rust `resolve_url` は `home_tab_name` をクエリに付与するが TS `resolveColumnUrl` は付与しない ✅ Phase 1 で解消（本番未使用の TS 側を削除）                                        | `webview.rs:20-41`, `types/index.ts:217-230`      |
+| C3  | ページ種別ラベル変換が再び二重化（過去のリファクタリングで共通化した `getPageTypeLabel` があるのに `ColumnLayoutTab.getPageLabel` が別実装）✅ Phase 2 で解消                                                                       | `types/index.ts:198`, `ColumnLayoutTab.tsx:23-36` |
+| C4  | IPC 定数が TS/Rust に二重定義（設計上の判断だが、整合性の自動検証なし）— スコープ外（コード生成は別プラン。現状維持と判断）                                                                                                         | `ipc.ts`, `ipc_constants.rs`                      |
+| C5  | `types/index.ts` のフィールド対応表コメントに削除済みの `zoomLevel` 行が残存 ✅ Phase 1 で解消                                                                                                                                      | `types/index.ts:157`                              |
 
 ### D. マジック値・命名の負債
 
-| #   | 内容                                                                                                             | 場所                                         |
-| --- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| D1  | `invoke("create_column_webview")` 生文字列（`IPC_COMMANDS` 不使用の取りこぼし）                                  | `useColumns.ts:427`                          |
-| D2  | 画面外退避座標 `-99999`（モバイル）/ `-9999`（デスクトップ）がリテラル散在                                       | `useColumns.ts:212,287,398,443,450`          |
-| D3  | Rust 側のラベル定数取りこぼし：`eval_in_webview` の `"column-"`、`switch_popup_session` の `format!("popup-{}")` | `webview.rs:675,730`                         |
-| D4  | `"main"` ウィンドウラベルのリテラルが Rust 全域に散在                                                            | `webview.rs`, `lib.rs`                       |
-| D5  | 旧プロジェクト名 "twitter-viewer" 由来の `__tvAccounts` 等のグローバル変数名                                     | `ipc_constants.rs:52-58`, `popup_toolbar.ts` |
-| D6  | localStorage キー `"mcx_activeColumnId"` がリテラル散在                                                          | `useColumns.ts:191,270,299`                  |
+| #   | 内容                                                                                                                               | 場所                                         |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| D1  | `invoke("create_column_webview")` 生文字列（`IPC_COMMANDS` 不使用の取りこぼし）✅ Phase 2 で解消                                   | `useColumns.ts:427`                          |
+| D2  | 画面外退避座標 `-99999`（モバイル）/ `-9999`（デスクトップ）がリテラル散在 ✅ Phase 2 で解消                                       | `useColumns.ts:212,287,398,443,450`          |
+| D3  | Rust 側のラベル定数取りこぼし：`eval_in_webview` の `"column-"`、`switch_popup_session` の `format!("popup-{}")` ✅ Phase 4 で解消 | `webview.rs:675,730`                         |
+| D4  | `"main"` ウィンドウラベルのリテラルが Rust 全域に散在 ✅ Phase 4 で解消                                                            | `webview.rs`, `lib.rs`                       |
+| D5  | 旧プロジェクト名 "twitter-viewer" 由来の `__tvAccounts` 等のグローバル変数名 ✅ Phase 4 で解消（`__mcx*` に改名）                  | `ipc_constants.rs:52-58`, `popup_toolbar.ts` |
+| D6  | localStorage キー `"mcx_activeColumnId"` がリテラル散在 ✅ Phase 2 で解消                                                          | `useColumns.ts:191,270,299`                  |
 
 ### E. 構造的な問題（大きいファイル・責務の混在）
 
-| #   | 内容                                                                                                                                                                                                                                              | 場所                                      |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| E1  | `webview.rs`（777 行）：カラム/ポップアップ/コンポーズ/設定読み出し/イベント中継が 1 ファイル。ポップアップ系 5 コマンドで `load_accounts_json` + `load_popup_esc_close_enabled` + `build_popup_init_script` + ラベル生成のボイラープレートが反復 | `webview.rs`                              |
-| E2  | `useColumns.ts`（576 行）：純関数のレイアウト計算、IPC オーケストレーション、モバイル専用 state（アクティブカラム・スワイプ）、グローバルイベント listen が混在                                                                                   | `useColumns.ts`                           |
-| E3  | `App.tsx`（476 行）：listen effect 4 つ + ハンドラ 15 個 + 7 ダイアログのレンダリングが同居                                                                                                                                                       | `App.tsx`                                 |
-| E4  | `MainActivity.kt`（550 行）：WebView 管理 + Cookie/Profile + ジェスチャー状態機械（~120 行）+ ダブルタップ検出が 1 クラス。Profile API サポート判定の try/catch が 3 回重複                                                                       | `MainActivity.kt:268-273,347-352,454-459` |
-| E5  | `handleApplySettings` が 4 回の `eval_in_webview` を直列 invoke（スクリプト適用の抽象化なし）                                                                                                                                                     | `App.tsx:244-268`                         |
-| E6  | エラー処理が `.catch(console.error)` / `.catch(() => {})` の散在（約 30 か所）。ロガー基盤（plugin-log）は導入済みなのに未使用（B3）                                                                                                              | TS 全域                                   |
+| #   | 内容                                                                                                                                                                                                                                                                                                                                                            | 場所                                      |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| E1  | `webview.rs`（777 行）：カラム/ポップアップ/コンポーズ/設定読み出し/イベント中継が 1 ファイル。ポップアップ系 5 コマンドで `load_accounts_json` + `load_popup_esc_close_enabled` + `build_popup_init_script` + ラベル生成のボイラープレートが反復 ✅ Phase 4 で解消（`settings_store.rs` 抽出・`build_popup_init` 集約・`webview/{column,popup,compose}` 分割） | `webview.rs`                              |
+| E2  | `useColumns.ts`（576 行）：純関数のレイアウト計算、IPC オーケストレーション、モバイル専用 state（アクティブカラム・スワイプ）、グローバルイベント listen が混在 ✅ Phase 3 で解消（`lib/gridLayout.ts`・`services/columnWebview.ts`・`useMobileColumns`/`useDesktopColumns` に分割）                                                                            | `useColumns.ts`                           |
+| E3  | `App.tsx`（476 行）：listen effect 4 つ + ハンドラ 15 個 + 7 ダイアログのレンダリングが同居 ✅ Phase 3 で一部解消（listen を `useWebviewEvents` へ抽出。ハンドラ・ダイアログ群は許容範囲として残置）                                                                                                                                                            | `App.tsx`                                 |
+| E4  | `MainActivity.kt`（550 行）：WebView 管理 + Cookie/Profile + ジェスチャー状態機械（~120 行）+ ダブルタップ検出が 1 クラス。Profile API サポート判定の try/catch が 3 回重複 ✅ Phase 5 で解消（`WebViewProfiles`・`BoomerangGestureDetector` 抽出・`newConfiguredWebView` 集約）                                                                                | `MainActivity.kt:268-273,347-352,454-459` |
+| E5  | `handleApplySettings` が 4 回の `eval_in_webview` を直列 invoke（スクリプト適用の抽象化なし）✅ Phase 3 で解消（`applyColumnSettingsScripts` に集約）                                                                                                                                                                                                           | `App.tsx:244-268`                         |
+| E6  | エラー処理が `.catch(console.error)` / `.catch(() => {})` の散在（約 30 か所）。ロガー基盤（plugin-log）は導入済みなのに未使用（B3）✅ Phase 6 で解消（文脈名付き `logError` に統一。意図的な握りつぶしは現状維持）                                                                                                                                             | TS 全域                                   |
 
 ### F. ドキュメント・リポジトリ衛生
 
-| #   | 内容                                                                                                                                                                                                                           | 場所                            |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------- |
-| F1  | **`CALUDE.md` がファイル名 typo**（正: `CLAUDE.md`）。このためエージェントのプロジェクトメモリとして機能していない                                                                                                             | リポジトリルート                |
-| F2  | inject ビルド成果物の管理方針が矛盾：CALUDE.md「リポジトリ管理対象」 vs README/.gitignore「管理対象外」（実態は gitignore + `keyboard_shortcut.js` のみ追跡）                                                                  | `CALUDE.md:53`, `README.md:177` |
-| F3  | README のプロジェクト構成が古い：存在しない `Sidebar/` 記載、`TopBar`/`TabActionDialog`/`LinkPopupDialog`/`constants/`/`android_bridge.rs`/Kotlin 層の記載なし。モバイルのカラム実装説明も旧方式（WebviewWindowBuilder）のまま | `README.md:82-128,168-173`      |
-| F4  | `account.rs` のコメントが存在しないフロー（visibilitychange → check_login_complete）を案内                                                                                                                                     | `account.rs:160`                |
-| F5  | 完了済み `REFACTORING_PLAN.md` がルートに残存                                                                                                                                                                                  | リポジトリルート                |
-| F6  | `.steering/` / `aidlc-docs/` は別ワークフロー（AIDLC）の資材で、現在の開発フロー（superpowers）と二重化                                                                                                                        | `.steering/`, `aidlc-docs/`     |
+| #   | 内容                                                                                                                                                                                                                                                                                 | 場所                            |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------- |
+| F1  | **`CALUDE.md` がファイル名 typo**（正: `CLAUDE.md`）。このためエージェントのプロジェクトメモリとして機能していない ✅ Phase 1 で解消                                                                                                                                                 | リポジトリルート                |
+| F2  | inject ビルド成果物の管理方針が矛盾：CALUDE.md「リポジトリ管理対象」 vs README/.gitignore「管理対象外」（実態は gitignore + `keyboard_shortcut.js` のみ追跡）✅ Phase 1 で解消（`keyboard_shortcut.ts` を TS ソース化）                                                              | `CALUDE.md:53`, `README.md:177` |
+| F3  | README のプロジェクト構成が古い：存在しない `Sidebar/` 記載、`TopBar`/`TabActionDialog`/`LinkPopupDialog`/`constants/`/`android_bridge.rs`/Kotlin 層の記載なし。モバイルのカラム実装説明も旧方式（WebviewWindowBuilder）のまま ✅ Phase 1 で解消（Phase 6 で 3〜5 の構造変更も反映） | `README.md:82-128,168-173`      |
+| F4  | `account.rs` のコメントが存在しないフロー（visibilitychange → check_login_complete）を案内 ✅ Phase 1 で解消                                                                                                                                                                         | `account.rs:160`                |
+| F5  | 完了済み `REFACTORING_PLAN.md` がルートに残存 ✅ Phase 1 で解消                                                                                                                                                                                                                      | リポジトリルート                |
+| F6  | `.steering/` / `aidlc-docs/` は別ワークフロー（AIDLC）の資材で、現在の開発フロー（superpowers）と二重化 — スコープ外（開発ワークフローの選択はユーザー判断）                                                                                                                         | `.steering/`, `aidlc-docs/`     |
 
 ### G. テストの空白地帯
 
-- `App.tsx`・`useAccounts.ts`・`useAutoReload.ts`・`LinkPopupDialog` にテストなし
-- Rust は `settings.rs` / `inject/mod.rs` のみ（後者は壊れている）。`webview.rs` の純粋ロジック（`resolve_url`, `webview_label`, `get_popup_bounds`）にテストなし
-- inject スクリプト（`_src/*.ts`）は全てテストなし
-- Kotlin は `MainActivityTest.kt` のみ（ジェスチャー状態機械はテスト不能な形で Activity に埋め込み）
+- `App.tsx`・`useAccounts.ts`・`useAutoReload.ts`・`LinkPopupDialog` にテストなし ✅ Phase 6 で一部解消（`useAccounts`・`LinkPopupDialog` のテストを追加。`App.tsx`・`useAutoReload.ts` は未対応）
+- Rust は `settings.rs` / `inject/mod.rs` のみ（後者は壊れている）。`webview.rs` の純粋ロジック（`resolve_url`, `webview_label`, `get_popup_bounds`）にテストなし ✅ Phase 4 で一部解消（`resolve_url` 等のテストと TS/Rust デフォルト設定の契約テストを追加。`get_popup_bounds` は未対応）
+- inject スクリプト（`_src/*.ts`）は全てテストなし — 未対応（inject アーキテクチャ再設計が必要なためスコープ外）
+- Kotlin は `MainActivityTest.kt` のみ（ジェスチャー状態機械はテスト不能な形で Activity に埋め込み）✅ Phase 5 で解消（`BoomerangGestureDetector` 抽出 + 特性テスト 11 件）
 
 ## 6. 制約（リファクタリング時に壊してはいけないもの）
 
