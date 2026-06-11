@@ -12,8 +12,6 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
-import androidx.webkit.WebViewCompat
-import androidx.webkit.WebViewFeature
 import java.io.File
 
 class AddAccount : AppCompatActivity() {
@@ -66,16 +64,8 @@ class AddAccount : AppCompatActivity() {
         // アカウントごとに独立した WebView Profile を割り当て、セッションを分離する。
         // Profile API 非対応の場合は Cookie をクリアして新鮮なセッションで開始する。
         val profileSet =
-          try {
-            WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER") &&
-              run {
-                WebViewCompat.setProfile(this, "account-$accountId")
-                true
-              }
-          } catch (e: Exception) {
-            Log.w(TAG, "Profile API unavailable: ${e.message}")
-            false
-          }
+          WebViewProfiles.isSupported &&
+            WebViewProfiles.apply(this, accountId, "add-account")
         if (!profileSet) {
           CookieManager.getInstance().removeAllCookies(null)
           CookieManager.getInstance().flush()

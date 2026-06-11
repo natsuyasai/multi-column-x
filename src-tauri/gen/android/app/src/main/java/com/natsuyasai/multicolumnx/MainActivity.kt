@@ -18,7 +18,6 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.webkit.ProfileStore
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import java.io.File
@@ -265,12 +264,7 @@ class MainActivity : TauriActivity() {
     accountId: String,
   ) {
     runOnUiThreadSync {
-      val profileApiSupported =
-        try {
-          WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER")
-        } catch (e: Exception) {
-          false
-        }
+      val profileApiSupported = WebViewProfiles.isSupported
 
       val webView =
         WebView(this).also { wv ->
@@ -282,7 +276,7 @@ class MainActivity : TauriActivity() {
           wv.webViewClient = ExternalLinkWebViewClient()
           wv.webChromeClient = ExternalLinkWebChromeClient()
           if (profileApiSupported && accountId.isNotEmpty()) {
-            setupWebViewProfile(wv, accountId, "popup $id")
+            WebViewProfiles.apply(wv, accountId, "popup $id")
           } else if (!profileApiSupported && accountId.isNotEmpty()) {
             setCookieForAccount(accountId)
           }
@@ -344,12 +338,7 @@ class MainActivity : TauriActivity() {
         return@runOnUiThreadSync
       }
 
-      val profileApiSupported =
-        try {
-          WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER")
-        } catch (e: Exception) {
-          false
-        }
+      val profileApiSupported = WebViewProfiles.isSupported
 
       // Profile API 非対応端末では loadUrl 前に Cookie を設定してアカウントを確定する。
       // createColumnWebView は直列 await で呼ばれるため Cookie の設定が干渉しない。
@@ -369,7 +358,7 @@ class MainActivity : TauriActivity() {
           wv.webViewClient = ColumnWebViewClient(url)
           wv.webChromeClient = ExternalLinkWebChromeClient()
           if (profileApiSupported) {
-            setupWebViewProfile(wv, accountId, "column $id")
+            WebViewProfiles.apply(wv, accountId, "column $id")
           }
           if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
             WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
@@ -451,13 +440,7 @@ class MainActivity : TauriActivity() {
   // Profile API 非対応端末で、アクティブカラムのアカウントに CookieManager を切り替える。
   // showColumnWebView とは独立して呼び出せるため WebView の表示状態に影響しない。
   fun setAccountCookies(accountId: String) {
-    val profileApiSupported =
-      try {
-        WebViewFeature.isFeatureSupported("PROFILE_URLS_AND_COOKIE_MANAGER")
-      } catch (e: Exception) {
-        false
-      }
-    if (profileApiSupported || accountId.isEmpty()) return
+    if (WebViewProfiles.isSupported || accountId.isEmpty()) return
     setCookieForAccount(accountId)
   }
 
@@ -578,19 +561,6 @@ class MainActivity : TauriActivity() {
       transport.webView = helper
       resultMsg.sendToTarget()
       return true
-    }
-  }
-
-  internal fun setupWebViewProfile(
-    webView: WebView,
-    accountId: String,
-    contextName: String,
-  ) {
-    try {
-      ProfileStore.getInstance().getOrCreateProfile("account-$accountId")
-      WebViewCompat.setProfile(webView, "account-$accountId")
-    } catch (e: Exception) {
-      Log.w(TAG, "Profile API unavailable for $contextName: ${e.message}")
     }
   }
 
