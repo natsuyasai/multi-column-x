@@ -57,3 +57,96 @@ pub mod globals {
     /// ポップアップ WebView に注入される Esc 閉じる設定
     pub const MCX_ESC_CLOSE_ENABLED: &str = "__mcxEscCloseEnabled";
 }
+
+/// TS 側（src/constants/ipc.contract.test.ts）と同じ fixture を参照する契約テスト。
+/// 定数を変更したら contracts/ipc-constants.json も合わせて更新すること。
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fixture() -> serde_json::Value {
+        serde_json::from_str(include_str!("../../contracts/ipc-constants.json")).unwrap()
+    }
+
+    #[test]
+    fn events_match_contract_fixture() {
+        let expected = &fixture()["events"];
+        let actual = [
+            ("ACCOUNT_LOGIN_COMPLETE", events::ACCOUNT_LOGIN_COMPLETE),
+            ("WEBVIEW_SCROLL", events::WEBVIEW_SCROLL),
+            ("CLOSE_TOPMOST_POPUP", events::CLOSE_TOPMOST_POPUP),
+            ("COLUMN_SWIPE_NAVIGATE", events::COLUMN_SWIPE_NAVIGATE),
+            ("COLUMN_SWIPE_PROGRESS", events::COLUMN_SWIPE_PROGRESS),
+            ("COLUMN_SWIPE_CANCEL", events::COLUMN_SWIPE_CANCEL),
+            ("COLUMN_DOUBLE_TAP", events::COLUMN_DOUBLE_TAP),
+            ("WEBVIEW_NEW_POSTS_COUNT", events::WEBVIEW_NEW_POSTS_COUNT),
+            (
+                "WEBVIEW_KEYBOARD_SHORTCUT",
+                events::WEBVIEW_KEYBOARD_SHORTCUT,
+            ),
+        ];
+        assert_eq!(
+            expected.as_object().unwrap().len(),
+            actual.len(),
+            "fixture のイベント数と Rust 側の定数数が一致しない"
+        );
+        for (key, value) in actual {
+            assert_eq!(expected[key], value, "イベント {key} がドリフトしている");
+        }
+    }
+
+    #[test]
+    fn labels_match_contract_fixture() {
+        let expected = &fixture()["labels"];
+        let actual = [
+            ("MAIN", labels::MAIN),
+            ("COLUMN_PREFIX", labels::COLUMN_PREFIX),
+            ("POPUP_PREFIX", labels::POPUP_PREFIX),
+            ("COMPOSE_PREFIX", labels::COMPOSE_PREFIX),
+            ("ADD_ACCOUNT_PREFIX", labels::ADD_ACCOUNT_PREFIX),
+        ];
+        assert_eq!(expected.as_object().unwrap().len(), actual.len());
+        for (key, value) in actual {
+            assert_eq!(expected[key], value, "ラベル {key} がドリフトしている");
+        }
+    }
+
+    #[test]
+    fn globals_match_contract_fixture() {
+        let expected = &fixture()["globals"];
+        let actual = [
+            ("MULTI_COLUMN_X", globals::MULTI_COLUMN_X),
+            ("MULTI_COLUMN_X_CONFIG", globals::MULTI_COLUMN_X_CONFIG),
+            ("MCX_ACCOUNTS", globals::MCX_ACCOUNTS),
+            ("MCX_CURRENT_ACCOUNT_ID", globals::MCX_CURRENT_ACCOUNT_ID),
+            ("MCX_TARGET_HREF", globals::MCX_TARGET_HREF),
+            ("MCX_ESC_CLOSE_ENABLED", globals::MCX_ESC_CLOSE_ENABLED),
+        ];
+        assert_eq!(expected.as_object().unwrap().len(), actual.len());
+        for (key, value) in actual {
+            assert_eq!(
+                expected[key], value,
+                "グローバル変数名 {key} がドリフトしている"
+            );
+        }
+    }
+
+    /// fixture の全コマンド名が lib.rs の generate_handler! に登録されていることを
+    /// ソーステキストで検証する。コマンド関数の改名・削除を検出する。
+    #[test]
+    fn all_contract_commands_are_registered_in_lib_rs() {
+        let lib_src = include_str!("lib.rs");
+        let commands = fixture()["commands"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_string())
+            .collect::<Vec<_>>();
+        for cmd in &commands {
+            assert!(
+                lib_src.contains(&format!("::{cmd},")) || lib_src.contains(&format!("::{cmd}\n")),
+                "コマンド {cmd} が lib.rs の generate_handler! に見つからない"
+            );
+        }
+    }
+}
