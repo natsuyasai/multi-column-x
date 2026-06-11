@@ -152,25 +152,10 @@ class MainActivity : TauriActivity() {
     accountId: String,
   ) {
     runOnUiThreadSync {
-      val profileApiSupported = WebViewProfiles.isSupported
-
       val webView =
-        WebView(this).also { wv ->
-          wv.settings.javaScriptEnabled = true
-          wv.settings.domStorageEnabled = true
-          wv.settings.setSupportMultipleWindows(true)
-          wv.settings.cacheMode = android.webkit.WebSettings.LOAD_CACHE_ELSE_NETWORK
-          CookieManager.getInstance().setAcceptThirdPartyCookies(wv, true)
+        newConfiguredWebView(initScript, accountId, "popup $id").also { wv ->
           wv.webViewClient = ExternalLinkWebViewClient()
           wv.webChromeClient = ExternalLinkWebChromeClient()
-          if (profileApiSupported && accountId.isNotEmpty()) {
-            WebViewProfiles.apply(wv, accountId, "popup $id")
-          } else if (!profileApiSupported && accountId.isNotEmpty()) {
-            setCookieForAccount(accountId)
-          }
-          if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
-            WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
-          }
         }
       val params =
         FrameLayout.LayoutParams(
@@ -226,31 +211,10 @@ class MainActivity : TauriActivity() {
         return@runOnUiThreadSync
       }
 
-      val profileApiSupported = WebViewProfiles.isSupported
-
-      // Profile API 非対応端末では loadUrl 前に Cookie を設定してアカウントを確定する。
-      // createColumnWebView は直列 await で呼ばれるため Cookie の設定が干渉しない。
-      if (!profileApiSupported && accountId.isNotEmpty()) {
-        setCookieForAccount(accountId)
-      }
-
       val webView =
-        WebView(this).also { wv ->
-          wv.settings.javaScriptEnabled = true
-          wv.settings.domStorageEnabled = true
-          wv.settings.setSupportMultipleWindows(true)
-          wv.settings.cacheMode = android.webkit.WebSettings.LOAD_CACHE_ELSE_NETWORK
-          // api.x.com は x.com とは別ホストのため、サードパーティ Cookie 送信を許可する。
-          // デフォルト false のままだと account/settings.json 等の v1.1 REST API が 401 になる。
-          CookieManager.getInstance().setAcceptThirdPartyCookies(wv, true)
+        newConfiguredWebView(initScript, accountId, "column $id").also { wv ->
           wv.webViewClient = ColumnWebViewClient(url)
           wv.webChromeClient = ExternalLinkWebChromeClient()
-          if (profileApiSupported) {
-            WebViewProfiles.apply(wv, accountId, "column $id")
-          }
-          if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
-            WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
-          }
           wv.visibility = if (visible) View.VISIBLE else View.GONE
         }
 
@@ -331,6 +295,33 @@ class MainActivity : TauriActivity() {
     if (WebViewProfiles.isSupported || accountId.isEmpty()) return
     setCookieForAccount(accountId)
   }
+
+  // カラム/ポップアップ共通の WebView 初期化。
+  // webViewClient / webChromeClient は呼び出し側で用途別に設定する。
+  // Profile API 対応端末はプロファイルで分離し、非対応端末は loadUrl 前に
+  // Cookie を設定してアカウントを確定する（このメソッドは loadUrl より先に呼ばれる）。
+  private fun newConfiguredWebView(
+    initScript: String,
+    accountId: String,
+    contextName: String,
+  ): WebView =
+    WebView(this).also { wv ->
+      wv.settings.javaScriptEnabled = true
+      wv.settings.domStorageEnabled = true
+      wv.settings.setSupportMultipleWindows(true)
+      wv.settings.cacheMode = android.webkit.WebSettings.LOAD_CACHE_ELSE_NETWORK
+      // api.x.com は x.com とは別ホストのため、サードパーティ Cookie 送信を許可する。
+      // デフォルト false のままだと account/settings.json 等の v1.1 REST API が 401 になる。
+      CookieManager.getInstance().setAcceptThirdPartyCookies(wv, true)
+      if (WebViewProfiles.isSupported && accountId.isNotEmpty()) {
+        WebViewProfiles.apply(wv, accountId, contextName)
+      } else if (accountId.isNotEmpty()) {
+        setCookieForAccount(accountId)
+      }
+      if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+        WebViewCompat.addDocumentStartJavaScript(wv, initScript, setOf("*"))
+      }
+    }
 
   // 保存済みの Cookie をアカウントのデータディレクトリから読み込み CookieManager に設定する。
   // Profile API が使えない環境での複数アカウント切り替えに使う。
