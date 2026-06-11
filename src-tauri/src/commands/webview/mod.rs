@@ -36,7 +36,7 @@ pub async fn eval_in_webview(app: AppHandle, label: String, script: String) -> R
     // Android のカラム WebView はネイティブ Android WebView で管理しているため
     // Tauri の get_webview では見つからない。android_bridge 経由で評価する。
     #[cfg(target_os = "android")]
-    if label.starts_with("column-") {
+    if label.starts_with(crate::ipc_constants::labels::COLUMN_PREFIX) {
         return crate::android_bridge::eval_in_column_webview(&label, &script);
     }
 

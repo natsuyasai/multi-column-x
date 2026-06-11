@@ -21,7 +21,7 @@ fn get_popup_bounds(app: &AppHandle) -> (LogicalPosition<f64>, LogicalSize<f64>)
         },
     );
     const PADDING: f64 = 50.0;
-    let Some(window) = app.get_window("main") else {
+    let Some(window) = app.get_window(labels::MAIN) else {
         return FALLBACK;
     };
     let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) else {
@@ -293,7 +293,7 @@ pub async fn switch_popup_session(
 
     if let (Some(p), Some(s)) = (pos, size) {
         let scale = app
-            .get_window("main")
+            .get_window(labels::MAIN)
             .and_then(|w| w.scale_factor().ok())
             .unwrap_or(1.0);
         builder = builder

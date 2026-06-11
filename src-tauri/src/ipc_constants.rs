@@ -29,6 +29,8 @@ pub mod events {
 /// WebView / ウィンドウラベルのプレフィックス
 #[allow(dead_code)]
 pub mod labels {
+    /// メインウィンドウのラベル
+    pub const MAIN: &str = "main";
     /// カラム WebView ラベルプレフィックス（例: "column-<uuid>"）
     pub const COLUMN_PREFIX: &str = "column-";
     /// ポップアップウィンドウラベルプレフィックス（例: "popup-<uuid>"）

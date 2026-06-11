@@ -85,10 +85,12 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
     // 非Linux の場合は一般の Window を取得して add_child を呼び出す。
     #[cfg(target_os = "linux")]
     let window = app
-        .get_webview_window("main")
+        .get_webview_window(labels::MAIN)
         .ok_or("main window not found")?;
     #[cfg(not(target_os = "linux"))]
-    let window = app.get_window("main").ok_or("main window not found")?;
+    let window = app
+        .get_window(labels::MAIN)
+        .ok_or("main window not found")?;
 
     // On Linux, window.add_child() places WebViews into a GTK VBox which ignores
     // position/size parameters. Instead, create an undecorated WebviewWindow at the
@@ -249,7 +251,9 @@ pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Resu
     // so columns stay in sync even after the main window is moved.
     #[cfg(target_os = "linux")]
     if let Some(webview_window) = app.get_webview_window(&label) {
-        let window = app.get_window("main").ok_or("main window not found")?;
+        let window = app
+            .get_window(labels::MAIN)
+            .ok_or("main window not found")?;
         let scale = window.scale_factor().unwrap_or(1.0);
         let inner_pos = window.inner_position().map_err(|e| e.to_string())?;
         let inner_size = window.inner_size().map_err(|e| e.to_string())?;

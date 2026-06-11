@@ -38,7 +38,7 @@ pub async fn open_compose_window(
     .initialization_script(&popup_init)
     .data_directory(data_dir);
 
-    if let Some(window) = app.get_window("main") {
+    if let Some(window) = app.get_window(labels::MAIN) {
         if let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) {
             let scale = window.scale_factor().unwrap_or(1.0);
             let center_x = pos.x as f64 + (size.width as f64 - COMPOSE_WIDTH * scale) / 2.0;
