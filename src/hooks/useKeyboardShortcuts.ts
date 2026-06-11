@@ -80,6 +80,13 @@ export function useKeyboardShortcuts({
       IPC_EVENTS.WEBVIEW_KEYBOARD_SHORTCUT,
       (e) => {
         if (!active) return;
+        if (e.payload.startsWith("jump_column_")) {
+          const digit = parseInt(e.payload.slice("jump_column_".length), 10);
+          if (digit >= 1 && digit <= 9) {
+            onJumpToColumn(digit - 1);
+          }
+          return;
+        }
         switch (e.payload) {
           case "compose_tweet":
             onComposeTweet();
@@ -113,6 +120,7 @@ export function useKeyboardShortcuts({
     onAccountManager,
     onAppSettings,
     onToggleTopBar,
+    onJumpToColumn,
     disabled,
   ]);
 }

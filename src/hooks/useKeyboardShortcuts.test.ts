@@ -261,6 +261,42 @@ describe("useKeyboardShortcuts", () => {
     expect(props.onJumpToColumn).toHaveBeenCalledWith(8);
   });
 
+  it("WebView から jump_column_1 イベントを受信すると onJumpToColumn(0) が呼ばれる", async () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    await act(async () => {
+      capturedListenCallback?.({ payload: "jump_column_1" });
+    });
+    expect(props.onJumpToColumn).toHaveBeenCalledWith(0);
+  });
+
+  it("WebView から jump_column_9 イベントを受信すると onJumpToColumn(8) が呼ばれる", async () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    await act(async () => {
+      capturedListenCallback?.({ payload: "jump_column_9" });
+    });
+    expect(props.onJumpToColumn).toHaveBeenCalledWith(8);
+  });
+
+  it("WebView から jump_column_0 イベントを受信しても onJumpToColumn が呼ばれない", async () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    await act(async () => {
+      capturedListenCallback?.({ payload: "jump_column_0" });
+    });
+    expect(props.onJumpToColumn).not.toHaveBeenCalled();
+  });
+
+  it("disabled=true のとき jump_column_1 イベントを受信しても onJumpToColumn が呼ばれない", async () => {
+    const props = makeProps({ disabled: true });
+    renderHook(() => useKeyboardShortcuts(props));
+    await act(async () => {
+      capturedListenCallback?.({ payload: "jump_column_1" });
+    });
+    expect(props.onJumpToColumn).not.toHaveBeenCalled();
+  });
+
   it("Ctrl+0 では onJumpToColumn が呼ばれない", () => {
     const props = makeProps();
     renderHook(() => useKeyboardShortcuts(props));
