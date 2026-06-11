@@ -15,16 +15,14 @@ import { TabActionDialog } from "./components/TabActionDialog/TabActionDialog";
 import { LinkPopupDialog } from "./components/LinkPopupDialog/LinkPopupDialog";
 import { useDialogState } from "./hooks/useDialogState";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import {
+  useNewPostsNotification,
+  useWebviewScrollRelay,
+} from "./hooks/useWebviewEvents";
 import { platform } from "@tauri-apps/plugin-os";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import type { ColumnSettings, GlobalSettings } from "./types";
-import {
-  IPC_COMMANDS,
-  IPC_EVENTS,
-  WEBVIEW_LABELS,
-  WEBVIEW_SCRIPTS,
-} from "./constants/ipc";
+import { IPC_COMMANDS, WEBVIEW_SCRIPTS } from "./constants/ipc";
 import {
   applyColumnSettingsScripts,
   evalInColumn,
@@ -126,46 +124,9 @@ const App: React.FC = () => {
     });
   }, [globalSettings.columnScale, isLoaded]);
 
-  // WebView 内の横ホイールを受け取ってスクロールバーを動かす
-  useEffect(() => {
-    const unlisten = listen<number>(IPC_EVENTS.WEBVIEW_SCROLL, (e) => {
-      const el = scrollbarRef.current;
-      if (el) el.scrollLeft += e.payload;
-    });
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, [scrollbarRef]);
-
-  // inject script からの新着カウントを受け取ってバッジを更新、通知カラムはデスクトップ通知
-  useEffect(() => {
-    const unlisten = listen<{ label: string; count: number }>(
-      IPC_EVENTS.WEBVIEW_NEW_POSTS_COUNT,
-      (e) => {
-        const { label, count } = e.payload;
-        const columnId = label.replace(WEBVIEW_LABELS.COLUMN_PREFIX, "");
-        setUnreadCount(columnId, count);
-
-        const col = useAppStore
-          .getState()
-          .columns.find((c) => c.id === columnId);
-        if (
-          col?.pageType === "notifications" &&
-          col.settings.autoReloadEnabled &&
-          count > 0 &&
-          "Notification" in window &&
-          Notification.permission === "granted"
-        ) {
-          new Notification("新着通知", {
-            body: `${count}件の新しい通知があります`,
-          });
-        }
-      },
-    );
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, [setUnreadCount]);
+  // WebView 内の横ホイール → スクロールバー追従、新着カウント → バッジ・デスクトップ通知
+  useWebviewScrollRelay(scrollbarRef);
+  useNewPostsNotification(setUnreadCount);
 
   const handleOpenLinkPopup = useCallback(() => {
     setShowLinkPopupDialog(true);
