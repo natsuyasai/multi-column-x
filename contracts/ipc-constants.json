@@ -1,0 +1,50 @@
+{
+  "commands": [
+    "load_settings",
+    "save_settings",
+    "create_column_webview",
+    "remove_column_webview",
+    "resize_column_webview",
+    "eval_in_webview",
+    "open_popup_window",
+    "open_link_popup_window",
+    "close_popup_window",
+    "switch_popup_session",
+    "open_compose_window",
+    "open_in_browser",
+    "open_add_account_window",
+    "delete_account_data",
+    "close_window",
+    "report_webview_scroll",
+    "get_mobile_insets",
+    "set_column_cookies",
+    "report_new_posts_count",
+    "report_keyboard_shortcut"
+  ],
+  "events": {
+    "ACCOUNT_LOGIN_COMPLETE": "account-login-complete",
+    "WEBVIEW_SCROLL": "webview-scroll",
+    "CLOSE_TOPMOST_POPUP": "close-topmost-popup",
+    "COLUMN_SWIPE_NAVIGATE": "column-swipe-navigate",
+    "COLUMN_SWIPE_PROGRESS": "column-swipe-progress",
+    "COLUMN_SWIPE_CANCEL": "column-swipe-cancel",
+    "COLUMN_DOUBLE_TAP": "column-double-tap",
+    "WEBVIEW_NEW_POSTS_COUNT": "webview-new-posts-count",
+    "WEBVIEW_KEYBOARD_SHORTCUT": "webview-keyboard-shortcut"
+  },
+  "labels": {
+    "MAIN": "main",
+    "COLUMN_PREFIX": "column-",
+    "POPUP_PREFIX": "popup-",
+    "COMPOSE_PREFIX": "compose-",
+    "ADD_ACCOUNT_PREFIX": "add-account-"
+  },
+  "globals": {
+    "MULTI_COLUMN_X": "__multiColumnX",
+    "MULTI_COLUMN_X_CONFIG": "__multiColumnXConfig",
+    "MCX_ACCOUNTS": "__mcxAccounts",
+    "MCX_CURRENT_ACCOUNT_ID": "__mcxCurrentAccountId",
+    "MCX_TARGET_HREF": "__mcxTargetHref",
+    "MCX_ESC_CLOSE_ENABLED": "__mcxEscCloseEnabled"
+  }
+}

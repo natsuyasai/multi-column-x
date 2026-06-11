@@ -2,7 +2,8 @@
 
 リファクタリング計画の前提となる、コードベースの現状構造・依存関係・問題点の棚卸し。
 
-> **2026-06-11 追記**: 全面リファクタリング（`docs/superpowers/plans/2026-06-10-full-refactoring.md`）の Phase 0〜6 が完了。
+> **2026-06-11 追記**: 全面リファクタリング（`docs/superpowers/plans/2026-06-10-full-refactoring.md`）の Phase 0〜6 と、
+> スコープ外項目の追加対応（Phase 7: C4 契約テスト・テスト空白地帯の補強）が完了。
 > 「5. 問題点インベントリ」の各項目に解消状況を追記した。行数・構造の記述は 2026-06-10 時点のスナップショットであり、
 > 現在の構造は `README.md` のプロジェクト構成を参照。
 
@@ -159,7 +160,7 @@ Kotlin → Rust: AppBridge.onSwipeNavigate 等 → #[no_mangle] JNI fn → app.e
 | C1  | デフォルト設定値が TS（`DEFAULT_COLUMN_SETTINGS`/`DEFAULT_GLOBAL_SETTINGS`）と Rust（serde default + `impl Default`）に二重定義。コメントによる手動同期規約のみで、自動検証なし ✅ Phase 4 で解消（ドリフト検出の契約テストを追加） | `types/index.ts:111-183`, `settings.rs:58-132`    |
 | C2  | カラム URL 解決が二重実装、かつ**既にドリフト**：Rust `resolve_url` は `home_tab_name` をクエリに付与するが TS `resolveColumnUrl` は付与しない ✅ Phase 1 で解消（本番未使用の TS 側を削除）                                        | `webview.rs:20-41`, `types/index.ts:217-230`      |
 | C3  | ページ種別ラベル変換が再び二重化（過去のリファクタリングで共通化した `getPageTypeLabel` があるのに `ColumnLayoutTab.getPageLabel` が別実装）✅ Phase 2 で解消                                                                       | `types/index.ts:198`, `ColumnLayoutTab.tsx:23-36` |
-| C4  | IPC 定数が TS/Rust に二重定義（設計上の判断だが、整合性の自動検証なし）— スコープ外（コード生成は別プラン。現状維持と判断）                                                                                                         | `ipc.ts`, `ipc_constants.rs`                      |
+| C4  | IPC 定数が TS/Rust に二重定義（設計上の判断だが、整合性の自動検証なし）✅ Phase 7 で解消（`contracts/ipc-constants.json` を共有 fixture とする契約テストを TS/Rust 双方に追加）                                                     | `ipc.ts`, `ipc_constants.rs`                      |
 | C5  | `types/index.ts` のフィールド対応表コメントに削除済みの `zoomLevel` 行が残存 ✅ Phase 1 で解消                                                                                                                                      | `types/index.ts:157`                              |
 
 ### D. マジック値・命名の負債
@@ -193,13 +194,13 @@ Kotlin → Rust: AppBridge.onSwipeNavigate 等 → #[no_mangle] JNI fn → app.e
 | F3  | README のプロジェクト構成が古い：存在しない `Sidebar/` 記載、`TopBar`/`TabActionDialog`/`LinkPopupDialog`/`constants/`/`android_bridge.rs`/Kotlin 層の記載なし。モバイルのカラム実装説明も旧方式（WebviewWindowBuilder）のまま ✅ Phase 1 で解消（Phase 6 で 3〜5 の構造変更も反映） | `README.md:82-128,168-173`      |
 | F4  | `account.rs` のコメントが存在しないフロー（visibilitychange → check_login_complete）を案内 ✅ Phase 1 で解消                                                                                                                                                                         | `account.rs:160`                |
 | F5  | 完了済み `REFACTORING_PLAN.md` がルートに残存 ✅ Phase 1 で解消                                                                                                                                                                                                                      | リポジトリルート                |
-| F6  | `.steering/` / `aidlc-docs/` は別ワークフロー（AIDLC）の資材で、現在の開発フロー（superpowers）と二重化 — スコープ外（開発ワークフローの選択はユーザー判断）                                                                                                                         | `.steering/`, `aidlc-docs/`     |
+| F6  | `.steering/` / `aidlc-docs/` は別ワークフロー（AIDLC）の資材で、現在の開発フロー（superpowers）と二重化 — 現状維持（2026-06-11 ユーザー判断により対応しないと決定）                                                                                                                  | `.steering/`, `aidlc-docs/`     |
 
 ### G. テストの空白地帯
 
-- `App.tsx`・`useAccounts.ts`・`useAutoReload.ts`・`LinkPopupDialog` にテストなし ✅ Phase 6 で一部解消（`useAccounts`・`LinkPopupDialog` のテストを追加。`App.tsx`・`useAutoReload.ts` は未対応）
-- Rust は `settings.rs` / `inject/mod.rs` のみ（後者は壊れている）。`webview.rs` の純粋ロジック（`resolve_url`, `webview_label`, `get_popup_bounds`）にテストなし ✅ Phase 4 で一部解消（`resolve_url` 等のテストと TS/Rust デフォルト設定の契約テストを追加。`get_popup_bounds` は未対応）
-- inject スクリプト（`_src/*.ts`）は全てテストなし — 未対応（inject アーキテクチャ再設計が必要なためスコープ外）
+- `App.tsx`・`useAccounts.ts`・`useAutoReload.ts`・`LinkPopupDialog` にテストなし ✅ Phase 6 で `useAccounts`・`LinkPopupDialog`、Phase 7 で `App.tsx`・`useAutoReload.ts` のテストを追加し解消
+- Rust は `settings.rs` / `inject/mod.rs` のみ（後者は壊れている）。`webview.rs` の純粋ロジック（`resolve_url`, `webview_label`, `get_popup_bounds`）にテストなし ✅ Phase 4 で `resolve_url` 等と TS/Rust デフォルト設定の契約テスト、Phase 7 で `get_popup_bounds`（`padded_popup_bounds` 抽出）のテストを追加し解消
+- inject スクリプト（`_src/*.ts`）は全てテストなし ✅ Phase 7 で一部解消（IIFE を jsdom で import して検証する方式で `ng_word`・`custom_css` のテストを追加。他スクリプトは同方式で追加可能）
 - Kotlin は `MainActivityTest.kt` のみ（ジェスチャー状態機械はテスト不能な形で Activity に埋め込み）✅ Phase 5 で解消（`BoomerangGestureDetector` 抽出 + 特性テスト 11 件）
 
 ## 6. 制約（リファクタリング時に壊してはいけないもの）

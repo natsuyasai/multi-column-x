@@ -9,30 +9,51 @@ use tauri::{AppHandle, Manager, WebviewUrl};
 #[cfg(desktop)]
 use tauri::{LogicalPosition, LogicalSize};
 
+#[cfg(desktop)]
+const POPUP_FALLBACK_BOUNDS: (LogicalPosition<f64>, LogicalSize<f64>) = (
+    LogicalPosition { x: 50.0, y: 50.0 },
+    LogicalSize {
+        width: 800.0,
+        height: 600.0,
+    },
+);
+
+#[cfg(desktop)]
+const POPUP_PADDING: f64 = 50.0;
+
+/// メインウィンドウの位置・サイズから POPUP_PADDING ぶん内側に寄せた
+/// ポップアップの位置とサイズを計算する（純粋関数）。
+#[cfg(desktop)]
+fn padded_popup_bounds(
+    main_x: f64,
+    main_y: f64,
+    main_width: f64,
+    main_height: f64,
+) -> (LogicalPosition<f64>, LogicalSize<f64>) {
+    (
+        LogicalPosition::new(main_x + POPUP_PADDING, main_y + POPUP_PADDING),
+        LogicalSize::new(
+            main_width - POPUP_PADDING * 2.0,
+            main_height - POPUP_PADDING * 2.0,
+        ),
+    )
+}
+
 /// デスクトップ専用: メインウィンドウを基準にパディングを付けたポップアップの
 /// 位置とサイズを返す。ウィンドウが取得できない場合はフォールバック値を使う。
 #[cfg(desktop)]
 fn get_popup_bounds(app: &AppHandle) -> (LogicalPosition<f64>, LogicalSize<f64>) {
-    const FALLBACK: (LogicalPosition<f64>, LogicalSize<f64>) = (
-        LogicalPosition { x: 50.0, y: 50.0 },
-        LogicalSize {
-            width: 800.0,
-            height: 600.0,
-        },
-    );
-    const PADDING: f64 = 50.0;
     let Some(window) = app.get_window(labels::MAIN) else {
-        return FALLBACK;
+        return POPUP_FALLBACK_BOUNDS;
     };
     let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) else {
-        return FALLBACK;
+        return POPUP_FALLBACK_BOUNDS;
     };
-    (
-        LogicalPosition::new(pos.x as f64 + PADDING, pos.y as f64 + PADDING),
-        LogicalSize::new(
-            size.width as f64 - PADDING * 2.0,
-            size.height as f64 - PADDING * 2.0,
-        ),
+    padded_popup_bounds(
+        pos.x as f64,
+        pos.y as f64,
+        size.width as f64,
+        size.height as f64,
     )
 }
 
@@ -325,4 +346,30 @@ pub async fn close_popup_window(app: AppHandle, label: String) -> Result<(), Str
         webview.close().map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+#[cfg(all(test, desktop))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn padded_popup_bounds_はメイン位置から50px内側に配置する() {
+        let (pos, size) = padded_popup_bounds(100.0, 200.0, 1400.0, 900.0);
+        assert_eq!((pos.x, pos.y), (150.0, 250.0));
+        assert_eq!((size.width, size.height), (1300.0, 800.0));
+    }
+
+    #[test]
+    fn padded_popup_bounds_は原点ウィンドウでもパディングを適用する() {
+        let (pos, size) = padded_popup_bounds(0.0, 0.0, 800.0, 600.0);
+        assert_eq!((pos.x, pos.y), (50.0, 50.0));
+        assert_eq!((size.width, size.height), (700.0, 500.0));
+    }
+
+    #[test]
+    fn フォールバック境界は800x600で位置50_50である() {
+        let (pos, size) = POPUP_FALLBACK_BOUNDS;
+        assert_eq!((pos.x, pos.y), (50.0, 50.0));
+        assert_eq!((size.width, size.height), (800.0, 600.0));
+    }
 }
