@@ -12,6 +12,9 @@ pub use popup::*;
 use crate::ipc_constants::events;
 use tauri::{AppHandle, Emitter, Manager};
 
+// Android はポップアップ/カラムとも URL 文字列を JNI 経由でそのまま渡すため、
+// 到達可能な呼び出し元がなく dead_code になる（参照自体は残るため cfg では消せない）。
+#[cfg_attr(target_os = "android", allow(dead_code))]
 fn parse_url(s: &str) -> Result<tauri::Url, String> {
     s.parse().map_err(|e: url::ParseError| e.to_string())
 }

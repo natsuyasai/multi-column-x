@@ -129,6 +129,48 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onDoubleTap<
     }
 }
 
+/// AppBridge.onPopupSwitchSession(popupId, accountId, url) から呼ばれる JNI エントリポイント。
+/// ポップアップツールバーのアカウント切替を受け取り、ポップアップを選択アカウントの
+/// セッションで再作成する。
+///
+/// WebView の JavaBridge スレッドから呼ばれ、再作成は呼び出し元 WebView 自身の
+/// destroy を伴うため、ブロックせず別タスクへ逃がしてから即座に返す。
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onPopupSwitchSession<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    popup_id: jni::objects::JString<'local>,
+    account_id: jni::objects::JString<'local>,
+    url: jni::objects::JString<'local>,
+) {
+    fn to_string(env: &mut JNIEnv, s: &jni::objects::JString) -> Option<String> {
+        env.get_string(s).ok().map(|v| v.into())
+    }
+    let (Some(popup_id), Some(account_id), Some(url)) = (
+        to_string(&mut env, &popup_id),
+        to_string(&mut env, &account_id),
+        to_string(&mut env, &url),
+    ) else {
+        return;
+    };
+    let app = TAURI_APP.lock().unwrap().clone();
+    let Some(app) = app else {
+        eprintln!("[AppBridge.onPopupSwitchSession] app handle not initialized");
+        return;
+    };
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = crate::commands::webview::switch_popup_session_android(
+            &app,
+            &popup_id,
+            &account_id,
+            &url,
+        ) {
+            eprintln!("[AppBridge.onPopupSwitchSession] {e}");
+        }
+    });
+}
+
 /// Kotlin から受け取ったシステムバーの高さ（dp）。
 static STATUS_BAR_HEIGHT_DP: AtomicI32 = AtomicI32::new(0);
 static NAV_BAR_HEIGHT_DP: AtomicI32 = AtomicI32::new(0);

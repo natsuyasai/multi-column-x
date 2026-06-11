@@ -1,11 +1,16 @@
 //! メディア／リンクポップアップウィンドウの作成・セッション切替・クローズ。
+#[cfg(not(target_os = "android"))]
 use super::parse_url;
 use crate::commands::settings_store::{load_accounts_json, load_popup_esc_close_enabled};
 use crate::ipc_constants::labels;
 use crate::state::AppState;
+#[cfg(not(target_os = "android"))]
 use std::path::PathBuf;
+#[cfg(not(target_os = "android"))]
 use std::time::Duration;
-use tauri::{AppHandle, Manager, WebviewUrl};
+#[cfg(not(target_os = "android"))]
+use tauri::WebviewUrl;
+use tauri::{AppHandle, Manager};
 #[cfg(desktop)]
 use tauri::{LogicalPosition, LogicalSize};
 
@@ -282,8 +287,46 @@ pub async fn open_link_popup_window(
     }
 }
 
+/// Android 専用: ネイティブポップアップ WebView を削除し、選択アカウントの
+/// セッション（WebView Profile）と新しい init script で再作成する。
+/// デスクトップの switch_popup_session と同じ「閉じて再作成」をネイティブ経路で行う。
+/// popup_toolbar → PopupSessionBridge → AppBridge.onPopupSwitchSession（JNI）から呼ばれる。
+#[cfg(target_os = "android")]
+pub fn switch_popup_session_android(
+    app: &AppHandle,
+    popup_label: &str,
+    account_id: &str,
+    url: &str,
+) -> Result<(), String> {
+    crate::android_bridge::remove_popup_webview(popup_label)?;
+    let PopupInit {
+        label: new_label,
+        init_script: popup_init,
+    } = build_popup_init(app, labels::POPUP_PREFIX, account_id, "");
+    crate::android_bridge::create_popup_webview(&new_label, url, &popup_init, account_id)
+}
+
 #[tauri::command]
 pub async fn switch_popup_session(
+    app: AppHandle,
+    #[allow(non_snake_case)] popupLabel: String,
+    #[allow(non_snake_case)] accountId: String,
+    #[allow(non_snake_case)] dataDirectory: String,
+    url: String,
+) -> Result<(), String> {
+    #[cfg(target_os = "android")]
+    {
+        let _ = dataDirectory;
+        return switch_popup_session_android(&app, &popupLabel, &accountId, &url);
+    }
+
+    #[cfg(not(target_os = "android"))]
+    switch_popup_session_window(app, popupLabel, accountId, dataDirectory, url).await
+}
+
+/// デスクトップ / iOS: Tauri ウィンドウとしてのポップアップを閉じて再作成する。
+#[cfg(not(target_os = "android"))]
+async fn switch_popup_session_window(
     app: AppHandle,
     #[allow(non_snake_case)] popupLabel: String,
     #[allow(non_snake_case)] accountId: String,

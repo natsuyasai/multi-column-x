@@ -41,6 +41,11 @@ declare global {
     invoke?: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
   }
 
+  // Android で MainActivity が addJavascriptInterface で公開するポップアップ操作ブリッジ
+  interface McxPopupBridge {
+    switchPopupSession: (accountId: string, url: string) => void;
+  }
+
   interface TvAccountInfo {
     id: string;
     label: string;
@@ -57,6 +62,7 @@ declare global {
     __mcxCurrentAccountId?: string;
     __mcxTargetHref?: string;
     __mcxEscCloseEnabled?: boolean;
+    __mcxPopupBridge?: McxPopupBridge;
     __mobileTopInset?: number;
     __mobileBottomInset?: number;
   }

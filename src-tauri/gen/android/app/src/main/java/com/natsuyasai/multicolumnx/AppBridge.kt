@@ -61,4 +61,15 @@ object AppBridge {
    */
   @JvmStatic
   external fun onDoubleTap()
+
+  /**
+   * ポップアップ内のアカウント切替セレクタが変更されたときに PopupSessionBridge から呼ぶ。
+   * Rust 側で既存ポップアップを削除し、選択アカウントのセッションで再作成する。
+   */
+  @JvmStatic
+  external fun onPopupSwitchSession(
+    popupId: String,
+    accountId: String,
+    url: String,
+  )
 }

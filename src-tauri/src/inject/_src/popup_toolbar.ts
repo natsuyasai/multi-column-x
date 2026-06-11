@@ -74,6 +74,16 @@ const CLOSE_POPUP_WINDOW = "close_popup_window";
     const selectedId = select.value;
     const selectedAccount = accounts.find((a) => a.id === selectedId);
     if (!selectedAccount) return;
+    // Android のネイティブ WebView には Tauri IPC が無いため、
+    // addJavascriptInterface で公開されたブリッジを優先して使う。
+    const androidBridge = window.__mcxPopupBridge;
+    if (androidBridge) {
+      androidBridge.switchPopupSession(
+        selectedAccount.id,
+        window.location.href,
+      );
+      return;
+    }
     const popupLabel =
       window.__TAURI_INTERNALS__?.metadata?.currentWebview?.label ?? "";
     tauriInvoke(SWITCH_POPUP_SESSION, {

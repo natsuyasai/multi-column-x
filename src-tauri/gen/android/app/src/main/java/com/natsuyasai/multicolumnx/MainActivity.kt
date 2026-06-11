@@ -156,6 +156,14 @@ class MainActivity : TauriActivity() {
         newConfiguredWebView(initScript, accountId, "popup $id").also { (wv, _) ->
           wv.webViewClient = ExternalLinkWebViewClient(url)
           wv.webChromeClient = ExternalLinkWebChromeClient()
+          // ネイティブ WebView には Tauri IPC が無いため、popup_toolbar の
+          // アカウント切替を Rust へ届けるブリッジを公開する（loadUrl 前に設定が必要）。
+          wv.addJavascriptInterface(
+            PopupSessionBridge(id) { popupId, selectedAccountId, currentUrl ->
+              AppBridge.onPopupSwitchSession(popupId, selectedAccountId, currentUrl)
+            },
+            POPUP_BRIDGE_JS_NAME,
+          )
         }
       val params =
         FrameLayout.LayoutParams(
@@ -474,5 +482,8 @@ class MainActivity : TauriActivity() {
     // ログイン画面検知からリカバリ用リロードまでの遅延。
     // プロファイル/Cookie の反映完了を待つための経験的な値。
     private const val LOGIN_RECOVERY_DELAY_MS = 1500L
+
+    // popup_toolbar.ts が参照する window.__mcxPopupBridge と一致させること。
+    private const val POPUP_BRIDGE_JS_NAME = "__mcxPopupBridge"
   }
 }
