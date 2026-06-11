@@ -89,8 +89,16 @@ multi-column-x/
 │   ├── types/index.ts                # 型定義（Column, Account, GlobalSettings 等）
 │   ├── constants/ipc.ts              # IPC 定数（コマンド名・イベント名・ラベル・スクリプト）
 │   ├── store/useAppStore.ts          # Zustand ストア（設定読み書き・状態管理）
+│   ├── lib/
+│   │   ├── gridLayout.ts             # グリッド座標計算（純粋関数・calculateGridBounds）
+│   │   └── log.ts                    # 文脈名付きエラーロガー（plugin-log 連携）
+│   ├── services/
+│   │   └── columnWebview.ts          # カラム WebView への Tauri IPC 呼び出しを集約
 │   ├── hooks/
-│   │   ├── useColumns.ts             # カラム操作・WebView 配置・グリッド座標計算
+│   │   ├── useColumns.ts             # カラム操作の公開 API（mobile/desktop 実装へ委譲）
+│   │   ├── useMobileColumns.ts       # モバイル: アクティブカラム・スワイプ・起動時復元
+│   │   ├── useDesktopColumns.ts      # デスクトップ: グリッド再配置・リサイズ監視
+│   │   ├── useWebviewEvents.ts       # WebView 発のイベント listen（スクロール・新着数）
 │   │   ├── useAccounts.ts            # アカウント追加・削除
 │   │   ├── useAutoReload.ts          # 自動更新カウントダウン
 │   │   ├── useDialogState.ts         # ダイアログ開閉状態管理
@@ -117,7 +125,11 @@ multi-column-x/
         ├── android_bridge.rs         # JNI ブリッジ（Android WebView 操作）
         ├── commands/
         │   ├── settings.rs           # 設定の保存・読み込み（tauri-plugin-store）
-        │   ├── webview.rs            # WebView 作成・削除・リサイズ・ポップアップ・投稿
+        │   ├── settings_store.rs     # Rust 側の設定読み出しヘルパー（store 直接参照）
+        │   ├── webview/
+        │   │   ├── column.rs         # カラム WebView の作成・削除・リサイズ・URL 解決
+        │   │   ├── popup.rs          # メディア/リンクポップアップ・セッション切替
+        │   │   └── compose.rs        # ツイート作成ウィンドウ
         │   └── account.rs            # アカウントウィンドウ・ログイン検出（desktop/mobile 分岐）
         └── inject/                   # WebView に注入する JS
             ├── _src/                 # TypeScript ソース（Vite でバンドル → *.js に出力）
@@ -138,11 +150,13 @@ Kotlin 層（Android）:
 
 ```
 src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/
-├── MainActivity.kt   # カラム/ポップアップ WebView 管理・ジェスチャー処理
-├── AddAccount.kt     # ログイン用 Activity（センチネルファイル書き込みで完了通知）
-├── AppBridge.kt      # Rust JNI 呼び出しの窓口
-├── ThreadUtils.kt    # UI スレッド実行ヘルパー
-└── UrlUtils.kt       # URL ユーティリティ
+├── MainActivity.kt              # カラム/ポップアップ WebView 管理・バックボタン処理
+├── BoomerangGestureDetector.kt  # 「逆引き→前進」スワイプとダブルタップの検出器
+├── WebViewProfiles.kt           # WebView Profile API のサポート判定・適用
+├── AddAccount.kt                # ログイン用 Activity（センチネルファイル書き込みで完了通知）
+├── AppBridge.kt                 # Rust JNI 呼び出しの窓口
+├── ThreadUtils.kt               # UI スレッド実行ヘルパー
+└── UrlUtils.kt                  # URL ユーティリティ
 ```
 
 ## Tauri コマンド一覧
@@ -197,4 +211,4 @@ Tauri v2 は JS → Rust の自動ケース変換を行わない。JS 側が cam
 
 ### グリッドレイアウト
 
-`Column.gridRow` / `Column.gridCol` でカラムをマトリクス状に配置する。同じ `gridCol` に複数カラムを配置すると縦積みになり、`heightMode`（`auto` / `fixed`）と `heightValue` / `heightUnit`（`px` / `%`）で各カラムの高さを制御する。`useColumns.ts` の `calculateGridBounds` が各カラムの絶対座標を計算して Rust に渡す。
+`Column.gridRow` / `Column.gridCol` でカラムをマトリクス状に配置する。同じ `gridCol` に複数カラムを配置すると縦積みになり、`heightMode`（`auto` / `fixed`）と `heightValue` / `heightUnit`（`px` / `%`）で各カラムの高さを制御する。`src/lib/gridLayout.ts` の `calculateGridBounds` が各カラムの絶対座標を計算して Rust に渡す。

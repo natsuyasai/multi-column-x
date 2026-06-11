@@ -11,6 +11,7 @@ import {
   WEBVIEW_SCRIPTS,
 } from "../constants/ipc";
 import { MOBILE_TAB_BAR_HEIGHT } from "../lib/gridLayout";
+import { logError } from "../lib/log";
 import {
   createColumnWebview,
   evalInColumn,
@@ -43,7 +44,9 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
     if (isMobile) {
       const activeCol = currentColumns.find((c) => c.id === id);
       if (activeCol) {
-        await setColumnCookies(activeCol.accountId).catch(console.error);
+        await setColumnCookies(activeCol.accountId).catch(
+          logError("setActiveColumn:setColumnCookies"),
+        );
       }
     }
 
@@ -55,7 +58,7 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
           y: isActive ? MOBILE_TAB_BAR_HEIGHT : 0,
           width: window.innerWidth,
           height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
-        }).catch(console.error);
+        }).catch(logError("setActiveColumn:resizeColumnWebview"));
       }),
     );
   }, []);
@@ -91,7 +94,7 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
             y: 0,
             width: window.innerWidth,
             height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
-          }).catch(console.error);
+          }).catch(logError("restoreMobileColumns:createColumnWebview"));
         }),
       );
       if (targetColumn) {
@@ -101,7 +104,9 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
           localStorage.setItem(STORAGE_KEYS.ACTIVE_COLUMN_ID, targetColumn.id);
         } catch {}
         // Cookie 設定（認証に必要）
-        await setColumnCookies(targetColumn.accountId).catch(console.error);
+        await setColumnCookies(targetColumn.accountId).catch(
+          logError("restoreMobileColumns:setColumnCookies"),
+        );
         // アクティブカラムのみ表示。非アクティブカラムには RESIZE を送らず
         // onPause() を呼ばせないことでバックグラウンド読み込みを継続させる。
         await resizeColumnWebview(targetColumn.id, {
@@ -109,7 +114,7 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
           y: MOBILE_TAB_BAR_HEIGHT,
           width: window.innerWidth,
           height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
-        }).catch(console.error);
+        }).catch(logError("restoreMobileColumns:resizeColumnWebview"));
       }
     },
     [],

@@ -5,6 +5,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { platform } from "@tauri-apps/plugin-os";
 import { useAppStore } from "../store/useAppStore";
 import type { Column } from "../types";
+import { logError } from "../lib/log";
 import {
   HEADER_HEIGHT,
   SCROLLBAR_HEIGHT,
@@ -67,7 +68,9 @@ export function useDesktopColumns({
 
     await Promise.all(
       Object.entries(bounds).map(([columnId, b]) =>
-        resizeColumnWebview(columnId, b).catch(console.error),
+        resizeColumnWebview(columnId, b).catch(
+          logError("recalculateAllBounds:resizeColumnWebview"),
+        ),
       ),
     );
   }, [activeColumnId, setActiveColumn, containerRef, scrollbarRef]);
@@ -96,7 +99,7 @@ export function useDesktopColumns({
         const b = bounds[column.id];
         if (!b) continue;
         await createColumnWebview(column, account.dataDirectory, b).catch(
-          console.error,
+          logError("restoreDesktopColumns:createColumnWebview"),
         );
       }
     },

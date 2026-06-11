@@ -3,6 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { Column, ColumnSettings } from "../types";
 import type { ColumnBounds } from "../lib/gridLayout";
+import { logError } from "../lib/log";
 import {
   IPC_COMMANDS,
   WEBVIEW_LABELS,
@@ -48,7 +49,7 @@ export async function evalInColumn(
   await invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
     label: WEBVIEW_LABELS.column(columnId),
     script,
-  }).catch(console.error);
+  }).catch(logError("evalInColumn"));
 }
 
 /** カラム設定変更時に必要な inject スクリプト一式を適用してリロードする */

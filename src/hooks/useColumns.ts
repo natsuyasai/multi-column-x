@@ -16,6 +16,7 @@ import {
   removeColumnWebview,
   resizeColumnWebview,
 } from "../services/columnWebview";
+import { logError } from "../lib/log";
 import { useMobileColumns } from "./useMobileColumns";
 import { useDesktopColumns } from "./useDesktopColumns";
 
@@ -109,7 +110,7 @@ export function useColumns() {
           y: 0,
           width: window.innerWidth,
           height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
-        }).catch(console.error);
+        }).catch(logError("handleAddColumn:createColumnWebview(mobile)"));
         if (activeColumnId === null) {
           await setActiveColumn(column.id);
         }
@@ -135,7 +136,7 @@ export function useColumns() {
       if (!b) return;
 
       await createColumnWebview(column, account.dataDirectory, b).catch(
-        console.error,
+        logError("handleAddColumn:createColumnWebview"),
       );
     },
     [accounts, addColumn, activeColumnId, setActiveColumn, setColumnBounds],
@@ -171,7 +172,9 @@ export function useColumns() {
   // カラム削除
   const handleRemoveColumn = useCallback(
     async (columnId: string) => {
-      await removeColumnWebview(columnId).catch(console.error);
+      await removeColumnWebview(columnId).catch(
+        logError("handleRemoveColumn:removeColumnWebview"),
+      );
       removeColumn(columnId);
       const { isMobile, columns: remainingColumns } = useAppStore.getState();
       if (isMobile) {
@@ -222,7 +225,9 @@ export function useColumns() {
   const recreateAllWebviews = useCallback(async () => {
     const { columns: currentColumns, topBarExpanded } = useAppStore.getState();
     for (const column of currentColumns) {
-      await removeColumnWebview(column.id).catch(console.error);
+      await removeColumnWebview(column.id).catch(
+        logError("recreateAllWebviews:removeColumnWebview"),
+      );
     }
     await restoreColumns(getTopBarHeight(topBarExpanded));
   }, [restoreColumns]);
