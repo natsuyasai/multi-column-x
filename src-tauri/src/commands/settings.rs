@@ -76,6 +76,9 @@ fn default_blur_image_amount() -> String {
 fn default_column_scale() -> String {
     "default".to_string()
 }
+fn default_mobile_swipe_area_height() -> u32 {
+    28
+}
 
 impl Default for WindowBounds {
     fn default() -> Self {
@@ -115,6 +118,8 @@ impl Default for GlobalSettingsData {
             hide_ad_enabled: true,
             column_scale: default_column_scale(),
             use_x_app_for_compose: false,
+            mobile_swipe_area_enabled: true,
+            mobile_swipe_area_height: 28,
             presets: vec![],
             ng_words: vec![],
         }
@@ -240,6 +245,12 @@ pub struct GlobalSettingsData {
     #[serde(rename = "useXAppForCompose")]
     #[serde(default)]
     pub use_x_app_for_compose: bool,
+    #[serde(rename = "mobileSwipeAreaEnabled")]
+    #[serde(default = "default_true")]
+    pub mobile_swipe_area_enabled: bool,
+    #[serde(rename = "mobileSwipeAreaHeight")]
+    #[serde(default = "default_mobile_swipe_area_height")]
+    pub mobile_swipe_area_height: u32,
     #[serde(default)]
     pub presets: Vec<ColumnPresetData>,
     #[serde(rename = "ngWords")]
@@ -307,6 +318,13 @@ mod tests {
     fn global_settings_default_popup_esc_close_enabled() {
         let gs = GlobalSettingsData::default();
         assert!(gs.popup_esc_close_enabled);
+    }
+
+    #[test]
+    fn global_settings_default_mobile_swipe_area() {
+        let gs = GlobalSettingsData::default();
+        assert!(gs.mobile_swipe_area_enabled);
+        assert_eq!(gs.mobile_swipe_area_height, 28);
     }
 
     #[test]
