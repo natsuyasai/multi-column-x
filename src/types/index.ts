@@ -66,6 +66,8 @@ export interface GlobalSettings {
   hideAdEnabled: boolean;
   columnScale: ColumnScale;
   useXAppForCompose: boolean;
+  mobileSwipeAreaEnabled: boolean;
+  mobileSwipeAreaHeight: number;
   presets: ColumnPreset[];
   ngWords: string[];
 }
@@ -156,6 +158,8 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   hideAdEnabled: true,
   columnScale: "default",
   useXAppForCompose: false,
+  mobileSwipeAreaEnabled: true,
+  mobileSwipeAreaHeight: 28,
   presets: [],
   ngWords: [],
 };
