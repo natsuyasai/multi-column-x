@@ -100,6 +100,12 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   const [useXAppForCompose, setUseXAppForCompose] = useState(
     settings.useXAppForCompose ?? false,
   );
+  const [mobileSwipeAreaEnabled, setMobileSwipeAreaEnabled] = useState(
+    settings.mobileSwipeAreaEnabled,
+  );
+  const [mobileSwipeAreaHeight, setMobileSwipeAreaHeight] = useState(
+    settings.mobileSwipeAreaHeight,
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,6 +130,8 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       hideAdEnabled,
       columnScale,
       useXAppForCompose,
+      mobileSwipeAreaEnabled,
+      mobileSwipeAreaHeight,
       ngWords,
     });
     onClose();
@@ -408,6 +416,44 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                       onChange={(e) => setUseXAppForCompose(e.target.checked)}
                     />
                     ツイートボタンでXアプリを起動する
+                  </label>
+                </section>
+              )}
+
+              {isMobile && (
+                <section className={styles.section}>
+                  <h3 className={styles.sectionTitle}>
+                    モバイル: スワイプ切替
+                  </h3>
+                  <label className={styles.checkLabel}>
+                    <input
+                      type="checkbox"
+                      aria-label="スワイプでカラム切替を有効化"
+                      checked={mobileSwipeAreaEnabled}
+                      onChange={(e) =>
+                        setMobileSwipeAreaEnabled(e.target.checked)
+                      }
+                    />
+                    スワイプでカラム切替を有効化
+                  </label>
+                  <label className={styles.fieldLabel}>
+                    スワイプ領域の高さ(px)
+                    <input
+                      type="number"
+                      aria-label="スワイプ領域の高さ(px)"
+                      className={styles.numberInput}
+                      min={16}
+                      max={56}
+                      value={mobileSwipeAreaHeight}
+                      onChange={(e) =>
+                        setMobileSwipeAreaHeight(
+                          Math.min(
+                            56,
+                            Math.max(16, Number(e.target.value) || 16),
+                          ),
+                        )
+                      }
+                    />
                   </label>
                 </section>
               )}

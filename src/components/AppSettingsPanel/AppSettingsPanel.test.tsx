@@ -159,6 +159,38 @@ describe("AppSettingsPanel グローバルNGワード", () => {
   });
 });
 
+describe("AppSettingsPanel スワイプ切替設定", () => {
+  beforeEach(() => {
+    mockStoreState.isMobile = true;
+  });
+
+  it("スワイプ領域の有効トグルを切り替えるとonApplyに反映される", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    const checkbox = screen.getByRole("checkbox", {
+      name: "スワイプでカラム切替を有効化",
+    });
+    fireEvent.click(checkbox);
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ mobileSwipeAreaEnabled: false }),
+    );
+  });
+
+  it("スワイプ領域の高さは16〜56にクランプされる", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    const input = screen.getByRole("spinbutton", {
+      name: "スワイプ領域の高さ(px)",
+    });
+    fireEvent.change(input, { target: { value: "999" } });
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ mobileSwipeAreaHeight: 56 }),
+    );
+  });
+});
+
 describe("AppSettingsPanel モバイルのカラム並び替え", () => {
   beforeEach(() => {
     mockStoreState.isMobile = true;
