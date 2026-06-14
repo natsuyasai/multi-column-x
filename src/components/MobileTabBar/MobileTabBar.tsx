@@ -8,9 +8,6 @@ import PersonIcon from "../../assets/icons/person.svg?react";
 import SettingsIcon from "../../assets/icons/settings.svg?react";
 import styles from "./MobileTabBar.module.scss";
 
-const MIN_FLICK_PX = 40;
-const MAX_FLICK_MS = 600;
-
 function getTabLabel(column: Column): string {
   if (column.label) return column.label;
   const labels: Record<PageType, string> = {
@@ -129,7 +126,6 @@ interface Props {
     phase: "progress" | "switching";
   } | null;
   onSelectColumn: (id: string) => void;
-  onSwipeNavigate?: (direction: "left" | "right") => void;
   onAddColumn: () => void;
   onAccountManager: () => void;
   onAppSettings: () => void;
@@ -144,7 +140,6 @@ export const MobileTabBar: React.FC<Props> = ({
   activeColumnId,
   swipeState,
   onSelectColumn,
-  onSwipeNavigate,
   onAddColumn,
   onAccountManager,
   onAppSettings,
@@ -154,40 +149,9 @@ export const MobileTabBar: React.FC<Props> = ({
 }) => {
   const sorted = [...columns].sort((a, b) => a.order - b.order);
   const [expanded, setExpanded] = useState(false);
-  const flickStart = useRef<{ x: number; y: number; time: number } | null>(
-    null,
-  );
-
-  const handleFlickStart = (e: React.TouchEvent) => {
-    const t = e.touches[0];
-    if (!t) return;
-    flickStart.current = { x: t.clientX, y: t.clientY, time: Date.now() };
-  };
-
-  const handleFlickEnd = (e: React.TouchEvent) => {
-    const start = flickStart.current;
-    flickStart.current = null;
-    if (!start) return;
-    const t = e.changedTouches[0];
-    if (!t) return;
-    if (Date.now() - start.time > MAX_FLICK_MS) return;
-    const dx = t.clientX - start.x;
-    const dy = t.clientY - start.y;
-    if (Math.abs(dx) < MIN_FLICK_PX || Math.abs(dx) <= Math.abs(dy)) return;
-    onSwipeNavigate?.(dx < 0 ? "left" : "right");
-  };
-
-  const cancelFlick = () => {
-    flickStart.current = null;
-  };
 
   return (
-    <div
-      className={styles.tabBar}
-      onTouchStart={handleFlickStart}
-      onTouchEnd={handleFlickEnd}
-      onTouchCancel={cancelFlick}
-    >
+    <div className={styles.tabBar}>
       {swipeState && (
         <div
           className={[
