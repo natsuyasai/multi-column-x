@@ -2,7 +2,11 @@
 import React, { useEffect, useCallback, useMemo } from "react";
 import { useAppStore } from "./store/useAppStore";
 import { useColumns } from "./hooks/useColumns";
-import { HEADER_HEIGHT, getTopBarHeight } from "./lib/gridLayout";
+import {
+  HEADER_HEIGHT,
+  getTopBarHeight,
+  resolveSwipeAreaHeight,
+} from "./lib/gridLayout";
 import { logError } from "./lib/log";
 import { useAccounts } from "./hooks/useAccounts";
 import { ColumnHeader } from "./components/ColumnHeader/ColumnHeader";
@@ -12,6 +16,7 @@ import { SettingsPanel } from "./components/SettingsPanel/SettingsPanel";
 import { AppSettingsPanel } from "./components/AppSettingsPanel/AppSettingsPanel";
 import { TopBar } from "./components/TopBar/TopBar";
 import { MobileTabBar } from "./components/MobileTabBar/MobileTabBar";
+import { MobileSwipeBar } from "./components/MobileSwipeBar/MobileSwipeBar";
 import { TabActionDialog } from "./components/TabActionDialog/TabActionDialog";
 import { LinkPopupDialog } from "./components/LinkPopupDialog/LinkPopupDialog";
 import { useDialogState } from "./hooks/useDialogState";
@@ -309,7 +314,6 @@ const App: React.FC = () => {
           accounts={accounts}
           activeColumnId={activeColumnId}
           onSelectColumn={setActiveColumn}
-          onSwipeNavigate={navigateColumn}
           onAddColumn={() => setShowAddColumn(true)}
           onAccountManager={() => setShowAccountManager(true)}
           onAppSettings={() => setShowAppSettings(true)}
@@ -317,6 +321,13 @@ const App: React.FC = () => {
           onComposeTweet={handleComposeTweet}
           onTabAction={handleTabAction}
           swipeState={swipeState}
+        />
+      )}
+      {isMobile && globalSettings.mobileSwipeAreaEnabled && (
+        <MobileSwipeBar
+          height={resolveSwipeAreaHeight(globalSettings)}
+          swipeState={swipeState}
+          onSwipeNavigate={navigateColumn}
         />
       )}
 
