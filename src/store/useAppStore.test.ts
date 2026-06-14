@@ -71,6 +71,8 @@ describe("useAppStore", () => {
         hideAdEnabled: false,
         columnScale: "default",
         useXAppForCompose: false,
+        mobileSwipeAreaEnabled: true,
+        mobileSwipeAreaHeight: 28,
         presets: [],
         ngWords: [],
       },

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { MOBILE_TAB_BAR_HEIGHT, useColumns } from "./useColumns";
+import { useColumns } from "./useColumns";
 import { useAppStore } from "../store/useAppStore";
 import { renderHook, act } from "@testing-library/react";
 import { invoke } from "@tauri-apps/api/core";
@@ -105,6 +105,8 @@ describe("useColumns mobile", () => {
         hideAdEnabled: false,
         columnScale: "default",
         useXAppForCompose: false,
+        mobileSwipeAreaEnabled: true,
+        mobileSwipeAreaHeight: 28,
         presets: [],
         ngWords: [],
       },
@@ -113,12 +115,12 @@ describe("useColumns mobile", () => {
     });
   });
 
-  it("setActiveColumn はアクティブ列を (0, tabBarHeight) に、非アクティブ列を (-99999, 0) に移動する", async () => {
+  it("setActiveColumn はアクティブ列を (0, 0) に、非アクティブ列を (-99999, 0) に移動する", async () => {
     const { result } = renderHook(() => useColumns());
     await act(async () => {
       await result.current.setActiveColumn("col-1");
     });
-    // col-1 should be at (0, 56), col-2 at (-99999, 0)
+    // col-1 should be at (0, 0), col-2 at (-99999, 0)
     const calls = mockInvoke.mock.calls.filter(
       (c) => c[0] === "resize_column_webview",
     );
@@ -129,7 +131,7 @@ describe("useColumns mobile", () => {
       (c) => (c[1] as any).bounds.columnId === "col-2",
     );
     expect(col1Call?.[1]).toMatchObject({
-      bounds: { columnId: "col-1", x: 0, y: MOBILE_TAB_BAR_HEIGHT },
+      bounds: { columnId: "col-1", x: 0, y: 0 },
     });
     expect(col2Call?.[1]).toMatchObject({
       bounds: { columnId: "col-2", x: -99999, y: 0 },

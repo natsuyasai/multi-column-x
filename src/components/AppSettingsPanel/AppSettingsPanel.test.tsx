@@ -37,6 +37,8 @@ const baseGlobalSettings: GlobalSettings = {
   hideAdEnabled: true,
   columnScale: "default",
   useXAppForCompose: false,
+  mobileSwipeAreaEnabled: true,
+  mobileSwipeAreaHeight: 28,
   presets: [],
   ngWords: [],
 };

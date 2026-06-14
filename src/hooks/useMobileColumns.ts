@@ -4,13 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useAppStore } from "../store/useAppStore";
 import type { Column } from "../types";
-import {
-  IPC_EVENTS,
-  OFFSCREEN,
-  STORAGE_KEYS,
-  WEBVIEW_SCRIPTS,
-} from "../constants/ipc";
-import { MOBILE_TAB_BAR_HEIGHT } from "../lib/gridLayout";
+import { IPC_EVENTS, STORAGE_KEYS, WEBVIEW_SCRIPTS } from "../constants/ipc";
+import { mobileColumnBounds, resolveSwipeAreaHeight } from "../lib/gridLayout";
 import { logError } from "../lib/log";
 import {
   createColumnWebview,
@@ -37,7 +32,12 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
     try {
       localStorage.setItem(STORAGE_KEYS.ACTIVE_COLUMN_ID, id);
     } catch {}
-    const { columns: currentColumns, isMobile } = useAppStore.getState();
+    const {
+      columns: currentColumns,
+      isMobile,
+      globalSettings,
+    } = useAppStore.getState();
+    const swipeAreaHeight = resolveSwipeAreaHeight(globalSettings);
 
     // モバイル: resize_column_webview より先にアクティブカラムのクッキーを切り替える。
     // CookieManager は共有のため、WebView が表示される前に正しいアカウントを設定する必要がある。
@@ -52,13 +52,15 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
 
     await Promise.all(
       currentColumns.map((col) => {
-        const isActive = col.id === id;
-        return resizeColumnWebview(col.id, {
-          x: isActive ? 0 : OFFSCREEN.MOBILE_X,
-          y: isActive ? MOBILE_TAB_BAR_HEIGHT : 0,
-          width: window.innerWidth,
-          height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
-        }).catch(logError("setActiveColumn:resizeColumnWebview"));
+        const bounds = mobileColumnBounds({
+          isActive: col.id === id,
+          swipeAreaHeight,
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
+        });
+        return resizeColumnWebview(col.id, bounds).catch(
+          logError("setActiveColumn:resizeColumnWebview"),
+        );
       }),
     );
   }, []);
@@ -81,6 +83,8 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
       const targetColumn =
         (savedId ? sortedByOrder.find((c) => c.id === savedId) : null) ??
         firstColumn;
+      const { globalSettings } = useAppStore.getState();
+      const swipeAreaHeight = resolveSwipeAreaHeight(globalSettings);
       // 全カラムを並列作成して loadUrl を一斉に開始する
       await Promise.all(
         sortedByOrder.map(async (column) => {
@@ -89,12 +93,16 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
           );
           if (!account) return;
           const isActive = column.id === targetColumn?.id;
-          await createColumnWebview(column, account.dataDirectory, {
-            x: isActive ? 0 : OFFSCREEN.MOBILE_X,
-            y: 0,
-            width: window.innerWidth,
-            height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
-          }).catch(logError("restoreMobileColumns:createColumnWebview"));
+          await createColumnWebview(
+            column,
+            account.dataDirectory,
+            mobileColumnBounds({
+              isActive,
+              swipeAreaHeight,
+              viewportWidth: window.innerWidth,
+              viewportHeight: window.innerHeight,
+            }),
+          ).catch(logError("restoreMobileColumns:createColumnWebview"));
         }),
       );
       if (targetColumn) {
@@ -109,12 +117,15 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
         );
         // アクティブカラムのみ表示。非アクティブカラムには RESIZE を送らず
         // onPause() を呼ばせないことでバックグラウンド読み込みを継続させる。
-        await resizeColumnWebview(targetColumn.id, {
-          x: 0,
-          y: MOBILE_TAB_BAR_HEIGHT,
-          width: window.innerWidth,
-          height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
-        }).catch(logError("restoreMobileColumns:resizeColumnWebview"));
+        await resizeColumnWebview(
+          targetColumn.id,
+          mobileColumnBounds({
+            isActive: true,
+            swipeAreaHeight,
+            viewportWidth: window.innerWidth,
+            viewportHeight: window.innerHeight,
+          }),
+        ).catch(logError("restoreMobileColumns:resizeColumnWebview"));
       }
     },
     [],

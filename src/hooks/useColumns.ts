@@ -7,9 +7,10 @@ import { OFFSCREEN } from "../constants/ipc";
 import {
   HEADER_HEIGHT,
   SCROLLBAR_HEIGHT,
-  MOBILE_TAB_BAR_HEIGHT,
   getTopBarHeight,
   calculateGridBounds,
+  mobileColumnBounds,
+  resolveSwipeAreaHeight,
 } from "../lib/gridLayout";
 import {
   createColumnWebview,
@@ -106,12 +107,19 @@ export function useColumns() {
 
       const { isMobile } = useAppStore.getState();
       if (isMobile) {
-        await createColumnWebview(column, account.dataDirectory, {
-          x: OFFSCREEN.MOBILE_X,
-          y: 0,
-          width: window.innerWidth,
-          height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
-        }).catch(logError("handleAddColumn:createColumnWebview(mobile)"));
+        const swipeAreaHeight = resolveSwipeAreaHeight(
+          useAppStore.getState().globalSettings,
+        );
+        await createColumnWebview(
+          column,
+          account.dataDirectory,
+          mobileColumnBounds({
+            isActive: false,
+            swipeAreaHeight,
+            viewportWidth: window.innerWidth,
+            viewportHeight: window.innerHeight,
+          }),
+        ).catch(logError("handleAddColumn:createColumnWebview(mobile)"));
         if (activeColumnId === null) {
           await setActiveColumn(column.id);
         }
@@ -151,12 +159,14 @@ export function useColumns() {
         resizeColumnWebview(
           col.id,
           isMobile
-            ? {
-                x: OFFSCREEN.MOBILE_X,
-                y: 0,
-                width: window.innerWidth,
-                height: window.innerHeight - MOBILE_TAB_BAR_HEIGHT,
-              }
+            ? mobileColumnBounds({
+                isActive: false,
+                swipeAreaHeight: resolveSwipeAreaHeight(
+                  useAppStore.getState().globalSettings,
+                ),
+                viewportWidth: window.innerWidth,
+                viewportHeight: window.innerHeight,
+              })
             : {
                 x: OFFSCREEN.DESKTOP_X,
                 y:
