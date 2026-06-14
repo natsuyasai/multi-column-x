@@ -1,4 +1,4 @@
-# モバイル: タブバー横フリックによるカラム切替 設計
+# モバイル: 専用フリック帯によるカラム切替 設計
 
 - 日付: 2026-06-14
 - 対象: Android（モバイル）のカラム切替操作
@@ -6,56 +6,64 @@
 
 ## 背景・課題
 
-Android ではカラム切替をスワイプ操作で行っている。現在は通常の左右スワイプがカラム内操作（X 自身の横スワイプ＝おすすめ/フォロー中タブ切替、画像カルーセル等）と干渉するため、「逆方向に引いてから折り返す」ブーメランジェスチャー（`BoomerangGestureDetector`）で誤検知を抑えている。
+Android ではカラム切替をスワイプ操作で行っている。現在は通常の左右スワイプがカラム内操作（X 自身の横スワイプ＝おすすめ/フォロー中タブ切替、画像カルーセル等）と干渉するため、「逆方向に引いてから折り返す」ブーメランジェスチャー（`BoomerangGestureDetector`）で誤検知を抑えている。しかしブーメラン方式でも画像拡大時の単指パンで誤検知する。ユーザーの主目的は「片手で・指の移動を最小に」カラムを切り替えたいことであり、下部タブバーのタップでは指の移動が手間。
 
-しかしブーメラン方式でも、**画像拡大時に表示位置を移動（単指パン）させたいときに誤検知**する。さらにユーザーの主目的は「**片手で・指の移動を最小に**カラムを切り替えたい」ことであり、下部タブバーをタップする現行手段（`MobileTabBar` の `onSelectColumn`）では指の移動が手間。
+当初は「下部 `MobileTabBar` の帯の上を横フリックする」案を採ったが、`MobileTabBar` の `.tabs` は `overflow-x: auto`（`MobileTabBar.module.scss`）で**横スクロール可能**であり、各タブは `min-width: 100px`。カラムが増えてタブが帯内に収まらなくなるとタブリストが横スクロールするため、タブバーへ付けた横フリック検出が**スクロール操作と衝突**する。フリックが本来狙う「カラムが複数ある」場面でこそ衝突するため、この案は破棄した。
 
 ## 目標
 
 - 画像ズーム中のパンや X 自身の横スワイプと**構造的に衝突しない**カラム切替手段を提供する。
+- タブバーの横スクロールとも**構造的に衝突しない**。
 - 片手・最小の指移動で前後カラムへ送れる操作にする。
 - ネイティブ（Kotlin / `dispatchTouchEvent` / ProGuard / システムジェスチャー除外）に手を入れず、React/TS のみで完結させ Vitest でテスト可能にする。
 
 ## 非目標（YAGNI）
 
-- スワイプ作用域をコンテンツ領域全体へ広げること（帯を高くする＝ネイティブ実装が必要になるため今回は対象外）。
+- スワイプ作用域をコンテンツ領域全体へ広げること。
 - ボリュームキー切替（メディア音量と競合するため不採用）。
 - 2本指スワイプ（片手操作に適さないため不採用）。
+- ブーメランジェスチャーの撤去（本スコープ外。実機確認後の後続タスク）。
 
-## 採用案: タブバー横フリックによる前後送り
+## 採用案: タブバー直上の専用フリック帯
 
-画面最下部の `MobileTabBar`（高さ `MOBILE_TAB_BAR_HEIGHT = 56px`）の上を**横にフリックすると隣のカラムへ送る**。
+`MobileTabBar` の**直上に独立した専用フリック帯（`MobileSwipeBar`）を置く**。帯はメイン React UI 層に描画し、横にフリックすると隣のカラムへ送る。
 
 - 左フリック（指を左へ）＝次カラム（order 昇順で次）
 - 右フリック（指を右へ）＝前カラム
 
-タップ（特定タブへジャンプ）は従来どおり維持し、同じ帯でフリックとタップを両立させる。
-
 ### なぜ衝突しないか（アーキテクチャ上の根拠）
 
-- コンテンツは子 WebView（OS ネイティブの別ウィンドウ）、タブバーはメイン React UI に描画されている。
-- そのためタブバーに付けた JS の touch ハンドラは**タブバー領域のタッチしか拾えない**。コンテンツ WebView は上に乗った別ウィンドウなので JS には届かない。
-- 結果として、画像ズーム中のパンも X の横スワイプもすべてコンテンツ領域で起きるため、タブバー上のフリックとは**自動的に分離**される。ブーメランの逆引きトリックは不要で、素直な横スワイプ判定でよい。
+- コンテンツは子 WebView（OS ネイティブの別ウィンドウ）で最前面にある。タブバー／フリック帯はメイン React UI に描画されている。
+- JS の touch ハンドラはメイン UI 層のタッチしか拾えない。コンテンツ WebView は上に乗った別ウィンドウなので JS には届かない。→ 画像ズーム中のパンも X の横スワイプもコンテンツ領域で起きるため自動的に分離される。
+- フリック帯は**専用の独立要素で横スクロールしない**（`MobileTabBar` の `.tabs` のようなスクロール領域を持たない）。そのためタブバー横スクロールとも衝突しない。
+- 帯はメイン UI 層にあるため、最前面の column WebView に覆われると touch を受け取れない。よって帯の高さぶん column WebView を縮めて帯を露出させる（タブバー 56px を空けているのと同じ手法。JS の bounds 変更のみで完結し、ネイティブ変更は不要）。
 
 ## コンポーネント設計
 
-### 変更対象
+### 新規 `MobileSwipeBar`（`src/components/MobileSwipeBar/`）
 
-- `src/components/MobileTabBar/MobileTabBar.tsx` — 横フリック検出を追加。
+横フリック検出専用の帯コンポーネント。
 
-### 検出ロジック（`MobileTabBar` 内）
+Props:
 
-タブバーのルート要素（`styles.tabBar`）に touch ハンドラを追加する。既存の `TabItem` 内の長押し用 touch ハンドラとは別レイヤー（親要素）で扱い、タップ／長押しと共存させる。
+- `height: number` — 帯の高さ（px）
+- `swipeState?: { direction: "left" | "right"; phase: "progress" | "switching" } | null`
+- `onSwipeNavigate?: (direction: "left" | "right") => void`
 
-状態（`useRef`）:
+表示（アフォーダンス）:
+
+- 帯に薄い背景色と中央のグリップドット（⠿ 相当）、両端に `‹` `›` を出し「ここを横フリックで切替」と分かるようにする。
+- 切替時は既存 `swipeState` インジケータ表示を流用し、`phase: "switching"` を一瞬出してフィードバックする。
+
+検出ロジック（`useRef` で状態保持）:
 
 - `flickStart: { x: number; y: number; time: number } | null`
 
-判定パラメータ（定数として定義）:
+判定パラメータ（定数）:
 
 - `MIN_FLICK_PX = 40` — 横方向の最小移動量（px）
-- `MAX_FLICK_OFF_AXIS_RATIO = 1.0` — `|dx| > |dy|` を要求（横移動が縦移動より大きい）
 - `MAX_FLICK_MS = 600` — この時間内に完了したものだけフリックとみなす
+- 横移動が縦移動より大きいこと（`|dx| > |dy|`）
 
 挙動:
 
@@ -64,72 +72,103 @@ Android ではカラム切替をスワイプ操作で行っている。現在は
    - `flickStart` が無ければ何もしない。
    - 経過時間が `MAX_FLICK_MS` 超過なら破棄。
    - `dx = endX - startX`、`dy = endY - startY`。
-   - `|dx| >= MIN_FLICK_PX` かつ `|dx| > |dy|` を満たすときのみフリック確定。
-   - `dx < 0`（左へ）→ `onSwipeNavigate("left")` 相当（次カラム）、`dx > 0`（右へ）→ 前カラム。
+   - `|dx| >= MIN_FLICK_PX` かつ `|dx| > |dy|` を満たすときのみ確定。
+   - `dx < 0`（左へ）→ `onSwipeNavigate("left")`、`dx > 0`（右へ）→ `onSwipeNavigate("right")`。
    - `flickStart` をクリア。
 3. `onTouchCancel`: `flickStart` をクリア。
 
-タップとの両立: フリック確定時は `TabItem` 側の `onSelect`（クリック）が誤発火しないよう、移動量がしきい値未満（=タップ）の場合のみ通常のタップとして扱われるようにする。`TabItem` は既に `onTouchMove` で 8px 超の移動時に長押しタイマーを解除しているが、クリック自体は発火しうる。親のフリック確定時に `suppressNextClick` 相当のガードを設けるか、フリック判定を親で行いタップは子の `onClick` に委ねる（移動量が小さければ `onClick` がそのまま発火するため、フリックと明確に分離できる）。実装時に既存のクリック挙動を壊さないことをテストで担保する。
+帯は非スクロールなので、当初案で必要だったスクロール判別トリックは不要。素直な横フリック判定でよい。
 
-### 切替先カラムの決定
+### `MobileTabBar` の変更
 
-`MobileTabBar` は現在 `activeColumnId` と `onSelectColumn(id)` を受け取っている。隣カラム算出は呼び出し側（`App.tsx` 経由で `useMobileColumns`）に既存ロジックがあるため、以下のいずれか:
+- 先行コミットで追加したルート要素への横フリック検出（`onTouchStart`/`onTouchEnd`/`onTouchCancel` と `onSwipeNavigate` prop）を**撤去**する（横スクロールと衝突するため）。
+- タップ（特定カラムへジャンプ）と長押し（タブアクション）は現状維持。
 
-- 案(i): `MobileTabBar` に新規 prop `onSwipeNavigate(direction: "left" | "right")` を追加し、隣カラム算出は `useMobileColumns` 側（`COLUMN_SWIPE_NAVIGATE` リスナと同じロジック）に集約する。**推奨**（責務の一元化、テスト容易）。
-- 案(ii): `MobileTabBar` 内で `columns` を order ソートして隣を求め `onSelectColumn` を呼ぶ。
+### `useMobileColumns` の `navigateColumn`（既存・維持）
 
-案(i) を採用する。`useMobileColumns` のスワイプナビゲーションロジック（order ソート → 現在 index → 隣 index → `setActiveColumn`、範囲外は無視、`swipeState` インジケータ表示）を関数として切り出し、ネイティブイベント経路とタブバーフリック経路の両方から呼べるようにする。
+カラム切替ロジックは `navigateColumn(direction)` に切り出し済み（order ソート → 現在 index → 隣 index → 範囲外無視 → `swipeState` 一時表示 → `setActiveColumn`）。ネイティブジェスチャー経路（`COLUMN_SWIPE_NAVIGATE`）とフリック帯経路の両方から共有する。
 
-### スワイプインジケータの流用
+## グローバル設定（3点同期）
 
-既存の `swipeState`（`{ direction, phase }`）と `MobileTabBar` のインジケータ表示はそのまま利用する。タブバーフリックでも `phase: "switching"` を一時表示して視覚フィードバックを出す。
+`GlobalSettings` に 2 項目を追加する。
 
-## データフロー
+- `mobileSwipeAreaEnabled: boolean` — デフォルト `true`。`false` のとき帯を**描画せず、column WebView をフル高さに戻す**。
+- `mobileSwipeAreaHeight: number` — 帯の高さ（px）。デフォルト `28`（タブバー 56px の半分）。クランプ範囲 16–56。
+
+更新が必要な箇所（既存のデフォルト二重定義・契約テストの規約に従う）:
+
+- `src/types/index.ts` — `GlobalSettings` interface と `DEFAULT_GLOBAL_SETTINGS`
+- `src-tauri/src/commands/settings.rs` — `GlobalSettingsData` struct・`impl Default`・camelCase 用 `#[serde(rename = "...")]`
+- `contracts/default-settings.json` — fixture 再生成
+- `src/components/AppSettingsPanel/AppSettingsPanel.tsx` — トグル（有効/無効）＋高さの数値入力
+
+## 幾何・データフロー
 
 ```
-[タブバー上の横フリック (JS touch)]
-  → MobileTabBar.onSwipeNavigate("left"|"right")
-  → useMobileColumns: navigateColumn(direction)
-      - columns を order ソート
-      - activeColumnId の index を取得
-      - 隣 index を算出（範囲外は無視）
+画面下部（下から）
+┌───────────────────────────────┐
+│ x.com コンテンツ [column WebView]  │  h = innerHeight - reservedBottom
+├───────────────────────────────┤
+│ MobileSwipeBar (mobileSwipeAreaHeight) │  ← enabled 時のみ。横フリックで切替
+├───────────────────────────────┤
+│ MobileTabBar (MOBILE_TAB_BAR_HEIGHT)   │  ← タップ/長押し
+└───────────────────────────────┘
+
+reservedBottom = MOBILE_TAB_BAR_HEIGHT + (enabled ? mobileSwipeAreaHeight : 0)
+```
+
+- `useMobileColumns` の `setActiveColumn` / `restoreMobileColumns`、および `hideColumnWebviews` 等の column WebView の resize 計算で、予約高さに帯高を反映する。実装時に現行の bounds 算出箇所（`MOBILE_TAB_BAR_HEIGHT` を参照している全箇所）を確認し、`reservedBottom` の算出に統一する。
+- 切替フロー:
+
+```
+[フリック帯の横フリック (JS touch)]
+  → MobileSwipeBar.onSwipeNavigate("left"|"right")
+  → App.tsx 経由で useMobileColumns.navigateColumn(direction)
+      - columns を order ソート → activeColumnId の index → 隣 index（範囲外無視）
       - swipeState = { direction, phase: "switching" } を一時表示
       - setActiveColumn(targetId)
 ```
 
-既存のネイティブ経路（`COLUMN_SWIPE_NAVIGATE` イベント → 同じ `navigateColumn`）と統合される。
-
-## 既存ブーメランジェスチャーの扱い
-
-- 第1段階では**併存**させる（ネイティブのブーメランは残したまま、タブバーフリックを追加）。リグレッションを避けつつ実機で新方式を確認するため。
-- 実機でタブバーフリックが期待どおり機能することを確認後、別タスクでブーメラン（`BoomerangGestureDetector` + `MainActivity.dispatchTouchEvent` のスワイプ呼び出し）を撤去する。ダブルタップ（先頭スクロール＋リロード）は別機能なので撤去対象外。
-- 本設計のスコープはタブバーフリックの追加までとし、ブーメラン撤去は後続タスクとする。
+既存のネイティブ経路（`COLUMN_SWIPE_NAVIGATE` → 同じ `navigateColumn`）と統合される。
 
 ## エラー処理・エッジケース
 
 - カラムが1個のみ: 隣が無いので何もしない（範囲外無視で吸収）。
-- ダイアログ表示中: 既存の `dialogOpenRef` ガードと同様に、フリック切替も抑止する。
-- 縦フリック（`|dy| >= |dx|`）: 切替しない（タブバーは現状スクロールしないが、誤作動防止）。
-- 短い移動（`< MIN_FLICK_PX`）: フリックでなくタップとして従来どおり処理。
+- ダイアログ表示中: 既存の `dialogOpenRef` ガードで抑止（`navigateColumn` 内で判定済み）。
+- 縦フリック（`|dy| >= |dx|`）・短い移動（`< MIN_FLICK_PX`）・規定時間超過（`> MAX_FLICK_MS`）: 切替しない。
+- `mobileSwipeAreaEnabled === false`: 帯を描画せず、コンテンツをフル高さに戻す。
+- `onSwipeNavigate` 未指定: 例外を出さない。
 
 ## テスト計画（Vitest, テスト名は日本語）
 
-`src/components/MobileTabBar/MobileTabBar.test.tsx` に追加:
+`src/components/MobileSwipeBar/MobileSwipeBar.test.tsx`（新規）:
 
-- 「タブバーを左へフリックすると次カラムへの onSwipeNavigate が呼ばれる」
-- 「タブバーを右へフリックすると前カラムへの onSwipeNavigate が呼ばれる」
-- 「移動量がしきい値未満のタッチはフリックと判定されず onSelectColumn(タップ) が維持される」
-- 「縦方向の移動が横より大きい場合はフリックと判定しない」
-- 「規定時間を超えたゆっくりした移動はフリックと判定しない」
+- 「左へフリックすると onSwipeNavigate が left で呼ばれる」
+- 「右へフリックすると onSwipeNavigate が right で呼ばれる」
+- 「移動量がしきい値未満のタッチはフリックと判定されない」
+- 「縦方向の移動が横より大きい場合はフリックと判定されない」
+- 「規定時間を超えたゆっくりした移動はフリックと判定されない」
+- 「onSwipeNavigate 未指定でもフリックでエラーにならない」
 
-`useMobileColumns` のテスト（必要に応じて）:
+`src/components/MobileTabBar/MobileTabBar.test.tsx`:
 
-- 「navigateColumn(left) で order 上の次カラムがアクティブになる」
-- 「navigateColumn が端カラムで範囲外のとき何もしない」
+- 先行コミットで追加したタブバー横フリックのテストを撤去する。
+- タップ（onSelectColumn）・長押し（onTabAction）のリグレッションが無いことを確認。
+
+`AppSettingsPanel` / 設定:
+
+- 「スワイプ領域の有効/無効トグルが切り替わる」
+- 「スワイプ領域の高さを変更できる（クランプされる）」
+- `DEFAULT_GLOBAL_SETTINGS` 契約テスト（TS/Rust/fixture）を新フィールドに合わせて更新。
+
+App 統合:
+
+- 「mobileSwipeAreaEnabled が false のとき MobileSwipeBar が描画されない」
 
 ## 受け入れ基準
 
-- タブバー上の横フリックで前後カラムへ切り替わる。
-- タブのタップ（特定カラムへジャンプ）と長押し（タブアクション）が従来どおり機能する。
+- タブバー直上の帯の横フリックで前後カラムへ切り替わる。
+- タブのタップ・長押し、タブバーの横スクロールが従来どおり機能する（フリックと衝突しない）。
 - コンテンツ領域（画像ズーム中のパン、X の横スワイプ）はフリック切替の影響を受けない。
-- 追加テストを含め `npm test` がオールグリーン。フォーマッターもパス。
+- グローバル設定で帯の有効/無効と高さを変更でき、無効時は帯が消えてコンテンツがフル高さになる。
+- 追加・更新テストを含め `npm test` がオールグリーン。フォーマッターもパス。
