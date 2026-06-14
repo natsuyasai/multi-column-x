@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { calculateGridBounds, MOBILE_TAB_BAR_HEIGHT } from "./gridLayout";
+import {
+  calculateGridBounds,
+  MOBILE_TAB_BAR_HEIGHT,
+  mobileColumnBounds,
+  resolveSwipeAreaHeight,
+} from "./gridLayout";
 import type { Column } from "../types";
 
 const baseSettings = {
@@ -141,5 +146,50 @@ describe("calculateGridBounds", () => {
 describe("MOBILE_TAB_BAR_HEIGHT", () => {
   it("56 px で定義されている", () => {
     expect(MOBILE_TAB_BAR_HEIGHT).toBe(56);
+  });
+});
+
+describe("resolveSwipeAreaHeight", () => {
+  it("有効なら設定値の高さを返す", () => {
+    expect(
+      resolveSwipeAreaHeight({
+        mobileSwipeAreaEnabled: true,
+        mobileSwipeAreaHeight: 28,
+      }),
+    ).toBe(28);
+  });
+
+  it("無効なら0を返す", () => {
+    expect(
+      resolveSwipeAreaHeight({
+        mobileSwipeAreaEnabled: false,
+        mobileSwipeAreaHeight: 28,
+      }),
+    ).toBe(0);
+  });
+});
+
+describe("mobileColumnBounds", () => {
+  it("アクティブはx=0,y=0で高さからタブバーと帯を引く", () => {
+    expect(
+      mobileColumnBounds({
+        isActive: true,
+        swipeAreaHeight: 28,
+        viewportWidth: 400,
+        viewportHeight: 800,
+      }),
+    ).toEqual({ x: 0, y: 0, width: 400, height: 800 - 56 - 28 });
+  });
+
+  it("非アクティブはxが画面外", () => {
+    const b = mobileColumnBounds({
+      isActive: false,
+      swipeAreaHeight: 0,
+      viewportWidth: 400,
+      viewportHeight: 800,
+    });
+    expect(b.x).toBeLessThan(0);
+    expect(b.y).toBe(0);
+    expect(b.height).toBe(800 - 56);
   });
 });
