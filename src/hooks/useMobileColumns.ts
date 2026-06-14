@@ -120,6 +120,23 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
     [],
   );
 
+  // 前後カラムへの切替（ネイティブジェスチャー経路・タブバーフリック経路の両方から呼ぶ）
+  const navigateColumn = useCallback(
+    (direction: "left" | "right") => {
+      if (dialogOpenRef.current) return;
+      const { columns: cols } = useAppStore.getState();
+      const sorted = [...cols].sort((a, b) => a.order - b.order);
+      const currentIdx = sorted.findIndex((c) => c.id === activeColumnId);
+      if (currentIdx < 0) return;
+      const targetIdx = direction === "left" ? currentIdx + 1 : currentIdx - 1;
+      if (targetIdx < 0 || targetIdx >= sorted.length) return;
+      setSwipeState({ direction, phase: "switching" });
+      setTimeout(() => setSwipeState(null), 400);
+      setActiveColumn(sorted[targetIdx].id);
+    },
+    [activeColumnId, setActiveColumn, dialogOpenRef],
+  );
+
   // カラムスワイプナビゲーション（モバイルのみ: Android ネイティブジェスチャー → Tauri イベント経由）
   useEffect(() => {
     if (!isMobile) return;
@@ -139,18 +156,7 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
     const unlistenNavigate = listen<string>(
       IPC_EVENTS.COLUMN_SWIPE_NAVIGATE,
       (e) => {
-        if (dialogOpenRef.current) return;
-        const direction = e.payload as "left" | "right";
-        const { columns: cols } = useAppStore.getState();
-        const sorted = [...cols].sort((a, b) => a.order - b.order);
-        const currentIdx = sorted.findIndex((c) => c.id === activeColumnId);
-        if (currentIdx < 0) return;
-        const targetIdx =
-          direction === "left" ? currentIdx + 1 : currentIdx - 1;
-        if (targetIdx < 0 || targetIdx >= sorted.length) return;
-        setSwipeState({ direction, phase: "switching" });
-        setTimeout(() => setSwipeState(null), 400);
-        setActiveColumn(sorted[targetIdx].id);
+        navigateColumn(e.payload as "left" | "right");
       },
     );
     const unlistenDoubleTap = listen(IPC_EVENTS.COLUMN_DOUBLE_TAP, () => {
@@ -164,13 +170,14 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
       unlistenNavigate.then((fn) => fn());
       unlistenDoubleTap.then((fn) => fn());
     };
-  }, [isMobile, activeColumnId, setActiveColumn, dialogOpenRef]);
+  }, [isMobile, activeColumnId, navigateColumn]);
 
   return {
     activeColumnId,
     setActiveColumnIdState,
     swipeState,
     setActiveColumn,
+    navigateColumn,
     restoreMobileColumns,
   };
 }

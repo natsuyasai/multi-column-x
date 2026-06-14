@@ -159,6 +159,112 @@ describe("MobileTabBar", () => {
     expect(onAddColumn).toHaveBeenCalled();
   });
 
+  describe("タブバーの横フリックでカラム切替", () => {
+    it("タブバーを左へフリックすると onSwipeNavigate が left で呼ばれる", () => {
+      const onSwipeNavigate = vi.fn();
+      const { container } = render(
+        <MobileTabBar
+          {...defaultProps}
+          columns={[col1, col2]}
+          onSwipeNavigate={onSwipeNavigate}
+        />,
+      );
+      const bar = container.firstChild as HTMLElement;
+      fireEvent.touchStart(bar, { touches: [{ clientX: 200, clientY: 20 }] });
+      fireEvent.touchEnd(bar, {
+        changedTouches: [{ clientX: 100, clientY: 24 }],
+      });
+      expect(onSwipeNavigate).toHaveBeenCalledWith("left");
+    });
+
+    it("タブバーを右へフリックすると onSwipeNavigate が right で呼ばれる", () => {
+      const onSwipeNavigate = vi.fn();
+      const { container } = render(
+        <MobileTabBar
+          {...defaultProps}
+          columns={[col1, col2]}
+          onSwipeNavigate={onSwipeNavigate}
+        />,
+      );
+      const bar = container.firstChild as HTMLElement;
+      fireEvent.touchStart(bar, { touches: [{ clientX: 100, clientY: 20 }] });
+      fireEvent.touchEnd(bar, {
+        changedTouches: [{ clientX: 220, clientY: 24 }],
+      });
+      expect(onSwipeNavigate).toHaveBeenCalledWith("right");
+    });
+
+    it("移動量がしきい値未満のタッチはフリックと判定されない", () => {
+      const onSwipeNavigate = vi.fn();
+      const { container } = render(
+        <MobileTabBar
+          {...defaultProps}
+          columns={[col1, col2]}
+          onSwipeNavigate={onSwipeNavigate}
+        />,
+      );
+      const bar = container.firstChild as HTMLElement;
+      fireEvent.touchStart(bar, { touches: [{ clientX: 100, clientY: 20 }] });
+      fireEvent.touchEnd(bar, {
+        changedTouches: [{ clientX: 110, clientY: 22 }],
+      });
+      expect(onSwipeNavigate).not.toHaveBeenCalled();
+    });
+
+    it("縦方向の移動が横より大きい場合はフリックと判定されない", () => {
+      const onSwipeNavigate = vi.fn();
+      const { container } = render(
+        <MobileTabBar
+          {...defaultProps}
+          columns={[col1, col2]}
+          onSwipeNavigate={onSwipeNavigate}
+        />,
+      );
+      const bar = container.firstChild as HTMLElement;
+      fireEvent.touchStart(bar, { touches: [{ clientX: 100, clientY: 20 }] });
+      fireEvent.touchEnd(bar, {
+        changedTouches: [{ clientX: 160, clientY: 160 }],
+      });
+      expect(onSwipeNavigate).not.toHaveBeenCalled();
+    });
+
+    it("規定時間を超えたゆっくりした移動はフリックと判定されない", () => {
+      vi.useFakeTimers();
+      try {
+        const onSwipeNavigate = vi.fn();
+        const { container } = render(
+          <MobileTabBar
+            {...defaultProps}
+            columns={[col1, col2]}
+            onSwipeNavigate={onSwipeNavigate}
+          />,
+        );
+        const bar = container.firstChild as HTMLElement;
+        fireEvent.touchStart(bar, { touches: [{ clientX: 200, clientY: 20 }] });
+        vi.advanceTimersByTime(800);
+        fireEvent.touchEnd(bar, {
+          changedTouches: [{ clientX: 100, clientY: 24 }],
+        });
+        expect(onSwipeNavigate).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("onSwipeNavigate 未指定でもフリックでエラーにならない", () => {
+      const { container } = render(
+        <MobileTabBar {...defaultProps} columns={[col1, col2]} />,
+      );
+      const bar = container.firstChild as HTMLElement;
+      expect(() => {
+        fireEvent.touchStart(bar, { touches: [{ clientX: 200, clientY: 20 }] });
+        fireEvent.touchEnd(bar, {
+          changedTouches: [{ clientX: 100, clientY: 24 }],
+        });
+      }).not.toThrow();
+    });
+  });
+
   describe("アクションボタンの SVG アイコン", () => {
     it("ツイートボタンに pencil SVG が表示される", () => {
       const { container } = render(

@@ -61,6 +61,7 @@ const App: React.FC = () => {
     activeColumnId,
     swipeState,
     setActiveColumn,
+    navigateColumn,
     setDialogOpen,
     recreateAllWebviews,
   } = useColumns();
@@ -308,6 +309,7 @@ const App: React.FC = () => {
           accounts={accounts}
           activeColumnId={activeColumnId}
           onSelectColumn={setActiveColumn}
+          onSwipeNavigate={navigateColumn}
           onAddColumn={() => setShowAddColumn(true)}
           onAccountManager={() => setShowAccountManager(true)}
           onAppSettings={() => setShowAppSettings(true)}
