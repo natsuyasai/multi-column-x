@@ -428,7 +428,6 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                   <label className={styles.checkLabel}>
                     <input
                       type="checkbox"
-                      aria-label="スワイプでカラム切替を有効化"
                       checked={mobileSwipeAreaEnabled}
                       onChange={(e) =>
                         setMobileSwipeAreaEnabled(e.target.checked)
@@ -440,7 +439,6 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                     スワイプ領域の高さ(px)
                     <input
                       type="number"
-                      aria-label="スワイプ領域の高さ(px)"
                       className={styles.numberInput}
                       min={16}
                       max={56}

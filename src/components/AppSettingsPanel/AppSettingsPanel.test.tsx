@@ -189,6 +189,19 @@ describe("AppSettingsPanel スワイプ切替設定", () => {
       expect.objectContaining({ mobileSwipeAreaHeight: 56 }),
     );
   });
+
+  it("スワイプ領域の高さに下限未満の値を入力すると16にクランプされる", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    const input = screen.getByRole("spinbutton", {
+      name: "スワイプ領域の高さ(px)",
+    });
+    fireEvent.change(input, { target: { value: "-5" } });
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ mobileSwipeAreaHeight: 16 }),
+    );
+  });
 });
 
 describe("AppSettingsPanel モバイルのカラム並び替え", () => {
