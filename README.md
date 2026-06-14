@@ -151,7 +151,7 @@ Kotlin 層（Android）:
 ```
 src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/
 ├── MainActivity.kt              # カラム/ポップアップ WebView 管理・バックボタン処理
-├── BoomerangGestureDetector.kt  # 「逆引き→前進」スワイプとダブルタップの検出器
+├── DoubleTapGestureDetector.kt  # アクティブカラムのダブルタップ検出器
 ├── WebViewProfiles.kt           # WebView Profile API のサポート判定・適用
 ├── AddAccount.kt                # ログイン用 Activity（センチネルファイル書き込みで完了通知）
 ├── AppBridge.kt                 # Rust JNI 呼び出しの窓口

@@ -52,12 +52,6 @@ export const IPC_EVENTS = {
   WEBVIEW_SCROLL: "webview-scroll",
   /** 最前面ポップアップを閉じる（Android JNI → TS listen） */
   CLOSE_TOPMOST_POPUP: "close-topmost-popup",
-  /** カラムスワイプナビゲーション（Android JNI → TS listen）"left"|"right" */
-  COLUMN_SWIPE_NAVIGATE: "column-swipe-navigate",
-  /** カラムスワイプ進行中（Android JNI → TS listen）"left"|"right" */
-  COLUMN_SWIPE_PROGRESS: "column-swipe-progress",
-  /** カラムスワイプキャンセル（Android JNI → TS listen） */
-  COLUMN_SWIPE_CANCEL: "column-swipe-cancel",
   /** アクティブカラムのダブルタップ（Android JNI → TS listen） */
   COLUMN_DOUBLE_TAP: "column-double-tap",
   /** 新着投稿カウント（inject script invoke → TS listen）{ label, count } */

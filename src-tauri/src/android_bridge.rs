@@ -54,67 +54,6 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_closeTopPopu
     }
 }
 
-fn emit_jstring_event<'local>(
-    env: &mut JNIEnv<'local>,
-    s: jni::objects::JString<'local>,
-    event: &'static str,
-) {
-    use tauri::Emitter;
-    let val: String = match env.get_string(&s) {
-        Ok(v) => v.into(),
-        Err(_) => return,
-    };
-    let guard = TAURI_APP.lock().unwrap();
-    if let Some(app) = guard.as_ref() {
-        let _ = app.emit(event, val);
-    }
-}
-
-/// AppBridge.onSwipeNavigate(direction) から呼ばれる JNI エントリポイント。
-/// 水平フリングを column-swipe-navigate イベントとして React に転送する。
-/// direction: "left"（次のカラム）または "right"（前のカラム）
-#[no_mangle]
-pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onSwipeNavigate<'local>(
-    mut env: JNIEnv<'local>,
-    _class: JClass<'local>,
-    direction: jni::objects::JString<'local>,
-) {
-    emit_jstring_event(
-        &mut env,
-        direction,
-        crate::ipc_constants::events::COLUMN_SWIPE_NAVIGATE,
-    );
-}
-
-/// AppBridge.onSwipeProgress(direction) から呼ばれる JNI エントリポイント。
-/// スワイプ操作中（指が動いている間）を column-swipe-progress イベントとして React に転送する。
-#[no_mangle]
-pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onSwipeProgress<'local>(
-    mut env: JNIEnv<'local>,
-    _class: JClass<'local>,
-    direction: jni::objects::JString<'local>,
-) {
-    emit_jstring_event(
-        &mut env,
-        direction,
-        crate::ipc_constants::events::COLUMN_SWIPE_PROGRESS,
-    );
-}
-
-/// AppBridge.onSwipeCancel() から呼ばれる JNI エントリポイント。
-/// スワイプがフリングに至らず終了したことを React に通知する。
-#[no_mangle]
-pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onSwipeCancel<'local>(
-    _env: JNIEnv<'local>,
-    _class: JClass<'local>,
-) {
-    use tauri::Emitter;
-    let guard = TAURI_APP.lock().unwrap();
-    if let Some(app) = guard.as_ref() {
-        let _ = app.emit(crate::ipc_constants::events::COLUMN_SWIPE_CANCEL, ());
-    }
-}
-
 /// AppBridge.onDoubleTap() から呼ばれる JNI エントリポイント。
 /// アクティブカラムのダブルタップを column-double-tap イベントとして React に通知する。
 #[no_mangle]

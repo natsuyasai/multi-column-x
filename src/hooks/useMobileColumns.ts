@@ -148,40 +148,20 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
     [activeColumnId, setActiveColumn, dialogOpenRef],
   );
 
-  // カラムスワイプナビゲーション（モバイルのみ: Android ネイティブジェスチャー → Tauri イベント経由）
+  // アクティブカラムのダブルタップ（先頭スクロール＋リロード）。
+  // 横スワイプによるカラム切替は MobileSwipeBar（navigateColumn）が担うため、
+  // ここではネイティブのダブルタップイベントのみを購読する。
   useEffect(() => {
     if (!isMobile) return;
-    const unlistenProgress = listen<string>(
-      IPC_EVENTS.COLUMN_SWIPE_PROGRESS,
-      (e) => {
-        if (dialogOpenRef.current) return;
-        setSwipeState({
-          direction: e.payload as "left" | "right",
-          phase: "progress",
-        });
-      },
-    );
-    const unlistenCancel = listen(IPC_EVENTS.COLUMN_SWIPE_CANCEL, () => {
-      setSwipeState(null);
-    });
-    const unlistenNavigate = listen<string>(
-      IPC_EVENTS.COLUMN_SWIPE_NAVIGATE,
-      (e) => {
-        navigateColumn(e.payload as "left" | "right");
-      },
-    );
     const unlistenDoubleTap = listen(IPC_EVENTS.COLUMN_DOUBLE_TAP, () => {
       if (dialogOpenRef.current) return;
       if (!activeColumnId) return;
       evalInColumn(activeColumnId, WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD);
     });
     return () => {
-      unlistenProgress.then((fn) => fn());
-      unlistenCancel.then((fn) => fn());
-      unlistenNavigate.then((fn) => fn());
       unlistenDoubleTap.then((fn) => fn());
     };
-  }, [isMobile, activeColumnId, navigateColumn]);
+  }, [isMobile, activeColumnId, dialogOpenRef]);
 
   return {
     activeColumnId,

@@ -25,9 +25,6 @@
     "ACCOUNT_LOGIN_COMPLETE": "account-login-complete",
     "WEBVIEW_SCROLL": "webview-scroll",
     "CLOSE_TOPMOST_POPUP": "close-topmost-popup",
-    "COLUMN_SWIPE_NAVIGATE": "column-swipe-navigate",
-    "COLUMN_SWIPE_PROGRESS": "column-swipe-progress",
-    "COLUMN_SWIPE_CANCEL": "column-swipe-cancel",
     "COLUMN_DOUBLE_TAP": "column-double-tap",
     "WEBVIEW_NEW_POSTS_COUNT": "webview-new-posts-count",
     "WEBVIEW_KEYBOARD_SHORTCUT": "webview-keyboard-shortcut"

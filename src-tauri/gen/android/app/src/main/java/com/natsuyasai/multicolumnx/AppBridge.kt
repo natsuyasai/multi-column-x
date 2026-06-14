@@ -36,26 +36,6 @@ object AppBridge {
   external fun closeTopPopup(): Boolean
 
   /**
-   * エッジスワイプを検出したときに MainActivity から呼ぶ。
-   * direction: "left"（次のカラム）または "right"（前のカラム）
-   */
-  @JvmStatic
-  external fun onSwipeNavigate(direction: String)
-
-  /**
-   * 水平スワイプ操作中（指が動いている間）に呼ぶ。
-   * direction: "left" または "right"
-   */
-  @JvmStatic
-  external fun onSwipeProgress(direction: String)
-
-  /**
-   * スワイプがフリングに至らず終了したときに呼ぶ（キャンセル）。
-   */
-  @JvmStatic
-  external fun onSwipeCancel()
-
-  /**
    * アクティブカラム領域でダブルタップを検出したときに呼ぶ。
    * column-double-tap イベントを emit してページリロードをトリガーする。
    */

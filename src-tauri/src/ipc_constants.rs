@@ -12,12 +12,6 @@ pub mod events {
     pub const WEBVIEW_SCROLL: &str = "webview-scroll";
     /// 最前面ポップアップを閉じる（Android JNI → TS listen）
     pub const CLOSE_TOPMOST_POPUP: &str = "close-topmost-popup";
-    /// カラムスワイプナビゲーション（Android JNI → TS listen）方向: "left"|"right"
-    pub const COLUMN_SWIPE_NAVIGATE: &str = "column-swipe-navigate";
-    /// カラムスワイプ進行中（Android JNI → TS listen）方向: "left"|"right"
-    pub const COLUMN_SWIPE_PROGRESS: &str = "column-swipe-progress";
-    /// カラムスワイプキャンセル（Android JNI → TS listen）
-    pub const COLUMN_SWIPE_CANCEL: &str = "column-swipe-cancel";
     /// アクティブカラムのダブルタップ（Android JNI → TS listen）
     pub const COLUMN_DOUBLE_TAP: &str = "column-double-tap";
     /// 新着投稿カウント（inject script invoke → TS listen）{ label, count }
@@ -75,9 +69,6 @@ mod tests {
             ("ACCOUNT_LOGIN_COMPLETE", events::ACCOUNT_LOGIN_COMPLETE),
             ("WEBVIEW_SCROLL", events::WEBVIEW_SCROLL),
             ("CLOSE_TOPMOST_POPUP", events::CLOSE_TOPMOST_POPUP),
-            ("COLUMN_SWIPE_NAVIGATE", events::COLUMN_SWIPE_NAVIGATE),
-            ("COLUMN_SWIPE_PROGRESS", events::COLUMN_SWIPE_PROGRESS),
-            ("COLUMN_SWIPE_CANCEL", events::COLUMN_SWIPE_CANCEL),
             ("COLUMN_DOUBLE_TAP", events::COLUMN_DOUBLE_TAP),
             ("WEBVIEW_NEW_POSTS_COUNT", events::WEBVIEW_NEW_POSTS_COUNT),
             (

@@ -35,18 +35,14 @@ class MainActivity : TauriActivity() {
   // 戻るボタン時の canGoBack 判定に使う。UI スレッドからのみアクセスする。
   private var activeColumnWebViewId: String? = null
 
-  // 「逆引き → 前進」ブーメランジェスチャーとダブルタップの検出器。
-  // 確定時のコールバックを AppBridge へ転送し、ポップアップ表示中はジェスチャーを無効化する。
+  // アクティブカラム領域のダブルタップ検出器（先頭スクロール＋リロード用）。
+  // 横スワイプによるカラム切替は React の MobileSwipeBar が担うため、
+  // ネイティブのジェスチャー検出はダブルタップのみを扱う。
+  // 確定時のコールバックを AppBridge へ転送し、ポップアップ表示中は無効化する。
   private val gestureDetector by lazy {
-    BoomerangGestureDetector(
+    DoubleTapGestureDetector(
       resources.displayMetrics.density,
-      object : BoomerangGestureDetector.Callbacks {
-        override fun onSwipeProgress(navDir: String) = AppBridge.onSwipeProgress(navDir)
-
-        override fun onSwipeNavigate(navDir: String) = AppBridge.onSwipeNavigate(navDir)
-
-        override fun onSwipeCancel() = AppBridge.onSwipeCancel()
-
+      object : DoubleTapGestureDetector.Callbacks {
         override fun onDoubleTap() = AppBridge.onDoubleTap()
 
         override fun isGestureBlocked(): Boolean = popupWebViews.isNotEmpty()
@@ -104,8 +100,8 @@ class MainActivity : TauriActivity() {
     )
   }
 
-  // 「逆引き → 前進」ブーメランジェスチャーでカラムを切り替える。
-  // 検出ロジックは BoomerangGestureDetector に委譲する。
+  // アクティブカラムのダブルタップ（先頭スクロール＋リロード）を検出する。
+  // 検出ロジックは DoubleTapGestureDetector に委譲する。
   override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
     gestureDetector.onTouchEvent(ev)
     return super.dispatchTouchEvent(ev)
