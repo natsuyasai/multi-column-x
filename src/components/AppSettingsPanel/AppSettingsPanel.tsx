@@ -25,6 +25,17 @@ interface AppSettingsPanelProps {
   onClose: () => void;
 }
 
+const SWIPE_AREA_MIN_HEIGHT = 16;
+const SWIPE_AREA_MAX_HEIGHT = 56;
+
+// 入力中の自由編集を許すため、確定時（適用・blur）にのみ有効範囲へ補正する。
+function clampSwipeAreaHeight(value: string): number {
+  return Math.min(
+    SWIPE_AREA_MAX_HEIGHT,
+    Math.max(SWIPE_AREA_MIN_HEIGHT, Number(value) || SWIPE_AREA_MIN_HEIGHT),
+  );
+}
+
 export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   settings,
   columns,
@@ -104,7 +115,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
     settings.mobileSwipeAreaEnabled,
   );
   const [mobileSwipeAreaHeight, setMobileSwipeAreaHeight] = useState(
-    settings.mobileSwipeAreaHeight,
+    String(settings.mobileSwipeAreaHeight),
   );
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -131,7 +142,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       columnScale,
       useXAppForCompose,
       mobileSwipeAreaEnabled,
-      mobileSwipeAreaHeight,
+      mobileSwipeAreaHeight: clampSwipeAreaHeight(mobileSwipeAreaHeight),
       ngWords,
     });
     onClose();
@@ -437,18 +448,17 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                   </label>
                   <label className={styles.fieldLabel}>
                     スワイプ領域の高さ(px)
+                    {/* min/max は付けない: ネイティブの範囲検証がフォーム送信を
+                        ブロックしてしまうため、補正は clampSwipeAreaHeight に一元化し
+                        入力中は自由に編集できるようにする（確定は blur と適用時）。 */}
                     <input
                       type="number"
                       className={styles.numberInput}
-                      min={16}
-                      max={56}
                       value={mobileSwipeAreaHeight}
-                      onChange={(e) =>
+                      onChange={(e) => setMobileSwipeAreaHeight(e.target.value)}
+                      onBlur={() =>
                         setMobileSwipeAreaHeight(
-                          Math.min(
-                            56,
-                            Math.max(16, Number(e.target.value) || 16),
-                          ),
+                          String(clampSwipeAreaHeight(mobileSwipeAreaHeight)),
                         )
                       }
                     />

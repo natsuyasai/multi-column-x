@@ -202,6 +202,27 @@ describe("AppSettingsPanel スワイプ切替設定", () => {
       expect.objectContaining({ mobileSwipeAreaHeight: 16 }),
     );
   });
+
+  it("高さ入力を空にしても即座に補正されず入力中の値を保持できる", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    const input = screen.getByRole("spinbutton", {
+      name: "スワイプ領域の高さ(px)",
+    }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "" } });
+    expect(input.value).toBe("");
+    fireEvent.change(input, { target: { value: "40" } });
+    expect(input.value).toBe("40");
+  });
+
+  it("高さ入力からフォーカスが外れると有効範囲へ補正される", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    const input = screen.getByRole("spinbutton", {
+      name: "スワイプ領域の高さ(px)",
+    }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "" } });
+    fireEvent.blur(input);
+    expect(input.value).toBe("16");
+  });
 });
 
 describe("AppSettingsPanel モバイルのカラム並び替え", () => {
