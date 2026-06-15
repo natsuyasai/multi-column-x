@@ -3,7 +3,7 @@ import { render, fireEvent } from "@testing-library/react";
 import { MobileSwipeBar } from "./MobileSwipeBar";
 
 describe("MobileSwipeBar", () => {
-  it("左へフリックすると onSwipeNavigate が left で呼ばれる", () => {
+  it("左へスワイプすると onSwipeNavigate が left で呼ばれる", () => {
     const onSwipeNavigate = vi.fn();
     const { container } = render(
       <MobileSwipeBar height={28} onSwipeNavigate={onSwipeNavigate} />,
@@ -16,7 +16,7 @@ describe("MobileSwipeBar", () => {
     expect(onSwipeNavigate).toHaveBeenCalledWith("left");
   });
 
-  it("右へフリックすると onSwipeNavigate が right で呼ばれる", () => {
+  it("右へスワイプすると onSwipeNavigate が right で呼ばれる", () => {
     const onSwipeNavigate = vi.fn();
     const { container } = render(
       <MobileSwipeBar height={28} onSwipeNavigate={onSwipeNavigate} />,
@@ -29,7 +29,7 @@ describe("MobileSwipeBar", () => {
     expect(onSwipeNavigate).toHaveBeenCalledWith("right");
   });
 
-  it("移動量がしきい値未満のタッチはフリックと判定されない", () => {
+  it("移動量がしきい値未満のタッチはスワイプと判定されない", () => {
     const onSwipeNavigate = vi.fn();
     const { container } = render(
       <MobileSwipeBar height={28} onSwipeNavigate={onSwipeNavigate} />,
@@ -37,12 +37,12 @@ describe("MobileSwipeBar", () => {
     const bar = container.firstChild as HTMLElement;
     fireEvent.touchStart(bar, { touches: [{ clientX: 100, clientY: 10 }] });
     fireEvent.touchEnd(bar, {
-      changedTouches: [{ clientX: 110, clientY: 12 }],
+      changedTouches: [{ clientX: 115, clientY: 12 }],
     });
     expect(onSwipeNavigate).not.toHaveBeenCalled();
   });
 
-  it("縦方向の移動が横より大きい場合はフリックと判定されない", () => {
+  it("縦方向の移動が横を大きく上回る場合はスワイプと判定されない", () => {
     const onSwipeNavigate = vi.fn();
     const { container } = render(
       <MobileSwipeBar height={28} onSwipeNavigate={onSwipeNavigate} />,
@@ -55,7 +55,7 @@ describe("MobileSwipeBar", () => {
     expect(onSwipeNavigate).not.toHaveBeenCalled();
   });
 
-  it("規定時間を超えたゆっくりした移動はフリックと判定されない", () => {
+  it("ゆっくりした横スワイプでも切り替わる（時間制限なし）", () => {
     vi.useFakeTimers();
     try {
       const onSwipeNavigate = vi.fn();
@@ -64,17 +64,30 @@ describe("MobileSwipeBar", () => {
       );
       const bar = container.firstChild as HTMLElement;
       fireEvent.touchStart(bar, { touches: [{ clientX: 200, clientY: 10 }] });
-      vi.advanceTimersByTime(800);
+      vi.advanceTimersByTime(1500);
       fireEvent.touchEnd(bar, {
         changedTouches: [{ clientX: 100, clientY: 12 }],
       });
-      expect(onSwipeNavigate).not.toHaveBeenCalled();
+      expect(onSwipeNavigate).toHaveBeenCalledWith("left");
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it("onSwipeNavigate 未指定でもフリックでエラーにならない", () => {
+  it("多少斜めでも横が縦を大きく上回っていれば切り替わる", () => {
+    const onSwipeNavigate = vi.fn();
+    const { container } = render(
+      <MobileSwipeBar height={28} onSwipeNavigate={onSwipeNavigate} />,
+    );
+    const bar = container.firstChild as HTMLElement;
+    fireEvent.touchStart(bar, { touches: [{ clientX: 100, clientY: 10 }] });
+    fireEvent.touchEnd(bar, {
+      changedTouches: [{ clientX: 160, clientY: 50 }],
+    });
+    expect(onSwipeNavigate).toHaveBeenCalledWith("right");
+  });
+
+  it("onSwipeNavigate 未指定でもスワイプでエラーにならない", () => {
     const { container } = render(<MobileSwipeBar height={28} />);
     const bar = container.firstChild as HTMLElement;
     expect(() => {

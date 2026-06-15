@@ -1,8 +1,7 @@
 import React, { useRef } from "react";
 import styles from "./MobileSwipeBar.module.scss";
 
-const MIN_FLICK_PX = 40;
-const MAX_FLICK_MS = 600;
+const MIN_SWIPE_PX = 40;
 
 interface Props {
   height: number;
@@ -18,31 +17,28 @@ export const MobileSwipeBar: React.FC<Props> = ({
   swipeState,
   onSwipeNavigate,
 }) => {
-  const flickStart = useRef<{ x: number; y: number; time: number } | null>(
-    null,
-  );
+  const swipeStart = useRef<{ x: number; y: number } | null>(null);
 
   const handleStart = (e: React.TouchEvent) => {
     const t = e.touches[0];
     if (!t) return;
-    flickStart.current = { x: t.clientX, y: t.clientY, time: Date.now() };
+    swipeStart.current = { x: t.clientX, y: t.clientY };
   };
 
   const handleEnd = (e: React.TouchEvent) => {
-    const start = flickStart.current;
-    flickStart.current = null;
+    const start = swipeStart.current;
+    swipeStart.current = null;
     if (!start) return;
     const t = e.changedTouches[0];
     if (!t) return;
-    if (Date.now() - start.time > MAX_FLICK_MS) return;
     const dx = t.clientX - start.x;
     const dy = t.clientY - start.y;
-    if (Math.abs(dx) < MIN_FLICK_PX || Math.abs(dx) <= Math.abs(dy)) return;
+    if (Math.abs(dx) < MIN_SWIPE_PX || Math.abs(dx) <= Math.abs(dy)) return;
     onSwipeNavigate?.(dx < 0 ? "left" : "right");
   };
 
   const cancel = () => {
-    flickStart.current = null;
+    swipeStart.current = null;
   };
 
   const className = [
