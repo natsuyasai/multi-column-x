@@ -22,6 +22,10 @@ interface AppSettingsPanelProps {
     patch: Omit<ColumnSettings, "visibleLinks" | "ngWords">,
   ) => void;
   onReloadAllWebviews: () => void;
+  appVersion: string;
+  updateChecking: boolean;
+  updateManualResult: "idle" | "none" | "error";
+  onCheckUpdate: () => void;
   onClose: () => void;
 }
 
@@ -44,6 +48,10 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   onApplyLayout,
   onApplyColumnDefaults,
   onReloadAllWebviews,
+  appVersion,
+  updateChecking,
+  updateManualResult,
+  onCheckUpdate,
   onClose,
 }) => {
   const isMobile = useAppStore((s) => s.isMobile);
@@ -495,6 +503,25 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 >
                   全WebViewを再生成
                 </button>
+              </section>
+
+              <section className={styles.section}>
+                <h3 className={styles.sectionTitle}>アプリ情報</h3>
+                <p className={styles.hint}>現在のバージョン: {appVersion}</p>
+                <button
+                  type="button"
+                  className={styles.applyAllBtn}
+                  onClick={onCheckUpdate}
+                  disabled={updateChecking}
+                >
+                  {updateChecking ? "確認中..." : "更新を確認"}
+                </button>
+                {updateManualResult === "none" && (
+                  <p className={styles.hint}>最新のバージョンです</p>
+                )}
+                {updateManualResult === "error" && (
+                  <p className={styles.hint}>更新の確認に失敗しました</p>
+                )}
               </section>
             </form>
           )}
