@@ -2,7 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { STORAGE_KEYS } from "../constants/ipc";
 import { logError } from "../lib/log";
 import { shouldAutoPrompt } from "../lib/updatePrompt";
-import { createUpdater, type AppUpdate } from "../services/updater";
+import {
+  createUpdater,
+  type AppUpdate,
+  type Updater,
+} from "../services/updater";
 
 type ManualResult = "idle" | "none" | "error";
 
@@ -20,12 +24,14 @@ export function useAppUpdater(isMobile: boolean) {
   const [checking, setChecking] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [manualResult, setManualResult] = useState<ManualResult>("idle");
-  const startedRef = useRef(false);
 
-  // 起動時に一度だけ自動チェックする。見送り済みバージョンは表示しない。
+  // updater インスタンスごとに一度、起動時の自動チェックを行う。見送り済みバージョンは表示しない。
+  // isMobile が確定して updater が mobile 実装へ切り替わった際にも確実にチェックするため、
+  // started 判定は updater 単位で持つ（false→true 切替で再チェックされる）。
+  const checkedUpdaterRef = useRef<Updater | null>(null);
   useEffect(() => {
-    if (startedRef.current) return;
-    startedRef.current = true;
+    if (checkedUpdaterRef.current === updater) return;
+    checkedUpdaterRef.current = updater;
     setChecking(true);
     updater
       .check()

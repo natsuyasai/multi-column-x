@@ -57,6 +57,30 @@ describe("useAppUpdater", () => {
     expect(result.current.available).toEqual({ version: "1.2.0" });
   });
 
+  it("isMobileがfalse→trueに切り替わると新しいupdaterで再チェックする", async () => {
+    const desktop = {
+      check: vi.fn().mockResolvedValue(null),
+      install: vi.fn(),
+    };
+    const mobile = {
+      check: vi.fn().mockResolvedValue({ version: "1.2.0" }),
+      install: vi.fn(),
+    };
+    vi.mocked(createUpdater).mockImplementation((isMobile: boolean) =>
+      isMobile ? mobile : desktop,
+    );
+    const { result, rerender } = renderHook(
+      ({ m }: { m: boolean }) => useAppUpdater(m),
+      { initialProps: { m: false } },
+    );
+    await waitFor(() => expect(desktop.check).toHaveBeenCalledOnce());
+    rerender({ m: true });
+    await waitFor(() =>
+      expect(result.current.available).toEqual({ version: "1.2.0" }),
+    );
+    expect(mobile.check).toHaveBeenCalledOnce();
+  });
+
   it("checkManualで更新が無ければmanualResultがnoneになる", async () => {
     vi.mocked(createUpdater).mockReturnValue({
       check: vi.fn().mockResolvedValue(null),
