@@ -1,6 +1,10 @@
 import { check } from "@tauri-apps/plugin-updater";
 import type { Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
+import { getVersion } from "@tauri-apps/api/app";
+import { invoke } from "@tauri-apps/api/core";
+import { fetchLatestRelease } from "../lib/githubRelease";
+import { isNewerVersion } from "../lib/version";
 
 export interface AppUpdate {
   version: string;
@@ -30,13 +34,21 @@ function createDesktopUpdater(): Updater {
   };
 }
 
-// モバイル実装はサブプロジェクト3（Android 更新）で差し替える。
+// Android: GitHub Releases API で最新版を検出し、APK をインストーラ経由で適用する。
 function createMobileUpdater(): Updater {
+  let apkUrl: string | null = null;
   return {
     async check() {
-      return null;
+      const current = await getVersion();
+      const release = await fetchLatestRelease();
+      if (!release || !isNewerVersion(release.version, current)) return null;
+      apkUrl = release.apkUrl;
+      return { version: release.version, notes: release.notes };
     },
-    async install() {},
+    async install() {
+      if (!apkUrl) return;
+      await invoke("install_apk_update", { url: apkUrl });
+    },
   };
 }
 
