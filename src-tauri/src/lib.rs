@@ -157,6 +157,7 @@ pub fn run() {
             commands::account::delete_account_data,
             commands::account::close_window,
             commands::webview::open_compose_window,
+            commands::update::install_apk_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
