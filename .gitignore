@@ -15,3 +15,5 @@ TODO.md
 
 keystore.properties
 upload-keystore.jks
+# Tauri updater signing keys (never commit)
+.tauri-keys/
