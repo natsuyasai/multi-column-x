@@ -31,6 +31,10 @@ class MainActivity : TauriActivity() {
   // ポップアップ WebView スタック（表示順に積む）。UI スレッドからのみ操作する。
   private val popupWebViews = ArrayDeque<Pair<String, WebView>>()
 
+  // ポップアップ表示中のジェスチャー無効化。判定待ちが完了しないまま 3 秒経過したら
+  // ジェスチャー判定をリセットし、全ジェスチャーが永久に受け付けられなくなる状態を防ぐ。
+  private val popupGestureBlock = PopupGestureBlock()
+
   // 現在表示中のカラム WebView の ID（showColumnWebView 呼び出し時に更新）。
   // 戻るボタン時の canGoBack 判定に使う。UI スレッドからのみアクセスする。
   private var activeColumnWebViewId: String? = null
@@ -45,7 +49,7 @@ class MainActivity : TauriActivity() {
       object : DoubleTapGestureDetector.Callbacks {
         override fun onDoubleTap() = AppBridge.onDoubleTap()
 
-        override fun isGestureBlocked(): Boolean = popupWebViews.isNotEmpty()
+        override fun isGestureBlocked(): Boolean = popupGestureBlock.isBlocked()
       },
     )
   }
@@ -168,6 +172,7 @@ class MainActivity : TauriActivity() {
         )
       contentRoot.addView(webView, params)
       popupWebViews.addLast(Pair(id, webView))
+      popupGestureBlock.onPopupCountChanged(popupWebViews.size)
       loadUrlForAccount(webView, url, accountId, profileApplied)
     }
   }
@@ -180,6 +185,7 @@ class MainActivity : TauriActivity() {
         val wv = popupWebViews.removeAt(idx).second
         contentRoot.removeView(wv)
         wv.destroy()
+        popupGestureBlock.onPopupCountChanged(popupWebViews.size)
       }
     }
   }
@@ -191,6 +197,7 @@ class MainActivity : TauriActivity() {
     val wv = popupWebViews.removeLast().second
     contentRoot.removeView(wv)
     wv.destroy()
+    popupGestureBlock.onPopupCountChanged(popupWebViews.size)
     return true
   }
 
