@@ -64,14 +64,17 @@ jobs:
       - name: Set NDK_HOME
         run: echo "NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
       - run: npm ci
-      # tauri.settings.gradle 等の Tauri 生成 glue は gitignore されローカル絶対パスを含むため、
-      # CI で再生成する。--skip-targets-install で rustup の android ターゲット導入は省略する。
-      - name: Generate Tauri Android project glue
-        run: npx tauri android init --ci --skip-targets-install
+      # tauri.settings.gradle 等の Tauri 生成 glue は gitignore されローカル絶対パスを含むため
+      # CI には存在しない。glue は build/dev 時のみ生成される（init では生成されない）。
+      # debug・単一 ABI の android build で glue を生成しつつ Rust/Kotlin/マニフェストも検証する。
+      - name: Build Android (debug, glue 生成 + コンパイル検証)
+        run: npx tauri android build --debug --apk --target aarch64 --ci
       - name: ktlint & unit tests (app は universal フレーバー必須)
         working-directory: src-tauri/gen/android
         run: |
