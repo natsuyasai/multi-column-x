@@ -493,6 +493,7 @@ const App: React.FC = () => {
         <UpdateDialog
           update={updater.available}
           installing={updater.installing}
+          progress={updater.progress}
           onInstall={updater.install}
           onLater={updater.dismiss}
         />
