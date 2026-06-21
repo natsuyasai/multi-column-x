@@ -12,16 +12,16 @@
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: #ccc;
+  color: var(--mcx-text-secondary);
   flex-shrink: 0;
 }
 
 .numberInput {
   width: 80px;
-  background: #111;
-  border: 1px solid #333;
+  background: var(--mcx-surface-sunken);
+  border: 1px solid var(--mcx-border);
   border-radius: 4px;
-  color: #eee;
+  color: var(--mcx-text);
   font-size: 13px;
   padding: 7px 8px;
   text-align: center;
@@ -32,7 +32,7 @@
 
   &:focus {
     outline: none;
-    border-color: #1d9bf0;
+    border-color: var(--mcx-accent);
   }
 }
 
@@ -65,12 +65,12 @@
 
 .gridColHeader {
   font-size: 10px;
-  color: #555;
+  color: var(--mcx-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   text-align: center;
   padding-bottom: 4px;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid var(--mcx-border-subtle);
   margin-bottom: 2px;
 }
 
@@ -89,51 +89,51 @@
   cursor: pointer;
   position: relative;
   font-size: 12px;
-  background: #1e1e2e;
-  border: 2px dashed #333;
+  background: var(--mcx-surface-muted);
+  border: 2px dashed var(--mcx-border);
   align-items: center;
   justify-content: center;
-  color: #444;
+  color: var(--mcx-text-muted);
   gap: 2px;
   transition:
     border-color 0.12s,
     background 0.12s;
 
   &:hover {
-    border-color: #555;
-    color: #666;
+    border-color: var(--mcx-border-strong);
+    color: var(--mcx-text-muted);
   }
 }
 
 .cellAssigned {
-  background: #0f1f30;
-  border: 2px solid #1d9bf066;
-  color: #eee;
+  background: var(--mcx-accent-bg);
+  border: 2px solid var(--mcx-accent-border);
+  color: var(--mcx-text);
   align-items: flex-start;
   justify-content: flex-start;
 
   &:hover {
-    border-color: #1d9bf0aa;
+    border-color: var(--mcx-accent);
   }
 
   &.cellSelected {
-    border-color: #f0c01d;
-    background: #2a2200;
-    box-shadow: 0 0 0 1px #f0c01d44;
+    border-color: var(--mcx-warning);
+    background: var(--mcx-warning-bg);
+    box-shadow: 0 0 0 1px var(--mcx-warning-border);
   }
 }
 
 // 空セルがpending（割り当て先として選択済み）
 .cellPending {
-  border-color: #1d9bf0;
-  background: #0d2233;
-  color: #1d9bf0;
+  border-color: var(--mcx-accent);
+  background: var(--mcx-accent-bg-strong);
+  color: var(--mcx-accent);
   font-size: 11px;
 }
 
 .cellName {
   font-size: 12px;
-  color: #ddd;
+  color: var(--mcx-text-secondary);
   font-weight: 500;
   width: 100%;
   overflow: hidden;
@@ -143,7 +143,7 @@
 
 .cellHeight {
   font-size: 10px;
-  color: #666;
+  color: var(--mcx-text-muted);
 }
 
 .removeBtn {
@@ -152,7 +152,7 @@
   right: 3px;
   background: none;
   border: none;
-  color: #444;
+  color: var(--mcx-text-muted);
   cursor: pointer;
   font-size: 12px;
   padding: 1px 4px;
@@ -160,16 +160,16 @@
   border-radius: 2px;
 
   &:hover {
-    color: #f55;
-    background: #2a1a1a;
+    color: var(--mcx-danger);
+    background: var(--mcx-danger-bg);
   }
 }
 
 .addRowBtn {
   background: none;
-  border: 1px dashed #2a2a2a;
+  border: 1px dashed var(--mcx-border-subtle);
   border-radius: 4px;
-  color: #444;
+  color: var(--mcx-text-muted);
   cursor: pointer;
   font-size: 11px;
   padding: 5px 8px;
@@ -180,8 +180,8 @@
     color 0.12s;
 
   &:hover {
-    border-color: #1d9bf0;
-    color: #1d9bf0;
+    border-color: var(--mcx-accent);
+    color: var(--mcx-accent);
   }
 }
 
@@ -196,7 +196,7 @@
 
 .unassignedLabel {
   font-size: 10px;
-  color: #555;
+  color: var(--mcx-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 2px;
@@ -204,23 +204,23 @@
 }
 
 .unassignedItem {
-  background: #1a1a2a;
-  border: 1px solid #333;
+  background: var(--mcx-surface-muted);
+  border: 1px solid var(--mcx-border);
   border-radius: 4px;
   padding: 7px 10px;
   cursor: default;
   font-size: 12px;
-  color: #888;
+  color: var(--mcx-text-tertiary);
 
   &.unassignedItemActive {
     cursor: pointer;
-    border-color: #1d9bf0;
-    background: #0d1e30;
-    color: #ccc;
+    border-color: var(--mcx-accent);
+    background: var(--mcx-accent-bg);
+    color: var(--mcx-text-secondary);
 
     &:hover {
-      background: #1a3a50;
-      color: #fff;
+      background: var(--mcx-accent-bg-strong);
+      color: var(--mcx-text);
     }
   }
 }
@@ -231,19 +231,19 @@
 
 .emptyNotice {
   font-size: 11px;
-  color: #333;
+  color: var(--mcx-text-muted);
 }
 
 .pendingHint {
   font-size: 10px;
-  color: #1d9bf0;
+  color: var(--mcx-accent);
   margin-top: 4px;
   line-height: 1.4;
 }
 
 .heightSettings {
-  background: #161622;
-  border: 1px solid #2a2a3a;
+  background: var(--mcx-surface-muted);
+  border: 1px solid var(--mcx-border);
   border-radius: 6px;
   padding: 10px 14px;
   display: flex;
@@ -254,7 +254,7 @@
 
 .heightSettingsTitle {
   font-size: 11px;
-  color: #666;
+  color: var(--mcx-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -271,11 +271,11 @@
   align-items: center;
   gap: 4px;
   font-size: 13px;
-  color: #ccc;
+  color: var(--mcx-text-secondary);
   cursor: pointer;
 
   input[type="radio"] {
-    accent-color: #1d9bf0;
+    accent-color: var(--mcx-accent);
     cursor: pointer;
   }
 }
@@ -289,37 +289,37 @@
 .unitSelect {
   -webkit-appearance: none;
   appearance: none;
-  background: #111;
+  background: var(--mcx-surface-sunken);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 6px center;
-  border: 1px solid #333;
+  border: 1px solid var(--mcx-border);
   border-radius: 4px;
-  color: #eee;
+  color: var(--mcx-text);
   font-size: 13px;
   padding: 7px 22px 7px 6px;
 
   &:focus {
     outline: none;
-    border-color: #1d9bf0;
+    border-color: var(--mcx-accent);
   }
 
   option {
-    background: #111;
-    color: #eee;
+    background: var(--mcx-surface-sunken);
+    color: var(--mcx-text);
   }
 }
 
 .orderSection {
   flex-shrink: 0;
-  border: 1px solid #2a2a2a;
+  border: 1px solid var(--mcx-border-subtle);
   border-radius: 6px;
   padding: 8px 12px;
 }
 
 .orderLabel {
   font-size: 10px;
-  color: #555;
+  color: var(--mcx-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 6px;
@@ -341,12 +341,12 @@
   gap: 8px;
   padding: 4px 6px;
   border-radius: 4px;
-  background: #1a1a1a;
+  background: var(--mcx-surface);
 }
 
 .orderItemName {
   font-size: 12px;
-  color: #ccc;
+  color: var(--mcx-text-secondary);
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -361,23 +361,23 @@
 
 .orderBtn {
   background: none;
-  border: 1px solid #333;
+  border: 1px solid var(--mcx-border);
   border-radius: 3px;
-  color: #666;
+  color: var(--mcx-text-muted);
   cursor: pointer;
   font-size: 10px;
   padding: 2px 6px;
   line-height: 1;
 
   &:hover:not(:disabled) {
-    color: #aaa;
-    border-color: #555;
-    background: #2a2a2a;
+    color: var(--mcx-text-tertiary);
+    border-color: var(--mcx-border-strong);
+    background: var(--mcx-surface-muted);
   }
 
   &:disabled {
-    color: #2a2a2a;
-    border-color: #222;
+    color: var(--mcx-border-subtle);
+    border-color: var(--mcx-border-subtle);
     cursor: default;
   }
 }
@@ -391,30 +391,30 @@
 }
 
 .cancelBtn {
-  background: #2a2a2a;
-  border: 1px solid #333;
+  background: var(--mcx-surface-muted);
+  border: 1px solid var(--mcx-border);
   border-radius: 4px;
-  color: #aaa;
+  color: var(--mcx-text-tertiary);
   cursor: pointer;
   font-size: 13px;
   padding: 7px 16px;
 
   &:hover {
-    background: #333;
+    background: var(--mcx-surface-hover);
   }
 }
 
 .applyBtn {
-  background: #1d9bf0;
+  background: var(--mcx-accent);
   border: none;
   border-radius: 4px;
-  color: white;
+  color: var(--mcx-text-on-accent);
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
   padding: 7px 20px;
 
   &:hover {
-    background: #1a8cd8;
+    background: var(--mcx-accent-hover);
   }
 }
