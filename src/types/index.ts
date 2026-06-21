@@ -45,7 +45,7 @@ export interface Column {
 }
 
 export interface GlobalSettings {
-  theme: "dark" | "light";
+  theme: "dark" | "light" | "system";
   customCSS: string;
   windowBounds: { x: number; y: number; width: number; height: number };
   defaultAccountId?: string;

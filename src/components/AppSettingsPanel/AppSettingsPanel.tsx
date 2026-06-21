@@ -116,6 +116,9 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   const [columnScale, setColumnScale] = useState<ColumnScale>(
     settings.columnScale ?? "default",
   );
+  const [theme, setTheme] = useState<"dark" | "light" | "system">(
+    settings.theme ?? "dark",
+  );
   const [useXAppForCompose, setUseXAppForCompose] = useState(
     settings.useXAppForCompose ?? false,
   );
@@ -133,6 +136,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       .map((w) => w.trim())
       .filter((w) => w.length > 0);
     onApply({
+      theme,
       defaultAutoReloadEnabled: autoReloadEnabled,
       defaultAutoReloadInterval: autoReloadInterval,
       defaultShowCountdown,
@@ -235,6 +239,30 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                         type="button"
                         className={`${styles.scaleBtn} ${columnScale === value ? styles.scaleBtnActive : ""}`}
                         onClick={() => setColumnScale(value)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className={styles.scaleRow}>
+                  <span className={styles.scaleLabel}>テーマ</span>
+                  <div className={styles.scaleOptions}>
+                    {(
+                      [
+                        { value: "dark", label: "ダーク" },
+                        { value: "light", label: "ライト" },
+                        { value: "system", label: "システム" },
+                      ] as {
+                        value: "dark" | "light" | "system";
+                        label: string;
+                      }[]
+                    ).map(({ value, label }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        className={`${styles.scaleBtn} ${theme === value ? styles.scaleBtnActive : ""}`}
+                        onClick={() => setTheme(value)}
                       >
                         {label}
                       </button>

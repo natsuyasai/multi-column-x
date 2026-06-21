@@ -272,3 +272,22 @@ describe("AppSettingsPanel モバイルのカラム並び替え", () => {
     expect(screen.queryByText("列数:")).not.toBeInTheDocument();
   });
 });
+
+describe("AppSettingsPanel テーマ選択", () => {
+  it("テーマでライトを選び適用するとonApplyにtheme:lightが渡る", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    fireEvent.click(screen.getByRole("button", { name: "ライト" }));
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ theme: "light" }),
+    );
+  });
+
+  it("現在のテーマ設定がアクティブ表示される", () => {
+    const settings = { ...baseGlobalSettings, theme: "system" as const };
+    render(<AppSettingsPanel {...defaultProps} settings={settings} />);
+    const btn = screen.getByRole("button", { name: "システム" });
+    expect(btn.className).toContain("scaleBtnActive");
+  });
+});

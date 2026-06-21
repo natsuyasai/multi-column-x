@@ -23,6 +23,7 @@ import { UpdateDialog } from "./components/UpdateDialog/UpdateDialog";
 import { useDialogState } from "./hooks/useDialogState";
 import { useAppUpdater } from "./hooks/useAppUpdater";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import { useTheme } from "./hooks/useTheme";
 import {
   useNewPostsNotification,
   useWebviewScrollRelay,
@@ -140,6 +141,9 @@ const App: React.FC = () => {
       evalInColumn(column.id, WEBVIEW_SCRIPTS.applyColumnScale(scale));
     });
   }, [globalSettings.columnScale, isLoaded]);
+
+  // 本体UIのテーマを data-theme 属性へ反映する
+  useTheme(globalSettings.theme);
 
   // WebView 内の横ホイール → スクロールバー追従、新着カウント → バッジ・デスクトップ通知
   useWebviewScrollRelay(scrollbarRef);

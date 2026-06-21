@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--mcx-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -15,8 +15,8 @@
 }
 
 .dialog {
-  background: #1a1a1a;
-  border: 1px solid #333;
+  background: var(--mcx-surface);
+  border: 1px solid var(--mcx-border);
   border-radius: 8px;
   padding: 24px;
   width: min(400px, 100%);
@@ -29,7 +29,7 @@
 
 .title {
   font-size: 16px;
-  color: #eee;
+  color: var(--mcx-text);
   margin: 0;
 }
 
@@ -41,15 +41,15 @@
 
 .label {
   font-size: 12px;
-  color: #888;
+  color: var(--mcx-text-tertiary);
 }
 
 .select,
 .input {
-  background: #0d0d0d;
-  border: 1px solid #333;
+  background: var(--mcx-surface-sunken);
+  border: 1px solid var(--mcx-border);
   border-radius: 4px;
-  color: #eee;
+  color: var(--mcx-text);
   font-size: 13px;
   padding: 8px;
   width: 100%;
@@ -68,8 +68,8 @@
 }
 
 .select option {
-  background: #0d0d0d;
-  color: #eee;
+  background: var(--mcx-surface-sunken);
+  color: var(--mcx-text);
 }
 
 .actions {
@@ -80,27 +80,27 @@
 }
 
 .cancelBtn {
-  background: #222;
-  border: 1px solid #444;
+  background: var(--mcx-surface-muted);
+  border: 1px solid var(--mcx-border-strong);
   border-radius: 4px;
-  color: #aaa;
+  color: var(--mcx-text-tertiary);
   cursor: pointer;
   font-size: 13px;
   padding: 8px 16px;
 }
 
 .submitBtn {
-  background: #1d9bf0;
+  background: var(--mcx-accent);
   border: none;
   border-radius: 4px;
-  color: white;
+  color: var(--mcx-text-on-accent);
   cursor: pointer;
   font-size: 13px;
   font-weight: bold;
   padding: 8px 16px;
 
   &:disabled {
-    background: #333;
+    background: var(--mcx-surface-muted);
     cursor: not-allowed;
   }
 }

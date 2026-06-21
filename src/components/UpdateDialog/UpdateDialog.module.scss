@@ -1,7 +1,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--mcx-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -9,14 +9,14 @@
 }
 
 .dialog {
-  background: var(--color-bg, #fff);
-  color: var(--color-text, #000);
+  background: var(--mcx-surface);
+  color: var(--mcx-text);
   border-radius: 8px;
   padding: 20px;
   width: min(420px, 90vw);
   max-height: 80vh;
   overflow: auto;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 32px var(--mcx-shadow);
 }
 
 .title {
@@ -31,7 +31,7 @@
 
 .notes {
   white-space: pre-wrap;
-  background: rgba(127, 127, 127, 0.1);
+  background: var(--mcx-surface-muted);
   padding: 8px;
   border-radius: 4px;
   max-height: 40vh;
@@ -55,13 +55,13 @@
 
 .laterBtn {
   background: transparent;
-  border: 1px solid rgba(127, 127, 127, 0.5);
+  border: 1px solid var(--mcx-border-strong);
   color: inherit;
 }
 
 .installBtn {
-  background: #1d9bf0;
-  color: #fff;
+  background: var(--mcx-accent);
+  color: var(--mcx-text-on-accent);
   border: none;
 }
 
