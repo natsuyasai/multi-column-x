@@ -30,7 +30,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid var(--mcx-surface-muted);
+  border-bottom: 1px solid var(--mcx-border-subtle);
   flex-shrink: 0;
 }
 
@@ -154,7 +154,7 @@
   }
 
   &::placeholder {
-    color: var(--mcx-border-strong);
+    color: var(--mcx-text-muted);
   }
 }
 

@@ -80,7 +80,7 @@
 }
 
 .cancelBtn {
-  background: var(--mcx-border-subtle);
+  background: var(--mcx-surface-muted);
   border: 1px solid var(--mcx-border-strong);
   border-radius: 4px;
   color: var(--mcx-text-tertiary);
@@ -100,7 +100,7 @@
   padding: 8px 16px;
 
   &:disabled {
-    background: var(--mcx-border);
+    background: var(--mcx-surface-muted);
     cursor: not-allowed;
   }
 }
