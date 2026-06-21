@@ -28,16 +28,19 @@ android {
   }
   signingConfigs {
     create("release") {
+      // keystore.properties は gitignore されており CI/デバッグ環境には存在しない。
+      // 無い場合は署名設定を空のままにする（unit test や debug ビルドは署名不要のため
+      // 構成時に null キャストで落ちないようにする）。リリース署名は本ファイルが存在する
+      // 環境（ローカル/リリースCI でSecretsからキーストアとPropertiesを復元）でのみ適用される。
       val keystorePropertiesFile = rootProject.file("keystore.properties")
-      val keystoreProperties = Properties()
       if (keystorePropertiesFile.exists()) {
+        val keystoreProperties = Properties()
         keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+        keyAlias = keystoreProperties["keyAlias"] as String
+        keyPassword = keystoreProperties["password"] as String
+        storeFile = file(keystoreProperties["storeFile"] as String)
+        storePassword = keystoreProperties["password"] as String
       }
-
-      keyAlias = keystoreProperties["keyAlias"] as String
-      keyPassword = keystoreProperties["password"] as String
-      storeFile = file(keystoreProperties["storeFile"] as String)
-      storePassword = keystoreProperties["password"] as String
     }
   }
   buildTypes {
