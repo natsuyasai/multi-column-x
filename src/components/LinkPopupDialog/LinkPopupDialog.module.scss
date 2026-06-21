@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--mcx-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -15,8 +15,8 @@
 }
 
 .panel {
-  background: #1a1a1a;
-  border: 1px solid #333;
+  background: var(--mcx-surface);
+  border: 1px solid var(--mcx-border);
   border-radius: 8px;
   padding: 20px;
   width: min(400px, 100%);
@@ -29,16 +29,16 @@
   h3 {
     margin: 0;
     font-size: 14px;
-    color: #e7e9ea;
+    color: var(--mcx-text);
     font-weight: normal;
   }
 
   input,
   select {
-    background: #0a0a0a;
-    border: 1px solid #333;
+    background: var(--mcx-surface-sunken);
+    border: 1px solid var(--mcx-border);
     border-radius: 4px;
-    color: #e7e9ea;
+    color: var(--mcx-text);
     font-size: 13px;
     padding: 8px 10px;
     width: 100%;
@@ -46,7 +46,7 @@
     outline: none;
 
     &:focus {
-      border-color: #1d9bf0;
+      border-color: var(--mcx-accent);
     }
   }
 
@@ -59,8 +59,8 @@
     padding-right: 28px;
 
     option {
-      background: #0a0a0a;
-      color: #e7e9ea;
+      background: var(--mcx-surface-sunken);
+      color: var(--mcx-text);
     }
   }
 }
@@ -80,19 +80,19 @@
 }
 
 .cancelBtn {
-  background: #2a2a2a;
-  color: #aaa;
+  background: var(--mcx-surface-muted);
+  color: var(--mcx-text-tertiary);
 
   &:hover {
-    background: #333;
+    background: var(--mcx-surface-hover);
   }
 }
 
 .okBtn {
-  background: #1d9bf0;
-  color: #fff;
+  background: var(--mcx-accent);
+  color: var(--mcx-text-on-accent);
 
   &:hover {
-    background: #1a8cd8;
+    background: var(--mcx-accent-hover);
   }
 }
