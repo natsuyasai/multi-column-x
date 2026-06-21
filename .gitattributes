@@ -1,0 +1,6 @@
+# Gradle wrapper (Unix launcher) must use LF so the shebang works on CI runners.
+gradlew text eol=lf
+*.sh text eol=lf
+
+# Windows batch files must keep CRLF.
+*.bat text eol=crlf

@@ -1,5 +1,5 @@
 // src/App.tsx
-import React, { useEffect, useCallback, useMemo } from "react";
+import React, { useEffect, useCallback, useMemo, useState } from "react";
 import { useAppStore } from "./store/useAppStore";
 import { useColumns } from "./hooks/useColumns";
 import {
@@ -19,13 +19,16 @@ import { MobileTabBar } from "./components/MobileTabBar/MobileTabBar";
 import { MobileSwipeBar } from "./components/MobileSwipeBar/MobileSwipeBar";
 import { TabActionDialog } from "./components/TabActionDialog/TabActionDialog";
 import { LinkPopupDialog } from "./components/LinkPopupDialog/LinkPopupDialog";
+import { UpdateDialog } from "./components/UpdateDialog/UpdateDialog";
 import { useDialogState } from "./hooks/useDialogState";
+import { useAppUpdater } from "./hooks/useAppUpdater";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import {
   useNewPostsNotification,
   useWebviewScrollRelay,
 } from "./hooks/useWebviewEvents";
 import { platform } from "@tauri-apps/plugin-os";
+import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import type { ColumnSettings, GlobalSettings } from "./types";
 import { IPC_COMMANDS, WEBVIEW_SCRIPTS } from "./constants/ipc";
@@ -87,6 +90,9 @@ const App: React.FC = () => {
     dialogOpen,
   } = useDialogState();
 
+  const updater = useAppUpdater(isMobile);
+  const [appVersion, setAppVersion] = useState("");
+
   const topBarHeight = getTopBarHeight(topBarExpanded);
 
   const scrollbarWidth = useMemo(() => {
@@ -111,6 +117,10 @@ const App: React.FC = () => {
 
   useEffect(() => {
     loadSettings();
+  }, []);
+
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(logError("getVersion"));
   }, []);
 
   // isLoaded が true になった（= DOM レンダリング完了後）タイミングで WebView を復元
@@ -157,14 +167,16 @@ const App: React.FC = () => {
   );
 
   // ダイアログ表示中は列WebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
+  // 更新ポップアップも同様に退避対象に含める。
+  const anyDialogOpen = dialogOpen || !!updater.available;
   useEffect(() => {
-    setDialogOpen(dialogOpen);
-    if (dialogOpen) {
+    setDialogOpen(anyDialogOpen);
+    if (anyDialogOpen) {
       hideColumnWebviews();
     } else {
       recalculateAllBounds();
     }
-  }, [dialogOpen]);
+  }, [anyDialogOpen]);
 
   const handleToggleTopBar = useCallback(() => {
     setTopBarExpanded(!topBarExpanded);
@@ -440,6 +452,10 @@ const App: React.FC = () => {
             );
           }}
           onReloadAllWebviews={recreateAllWebviews}
+          appVersion={appVersion}
+          updateChecking={updater.checking}
+          updateManualResult={updater.manualResult}
+          onCheckUpdate={updater.checkManually}
           onClose={() => setShowAppSettings(false)}
         />
       )}
@@ -466,6 +482,15 @@ const App: React.FC = () => {
             handleRemoveColumn(tabActionColumn.id);
           }}
           onClose={() => setTabActionColumnId(null)}
+        />
+      )}
+
+      {updater.available && (
+        <UpdateDialog
+          update={updater.available}
+          installing={updater.installing}
+          onInstall={updater.install}
+          onLater={updater.dismiss}
         />
       )}
     </div>

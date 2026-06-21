@@ -42,6 +42,7 @@
     public void removePopupWebView(java.lang.String);
     public void setAccountCookies(java.lang.String);
     public void launchComposeTweet();
+    public void downloadAndInstallApk(java.lang.String);
 }
 
 # popup_toolbar.ts が window.__mcxPopupBridge 経由で呼び出す JavascriptInterface メソッド。

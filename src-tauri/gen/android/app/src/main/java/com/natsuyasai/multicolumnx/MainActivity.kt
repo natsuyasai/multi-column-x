@@ -2,8 +2,10 @@ package com.natsuyasai.multicolumnx
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Message
+import android.provider.Settings
 import android.util.Log
 import android.view.MotionEvent
 import android.view.View
@@ -15,11 +17,14 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
+import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
 
 class MainActivity : TauriActivity() {
@@ -30,6 +35,10 @@ class MainActivity : TauriActivity() {
 
   // ポップアップ WebView スタック（表示順に積む）。UI スレッドからのみ操作する。
   private val popupWebViews = ArrayDeque<Pair<String, WebView>>()
+
+  // ポップアップ表示中のジェスチャー無効化。判定待ちが完了しないまま 3 秒経過したら
+  // ジェスチャー判定をリセットし、全ジェスチャーが永久に受け付けられなくなる状態を防ぐ。
+  private val popupGestureBlock = PopupGestureBlock()
 
   // 現在表示中のカラム WebView の ID（showColumnWebView 呼び出し時に更新）。
   // 戻るボタン時の canGoBack 判定に使う。UI スレッドからのみアクセスする。
@@ -45,7 +54,7 @@ class MainActivity : TauriActivity() {
       object : DoubleTapGestureDetector.Callbacks {
         override fun onDoubleTap() = AppBridge.onDoubleTap()
 
-        override fun isGestureBlocked(): Boolean = popupWebViews.isNotEmpty()
+        override fun isGestureBlocked(): Boolean = popupGestureBlock.isBlocked()
       },
     )
   }
@@ -137,6 +146,53 @@ class MainActivity : TauriActivity() {
     startActivity(intent)
   }
 
+  // GitHub Releases からダウンロードした APK でアプリを自己更新する。
+  // 提供元不明アプリのインストール許可が無ければ設定画面へ誘導する。
+  // ダウンロードはバックグラウンドスレッドで行い、完了後に UI スレッドでインストーラを起動する。
+  fun downloadAndInstallApk(url: String) {
+    // Android 8.0+ は「提供元不明アプリのインストール」許可が必要。未許可なら設定へ誘導する。
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+      !packageManager.canRequestPackageInstalls()
+    ) {
+      runOnUiThread {
+        try {
+          startActivity(
+            Intent(
+              Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+              Uri.parse("package:$packageName"),
+            ),
+          )
+        } catch (e: Exception) {
+          Log.w(TAG, "downloadAndInstallApk: cannot open unknown sources settings: ${e.message}")
+        }
+      }
+      return
+    }
+    Thread {
+      try {
+        val dir = File(getExternalFilesDir(null), "updates").apply { mkdirs() }
+        val apk = File(dir, "update.apk")
+        val conn = (URL(url).openConnection() as HttpURLConnection)
+        conn.connectTimeout = 30000
+        conn.readTimeout = 30000
+        conn.instanceFollowRedirects = true
+        conn.inputStream.use { input ->
+          apk.outputStream().use { output -> input.copyTo(output) }
+        }
+        val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", apk)
+        val intent =
+          Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+          }
+        runOnUiThread { startActivity(intent) }
+      } catch (e: Exception) {
+        Log.e(TAG, "downloadAndInstallApk failed: ${e.message}")
+      }
+    }.start()
+  }
+
   // ポップアップ WebView を全画面オーバーレイとして追加する。
   // カラム WebView の上に重なり、戻るボタンで閉じられる。
   // JNI スレッドから呼ばれるため runOnUiThread + CountDownLatch で UI 操作を同期する。
@@ -168,6 +224,7 @@ class MainActivity : TauriActivity() {
         )
       contentRoot.addView(webView, params)
       popupWebViews.addLast(Pair(id, webView))
+      popupGestureBlock.onPopupCountChanged(popupWebViews.size)
       loadUrlForAccount(webView, url, accountId, profileApplied)
     }
   }
@@ -180,6 +237,7 @@ class MainActivity : TauriActivity() {
         val wv = popupWebViews.removeAt(idx).second
         contentRoot.removeView(wv)
         wv.destroy()
+        popupGestureBlock.onPopupCountChanged(popupWebViews.size)
       }
     }
   }
@@ -191,6 +249,7 @@ class MainActivity : TauriActivity() {
     val wv = popupWebViews.removeLast().second
     contentRoot.removeView(wv)
     wv.destroy()
+    popupGestureBlock.onPopupCountChanged(popupWebViews.size)
     return true
   }
 

@@ -104,6 +104,13 @@ pub fn run() {
             Ok(())
         });
 
+    // デスクトップのみ自動更新・再起動プラグインを登録する。
+    // Android は APK 自己更新を別実装するため登録しない。
+    #[cfg(desktop)]
+    let builder = builder
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init());
+
     #[cfg(desktop)]
     let builder = builder.on_window_event(|window, event| {
         if let tauri::WindowEvent::CloseRequested { .. } = event {
@@ -150,6 +157,7 @@ pub fn run() {
             commands::account::delete_account_data,
             commands::account::close_window,
             commands::webview::open_compose_window,
+            commands::update::install_apk_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

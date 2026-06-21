@@ -45,3 +45,59 @@ jobs:
         env:
           RUSTFLAGS: "-D warnings"
       - run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      # tauri.settings.gradle / app/tauri.build.gradle.kts は Tauri が build/dev 時に生成する
+      # glue で、gitignore かつローカル絶対パスを含むため CI には無い。
+      # ktlint と単体テストはネイティブ(NDK/cargo)非依存なので、APK をビルドせず
+      # cargo metadata で得た crate の android プロジェクト位置から glue だけを生成する。
+      # ※ android プロジェクトを持つ Tauri プラグインを増減した場合はここも更新すること。
+      - name: Generate Tauri Android gradle glue
+        run: |
+          set -e
+          META=$(cargo metadata --manifest-path src-tauri/Cargo.toml --format-version 1)
+          dir_of() {
+            local mp
+            mp=$(echo "$META" | jq -r --arg n "$1" '.packages[]|select(.name==$n)|.manifest_path' | head -1)
+            echo "${mp%/Cargo.toml}"
+          }
+          TAURI="$(dir_of tauri)/mobile/android"
+          OPENER="$(dir_of tauri-plugin-opener)/android"
+          SHELL_DIR="$(dir_of tauri-plugin-shell)/android"
+          {
+            echo "include ':tauri-android'"
+            echo "project(':tauri-android').projectDir = new File('$TAURI')"
+            echo "include ':tauri-plugin-opener'"
+            echo "project(':tauri-plugin-opener').projectDir = new File('$OPENER')"
+            echo "include ':tauri-plugin-shell'"
+            echo "project(':tauri-plugin-shell').projectDir = new File('$SHELL_DIR')"
+          } > src-tauri/gen/android/tauri.settings.gradle
+          # ktlint(.kts) は末尾改行なしを要求するため printf で最終行に改行を付けない。
+          printf '%s\n' \
+            "val implementation by configurations" \
+            "dependencies {" \
+            "  implementation(\"androidx.lifecycle:lifecycle-process:2.10.0\")" \
+            "  implementation(project(\":tauri-android\"))" \
+            "  implementation(project(\":tauri-plugin-opener\"))" \
+            "  implementation(project(\":tauri-plugin-shell\"))" \
+            > src-tauri/gen/android/app/tauri.build.gradle.kts
+          printf '}' >> src-tauri/gen/android/app/tauri.build.gradle.kts
+          echo "--- tauri.settings.gradle ---"
+          cat src-tauri/gen/android/tauri.settings.gradle
+      - name: ktlint & unit tests (app は universal フレーバー必須)
+        working-directory: src-tauri/gen/android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew ktlintCheck :app:testUniversalDebugUnitTest

@@ -123,4 +123,6 @@ export const OFFSCREEN = {
 export const STORAGE_KEYS = {
   /** モバイルのアクティブカラム ID（バックグラウンド復帰後の復元用） */
   ACTIVE_COLUMN_ID: "mcx_activeColumnId",
+  /** 「後で」で見送った更新バージョン（再通知抑制用） */
+  DISMISSED_UPDATE_VERSION: "mcx_dismissedUpdateVersion",
 } as const;

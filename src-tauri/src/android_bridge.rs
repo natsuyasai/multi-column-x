@@ -190,6 +190,22 @@ pub fn launch_add_account_activity(account_id: &str) -> Result<(), String> {
     })
 }
 
+/// MainActivity.downloadAndInstallApk(url) 経由で APK を DL してインストーラを起動する。
+/// アプリ内 APK 自己更新（Android）で使う。
+pub fn download_and_install_apk(url: &str) -> Result<(), String> {
+    call_activity_method(|env, activity| {
+        let j_url = env.new_string(url).map_err(|e| e.to_string())?;
+        env.call_method(
+            activity,
+            "downloadAndInstallApk",
+            "(Ljava/lang/String;)V",
+            &[JValue::Object(&*j_url)],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
 // ── カラム WebView ネイティブ操作 ────────────────────────────────────────
 
 /// MainActivity.createColumnWebView を呼び出してカラム WebView を生成する。
