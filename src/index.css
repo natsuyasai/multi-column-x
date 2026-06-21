@@ -9,6 +9,7 @@
   --mcx-text-secondary: #cccccc;
   --mcx-text-tertiary: #999999;
   --mcx-text-muted: #666666;
+  --mcx-text-disabled: #444444;
   --mcx-text-on-accent: #ffffff;
   --mcx-border: #333333;
   --mcx-border-subtle: #222222;
@@ -41,6 +42,7 @@
   --mcx-text-secondary: #536471;
   --mcx-text-tertiary: #8899a6;
   --mcx-text-muted: #aab8c2;
+  --mcx-text-disabled: #c4cfd6;
   --mcx-text-on-accent: #ffffff;
   --mcx-border: #cfd9de;
   --mcx-border-subtle: #eff3f4;

@@ -376,7 +376,7 @@
   }
 
   &:disabled {
-    color: var(--mcx-text-muted);
+    color: var(--mcx-text-disabled);
     border-color: var(--mcx-border-subtle);
     cursor: default;
   }
