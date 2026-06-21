@@ -35,10 +35,10 @@
 
 @keyframes tabSwipeActivate {
   0% {
-    background: rgba(255, 255, 255, 0.22);
+    background: var(--mcx-surface-hover);
   }
   100% {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--mcx-surface-hover);
   }
 }
 
@@ -50,8 +50,8 @@
   height: 56px;
   display: flex;
   align-items: stretch;
-  background: #1c1c1e;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--mcx-surface);
+  border-top: 1px solid var(--mcx-border-subtle);
   z-index: 100;
 }
 
@@ -75,14 +75,14 @@
   cursor: pointer;
   white-space: nowrap;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--mcx-text-tertiary);
   min-width: 100px;
   user-select: none;
   -webkit-touch-callout: none;
 
   &.active {
-    color: #fff;
-    background: rgba(255, 255, 255, 0.08);
+    color: var(--mcx-text);
+    background: var(--mcx-surface-hover);
   }
 
   &.swipeActivated {
@@ -136,7 +136,7 @@
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  border-left: 1px solid var(--mcx-border-subtle);
 }
 
 .actionBtn {
@@ -144,7 +144,7 @@
   padding: 0 18px;
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--mcx-text-secondary);
   cursor: pointer;
   font-size: 18px;
   display: flex;
@@ -153,8 +153,8 @@
 
   &:hover,
   &:active {
-    background: rgba(255, 255, 255, 0.08);
-    color: #fff;
+    background: var(--mcx-surface-hover);
+    color: var(--mcx-text);
   }
 }
 
@@ -170,7 +170,7 @@
 .loginBannerText {
   flex: 1;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--mcx-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -179,8 +179,8 @@
 .loginCompleteBtn {
   flex-shrink: 0;
   padding: 8px 16px;
-  background: #1d9bf0;
-  color: #fff;
+  background: var(--mcx-accent);
+  color: var(--mcx-text-on-accent);
   border: none;
   border-radius: 20px;
   font-size: 13px;
@@ -189,7 +189,7 @@
   white-space: nowrap;
 
   &:active {
-    background: #1a8cd8;
+    background: var(--mcx-accent-hover);
   }
 }
 .btn {
@@ -198,7 +198,7 @@
   height: 28px;
   background: none;
   border: none;
-  color: #555;
+  color: var(--mcx-text-muted);
   cursor: pointer;
   border-radius: 4px;
   display: flex;
@@ -212,8 +212,8 @@
     background $transition;
 
   &:hover {
-    color: #aaa;
-    background: #1a1a1a;
+    color: var(--mcx-text-tertiary);
+    background: var(--mcx-surface);
   }
 }
 
@@ -227,7 +227,7 @@
   justify-content: center;
   font-size: 22px;
   font-weight: bold;
-  color: #fff;
+  color: var(--mcx-text);
   pointer-events: none;
   z-index: 110;
 
@@ -256,13 +256,13 @@
   composes: btn;
   width: 40px;
   height: 100%;
-  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  border-left: 1px solid var(--mcx-border-subtle);
   margin-top: 2px;
-  color: #fff;
+  color: var(--mcx-text);
   font-size: 20px;
 
   &:hover {
-    color: #fff;
-    background: #1a1a1a;
+    color: var(--mcx-text);
+    background: var(--mcx-surface);
   }
 }
