@@ -50,16 +50,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
       - uses: android-actions/setup-android@v3
-      - name: ktlint check
+      - name: Install Android NDK
+        run: sdkmanager "ndk;26.1.10909125"
+      - name: Set NDK_HOME
+        run: echo "NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      # tauri.settings.gradle 等の Tauri 生成 glue は gitignore されローカル絶対パスを含むため、
+      # CI で再生成する。--skip-targets-install で rustup の android ターゲット導入は省略する。
+      - name: Generate Tauri Android project glue
+        run: npx tauri android init --ci --skip-targets-install
+      - name: ktlint & unit tests (app は universal フレーバー必須)
         working-directory: src-tauri/gen/android
         run: |
           chmod +x ./gradlew
-          ./gradlew ktlintCheck
-      - name: Unit tests (app は universal フレーバー必須)
-        working-directory: src-tauri/gen/android
-        run: ./gradlew :app:testUniversalDebugUnitTest
+          ./gradlew ktlintCheck :app:testUniversalDebugUnitTest
