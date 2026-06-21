@@ -11,11 +11,19 @@ export interface AppUpdate {
   notes?: string;
 }
 
+/** 更新適用中の処理状態。UI で進捗表示するために通知する。 */
+export type UpdateProgress =
+  | { phase: "downloading"; downloaded: number; total: number | null }
+  | { phase: "installing" }
+  | { phase: "restarting" };
+
+export type UpdateProgressCallback = (progress: UpdateProgress) => void;
+
 export interface Updater {
   /** 更新があれば情報を返す。無ければ null。 */
   check(): Promise<AppUpdate | null>;
-  /** 直近の check() で見つかった更新を適用する。 */
-  install(): Promise<void>;
+  /** 直近の check() で見つかった更新を適用する。進捗は onProgress で通知する。 */
+  install(onProgress?: UpdateProgressCallback): Promise<void>;
 }
 
 function createDesktopUpdater(): Updater {
@@ -26,9 +34,27 @@ function createDesktopUpdater(): Updater {
       if (!pending) return null;
       return { version: pending.version, notes: pending.body || undefined };
     },
-    async install() {
+    async install(onProgress) {
       if (!pending) return;
-      await pending.downloadAndInstall();
+      let total: number | null = null;
+      let downloaded = 0;
+      await pending.downloadAndInstall((event) => {
+        switch (event.event) {
+          case "Started":
+            total = event.data.contentLength ?? null;
+            downloaded = 0;
+            onProgress?.({ phase: "downloading", downloaded, total });
+            break;
+          case "Progress":
+            downloaded += event.data.chunkLength;
+            onProgress?.({ phase: "downloading", downloaded, total });
+            break;
+          case "Finished":
+            onProgress?.({ phase: "installing" });
+            break;
+        }
+      });
+      onProgress?.({ phase: "restarting" });
       await relaunch();
     },
   };
@@ -45,8 +71,11 @@ function createMobileUpdater(): Updater {
       apkUrl = release.apkUrl;
       return { version: release.version, notes: release.notes };
     },
-    async install() {
+    async install(onProgress) {
       if (!apkUrl) return;
+      // Android はネイティブ側にダウンロードを委ねるため進捗チャネルが無い。
+      // 不確定のダウンロード状態を通知してフリーズに見えないようにする。
+      onProgress?.({ phase: "downloading", downloaded: 0, total: null });
       await invoke("install_apk_update", { url: apkUrl });
     },
   };

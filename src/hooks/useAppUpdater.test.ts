@@ -81,6 +81,61 @@ describe("useAppUpdater", () => {
     expect(mobile.check).toHaveBeenCalledOnce();
   });
 
+  it("install中は通知されたprogressを公開し完了でnullに戻す", async () => {
+    // install を任意のタイミングで解決できるよう deferred にする。
+    let resolveInstall!: () => void;
+    let report!: (p: unknown) => void;
+    const install = vi.fn().mockImplementation((onProgress) => {
+      report = onProgress;
+      return new Promise<void>((resolve) => {
+        resolveInstall = resolve;
+      });
+    });
+    vi.mocked(createUpdater).mockReturnValue({
+      check: vi.fn().mockResolvedValue({ version: "1.2.0" }),
+      install,
+    });
+    const { result } = renderHook(() => useAppUpdater(false));
+    await waitFor(() => expect(result.current.available).not.toBeNull());
+
+    // install 実行中（未解決）に進捗を通知すると progress に反映される。
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.install();
+    });
+    act(() => report({ phase: "downloading", downloaded: 500, total: 1000 }));
+    expect(result.current.progress).toEqual({
+      phase: "downloading",
+      downloaded: 500,
+      total: 1000,
+    });
+    expect(result.current.installing).toBe(true);
+
+    act(() => report({ phase: "installing" }));
+    expect(result.current.progress).toEqual({ phase: "installing" });
+
+    // 解決後は片付けられて null に戻る。
+    await act(async () => {
+      resolveInstall();
+      await pending;
+    });
+    expect(result.current.progress).toBeNull();
+    expect(result.current.installing).toBe(false);
+  });
+
+  it("installが失敗してもprogressはnullに戻る", async () => {
+    const install = vi.fn().mockRejectedValue(new Error("boom"));
+    vi.mocked(createUpdater).mockReturnValue({
+      check: vi.fn().mockResolvedValue({ version: "1.2.0" }),
+      install,
+    });
+    const { result } = renderHook(() => useAppUpdater(false));
+    await waitFor(() => expect(result.current.available).not.toBeNull());
+    await act(async () => await result.current.install());
+    expect(result.current.progress).toBeNull();
+    expect(result.current.installing).toBe(false);
+  });
+
   it("checkManualで更新が無ければmanualResultがnoneになる", async () => {
     vi.mocked(createUpdater).mockReturnValue({
       check: vi.fn().mockResolvedValue(null),

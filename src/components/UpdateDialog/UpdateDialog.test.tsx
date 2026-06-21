@@ -57,4 +57,60 @@ describe("UpdateDialog", () => {
     );
     expect(screen.getByRole("button", { name: /更新/ })).toBeDisabled();
   });
+
+  it("ダウンロード進捗を%と進捗バーで表示する", () => {
+    render(
+      <UpdateDialog
+        update={update}
+        installing={true}
+        progress={{ phase: "downloading", downloaded: 500, total: 1000 }}
+        onInstall={vi.fn()}
+        onLater={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/ダウンロード中.*50%/)).toBeInTheDocument();
+    const bar = screen.getByRole("progressbar");
+    expect(bar).toHaveAttribute("aria-valuenow", "50");
+  });
+
+  it("totalが不明な場合は不確定のダウンロード状態を表示する", () => {
+    render(
+      <UpdateDialog
+        update={update}
+        installing={true}
+        progress={{ phase: "downloading", downloaded: 0, total: null }}
+        onInstall={vi.fn()}
+        onLater={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/ダウンロード中/)).toBeInTheDocument();
+    const bar = screen.getByRole("progressbar");
+    expect(bar).not.toHaveAttribute("aria-valuenow");
+  });
+
+  it("インストール中フェーズを表示する", () => {
+    render(
+      <UpdateDialog
+        update={update}
+        installing={true}
+        progress={{ phase: "installing" }}
+        onInstall={vi.fn()}
+        onLater={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/インストール中/)).toBeInTheDocument();
+  });
+
+  it("再起動中フェーズを表示する", () => {
+    render(
+      <UpdateDialog
+        update={update}
+        installing={true}
+        progress={{ phase: "restarting" }}
+        onInstall={vi.fn()}
+        onLater={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/再起動中/)).toBeInTheDocument();
+  });
 });

@@ -45,6 +45,56 @@ describe("desktop updater", () => {
     expect(dl).toHaveBeenCalledOnce();
     expect(relaunch).toHaveBeenCalledOnce();
   });
+
+  it("installはダウンロードイベントを進捗通知へ変換する", async () => {
+    // downloadAndInstall に渡された onEvent を呼び出してイベント列を再現する。
+    const dl = vi.fn().mockImplementation(async (onEvent) => {
+      onEvent({ event: "Started", data: { contentLength: 1000 } });
+      onEvent({ event: "Progress", data: { chunkLength: 400 } });
+      onEvent({ event: "Progress", data: { chunkLength: 600 } });
+      onEvent({ event: "Finished" });
+    });
+    vi.mocked(check).mockResolvedValue({
+      version: "1.2.0",
+      body: "",
+      downloadAndInstall: dl,
+    } as never);
+    vi.mocked(relaunch).mockResolvedValue(undefined as never);
+    const u = createUpdater(false);
+    await u.check();
+    const progress = vi.fn();
+    await u.install(progress);
+    expect(progress.mock.calls.map((c) => c[0])).toEqual([
+      { phase: "downloading", downloaded: 0, total: 1000 },
+      { phase: "downloading", downloaded: 400, total: 1000 },
+      { phase: "downloading", downloaded: 1000, total: 1000 },
+      { phase: "installing" },
+      { phase: "restarting" },
+    ]);
+  });
+
+  it("contentLengthが無い場合はtotalをnullで通知する", async () => {
+    const dl = vi.fn().mockImplementation(async (onEvent) => {
+      onEvent({ event: "Started", data: {} });
+      onEvent({ event: "Progress", data: { chunkLength: 400 } });
+      onEvent({ event: "Finished" });
+    });
+    vi.mocked(check).mockResolvedValue({
+      version: "1.2.0",
+      body: "",
+      downloadAndInstall: dl,
+    } as never);
+    vi.mocked(relaunch).mockResolvedValue(undefined as never);
+    const u = createUpdater(false);
+    await u.check();
+    const progress = vi.fn();
+    await u.install(progress);
+    expect(progress.mock.calls[0][0]).toEqual({
+      phase: "downloading",
+      downloaded: 0,
+      total: null,
+    });
+  });
 });
 
 describe("mobile updater", () => {
@@ -82,6 +132,23 @@ describe("mobile updater", () => {
     await u.install();
     expect(invoke).toHaveBeenCalledWith("install_apk_update", {
       url: "https://x/app.apk",
+    });
+  });
+
+  it("installは進捗チャネルが無いため不確定のダウンロード状態を通知する", async () => {
+    vi.mocked(getVersion).mockResolvedValue("1.0.0");
+    vi.mocked(fetchLatestRelease).mockResolvedValue({
+      version: "1.2.0",
+      apkUrl: "https://x/app.apk",
+    });
+    const u = createUpdater(true);
+    await u.check();
+    const progress = vi.fn();
+    await u.install(progress);
+    expect(progress).toHaveBeenCalledWith({
+      phase: "downloading",
+      downloaded: 0,
+      total: null,
     });
   });
 });

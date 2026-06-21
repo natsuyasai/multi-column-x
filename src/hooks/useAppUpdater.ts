@@ -6,6 +6,7 @@ import {
   createUpdater,
   type AppUpdate,
   type Updater,
+  type UpdateProgress,
 } from "../services/updater";
 
 type ManualResult = "idle" | "none" | "error";
@@ -23,6 +24,7 @@ export function useAppUpdater(isMobile: boolean) {
   const [available, setAvailable] = useState<AppUpdate | null>(null);
   const [checking, setChecking] = useState(false);
   const [installing, setInstalling] = useState(false);
+  const [progress, setProgress] = useState<UpdateProgress | null>(null);
   const [manualResult, setManualResult] = useState<ManualResult>("idle");
 
   // updater インスタンスごとに一度、起動時の自動チェックを行う。見送り済みバージョンは表示しない。
@@ -65,12 +67,14 @@ export function useAppUpdater(isMobile: boolean) {
 
   const install = useCallback(async () => {
     setInstalling(true);
+    setProgress(null);
     try {
-      await updater.install();
+      await updater.install((p) => setProgress(p));
     } catch (e) {
       logError("useAppUpdater:install")(e);
     } finally {
       setInstalling(false);
+      setProgress(null);
     }
   }, [updater]);
 
@@ -91,6 +95,7 @@ export function useAppUpdater(isMobile: boolean) {
     available,
     checking,
     installing,
+    progress,
     manualResult,
     checkManually,
     install,
