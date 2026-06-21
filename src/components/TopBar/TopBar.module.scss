@@ -92,7 +92,7 @@ $transition: 200ms ease;
 
   &:hover {
     color: var(--mcx-text-tertiary);
-    background: var(--mcx-surface);
+    background: var(--mcx-surface-hover);
   }
 }
 
@@ -141,6 +141,6 @@ $transition: 200ms ease;
 
   &:hover {
     color: var(--mcx-text-secondary);
-    background: var(--mcx-surface);
+    background: var(--mcx-surface-hover);
   }
 }
