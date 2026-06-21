@@ -1,3 +1,68 @@
+:root,
+:root[data-theme="dark"] {
+  --mcx-app-bg: #000000;
+  --mcx-surface: #1a1a1a;
+  --mcx-surface-sunken: #101010;
+  --mcx-surface-muted: #2a2a2a;
+  --mcx-surface-hover: #333333;
+  --mcx-text: #f5f5f5;
+  --mcx-text-secondary: #cccccc;
+  --mcx-text-tertiary: #999999;
+  --mcx-text-muted: #666666;
+  --mcx-text-on-accent: #ffffff;
+  --mcx-border: #333333;
+  --mcx-border-subtle: #222222;
+  --mcx-border-strong: #555555;
+  --mcx-accent: #1d9bf0;
+  --mcx-accent-hover: #1a8cd8;
+  --mcx-accent-bg: #0f1f30;
+  --mcx-accent-bg-strong: #0d2233;
+  --mcx-accent-border: rgba(29, 155, 240, 0.4);
+  --mcx-danger: #e06c75;
+  --mcx-danger-bg: #2a1515;
+  --mcx-danger-border: #442222;
+  --mcx-warning: #e5c07b;
+  --mcx-warning-bg: #2a2200;
+  --mcx-warning-border: rgba(240, 192, 29, 0.27);
+  --mcx-overlay: rgba(0, 0, 0, 0.7);
+  --mcx-scrollbar-track: #0a0a0a;
+  --mcx-scrollbar-thumb: #333333;
+  --mcx-scrollbar-thumb-hover: #555555;
+  --mcx-shadow: rgba(0, 0, 0, 0.5);
+}
+
+:root[data-theme="light"] {
+  --mcx-app-bg: #e6ecf0;
+  --mcx-surface: #ffffff;
+  --mcx-surface-sunken: #f7f9f9;
+  --mcx-surface-muted: #eff3f4;
+  --mcx-surface-hover: #e1e8ed;
+  --mcx-text: #0f1419;
+  --mcx-text-secondary: #536471;
+  --mcx-text-tertiary: #8899a6;
+  --mcx-text-muted: #aab8c2;
+  --mcx-text-on-accent: #ffffff;
+  --mcx-border: #cfd9de;
+  --mcx-border-subtle: #eff3f4;
+  --mcx-border-strong: #aab8c2;
+  --mcx-accent: #1d9bf0;
+  --mcx-accent-hover: #1a8cd8;
+  --mcx-accent-bg: #e8f5fd;
+  --mcx-accent-bg-strong: #d2ebfb;
+  --mcx-accent-border: rgba(29, 155, 240, 0.5);
+  --mcx-danger: #d4322c;
+  --mcx-danger-bg: #fde8e8;
+  --mcx-danger-border: #f1c0c0;
+  --mcx-warning: #b8860b;
+  --mcx-warning-bg: #fdf6e3;
+  --mcx-warning-border: rgba(184, 134, 11, 0.3);
+  --mcx-overlay: rgba(0, 0, 0, 0.45);
+  --mcx-scrollbar-track: #e1e8ed;
+  --mcx-scrollbar-thumb: #aab8c2;
+  --mcx-scrollbar-thumb-hover: #8899a6;
+  --mcx-shadow: rgba(0, 0, 0, 0.15);
+}
+
 *,
 *::before,
 *::after {
@@ -11,7 +76,7 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #000;
+  background: var(--mcx-app-bg);
 }
 
 #root {
