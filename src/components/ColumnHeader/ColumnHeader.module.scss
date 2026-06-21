@@ -3,9 +3,9 @@
   align-items: center;
   gap: 6px;
   padding: 6px 8px;
-  background: #111;
+  background: var(--mcx-surface-sunken);
   border-top: 2px solid transparent;
-  border-bottom: 1px solid #222;
+  border-bottom: 1px solid var(--mcx-border-subtle);
   height: 36px;
   flex-shrink: 0;
   user-select: none;
@@ -20,7 +20,7 @@
 
 .label {
   font-size: 12px;
-  color: #aaa;
+  color: var(--mcx-text-tertiary);
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -29,7 +29,7 @@
 
 .countdown {
   font-size: 10px;
-  color: #444;
+  color: var(--mcx-text-muted);
   flex-shrink: 0;
   min-width: 28px;
   text-align: right;
@@ -43,7 +43,7 @@
 .actionBtn {
   background: none;
   border: none;
-  color: #555;
+  color: var(--mcx-text-muted);
   cursor: pointer;
   font-size: 14px;
   padding: 2px 4px;
@@ -51,16 +51,16 @@
   line-height: 1;
 
   &:hover {
-    color: #aaa;
-    background: #222;
+    color: var(--mcx-text-tertiary);
+    background: var(--mcx-border-subtle);
   }
 }
 
 .unreadBadge {
-  background: #1d9bf0;
+  background: var(--mcx-accent);
   border: none;
   border-radius: 10px;
-  color: #fff;
+  color: var(--mcx-text-on-accent);
   cursor: pointer;
   font-size: 10px;
   font-weight: bold;
@@ -69,6 +69,6 @@
   line-height: 1.4;
 
   &:hover {
-    background: #1a8cd8;
+    background: var(--mcx-accent-hover);
   }
 }
