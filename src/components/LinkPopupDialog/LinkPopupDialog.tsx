@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import type { Account } from "../../types";
 import styles from "./LinkPopupDialog.module.scss";
 
@@ -17,6 +17,11 @@ export const LinkPopupDialog: React.FC<LinkPopupDialogProps> = ({
 }) => {
   const [url, setUrl] = useState("");
   const [accountId, setAccountId] = useState(defaultAccountId);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
 
   const handleSubmit = () => {
     onSubmit(url, accountId);
@@ -33,6 +38,7 @@ export const LinkPopupDialog: React.FC<LinkPopupDialogProps> = ({
       <div className={styles.panel}>
         <h3>URLをポップアップウィンドウで開く</h3>
         <input
+          ref={inputRef}
           type="text"
           placeholder="https://x.com/..."
           value={url}
@@ -41,7 +47,6 @@ export const LinkPopupDialog: React.FC<LinkPopupDialogProps> = ({
             if (e.key === "Enter") handleSubmit();
             if (e.key === "Escape") handleCancel();
           }}
-          autoFocus
         />
         {accounts.length > 1 && (
           <select
