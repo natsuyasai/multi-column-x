@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { useAppStore, migrateColumn } from "./useAppStore";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { Account, Column } from "../types";
+import { useAppStore, migrateColumn } from "./useAppStore";
 
 // Mock invoke from @tauri-apps/api/core
 vi.mock("@tauri-apps/api/core", () => ({

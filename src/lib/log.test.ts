@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { error as pluginError } from "@tauri-apps/plugin-log";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { logError } from "./log";
 
 vi.mock("@tauri-apps/plugin-log", () => ({

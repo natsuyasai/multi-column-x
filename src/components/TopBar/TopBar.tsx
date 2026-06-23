@@ -1,15 +1,15 @@
 import React from "react";
-import type { Account, Column, PageType } from "../../types";
-import HomeIcon from "../../assets/icons/home.svg?react";
-import NotificationsIcon from "../../assets/icons/notifications.svg?react";
-import SearchIcon from "../../assets/icons/search.svg?react";
-import ListIcon from "../../assets/icons/list.svg?react";
 import CustomIcon from "../../assets/icons/custom.svg?react";
-import PencilIcon from "../../assets/icons/pencil.svg?react";
+import HomeIcon from "../../assets/icons/home.svg?react";
 import LinkIcon from "../../assets/icons/link.svg?react";
-import PlusIcon from "../../assets/icons/plus.svg?react";
+import ListIcon from "../../assets/icons/list.svg?react";
+import NotificationsIcon from "../../assets/icons/notifications.svg?react";
+import PencilIcon from "../../assets/icons/pencil.svg?react";
 import PersonIcon from "../../assets/icons/person.svg?react";
+import PlusIcon from "../../assets/icons/plus.svg?react";
+import SearchIcon from "../../assets/icons/search.svg?react";
 import SettingsIcon from "../../assets/icons/settings.svg?react";
+import type { Account, Column, PageType } from "../../types";
 import styles from "./TopBar.module.scss";
 
 interface TopBarProps {

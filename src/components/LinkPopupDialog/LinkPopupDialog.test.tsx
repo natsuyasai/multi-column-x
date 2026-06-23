@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { LinkPopupDialog } from "./LinkPopupDialog";
+import { describe, it, expect, vi } from "vitest";
 import type { Account } from "../../types";
+import { LinkPopupDialog } from "./LinkPopupDialog";
 
 const mockAccounts: Account[] = [
   {

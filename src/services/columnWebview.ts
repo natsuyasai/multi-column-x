@@ -1,14 +1,14 @@
 // src/services/columnWebview.ts
 // カラム WebView に対する Tauri IPC 呼び出しを集約するサービス層
 import { invoke } from "@tauri-apps/api/core";
-import type { Column, ColumnSettings } from "../types";
-import type { ColumnBounds } from "../lib/gridLayout";
-import { logError } from "../lib/log";
 import {
   IPC_COMMANDS,
   WEBVIEW_LABELS,
   WEBVIEW_SCRIPTS,
 } from "../constants/ipc";
+import type { ColumnBounds } from "../lib/gridLayout";
+import { logError } from "../lib/log";
+import type { Column, ColumnSettings } from "../types";
 
 /** カラム WebView を作成する */
 export async function createColumnWebview(

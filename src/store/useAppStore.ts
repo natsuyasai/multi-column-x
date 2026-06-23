@@ -1,5 +1,7 @@
-import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
+import { create } from "zustand";
+import { IPC_COMMANDS } from "../constants/ipc";
+import { logError } from "../lib/log";
 import type {
   Account,
   Column,
@@ -8,8 +10,6 @@ import type {
   AppSettings,
 } from "../types";
 import { DEFAULT_GLOBAL_SETTINGS } from "../types";
-import { IPC_COMMANDS } from "../constants/ipc";
-import { logError } from "../lib/log";
 
 export function migrateColumn(
   col: Partial<Column> &

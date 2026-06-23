@@ -1,11 +1,11 @@
 import React, { useState, useRef } from "react";
-import type { Column, Account, PageType } from "../../types";
-import { useAutoReload } from "../../hooks/useAutoReload";
-import PencilIcon from "../../assets/icons/pencil.svg?react";
 import LinkIcon from "../../assets/icons/link.svg?react";
-import PlusIcon from "../../assets/icons/plus.svg?react";
+import PencilIcon from "../../assets/icons/pencil.svg?react";
 import PersonIcon from "../../assets/icons/person.svg?react";
+import PlusIcon from "../../assets/icons/plus.svg?react";
 import SettingsIcon from "../../assets/icons/settings.svg?react";
+import { useAutoReload } from "../../hooks/useAutoReload";
+import type { Column, Account, PageType } from "../../types";
 import styles from "./MobileTabBar.module.scss";
 
 function getTabLabel(column: Column): string {

@@ -1,13 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { IPC_EVENTS } from "../constants/ipc";
+import { useAppStore } from "../store/useAppStore";
+import { DEFAULT_COLUMN_SETTINGS } from "../types";
+import type { Column } from "../types";
 import {
   useNewPostsNotification,
   useWebviewScrollRelay,
 } from "./useWebviewEvents";
-import { useAppStore } from "../store/useAppStore";
-import { IPC_EVENTS } from "../constants/ipc";
-import { DEFAULT_COLUMN_SETTINGS } from "../types";
-import type { Column } from "../types";
 
 type ListenCallback = (event: { payload: unknown }) => void;
 const capturedCallbacks = new Map<string, ListenCallback>();

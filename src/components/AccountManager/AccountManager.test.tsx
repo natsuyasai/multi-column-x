@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { AccountManager } from "./AccountManager";
+import { describe, it, expect, vi } from "vitest";
 import type { Account } from "../../types";
+import { AccountManager } from "./AccountManager";
 
 const mockAccounts: Account[] = [
   {

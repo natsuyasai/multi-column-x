@@ -1,7 +1,7 @@
 import React, { useState } from "react";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
 import type { Account, Column, GlobalSettings, PageType } from "../../types";
 import { DEFAULT_COLUMN_SETTINGS } from "../../types";
-import { useEscapeKey } from "../../hooks/useEscapeKey";
 import styles from "./AddColumnDialog.module.scss";
 
 interface AddColumnDialogProps {

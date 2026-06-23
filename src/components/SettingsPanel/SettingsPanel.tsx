@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import type { Column, ColumnSettings } from "../../types";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
+import type { Column, ColumnSettings } from "../../types";
 import styles from "./SettingsPanel.module.scss";
 
 interface SettingsPanelProps {

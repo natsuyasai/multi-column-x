@@ -1,11 +1,8 @@
 // src/hooks/useDesktopColumns.ts
 // デスクトップのグリッド bounds 管理・リサイズ追従・起動時復元
-import { useCallback, useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { platform } from "@tauri-apps/plugin-os";
-import { useAppStore } from "../store/useAppStore";
-import type { Column } from "../types";
-import { logError } from "../lib/log";
+import { useCallback, useEffect, useState } from "react";
 import {
   HEADER_HEIGHT,
   SCROLLBAR_HEIGHT,
@@ -13,10 +10,13 @@ import {
   calculateGridBounds,
   type ColumnBounds,
 } from "../lib/gridLayout";
+import { logError } from "../lib/log";
 import {
   createColumnWebview,
   resizeColumnWebview,
 } from "../services/columnWebview";
+import { useAppStore } from "../store/useAppStore";
+import type { Column } from "../types";
 
 interface DesktopColumnsArgs {
   containerRef: React.RefObject<HTMLDivElement | null>;

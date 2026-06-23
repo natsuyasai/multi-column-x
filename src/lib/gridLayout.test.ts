@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
+import type { Column } from "../types";
 import {
   calculateGridBounds,
   MOBILE_TAB_BAR_HEIGHT,
   mobileColumnBounds,
   resolveSwipeAreaHeight,
 } from "./gridLayout";
-import type { Column } from "../types";
 
 const baseSettings = {
   autoReloadEnabled: true,

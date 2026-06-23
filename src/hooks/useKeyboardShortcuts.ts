@@ -1,5 +1,5 @@
-import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { useEffect } from "react";
 import { IPC_EVENTS } from "../constants/ipc";
 
 const NOOP = () => {};

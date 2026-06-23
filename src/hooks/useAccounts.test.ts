@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
 import { invoke } from "@tauri-apps/api/core";
-import { useAccounts } from "./useAccounts";
+import { renderHook, act } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useAppStore } from "../store/useAppStore";
+import { useAccounts } from "./useAccounts";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),

@@ -1,7 +1,7 @@
 // src/lib/gridLayout.ts
 // カラムのグリッド配置に関する純粋な座標計算（Tauri 非依存）
-import type { Column } from "../types";
 import { OFFSCREEN } from "../constants/ipc";
+import type { Column } from "../types";
 
 export const HEADER_HEIGHT = 36; // ColumnHeader の高さ（px）
 export const SCROLLBAR_HEIGHT = 12; // 下部スクロールバーの高さ（px）

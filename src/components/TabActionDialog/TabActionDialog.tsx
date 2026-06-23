@@ -1,6 +1,6 @@
 import React from "react";
-import SettingsIcon from "../../assets/icons/settings.svg?react";
 import CloseIcon from "../../assets/icons/close.svg?react";
+import SettingsIcon from "../../assets/icons/settings.svg?react";
 import styles from "./TabActionDialog.module.scss";
 
 interface Props {
