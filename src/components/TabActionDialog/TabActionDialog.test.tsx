@@ -44,4 +44,33 @@ describe("TabActionDialog", () => {
       removeBtn?.querySelector('[data-testid="icon-close"]'),
     ).toBeInTheDocument();
   });
+
+  it("シートに role=dialog が設定されている", () => {
+    render(<TabActionDialog {...defaultProps} />);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("Escape キーで onClose が呼ばれる", () => {
+    const onClose = vi.fn();
+    render(<TabActionDialog {...defaultProps} onClose={onClose} />);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("背景クリックで onClose が呼ばれる", () => {
+    const onClose = vi.fn();
+    const { container } = render(
+      <TabActionDialog {...defaultProps} onClose={onClose} />,
+    );
+    const overlay = container.firstElementChild as HTMLElement;
+    fireEvent.click(overlay);
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("シートクリックでは onClose が呼ばれない", () => {
+    const onClose = vi.fn();
+    render(<TabActionDialog {...defaultProps} onClose={onClose} />);
+    fireEvent.click(screen.getByRole("dialog"));
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });
