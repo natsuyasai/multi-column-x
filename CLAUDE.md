@@ -93,7 +93,8 @@ app モジュールの variant は universal フレーバー付きのため、`.
   - 既存コード由来の a11y 等は段階解消のため **warn**。新規コードでは警告を残さないこと。
 - **import エイリアス**: `@/*` → `src/*`（tsconfig / vite / vitest に設定）。新規コードは `@/` を使う。
 - **Storybook**（`.storybook/`）はコンポーネントと**同じディレクトリ**に `<Name>.stories.tsx` をコロケーション配置する。バレル（`index.ts`）は作らない。play function は `npm run test:story` で chromium ブラウザ実行される。テーマは `document.documentElement` の `data-theme` で切り替える（`MobileTabBar.stories.tsx` 参照）。
-- **プロパティテスト**: `fast-check` を使い `<name>.property.test.ts` に置く。`src/lib/` の純粋関数が好適。`npm run test:property`。
+- **プロパティテスト**: フロントは `fast-check`（`<name>.property.test.ts`、`npm run test:property`）。Rust は `proptest`（dev-dependency、`#[cfg(test)]` 内に `mod properties`、`cargo test`）。Kotlin は `kotest-property`（JUnit4 の `@Test` から `runBlocking { forAll {} }`、`:app:testUniversalDebugUnitTest`）。詳細は `.claude/skills/property-based-testing` を参照。
+  - kotest は jvmTarget 1.8 互換の **5.x** を使う（6.x は JVM 11 のため上げない）。
 - 開発フロー全体は `.claude/skills/feature-development-flow`（要求明確化→プラン→TDD実装→プロパティテスト→完了処理）を参照。
 
 ## ビルドコマンド早見表

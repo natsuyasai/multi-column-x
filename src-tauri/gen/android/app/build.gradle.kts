@@ -94,6 +94,9 @@ dependencies {
   // （5.x は inline mock maker が既定で、MotionEvent 等の final クラスをモックできる）。
   testImplementation("org.mockito.kotlin:mockito-kotlin:4.1.0")
   testImplementation("org.mockito:mockito-core:5.18.0")
+  // プロパティベーステスト。kotest 5.x は jvmTarget 1.8 互換。JUnit4 の @Test 内から
+  // runBlocking 経由で forAll/checkAll を呼ぶ（kotest のテストランナーは使わない）。
+  testImplementation("io.kotest:kotest-property:5.9.1")
   androidTestImplementation("androidx.test.ext:junit:1.1.4")
   androidTestImplementation("androidx.test.espresso:espresso-core:3.5.0")
 }
