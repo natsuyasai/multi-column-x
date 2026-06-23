@@ -16,8 +16,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx prettier --check .
+      - run: npm run lint
+      - run: npm run typecheck
       - run: npm run build:inject
       - run: npm test
+      # Storybook の play function は vitest ブラウザモード(chromium)で実行するため
+      # Playwright のブラウザを先に用意する。
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+      - run: npm run test:story
 
   rust:
     runs-on: ubuntu-latest
