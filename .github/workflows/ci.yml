@@ -36,7 +36,7 @@ jobs:
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt
+          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
@@ -47,10 +47,8 @@ jobs:
       - run: npm ci
       - run: npm run build:inject
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
-      - name: cargo check (deny warnings)
-        run: cargo check --manifest-path src-tauri/Cargo.toml
-        env:
-          RUSTFLAGS: "-D warnings"
+      - name: cargo clippy (deny warnings)
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
       - run: cargo test --manifest-path src-tauri/Cargo.toml
 
   android:

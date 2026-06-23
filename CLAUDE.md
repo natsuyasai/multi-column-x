@@ -107,6 +107,7 @@ npm run tauri:build:debug  # デバッグビルド
 npm run tauri:android:build # Android ビルド
 npm run typecheck          # 型チェック（tsc --noEmit）
 npm run lint               # ESLint（src の TS/TSX）/ npm run lint:fix で自動修正
+npm run lint:rust          # Rust 静的解析（cargo clippy --all-targets -- -D warnings）
 npm test                   # Vitest 単体テスト（unit プロジェクト）
 npm run test:story         # Storybook play function（chromium ブラウザ実行）
 npm run test:property      # fast-check プロパティテスト
