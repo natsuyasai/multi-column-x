@@ -1,7 +1,7 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { AppSettingsPanel } from "./AppSettingsPanel";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { GlobalSettings, Column, Account } from "../../types";
+import { AppSettingsPanel } from "./AppSettingsPanel";
 
 const mockStoreState = {
   isMobile: false,

@@ -1,9 +1,7 @@
 // src/hooks/useMobileColumns.ts
 // モバイル（Android）のアクティブカラム管理・スワイプナビゲーション・起動時復元
-import { useCallback, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { useAppStore } from "../store/useAppStore";
-import type { Column } from "../types";
+import { useCallback, useEffect, useState } from "react";
 import { IPC_EVENTS, STORAGE_KEYS, WEBVIEW_SCRIPTS } from "../constants/ipc";
 import { mobileColumnBounds, resolveSwipeAreaHeight } from "../lib/gridLayout";
 import { logError } from "../lib/log";
@@ -13,6 +11,8 @@ import {
   resizeColumnWebview,
   setColumnCookies,
 } from "../services/columnWebview";
+import { useAppStore } from "../store/useAppStore";
+import type { Column } from "../types";
 
 export interface SwipeState {
   direction: "left" | "right";

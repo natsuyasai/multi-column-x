@@ -1,8 +1,6 @@
 // src/hooks/useColumns.ts
 // モバイル/デスクトップ実装（useMobileColumns / useDesktopColumns）を組み合わせるファサード
 import { useCallback, useRef } from "react";
-import { useAppStore } from "../store/useAppStore";
-import type { Column } from "../types";
 import { OFFSCREEN } from "../constants/ipc";
 import {
   HEADER_HEIGHT,
@@ -12,14 +10,16 @@ import {
   mobileColumnBounds,
   resolveSwipeAreaHeight,
 } from "../lib/gridLayout";
+import { logError } from "../lib/log";
 import {
   createColumnWebview,
   removeColumnWebview,
   resizeColumnWebview,
 } from "../services/columnWebview";
-import { logError } from "../lib/log";
-import { useMobileColumns } from "./useMobileColumns";
+import { useAppStore } from "../store/useAppStore";
+import type { Column } from "../types";
 import { useDesktopColumns } from "./useDesktopColumns";
+import { useMobileColumns } from "./useMobileColumns";
 
 // グリッド座標計算は src/lib/gridLayout.ts へ移動した。既存 import 互換のため re-export する。
 export {

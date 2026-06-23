@@ -17,3 +17,9 @@ keystore.properties
 upload-keystore.jks
 # Tauri updater signing keys (never commit)
 .tauri-keys/
+
+*storybook.log
+storybook-static
+
+# 一時的な実装プラン等（implementation-planning スキル）
+tmp/

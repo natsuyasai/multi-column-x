@@ -1,8 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MobileTabBar } from "./MobileTabBar";
+import { describe, it, expect, vi } from "vitest";
 import type { Column, Account } from "../../types";
+import { MobileTabBar } from "./MobileTabBar";
 
 const baseSettings = {
   autoReloadEnabled: true,

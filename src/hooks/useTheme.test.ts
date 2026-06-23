@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
+import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { useTheme } from "./useTheme";
 
 type Listener = (e: { matches: boolean }) => void;

@@ -1,8 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ColumnHeader } from "./ColumnHeader";
+import { describe, it, expect, vi } from "vitest";
 import type { Column, Account } from "../../types";
+import { ColumnHeader } from "./ColumnHeader";
 
 const mockAccount: Account = {
   id: "acc-1",

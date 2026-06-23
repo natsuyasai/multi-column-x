@@ -1,10 +1,10 @@
 // src/hooks/useAccounts.ts
-import { useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { useCallback, useRef } from "react";
+import { IPC_COMMANDS, IPC_EVENTS } from "../constants/ipc";
 import { useAppStore } from "../store/useAppStore";
 import type { Account } from "../types";
-import { IPC_COMMANDS, IPC_EVENTS } from "../constants/ipc";
 
 const ACCOUNT_COLORS = [
   "#1d9bf0",

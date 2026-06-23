@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { PresetsTab } from "./PresetsTab";
+import { describe, it, expect, vi } from "vitest";
 import type { ColumnPreset } from "../../types";
+import { PresetsTab } from "./PresetsTab";
 
 const mockPresets: ColumnPreset[] = [
   {

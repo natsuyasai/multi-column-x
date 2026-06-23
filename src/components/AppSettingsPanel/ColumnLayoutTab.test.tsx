@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
-import { ColumnLayoutTab } from "./ColumnLayoutTab";
+import { describe, it, expect, vi } from "vitest";
 import type { Account, Column } from "../../types";
+import { ColumnLayoutTab } from "./ColumnLayoutTab";
 
 const baseSettings = {
   autoReloadEnabled: true,

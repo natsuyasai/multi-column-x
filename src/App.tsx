@@ -1,43 +1,43 @@
 // src/App.tsx
+import { getVersion } from "@tauri-apps/api/app";
+import { invoke } from "@tauri-apps/api/core";
+import { platform } from "@tauri-apps/plugin-os";
 import React, { useEffect, useCallback, useMemo, useState } from "react";
-import { useAppStore } from "./store/useAppStore";
-import { useColumns } from "./hooks/useColumns";
-import {
-  HEADER_HEIGHT,
-  getTopBarHeight,
-  resolveSwipeAreaHeight,
-} from "./lib/gridLayout";
-import { logError } from "./lib/log";
-import { useAccounts } from "./hooks/useAccounts";
-import { ColumnHeader } from "./components/ColumnHeader/ColumnHeader";
-import { AddColumnDialog } from "./components/AddColumnDialog/AddColumnDialog";
+import styles from "./App.module.scss";
 import { AccountManager } from "./components/AccountManager/AccountManager";
-import { SettingsPanel } from "./components/SettingsPanel/SettingsPanel";
+import { AddColumnDialog } from "./components/AddColumnDialog/AddColumnDialog";
 import { AppSettingsPanel } from "./components/AppSettingsPanel/AppSettingsPanel";
-import { TopBar } from "./components/TopBar/TopBar";
-import { MobileTabBar } from "./components/MobileTabBar/MobileTabBar";
-import { MobileSwipeBar } from "./components/MobileSwipeBar/MobileSwipeBar";
-import { TabActionDialog } from "./components/TabActionDialog/TabActionDialog";
+import { ColumnHeader } from "./components/ColumnHeader/ColumnHeader";
 import { LinkPopupDialog } from "./components/LinkPopupDialog/LinkPopupDialog";
+import { MobileSwipeBar } from "./components/MobileSwipeBar/MobileSwipeBar";
+import { MobileTabBar } from "./components/MobileTabBar/MobileTabBar";
+import { SettingsPanel } from "./components/SettingsPanel/SettingsPanel";
+import { TabActionDialog } from "./components/TabActionDialog/TabActionDialog";
+import { TopBar } from "./components/TopBar/TopBar";
 import { UpdateDialog } from "./components/UpdateDialog/UpdateDialog";
-import { useDialogState } from "./hooks/useDialogState";
+import { IPC_COMMANDS, WEBVIEW_SCRIPTS } from "./constants/ipc";
+import { useAccounts } from "./hooks/useAccounts";
 import { useAppUpdater } from "./hooks/useAppUpdater";
+import { useColumns } from "./hooks/useColumns";
+import { useDialogState } from "./hooks/useDialogState";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useTheme } from "./hooks/useTheme";
 import {
   useNewPostsNotification,
   useWebviewScrollRelay,
 } from "./hooks/useWebviewEvents";
-import { platform } from "@tauri-apps/plugin-os";
-import { getVersion } from "@tauri-apps/api/app";
-import { invoke } from "@tauri-apps/api/core";
-import type { ColumnSettings, GlobalSettings } from "./types";
-import { IPC_COMMANDS, WEBVIEW_SCRIPTS } from "./constants/ipc";
+import {
+  HEADER_HEIGHT,
+  getTopBarHeight,
+  resolveSwipeAreaHeight,
+} from "./lib/gridLayout";
+import { logError } from "./lib/log";
 import {
   applyColumnSettingsScripts,
   evalInColumn,
 } from "./services/columnWebview";
-import styles from "./App.module.scss";
+import { useAppStore } from "./store/useAppStore";
+import type { ColumnSettings, GlobalSettings } from "./types";
 
 const App: React.FC = () => {
   const {

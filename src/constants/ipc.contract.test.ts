@@ -3,14 +3,14 @@
 // （イベント名・ラベル・グローバル変数名の一致と、コマンド名の lib.rs 登録を検証する）。
 // 定数を変更したら contracts/ipc-constants.json も合わせて更新すること。
 import { describe, it, expect } from "vitest";
+import fixture from "../../contracts/ipc-constants.json";
+import { INJECT_COMMANDS } from "../../src-tauri/src/inject/_src/constants";
 import {
   IPC_COMMANDS,
   IPC_EVENTS,
   WEBVIEW_LABELS,
   WEBVIEW_SCRIPTS,
 } from "./ipc";
-import { INJECT_COMMANDS } from "../../src-tauri/src/inject/_src/constants";
-import fixture from "../../contracts/ipc-constants.json";
 
 describe("TS/Rust IPC定数の契約", () => {
   it("IPC_COMMANDSの全コマンド名がfixtureと一致する", () => {

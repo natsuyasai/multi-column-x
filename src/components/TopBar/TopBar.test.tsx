@@ -1,8 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { TopBar } from "./TopBar";
+import { describe, it, expect, vi } from "vitest";
 import type { Column, Account } from "../../types";
+import { TopBar } from "./TopBar";
 
 const baseSettings = {
   autoReloadEnabled: true,

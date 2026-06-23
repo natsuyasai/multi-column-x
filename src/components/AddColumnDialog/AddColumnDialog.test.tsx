@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { AddColumnDialog } from "./AddColumnDialog";
+import { describe, it, expect, vi } from "vitest";
 import type { Account, GlobalSettings } from "../../types";
+import { AddColumnDialog } from "./AddColumnDialog";
 
 const mockAccounts: Account[] = [
   {

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { useAppStore } from "../../store/useAppStore";
 import type {
   GlobalSettings,
   Column,
@@ -7,10 +8,9 @@ import type {
   ColumnSettings,
   ColumnScale,
 } from "../../types";
-import { useAppStore } from "../../store/useAppStore";
+import styles from "./AppSettingsPanel.module.scss";
 import { ColumnLayoutTab } from "./ColumnLayoutTab";
 import { PresetsTab } from "./PresetsTab";
-import styles from "./AppSettingsPanel.module.scss";
 
 interface AppSettingsPanelProps {
   settings: GlobalSettings;

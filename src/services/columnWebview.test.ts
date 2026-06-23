@@ -1,5 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { DEFAULT_COLUMN_SETTINGS } from "../types";
+import type { Column } from "../types";
 import {
   applyColumnSettingsScripts,
   createColumnWebview,
@@ -7,8 +9,6 @@ import {
   resizeColumnWebview,
   setColumnCookies,
 } from "./columnWebview";
-import { DEFAULT_COLUMN_SETTINGS } from "../types";
-import type { Column } from "../types";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 

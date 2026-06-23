@@ -1,9 +1,9 @@
 import React from "react";
+import CloseIcon from "../../assets/icons/close.svg?react";
+import SettingsIcon from "../../assets/icons/settings.svg?react";
+import { useAutoReload } from "../../hooks/useAutoReload";
 import type { Account, Column } from "../../types";
 import { getPageTypeLabel } from "../../types";
-import { useAutoReload } from "../../hooks/useAutoReload";
-import SettingsIcon from "../../assets/icons/settings.svg?react";
-import CloseIcon from "../../assets/icons/close.svg?react";
 import styles from "./ColumnHeader.module.scss";
 
 interface ColumnHeaderProps {

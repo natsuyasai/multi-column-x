@@ -1,9 +1,9 @@
 // src/hooks/useWebviewEvents.ts
 // カラム WebView から emit されるイベントの listen をまとめたフック
-import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { useAppStore } from "../store/useAppStore";
+import { useEffect } from "react";
 import { IPC_EVENTS, WEBVIEW_LABELS } from "../constants/ipc";
+import { useAppStore } from "../store/useAppStore";
 
 /** WebView 内の横ホイールを受け取ってスクロールバーを動かす */
 export function useWebviewScrollRelay(

@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
 import { invoke } from "@tauri-apps/api/core";
+import { renderHook, act } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useAutoReload } from "./useAutoReload";
 
 vi.mock("@tauri-apps/api/core", () => ({
