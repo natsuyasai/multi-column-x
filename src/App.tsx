@@ -116,8 +116,10 @@ const App: React.FC = () => {
     }
   }, [setIsMobile]);
 
+  // マウント時のみ設定をロードする（loadSettings 変化で再実行させない）
   useEffect(() => {
     loadSettings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -125,10 +127,12 @@ const App: React.FC = () => {
   }, []);
 
   // isLoaded が true になった（= DOM レンダリング完了後）タイミングで WebView を復元
+  // isLoaded の true 遷移時のみ実行し、topBarHeight 変化で再復元させない
   useEffect(() => {
     if (isLoaded) {
       restoreColumns(topBarHeight);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoaded]);
 
   // x.com の表示サイズを IndexedDB 経由で設定する
@@ -140,6 +144,8 @@ const App: React.FC = () => {
     columns.forEach((column) => {
       evalInColumn(column.id, WEBVIEW_SCRIPTS.applyColumnScale(scale));
     });
+    // columnScale/isLoaded 変化時のみ scale を適用し、columns 変化では再適用しない
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [globalSettings.columnScale, isLoaded]);
 
   // 本体UIのテーマを data-theme 属性へ反映する
@@ -151,7 +157,7 @@ const App: React.FC = () => {
 
   const handleOpenLinkPopup = useCallback(() => {
     setShowLinkPopupDialog(true);
-  }, []);
+  }, [setShowLinkPopupDialog]);
 
   const handleSubmitLinkPopup = useCallback(
     async (url: string, accountId: string) => {
@@ -167,7 +173,7 @@ const App: React.FC = () => {
         url: resolved,
       }).catch(logError("handleSubmitLinkPopup:openLinkPopupWindow"));
     },
-    [accounts],
+    [accounts, setShowLinkPopupDialog],
   );
 
   // ダイアログ表示中は列WebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
@@ -180,6 +186,8 @@ const App: React.FC = () => {
     } else {
       recalculateAllBounds();
     }
+    // anyDialogOpen 変化時のみ退避/復元する（他の依存で再実行させない）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anyDialogOpen]);
 
   const handleToggleTopBar = useCallback(() => {
@@ -231,7 +239,7 @@ const App: React.FC = () => {
       const globalNgWords = useAppStore.getState().globalSettings.ngWords ?? [];
       await applyColumnSettingsScripts(columnId, settings, globalNgWords);
     },
-    [handleUpdateColumn],
+    [handleUpdateColumn, setSettingsColumnId],
   );
 
   const handleApplyGlobalSettings = useCallback(
@@ -262,7 +270,7 @@ const App: React.FC = () => {
       await hideColumnWebviews();
       setTabActionColumnId(columnId);
     },
-    [hideColumnWebviews],
+    [hideColumnWebviews, setTabActionColumnId],
   );
 
   const handleComposeTweet = useCallback(() => {
