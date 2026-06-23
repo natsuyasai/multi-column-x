@@ -267,7 +267,16 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
                             <div
                               key={rIdx}
                               className={`${styles.cell} ${styles.cellAssigned} ${isSelected ? styles.cellSelected : ""}`}
+                              role="button"
+                              tabIndex={0}
+                              aria-label={`列${colNum}行${r}のセル`}
                               onClick={() => handleCellClick(r, colNum)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  if (e.key === " ") e.preventDefault();
+                                  handleCellClick(r, colNum);
+                                }
+                              }}
                             >
                               <span className={styles.cellName}>
                                 {getLabel(colAtCell)}
@@ -294,7 +303,16 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
                           <div
                             key={rIdx}
                             className={`${styles.cell} ${isPending ? styles.cellPending : ""}`}
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`列${colNum}行${r}のセル`}
                             onClick={() => handleCellClick(r, colNum)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                if (e.key === " ") e.preventDefault();
+                                handleCellClick(r, colNum);
+                              }
+                            }}
                           >
                             {pendingCell ? "← ここに配置" : "+"}
                           </div>
@@ -319,13 +337,15 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
             <div className={styles.unassigned}>
               <div className={styles.unassignedLabel}>未割当</div>
               {unassigned.map((col) => (
-                <div
+                <button
                   key={col.id}
+                  type="button"
                   className={`${styles.unassignedItem} ${pendingCell ? styles.unassignedItemActive : ""}`}
+                  disabled={!pendingCell}
                   onClick={() => pendingCell && handleAssign(col.id)}
                 >
                   <div className={styles.unassignedName}>{getLabel(col)}</div>
-                </div>
+                </button>
               ))}
               {unassigned.length === 0 && (
                 <div className={styles.emptyNotice}>なし</div>
