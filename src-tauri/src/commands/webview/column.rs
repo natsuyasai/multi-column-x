@@ -410,4 +410,44 @@ mod tests {
     fn webview_label_uses_column_prefix() {
         assert_eq!(webview_label("abc"), "column-abc");
     }
+
+    mod properties {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            /// 検索クエリは URL エンコードされて埋め込まれ、デコードすると元の値に戻る（ラウンドトリップ）。
+            #[test]
+            fn resolve_url_search_query_roundtrips(query in any::<String>()) {
+                let mut col = column("search");
+                col.search_query = Some(query.clone());
+                let url = resolve_url(&col);
+                let encoded = url
+                    .strip_prefix("https://x.com/search?q=")
+                    .expect("search URL は固定プレフィックスで始まる");
+                let decoded = urlencoding::decode(encoded)
+                    .expect("エンコード結果は常にデコード可能")
+                    .into_owned();
+                prop_assert_eq!(decoded, query);
+            }
+
+            /// どの page_type・どんな入力でも、生成 URL は常に https:// スキームになる。
+            #[test]
+            fn resolve_url_always_https(
+                page_type in prop::sample::select(vec![
+                    "home", "notifications", "search", "list", "custom", "unknown",
+                ]),
+                value in any::<String>(),
+            ) {
+                let mut col = column(page_type);
+                col.home_tab_name = Some(value.clone());
+                col.search_query = Some(value.clone());
+                col.list_id = Some(value.clone());
+                // custom は URL をそのまま使うため、http(s) の値を与える
+                col.custom_url = Some(format!("https://x.com/{value}"));
+                let url = resolve_url(&col);
+                prop_assert!(url.starts_with("https://"));
+            }
+        }
+    }
 }
