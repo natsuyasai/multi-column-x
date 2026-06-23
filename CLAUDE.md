@@ -87,6 +87,15 @@ app モジュールの variant は universal フレーバー付きのため、`.
 
 デバッグビルドでは R8 が無効なため症状が出ず、リリースビルドで初めてクラッシュする。変更後はリリースビルドで動作確認すること。
 
+### フロントエンドの品質ツール（ESLint / Storybook / プロパティテスト）
+
+- **ESLint**（flat config: `eslint.config.js`）はフロント `src` の TS/TSX のみを対象にする。`import-x/order` で import 順を統一し、`@/` は internal グループ。`npm run lint` / 自動整列は `npm run lint:fix`。
+  - 既存コード由来の a11y 等は段階解消のため **warn**。新規コードでは警告を残さないこと。
+- **import エイリアス**: `@/*` → `src/*`（tsconfig / vite / vitest に設定）。新規コードは `@/` を使う。
+- **Storybook**（`.storybook/`）はコンポーネントと**同じディレクトリ**に `<Name>.stories.tsx` をコロケーション配置する。バレル（`index.ts`）は作らない。play function は `npm run test:story` で chromium ブラウザ実行される。テーマは `document.documentElement` の `data-theme` で切り替える（`MobileTabBar.stories.tsx` 参照）。
+- **プロパティテスト**: `fast-check` を使い `<name>.property.test.ts` に置く。`src/lib/` の純粋関数が好適。`npm run test:property`。
+- 開発フロー全体は `.claude/skills/feature-development-flow`（要求明確化→プラン→TDD実装→プロパティテスト→完了処理）を参照。
+
 ## ビルドコマンド早見表
 
 ```bash
@@ -95,5 +104,10 @@ npm run tauri:dev          # 開発起動（build:inject を前段実行）
 npm run tauri:build        # リリースビルド
 npm run tauri:build:debug  # デバッグビルド
 npm run tauri:android:build # Android ビルド
-npm test                   # Vitest テスト実行
+npm run typecheck          # 型チェック（tsc --noEmit）
+npm run lint               # ESLint（src の TS/TSX）/ npm run lint:fix で自動修正
+npm test                   # Vitest 単体テスト（unit プロジェクト）
+npm run test:story         # Storybook play function（chromium ブラウザ実行）
+npm run test:property      # fast-check プロパティテスト
+npm run storybook          # Storybook 起動（目視確認）
 ```
