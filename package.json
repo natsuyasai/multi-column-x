@@ -15,6 +15,7 @@
     "format:kotlin": "cd src-tauri\\gen\\android && .\\gradlew.bat ktlintFormat",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
+    "lint:rust": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings",
     "tauri": "tauri",
     "test": "vitest run --project unit",
     "test:watch": "vitest --project unit",

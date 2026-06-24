@@ -123,6 +123,18 @@ describe("LinkPopupDialog", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
+  it("マウント時にinputがフォーカスされる", () => {
+    render(
+      <LinkPopupDialog
+        accounts={mockAccounts}
+        defaultAccountId="acc-1"
+        onSubmit={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByPlaceholderText("https://x.com/...")).toHaveFocus();
+  });
+
   it("EscキーでonCloseが呼ばれる", () => {
     const onClose = vi.fn();
     render(

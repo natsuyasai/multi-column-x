@@ -154,6 +154,87 @@ describe("ColumnLayoutTab", () => {
     fireEvent.click(removeButtons[0]);
     expect(screen.getByText("未割当")).toBeInTheDocument();
   });
+
+  it("割当済みセルでEnterキー押下時に選択され高さ設定が表示される", () => {
+    render(
+      <ColumnLayoutTab
+        columns={mockColumns}
+        accounts={mockAccounts}
+        onApply={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    const grid = screen.getByTestId("grid-preview");
+    const cell = within(grid)
+      .getByText("テストアカウント - ホーム")
+      .closest('[role="button"]') as HTMLElement;
+    fireEvent.keyDown(cell, { key: "Enter" });
+    expect(screen.getByText(/高さ設定/)).toBeInTheDocument();
+  });
+
+  it("割当済みセルでSpaceキー押下時に選択され高さ設定が表示される", () => {
+    render(
+      <ColumnLayoutTab
+        columns={mockColumns}
+        accounts={mockAccounts}
+        onApply={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    const grid = screen.getByTestId("grid-preview");
+    const cell = within(grid)
+      .getByText("テストアカウント - 通知")
+      .closest('[role="button"]') as HTMLElement;
+    fireEvent.keyDown(cell, { key: " " });
+    expect(screen.getByText(/高さ設定/)).toBeInTheDocument();
+  });
+
+  it("未割当アイテムはpendingCellが無いとき無効なボタンである", () => {
+    render(
+      <ColumnLayoutTab
+        columns={mockColumns}
+        accounts={mockAccounts}
+        onApply={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    // c1 を解除して未割当に移動
+    const removeButtons = screen.getAllByLabelText("割り当て解除");
+    fireEvent.click(removeButtons[0]);
+    const unassignedSection = screen.getByText("未割当").parentElement!;
+    const itemButton = within(unassignedSection).getByRole("button", {
+      name: /テストアカウント/,
+    });
+    expect(itemButton).toBeDisabled();
+  });
+
+  it("空セル選択後に未割当アイテムボタンをクリックすると割り当てられる", () => {
+    render(
+      <ColumnLayoutTab
+        columns={mockColumns}
+        accounts={mockAccounts}
+        onApply={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    // c1 を解除して未割当に移動
+    const removeButtons = screen.getAllByLabelText("割り当て解除");
+    fireEvent.click(removeButtons[0]);
+    // 行を追加して空セルを pending にする
+    fireEvent.click(screen.getAllByText("+ 行を追加")[0]);
+    const unassignedSection = screen.getByText("未割当").parentElement!;
+    const itemButton = within(unassignedSection).getByRole("button", {
+      name: /テストアカウント/,
+    });
+    expect(itemButton).not.toBeDisabled();
+    fireEvent.click(itemButton);
+    // 割り当てられて未割当リストから消える
+    expect(
+      within(screen.getByText("未割当").parentElement!).queryByRole("button", {
+        name: /テストアカウント/,
+      }),
+    ).not.toBeInTheDocument();
+  });
 });
 
 describe("ColumnLayoutTab カラム順序", () => {

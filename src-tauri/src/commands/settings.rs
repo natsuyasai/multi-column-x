@@ -126,16 +126,6 @@ impl Default for GlobalSettingsData {
     }
 }
 
-impl Default for AppSettingsData {
-    fn default() -> Self {
-        Self {
-            accounts: vec![],
-            columns: vec![],
-            global_settings: GlobalSettingsData::default(),
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ColumnData {
     pub id: String,
@@ -258,7 +248,7 @@ pub struct GlobalSettingsData {
     pub ng_words: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct AppSettingsData {
     pub accounts: Vec<AccountData>,
     pub columns: Vec<ColumnData>,
