@@ -91,7 +91,10 @@ const App: React.FC = () => {
     dialogOpen,
   } = useDialogState();
 
-  const updater = useAppUpdater(isMobile);
+  // カラム（ネイティブ WebView）の復元が完了したかどうか。
+  // 起動時の更新チェックは復元完了後にゲートし、UpdateDialog がカラムの裏に隠れるのを防ぐ。
+  const [columnsRestored, setColumnsRestored] = useState(false);
+  const updater = useAppUpdater(isMobile, columnsRestored);
   const [appVersion, setAppVersion] = useState("");
 
   const topBarHeight = getTopBarHeight(topBarExpanded);
@@ -130,7 +133,8 @@ const App: React.FC = () => {
   // isLoaded の true 遷移時のみ実行し、topBarHeight 変化で再復元させない
   useEffect(() => {
     if (isLoaded) {
-      restoreColumns(topBarHeight);
+      // 復元が一巡したら（成功・失敗どちらでも）フラグを立て、起動時更新チェックを解放する
+      restoreColumns(topBarHeight).finally(() => setColumnsRestored(true));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoaded]);
