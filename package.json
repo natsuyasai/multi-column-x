@@ -1,7 +1,7 @@
 {
   "name": "multi-column-x",
   "private": true,
-  "version": "0.1.5",
+  "version": "0.1.6",
   "type": "module",
   "scripts": {
     "build:inject": "vite build --config vite.inject.config.ts && vite build --config vite.inject.config.ts --mode react",

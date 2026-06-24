@@ -22,6 +22,25 @@ describe("useAppUpdater", () => {
     );
   });
 
+  it("readyがfalseの間は起動チェックせず、trueになってから1度だけチェックする", async () => {
+    const check = vi.fn().mockResolvedValue({ version: "1.2.0" });
+    vi.mocked(createUpdater).mockReturnValue({ check, install: vi.fn() });
+    const { result, rerender } = renderHook(
+      ({ ready }: { ready: boolean }) => useAppUpdater(false, ready),
+      { initialProps: { ready: false } },
+    );
+    // ready=false の間はチェックされない（カラム復元前）
+    await Promise.resolve();
+    expect(check).not.toHaveBeenCalled();
+    expect(result.current.available).toBeNull();
+    // ready=true（カラム復元完了）になって初めてチェックする
+    rerender({ ready: true });
+    await waitFor(() =>
+      expect(result.current.available).toEqual({ version: "1.2.0" }),
+    );
+    expect(check).toHaveBeenCalledOnce();
+  });
+
   it("見送り済みバージョンは起動時に表示しない", async () => {
     localStorage.setItem("mcx_dismissedUpdateVersion", "1.2.0");
     vi.mocked(createUpdater).mockReturnValue({
