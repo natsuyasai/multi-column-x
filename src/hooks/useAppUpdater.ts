@@ -19,7 +19,7 @@ function readDismissed(): string | null {
   }
 }
 
-export function useAppUpdater(isMobile: boolean) {
+export function useAppUpdater(isMobile: boolean, ready: boolean = true) {
   const updater = useMemo(() => createUpdater(isMobile), [isMobile]);
   const [available, setAvailable] = useState<AppUpdate | null>(null);
   const [checking, setChecking] = useState(false);
@@ -30,8 +30,11 @@ export function useAppUpdater(isMobile: boolean) {
   // updater インスタンスごとに一度、起動時の自動チェックを行う。見送り済みバージョンは表示しない。
   // isMobile が確定して updater が mobile 実装へ切り替わった際にも確実にチェックするため、
   // started 判定は updater 単位で持つ（false→true 切替で再チェックされる）。
+  // ready が false の間はチェックしない（カラム復元前に UpdateDialog がネイティブ WebView の裏へ
+  // 隠れるのを防ぐため、復元完了で ready=true になってから初めてチェックする）。
   const checkedUpdaterRef = useRef<Updater | null>(null);
   useEffect(() => {
+    if (!ready) return;
     if (checkedUpdaterRef.current === updater) return;
     checkedUpdaterRef.current = updater;
     setChecking(true);
@@ -44,7 +47,7 @@ export function useAppUpdater(isMobile: boolean) {
       })
       .catch(logError("useAppUpdater:startupCheck"))
       .finally(() => setChecking(false));
-  }, [updater]);
+  }, [updater, ready]);
 
   // 手動チェック。見送り記録を無視して結果を表示する。
   const checkManually = useCallback(async () => {
