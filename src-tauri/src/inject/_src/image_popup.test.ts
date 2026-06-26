@@ -6,6 +6,7 @@ import {
   classifyMediaHref,
   isMediaLink,
   buildVideoUrl,
+  buildIStatusVideoUrl,
   findStatusPermalink,
   findMediaIndex,
 } from "./image_popup";
@@ -124,6 +125,20 @@ describe("inject/image_popup の純粋関数", () => {
     });
   });
 
+  describe("buildIStatusVideoUrl", () => {
+    it("status id から /i/status/<id>/video/<index> の絶対 URL を組み立てる", () => {
+      expect(buildIStatusVideoUrl("2069216779545751868", 1)).toBe(
+        "https://x.com/i/status/2069216779545751868/video/1",
+      );
+    });
+
+    it("index を反映する", () => {
+      expect(buildIStatusVideoUrl("123", 2)).toBe(
+        "https://x.com/i/status/123/video/2",
+      );
+    });
+  });
+
   describe("findStatusPermalink", () => {
     it("time 子要素を持つ status リンクの href を返す", () => {
       const article = buildArticle("/alice/status/123");
@@ -155,6 +170,35 @@ describe("inject/image_popup の純粋関数", () => {
     });
   });
 });
+
+/**
+ * 引用RT 風 DOM を生成する。外側ツイートの timestamp リンクを持つ article の中に、
+ * 引用ツイートコンテナ（div[role="link"][tabindex="0"]）→ tweetPhoto → playButton を配置する。
+ * quotedTweetId を渡すと引用コンテナに疑似 React fiber を付与し、最寄りの tweet.id_str として返す。
+ */
+function buildQuotedTweetWithVideo(
+  outerStatusHref: string,
+  quotedTweetId: string | null,
+): HTMLButtonElement {
+  const article = buildArticle(outerStatusHref);
+  const quoted = document.createElement("div");
+  quoted.setAttribute("role", "link");
+  quoted.setAttribute("tabindex", "0");
+  const photo = document.createElement("div");
+  photo.dataset.testid = "tweetPhoto";
+  const button = document.createElement("button");
+  button.dataset.testid = "playButton";
+  photo.appendChild(button);
+  quoted.appendChild(photo);
+  article.appendChild(quoted);
+  if (quotedTweetId !== null) {
+    (quoted as unknown as Record<string, unknown>)["__reactFiber$test"] = {
+      memoizedProps: { tweet: { id_str: quotedTweetId } },
+      return: null,
+    };
+  }
+  return button;
+}
 
 describe("inject/image_popup のクリック傍受", () => {
   beforeAll(async () => {
@@ -251,6 +295,33 @@ describe("inject/image_popup のクリック傍受", () => {
     const article = buildArticle("/carol/status/555");
     const photo = addTweetPhoto(article, true);
     const button = photo.querySelector("button")!;
+
+    const event = click(button);
+
+    expect(invokeMock).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it("引用ツイート内の playButton は fiber の tweet.id_str から /i/status/<id>/video/1 を開く", () => {
+    const button = buildQuotedTweetWithVideo(
+      "/sankims/status/2070347996856996068",
+      "2069216779545751868",
+    );
+
+    const event = click(button);
+
+    expect(invokeMock).toHaveBeenCalledWith("open_popup_window", {
+      webviewLabelCaller: WEBVIEW_LABEL,
+      url: "https://x.com/i/status/2069216779545751868/video/1",
+    });
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it("引用ツイート内の playButton は ID を取得できなければ傍受せずインライン再生にフォールバックする", () => {
+    const button = buildQuotedTweetWithVideo(
+      "/sankims/status/2070347996856996068",
+      null,
+    );
 
     const event = click(button);
 
