@@ -34,6 +34,8 @@ const globalSettings: GlobalSettings = {
   defaultColumnCustomCSS: "",
   popupEscCloseEnabled: true,
   videoAutoPlayStopEnabled: true,
+  imagePopupEnabled: true,
+  videoPopupEnabled: true,
   showSortButtons: false,
   smallImageEnabled: false,
   smallImageWidth: "50%",
