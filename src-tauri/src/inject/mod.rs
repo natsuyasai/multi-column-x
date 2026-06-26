@@ -134,8 +134,9 @@ pub fn build_popup_init_script(
     esc_close_enabled: bool,
 ) -> String {
     let popup_toolbar = include_str!("popup_toolbar.js");
+    let popup_video_autoplay = include_str!("popup_video_autoplay.js");
     format!(
-        "window.{}={};window.{}={:?};window.{}={:?};window.{}={};\n{}",
+        "window.{}={};window.{}={:?};window.{}={:?};window.{}={};\n{}\n{}",
         globals::MCX_ACCOUNTS,
         accounts_json,
         globals::MCX_CURRENT_ACCOUNT_ID,
@@ -144,7 +145,8 @@ pub fn build_popup_init_script(
         target_href,
         globals::MCX_ESC_CLOSE_ENABLED,
         esc_close_enabled,
-        popup_toolbar
+        popup_toolbar,
+        popup_video_autoplay
     )
 }
 
@@ -297,6 +299,15 @@ mod tests {
         assert!(script.contains("acc1"));
         assert!(script.contains("__mcxEscCloseEnabled"));
         assert!(script.contains("true"));
+    }
+
+    #[test]
+    fn build_popup_init_scriptに動画自動再生スクリプトが含まれる() {
+        let script =
+            build_popup_init_script("[]", "acc1", "https://x.com/user/status/123/video/1", true);
+        // popup_video_autoplay.ts 内の一意なマーカーコメント
+        assert!(script.contains("mcx-video-autoplay"));
+        assert!(script.contains("shouldAutoplay"));
     }
 
     #[test]
