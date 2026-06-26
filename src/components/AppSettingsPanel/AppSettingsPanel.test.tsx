@@ -29,6 +29,8 @@ const baseGlobalSettings: GlobalSettings = {
   defaultColumnCustomCSS: "",
   popupEscCloseEnabled: true,
   videoAutoPlayStopEnabled: true,
+  imagePopupEnabled: true,
+  videoPopupEnabled: true,
   showSortButtons: false,
   smallImageEnabled: false,
   smallImageWidth: "50%",
@@ -270,6 +272,69 @@ describe("AppSettingsPanel モバイルのカラム並び替え", () => {
     fireEvent.click(screen.getByRole("button", { name: "カラム配置" }));
     // 列数入力（グリッドエディタ）が表示されない
     expect(screen.queryByText("列数:")).not.toBeInTheDocument();
+  });
+});
+
+describe("AppSettingsPanel ポップアップウィンドウ", () => {
+  it("画像・動画をポップアップで開くトグルが表示される", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(
+      screen.getByRole("checkbox", {
+        name: "画像をポップアップウィンドウで開く",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", {
+        name: "動画をポップアップウィンドウで開く",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("各トグルの初期checked状態がsettingsの値を反映する", () => {
+    const settings = {
+      ...baseGlobalSettings,
+      imagePopupEnabled: false,
+      videoPopupEnabled: true,
+    };
+    render(<AppSettingsPanel {...defaultProps} settings={settings} />);
+    expect(
+      screen.getByRole("checkbox", {
+        name: "画像をポップアップウィンドウで開く",
+      }),
+    ).not.toBeChecked();
+    expect(
+      screen.getByRole("checkbox", {
+        name: "動画をポップアップウィンドウで開く",
+      }),
+    ).toBeChecked();
+  });
+
+  it("画像ポップアップトグルを切り替えて適用するとonApplyに反映される", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: "画像をポップアップウィンドウで開く",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ imagePopupEnabled: false }),
+    );
+  });
+
+  it("動画ポップアップトグルを切り替えて適用するとonApplyに反映される", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: "動画をポップアップウィンドウで開く",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ videoPopupEnabled: false }),
+    );
   });
 });
 

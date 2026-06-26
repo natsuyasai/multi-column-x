@@ -58,6 +58,8 @@ export interface GlobalSettings {
   defaultColumnCustomCSS: string;
   popupEscCloseEnabled: boolean;
   videoAutoPlayStopEnabled: boolean;
+  imagePopupEnabled: boolean;
+  videoPopupEnabled: boolean;
   showSortButtons: boolean;
   smallImageEnabled: boolean;
   smallImageWidth: string;
@@ -150,6 +152,8 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   defaultColumnCustomCSS: "",
   popupEscCloseEnabled: true,
   videoAutoPlayStopEnabled: true,
+  imagePopupEnabled: true,
+  videoPopupEnabled: true,
   showSortButtons: false,
   smallImageEnabled: false,
   smallImageWidth: "50%",
