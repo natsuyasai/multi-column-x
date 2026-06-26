@@ -32,6 +32,20 @@ pub(crate) fn load_popup_esc_close_enabled(app: &AppHandle) -> bool {
         .unwrap_or(true)
 }
 
+pub(crate) fn load_image_popup_enabled(app: &AppHandle) -> bool {
+    load_global_settings(app)
+        .get("imagePopupEnabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true)
+}
+
+pub(crate) fn load_video_popup_enabled(app: &AppHandle) -> bool {
+    load_global_settings(app)
+        .get("videoPopupEnabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true)
+}
+
 pub(crate) fn load_global_ng_words(app: &AppHandle) -> Vec<String> {
     load_global_settings(app)
         .get("ngWords")
