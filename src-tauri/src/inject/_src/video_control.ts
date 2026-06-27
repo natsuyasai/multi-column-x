@@ -1,5 +1,16 @@
+// mediaviewer（X の全画面メディアビューア）ではユーザーが明示的に再生を望んでいるため、
+// オートプレイ抑制を行わない。Android で動画再生時にこの URL へ遷移する。
+// 例: /ANIMA_info/status/2070703676067635303/mediaviewer
+export function isMediaViewerPath(pathname: string): boolean {
+  return /\/mediaviewer\/?$/.test(pathname);
+}
+
 (function () {
   function blockFirstAutoplay(video: HTMLVideoElement): void {
+    // mediaviewer ではブロックしない（処理時点の URL でその都度判定する）
+    if (isMediaViewerPath(window.location.pathname)) {
+      return;
+    }
     video.pause();
     let blocked = true;
     setTimeout(() => {
