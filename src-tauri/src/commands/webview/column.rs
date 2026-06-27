@@ -3,7 +3,8 @@
 use super::parse_url;
 use crate::commands::settings::ColumnData;
 use crate::commands::settings_store::{
-    load_global_ng_words, load_hide_ad_enabled, load_video_auto_play_stop_enabled,
+    load_global_ng_words, load_hide_ad_enabled, load_image_popup_enabled,
+    load_video_auto_play_stop_enabled, load_video_popup_enabled,
 };
 use crate::inject::{build_init_script, InitScriptParams};
 use crate::ipc_constants::labels;
@@ -63,6 +64,8 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
 
     let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(&app);
     let hide_ad_enabled = load_hide_ad_enabled(&app);
+    let image_popup_enabled = load_image_popup_enabled(&app);
+    let video_popup_enabled = load_video_popup_enabled(&app);
     let global_ng_words = load_global_ng_words(&app);
     let init_script = build_init_script(&InitScriptParams {
         is_mobile: false,
@@ -75,6 +78,8 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         blur_image_enabled: args.column.settings.blur_image_enabled,
         blur_image_amount: &args.column.settings.blur_image_amount,
         hide_ad_enabled,
+        image_popup_enabled,
+        video_popup_enabled,
         custom_css: &args.column.settings.custom_css,
         visible_links: &args.column.settings.visible_links,
         ng_words: &args.column.settings.ng_words,
@@ -147,6 +152,8 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
 
     let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(&app);
     let hide_ad_enabled = load_hide_ad_enabled(&app);
+    let image_popup_enabled = load_image_popup_enabled(&app);
+    let video_popup_enabled = load_video_popup_enabled(&app);
     let global_ng_words = load_global_ng_words(&app);
     let init_script = build_init_script(&InitScriptParams {
         is_mobile: true,
@@ -159,6 +166,8 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         blur_image_enabled: args.column.settings.blur_image_enabled,
         blur_image_amount: &args.column.settings.blur_image_amount,
         hide_ad_enabled,
+        image_popup_enabled,
+        video_popup_enabled,
         custom_css: &args.column.settings.custom_css,
         visible_links: &args.column.settings.visible_links,
         ng_words: &args.column.settings.ng_words,

@@ -13,6 +13,8 @@ pub struct InitScriptParams<'a> {
     pub blur_image_enabled: bool,
     pub blur_image_amount: &'a str,
     pub hide_ad_enabled: bool,
+    pub image_popup_enabled: bool,
+    pub video_popup_enabled: bool,
     pub custom_css: &'a str,
     pub visible_links: &'a [String],
     pub ng_words: &'a [String],
@@ -65,7 +67,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     let global_ng_words_json =
         serde_json::to_string(params.global_ng_words).unwrap_or_else(|_| "[]".to_string());
     let config = format!(
-        "window.{} = {{ areaRemoveEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?}, blurImageEnabled: {}, blurImageAmount: {:?}, hideAdEnabled: {}, ngWords: {}, globalNgWords: {} }};",
+        "window.{} = {{ areaRemoveEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?}, blurImageEnabled: {}, blurImageAmount: {:?}, hideAdEnabled: {}, imagePopupEnabled: {}, videoPopupEnabled: {}, ngWords: {}, globalNgWords: {} }};",
         globals::MULTI_COLUMN_X_CONFIG,
         params.area_remove_enabled,
         params.show_custom_menu,
@@ -75,6 +77,8 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         params.blur_image_enabled,
         params.blur_image_amount,
         params.hide_ad_enabled,
+        params.image_popup_enabled,
+        params.video_popup_enabled,
         ng_words_json,
         global_ng_words_json
     );
@@ -130,8 +134,9 @@ pub fn build_popup_init_script(
     esc_close_enabled: bool,
 ) -> String {
     let popup_toolbar = include_str!("popup_toolbar.js");
+    let popup_video_autoplay = include_str!("popup_video_autoplay.js");
     format!(
-        "window.{}={};window.{}={:?};window.{}={:?};window.{}={};\n{}",
+        "window.{}={};window.{}={:?};window.{}={:?};window.{}={};\n{}\n{}",
         globals::MCX_ACCOUNTS,
         accounts_json,
         globals::MCX_CURRENT_ACCOUNT_ID,
@@ -140,7 +145,8 @@ pub fn build_popup_init_script(
         target_href,
         globals::MCX_ESC_CLOSE_ENABLED,
         esc_close_enabled,
-        popup_toolbar
+        popup_toolbar,
+        popup_video_autoplay
     )
 }
 
@@ -160,6 +166,8 @@ mod tests {
             blur_image_enabled: false,
             blur_image_amount: "10px",
             hide_ad_enabled: false,
+            image_popup_enabled: true,
+            video_popup_enabled: true,
             custom_css: "",
             visible_links: &[],
             ng_words: &[],
@@ -207,6 +215,38 @@ mod tests {
         assert!(script.contains("showCustomMenu: true"));
         assert!(script.contains("smallImageEnabled: false"));
         assert!(script.contains("hideAdEnabled: false"));
+    }
+
+    #[test]
+    fn build_init_scriptのconfigに画像ポップアップ有効が含まれる() {
+        let mut params = default_params();
+        params.image_popup_enabled = true;
+        let script = build_init_script(&params);
+        assert!(script.contains("imagePopupEnabled: true"));
+    }
+
+    #[test]
+    fn build_init_scriptのconfigに画像ポップアップ無効が含まれる() {
+        let mut params = default_params();
+        params.image_popup_enabled = false;
+        let script = build_init_script(&params);
+        assert!(script.contains("imagePopupEnabled: false"));
+    }
+
+    #[test]
+    fn build_init_scriptのconfigに動画ポップアップ有効が含まれる() {
+        let mut params = default_params();
+        params.video_popup_enabled = true;
+        let script = build_init_script(&params);
+        assert!(script.contains("videoPopupEnabled: true"));
+    }
+
+    #[test]
+    fn build_init_scriptのconfigに動画ポップアップ無効が含まれる() {
+        let mut params = default_params();
+        params.video_popup_enabled = false;
+        let script = build_init_script(&params);
+        assert!(script.contains("videoPopupEnabled: false"));
     }
 
     #[test]
@@ -259,6 +299,15 @@ mod tests {
         assert!(script.contains("acc1"));
         assert!(script.contains("__mcxEscCloseEnabled"));
         assert!(script.contains("true"));
+    }
+
+    #[test]
+    fn build_popup_init_scriptに動画自動再生スクリプトが含まれる() {
+        let script =
+            build_popup_init_script("[]", "acc1", "https://x.com/user/status/123/video/1", true);
+        // popup_video_autoplay.ts 内の一意なマーカーコメント
+        assert!(script.contains("mcx-video-autoplay"));
+        assert!(script.contains("shouldAutoplay"));
     }
 
     #[test]

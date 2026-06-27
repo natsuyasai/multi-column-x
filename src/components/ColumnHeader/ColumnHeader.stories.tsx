@@ -70,6 +70,7 @@ const meta: Meta<typeof ColumnHeader> = {
     account,
     unreadCount: 3,
     onReload: fn(),
+    onReloadPage: fn(),
     onSettings: fn(),
     onClose: fn(),
     onClearUnread: fn(),

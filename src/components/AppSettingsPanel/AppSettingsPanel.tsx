@@ -112,6 +112,12 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   const [videoAutoPlayStopEnabled, setVideoAutoPlayStopEnabled] = useState(
     settings.videoAutoPlayStopEnabled,
   );
+  const [imagePopupEnabled, setImagePopupEnabled] = useState(
+    settings.imagePopupEnabled,
+  );
+  const [videoPopupEnabled, setVideoPopupEnabled] = useState(
+    settings.videoPopupEnabled,
+  );
   const [hideAdEnabled, setHideAdEnabled] = useState(settings.hideAdEnabled);
   const [columnScale, setColumnScale] = useState<ColumnScale>(
     settings.columnScale ?? "default",
@@ -146,6 +152,8 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       defaultColumnCustomCSS,
       popupEscCloseEnabled,
       videoAutoPlayStopEnabled,
+      imagePopupEnabled,
+      videoPopupEnabled,
       smallImageEnabled,
       smallImageWidth,
       blurImageEnabled,
@@ -424,6 +432,22 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                     onChange={(e) => setPopupEscCloseEnabled(e.target.checked)}
                   />
                   Escキーで閉じる
+                </label>
+                <label className={styles.checkLabel}>
+                  <input
+                    type="checkbox"
+                    checked={imagePopupEnabled}
+                    onChange={(e) => setImagePopupEnabled(e.target.checked)}
+                  />
+                  画像をポップアップウィンドウで開く
+                </label>
+                <label className={styles.checkLabel}>
+                  <input
+                    type="checkbox"
+                    checked={videoPopupEnabled}
+                    onChange={(e) => setVideoPopupEnabled(e.target.checked)}
+                  />
+                  動画をポップアップウィンドウで開く
                 </label>
               </section>
 

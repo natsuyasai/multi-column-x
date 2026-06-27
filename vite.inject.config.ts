@@ -14,6 +14,7 @@ const plainEntries = [
   "auto_reload",
   "scroll_event",
   "popup_toolbar",
+  "popup_video_autoplay",
   "context_menu",
   "video_control",
   "small_image",

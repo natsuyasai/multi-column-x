@@ -80,6 +80,9 @@ export const WEBVIEW_SCRIPTS = {
   TRIGGER_RELOAD:
     "window.__multiColumnX && window.__multiColumnX.triggerReload();",
 
+  /** ページ全体を再読み込みする（location.reload()） */
+  RELOAD_PAGE: "location.reload();",
+
   /** スクロール位置を先頭に戻してからページをリロードする（ダブルタップ用） */
   SCROLL_TOP_AND_RELOAD:
     "window.__multiColumnX && window.__multiColumnX.triggerReload(true);",

@@ -14,6 +14,14 @@ describe("TS/Rust デフォルト設定の契約", () => {
     expect(DEFAULT_GLOBAL_SETTINGS).toEqual(expected);
   });
 
+  it("画像ポップアップ既定値がtrueである", () => {
+    expect(DEFAULT_GLOBAL_SETTINGS.imagePopupEnabled).toBe(true);
+  });
+
+  it("動画ポップアップ既定値がtrueである", () => {
+    expect(DEFAULT_GLOBAL_SETTINGS.videoPopupEnabled).toBe(true);
+  });
+
   it("fixtureのaccounts/columnsは空配列である", () => {
     expect(fixture.accounts).toEqual([]);
     expect(fixture.columns).toEqual([]);

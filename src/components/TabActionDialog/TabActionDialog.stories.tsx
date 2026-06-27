@@ -30,6 +30,7 @@ const meta: Meta<typeof TabActionDialog> = {
   parameters: { layout: "fullscreen" },
   args: {
     columnLabel: "ホーム",
+    onReload: fn(),
     onSettings: fn(),
     onRemove: fn(),
     onClose: fn(),

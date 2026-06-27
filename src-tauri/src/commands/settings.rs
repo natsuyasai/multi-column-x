@@ -110,6 +110,8 @@ impl Default for GlobalSettingsData {
             default_column_custom_css: String::new(),
             popup_esc_close_enabled: true,
             video_auto_play_stop_enabled: true,
+            image_popup_enabled: true,
+            video_popup_enabled: true,
             show_sort_buttons: false,
             small_image_enabled: false,
             small_image_width: "50%".to_string(),
@@ -196,6 +198,12 @@ pub struct GlobalSettingsData {
     #[serde(rename = "videoAutoPlayStopEnabled")]
     #[serde(default)]
     pub video_auto_play_stop_enabled: bool,
+    #[serde(rename = "imagePopupEnabled")]
+    #[serde(default = "default_true")]
+    pub image_popup_enabled: bool,
+    #[serde(rename = "videoPopupEnabled")]
+    #[serde(default = "default_true")]
+    pub video_popup_enabled: bool,
     #[serde(rename = "showSortButtons")]
     #[serde(default = "default_true")]
     pub show_sort_buttons: bool,
@@ -308,6 +316,18 @@ mod tests {
     fn global_settings_default_popup_esc_close_enabled() {
         let gs = GlobalSettingsData::default();
         assert!(gs.popup_esc_close_enabled);
+    }
+
+    #[test]
+    fn global_settings_default_image_popup_enabled() {
+        let gs = GlobalSettingsData::default();
+        assert!(gs.image_popup_enabled);
+    }
+
+    #[test]
+    fn global_settings_default_video_popup_enabled() {
+        let gs = GlobalSettingsData::default();
+        assert!(gs.video_popup_enabled);
     }
 
     #[test]
