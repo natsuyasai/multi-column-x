@@ -10,6 +10,7 @@ interface ColumnHeaderProps {
   column: Column;
   account: Account;
   onReload: (columnId: string) => void;
+  onReloadPage: (columnId: string) => void;
   onSettings: (columnId: string) => void;
   onClose: (columnId: string) => void;
   unreadCount?: number;
@@ -20,6 +21,7 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
   column,
   account,
   onReload,
+  onReloadPage,
   onSettings,
   onClose,
   unreadCount = 0,
@@ -65,6 +67,17 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
           title="更新"
         >
           ↺
+        </button>
+        <button
+          className={styles.actionBtn}
+          onClick={() => {
+            onReloadPage(column.id);
+            reset();
+          }}
+          aria-label="ページを再読み込み"
+          title="ページを再読み込み"
+        >
+          ⟳
         </button>
         <button
           className={styles.actionBtn}
