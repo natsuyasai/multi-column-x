@@ -43,6 +43,7 @@ const defaultProps = {
   column: mockColumn,
   account: mockAccount,
   onReload: vi.fn(),
+  onReloadPage: vi.fn(),
   onSettings: vi.fn(),
   onClose: vi.fn(),
 };
@@ -67,6 +68,19 @@ describe("ColumnHeader", () => {
     render(<ColumnHeader {...defaultProps} onReload={onReload} />);
     fireEvent.click(screen.getByLabelText("更新"));
     expect(onReload).toHaveBeenCalledWith("col-1");
+  });
+
+  it("ページ再読み込みボタンクリックでonReloadPageが呼ばれる", () => {
+    const onReloadPage = vi.fn();
+    render(<ColumnHeader {...defaultProps} onReloadPage={onReloadPage} />);
+    fireEvent.click(screen.getByLabelText("ページを再読み込み"));
+    expect(onReloadPage).toHaveBeenCalledWith("col-1");
+  });
+
+  it("ページ再読み込みボタンは更新ボタンとは別に存在する", () => {
+    render(<ColumnHeader {...defaultProps} />);
+    expect(screen.getByLabelText("更新")).toBeInTheDocument();
+    expect(screen.getByLabelText("ページを再読み込み")).toBeInTheDocument();
   });
 
   it("並び替えボタンが存在しない", () => {

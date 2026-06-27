@@ -236,6 +236,10 @@ const App: React.FC = () => {
     await evalInColumn(columnId, WEBVIEW_SCRIPTS.TRIGGER_RELOAD);
   }, []);
 
+  const handleReloadPage = useCallback(async (columnId: string) => {
+    await evalInColumn(columnId, WEBVIEW_SCRIPTS.RELOAD_PAGE);
+  }, []);
+
   const handleApplySettings = useCallback(
     async (columnId: string, settings: ColumnSettings, width: number) => {
       handleUpdateColumn(columnId, { settings, width });
@@ -379,6 +383,7 @@ const App: React.FC = () => {
                 column={column}
                 account={account}
                 onReload={handleReload}
+                onReloadPage={handleReloadPage}
                 onSettings={setSettingsColumnId}
                 onClose={handleRemoveColumn}
                 unreadCount={unreadCounts[column.id] ?? 0}
@@ -489,6 +494,10 @@ const App: React.FC = () => {
       {tabActionColumn && (
         <TabActionDialog
           columnLabel={tabActionColumn.label || tabActionColumn.pageType}
+          onReload={() => {
+            setTabActionColumnId(null);
+            handleReloadPage(tabActionColumn.id);
+          }}
           onSettings={() => {
             setTabActionColumnId(null);
             setSettingsColumnId(tabActionColumn.id);

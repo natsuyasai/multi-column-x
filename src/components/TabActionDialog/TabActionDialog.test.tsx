@@ -4,6 +4,7 @@ import { TabActionDialog } from "./TabActionDialog";
 
 const defaultProps = {
   columnLabel: "テストカラム",
+  onReload: vi.fn(),
   onSettings: vi.fn(),
   onRemove: vi.fn(),
   onClose: vi.fn(),
@@ -13,6 +14,13 @@ describe("TabActionDialog", () => {
   it("カラムラベルが表示される", () => {
     render(<TabActionDialog {...defaultProps} />);
     expect(screen.getByText("テストカラム")).toBeInTheDocument();
+  });
+
+  it("再読み込みボタンをクリックすると onReload が呼ばれる", () => {
+    const onReload = vi.fn();
+    render(<TabActionDialog {...defaultProps} onReload={onReload} />);
+    fireEvent.click(screen.getByText(/再読み込み/));
+    expect(onReload).toHaveBeenCalled();
   });
 
   it("設定ボタンをクリックすると onSettings が呼ばれる", () => {

@@ -5,6 +5,7 @@ import styles from "./TabActionDialog.module.scss";
 
 interface Props {
   columnLabel: string;
+  onReload: () => void;
   onSettings: () => void;
   onRemove: () => void;
   onClose: () => void;
@@ -12,6 +13,7 @@ interface Props {
 
 export const TabActionDialog: React.FC<Props> = ({
   columnLabel,
+  onReload,
   onSettings,
   onRemove,
   onClose,
@@ -34,6 +36,10 @@ export const TabActionDialog: React.FC<Props> = ({
     >
       <div className={styles.sheet} role="dialog" aria-modal="true">
         <p className={styles.label}>{columnLabel}</p>
+        <button className={styles.actionBtn} onClick={onReload}>
+          <span aria-hidden="true">⟳</span>
+          再読み込み
+        </button>
         <button className={styles.actionBtn} onClick={onSettings}>
           <SettingsIcon width={16} height={16} data-testid="icon-settings" />
           設定
