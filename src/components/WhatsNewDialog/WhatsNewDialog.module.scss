@@ -1,0 +1,84 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--mcx-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dialog {
+  background: var(--mcx-surface);
+  color: var(--mcx-text);
+  border-radius: 8px;
+  padding: 20px;
+  width: min(480px, 90vw);
+  max-height: 80vh;
+  overflow: auto;
+  box-shadow: 0 8px 32px var(--mcx-shadow);
+}
+
+.title {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+}
+
+.version {
+  margin: 0 0 16px;
+  font-size: 0.9rem;
+  color: var(--mcx-text);
+  opacity: 0.7;
+}
+
+.notes {
+  background: var(--mcx-surface-muted);
+  padding: 12px 16px;
+  border-radius: 4px;
+  max-height: 45vh;
+  overflow: auto;
+
+  h3 {
+    margin: 12px 0 6px;
+    font-size: 0.95rem;
+
+    &:first-child {
+      margin-top: 0;
+    }
+  }
+
+  ul {
+    margin: 0 0 8px;
+    padding-left: 1.4em;
+  }
+
+  li {
+    margin: 2px 0;
+    font-size: 0.9rem;
+  }
+
+  p {
+    margin: 0 0 8px;
+    font-size: 0.9rem;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.closeBtn {
+  padding: 8px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  background: var(--mcx-accent);
+  color: var(--mcx-text-on-accent);
+  border: none;
+  font-size: 0.9rem;
+}

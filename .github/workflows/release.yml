@@ -16,6 +16,8 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Read version from tauri.conf.json
         id: version
         run: echo "version=$(jq -r .version src-tauri/tauri.conf.json)" >> "$GITHUB_OUTPUT"
@@ -28,24 +30,105 @@ jobs:
             echo "tag ($tag) != tauri.conf.json version ($ver)"
             exit 1
           fi
-      - name: Create draft release
+      - name: Determine previous tag
+        id: prevtag
+        run: |
+          git fetch --tags --force
+          version="${{ steps.version.outputs.version }}"
+          current="v$version"
+          mapfile -t tags < <(git tag --sort=-version:refname)
+          prev=""
+          if printf '%s\n' "${tags[@]}" | grep -qx "$current"; then
+            found=0
+            for t in "${tags[@]}"; do
+              if [ "$found" = "1" ]; then prev="$t"; break; fi
+              if [ "$t" = "$current" ]; then found=1; fi
+            done
+            head_ref="$current"
+          else
+            prev="${tags[0]:-}"
+            head_ref="$(git rev-parse HEAD)"
+          fi
+          echo "prev=$prev" >> "$GITHUB_OUTPUT"
+          echo "head=$head_ref" >> "$GITHUB_OUTPUT"
+      - name: Create or update draft release with notes
         id: create
         uses: actions/github-script@v7
+        env:
+          PREV_TAG: ${{ steps.prevtag.outputs.prev }}
+          HEAD_REF: ${{ steps.prevtag.outputs.head }}
+          VERSION: ${{ steps.version.outputs.version }}
         with:
           result-encoding: string
           script: |
-            const tag = `v${{ steps.version.outputs.version }}`;
+            const path = require("node:path");
+            const { pathToFileURL } = require("node:url");
+            const { buildReleaseBody } = await import(
+              pathToFileURL(
+                path.join(process.env.GITHUB_WORKSPACE, "scripts", "releaseNotes.mjs"),
+              ).href,
+            );
+
+            const version = process.env.VERSION;
+            const tag = `v${version}`;
+            const prev = process.env.PREV_TAG;
+            const head = process.env.HEAD_REF;
+
+            // 前タグ〜HEAD のコミットに紐づくマージ済み PR を収集する
+            const prMap = new Map();
+            if (prev) {
+              const { data: cmp } = await github.rest.repos.compareCommits({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                base: prev,
+                head,
+              });
+              for (const commit of cmp.commits) {
+                const { data: associated } =
+                  await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    commit_sha: commit.sha,
+                  });
+                for (const pr of associated) {
+                  if (pr.merged_at) prMap.set(pr.number, pr);
+                }
+              }
+            }
+
+            const prs = [...prMap.values()].map((pr) => ({
+              title: pr.title,
+              body: pr.body,
+              labels: (pr.labels ?? []).map((l) =>
+                typeof l === "string" ? l : l.name,
+              ),
+            }));
+
+            const body = buildReleaseBody(prs);
+            console.log(`generated release body (${prs.length} PRs):\n${body}`);
+
             const existing = await github.rest.repos.listReleases({
               owner: context.repo.owner,
               repo: context.repo.repo,
             });
             const found = existing.data.find((r) => r.tag_name === tag);
-            if (found) return String(found.id);
+            if (found) {
+              if (body) {
+                await github.rest.repos.updateRelease({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  release_id: found.id,
+                  body,
+                });
+              }
+              return String(found.id);
+            }
             const { data } = await github.rest.repos.createRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
               tag_name: tag,
               name: `MultiColumnX ${tag}`,
+              body,
               draft: true,
               prerelease: false,
             });

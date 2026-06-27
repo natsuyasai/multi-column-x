@@ -15,6 +15,7 @@ import { SettingsPanel } from "./components/SettingsPanel/SettingsPanel";
 import { TabActionDialog } from "./components/TabActionDialog/TabActionDialog";
 import { TopBar } from "./components/TopBar/TopBar";
 import { UpdateDialog } from "./components/UpdateDialog/UpdateDialog";
+import { WhatsNewDialog } from "./components/WhatsNewDialog/WhatsNewDialog";
 import { IPC_COMMANDS, WEBVIEW_SCRIPTS } from "./constants/ipc";
 import { useAccounts } from "./hooks/useAccounts";
 import { useAppUpdater } from "./hooks/useAppUpdater";
@@ -26,6 +27,7 @@ import {
   useNewPostsNotification,
   useWebviewScrollRelay,
 } from "./hooks/useWebviewEvents";
+import { useWhatsNew } from "./hooks/useWhatsNew";
 import {
   HEADER_HEIGHT,
   getTopBarHeight,
@@ -95,6 +97,7 @@ const App: React.FC = () => {
   // 起動時の更新チェックは復元完了後にゲートし、UpdateDialog がカラムの裏に隠れるのを防ぐ。
   const [columnsRestored, setColumnsRestored] = useState(false);
   const updater = useAppUpdater(isMobile, columnsRestored);
+  const whatsNew = useWhatsNew(columnsRestored);
   const [appVersion, setAppVersion] = useState("");
 
   const topBarHeight = getTopBarHeight(topBarExpanded);
@@ -182,7 +185,7 @@ const App: React.FC = () => {
 
   // ダイアログ表示中は列WebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
   // 更新ポップアップも同様に退避対象に含める。
-  const anyDialogOpen = dialogOpen || !!updater.available;
+  const anyDialogOpen = dialogOpen || !!updater.available || !!whatsNew.notes;
   useEffect(() => {
     setDialogOpen(anyDialogOpen);
     if (anyDialogOpen) {
@@ -517,6 +520,14 @@ const App: React.FC = () => {
           progress={updater.progress}
           onInstall={updater.install}
           onLater={updater.dismiss}
+        />
+      )}
+
+      {whatsNew.notes && (
+        <WhatsNewDialog
+          version={appVersion}
+          notes={whatsNew.notes}
+          onClose={whatsNew.dismiss}
         />
       )}
     </div>

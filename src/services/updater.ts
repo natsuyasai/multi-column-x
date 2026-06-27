@@ -15,7 +15,9 @@ export interface AppUpdate {
 export type UpdateProgress =
   | { phase: "downloading"; downloaded: number; total: number | null }
   | { phase: "installing" }
-  | { phase: "restarting" };
+  | { phase: "restarting" }
+  // Android: OSがAPKダウンロードを引き継いだ後の待機状態
+  | { phase: "awaitingInstall" };
 
 export type UpdateProgressCallback = (progress: UpdateProgress) => void;
 
@@ -77,6 +79,9 @@ function createMobileUpdater(): Updater {
       // 不確定のダウンロード状態を通知してフリーズに見えないようにする。
       onProgress?.({ phase: "downloading", downloaded: 0, total: null });
       await invoke("install_apk_update", { url: apkUrl });
+      // invoke はバックグラウンド Thread を起動して即 return する fire-and-forget。
+      // OS がダウンロードを引き継いだことを UI に伝え、ボタン再押下を防ぐ。
+      onProgress?.({ phase: "awaitingInstall" });
     },
   };
 }

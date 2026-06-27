@@ -71,11 +71,19 @@ export function useAppUpdater(isMobile: boolean, ready: boolean = true) {
   const install = useCallback(async () => {
     setInstalling(true);
     setProgress(null);
+    let lastPhase: string | null = null;
     try {
-      await updater.install((p) => setProgress(p));
+      await updater.install((p) => {
+        setProgress(p);
+        lastPhase = p.phase;
+      });
+      // awaitingInstall: OSがAPKダウンロードを継続中のため状態を維持してボタン再押下を防ぐ
+      if (lastPhase !== "awaitingInstall") {
+        setInstalling(false);
+        setProgress(null);
+      }
     } catch (e) {
       logError("useAppUpdater:install")(e);
-    } finally {
       setInstalling(false);
       setProgress(null);
     }

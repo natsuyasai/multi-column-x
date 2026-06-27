@@ -30,6 +30,11 @@ function describeProgress(progress: UpdateProgress): {
       return { label: "インストール中...", percent: null };
     case "restarting":
       return { label: "再起動中...", percent: null };
+    case "awaitingInstall":
+      return {
+        label: "ダウンロード中です。完了後にインストール画面が表示されます。",
+        percent: null,
+      };
   }
 }
 
