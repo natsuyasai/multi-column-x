@@ -128,4 +128,6 @@ export const STORAGE_KEYS = {
   ACTIVE_COLUMN_ID: "mcx_activeColumnId",
   /** 「後で」で見送った更新バージョン（再通知抑制用） */
   DISMISSED_UPDATE_VERSION: "mcx_dismissedUpdateVersion",
+  /** 最後に What's New を表示した（=起動した）アプリバージョン */
+  LAST_SEEN_VERSION: "mcx_lastSeenVersion",
 } as const;
