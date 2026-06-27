@@ -113,4 +113,19 @@ describe("UpdateDialog", () => {
     );
     expect(screen.getByText(/再起動中/)).toBeInTheDocument();
   });
+
+  it("インストール待機フェーズ(awaitingInstall)を表示する", () => {
+    render(
+      <UpdateDialog
+        update={update}
+        installing={true}
+        progress={{ phase: "awaitingInstall" }}
+        onInstall={vi.fn()}
+        onLater={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText(/完了後にインストール画面が表示されます/),
+    ).toBeInTheDocument();
+  });
 });

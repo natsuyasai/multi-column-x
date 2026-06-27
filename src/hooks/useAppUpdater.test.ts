@@ -142,6 +142,36 @@ describe("useAppUpdater", () => {
     expect(result.current.installing).toBe(false);
   });
 
+  it("awaitingInstallが最終phaseのときinstall解決後も状態を維持する", async () => {
+    let resolveInstall!: () => void;
+    let report!: (p: unknown) => void;
+    const install = vi.fn().mockImplementation((onProgress) => {
+      report = onProgress;
+      return new Promise<void>((resolve) => {
+        resolveInstall = resolve;
+      });
+    });
+    vi.mocked(createUpdater).mockReturnValue({
+      check: vi.fn().mockResolvedValue({ version: "1.2.0" }),
+      install,
+    });
+    const { result } = renderHook(() => useAppUpdater(false));
+    await waitFor(() => expect(result.current.available).not.toBeNull());
+
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.install();
+    });
+    act(() => report({ phase: "awaitingInstall" }));
+    await act(async () => {
+      resolveInstall();
+      await pending;
+    });
+    // awaitingInstallが最終phaseのためOSがダウンロード継続中→リセットしない
+    expect(result.current.progress).toEqual({ phase: "awaitingInstall" });
+    expect(result.current.installing).toBe(true);
+  });
+
   it("installが失敗してもprogressはnullに戻る", async () => {
     const install = vi.fn().mockRejectedValue(new Error("boom"));
     vi.mocked(createUpdater).mockReturnValue({

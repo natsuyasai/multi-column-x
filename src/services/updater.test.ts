@@ -151,4 +151,20 @@ describe("mobile updater", () => {
       total: null,
     });
   });
+
+  it("installはinvoke完了後にawaitingInstallを通知する", async () => {
+    vi.mocked(getVersion).mockResolvedValue("1.0.0");
+    vi.mocked(fetchLatestRelease).mockResolvedValue({
+      version: "1.2.0",
+      apkUrl: "https://x/app.apk",
+    });
+    const u = createUpdater(true);
+    await u.check();
+    const progress = vi.fn();
+    await u.install(progress);
+    expect(progress.mock.calls.map((c) => c[0])).toEqual([
+      { phase: "downloading", downloaded: 0, total: null },
+      { phase: "awaitingInstall" },
+    ]);
+  });
 });
