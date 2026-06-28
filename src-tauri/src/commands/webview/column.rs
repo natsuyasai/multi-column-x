@@ -273,9 +273,9 @@ pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Resu
 
         let screen_y = inner_pos.y as f64 / scale + bounds.y;
 
-        // 案A: スクリーン左端で自然クリップ。完全に画面外のときのみ非表示にし、
-        // 左端はみ出しは x_offset を負のまま配置して OS のクリップに委ねる（コンテンツ位置を維持）。
-        // 右端のみ win_logical_width でクリップして幅を制限する。
+        // 幅クリップ（左右対称）: ウィンドウは常に x>=0 に配置し、はみ出し分だけ幅を縮める。
+        // Linux WM がウィンドウを画面内にクランプするため負位置クリップ（案A）は使えない。
+        // x_offset は常に 0 以上。完全に画面外のときのみ非表示にする。
         match linux_column_layout(bounds.x, bounds.width, win_logical_width) {
             None => {
                 let _ = webview_window.hide();
@@ -346,29 +346,35 @@ pub async fn set_column_cookies(
     Ok(())
 }
 
-/// Linux カラムの表示レイアウトを計算する純粋関数（案A: スクリーン左端で自然クリップ）。
+/// Linux カラムの表示レイアウトを計算する純粋関数（幅クリップ・左右対称）。
 ///
 /// 戻り値:
 /// - `None`               : カラムを hide する（完全に画面外）
 /// - `Some((x_offset, vis_width))` : screen_x = inner_pos.x/scale + x_offset で配置し、
-///   幅 vis_width で表示する。x_offset は負値になりうる（左端クリップは OS に委ねる）。
+///   幅 vis_width で表示する。x_offset は常に 0 以上（負にならない）。
 ///
-/// 左端にはみ出す場合は x_offset が負のまま配置し、スクリーン左端で自然クリップさせる。
-/// これによりコンテンツの水平位置を保ったまま見えている部分だけを表示できる（幅は縮小しない）。
-/// 右端のみ win_logical_width でクリップして正しい幅を計算する。
+/// ウィンドウは常に x>=0 に配置し、はみ出した分だけ幅を縮める（左右対称クリップ）。
+/// Linux の WM はウィンドウ X 座標を画面内にクランプするため、負位置クリップ（案A）は使えない。
+/// 左端はみ出し時: x_offset=0、vis_width=bounds_x+bounds_width（はみ出した左側分だけ縮む）。
+/// 右端はみ出し時: x_offset=bounds_x、vis_width=win_logical_width-bounds_x（幅を縮める）。
 #[cfg(target_os = "linux")]
 fn linux_column_layout(
     bounds_x: f64,
     bounds_width: f64,
     win_logical_width: f64,
 ) -> Option<(f64, f64)> {
-    // 完全に左（右端が 0 以下）または完全に右（左端がウィンドウ幅以上）なら非表示
-    if bounds_x + bounds_width <= 0.0 || bounds_x >= win_logical_width {
+    // ウィンドウ配置の論理X（常に 0 以上）
+    let left = bounds_x.max(0.0);
+    // 可視領域の右端を win_logical_width でクリップ
+    let right = (bounds_x + bounds_width).min(win_logical_width);
+    // 可視幅が 0 以下なら完全に画面外（左または右）
+    if right - left <= 0.0 {
         return None;
     }
-    // 右端を win_logical_width でクリップ、左端はクリップしない（OS の自然クリップに委ねる）
-    let vis_width = (win_logical_width - bounds_x).min(bounds_width).max(1.0);
-    Some((bounds_x, vis_width))
+    // f64 の加算精度で right-left が bounds_width をわずかに超える場合があるため
+    // .min(bounds_width) で要求幅を超えないことを厳密に保証する。
+    let vis_width = (right - left).min(bounds_width).max(1.0);
+    Some((left, vis_width))
 }
 
 #[cfg(test)]
@@ -450,10 +456,10 @@ mod tests {
         use super::super::linux_column_layout;
 
         #[test]
-        fn 左端はみ出しはx_offsetが負でvis_widthはbounds_widthと等しい() {
-            // bounds_x が負だが右側は表示範囲内 → x_offset が負・幅は縮小しない（案A: スクリーン左端で自然クリップ）
+        fn 左端はみ出しはx_offsetが0でvis_widthがはみ出し分だけ縮む() {
+            // bounds_x が負だが右側は表示範囲内 → x_offset=0、幅はみ出し分だけ縮小（幅クリップ・左右対称）
             let result = linux_column_layout(-100.0, 400.0, 1000.0);
-            assert_eq!(result, Some((-100.0, 400.0)));
+            assert_eq!(result, Some((0.0, 300.0)));
         }
 
         #[test]
@@ -540,19 +546,34 @@ mod tests {
         use proptest::prelude::*;
 
         proptest! {
-            /// 表示されるときx_offsetは常にbounds_xと等しい。
+            /// 表示されるときx_offsetは常にbounds_xを0でクランプした値である。
             ///
-            /// linux_column_layout が Some を返す場合、x_offset（スクリーン補正前の論理 X 座標）は
-            /// 入力の bounds_x をそのまま返すことを保証する。左端クリップは OS に委ねる設計（案A）の
-            /// 不変条件であり、コンテンツ水平位置を保持するために必須。
+            /// linux_column_layout が Some を返す場合、x_offset は max(bounds_x, 0.0) に等しい。
+            /// 左端はみ出し時は 0 に、それ以外は bounds_x をそのまま返す（幅クリップ・左右対称）。
             #[test]
-            fn 表示されるときx_offsetは常にbounds_xと等しい(
+            fn 表示されるときx_offsetは常にbounds_xを0でクランプした値である(
                 bounds_x in -10000.0f64..10000.0,
                 bounds_width in 1.0f64..5000.0,
                 win_logical_width in 1.0f64..5000.0,
             ) {
                 if let Some((x_offset, _)) = linux_column_layout(bounds_x, bounds_width, win_logical_width) {
-                    prop_assert_eq!(x_offset, bounds_x);
+                    prop_assert_eq!(x_offset, bounds_x.max(0.0));
+                }
+            }
+
+            /// 表示されるときx_offsetは常に0以上である。
+            ///
+            /// Linux WM がウィンドウを画面内にクランプするため、x_offset が負になると
+            /// WM クランプによってウィンドウが意図しない位置に配置される。
+            /// この不変条件により WM クランプを受けないことを保証する。
+            #[test]
+            fn 表示されるときx_offsetは常に0以上である(
+                bounds_x in -10000.0f64..10000.0,
+                bounds_width in 1.0f64..5000.0,
+                win_logical_width in 1.0f64..5000.0,
+            ) {
+                if let Some((x_offset, _)) = linux_column_layout(bounds_x, bounds_width, win_logical_width) {
+                    prop_assert!(x_offset >= 0.0, "x_offset={x_offset} は 0.0 未満（WM クランプが発生する）");
                 }
             }
 
