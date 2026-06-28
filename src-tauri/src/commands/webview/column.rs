@@ -13,10 +13,10 @@ use crate::ipc_constants::labels;
 use crate::state::AppState;
 #[cfg(desktop)]
 use std::path::PathBuf;
-#[cfg(all(desktop, not(target_os = "linux")))]
-use tauri::WebviewBuilder;
 #[cfg(target_os = "linux")]
 use tauri::Emitter;
+#[cfg(all(desktop, not(target_os = "linux")))]
+use tauri::WebviewBuilder;
 use tauri::{AppHandle, Manager};
 #[cfg(desktop)]
 use tauri::{LogicalPosition, LogicalSize, WebviewUrl};
