@@ -140,6 +140,44 @@ describe("useColumns mobile", () => {
     });
   });
 
+  it("recreateColumnWebview は対象カラムを remove してから create し直す", async () => {
+    const { result } = renderHook(() => useColumns());
+    await act(async () => {
+      await result.current.setActiveColumn("col-1");
+    });
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.recreateColumnWebview("col-1");
+    });
+
+    const removeIdx = mockInvoke.mock.calls.findIndex(
+      (c) => c[0] === "remove_column_webview" && (c[1] as any).columnId === "col-1",
+    );
+    const createIdx = mockInvoke.mock.calls.findIndex(
+      (c) =>
+        c[0] === "create_column_webview" &&
+        (c[1] as any).args.column.id === "col-1",
+    );
+    expect(removeIdx).toBeGreaterThanOrEqual(0);
+    expect(createIdx).toBeGreaterThanOrEqual(0);
+    // remove が create より前に呼ばれる（クラッシュ状態の WebView を破棄してから再作成）
+    expect(removeIdx).toBeLessThan(createIdx);
+  });
+
+  it("recreateColumnWebview は存在しないカラムでは何もしない", async () => {
+    const { result } = renderHook(() => useColumns());
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.recreateColumnWebview("col-unknown");
+    });
+
+    expect(mockInvoke).not.toHaveBeenCalled();
+  });
+
   it("handleRemoveColumn でアクティブ列を削除すると order が最小の列がアクティブになる", async () => {
     const { result } = renderHook(() => useColumns());
     // set col-1 active first
