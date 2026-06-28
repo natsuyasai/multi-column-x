@@ -5,6 +5,7 @@ import { useAppStore } from "../store/useAppStore";
 import { DEFAULT_COLUMN_SETTINGS } from "../types";
 import type { Column } from "../types";
 import {
+  useColumnCrashRecovery,
   useNewPostsNotification,
   useWebviewScrollRelay,
 } from "./useWebviewEvents";
@@ -56,6 +57,69 @@ describe("useWebviewScrollRelay", () => {
     await act(async () => {
       capturedCallbacks.get(IPC_EVENTS.WEBVIEW_SCROLL)?.({ payload: 120 });
     });
+  });
+});
+
+describe("useColumnCrashRecovery", () => {
+  beforeEach(() => {
+    capturedCallbacks.clear();
+    mockUnlisten.mockReset();
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function emitCrash(columnId: string) {
+    capturedCallbacks.get(IPC_EVENTS.COLUMN_WEBVIEW_CRASHED)?.({
+      payload: columnId,
+    });
+  }
+
+  it("クラッシュイベントの columnId で再生成を呼ぶ", async () => {
+    const recreate = vi.fn();
+    renderHook(() => useColumnCrashRecovery(recreate));
+    await act(async () => {
+      emitCrash("col-1");
+    });
+    expect(recreate).toHaveBeenCalledWith("col-1");
+  });
+
+  it("同一カラムのクールダウン中の連続クラッシュは無視する（クラッシュループ防止）", async () => {
+    const recreate = vi.fn();
+    renderHook(() => useColumnCrashRecovery(recreate));
+    await act(async () => {
+      emitCrash("col-1");
+      emitCrash("col-1");
+    });
+    expect(recreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("クールダウン経過後は再度再生成する", async () => {
+    const recreate = vi.fn();
+    renderHook(() => useColumnCrashRecovery(recreate));
+    await act(async () => {
+      emitCrash("col-1");
+    });
+    await act(async () => {
+      vi.setSystemTime(10000);
+      emitCrash("col-1");
+    });
+    expect(recreate).toHaveBeenCalledTimes(2);
+  });
+
+  it("別カラムのクラッシュはクールダウンと独立して再生成する", async () => {
+    const recreate = vi.fn();
+    renderHook(() => useColumnCrashRecovery(recreate));
+    await act(async () => {
+      emitCrash("col-1");
+      emitCrash("col-2");
+    });
+    expect(recreate).toHaveBeenCalledWith("col-1");
+    expect(recreate).toHaveBeenCalledWith("col-2");
+    expect(recreate).toHaveBeenCalledTimes(2);
   });
 });
 

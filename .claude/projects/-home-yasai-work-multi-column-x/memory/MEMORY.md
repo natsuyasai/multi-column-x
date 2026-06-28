@@ -1,0 +1,1 @@
+- [Linux カラムクリップ仕様](linux-column-clip-spec.md) — 横スクロール時の幅クリップ仕様と過去デグレード経緯（変更時は linux_column_layout のテストで仕様を固定）

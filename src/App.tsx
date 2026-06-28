@@ -24,6 +24,7 @@ import { useDialogState } from "./hooks/useDialogState";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useTheme } from "./hooks/useTheme";
 import {
+  useColumnCrashRecovery,
   useNewPostsNotification,
   useWebviewScrollRelay,
 } from "./hooks/useWebviewEvents";
@@ -162,6 +163,7 @@ const App: React.FC = () => {
   // WebView 内の横ホイール → スクロールバー追従、新着カウント → バッジ・デスクトップ通知
   useWebviewScrollRelay(scrollbarRef);
   useNewPostsNotification(setUnreadCount);
+  useColumnCrashRecovery(recreateColumnWebview);
 
   const handleOpenLinkPopup = useCallback(() => {
     setShowLinkPopupDialog(true);

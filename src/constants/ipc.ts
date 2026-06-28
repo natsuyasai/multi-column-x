@@ -58,6 +58,8 @@ export const IPC_EVENTS = {
   WEBVIEW_NEW_POSTS_COUNT: "webview-new-posts-count",
   /** キーボードショートカット（inject script invoke → TS listen）キー種別文字列 */
   WEBVIEW_KEYBOARD_SHORTCUT: "webview-keyboard-shortcut",
+  /** カラム WebView の WebProcess クラッシュ通知（Linux: Rust emit → TS listen）payload=columnId */
+  COLUMN_WEBVIEW_CRASHED: "column-webview-crashed",
 } as const;
 
 /** WebView / ウィンドウラベルのプレフィックスと生成ヘルパー */
