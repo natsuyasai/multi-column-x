@@ -270,30 +270,26 @@ pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Resu
 
         let screen_y = inner_pos.y as f64 / scale + bounds.y;
 
-        // Completely off-screen (left or right): hide.
-        if bounds.x + bounds.width <= 0.0 || bounds.x >= win_logical_width {
-            let _ = webview_window.hide();
-            return Ok(());
+        // 案A: スクリーン左端で自然クリップ。完全に画面外のときのみ非表示にし、
+        // 左端はみ出しは x_offset を負のまま配置して OS のクリップに委ねる（コンテンツ位置を維持）。
+        // 右端のみ win_logical_width でクリップして幅を制限する。
+        match linux_column_layout(bounds.x, bounds.width, win_logical_width) {
+            None => {
+                let _ = webview_window.hide();
+                return Ok(());
+            }
+            Some((x_offset, vis_width)) => {
+                let screen_x = inner_pos.x as f64 / scale + x_offset;
+                // show 前に reposition してフラッシュ回避（既存コメント方針を踏襲）
+                webview_window
+                    .set_position(LogicalPosition::new(screen_x, screen_y))
+                    .map_err(|e| e.to_string())?;
+                webview_window
+                    .set_size(LogicalSize::new(vis_width, bounds.height.max(1.0)))
+                    .map_err(|e| e.to_string())?;
+                let _ = webview_window.show();
+            }
         }
-
-        // Clip left when x<0 to prevent GTK/WM から負座標へのクランプ。
-        // 右端も win_logical_width でクリップして右側のはみ出しを抑制する。
-        let clip_left = (-bounds.x).max(0.0);
-        let vis_x = bounds.x + clip_left;
-        let vis_width = (win_logical_width - vis_x)
-            .min(bounds.width - clip_left)
-            .max(1.0);
-
-        let screen_x = inner_pos.x as f64 / scale + vis_x;
-
-        // Reposition before show() to avoid a flash at the old position.
-        webview_window
-            .set_position(LogicalPosition::new(screen_x, screen_y))
-            .map_err(|e| e.to_string())?;
-        webview_window
-            .set_size(LogicalSize::new(vis_width, bounds.height.max(1.0)))
-            .map_err(|e| e.to_string())?;
-        let _ = webview_window.show();
     }
 
     #[cfg(not(target_os = "linux"))]
@@ -345,6 +341,31 @@ pub async fn set_column_cookies(
         crate::android_bridge::set_account_cookies(&accountId)?;
     }
     Ok(())
+}
+
+/// Linux カラムの表示レイアウトを計算する純粋関数（案A: スクリーン左端で自然クリップ）。
+///
+/// 戻り値:
+/// - `None`               : カラムを hide する（完全に画面外）
+/// - `Some((x_offset, vis_width))` : screen_x = inner_pos.x/scale + x_offset で配置し、
+///   幅 vis_width で表示する。x_offset は負値になりうる（左端クリップは OS に委ねる）。
+///
+/// 左端にはみ出す場合は x_offset が負のまま配置し、スクリーン左端で自然クリップさせる。
+/// これによりコンテンツの水平位置を保ったまま見えている部分だけを表示できる（幅は縮小しない）。
+/// 右端のみ win_logical_width でクリップして正しい幅を計算する。
+#[cfg(target_os = "linux")]
+fn linux_column_layout(
+    bounds_x: f64,
+    bounds_width: f64,
+    win_logical_width: f64,
+) -> Option<(f64, f64)> {
+    // 完全に左（右端が 0 以下）または完全に右（左端がウィンドウ幅以上）なら非表示
+    if bounds_x + bounds_width <= 0.0 || bounds_x >= win_logical_width {
+        return None;
+    }
+    // 右端を win_logical_width でクリップ、左端はクリップしない（OS の自然クリップに委ねる）
+    let vis_width = (win_logical_width - bounds_x).min(bounds_width).max(1.0);
+    Some((bounds_x, vis_width))
 }
 
 #[cfg(test)]
@@ -418,6 +439,47 @@ mod tests {
     #[test]
     fn webview_label_uses_column_prefix() {
         assert_eq!(webview_label("abc"), "column-abc");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[allow(non_snake_case)]
+    mod linux_layout {
+        use super::super::linux_column_layout;
+
+        #[test]
+        fn 左端はみ出しはx_offsetが負でvis_widthはbounds_widthと等しい() {
+            // bounds_x が負だが右側は表示範囲内 → x_offset が負・幅は縮小しない（案A: スクリーン左端で自然クリップ）
+            let result = linux_column_layout(-100.0, 400.0, 1000.0);
+            assert_eq!(result, Some((-100.0, 400.0)));
+        }
+
+        #[test]
+        fn 右端はみ出しはvis_widthがwin_logical_widthとbounds_xの差にクリップされる() {
+            // bounds_x + bounds_width > win_logical_width → 右端のみクリップ
+            let result = linux_column_layout(800.0, 400.0, 1000.0);
+            assert_eq!(result, Some((800.0, 200.0)));
+        }
+
+        #[test]
+        fn 完全に左の場合はNoneを返す() {
+            // bounds_x + bounds_width <= 0.0 → 完全に画面外（左）
+            let result = linux_column_layout(-400.0, 400.0, 1000.0);
+            assert_eq!(result, None);
+        }
+
+        #[test]
+        fn 完全に右の場合はNoneを返す() {
+            // bounds_x >= win_logical_width → 完全に画面外（右）
+            let result = linux_column_layout(1000.0, 400.0, 1000.0);
+            assert_eq!(result, None);
+        }
+
+        #[test]
+        fn ウィンドウ内に完全収容の場合はbounds_xとbounds_widthをそのまま返す() {
+            // 左右どちらにもはみ出さない → bounds_x と bounds_width をそのまま返す
+            let result = linux_column_layout(100.0, 400.0, 1000.0);
+            assert_eq!(result, Some((100.0, 400.0)));
+        }
     }
 
     mod properties {
