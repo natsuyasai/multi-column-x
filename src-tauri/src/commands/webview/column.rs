@@ -519,6 +519,35 @@ mod tests {
             assert_eq!(r2, (0.0, 250.0));
             assert_eq!(r3, (0.0, 150.0));
         }
+
+        /// 回帰防止: 右端カラムが「全幅のまま右端に居座り、縮まない」デグレードを捕捉する。
+        /// 右へはみ出しが進む（bounds_x が大きくなる）ほど x_offset は bounds_x のまま、
+        /// vis_width は win_logical_width - bounds_x で単調に縮み、全幅(400)で居座らないことを保証する。
+        #[test]
+        fn 右端カラムは全幅で居座らずはみ出しが進むほど幅が縮む() {
+            let width = 400.0;
+            let win = 1000.0;
+            // bounds_x: 650 → 750 → 850 と右へはみ出していくケース（いずれも x+width > win）
+            let r1 = linux_column_layout(650.0, width, win).expect("一部可視なので表示");
+            let r2 = linux_column_layout(750.0, width, win).expect("一部可視なので表示");
+            let r3 = linux_column_layout(850.0, width, win).expect("一部可視なので表示");
+
+            // x_offset は bounds_x のまま（右端は位置を動かさず幅だけクリップ）
+            assert_eq!(r1.0, 650.0);
+            assert_eq!(r2.0, 750.0);
+            assert_eq!(r3.0, 850.0);
+
+            // 全幅(400)で居座らない＝デグレードしていないこと
+            assert!(r1.1 < width, "vis_width={} が全幅のまま居座っている", r1.1);
+            // はみ出すほど幅は単調に縮む
+            assert!(r1.1 > r2.1, "{} は {} より大きいはず（縮小が進む）", r1.1, r2.1);
+            assert!(r2.1 > r3.1, "{} は {} より大きいはず（縮小が進む）", r2.1, r3.1);
+
+            // 具体値: win - bounds_x に一致
+            assert_eq!(r1, (650.0, 350.0));
+            assert_eq!(r2, (750.0, 250.0));
+            assert_eq!(r3, (850.0, 150.0));
+        }
     }
 
     mod properties {
