@@ -212,3 +212,16 @@ Tauri v2 は JS → Rust の自動ケース変換を行わない。JS 側が cam
 ### グリッドレイアウト
 
 `Column.gridRow` / `Column.gridCol` でカラムをマトリクス状に配置する。同じ `gridCol` に複数カラムを配置すると縦積みになり、`heightMode`（`auto` / `fixed`）と `heightValue` / `heightUnit`（`px` / `%`）で各カラムの高さを制御する。`src/lib/gridLayout.ts` の `calculateGridBounds` が各カラムの絶対座標を計算して Rust に渡す。
+
+### Linux カラム WebView の配置・クリッピング仕様
+
+Windows / macOS ではカラムは `window.add_child()` の子 WebView で、親ウィンドウのクライアント領域によって自動的にクリップされる。一方 **Linux ではカラムが独立した `WebviewWindow`（OS ネイティブウィンドウ）** のため親クリップが効かず、横スクロールで画面端にはみ出すカラムの表示を Rust 側の座標計算で明示的に制御する。このロジックは `resize_column_webview`（`src-tauri/src/commands/webview/column.rs`）の純粋関数 `linux_column_layout` に集約されている。
+
+仕様（横スクロール時の各カラムの可視領域）:
+
+- **ウィンドウは常に画面内（論理 X 座標 `>= 0`）に配置する**。Linux の WM はウィンドウ X 座標を画面内へクランプするため、負の座標を指定して「スクリーン左端で自然クリップ」させる方式は機能しない（左端カラムが全幅のまま左端に居座り、完全に画面外になるまで縮まないデグレードを引き起こす）。
+- **左右対称の「幅クリップ」**: 画面端にはみ出したカラムは、はみ出した分だけ幅を縮めて表示する（左端・右端とも同じ挙動）。可視領域は `left = max(0, x)` 〜 `right = min(x + width, ウィンドウ幅)` で求め、幅 `right - left` で配置する。
+- **完全に画面外**（`x + width <= 0` または `x >= ウィンドウ幅`）のカラムは `hide()` する。
+- **起動時は `visible(false)` で非表示作成**し、全カラム作成後に `recalculateAllBounds`（→ `resize_column_webview`）で WM が確定した座標へ配置してから `show()` する。WM がウィンドウ位置を確定する前に誤った座標で可視化すると WebKit WebProcess が不正状態で起動し、カラムが空白になる。
+
+`linux_column_layout` は純粋関数として example テストとプロパティテスト（`x_offset >= 0` など WM クランプ回避の不変条件）で仕様を固定している。**このクリッピング挙動を変更する場合は、必ず `linux_column_layout` のテストで仕様を表現してから実装すること**（過去にインライン実装のままテストなしで挙動が変わりデグレードした経緯がある）。
