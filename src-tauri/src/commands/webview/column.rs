@@ -524,4 +524,91 @@ mod tests {
             }
         }
     }
+
+    /// linux_column_layout のプロパティテスト（Linux 専用関数のため Linux ガード）。
+    ///
+    /// ジェネレータ範囲を有限値に制約する理由:
+    ///   - f64 の `any::<f64>()` は NaN・±inf を含み、比較演算や算術演算が
+    ///     不定動作を引き起こすため、有限区間のみを対象とする。
+    ///   - `bounds_x`: 画面外への移動を含む実用範囲として ±10000 論理ピクセル。
+    ///   - `bounds_width` / `win_logical_width`: 1 以上の正値（幅ゼロや負幅は
+    ///     プロダクトコードの呼び出し側で保証済み）、上限 5000 は超大型ディスプレイ相当。
+    #[cfg(target_os = "linux")]
+    #[allow(non_snake_case)]
+    mod linux_properties {
+        use super::super::linux_column_layout;
+        use proptest::prelude::*;
+
+        proptest! {
+            /// 表示されるときx_offsetは常にbounds_xと等しい。
+            ///
+            /// linux_column_layout が Some を返す場合、x_offset（スクリーン補正前の論理 X 座標）は
+            /// 入力の bounds_x をそのまま返すことを保証する。左端クリップは OS に委ねる設計（案A）の
+            /// 不変条件であり、コンテンツ水平位置を保持するために必須。
+            #[test]
+            fn 表示されるときx_offsetは常にbounds_xと等しい(
+                bounds_x in -10000.0f64..10000.0,
+                bounds_width in 1.0f64..5000.0,
+                win_logical_width in 1.0f64..5000.0,
+            ) {
+                if let Some((x_offset, _)) = linux_column_layout(bounds_x, bounds_width, win_logical_width) {
+                    prop_assert_eq!(x_offset, bounds_x);
+                }
+            }
+
+            /// 表示されるときvis_widthは常に1以上である。
+            ///
+            /// WebView のサイズが 0 以下になると GTK がエラーを起こすため、
+            /// vis_width は必ず 1.0 以上でなければならない。`.max(1.0)` による保証の不変条件。
+            #[test]
+            fn 表示されるときvis_widthは常に1以上である(
+                bounds_x in -10000.0f64..10000.0,
+                bounds_width in 1.0f64..5000.0,
+                win_logical_width in 1.0f64..5000.0,
+            ) {
+                if let Some((_, vis_width)) = linux_column_layout(bounds_x, bounds_width, win_logical_width) {
+                    prop_assert!(vis_width >= 1.0, "vis_width={vis_width} は 1.0 未満");
+                }
+            }
+
+            /// bounds_widthが1以上ならvis_widthはbounds_width以下にクリップされる。
+            ///
+            /// 右端クリップは幅を「縮小のみ」する。入力より大きい幅を返すことはなく、
+            /// カラムがウィンドウ右端を越えて表示されないことを保証する。
+            #[test]
+            fn bounds_widthが1以上ならvis_widthはbounds_width以下にクリップされる(
+                bounds_x in -10000.0f64..10000.0,
+                bounds_width in 1.0f64..5000.0,
+                win_logical_width in 1.0f64..5000.0,
+            ) {
+                if let Some((_, vis_width)) = linux_column_layout(bounds_x, bounds_width, win_logical_width) {
+                    prop_assert!(
+                        vis_width <= bounds_width,
+                        "vis_width={vis_width} が bounds_width={bounds_width} を超えている"
+                    );
+                }
+            }
+
+            /// Noneを返すのは完全に画面外のときだけである。
+            ///
+            /// None（WebView を hide）の条件と、実際の戻り値の双方向一致を検証する。
+            /// カラムが部分的にでも表示範囲に入っている場合は必ず Some を返す。
+            #[test]
+            fn Noneを返すのは完全に画面外のときだけである(
+                bounds_x in -10000.0f64..10000.0,
+                bounds_width in 1.0f64..5000.0,
+                win_logical_width in 1.0f64..5000.0,
+            ) {
+                let result = linux_column_layout(bounds_x, bounds_width, win_logical_width);
+                let is_out_of_screen =
+                    bounds_x + bounds_width <= 0.0 || bounds_x >= win_logical_width;
+                prop_assert_eq!(
+                    result.is_none(),
+                    is_out_of_screen,
+                    "bounds_x={}, bounds_width={}, win_logical_width={}: result={:?}, is_out_of_screen={}",
+                    bounds_x, bounds_width, win_logical_width, result, is_out_of_screen
+                );
+            }
+        }
+    }
 }
