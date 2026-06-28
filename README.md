@@ -225,3 +225,13 @@ Windows / macOS ではカラムは `window.add_child()` の子 WebView で、親
 - **起動時は `visible(false)` で非表示作成**し、全カラム作成後に `recalculateAllBounds`（→ `resize_column_webview`）で WM が確定した座標へ配置してから `show()` する。WM がウィンドウ位置を確定する前に誤った座標で可視化すると WebKit WebProcess が不正状態で起動し、カラムが空白になる。
 
 `linux_column_layout` は純粋関数として example テストとプロパティテスト（`x_offset >= 0` など WM クランプ回避の不変条件）で仕様を固定している。**このクリッピング挙動を変更する場合は、必ず `linux_column_layout` のテストで仕様を表現してから実装すること**（過去にインライン実装のままテストなしで挙動が変わりデグレードした経緯がある）。
+
+#### WebProcess クラッシュ対策（横スクロール・スリープ復帰）
+
+Linux の独立 `WebviewWindow` は WebKitGTK の WebProcess で描画されるが、(1) 横スクロールで `resize_column_webview` が高頻度に連続発火したとき、(2) スリープ復帰後などに、WebProcess がクラッシュして白画面/フリーズになることがある。次の3層で予防と復旧を行う:
+
+- **予防（スクロール）**: スクロールバー操作 → 全カラム再配置を `rafThrottle`（`src/lib/rafThrottle.ts`）で 1 フレーム 1 回に間引き、`resize_column_webview` の連続発火を抑える（`useDesktopColumns.handleScrollbarScroll`）。
+- **自動復旧**: カラム作成時に webkit2gtk の `connect_web_process_terminated` を接続し、クラッシュ時に `column-webview-crashed`（payload=columnId）を emit する。TS 側 `useColumnCrashRecovery` が当該カラムを再生成して自動復旧する（同一カラムは `CRASH_RECOVERY_COOLDOWN_MS` 秒のクールダウンでクラッシュループを防止）。
+- **手動復旧**: カラムヘッダの「⟳ ページを再読み込み」ボタンはデスクトップでは `location.reload` ではなく WebView 自体の再生成（`recreateColumnWebview`）を行い、`location.reload` が効かない白画面からも復旧できる。モバイル（Android ネイティブ WebView）は従来どおりページ再読み込み。
+
+webkit2gtk は wry と同一バージョン（`=2.0.2`, `v2_40`）を `[target.'cfg(target_os = "linux")'.dependencies]` でピン留めする（`PlatformWebview::inner()` の戻り型を一致させるため）。

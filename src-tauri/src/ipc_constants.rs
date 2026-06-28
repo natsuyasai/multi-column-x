@@ -18,6 +18,9 @@ pub mod events {
     pub const WEBVIEW_NEW_POSTS_COUNT: &str = "webview-new-posts-count";
     /// キーボードショートカット（inject script invoke → TS listen）キー種別文字列
     pub const WEBVIEW_KEYBOARD_SHORTCUT: &str = "webview-keyboard-shortcut";
+    /// カラム WebView の WebProcess クラッシュ通知（Linux: Rust emit → TS listen）
+    /// payload はクラッシュしたカラム ID 文字列。TS 側で当該カラムを再生成する。
+    pub const COLUMN_WEBVIEW_CRASHED: &str = "column-webview-crashed";
 }
 
 /// WebView / ウィンドウラベルのプレフィックス
@@ -75,6 +78,7 @@ mod tests {
                 "WEBVIEW_KEYBOARD_SHORTCUT",
                 events::WEBVIEW_KEYBOARD_SHORTCUT,
             ),
+            ("COLUMN_WEBVIEW_CRASHED", events::COLUMN_WEBVIEW_CRASHED),
         ];
         assert_eq!(
             expected.as_object().unwrap().len(),

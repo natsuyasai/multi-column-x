@@ -24,6 +24,7 @@ import { useDialogState } from "./hooks/useDialogState";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useTheme } from "./hooks/useTheme";
 import {
+  useColumnCrashRecovery,
   useNewPostsNotification,
   useWebviewScrollRelay,
 } from "./hooks/useWebviewEvents";
@@ -75,6 +76,7 @@ const App: React.FC = () => {
     navigateColumn,
     setDialogOpen,
     recreateAllWebviews,
+    recreateColumnWebview,
   } = useColumns();
   const { startAddAccount, removeAccount } = useAccounts();
   const {
@@ -161,6 +163,7 @@ const App: React.FC = () => {
   // WebView 内の横ホイール → スクロールバー追従、新着カウント → バッジ・デスクトップ通知
   useWebviewScrollRelay(scrollbarRef);
   useNewPostsNotification(setUnreadCount);
+  useColumnCrashRecovery(recreateColumnWebview);
 
   const handleOpenLinkPopup = useCallback(() => {
     setShowLinkPopupDialog(true);
@@ -239,9 +242,19 @@ const App: React.FC = () => {
     await evalInColumn(columnId, WEBVIEW_SCRIPTS.TRIGGER_RELOAD);
   }, []);
 
-  const handleReloadPage = useCallback(async (columnId: string) => {
-    await evalInColumn(columnId, WEBVIEW_SCRIPTS.RELOAD_PAGE);
-  }, []);
+  const handleReloadPage = useCallback(
+    async (columnId: string) => {
+      // デスクトップ（特に Linux）では WebProcess クラッシュで location.reload が
+      // 効かない白画面に陥るため、WebView 自体を作り直して復旧する。
+      // モバイル（Android ネイティブ WebView）は従来どおりページ再読み込みで十分。
+      if (useAppStore.getState().isMobile) {
+        await evalInColumn(columnId, WEBVIEW_SCRIPTS.RELOAD_PAGE);
+      } else {
+        await recreateColumnWebview(columnId);
+      }
+    },
+    [recreateColumnWebview],
+  );
 
   const handleApplySettings = useCallback(
     async (columnId: string, settings: ColumnSettings, width: number) => {

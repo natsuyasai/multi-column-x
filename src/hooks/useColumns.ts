@@ -233,6 +233,74 @@ export function useColumns() {
     dialogOpenRef.current = open;
   }, []);
 
+  // 単一カラムの WebView を破棄して作り直す。WebKitGTK の WebProcess が
+  // クラッシュ（白画面/フリーズ）した WebView を、ヘッダの再読み込みボタンや
+  // クラッシュ検知イベントから復旧させるために使う。
+  const recreateColumnWebview = useCallback(
+    async (columnId: string) => {
+      const {
+        columns: currentColumns,
+        accounts: currentAccounts,
+        isMobile,
+        topBarExpanded,
+        globalSettings,
+      } = useAppStore.getState();
+      const column = currentColumns.find((c) => c.id === columnId);
+      if (!column) return;
+      const account = currentAccounts.find((a) => a.id === column.accountId);
+      if (!account) return;
+
+      await removeColumnWebview(columnId).catch(
+        logError("recreateColumnWebview:removeColumnWebview"),
+      );
+
+      if (isMobile) {
+        await createColumnWebview(
+          column,
+          account.dataDirectory,
+          mobileColumnBounds({
+            isActive: false,
+            swipeAreaHeight: resolveSwipeAreaHeight(globalSettings),
+            viewportWidth: window.innerWidth,
+            viewportHeight: window.innerHeight,
+          }),
+        ).catch(logError("recreateColumnWebview:createColumnWebview(mobile)"));
+        // アクティブカラムを作り直した場合は再配置して可視化する
+        if (activeColumnId === columnId) {
+          await setActiveColumn(columnId);
+        }
+        return;
+      }
+
+      if (!containerRef.current) return;
+      const containerHeight = containerRef.current.clientHeight;
+      const scrollLeft = scrollbarRef.current?.scrollLeft ?? 0;
+      const bounds = calculateGridBounds(currentColumns, {
+        containerHeight,
+        scrollLeft,
+        headerHeight: HEADER_HEIGHT,
+        scrollbarHeight: SCROLLBAR_HEIGHT,
+        topBarHeight: getTopBarHeight(topBarExpanded),
+      });
+      const b = bounds[columnId];
+      if (!b) return;
+
+      await createColumnWebview(column, account.dataDirectory, b).catch(
+        logError("recreateColumnWebview:createColumnWebview"),
+      );
+      // Linux ではカラムを非表示で作成するため、作成後に recalculateAllBounds で
+      // 正しい座標に配置・表示する。
+      await recalculateAllBounds();
+    },
+    [
+      containerRef,
+      scrollbarRef,
+      activeColumnId,
+      setActiveColumn,
+      recalculateAllBounds,
+    ],
+  );
+
   const recreateAllWebviews = useCallback(async () => {
     const { columns: currentColumns, topBarExpanded } = useAppStore.getState();
     for (const column of currentColumns) {
@@ -262,5 +330,6 @@ export function useColumns() {
     navigateColumn,
     setDialogOpen,
     recreateAllWebviews,
+    recreateColumnWebview,
   };
 }
