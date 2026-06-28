@@ -489,6 +489,36 @@ mod tests {
             let result = linux_column_layout(100.0, 400.0, 1000.0);
             assert_eq!(result, Some((100.0, 400.0)));
         }
+
+        /// 回帰防止: 左端カラムが「全幅のまま左端に居座り、完全に画面外になるまで縮まない」
+        /// デグレード（負の screen_x を指定して WM クランプされる案A）を捕捉する。
+        /// 左へスクロールが進む（bounds_x が小さくなる）ほど x_offset は常に 0、
+        /// vis_width は単調に縮み、全幅(400)で居座らないことを保証する。
+        #[test]
+        fn 左端カラムは全幅で居座らずスクロールが進むほど幅が縮む() {
+            let width = 400.0;
+            let win = 1000.0;
+            // bounds_x: -50 → -150 → -250 と左へはみ出していくケース
+            let r1 = linux_column_layout(-50.0, width, win).expect("一部可視なので表示");
+            let r2 = linux_column_layout(-150.0, width, win).expect("一部可視なので表示");
+            let r3 = linux_column_layout(-250.0, width, win).expect("一部可視なので表示");
+
+            // x_offset は常に 0（WM クランプを受ける負位置にしない）
+            assert_eq!(r1.0, 0.0);
+            assert_eq!(r2.0, 0.0);
+            assert_eq!(r3.0, 0.0);
+
+            // 全幅(400)で居座らない＝デグレードしていないこと
+            assert!(r1.1 < width, "vis_width={} が全幅のまま居座っている", r1.1);
+            // はみ出すほど幅は単調に縮む
+            assert!(r1.1 > r2.1, "{} は {} より大きいはず（縮小が進む）", r1.1, r2.1);
+            assert!(r2.1 > r3.1, "{} は {} より大きいはず（縮小が進む）", r2.1, r3.1);
+
+            // 具体値: width - |x| に一致
+            assert_eq!(r1, (0.0, 350.0));
+            assert_eq!(r2, (0.0, 250.0));
+            assert_eq!(r3, (0.0, 150.0));
+        }
     }
 
     mod properties {
