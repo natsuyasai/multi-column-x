@@ -102,8 +102,12 @@ export function useDesktopColumns({
           logError("restoreDesktopColumns:createColumnWebview"),
         );
       }
+
+      // Linux ではカラムを非表示で作成するため、全作成後に recalculateAllBounds で
+      // WM がウィンドウ位置を確定した後の正確な座標で配置・表示する。
+      await recalculateAllBounds();
     },
-    [],
+    [recalculateAllBounds],
   );
 
   // ウィンドウリサイズ時に全カラムを再配置（ダイアログ表示中は仮想キーボード起因のリサイズを無視）
