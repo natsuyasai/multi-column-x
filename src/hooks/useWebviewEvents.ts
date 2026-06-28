@@ -36,19 +36,16 @@ export function useColumnCrashRecovery(
 ) {
   useEffect(() => {
     const lastRecreatedAt: Record<string, number> = {};
-    const unlisten = listen<string>(
-      IPC_EVENTS.COLUMN_WEBVIEW_CRASHED,
-      (e) => {
-        const columnId = e.payload;
-        const now = Date.now();
-        const last = lastRecreatedAt[columnId];
-        if (last !== undefined && now - last < CRASH_RECOVERY_COOLDOWN_MS) {
-          return;
-        }
-        lastRecreatedAt[columnId] = now;
-        void recreateColumnWebview(columnId);
-      },
-    );
+    const unlisten = listen<string>(IPC_EVENTS.COLUMN_WEBVIEW_CRASHED, (e) => {
+      const columnId = e.payload;
+      const now = Date.now();
+      const last = lastRecreatedAt[columnId];
+      if (last !== undefined && now - last < CRASH_RECOVERY_COOLDOWN_MS) {
+        return;
+      }
+      lastRecreatedAt[columnId] = now;
+      void recreateColumnWebview(columnId);
+    });
     return () => {
       unlisten.then((fn) => fn());
     };

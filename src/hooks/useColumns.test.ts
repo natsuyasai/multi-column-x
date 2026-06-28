@@ -153,7 +153,8 @@ describe("useColumns mobile", () => {
     });
 
     const removeIdx = mockInvoke.mock.calls.findIndex(
-      (c) => c[0] === "remove_column_webview" && (c[1] as any).columnId === "col-1",
+      (c) =>
+        c[0] === "remove_column_webview" && (c[1] as any).columnId === "col-1",
     );
     const createIdx = mockInvoke.mock.calls.findIndex(
       (c) =>

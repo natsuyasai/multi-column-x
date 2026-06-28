@@ -154,7 +154,10 @@ export function useDesktopColumns({
     () => rafThrottle(() => recalculateRef.current()),
     [],
   );
-  useEffect(() => () => handleScrollbarScroll.cancel(), [handleScrollbarScroll]);
+  useEffect(
+    () => () => handleScrollbarScroll.cancel(),
+    [handleScrollbarScroll],
+  );
 
   return {
     columnBounds,
