@@ -7,10 +7,14 @@ use crate::commands::settings_store::{
     load_video_auto_play_stop_enabled, load_video_popup_enabled,
 };
 use crate::inject::{build_init_script, InitScriptParams};
+#[cfg(target_os = "linux")]
+use crate::ipc_constants::events;
 use crate::ipc_constants::labels;
 use crate::state::AppState;
 #[cfg(desktop)]
 use std::path::PathBuf;
+#[cfg(target_os = "linux")]
+use tauri::Emitter;
 #[cfg(all(desktop, not(target_os = "linux")))]
 use tauri::WebviewBuilder;
 use tauri::{AppHandle, Manager};
@@ -110,18 +114,32 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         // 正しい座標に配置してから表示する。WM がウィンドウ位置を確定する前に
         // 誤った座標で可視化され WebKit WebProcess が不正状態で起動するのを防ぐ
         // （空白カラム対策）。parent() の transient-for で常にメインより前面に維持する。
-        tauri::WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(parse_url(&url)?))
-            .initialization_script(&init_script)
-            .data_directory(data_dir)
-            .decorations(false)
-            .skip_taskbar(true)
-            .visible(false)
-            .position(screen_x, screen_y)
-            .inner_size(args.width.max(1.0), args.height.max(1.0))
-            .parent(&window)
-            .map_err(|e| e.to_string())?
-            .build()
-            .map_err(|e| e.to_string())?;
+        let webview_window =
+            tauri::WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(parse_url(&url)?))
+                .initialization_script(&init_script)
+                .data_directory(data_dir)
+                .decorations(false)
+                .skip_taskbar(true)
+                .visible(false)
+                .position(screen_x, screen_y)
+                .inner_size(args.width.max(1.0), args.height.max(1.0))
+                .parent(&window)
+                .map_err(|e| e.to_string())?
+                .build()
+                .map_err(|e| e.to_string())?;
+
+        // WebKitGTK の WebProcess がクラッシュ（白画面/フリーズ）したら検知して
+        // フロントへ通知する。TS 側が当該カラムの WebView を再生成して復旧する。
+        let crash_app = app.clone();
+        let crash_column_id = args.column.id.clone();
+        let _ = webview_window.with_webview(move |platform_webview| {
+            use webkit2gtk::WebViewExt;
+            platform_webview
+                .inner()
+                .connect_web_process_terminated(move |_webview, _reason| {
+                    let _ = crash_app.emit(events::COLUMN_WEBVIEW_CRASHED, &crash_column_id);
+                });
+        });
     }
 
     #[cfg(not(target_os = "linux"))]

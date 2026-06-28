@@ -2,7 +2,7 @@
 // デスクトップのグリッド bounds 管理・リサイズ追従・起動時復元
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { platform } from "@tauri-apps/plugin-os";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   HEADER_HEIGHT,
   SCROLLBAR_HEIGHT,
@@ -11,6 +11,7 @@ import {
   type ColumnBounds,
 } from "../lib/gridLayout";
 import { logError } from "../lib/log";
+import { rafThrottle } from "../lib/rafThrottle";
 import {
   createColumnWebview,
   resizeColumnWebview,
@@ -143,10 +144,20 @@ export function useDesktopColumns({
     };
   }, [isMobile, recalculateAllBounds]);
 
-  // 下部スクロールバー操作 → WebView 追従
-  const handleScrollbarScroll = useCallback(() => {
-    recalculateAllBounds();
-  }, [recalculateAllBounds]);
+  // 下部スクロールバー操作 → WebView 追従。
+  // scroll は高頻度で発火するため rAF で 1 フレーム 1 回に間引く。間引かないと
+  // Linux で resize_column_webview（WebviewWindow 再配置）が連続発火し、
+  // WebKitGTK WebProcess が高負荷でクラッシュする要因になる。
+  const recalculateRef = useRef(recalculateAllBounds);
+  recalculateRef.current = recalculateAllBounds;
+  const handleScrollbarScroll = useMemo(
+    () => rafThrottle(() => recalculateRef.current()),
+    [],
+  );
+  useEffect(
+    () => () => handleScrollbarScroll.cancel(),
+    [handleScrollbarScroll],
+  );
 
   return {
     columnBounds,
