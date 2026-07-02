@@ -24,10 +24,6 @@ describe("useAccounts (mobile)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal(
-      "prompt",
-      vi.fn(() => "テスト垢"),
-    );
-    vi.stubGlobal(
       "confirm",
       vi.fn(() => true),
     );
@@ -38,7 +34,7 @@ describe("useAccounts (mobile)", () => {
     vi.unstubAllGlobals();
   });
 
-  it("open_add_account_window成功でアカウントがstoreに追加されclose_windowが呼ばれる", async () => {
+  it("open_add_account_window成功でpendingAccountNameがセットされる", async () => {
     mockInvoke.mockImplementation(async (cmd) =>
       cmd === "open_add_account_window" ? addAccountResult : undefined,
     );
@@ -48,6 +44,27 @@ describe("useAccounts (mobile)", () => {
       await result.current.startAddAccount();
     });
 
+    expect(result.current.pendingAccountName).toMatchObject({
+      accountId: "acc-new",
+      dataDirectory: "/data/acc-new",
+      windowLabel: "add-account",
+    });
+    expect(useAppStore.getState().accounts).toHaveLength(0);
+  });
+
+  it("submitAccountNameでアカウントがstoreに追加されclose_windowが呼ばれる", async () => {
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "open_add_account_window" ? addAccountResult : undefined,
+    );
+    const { result } = renderHook(() => useAccounts());
+
+    await act(async () => {
+      await result.current.startAddAccount();
+    });
+    await act(async () => {
+      await result.current.submitAccountName("テスト垢");
+    });
+
     const accounts = useAppStore.getState().accounts;
     expect(accounts).toHaveLength(1);
     expect(accounts[0]).toMatchObject({
@@ -55,6 +72,27 @@ describe("useAccounts (mobile)", () => {
       label: "テスト垢",
       dataDirectory: "/data/acc-new",
     });
+    expect(mockInvoke).toHaveBeenCalledWith("close_window", {
+      label: "add-account",
+    });
+    expect(result.current.pendingAccountName).toBeNull();
+  });
+
+  it("cancelAccountNameを呼ぶとアカウントを追加せずclose_windowが呼ばれる", async () => {
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "open_add_account_window" ? addAccountResult : undefined,
+    );
+    const { result } = renderHook(() => useAccounts());
+
+    await act(async () => {
+      await result.current.startAddAccount();
+    });
+    await act(async () => {
+      result.current.cancelAccountName();
+    });
+
+    expect(useAppStore.getState().accounts).toHaveLength(0);
+    expect(result.current.pendingAccountName).toBeNull();
     expect(mockInvoke).toHaveBeenCalledWith("close_window", {
       label: "add-account",
     });
@@ -69,6 +107,7 @@ describe("useAccounts (mobile)", () => {
     });
 
     expect(useAppStore.getState().accounts).toHaveLength(0);
+    expect(result.current.pendingAccountName).toBeNull();
   });
 
   it("追加処理中の再呼び出しは何もしない（連打防止）", async () => {
@@ -98,7 +137,31 @@ describe("useAccounts (mobile)", () => {
       resolveOpen(addAccountResult);
       await first;
     });
+    expect(result.current.pendingAccountName).not.toBeNull();
+
+    await act(async () => {
+      await result.current.submitAccountName("テスト垢");
+    });
     expect(useAppStore.getState().accounts).toHaveLength(1);
+  });
+
+  it("アカウント名入力待ち中はstartAddAccountを再呼び出ししても何もしない", async () => {
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "open_add_account_window" ? addAccountResult : undefined,
+    );
+    const { result } = renderHook(() => useAccounts());
+
+    await act(async () => {
+      await result.current.startAddAccount();
+    });
+    await act(async () => {
+      await result.current.startAddAccount();
+    });
+
+    const openCalls = mockInvoke.mock.calls.filter(
+      (c) => c[0] === "open_add_account_window",
+    );
+    expect(openCalls).toHaveLength(1);
   });
 
   it("removeAccountはconfirmがfalseならdelete_account_dataを呼ばない", async () => {
