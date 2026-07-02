@@ -11,12 +11,20 @@ TweetDeck スタイルの Twitter/X デスクトップ・モバイルクライ�
 - **自動更新** — 設定した間隔で自動リロード。スクロール中は更新をスキップ
 - **メディアポップアップ** — 画像・動画リンクを別ウィンドウで開く
 - **リンクポップアップ** — 任意の URL を専用ウィンドウで開く
-- **ツイート投稿ウィンドウ** — サイドバーからツイート作成ウィンドウを開く
+- **ツイート投稿ウィンドウ** — TopBar / モバイルタブバーからツイート作成ウィンドウを開く
 - **ポップアップセッション切替** — ポップアップウィンドウのアカウントをその場で切り替え
 - **カスタムコンテキストメニュー** — WebView 右クリックメニューを拡張
 - **動画自動再生停止** — ページ読み込み時に動画の自動再生を停止
+- **NG ワード** — カラム別・グローバルの NG ワードでタイムラインをフィルタ
+- **画像の縮小・ぼかし表示 / 広告非表示** — カラムごとのタイムライン表示調整
+- **新着バッジ・デスクトップ通知** — カラムごとの新着件数バッジ、通知カラムのデスクトップ通知
+- **キーボードショートカット** — 投稿・カラム追加・カラム 1-9 ジャンプなど（カラム WebView フォーカス中も有効）
+- **テーマ切替** — ダーク / ライト / システム連動
+- **プリセット** — カラム構成の保存・切り替え（デスクトップ）
 - **TopBar ナビゲーション** — 横方向ツールバーでカラム追加・アカウント管理・設定を操作（デスクトップ）
-- **Android 対応** — モバイルタブバー UI でカラムを切り替え表示
+- **自動アップデート** — GitHub Releases からの更新確認・適用と What's New 表示（デスクトップ / Android APK）
+- **クラッシュ自動復旧** — Linux の WebProcess クラッシュを検知してカラム WebView を自動再生成
+- **Android 対応** — モバイルタブバー UI・スワイプバーでカラムを切り替え表示
 
 ## 技術スタック
 
@@ -73,10 +81,16 @@ npm run tauri:build:debug
 npm run tauri:android:build
 ```
 
-### テスト
+### テスト・品質チェック
 
 ```bash
-npm test
+npm test                 # Vitest 単体テスト
+npm run test:property    # fast-check プロパティテスト
+npm run test:story       # Storybook play function（chromium）
+npm run lint             # ESLint
+npm run typecheck        # tsc --noEmit
+npm run lint:rust        # cargo clippy（-D warnings）
+cd src-tauri && cargo test   # Rust 単体テスト
 ```
 
 ## プロジェクト構成
@@ -133,13 +147,22 @@ multi-column-x/
         │   └── account.rs            # アカウントウィンドウ・ログイン検出（desktop/mobile 分岐）
         └── inject/                   # WebView に注入する JS
             ├── _src/                 # TypeScript ソース（Vite でバンドル → *.js に出力）
-            │   ├── auto_reload.ts    # 自動更新
+            │   ├── auto_reload.ts    # 自動更新（新着数報告を含む）
+            │   ├── blur_image.ts     # 画像ぼかし表示
             │   ├── context_menu.ts   # カスタムコンテキストメニュー
             │   ├── custom_css.ts     # カスタム CSS 適用
-            │   ├── header_customizer.ts / .tsx / .scss  # ヘッダー非表示
+            │   ├── header_customizer.ts / useHeaderCustomizer.ts  # ヘッダー非表示
+            │   ├── hide_ad.ts        # 広告非表示
             │   ├── image_popup.ts    # メディアリンクをポップアップで開く
+            │   ├── keyboard_shortcut.ts # ショートカットキーを main へ転送
+            │   ├── mobile_area_hide.ts  # モバイル用の領域非表示
+            │   ├── ng_word.ts        # NG ワードフィルタ
             │   ├── popup_toolbar.ts  # ポップアップツールバー（アカウント切替）
+            │   ├── popup_video_autoplay.ts # ポップアップ動画の自動再生
             │   ├── scroll_event.ts   # 横スクロールイベントを main WebView に中継
+            │   ├── scroll_pos_restore.ts # 写真閲覧後のスクロール位置復元
+            │   ├── sidebar_hide.ts   # x.com サイドバー非表示
+            │   ├── small_image.ts    # 画像縮小表示
             │   ├── tab_selector.ts   # ホームタブ選択
             │   └── video_control.ts  # 動画自動再生停止
             ├── *.js                  # _src をビルドした成果物（gitignore 対象・直接編集禁止）
@@ -152,6 +175,8 @@ Kotlin 層（Android）:
 src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/
 ├── MainActivity.kt              # カラム/ポップアップ WebView 管理・バックボタン処理
 ├── DoubleTapGestureDetector.kt  # アクティブカラムのダブルタップ検出器
+├── PopupGestureBlock.kt         # ポップアップ表示中のジェスチャー抑止
+├── PopupSessionBridge.kt        # ポップアップのセッション切替ブリッジ
 ├── WebViewProfiles.kt           # WebView Profile API のサポート判定・適用
 ├── AddAccount.kt                # ログイン用 Activity（センチネルファイル書き込みで完了通知）
 ├── AppBridge.kt                 # Rust JNI 呼び出しの窓口
@@ -183,6 +208,7 @@ src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/
 | `open_add_account_window`  | アカウント追加ウィンドウを開く（ログイン検出付き）     |
 | `delete_account_data`      | アカウントデータディレクトリを削除                     |
 | `close_window`             | 指定ラベルのウィンドウ / WebView を閉じる              |
+| `install_apk_update`       | APK をダウンロードしてインストーラを起動（Android）    |
 
 ## アーキテクチャ上の注意点
 
@@ -190,9 +216,11 @@ src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/
 
 Tauri v2 の `window.add_child()` で作成した子 WebView は OS ネイティブウィンドウのため、CSS の `z-index` が効かない。ダイアログ表示中は全カラム WebView を画面外（x: -9999）に退避し、閉じたときに座標を復元する。
 
-### 外部 WebView での IPC 不可
+### 外部 WebView への IPC 注入（remote capability）
 
-x.com などの外部 URL を表示する WebView では `window.__TAURI__` が inject されないため、JS から Tauri コマンドを呼び出せない。ログイン完了の検出はデスクトップでは Rust 側の tokio タスクが URL を 500ms ごとにポーリングして行う。
+x.com などの外部 URL を表示するカラム / ポップアップ WebView には、`src-tauri/capabilities/column-webview.json` の `remote` 設定によって IPC（`window.__TAURI__`）が注入される。inject スクリプト（新着数報告・横スクロール中継・メディアポップアップ等）はこの IPC を通じて Tauri コマンドを invoke する。リモートページにアプリのコマンドを開放する設定であるため、`remote.urls` の対象ドメインは必要最小限に保つこと。
+
+なお、ログイン完了の検出だけは IPC ではなく、デスクトップでは Rust 側の tokio タスクが URL を 500ms ごとにポーリングして行う（ログイン画面の遷移を JS 注入に依存させないため）。
 
 ### serde の camelCase / snake_case
 
