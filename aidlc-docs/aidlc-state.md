@@ -1,12 +1,12 @@
 # aidlc-state: 改善計画の実行状態
 
-最終更新: 2026-07-02（このファイルはウェーブの起動・完了・検証のたびに必ず更新すること）
+最終更新: 2026-07-03（このファイルはウェーブの起動・完了・検証のたびに必ず更新すること）
 
 ## 参照ドキュメント
 
 - 監査（問題インベントリ S/R/T/U/D）: `aidlc-docs/inception/reverse-engineering/2026-07-02-project-audit.md`
 - 実行計画（10 フェーズ・タスク詳細）: `aidlc-docs/construction/plans/2026-07-02-improvement-plan.md`
-- どちらもブランチ `docs/project-audit-2026-07`（コミット 6989a9d）にのみ存在。**develop へ未マージ**
+- どちらもブランチ `docs/project-audit-2026-07` に存在。**PR #26** で develop へレビュー中
 
 ## 実行方式
 
@@ -16,20 +16,33 @@
 
 ## フェーズ進捗
 
-| フェーズ | 内容                                                        | ブランチ                      | 状態                                                                                                                                                                   |
-| -------- | ----------------------------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1        | セキュリティ強化（S2→S4→S1→S3→S5/S6）                       | `fix/security-hardening`      | ✅ コード完了・自動ゲート検証済み（bde83b9〜1668db2 の5コミット。cargo test 57件・Vitest 461件をメイン側で再検証済み）。**実機手動確認のみ未了**（下記チェックリスト） |
-| 3        | useDesktopColumns / useMobileColumns テスト                 | `test/desktop-mobile-columns` | ✅ 完了・検証済み（a8b9971, b021085。テスト11件追加、Vitest 472件、プロダクトコード変更なしを差分確認済み）                                                            |
-| 4        | inject スクリプトテスト                                     | `test/inject-scripts`         | ✅ 完了・検証済み（8127536〜baeb87e の6コミット。テスト31件追加、Vitest 492件、テストファイル7件のみの差分を確認済み）                                                 |
-| 2        | Rust リファクタ（R2 init script 重複 / R5 lock expect）     | `refactor/rust-column-init`   | ✅ 完了・検証済み（a541ac2, 94f392b。column.rs/popup.rs のみの差分で net -16 行、cargo test 57件不変を確認）                                                           |
-| 5        | Rust テスト（settings_store 純関数化 / parse_url / update） | `test/rust-settings-store`    | ✅ 完了・検証済み（5018ede, 0c2e7b5。テスト9件追加で計66件、許可3ファイルのみの差分を確認、メイン側で cargo test 再検証済み）                                          |
-| 9        | AppSettingsPanel リファクタ（R1）                           | `refactor/app-settings-panel` | 🔄 実行中（2026-07-03 起動。他フェーズと競合しないため前倒し）                                                                                                         |
-| 6        | アカウント操作のダイアログ化（U1）                          | `feat/account-dialogs`        | ⏳ ウェーブ3 待機（6/7/8 は App.tsx が相互競合。順次 or 慎重に並列）                                                                                                   |
-| 7        | カラムヘッダー直接移動（U2+R3）                             | `feat/column-header-move`     | ⏳ ウェーブ3 待機                                                                                                                                                      |
-| 8        | ショートカット拡充 r/?（U3）                                | `feat/shortcut-reload-help`   | ⏳ ウェーブ3 待機                                                                                                                                                      |
-| 10       | 通知対象拡大（U4）/ プリセットモバイル（U5）                | `feat/notify-any-column`      | ⏳ ウェーブ4 待機（フェーズ9完了後。AppSettingsPanel 依存）                                                                                                            |
+| フェーズ | 内容                                                        | ブランチ                      | 状態                                                                                                                                                                               |
+| -------- | ----------------------------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1        | セキュリティ強化（S2→S4→S1→S3→S5/S6）                       | `fix/security-hardening`      | ✅ コード完了・自動ゲート検証済み（bde83b9〜1668db2 の5コミット。cargo test 57件・Vitest 461件をメイン側で再検証済み）。**実機手動確認のみ未了**（下記チェックリスト）。**PR #27** |
+| 3        | useDesktopColumns / useMobileColumns テスト                 | `test/desktop-mobile-columns` | ✅ 完了・検証済み（a8b9971, b021085。テスト11件追加、Vitest 472件、プロダクトコード変更なしを差分確認済み。**PR #28**）                                                            |
+| 4        | inject スクリプトテスト                                     | `test/inject-scripts`         | ✅ 完了・検証済み（8127536〜baeb87e の6コミット。テスト31件追加、Vitest 492件、テストファイル7件のみの差分を確認済み。**PR #29**）                                                 |
+| 2        | Rust リファクタ（R2 init script 重複 / R5 lock expect）     | `refactor/rust-column-init`   | ✅ 完了・検証済み（a541ac2, 94f392b。column.rs/popup.rs のみの差分で net -16 行、cargo test 57件不変を確認。**PR #30**（#27へのスタック））                                        |
+| 5        | Rust テスト（settings_store 純関数化 / parse_url / update） | `test/rust-settings-store`    | ✅ 完了・検証済み（5018ede, 0c2e7b5。テスト9件追加で計66件、許可3ファイルのみの差分を確認、メイン側で cargo test 再検証済み。**PR #31**（#27へのスタック））                       |
+| 9        | AppSettingsPanel リファクタ（R1）                           | `refactor/app-settings-panel` | 🔄 実行中（2026-07-03 起動。他フェーズと競合しないため前倒し）                                                                                                                     |
+| 6        | アカウント操作のダイアログ化（U1）                          | `feat/account-dialogs`        | 🔄 ウェーブ3 実行中（2026-07-03 起動。main 起点）                                                                                                                                  |
+| 7        | カラムヘッダー直接移動（U2+R3）                             | `feat/column-header-move`     | ⏳ ウェーブ3 待機（フェーズ6完了後、`feat/account-dialogs` 起点で起動。App.tsx 競合回避）                                                                                          |
+| 8        | ショートカット拡充 r/?（U3）                                | `feat/shortcut-reload-help`   | ⏳ ウェーブ3 待機（フェーズ7完了後、`feat/column-header-move` 起点で起動）                                                                                                         |
+| 10       | 通知対象拡大（U4）/ プリセットモバイル（U5）                | `feat/notify-any-column`      | ⏳ ウェーブ4 待機（フェーズ9完了後。AppSettingsPanel 依存）                                                                                                                        |
 
 凡例: ✅ 完了・検証済み / 🔄 実行中 / ⏳ 待機 / ❌ 失敗・要対応
+
+## PR 一覧（スタック関係に注意）
+
+| PR  | 内容                                                    | base                       | マージ順                                 |
+| --- | ------------------------------------------------------- | -------------------------- | ---------------------------------------- |
+| #26 | 監査・計画・README 現行化（docs/project-audit-2026-07） | develop                    | いつでも可                               |
+| #27 | フェーズ1 セキュリティ強化                              | develop                    | 実機確認後、最優先                       |
+| #28 | フェーズ3 フックテスト                                  | develop                    | いつでも可                               |
+| #29 | フェーズ4 inject テスト                                 | develop                    | いつでも可                               |
+| #30 | フェーズ2 Rust リファクタ                               | **fix/security-hardening** | #27 の後（マージ後 develop へ retarget） |
+| #31 | フェーズ5 Rust テスト                                   | **fix/security-hardening** | #27 の後（マージ後 develop へ retarget） |
+
+#30 と #31 は相互に独立だが、どちらも #27 に積んである。フェーズ 6〜10 は完了・検証のたびに同様に PR を作成する（6→7→8 はスタック予定）。
 
 ## ウェーブ完了時の検証手順（メインセッションの仕事）
 
@@ -43,7 +56,7 @@
 - [ ] フェーズ1 Task 1.3（capability の x.com 限定）: 実機で「新着バッジ」「画像ポップアップ」「x.com 以外のリンクポップアップの縮退」を確認（計画書 Task 1.3 Step 2 のチェックリスト）
 - [ ] フェーズ1 Task 1.4（CSP）: `npm run tauri:dev` で main UI 全機能がコンソールエラーなしで動くこと
 - [ ] フェーズ1 Task 1.2: カラム再読み込み（⟳）・自動リロードが main 呼び出しで正常動作すること（実機）
-- [ ] `docs/project-audit-2026-07` ブランチの PR / develop へのマージ
+- [ ] PR #26〜#31 のレビューとマージ（順序は PR 一覧参照）
 
 ## 既知の環境問題（トラブルシューティング）
 
