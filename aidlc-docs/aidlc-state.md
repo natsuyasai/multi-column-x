@@ -16,18 +16,18 @@
 
 ## フェーズ進捗
 
-| フェーズ | 内容                                                        | ブランチ                      | 状態                                                                 |
-| -------- | ----------------------------------------------------------- | ----------------------------- | -------------------------------------------------------------------- |
-| 1        | セキュリティ強化（S2→S4→S1→S3→S5/S6）                       | `fix/security-hardening`      | 🔄 ウェーブ1 実行中（2026-07-02 起動）                               |
-| 3        | useDesktopColumns / useMobileColumns テスト                 | `test/desktop-mobile-columns` | 🔄 ウェーブ1 実行中（2026-07-02 起動）                               |
-| 4        | inject スクリプトテスト                                     | `test/inject-scripts`         | 🔄 ウェーブ1 実行中（2026-07-02 起動）                               |
-| 2        | Rust リファクタ（R2 init script 重複 / R5 lock expect）     | `refactor/rust-column-init`   | ⏳ ウェーブ2 待機（フェーズ1完了後。column.rs 等が競合するため）     |
-| 5        | Rust テスト（settings_store 純関数化 / parse_url / update） | `test/rust-settings-store`    | ⏳ ウェーブ2 待機（フェーズ1と webview/mod.rs が競合）               |
-| 9        | AppSettingsPanel リファクタ（R1）                           | `refactor/app-settings-panel` | ⏳ ウェーブ2 待機（他と競合しないため前倒し可）                      |
-| 6        | アカウント操作のダイアログ化（U1）                          | `feat/account-dialogs`        | ⏳ ウェーブ3 待機（6/7/8 は App.tsx が相互競合。順次 or 慎重に並列） |
-| 7        | カラムヘッダー直接移動（U2+R3）                             | `feat/column-header-move`     | ⏳ ウェーブ3 待機                                                    |
-| 8        | ショートカット拡充 r/?（U3）                                | `feat/shortcut-reload-help`   | ⏳ ウェーブ3 待機                                                    |
-| 10       | 通知対象拡大（U4）/ プリセットモバイル（U5）                | `feat/notify-any-column`      | ⏳ ウェーブ4 待機（フェーズ9完了後。AppSettingsPanel 依存）          |
+| フェーズ | 内容                                                        | ブランチ                      | 状態                                                                                                        |
+| -------- | ----------------------------------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| 1        | セキュリティ強化（S2→S4→S1→S3→S5/S6）                       | `fix/security-hardening`      | 🔄 ウェーブ1 実行中（2026-07-02 起動）                                                                      |
+| 3        | useDesktopColumns / useMobileColumns テスト                 | `test/desktop-mobile-columns` | ✅ 完了・検証済み（a8b9971, b021085。テスト11件追加、Vitest 472件、プロダクトコード変更なしを差分確認済み） |
+| 4        | inject スクリプトテスト                                     | `test/inject-scripts`         | 🔄 ウェーブ1 実行中（2026-07-02 起動）                                                                      |
+| 2        | Rust リファクタ（R2 init script 重複 / R5 lock expect）     | `refactor/rust-column-init`   | ⏳ ウェーブ2 待機（フェーズ1完了後。column.rs 等が競合するため）                                            |
+| 5        | Rust テスト（settings_store 純関数化 / parse_url / update） | `test/rust-settings-store`    | ⏳ ウェーブ2 待機（フェーズ1と webview/mod.rs が競合）                                                      |
+| 9        | AppSettingsPanel リファクタ（R1）                           | `refactor/app-settings-panel` | ⏳ ウェーブ2 待機（他と競合しないため前倒し可）                                                             |
+| 6        | アカウント操作のダイアログ化（U1）                          | `feat/account-dialogs`        | ⏳ ウェーブ3 待機（6/7/8 は App.tsx が相互競合。順次 or 慎重に並列）                                        |
+| 7        | カラムヘッダー直接移動（U2+R3）                             | `feat/column-header-move`     | ⏳ ウェーブ3 待機                                                                                           |
+| 8        | ショートカット拡充 r/?（U3）                                | `feat/shortcut-reload-help`   | ⏳ ウェーブ3 待機                                                                                           |
+| 10       | 通知対象拡大（U4）/ プリセットモバイル（U5）                | `feat/notify-any-column`      | ⏳ ウェーブ4 待機（フェーズ9完了後。AppSettingsPanel 依存）                                                 |
 
 凡例: ✅ 完了・検証済み / 🔄 実行中 / ⏳ 待機 / ❌ 失敗・要対応
 
