@@ -23,10 +23,6 @@ const addAccountResult = JSON.stringify({
 describe("useAccounts (mobile)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubGlobal(
-      "confirm",
-      vi.fn(() => true),
-    );
     useAppStore.setState({ accounts: [], isMobile: true });
   });
 
@@ -164,11 +160,7 @@ describe("useAccounts (mobile)", () => {
     expect(openCalls).toHaveLength(1);
   });
 
-  it("removeAccountはconfirmがfalseならdelete_account_dataを呼ばない", async () => {
-    vi.stubGlobal(
-      "confirm",
-      vi.fn(() => false),
-    );
+  it("removeAccountを呼ぶとpendingRemovalに削除対象がセットされる（即座には削除しない）", async () => {
     useAppStore.setState({
       accounts: [
         {
@@ -183,10 +175,15 @@ describe("useAccounts (mobile)", () => {
     });
     const { result } = renderHook(() => useAccounts());
 
-    await act(async () => {
-      await result.current.removeAccount("acc-1");
+    act(() => {
+      result.current.removeAccount("acc-1");
     });
 
+    expect(result.current.pendingRemoval).toMatchObject({
+      id: "acc-1",
+      label: "Test",
+      dataDirectory: "/data/acc-1",
+    });
     expect(mockInvoke).not.toHaveBeenCalledWith(
       "delete_account_data",
       expect.anything(),
@@ -194,7 +191,37 @@ describe("useAccounts (mobile)", () => {
     expect(useAppStore.getState().accounts).toHaveLength(1);
   });
 
-  it("removeAccountはconfirmがtrueならdelete_account_dataを呼びstoreから削除する", async () => {
+  it("cancelRemovalを呼ぶとdelete_account_dataを呼ばずpendingRemovalが解除される", async () => {
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-1",
+          label: "Test",
+          dataDirectory: "/data/acc-1",
+          color: "#1d9bf0",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      isMobile: true,
+    });
+    const { result } = renderHook(() => useAccounts());
+
+    act(() => {
+      result.current.removeAccount("acc-1");
+    });
+    act(() => {
+      result.current.cancelRemoval();
+    });
+
+    expect(result.current.pendingRemoval).toBeNull();
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "delete_account_data",
+      expect.anything(),
+    );
+    expect(useAppStore.getState().accounts).toHaveLength(1);
+  });
+
+  it("confirmRemovalを呼ぶとdelete_account_dataを呼びstoreから削除する", async () => {
     mockInvoke.mockResolvedValue(undefined);
     useAppStore.setState({
       accounts: [
@@ -210,13 +237,17 @@ describe("useAccounts (mobile)", () => {
     });
     const { result } = renderHook(() => useAccounts());
 
+    act(() => {
+      result.current.removeAccount("acc-1");
+    });
     await act(async () => {
-      await result.current.removeAccount("acc-1");
+      await result.current.confirmRemoval();
     });
 
     expect(mockInvoke).toHaveBeenCalledWith("delete_account_data", {
       dataDirectory: "/data/acc-1",
     });
     expect(useAppStore.getState().accounts).toHaveLength(0);
+    expect(result.current.pendingRemoval).toBeNull();
   });
 });

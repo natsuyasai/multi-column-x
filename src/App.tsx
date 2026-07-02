@@ -9,6 +9,7 @@ import { AccountNameDialog } from "./components/AccountNameDialog/AccountNameDia
 import { AddColumnDialog } from "./components/AddColumnDialog/AddColumnDialog";
 import { AppSettingsPanel } from "./components/AppSettingsPanel/AppSettingsPanel";
 import { ColumnHeader } from "./components/ColumnHeader/ColumnHeader";
+import { ConfirmDialog } from "./components/ConfirmDialog/ConfirmDialog";
 import { LinkPopupDialog } from "./components/LinkPopupDialog/LinkPopupDialog";
 import { MobileSwipeBar } from "./components/MobileSwipeBar/MobileSwipeBar";
 import { MobileTabBar } from "./components/MobileTabBar/MobileTabBar";
@@ -50,6 +51,7 @@ const App: React.FC = () => {
     accounts,
     globalSettings,
     updateGlobalSettings,
+    updateAccount,
     topBarExpanded,
     setTopBarExpanded,
     replaceColumns,
@@ -85,6 +87,9 @@ const App: React.FC = () => {
     pendingAccountName,
     submitAccountName,
     cancelAccountName,
+    pendingRemoval,
+    confirmRemoval,
+    cancelRemoval,
   } = useAccounts();
   const {
     showAddColumn,
@@ -199,7 +204,8 @@ const App: React.FC = () => {
     dialogOpen ||
     !!updater.available ||
     !!whatsNew.notes ||
-    !!pendingAccountName;
+    !!pendingAccountName ||
+    !!pendingRemoval;
   useEffect(() => {
     setDialogOpen(anyDialogOpen);
     if (anyDialogOpen) {
@@ -477,6 +483,7 @@ const App: React.FC = () => {
           onAddAccount={startAddAccount}
           onRemoveAccount={removeAccount}
           onSetDefault={handleSetDefaultAccount}
+          onUpdateAccount={updateAccount}
           onClose={() => setShowAccountManager(false)}
         />
       )}
@@ -487,6 +494,16 @@ const App: React.FC = () => {
           title="アカウント名を入力"
           onSubmit={submitAccountName}
           onCancel={cancelAccountName}
+        />
+      )}
+
+      {pendingRemoval && (
+        <ConfirmDialog
+          title="アカウントの削除"
+          message={`「${pendingRemoval.label}」を削除しますか？セッションデータも削除されます。`}
+          confirmLabel="削除する"
+          onConfirm={confirmRemoval}
+          onCancel={cancelRemoval}
         />
       )}
 

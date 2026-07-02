@@ -21,10 +21,69 @@ describe("AccountManager", () => {
         onAddAccount={vi.fn()}
         onRemoveAccount={vi.fn()}
         onSetDefault={vi.fn()}
+        onUpdateAccount={vi.fn()}
         onClose={vi.fn()}
       />,
     );
     expect(screen.getByText("アカウントA")).toBeInTheDocument();
+  });
+
+  it("名前を編集して保存できる", () => {
+    const onUpdateAccount = vi.fn();
+    render(
+      <AccountManager
+        accounts={mockAccounts}
+        onAddAccount={vi.fn()}
+        onRemoveAccount={vi.fn()}
+        onSetDefault={vi.fn()}
+        onUpdateAccount={onUpdateAccount}
+        onClose={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText("アカウントA を編集"));
+    const input = screen.getByLabelText("アカウント名");
+    fireEvent.change(input, { target: { value: "推し垢" } });
+    fireEvent.click(screen.getByText("保存"));
+    expect(onUpdateAccount).toHaveBeenCalledWith("acc-1", { label: "推し垢" });
+  });
+
+  it("編集をキャンセルすると変更が破棄される", () => {
+    const onUpdateAccount = vi.fn();
+    render(
+      <AccountManager
+        accounts={mockAccounts}
+        onAddAccount={vi.fn()}
+        onRemoveAccount={vi.fn()}
+        onSetDefault={vi.fn()}
+        onUpdateAccount={onUpdateAccount}
+        onClose={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText("アカウントA を編集"));
+    const input = screen.getByLabelText("アカウント名");
+    fireEvent.change(input, { target: { value: "変更中" } });
+    fireEvent.click(screen.getByText("キャンセル"));
+    expect(onUpdateAccount).not.toHaveBeenCalled();
+    expect(screen.getByText("アカウントA")).toBeInTheDocument();
+  });
+
+  it("色を変更できる", () => {
+    const onUpdateAccount = vi.fn();
+    render(
+      <AccountManager
+        accounts={mockAccounts}
+        onAddAccount={vi.fn()}
+        onRemoveAccount={vi.fn()}
+        onSetDefault={vi.fn()}
+        onUpdateAccount={onUpdateAccount}
+        onClose={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText("アカウントA を編集"));
+    fireEvent.click(screen.getByLabelText("色を #e5c07b に変更"));
+    expect(onUpdateAccount).toHaveBeenCalledWith("acc-1", {
+      color: "#e5c07b",
+    });
   });
 
   it("削除ボタンでonRemoveAccountが呼ばれる", () => {
@@ -35,6 +94,7 @@ describe("AccountManager", () => {
         onAddAccount={vi.fn()}
         onRemoveAccount={onRemoveAccount}
         onSetDefault={vi.fn()}
+        onUpdateAccount={vi.fn()}
         onClose={vi.fn()}
       />,
     );
@@ -50,6 +110,7 @@ describe("AccountManager", () => {
         onAddAccount={vi.fn()}
         onRemoveAccount={vi.fn()}
         onSetDefault={vi.fn()}
+        onUpdateAccount={vi.fn()}
         onClose={vi.fn()}
       />,
     );
@@ -73,6 +134,7 @@ describe("AccountManager", () => {
         onAddAccount={vi.fn()}
         onRemoveAccount={vi.fn()}
         onSetDefault={vi.fn()}
+        onUpdateAccount={vi.fn()}
         onClose={vi.fn()}
       />,
     );
@@ -89,6 +151,7 @@ describe("AccountManager", () => {
         onAddAccount={vi.fn()}
         onRemoveAccount={vi.fn()}
         onSetDefault={vi.fn()}
+        onUpdateAccount={vi.fn()}
         onClose={onClose}
       />,
     );
@@ -103,6 +166,7 @@ describe("AccountManager", () => {
         onAddAccount={vi.fn()}
         onRemoveAccount={vi.fn()}
         onSetDefault={vi.fn()}
+        onUpdateAccount={vi.fn()}
         onClose={vi.fn()}
       />,
     );

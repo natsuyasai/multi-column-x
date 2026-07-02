@@ -30,11 +30,21 @@ export interface PendingAccountName {
   defaultValue: string;
 }
 
+// アカウント削除の確認待ちであることを表す状態。
+// ConfirmDialog はこの値の有無で表示・非表示を切り替える。
+export interface PendingAccountRemoval {
+  id: string;
+  label: string;
+  dataDirectory: string;
+}
+
 export function useAccounts() {
   const { accounts, addAccount, removeAccount, isMobile } = useAppStore();
   const isAddingRef = useRef(false);
   const [pendingAccountName, setPendingAccountName] =
     useState<PendingAccountName | null>(null);
+  const [pendingRemoval, setPendingRemoval] =
+    useState<PendingAccountRemoval | null>(null);
 
   const requestAccountName = useCallback(
     (accountId: string, dataDirectory: string, windowLabel: string) => {
@@ -166,30 +176,42 @@ export function useAccounts() {
     }
   }, [isMobile, pendingAccountName, requestAccountName]);
 
-  const handleRemoveAccount = useCallback(
-    async (id: string) => {
+  const requestRemoveAccount = useCallback(
+    (id: string) => {
       const account = accounts.find((a) => a.id === id);
       if (!account) return;
-
-      const confirmed = confirm(
-        `「${account.label}」を削除しますか？セッションデータも削除されます。`,
-      );
-      if (!confirmed) return;
-
-      await invoke(IPC_COMMANDS.DELETE_ACCOUNT_DATA, {
+      setPendingRemoval({
+        id: account.id,
+        label: account.label,
         dataDirectory: account.dataDirectory,
       });
-      removeAccount(id);
     },
-    [accounts, removeAccount],
+    [accounts],
   );
+
+  const confirmRemoval = useCallback(async () => {
+    const pending = pendingRemoval;
+    if (!pending) return;
+    setPendingRemoval(null);
+    await invoke(IPC_COMMANDS.DELETE_ACCOUNT_DATA, {
+      dataDirectory: pending.dataDirectory,
+    });
+    removeAccount(pending.id);
+  }, [pendingRemoval, removeAccount]);
+
+  const cancelRemoval = useCallback(() => {
+    setPendingRemoval(null);
+  }, []);
 
   return {
     accounts,
     startAddAccount,
-    removeAccount: handleRemoveAccount,
+    removeAccount: requestRemoveAccount,
     pendingAccountName,
     submitAccountName,
     cancelAccountName,
+    pendingRemoval,
+    confirmRemoval,
+    cancelRemoval,
   };
 }
