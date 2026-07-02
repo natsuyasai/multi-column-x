@@ -15,3 +15,17 @@ pub async fn install_apk_update(url: String) -> Result<(), String> {
         Err("install_apk_update is only supported on Android".into())
     }
 }
+
+#[cfg(all(test, not(target_os = "android")))]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn android以外ではinstall_apk_updateが未対応エラーを返す() {
+        let result = install_apk_update("https://example.com/app.apk".to_string()).await;
+        assert_eq!(
+            result,
+            Err("install_apk_update is only supported on Android".to_string())
+        );
+    }
+}
