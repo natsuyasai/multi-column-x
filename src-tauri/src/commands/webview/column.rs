@@ -59,6 +59,34 @@ pub struct CreateWebviewArgs {
     pub height: f64,
 }
 
+/// カラム WebView に注入する init script を、設定ストアの読み出しを含めて構築する。
+/// desktop / mobile 双方の `create_column_webview` から呼ばれ、挙動差分は `is_mobile` のみ。
+fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: bool) -> String {
+    let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(app);
+    let hide_ad_enabled = load_hide_ad_enabled(app);
+    let image_popup_enabled = load_image_popup_enabled(app);
+    let video_popup_enabled = load_video_popup_enabled(app);
+    let global_ng_words = load_global_ng_words(app);
+    build_init_script(&InitScriptParams {
+        is_mobile,
+        area_remove_enabled: column.settings.area_remove_enabled,
+        show_custom_menu: column.settings.show_custom_menu,
+        scroll_pos_restore_enabled: column.settings.scroll_pos_restore_enabled,
+        video_auto_play_stop_enabled,
+        small_image_enabled: column.settings.small_image_enabled,
+        small_image_width: &column.settings.small_image_width,
+        blur_image_enabled: column.settings.blur_image_enabled,
+        blur_image_amount: &column.settings.blur_image_amount,
+        hide_ad_enabled,
+        image_popup_enabled,
+        video_popup_enabled,
+        custom_css: &column.settings.custom_css,
+        visible_links: &column.settings.visible_links,
+        ng_words: &column.settings.ng_words,
+        global_ng_words: &global_ng_words,
+    })
+}
+
 #[cfg(desktop)]
 #[tauri::command]
 pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> Result<(), String> {
@@ -66,29 +94,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
     let label = webview_label(&args.column.id);
     let data_dir = PathBuf::from(&args.data_directory);
 
-    let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(&app);
-    let hide_ad_enabled = load_hide_ad_enabled(&app);
-    let image_popup_enabled = load_image_popup_enabled(&app);
-    let video_popup_enabled = load_video_popup_enabled(&app);
-    let global_ng_words = load_global_ng_words(&app);
-    let init_script = build_init_script(&InitScriptParams {
-        is_mobile: false,
-        area_remove_enabled: args.column.settings.area_remove_enabled,
-        show_custom_menu: args.column.settings.show_custom_menu,
-        scroll_pos_restore_enabled: args.column.settings.scroll_pos_restore_enabled,
-        video_auto_play_stop_enabled,
-        small_image_enabled: args.column.settings.small_image_enabled,
-        small_image_width: &args.column.settings.small_image_width,
-        blur_image_enabled: args.column.settings.blur_image_enabled,
-        blur_image_amount: &args.column.settings.blur_image_amount,
-        hide_ad_enabled,
-        image_popup_enabled,
-        video_popup_enabled,
-        custom_css: &args.column.settings.custom_css,
-        visible_links: &args.column.settings.visible_links,
-        ng_words: &args.column.settings.ng_words,
-        global_ng_words: &global_ng_words,
-    });
+    let init_script = build_column_init_script(&app, &args.column, false);
 
     // parent() は &WebviewWindow を要求するため、Linux では get_webview_window を使う。
     // 非Linux の場合は一般の Window を取得して add_child を呼び出す。
@@ -171,29 +177,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
     let url = resolve_url(&args.column);
     let label = webview_label(&args.column.id);
 
-    let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(&app);
-    let hide_ad_enabled = load_hide_ad_enabled(&app);
-    let image_popup_enabled = load_image_popup_enabled(&app);
-    let video_popup_enabled = load_video_popup_enabled(&app);
-    let global_ng_words = load_global_ng_words(&app);
-    let init_script = build_init_script(&InitScriptParams {
-        is_mobile: true,
-        area_remove_enabled: args.column.settings.area_remove_enabled,
-        show_custom_menu: args.column.settings.show_custom_menu,
-        scroll_pos_restore_enabled: args.column.settings.scroll_pos_restore_enabled,
-        video_auto_play_stop_enabled,
-        small_image_enabled: args.column.settings.small_image_enabled,
-        small_image_width: &args.column.settings.small_image_width,
-        blur_image_enabled: args.column.settings.blur_image_enabled,
-        blur_image_amount: &args.column.settings.blur_image_amount,
-        hide_ad_enabled,
-        image_popup_enabled,
-        video_popup_enabled,
-        custom_css: &args.column.settings.custom_css,
-        visible_links: &args.column.settings.visible_links,
-        ng_words: &args.column.settings.ng_words,
-        global_ng_words: &global_ng_words,
-    });
+    let init_script = build_column_init_script(&app, &args.column, true);
 
     // Android では Tauri WebviewWindowBuilder を使わず、
     // ネイティブ Android WebView を content FrameLayout のオーバーレイとして追加する。
