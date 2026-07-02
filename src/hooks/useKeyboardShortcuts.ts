@@ -13,7 +13,21 @@ interface KeyboardShortcutsOptions {
   onAppSettings?: () => void;
   onToggleTopBar?: () => void;
   onJumpToColumn?: (index: number) => void;
+  onReloadColumn?: () => void;
+  onToggleHelp?: () => void;
   disabled?: boolean;
+}
+
+/** 入力中の要素（input / textarea / contentEditable）かどうかを判定する。
+ * 修飾キー無しのショートカット（r / ?）はタイピングと衝突するためこのガードが必要。
+ * Ctrl 併用の既存ショートカットは通常のテキスト入力と衝突しないため対象外とする。 */
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.isContentEditable
+  );
 }
 
 export function useKeyboardShortcuts({
@@ -24,12 +38,25 @@ export function useKeyboardShortcuts({
   onAppSettings = NOOP,
   onToggleTopBar = NOOP,
   onJumpToColumn = NOOP_INDEX,
+  onReloadColumn = NOOP,
+  onToggleHelp = NOOP,
   disabled = false,
 }: KeyboardShortcutsOptions): void {
   useEffect(() => {
     if (disabled) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!e.ctrlKey) return;
+      if (!e.ctrlKey) {
+        if (isEditableTarget(e.target)) return;
+        if (e.key.toLowerCase() === "r") {
+          onReloadColumn();
+          return;
+        }
+        if (e.key === "?") {
+          onToggleHelp();
+          return;
+        }
+        return;
+      }
       const key = e.key.toLowerCase();
       if (key === "t") {
         onComposeTweet();
@@ -70,6 +97,8 @@ export function useKeyboardShortcuts({
     onAppSettings,
     onToggleTopBar,
     onJumpToColumn,
+    onReloadColumn,
+    onToggleHelp,
     disabled,
   ]);
 
@@ -106,6 +135,12 @@ export function useKeyboardShortcuts({
           case "toggle_top_bar":
             onToggleTopBar();
             break;
+          case "reload_column":
+            onReloadColumn();
+            break;
+          case "show_shortcut_help":
+            onToggleHelp();
+            break;
         }
       },
     );
@@ -121,6 +156,8 @@ export function useKeyboardShortcuts({
     onAppSettings,
     onToggleTopBar,
     onJumpToColumn,
+    onReloadColumn,
+    onToggleHelp,
     disabled,
   ]);
 }

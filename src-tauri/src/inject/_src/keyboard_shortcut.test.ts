@@ -59,4 +59,43 @@ describe("inject/keyboard_shortcut", () => {
       key: "account_manager",
     });
   });
+
+  it("r キー（Ctrl なし）を押すと reload_column が転送される", () => {
+    pressKey("r", false);
+    expect(invokeMock).toHaveBeenCalledWith("report_keyboard_shortcut", {
+      key: "reload_column",
+    });
+  });
+
+  it("? キー（Ctrl なし）を押すと show_shortcut_help が転送される", () => {
+    pressKey("?", false);
+    expect(invokeMock).toHaveBeenCalledWith("report_keyboard_shortcut", {
+      key: "show_shortcut_help",
+    });
+  });
+
+  it("Ctrl+r では reload_column が転送されない", () => {
+    pressKey("r", true);
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("input要素にフォーカス中は r キーを押しても転送されない", () => {
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "r", ctrlKey: false, bubbles: true }),
+    );
+    expect(invokeMock).not.toHaveBeenCalled();
+    document.body.removeChild(input);
+  });
+
+  it("textarea要素にフォーカス中は ? キーを押しても転送されない", () => {
+    const textarea = document.createElement("textarea");
+    document.body.appendChild(textarea);
+    textarea.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "?", ctrlKey: false, bubbles: true }),
+    );
+    expect(invokeMock).not.toHaveBeenCalled();
+    document.body.removeChild(textarea);
+  });
 });

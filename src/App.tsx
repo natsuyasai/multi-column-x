@@ -222,8 +222,15 @@ const App: React.FC = () => {
     setTimeout(() => recalculateAllBounds(), 220);
   }, [topBarExpanded, setTopBarExpanded, recalculateAllBounds]);
 
+  // 「フォーカスカラム」= 最後に 1-9 ジャンプ／TopBar クリックでジャンプしたカラム。
+  // r キーでのリロード対象を決めるために使う（無ければ order 最小の先頭カラムにフォールバック）。
+  const [lastFocusedColumnId, setLastFocusedColumnId] = useState<string | null>(
+    null,
+  );
+
   const handleJumpToColumn = useCallback(
     (columnId: string) => {
+      setLastFocusedColumnId(columnId);
       const el = scrollbarRef.current;
       if (!el) return;
       const bounds = columnBounds[columnId];
@@ -258,6 +265,14 @@ const App: React.FC = () => {
   const handleReload = useCallback(async (columnId: string) => {
     await evalInColumn(columnId, WEBVIEW_SCRIPTS.TRIGGER_RELOAD);
   }, []);
+
+  // r キー用: フォーカスカラム（無ければ order 最小の先頭カラム）をリロードする
+  const handleReloadFocusedColumn = useCallback(() => {
+    const sorted = [...columns].sort((a, b) => a.order - b.order);
+    const target =
+      columns.find((c) => c.id === lastFocusedColumnId) ?? sorted[0];
+    if (target) handleReload(target.id);
+  }, [columns, lastFocusedColumnId, handleReload]);
 
   const handleReloadPage = useCallback(
     async (columnId: string) => {
@@ -332,6 +347,7 @@ const App: React.FC = () => {
     onAppSettings: handleOpenAppSettings,
     onToggleTopBar: handleToggleTopBar,
     onJumpToColumn: handleJumpToColumnByIndex,
+    onReloadColumn: handleReloadFocusedColumn,
     disabled: dialogOpen,
   });
 
