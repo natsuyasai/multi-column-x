@@ -277,7 +277,12 @@ pub async fn load_settings(app: AppHandle) -> Result<AppSettingsData, String> {
 }
 
 #[tauri::command]
-pub async fn save_settings(app: AppHandle, settings: AppSettingsData) -> Result<(), String> {
+pub async fn save_settings(
+    caller: tauri::Webview,
+    app: AppHandle,
+    settings: AppSettingsData,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let store = app.store("settings.json").map_err(|e| e.to_string())?;
     store.set(
         "appSettings",

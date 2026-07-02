@@ -137,7 +137,12 @@ fn is_safe_account_dir(path: &Path, accounts_root: &Path) -> bool {
 }
 
 #[tauri::command]
-pub async fn delete_account_data(app: AppHandle, data_directory: String) -> Result<(), String> {
+pub async fn delete_account_data(
+    caller: tauri::Webview,
+    app: AppHandle,
+    data_directory: String,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let accounts_root = app
         .path()
         .app_data_dir()
@@ -154,7 +159,12 @@ pub async fn delete_account_data(app: AppHandle, data_directory: String) -> Resu
 }
 
 #[tauri::command]
-pub async fn close_window(app: AppHandle, label: String) -> Result<(), String> {
+pub async fn close_window(
+    caller: tauri::Webview,
+    app: AppHandle,
+    label: String,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     if let Some(window) = app.get_webview_window(&label) {
         window.close().map_err(|e| e.to_string())?;
         return Ok(());
