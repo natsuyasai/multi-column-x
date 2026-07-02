@@ -1,5 +1,5 @@
 use crate::ipc_constants::{events, labels};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl};
 
 #[cfg(desktop)]
@@ -126,9 +126,27 @@ pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
     Err("timeout".to_string())
 }
 
+/// 削除対象パスが accounts ルートの「配下」であることを検証する（ルート自体・外部・.. 参照は拒否）。
+/// canonicalize は存在しないパスで失敗するため、字句的な正規化（components ベース）で判定する。
+fn is_safe_account_dir(path: &Path, accounts_root: &Path) -> bool {
+    use std::path::Component;
+    if path.components().any(|c| matches!(c, Component::ParentDir)) {
+        return false;
+    }
+    path.starts_with(accounts_root) && path != accounts_root
+}
+
 #[tauri::command]
-pub async fn delete_account_data(data_directory: String) -> Result<(), String> {
-    let path = PathBuf::from(data_directory);
+pub async fn delete_account_data(app: AppHandle, data_directory: String) -> Result<(), String> {
+    let accounts_root = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("accounts");
+    let path = PathBuf::from(&data_directory);
+    if !is_safe_account_dir(&path, &accounts_root) {
+        return Err("invalid account data directory".to_string());
+    }
     if path.exists() {
         std::fs::remove_dir_all(&path).map_err(|e| e.to_string())?;
     }
@@ -147,4 +165,40 @@ pub async fn close_window(app: AppHandle, label: String) -> Result<(), String> {
         webview.close().map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accounts配下のディレクトリは削除を許可する() {
+        let root = Path::new("/data/app/accounts");
+        assert!(is_safe_account_dir(
+            Path::new("/data/app/accounts/account-abc"),
+            root
+        ));
+    }
+
+    #[test]
+    fn accounts直下でないパスは拒否する() {
+        let root = Path::new("/data/app/accounts");
+        assert!(!is_safe_account_dir(Path::new("/data/app"), root));
+        assert!(!is_safe_account_dir(Path::new("/etc"), root));
+    }
+
+    #[test]
+    fn 親ディレクトリ参照を含むパスは拒否する() {
+        let root = Path::new("/data/app/accounts");
+        assert!(!is_safe_account_dir(
+            Path::new("/data/app/accounts/../../../etc"),
+            root
+        ));
+    }
+
+    #[test]
+    fn accountsルート自体は拒否する() {
+        let root = Path::new("/data/app/accounts");
+        assert!(!is_safe_account_dir(root, root));
+    }
 }
