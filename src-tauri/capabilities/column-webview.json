@@ -4,7 +4,12 @@
   "description": "Capability for column webviews",
   "windows": ["column-*", "popup-*", "compose-*", "add-account", "main"],
   "remote": {
-    "urls": ["https://*", "http://*"]
+    "urls": [
+      "https://x.com/*",
+      "https://*.x.com/*",
+      "https://twitter.com/*",
+      "https://*.twitter.com/*"
+    ]
   },
   "permissions": [
     "core:default",
