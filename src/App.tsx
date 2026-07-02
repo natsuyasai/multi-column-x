@@ -69,6 +69,7 @@ const App: React.FC = () => {
     restoreColumns,
     handleAddColumn,
     handleRemoveColumn,
+    handleMoveColumn,
     handleUpdateColumn,
     recalculateAllBounds,
     hideColumnWebviews,
@@ -419,6 +420,7 @@ const App: React.FC = () => {
                 onReloadPage={handleReloadPage}
                 onSettings={setSettingsColumnId}
                 onClose={handleRemoveColumn}
+                onMove={handleMoveColumn}
                 unreadCount={unreadCounts[column.id] ?? 0}
                 onClearUnread={clearUnreadCount}
               />

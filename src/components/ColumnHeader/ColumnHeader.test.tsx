@@ -46,6 +46,7 @@ const defaultProps = {
   onReloadPage: vi.fn(),
   onSettings: vi.fn(),
   onClose: vi.fn(),
+  onMove: vi.fn(),
 };
 
 describe("ColumnHeader", () => {
@@ -83,10 +84,18 @@ describe("ColumnHeader", () => {
     expect(screen.getByLabelText("ページを再読み込み")).toBeInTheDocument();
   });
 
-  it("並び替えボタンが存在しない", () => {
-    render(<ColumnHeader {...defaultProps} />);
-    expect(screen.queryByLabelText("左に移動")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("右に移動")).not.toBeInTheDocument();
+  it("左移動ボタンクリックでonMoveがleftで呼ばれる", () => {
+    const onMove = vi.fn();
+    render(<ColumnHeader {...defaultProps} onMove={onMove} />);
+    fireEvent.click(screen.getByLabelText("左に移動"));
+    expect(onMove).toHaveBeenCalledWith("col-1", "left");
+  });
+
+  it("右移動ボタンクリックでonMoveがrightで呼ばれる", () => {
+    const onMove = vi.fn();
+    render(<ColumnHeader {...defaultProps} onMove={onMove} />);
+    fireEvent.click(screen.getByLabelText("右に移動"));
+    expect(onMove).toHaveBeenCalledWith("col-1", "right");
   });
 
   it("設定ボタンに settings SVG が表示される", () => {

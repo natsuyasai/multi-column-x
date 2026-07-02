@@ -73,6 +73,7 @@ const meta: Meta<typeof ColumnHeader> = {
     onReloadPage: fn(),
     onSettings: fn(),
     onClose: fn(),
+    onMove: fn(),
     onClearUnread: fn(),
   },
 };
@@ -90,6 +91,11 @@ export const Default: Story = {
     // 閉じるボタンを押すとカラム ID で onClose が呼ばれる
     await userEvent.click(canvas.getByLabelText("カラムを閉じる"));
     await expect(args.onClose).toHaveBeenCalledWith("col-1");
+    // 左右移動ボタンを押すとカラム ID と方向で onMove が呼ばれる
+    await userEvent.click(canvas.getByLabelText("左に移動"));
+    await expect(args.onMove).toHaveBeenCalledWith("col-1", "left");
+    await userEvent.click(canvas.getByLabelText("右に移動"));
+    await expect(args.onMove).toHaveBeenCalledWith("col-1", "right");
   },
 };
 

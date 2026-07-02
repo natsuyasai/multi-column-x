@@ -13,6 +13,7 @@ interface ColumnHeaderProps {
   onReloadPage: (columnId: string) => void;
   onSettings: (columnId: string) => void;
   onClose: (columnId: string) => void;
+  onMove: (columnId: string, direction: "left" | "right") => void;
   unreadCount?: number;
   onClearUnread?: (columnId: string) => void;
 }
@@ -24,6 +25,7 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
   onReloadPage,
   onSettings,
   onClose,
+  onMove,
   unreadCount = 0,
   onClearUnread,
 }) => {
@@ -57,6 +59,22 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
         </span>
       )}
       <div className={styles.actions}>
+        <button
+          className={styles.actionBtn}
+          onClick={() => onMove(column.id, "left")}
+          aria-label="左に移動"
+          title="左に移動"
+        >
+          ◀
+        </button>
+        <button
+          className={styles.actionBtn}
+          onClick={() => onMove(column.id, "right")}
+          aria-label="右に移動"
+          title="右に移動"
+        >
+          ▶
+        </button>
         <button
           className={styles.actionBtn}
           onClick={() => {
