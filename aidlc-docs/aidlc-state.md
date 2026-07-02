@@ -16,18 +16,18 @@
 
 ## フェーズ進捗
 
-| フェーズ | 内容                                                        | ブランチ                      | 状態                                                                                                        |
-| -------- | ----------------------------------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| 1        | セキュリティ強化（S2→S4→S1→S3→S5/S6）                       | `fix/security-hardening`      | 🔄 ウェーブ1 実行中（2026-07-02 起動）                                                                      |
-| 3        | useDesktopColumns / useMobileColumns テスト                 | `test/desktop-mobile-columns` | ✅ 完了・検証済み（a8b9971, b021085。テスト11件追加、Vitest 472件、プロダクトコード変更なしを差分確認済み） |
-| 4        | inject スクリプトテスト                                     | `test/inject-scripts`         | 🔄 ウェーブ1 実行中（2026-07-02 起動）                                                                      |
-| 2        | Rust リファクタ（R2 init script 重複 / R5 lock expect）     | `refactor/rust-column-init`   | ⏳ ウェーブ2 待機（フェーズ1完了後。column.rs 等が競合するため）                                            |
-| 5        | Rust テスト（settings_store 純関数化 / parse_url / update） | `test/rust-settings-store`    | ⏳ ウェーブ2 待機（フェーズ1と webview/mod.rs が競合）                                                      |
-| 9        | AppSettingsPanel リファクタ（R1）                           | `refactor/app-settings-panel` | ⏳ ウェーブ2 待機（他と競合しないため前倒し可）                                                             |
-| 6        | アカウント操作のダイアログ化（U1）                          | `feat/account-dialogs`        | ⏳ ウェーブ3 待機（6/7/8 は App.tsx が相互競合。順次 or 慎重に並列）                                        |
-| 7        | カラムヘッダー直接移動（U2+R3）                             | `feat/column-header-move`     | ⏳ ウェーブ3 待機                                                                                           |
-| 8        | ショートカット拡充 r/?（U3）                                | `feat/shortcut-reload-help`   | ⏳ ウェーブ3 待機                                                                                           |
-| 10       | 通知対象拡大（U4）/ プリセットモバイル（U5）                | `feat/notify-any-column`      | ⏳ ウェーブ4 待機（フェーズ9完了後。AppSettingsPanel 依存）                                                 |
+| フェーズ | 内容                                                        | ブランチ                      | 状態                                                                                                                                                                   |
+| -------- | ----------------------------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1        | セキュリティ強化（S2→S4→S1→S3→S5/S6）                       | `fix/security-hardening`      | ✅ コード完了・自動ゲート検証済み（bde83b9〜1668db2 の5コミット。cargo test 57件・Vitest 461件をメイン側で再検証済み）。**実機手動確認のみ未了**（下記チェックリスト） |
+| 3        | useDesktopColumns / useMobileColumns テスト                 | `test/desktop-mobile-columns` | ✅ 完了・検証済み（a8b9971, b021085。テスト11件追加、Vitest 472件、プロダクトコード変更なしを差分確認済み）                                                            |
+| 4        | inject スクリプトテスト                                     | `test/inject-scripts`         | ✅ 完了・検証済み（8127536〜baeb87e の6コミット。テスト31件追加、Vitest 492件、テストファイル7件のみの差分を確認済み）                                                 |
+| 2        | Rust リファクタ（R2 init script 重複 / R5 lock expect）     | `refactor/rust-column-init`   | 🔄 ウェーブ2 実行中（2026-07-03 起動。`fix/security-hardening` 起点）                                                                                                  |
+| 5        | Rust テスト（settings_store 純関数化 / parse_url / update） | `test/rust-settings-store`    | 🔄 ウェーブ2 実行中（2026-07-03 起動。`fix/security-hardening` 起点）                                                                                                  |
+| 9        | AppSettingsPanel リファクタ（R1）                           | `refactor/app-settings-panel` | 🔄 実行中（2026-07-03 起動。他フェーズと競合しないため前倒し）                                                                                                         |
+| 6        | アカウント操作のダイアログ化（U1）                          | `feat/account-dialogs`        | ⏳ ウェーブ3 待機（6/7/8 は App.tsx が相互競合。順次 or 慎重に並列）                                                                                                   |
+| 7        | カラムヘッダー直接移動（U2+R3）                             | `feat/column-header-move`     | ⏳ ウェーブ3 待機                                                                                                                                                      |
+| 8        | ショートカット拡充 r/?（U3）                                | `feat/shortcut-reload-help`   | ⏳ ウェーブ3 待機                                                                                                                                                      |
+| 10       | 通知対象拡大（U4）/ プリセットモバイル（U5）                | `feat/notify-any-column`      | ⏳ ウェーブ4 待機（フェーズ9完了後。AppSettingsPanel 依存）                                                                                                            |
 
 凡例: ✅ 完了・検証済み / 🔄 実行中 / ⏳ 待機 / ❌ 失敗・要対応
 
@@ -42,7 +42,13 @@
 
 - [ ] フェーズ1 Task 1.3（capability の x.com 限定）: 実機で「新着バッジ」「画像ポップアップ」「x.com 以外のリンクポップアップの縮退」を確認（計画書 Task 1.3 Step 2 のチェックリスト）
 - [ ] フェーズ1 Task 1.4（CSP）: `npm run tauri:dev` で main UI 全機能がコンソールエラーなしで動くこと
+- [ ] フェーズ1 Task 1.2: カラム再読み込み（⟳）・自動リロードが main 呼び出しで正常動作すること（実機）
 - [ ] `docs/project-audit-2026-07` ブランチの PR / develop へのマージ
+
+## 既知の環境問題（トラブルシューティング）
+
+- **`generate_context!` の「trailing comma」proc-macro panic**（clippy / cargo test --doc で発生）: worktree の `src-tauri/target/debug/build/multicolumnx-*` 生成物が並行ビルドで破損することがある。ソースの問題ではなく、該当ディレクトリを削除して再ビルドで解消（フェーズ1で2回発生・解消済み）。
+- 各 worktree には `src-tauri/gen/android/gradlew.bat` の改行差分が最初から出る。コミットに含めないこと。
 
 ## セッション再開手順（新しいセッションで続きから）
 
