@@ -160,7 +160,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         .map_err(|e| e.to_string())?;
 
     let state = app.state::<AppState>();
-    let mut registry = state.registry.lock().unwrap();
+    let mut registry = state.registry.lock().expect("registry mutex poisoned");
     registry.register(
         label,
         args.column.id.clone(),
@@ -198,7 +198,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
     }
 
     let state = app.state::<AppState>();
-    let mut registry = state.registry.lock().unwrap();
+    let mut registry = state.registry.lock().expect("registry mutex poisoned");
     registry.register(
         label,
         args.column.id.clone(),
@@ -222,7 +222,7 @@ pub async fn remove_column_webview(app: AppHandle, column_id: String) -> Result<
     }
 
     let state = app.state::<AppState>();
-    let mut registry = state.registry.lock().unwrap();
+    let mut registry = state.registry.lock().expect("registry mutex poisoned");
     registry.unregister(&label);
 
     Ok(())
@@ -239,7 +239,7 @@ pub async fn remove_column_webview(app: AppHandle, column_id: String) -> Result<
     }
 
     let state = app.state::<AppState>();
-    let mut registry = state.registry.lock().unwrap();
+    let mut registry = state.registry.lock().expect("registry mutex poisoned");
     registry.unregister(&label);
 
     Ok(())
