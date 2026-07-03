@@ -46,6 +46,10 @@ interface AppStore {
   loadSettings: () => Promise<void>;
   saveSettings: () => Promise<void>;
   addAccount: (account: Account) => void;
+  updateAccount: (
+    id: string,
+    patch: Partial<Pick<Account, "label" | "color">>,
+  ) => void;
   removeAccount: (id: string) => void;
   addColumn: (column: Column) => void;
   removeColumn: (id: string) => void;
@@ -105,6 +109,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   addAccount: (account) => {
     set((state) => ({ accounts: [...state.accounts, account] }));
+    get().saveSettings();
+  },
+
+  updateAccount: (id, patch) => {
+    set((state) => ({
+      accounts: state.accounts.map((a) =>
+        a.id === id ? { ...a, ...patch } : a,
+      ),
+    }));
     get().saveSettings();
   },
 

@@ -5,9 +5,11 @@ import { platform } from "@tauri-apps/plugin-os";
 import React, { useEffect, useCallback, useMemo, useState } from "react";
 import styles from "./App.module.scss";
 import { AccountManager } from "./components/AccountManager/AccountManager";
+import { AccountNameDialog } from "./components/AccountNameDialog/AccountNameDialog";
 import { AddColumnDialog } from "./components/AddColumnDialog/AddColumnDialog";
 import { AppSettingsPanel } from "./components/AppSettingsPanel/AppSettingsPanel";
 import { ColumnHeader } from "./components/ColumnHeader/ColumnHeader";
+import { ConfirmDialog } from "./components/ConfirmDialog/ConfirmDialog";
 import { LinkPopupDialog } from "./components/LinkPopupDialog/LinkPopupDialog";
 import { MobileSwipeBar } from "./components/MobileSwipeBar/MobileSwipeBar";
 import { MobileTabBar } from "./components/MobileTabBar/MobileTabBar";
@@ -49,6 +51,7 @@ const App: React.FC = () => {
     accounts,
     globalSettings,
     updateGlobalSettings,
+    updateAccount,
     topBarExpanded,
     setTopBarExpanded,
     replaceColumns,
@@ -78,7 +81,16 @@ const App: React.FC = () => {
     recreateAllWebviews,
     recreateColumnWebview,
   } = useColumns();
-  const { startAddAccount, removeAccount } = useAccounts();
+  const {
+    startAddAccount,
+    removeAccount,
+    pendingAccountName,
+    submitAccountName,
+    cancelAccountName,
+    pendingRemoval,
+    confirmRemoval,
+    cancelRemoval,
+  } = useAccounts();
   const {
     showAddColumn,
     setShowAddColumn,
@@ -187,8 +199,13 @@ const App: React.FC = () => {
   );
 
   // ダイアログ表示中は列WebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
-  // 更新ポップアップも同様に退避対象に含める。
-  const anyDialogOpen = dialogOpen || !!updater.available || !!whatsNew.notes;
+  // 更新ポップアップ・アカウント名入力ダイアログも同様に退避対象に含める。
+  const anyDialogOpen =
+    dialogOpen ||
+    !!updater.available ||
+    !!whatsNew.notes ||
+    !!pendingAccountName ||
+    !!pendingRemoval;
   useEffect(() => {
     setDialogOpen(anyDialogOpen);
     if (anyDialogOpen) {
@@ -466,7 +483,27 @@ const App: React.FC = () => {
           onAddAccount={startAddAccount}
           onRemoveAccount={removeAccount}
           onSetDefault={handleSetDefaultAccount}
+          onUpdateAccount={updateAccount}
           onClose={() => setShowAccountManager(false)}
+        />
+      )}
+
+      {pendingAccountName && (
+        <AccountNameDialog
+          defaultValue={pendingAccountName.defaultValue}
+          title="アカウント名を入力"
+          onSubmit={submitAccountName}
+          onCancel={cancelAccountName}
+        />
+      )}
+
+      {pendingRemoval && (
+        <ConfirmDialog
+          title="アカウントの削除"
+          message={`「${pendingRemoval.label}」を削除しますか？セッションデータも削除されます。`}
+          confirmLabel="削除する"
+          onConfirm={confirmRemoval}
+          onCancel={cancelRemoval}
         />
       )}
 

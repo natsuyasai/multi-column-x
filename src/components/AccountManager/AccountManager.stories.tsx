@@ -52,6 +52,7 @@ const meta: Meta<typeof AccountManager> = {
     onAddAccount: fn(),
     onRemoveAccount: fn(),
     onSetDefault: fn(),
+    onUpdateAccount: fn(),
     onClose: fn(),
   },
 };
@@ -67,6 +68,21 @@ export const Default: Story = {
     // 削除ボタンを押すと対象アカウント ID で onRemoveAccount が呼ばれる
     await userEvent.click(canvas.getByLabelText("アカウントB を削除"));
     await expect(args.onRemoveAccount).toHaveBeenCalledWith("acc-2");
+  },
+};
+
+export const EditAccount: Story = {
+  name: "アカウント編集",
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByLabelText("アカウントA を編集"));
+    const input = canvas.getByLabelText("アカウント名");
+    await userEvent.clear(input);
+    await userEvent.type(input, "推し垢");
+    await userEvent.click(canvas.getByText("保存"));
+    await expect(args.onUpdateAccount).toHaveBeenCalledWith("acc-1", {
+      label: "推し垢",
+    });
   },
 };
 
