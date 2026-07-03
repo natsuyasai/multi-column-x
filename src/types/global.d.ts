@@ -12,8 +12,6 @@ interface MultiColumnXAPI {
   applyCustomCSS: (css: string) => void;
   /** ヘッダーカスタマイズ（エリア除去）の有効/無効を切り替える */
   applyAreaRemove: (enabled: boolean) => void;
-  /** ホームタブを選択する */
-  selectHomeTab: () => void;
 }
 
 /** カラム WebView に inject される設定オブジェクト (window.__multiColumnXConfig) */
