@@ -14,6 +14,7 @@ import { LinkPopupDialog } from "./components/LinkPopupDialog/LinkPopupDialog";
 import { MobileSwipeBar } from "./components/MobileSwipeBar/MobileSwipeBar";
 import { MobileTabBar } from "./components/MobileTabBar/MobileTabBar";
 import { SettingsPanel } from "./components/SettingsPanel/SettingsPanel";
+import { ShortcutHelpDialog } from "./components/ShortcutHelpDialog/ShortcutHelpDialog";
 import { TabActionDialog } from "./components/TabActionDialog/TabActionDialog";
 import { TopBar } from "./components/TopBar/TopBar";
 import { UpdateDialog } from "./components/UpdateDialog/UpdateDialog";
@@ -104,6 +105,8 @@ const App: React.FC = () => {
     setShowLinkPopupDialog,
     tabActionColumnId,
     setTabActionColumnId,
+    showShortcutHelp,
+    setShowShortcutHelp,
     dialogOpen,
   } = useDialogState();
 
@@ -262,6 +265,10 @@ const App: React.FC = () => {
     setShowAppSettings(true);
   }, [setShowAppSettings]);
 
+  const handleToggleShortcutHelp = useCallback(() => {
+    setShowShortcutHelp(true);
+  }, [setShowShortcutHelp]);
+
   const handleReload = useCallback(async (columnId: string) => {
     await evalInColumn(columnId, WEBVIEW_SCRIPTS.TRIGGER_RELOAD);
   }, []);
@@ -348,6 +355,7 @@ const App: React.FC = () => {
     onToggleTopBar: handleToggleTopBar,
     onJumpToColumn: handleJumpToColumnByIndex,
     onReloadColumn: handleReloadFocusedColumn,
+    onToggleHelp: handleToggleShortcutHelp,
     disabled: dialogOpen,
   });
 
@@ -595,6 +603,10 @@ const App: React.FC = () => {
           notes={whatsNew.notes}
           onClose={whatsNew.dismiss}
         />
+      )}
+
+      {showShortcutHelp && (
+        <ShortcutHelpDialog onClose={() => setShowShortcutHelp(false)} />
       )}
     </div>
   );

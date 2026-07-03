@@ -13,6 +13,8 @@ export interface DialogState {
   setShowLinkPopupDialog: (v: boolean) => void;
   tabActionColumnId: string | null;
   setTabActionColumnId: (id: string | null) => void;
+  showShortcutHelp: boolean;
+  setShowShortcutHelp: (v: boolean) => void;
   dialogOpen: boolean;
 }
 
@@ -25,6 +27,7 @@ export function useDialogState(): DialogState {
   const [tabActionColumnId, setTabActionColumnId] = useState<string | null>(
     null,
   );
+  const [showShortcutHelp, setShowShortcutHelp] = useState(false);
 
   const dialogOpen =
     showAddColumn ||
@@ -32,7 +35,8 @@ export function useDialogState(): DialogState {
     showAppSettings ||
     !!settingsColumnId ||
     showLinkPopupDialog ||
-    !!tabActionColumnId;
+    !!tabActionColumnId ||
+    showShortcutHelp;
 
   return {
     showAddColumn,
@@ -47,6 +51,8 @@ export function useDialogState(): DialogState {
     setShowLinkPopupDialog,
     tabActionColumnId,
     setTabActionColumnId,
+    showShortcutHelp,
+    setShowShortcutHelp,
     dialogOpen,
   };
 }
