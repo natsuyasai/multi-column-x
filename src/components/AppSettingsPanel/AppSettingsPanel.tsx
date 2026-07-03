@@ -207,11 +207,10 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
               onSave={(name) => savePreset(name)}
               onLoad={(id) => {
                 loadPreset(id);
-                // モバイルはプリセットで置き換わったカラム構成に合わせて
-                // WebView を作り直す必要がある（デスクトップは従来どおり変更しない）。
-                if (isMobile) {
-                  onReloadAllWebviews();
-                }
+                // プリセットで置き換わったカラム構成に合わせて WebView を作り直す。
+                // デスクトップ／モバイル問わず、store の columns が変わるだけでは
+                // 既存のネイティブ WebView は入れ替わらないため必須。
+                onReloadAllWebviews();
                 onClose();
               }}
               onDelete={(id) => deletePreset(id)}
