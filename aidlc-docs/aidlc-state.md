@@ -16,18 +16,18 @@
 
 ## フェーズ進捗
 
-| フェーズ | 内容                                                        | ブランチ                      | 状態                                                                                                                                                                                                                               |
-| -------- | ----------------------------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
-| 1        | セキュリティ強化（S2→S4→S1→S3→S5/S6）                       | `fix/security-hardening`      | ✅ コード完了・自動ゲート検証済み（bde83b9〜1668db2 の5コミット。cargo test 57件・Vitest 461件をメイン側で再検証済み）。**実機手動確認のみ未了**（下記チェックリスト）。**PR #27**                                                 |
-| 3        | useDesktopColumns / useMobileColumns テスト                 | `test/desktop-mobile-columns` | ✅ 完了・検証済み（a8b9971, b021085。テスト11件追加、Vitest 472件、プロダクトコード変更なしを差分確認済み。**PR #28**）                                                                                                            |
-| 4        | inject スクリプトテスト                                     | `test/inject-scripts`         | ✅ 完了・検証済み（8127536〜baeb87e の6コミット。テスト31件追加、Vitest 492件、テストファイル7件のみの差分を確認済み。**PR #29**）                                                                                                 |
-| 2        | Rust リファクタ（R2 init script 重複 / R5 lock expect）     | `refactor/rust-column-init`   | ✅ 完了・検証済み（a541ac2, 94f392b。column.rs/popup.rs のみの差分で net -16 行、cargo test 57件不変を確認。**PR #30**（#27へのスタック））                                                                                        |
-| 5        | Rust テスト（settings_store 純関数化 / parse_url / update） | `test/rust-settings-store`    | ✅ 完了・検証済み（5018ede, 0c2e7b5。テスト9件追加で計66件、許可3ファイルのみの差分を確認、メイン側で cargo test 再検証済み。**PR #31**（#27へのスタック））                                                                       |
-| 9        | AppSettingsPanel リファクタ（R1）                           | `refactor/app-settings-panel` | ✅ 完了・検証済み（93b384b, 93dd44a。本体 575→239 行、既存テスト/Story 無変更で Vitest 461件・test:story 44件グリーンを再検証済み。**PR #37**）                                                                                    |
-| 6        | アカウント操作のダイアログ化（U1）                          | `feat/account-dialogs`        | ✅ 完了・検証済み（f2929cc, ea189e0。ダイアログ2種+アカウント編集、テスト26件追加、Vitest 481件を再検証済み。**PR #32**。実機確認未了）                                                                                            |     |
-| 7        | カラムヘッダー直接移動（U2+R3）                             | `feat/column-header-move`     | ✅ 完了・検証済み（228fe84。テスト2件追加、Vitest 482件を再検証済み、差分4ファイルのみ。**PR #33**（#32へのスタック））                                                                                                            |     |
-| 8        | ショートカット拡充 r/?（U3）                                | `feat/shortcut-reload-help`   | ✅ 完了・検証済み（a19f9d3, fee26d0。テスト27件追加、Vitest 505件を再検証済み、3箇所同期実施。**PR #34**（#33へのスタック））                                                                                                      |
-| 10       | 通知対象拡大（U4）/ プリセットモバイル（U5）                | `feat/notify-any-column`      | ✅ Task 10.1 完了・検証済み（fe1d3e3, 6a7e709, 42e8812。テスト7件追加。**PR #36**（#27へのスタック））。🔄 Task 10.2（プリセットモバイル）を 2026-07-04 起動（ブランチ `feat/mobile-presets`、`refactor/app-settings-panel` 起点） |
+| フェーズ | 内容                                                        | ブランチ                      | 状態                                                                                                                                                                                                                   |
+| -------- | ----------------------------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
+| 1        | セキュリティ強化（S2→S4→S1→S3→S5/S6）                       | `fix/security-hardening`      | ✅ コード完了・自動ゲート検証済み（bde83b9〜1668db2 の5コミット。cargo test 57件・Vitest 461件をメイン側で再検証済み）。**実機手動確認のみ未了**（下記チェックリスト）。**PR #27**                                     |
+| 3        | useDesktopColumns / useMobileColumns テスト                 | `test/desktop-mobile-columns` | ✅ 完了・検証済み（a8b9971, b021085。テスト11件追加、Vitest 472件、プロダクトコード変更なしを差分確認済み。**PR #28**）                                                                                                |
+| 4        | inject スクリプトテスト                                     | `test/inject-scripts`         | ✅ 完了・検証済み（8127536〜baeb87e の6コミット。テスト31件追加、Vitest 492件、テストファイル7件のみの差分を確認済み。**PR #29**）                                                                                     |
+| 2        | Rust リファクタ（R2 init script 重複 / R5 lock expect）     | `refactor/rust-column-init`   | ✅ 完了・検証済み（a541ac2, 94f392b。column.rs/popup.rs のみの差分で net -16 行、cargo test 57件不変を確認。**PR #30**（#27へのスタック））                                                                            |
+| 5        | Rust テスト（settings_store 純関数化 / parse_url / update） | `test/rust-settings-store`    | ✅ 完了・検証済み（5018ede, 0c2e7b5。テスト9件追加で計66件、許可3ファイルのみの差分を確認、メイン側で cargo test 再検証済み。**PR #31**（#27へのスタック））                                                           |
+| 9        | AppSettingsPanel リファクタ（R1）                           | `refactor/app-settings-panel` | ✅ 完了・検証済み（93b384b, 93dd44a。本体 575→239 行、既存テスト/Story 無変更で Vitest 461件・test:story 44件グリーンを再検証済み。**PR #37**）                                                                        |
+| 6        | アカウント操作のダイアログ化（U1）                          | `feat/account-dialogs`        | ✅ 完了・検証済み（f2929cc, ea189e0。ダイアログ2種+アカウント編集、テスト26件追加、Vitest 481件を再検証済み。**PR #32**。実機確認未了）                                                                                |     |
+| 7        | カラムヘッダー直接移動（U2+R3）                             | `feat/column-header-move`     | ✅ 完了・検証済み（228fe84。テスト2件追加、Vitest 482件を再検証済み、差分4ファイルのみ。**PR #33**（#32へのスタック））                                                                                                |     |
+| 8        | ショートカット拡充 r/?（U3）                                | `feat/shortcut-reload-help`   | ✅ 完了・検証済み（a19f9d3, fee26d0。テスト27件追加、Vitest 505件を再検証済み、3箇所同期実施。**PR #34**（#33へのスタック））                                                                                          |
+| 10       | 通知対象拡大（U4）/ プリセットモバイル（U5）                | `feat/notify-any-column`      | ✅ Task 10.1 完了・検証済み（fe1d3e3, 6a7e709, 42e8812。テスト7件追加。**PR #36**（#27へのスタック））。✅ Task 10.2 完了・検証済み（b7c7411。テスト8件追加、Vitest 467件を再検証済み。**PR #38**（#37へのスタック）） |
 
 凡例: ✅ 完了・検証済み / 🔄 実行中 / ⏳ 待機 / ❌ 失敗・要対応
 
@@ -65,6 +65,16 @@
 
 - **`generate_context!` の「trailing comma」proc-macro panic**（clippy / cargo test --doc で発生）: worktree の `src-tauri/target/debug/build/multicolumnx-*` 生成物が並行ビルドで破損することがある。ソースの問題ではなく、該当ディレクトリを削除して再ビルドで解消（フェーズ1で2回発生・解消済み）。
 - 各 worktree には `src-tauri/gen/android/gradlew.bat` の改行差分が最初から出る。コミットに含めないこと。
+
+## 全フェーズ完了（2026-07-04）とバックログ
+
+計画の全 10 フェーズが完了し PR 化された。実装中にエージェントが発見した**未対応の改善候補**（次回の計画立案の入力）:
+
+- **デスクトップのプリセット読み込みで WebView が再生成されない疑い**: `PresetsTab.onLoad` は store 更新のみで、既存カラムの WebView は入れ替わらない可能性（Task 10.2 で発見。モバイルは #38 で対応済み、デスクトップは既存挙動維持のため未対応）
+- `tab_selector.ts` の公開 API `selectHomeTab` が no-op の死にコード疑い（フェーズ4で発見）
+- inject の一部（sidebar_hide / mobile_area_hide / context_menu 等)が disconnect 手段のない永続 MutationObserver を登録する設計（フェーズ4で発見。本番では 1 ページ 1 回注入のため実害なし）
+- `android_bridge.rs` の `TAURI_APP` / `MAIN_ACTIVITY` ロックの `unwrap()`（フェーズ2のスコープ外として未変更）
+- Rust の日本語テスト名に ASCII 大文字を含めると `non_snake_case` で `-D warnings` が落ちる → 英単語は小文字で埋め込む運用
 
 ## セッション再開手順（新しいセッションで続きから）
 
