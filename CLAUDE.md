@@ -24,6 +24,7 @@ React 19 + TypeScript フロントエンドと Rust バックエンドで構成�
 
 - 必ず日本語で回答してください。
 - テストケース名は日本語で作成してください。
+  - **Rust のテスト関数名には ASCII 大文字を含めないこと**（例: `ngWordsは…` は NG → `ngwordsは…`）。テスト関数名に大文字が入ると `non_snake_case` 警告が発生し、`cargo clippy -- -D warnings`（CI / `npm run lint:rust`）がビルドエラーになる。日本語（非 ASCII）部分は snake_case 判定の対象外なのでそのまま使ってよい。英単語を含める場合はすべて小文字にする。
 - Robert C. Martinが提唱する原則に従ってコードを作成してください。
 - TDDおよびテスト駆動開発で実装する際は、すべてt-wadaの推奨する進め方に従ってください。
 - リファクタリングはMartin Fowlerが推奨する進め方に従ってください。
