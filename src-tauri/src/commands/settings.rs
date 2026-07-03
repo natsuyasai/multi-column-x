@@ -53,6 +53,9 @@ pub struct ColumnSettings {
     #[serde(rename = "ngWords")]
     #[serde(default)]
     pub ng_words: Vec<String>,
+    #[serde(rename = "desktopNotifyEnabled")]
+    #[serde(default)]
+    pub desktop_notify_enabled: bool,
 }
 
 // デシリアライズ時のデフォルト値ヘルパー関数。
@@ -363,6 +366,20 @@ mod tests {
             serde_json::from_str(include_str!("../../../contracts/default-settings.json")).unwrap();
         let actual = serde_json::to_value(AppSettingsData::default()).unwrap();
         assert_eq!(actual, fixture);
+    }
+
+    /// 新フィールド追加前に保存された旧カラム設定 JSON（desktopNotifyEnabled 欠落）を
+    /// デシリアライズしてもエラーにならず、デフォルト値 false にフォールバックすることを確認する。
+    #[test]
+    fn 通知設定フィールドが無い旧カラム設定はデフォルトで通知しない() {
+        let json = serde_json::json!({
+            "autoReloadEnabled": true,
+            "autoReloadInterval": 600,
+            "areaRemoveEnabled": true,
+            "customCSS": "",
+        });
+        let settings: ColumnSettings = serde_json::from_value(json).unwrap();
+        assert!(!settings.desktop_notify_enabled);
     }
 
     #[test]
