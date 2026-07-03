@@ -23,10 +23,10 @@
 | 4        | inject スクリプトテスト                                     | `test/inject-scripts`         | ✅ 完了・検証済み（8127536〜baeb87e の6コミット。テスト31件追加、Vitest 492件、テストファイル7件のみの差分を確認済み。**PR #29**）                                                 |
 | 2        | Rust リファクタ（R2 init script 重複 / R5 lock expect）     | `refactor/rust-column-init`   | ✅ 完了・検証済み（a541ac2, 94f392b。column.rs/popup.rs のみの差分で net -16 行、cargo test 57件不変を確認。**PR #30**（#27へのスタック））                                        |
 | 5        | Rust テスト（settings_store 純関数化 / parse_url / update） | `test/rust-settings-store`    | ✅ 完了・検証済み（5018ede, 0c2e7b5。テスト9件追加で計66件、許可3ファイルのみの差分を確認、メイン側で cargo test 再検証済み。**PR #31**（#27へのスタック））                       |
-| 9        | AppSettingsPanel リファクタ（R1）                           | `refactor/app-settings-panel` | 🔄 実行中（2026-07-03 起動。他フェーズと競合しないため前倒し）                                                                                                                     |
+| 9        | AppSettingsPanel リファクタ（R1）                           | `refactor/app-settings-panel` | 🔄 実行中（コミット未、settingsDraft.ts 検討中。セッション上限で一度中断→再開済み）                                                                                                |
 | 6        | アカウント操作のダイアログ化（U1）                          | `feat/account-dialogs`        | ✅ 完了・検証済み（f2929cc, ea189e0。ダイアログ2種+アカウント編集、テスト26件追加、Vitest 481件を再検証済み。**PR #32**。実機確認未了）                                            |     |
 | 7        | カラムヘッダー直接移動（U2+R3）                             | `feat/column-header-move`     | ✅ 完了・検証済み（228fe84。テスト2件追加、Vitest 482件を再検証済み、差分4ファイルのみ。**PR #33**（#32へのスタック））                                                            |     |
-| 8        | ショートカット拡充 r/?（U3）                                | `feat/shortcut-reload-help`   | 🔄 実行中（2026-07-03 起動。`feat/column-header-move` 起点のスタック）                                                                                                             |
+| 8        | ショートカット拡充 r/?（U3）                                | `feat/shortcut-reload-help`   | 🔄 実行中（rキーは a19f9d3 でコミット済み、?キーのヘルプダイアログ作業中。セッション上限で一度中断→再開済み）                                                                      |
 | 10       | 通知対象拡大（U4）/ プリセットモバイル（U5）                | `feat/notify-any-column`      | ⏳ ウェーブ4 待機（フェーズ9完了後。AppSettingsPanel 依存）                                                                                                                        |
 
 凡例: ✅ 完了・検証済み / 🔄 実行中 / ⏳ 待機 / ❌ 失敗・要対応
