@@ -221,4 +221,95 @@ describe("useNewPostsNotification", () => {
     expect(setUnreadCount).toHaveBeenCalledWith("col-1", 0);
     expect(notificationSpy).not.toHaveBeenCalled();
   });
+
+  it("desktopNotifyEnabledが有効なカラムは通知される", async () => {
+    const notificationSpy = vi.fn();
+    class MockNotification {
+      static permission = "granted";
+      constructor(title: string, options?: NotificationOptions) {
+        notificationSpy(title, options);
+      }
+    }
+    vi.stubGlobal("Notification", MockNotification);
+    useAppStore.setState({
+      columns: [
+        makeColumn({
+          id: "col-1",
+          pageType: "search",
+          settings: {
+            ...DEFAULT_COLUMN_SETTINGS,
+            autoReloadEnabled: true,
+            desktopNotifyEnabled: true,
+          },
+        }),
+      ],
+    });
+    const setUnreadCount = vi.fn();
+    renderHook(() => useNewPostsNotification(setUnreadCount));
+    await act(async () => {
+      emitNewPosts("column-col-1", 2);
+    });
+    expect(notificationSpy).toHaveBeenCalledWith("新着通知", {
+      body: "2件の新しい通知があります",
+    });
+  });
+
+  it("desktopNotifyEnabledが無効なカラムはバッジのみ更新される", async () => {
+    const notificationSpy = vi.fn();
+    class MockNotification {
+      static permission = "granted";
+      constructor(title: string, options?: NotificationOptions) {
+        notificationSpy(title, options);
+      }
+    }
+    vi.stubGlobal("Notification", MockNotification);
+    useAppStore.setState({
+      columns: [
+        makeColumn({
+          id: "col-1",
+          pageType: "search",
+          settings: {
+            ...DEFAULT_COLUMN_SETTINGS,
+            autoReloadEnabled: true,
+            desktopNotifyEnabled: false,
+          },
+        }),
+      ],
+    });
+    const setUnreadCount = vi.fn();
+    renderHook(() => useNewPostsNotification(setUnreadCount));
+    await act(async () => {
+      emitNewPosts("column-col-1", 2);
+    });
+    expect(setUnreadCount).toHaveBeenCalledWith("col-1", 2);
+    expect(notificationSpy).not.toHaveBeenCalled();
+  });
+
+  it("notificationsカラムはdesktopNotifyEnabled未設定でも従来どおり通知される", async () => {
+    const notificationSpy = vi.fn();
+    class MockNotification {
+      static permission = "granted";
+      constructor(title: string, options?: NotificationOptions) {
+        notificationSpy(title, options);
+      }
+    }
+    vi.stubGlobal("Notification", MockNotification);
+    useAppStore.setState({
+      columns: [
+        makeColumn({
+          id: "col-1",
+          pageType: "notifications",
+          settings: { ...DEFAULT_COLUMN_SETTINGS, autoReloadEnabled: true },
+        }),
+      ],
+    });
+    const setUnreadCount = vi.fn();
+    renderHook(() => useNewPostsNotification(setUnreadCount));
+    await act(async () => {
+      emitNewPosts("column-col-1", 4);
+    });
+    expect(notificationSpy).toHaveBeenCalledWith("新着通知", {
+      body: "4件の新しい通知があります",
+    });
+  });
 });
