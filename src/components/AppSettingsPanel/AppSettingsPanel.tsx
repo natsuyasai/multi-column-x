@@ -11,6 +11,11 @@ import type {
 import styles from "./AppSettingsPanel.module.scss";
 import { ColumnLayoutTab } from "./ColumnLayoutTab";
 import { PresetsTab } from "./PresetsTab";
+import {
+  clampSwipeAreaHeight,
+  createSettingsDraft,
+  type SettingsDraft,
+} from "./settingsDraft";
 
 interface AppSettingsPanelProps {
   settings: GlobalSettings;
@@ -27,17 +32,6 @@ interface AppSettingsPanelProps {
   updateManualResult: "idle" | "none" | "error";
   onCheckUpdate: () => void;
   onClose: () => void;
-}
-
-const SWIPE_AREA_MIN_HEIGHT = 16;
-const SWIPE_AREA_MAX_HEIGHT = 56;
-
-// 入力中の自由編集を許すため、確定時（適用・blur）にのみ有効範囲へ補正する。
-function clampSwipeAreaHeight(value: string): number {
-  return Math.min(
-    SWIPE_AREA_MAX_HEIGHT,
-    Math.max(SWIPE_AREA_MIN_HEIGHT, Number(value) || SWIPE_AREA_MIN_HEIGHT),
-  );
 }
 
 export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
@@ -61,108 +55,45 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
     "general",
   );
 
-  const [globalNgWordsText, setGlobalNgWordsText] = useState(
-    (settings.ngWords ?? []).join("\n"),
+  const [draft, setDraft] = useState<SettingsDraft>(() =>
+    createSettingsDraft(settings),
   );
 
-  // カラムデフォルト - 自動更新
-  const [autoReloadEnabled, setAutoReloadEnabled] = useState(
-    settings.defaultAutoReloadEnabled,
-  );
-  const [autoReloadInterval, setAutoReloadInterval] = useState(
-    settings.defaultAutoReloadInterval,
-  );
-  const [defaultShowCountdown, setDefaultShowCountdown] = useState(
-    settings.defaultShowCountdown,
-  );
-
-  // カラムデフォルト - 表示
-  const [defaultAreaRemoveEnabled, setDefaultAreaRemoveEnabled] = useState(
-    settings.defaultAreaRemoveEnabled,
-  );
-  const [defaultShowCustomMenu, setDefaultShowCustomMenu] = useState(
-    settings.defaultShowCustomMenu,
-  );
-  const [defaultScrollPosRestoreEnabled, setDefaultScrollPosRestoreEnabled] =
-    useState(settings.defaultScrollPosRestoreEnabled);
-
-  // カラムデフォルト - 画像
-  const [smallImageEnabled, setSmallImageEnabled] = useState(
-    settings.smallImageEnabled,
-  );
-  const [smallImageWidth, setSmallImageWidth] = useState(
-    settings.smallImageWidth,
-  );
-  const [blurImageEnabled, setBlurImageEnabled] = useState(
-    settings.blurImageEnabled,
-  );
-  const [blurImageAmount, setBlurImageAmount] = useState(
-    settings.blurImageAmount,
-  );
-
-  // カラムデフォルト - カスタムCSS
-  const [defaultColumnCustomCSS, setDefaultColumnCustomCSS] = useState(
-    settings.defaultColumnCustomCSS,
-  );
-
-  // グローバル設定
-  const [popupEscCloseEnabled, setPopupEscCloseEnabled] = useState(
-    settings.popupEscCloseEnabled,
-  );
-  const [videoAutoPlayStopEnabled, setVideoAutoPlayStopEnabled] = useState(
-    settings.videoAutoPlayStopEnabled,
-  );
-  const [imagePopupEnabled, setImagePopupEnabled] = useState(
-    settings.imagePopupEnabled,
-  );
-  const [videoPopupEnabled, setVideoPopupEnabled] = useState(
-    settings.videoPopupEnabled,
-  );
-  const [hideAdEnabled, setHideAdEnabled] = useState(settings.hideAdEnabled);
-  const [columnScale, setColumnScale] = useState<ColumnScale>(
-    settings.columnScale ?? "default",
-  );
-  const [theme, setTheme] = useState<"dark" | "light" | "system">(
-    settings.theme ?? "dark",
-  );
-  const [useXAppForCompose, setUseXAppForCompose] = useState(
-    settings.useXAppForCompose ?? false,
-  );
-  const [mobileSwipeAreaEnabled, setMobileSwipeAreaEnabled] = useState(
-    settings.mobileSwipeAreaEnabled,
-  );
-  const [mobileSwipeAreaHeight, setMobileSwipeAreaHeight] = useState(
-    String(settings.mobileSwipeAreaHeight),
-  );
+  const set = <K extends keyof SettingsDraft>(
+    key: K,
+    value: SettingsDraft[K],
+  ) => {
+    setDraft((prev) => ({ ...prev, [key]: value }));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const ngWords = globalNgWordsText
+    const ngWords = draft.globalNgWordsText
       .split("\n")
       .map((w) => w.trim())
       .filter((w) => w.length > 0);
     onApply({
-      theme,
-      defaultAutoReloadEnabled: autoReloadEnabled,
-      defaultAutoReloadInterval: autoReloadInterval,
-      defaultShowCountdown,
-      defaultAreaRemoveEnabled,
-      defaultShowCustomMenu,
-      defaultScrollPosRestoreEnabled,
-      defaultColumnCustomCSS,
-      popupEscCloseEnabled,
-      videoAutoPlayStopEnabled,
-      imagePopupEnabled,
-      videoPopupEnabled,
-      smallImageEnabled,
-      smallImageWidth,
-      blurImageEnabled,
-      blurImageAmount,
-      hideAdEnabled,
-      columnScale,
-      useXAppForCompose,
-      mobileSwipeAreaEnabled,
-      mobileSwipeAreaHeight: clampSwipeAreaHeight(mobileSwipeAreaHeight),
+      theme: draft.theme,
+      defaultAutoReloadEnabled: draft.defaultAutoReloadEnabled,
+      defaultAutoReloadInterval: draft.defaultAutoReloadInterval,
+      defaultShowCountdown: draft.defaultShowCountdown,
+      defaultAreaRemoveEnabled: draft.defaultAreaRemoveEnabled,
+      defaultShowCustomMenu: draft.defaultShowCustomMenu,
+      defaultScrollPosRestoreEnabled: draft.defaultScrollPosRestoreEnabled,
+      defaultColumnCustomCSS: draft.defaultColumnCustomCSS,
+      popupEscCloseEnabled: draft.popupEscCloseEnabled,
+      videoAutoPlayStopEnabled: draft.videoAutoPlayStopEnabled,
+      imagePopupEnabled: draft.imagePopupEnabled,
+      videoPopupEnabled: draft.videoPopupEnabled,
+      smallImageEnabled: draft.smallImageEnabled,
+      smallImageWidth: draft.smallImageWidth,
+      blurImageEnabled: draft.blurImageEnabled,
+      blurImageAmount: draft.blurImageAmount,
+      hideAdEnabled: draft.hideAdEnabled,
+      columnScale: draft.columnScale,
+      useXAppForCompose: draft.useXAppForCompose,
+      mobileSwipeAreaEnabled: draft.mobileSwipeAreaEnabled,
+      mobileSwipeAreaHeight: clampSwipeAreaHeight(draft.mobileSwipeAreaHeight),
       ngWords,
     });
     onClose();
@@ -170,17 +101,17 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
 
   const handleApplyColumnDefaults = () => {
     onApplyColumnDefaults({
-      autoReloadEnabled,
-      autoReloadInterval,
-      showCountdown: defaultShowCountdown,
-      areaRemoveEnabled: defaultAreaRemoveEnabled,
-      showCustomMenu: defaultShowCustomMenu,
-      scrollPosRestoreEnabled: defaultScrollPosRestoreEnabled,
-      customCSS: defaultColumnCustomCSS,
-      smallImageEnabled,
-      smallImageWidth,
-      blurImageEnabled,
-      blurImageAmount,
+      autoReloadEnabled: draft.defaultAutoReloadEnabled,
+      autoReloadInterval: draft.defaultAutoReloadInterval,
+      showCountdown: draft.defaultShowCountdown,
+      areaRemoveEnabled: draft.defaultAreaRemoveEnabled,
+      showCustomMenu: draft.defaultShowCustomMenu,
+      scrollPosRestoreEnabled: draft.defaultScrollPosRestoreEnabled,
+      customCSS: draft.defaultColumnCustomCSS,
+      smallImageEnabled: draft.smallImageEnabled,
+      smallImageWidth: draft.smallImageWidth,
+      blurImageEnabled: draft.blurImageEnabled,
+      blurImageAmount: draft.blurImageAmount,
     });
   };
 
@@ -245,8 +176,8 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                       <button
                         key={value}
                         type="button"
-                        className={`${styles.scaleBtn} ${columnScale === value ? styles.scaleBtnActive : ""}`}
-                        onClick={() => setColumnScale(value)}
+                        className={`${styles.scaleBtn} ${draft.columnScale === value ? styles.scaleBtnActive : ""}`}
+                        onClick={() => set("columnScale", value)}
                       >
                         {label}
                       </button>
@@ -269,8 +200,8 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                       <button
                         key={value}
                         type="button"
-                        className={`${styles.scaleBtn} ${theme === value ? styles.scaleBtnActive : ""}`}
-                        onClick={() => setTheme(value)}
+                        className={`${styles.scaleBtn} ${draft.theme === value ? styles.scaleBtnActive : ""}`}
+                        onClick={() => set("theme", value)}
                       >
                         {label}
                       </button>
@@ -286,12 +217,14 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 <label className={styles.checkLabel}>
                   <input
                     type="checkbox"
-                    checked={autoReloadEnabled}
-                    onChange={(e) => setAutoReloadEnabled(e.target.checked)}
+                    checked={draft.defaultAutoReloadEnabled}
+                    onChange={(e) =>
+                      set("defaultAutoReloadEnabled", e.target.checked)
+                    }
                   />
                   自動更新を有効にする
                 </label>
-                {autoReloadEnabled && (
+                {draft.defaultAutoReloadEnabled && (
                   <>
                     <label className={styles.fieldLabel}>
                       更新間隔（秒）
@@ -300,18 +233,21 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                         className={styles.numberInput}
                         min={10}
                         max={3600}
-                        value={autoReloadInterval}
+                        value={draft.defaultAutoReloadInterval}
                         onChange={(e) =>
-                          setAutoReloadInterval(Number(e.target.value))
+                          set(
+                            "defaultAutoReloadInterval",
+                            Number(e.target.value),
+                          )
                         }
                       />
                     </label>
                     <label className={styles.checkLabel}>
                       <input
                         type="checkbox"
-                        checked={defaultShowCountdown}
+                        checked={draft.defaultShowCountdown}
                         onChange={(e) =>
-                          setDefaultShowCountdown(e.target.checked)
+                          set("defaultShowCountdown", e.target.checked)
                         }
                       />
                       カウントダウンを表示する
@@ -325,20 +261,20 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 <label className={styles.checkLabel}>
                   <input
                     type="checkbox"
-                    checked={defaultAreaRemoveEnabled}
+                    checked={draft.defaultAreaRemoveEnabled}
                     onChange={(e) =>
-                      setDefaultAreaRemoveEnabled(e.target.checked)
+                      set("defaultAreaRemoveEnabled", e.target.checked)
                     }
                   />
                   ヘッダー・投稿欄を非表示にする
                 </label>
-                {defaultAreaRemoveEnabled && (
+                {draft.defaultAreaRemoveEnabled && (
                   <label className={styles.checkLabel}>
                     <input
                       type="checkbox"
-                      checked={defaultShowCustomMenu}
+                      checked={draft.defaultShowCustomMenu}
                       onChange={(e) =>
-                        setDefaultShowCustomMenu(e.target.checked)
+                        set("defaultShowCustomMenu", e.target.checked)
                       }
                     />
                     カスタムメニューボタンを表示する
@@ -347,9 +283,9 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 <label className={styles.checkLabel}>
                   <input
                     type="checkbox"
-                    checked={defaultScrollPosRestoreEnabled}
+                    checked={draft.defaultScrollPosRestoreEnabled}
                     onChange={(e) =>
-                      setDefaultScrollPosRestoreEnabled(e.target.checked)
+                      set("defaultScrollPosRestoreEnabled", e.target.checked)
                     }
                   />
                   写真閲覧後のスクロール位置を復元する
@@ -361,19 +297,19 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 <label className={styles.checkLabel}>
                   <input
                     type="checkbox"
-                    checked={smallImageEnabled}
-                    onChange={(e) => setSmallImageEnabled(e.target.checked)}
+                    checked={draft.smallImageEnabled}
+                    onChange={(e) => set("smallImageEnabled", e.target.checked)}
                   />
                   画像を縮小表示する
                 </label>
-                {smallImageEnabled && (
+                {draft.smallImageEnabled && (
                   <label className={styles.fieldLabel}>
                     幅（例: 50%, 200px）
                     <input
                       type="text"
                       className={styles.textInput}
-                      value={smallImageWidth}
-                      onChange={(e) => setSmallImageWidth(e.target.value)}
+                      value={draft.smallImageWidth}
+                      onChange={(e) => set("smallImageWidth", e.target.value)}
                       placeholder="50%"
                     />
                   </label>
@@ -381,19 +317,19 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 <label className={styles.checkLabel}>
                   <input
                     type="checkbox"
-                    checked={blurImageEnabled}
-                    onChange={(e) => setBlurImageEnabled(e.target.checked)}
+                    checked={draft.blurImageEnabled}
+                    onChange={(e) => set("blurImageEnabled", e.target.checked)}
                   />
                   画像をぼかして表示する
                 </label>
-                {blurImageEnabled && (
+                {draft.blurImageEnabled && (
                   <label className={styles.fieldLabel}>
                     ブラー量（例: 10px）
                     <input
                       type="text"
                       className={styles.textInput}
-                      value={blurImageAmount}
-                      onChange={(e) => setBlurImageAmount(e.target.value)}
+                      value={draft.blurImageAmount}
+                      onChange={(e) => set("blurImageAmount", e.target.value)}
                       placeholder="10px"
                     />
                   </label>
@@ -406,8 +342,10 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 </h3>
                 <textarea
                   className={styles.cssTextarea}
-                  value={defaultColumnCustomCSS}
-                  onChange={(e) => setDefaultColumnCustomCSS(e.target.value)}
+                  value={draft.defaultColumnCustomCSS}
+                  onChange={(e) =>
+                    set("defaultColumnCustomCSS", e.target.value)
+                  }
                   placeholder="/* カスタムCSSを入力 */"
                   spellCheck={false}
                 />
@@ -428,24 +366,26 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 <label className={styles.checkLabel}>
                   <input
                     type="checkbox"
-                    checked={popupEscCloseEnabled}
-                    onChange={(e) => setPopupEscCloseEnabled(e.target.checked)}
+                    checked={draft.popupEscCloseEnabled}
+                    onChange={(e) =>
+                      set("popupEscCloseEnabled", e.target.checked)
+                    }
                   />
                   Escキーで閉じる
                 </label>
                 <label className={styles.checkLabel}>
                   <input
                     type="checkbox"
-                    checked={imagePopupEnabled}
-                    onChange={(e) => setImagePopupEnabled(e.target.checked)}
+                    checked={draft.imagePopupEnabled}
+                    onChange={(e) => set("imagePopupEnabled", e.target.checked)}
                   />
                   画像をポップアップウィンドウで開く
                 </label>
                 <label className={styles.checkLabel}>
                   <input
                     type="checkbox"
-                    checked={videoPopupEnabled}
-                    onChange={(e) => setVideoPopupEnabled(e.target.checked)}
+                    checked={draft.videoPopupEnabled}
+                    onChange={(e) => set("videoPopupEnabled", e.target.checked)}
                   />
                   動画をポップアップウィンドウで開く
                 </label>
@@ -456,9 +396,9 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 <label className={styles.checkLabel}>
                   <input
                     type="checkbox"
-                    checked={videoAutoPlayStopEnabled}
+                    checked={draft.videoAutoPlayStopEnabled}
                     onChange={(e) =>
-                      setVideoAutoPlayStopEnabled(e.target.checked)
+                      set("videoAutoPlayStopEnabled", e.target.checked)
                     }
                   />
                   動画の自動再生を停止する
@@ -470,8 +410,8 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 <label className={styles.checkLabel}>
                   <input
                     type="checkbox"
-                    checked={hideAdEnabled}
-                    onChange={(e) => setHideAdEnabled(e.target.checked)}
+                    checked={draft.hideAdEnabled}
+                    onChange={(e) => set("hideAdEnabled", e.target.checked)}
                   />
                   広告を非表示にする
                 </label>
@@ -483,8 +423,10 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                   <label className={styles.checkLabel}>
                     <input
                       type="checkbox"
-                      checked={useXAppForCompose}
-                      onChange={(e) => setUseXAppForCompose(e.target.checked)}
+                      checked={draft.useXAppForCompose}
+                      onChange={(e) =>
+                        set("useXAppForCompose", e.target.checked)
+                      }
                     />
                     ツイートボタンでXアプリを起動する
                   </label>
@@ -499,9 +441,9 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                   <label className={styles.checkLabel}>
                     <input
                       type="checkbox"
-                      checked={mobileSwipeAreaEnabled}
+                      checked={draft.mobileSwipeAreaEnabled}
                       onChange={(e) =>
-                        setMobileSwipeAreaEnabled(e.target.checked)
+                        set("mobileSwipeAreaEnabled", e.target.checked)
                       }
                     />
                     スワイプでカラム切替を有効化
@@ -514,11 +456,16 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                     <input
                       type="number"
                       className={styles.numberInput}
-                      value={mobileSwipeAreaHeight}
-                      onChange={(e) => setMobileSwipeAreaHeight(e.target.value)}
+                      value={draft.mobileSwipeAreaHeight}
+                      onChange={(e) =>
+                        set("mobileSwipeAreaHeight", e.target.value)
+                      }
                       onBlur={() =>
-                        setMobileSwipeAreaHeight(
-                          String(clampSwipeAreaHeight(mobileSwipeAreaHeight)),
+                        set(
+                          "mobileSwipeAreaHeight",
+                          String(
+                            clampSwipeAreaHeight(draft.mobileSwipeAreaHeight),
+                          ),
                         )
                       }
                     />
@@ -530,8 +477,8 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 <h3 className={styles.sectionTitle}>グローバルNGワード</h3>
                 <textarea
                   className={styles.cssTextarea}
-                  value={globalNgWordsText}
-                  onChange={(e) => setGlobalNgWordsText(e.target.value)}
+                  value={draft.globalNgWordsText}
+                  onChange={(e) => set("globalNgWordsText", e.target.value)}
                   placeholder="1行に1ワードで入力（全カラムに適用）"
                   spellCheck={false}
                 />
