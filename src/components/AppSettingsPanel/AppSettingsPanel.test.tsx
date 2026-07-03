@@ -275,6 +275,67 @@ describe("AppSettingsPanel モバイルのカラム並び替え", () => {
   });
 });
 
+describe("AppSettingsPanel モバイルのプリセットタブ", () => {
+  beforeEach(() => {
+    mockStoreState.isMobile = true;
+  });
+
+  it("モバイルでもプリセットタブが表示される", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(
+      screen.getByRole("button", { name: "プリセット" }),
+    ).toBeInTheDocument();
+  });
+
+  it("モバイルのプリセットタブでは保存セクションが表示されない", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    fireEvent.click(screen.getByRole("button", { name: "プリセット" }));
+    expect(
+      screen.queryByPlaceholderText("プリセット名を入力"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("モバイルでプリセットを読み込むとカラムが置き換わりWebViewが再生成される", () => {
+    const onReloadAllWebviews = vi.fn();
+    const settings = {
+      ...baseGlobalSettings,
+      presets: [{ id: "preset-1", name: "ホーム", columns: [] }],
+    };
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={settings}
+        onReloadAllWebviews={onReloadAllWebviews}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "プリセット" }));
+    fireEvent.click(screen.getByRole("button", { name: "読み込む" }));
+    expect(mockStoreState.loadPreset).toHaveBeenCalledWith("preset-1");
+    expect(onReloadAllWebviews).toHaveBeenCalled();
+  });
+});
+
+describe("AppSettingsPanel デスクトップのプリセット読み込み（既存挙動）", () => {
+  it("デスクトップでプリセットを読み込んでもWebView再生成は呼ばれない", () => {
+    const onReloadAllWebviews = vi.fn();
+    const settings = {
+      ...baseGlobalSettings,
+      presets: [{ id: "preset-1", name: "ホーム", columns: [] }],
+    };
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={settings}
+        onReloadAllWebviews={onReloadAllWebviews}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "プリセット" }));
+    fireEvent.click(screen.getByRole("button", { name: "読み込む" }));
+    expect(mockStoreState.loadPreset).toHaveBeenCalledWith("preset-1");
+    expect(onReloadAllWebviews).not.toHaveBeenCalled();
+  });
+});
+
 describe("AppSettingsPanel ポップアップウィンドウ", () => {
   it("画像・動画をポップアップで開くトグルが表示される", () => {
     render(<AppSettingsPanel {...defaultProps} />);

@@ -145,14 +145,12 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
           >
             カラム配置
           </button>
-          {!isMobile && (
-            <button
-              className={`${styles.tab} ${activeTab === "presets" ? styles.tabActive : ""}`}
-              onClick={() => setActiveTab("presets")}
-            >
-              プリセット
-            </button>
-          )}
+          <button
+            className={`${styles.tab} ${activeTab === "presets" ? styles.tabActive : ""}`}
+            onClick={() => setActiveTab("presets")}
+          >
+            プリセット
+          </button>
         </div>
 
         <div className={styles.tabContent}>
@@ -202,12 +200,18 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
             />
           )}
 
-          {!isMobile && activeTab === "presets" && (
+          {activeTab === "presets" && (
             <PresetsTab
               presets={settings.presets ?? []}
+              isMobile={isMobile}
               onSave={(name) => savePreset(name)}
               onLoad={(id) => {
                 loadPreset(id);
+                // モバイルはプリセットで置き換わったカラム構成に合わせて
+                // WebView を作り直す必要がある（デスクトップは従来どおり変更しない）。
+                if (isMobile) {
+                  onReloadAllWebviews();
+                }
                 onClose();
               }}
               onDelete={(id) => deletePreset(id)}
