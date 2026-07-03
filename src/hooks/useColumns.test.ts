@@ -1,7 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createColumnWebview } from "../services/columnWebview";
 import { useAppStore } from "../store/useAppStore";
+import type { Column } from "../types";
 import { useColumns } from "./useColumns";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -177,6 +179,40 @@ describe("useColumns mobile", () => {
     });
 
     expect(mockInvoke).not.toHaveBeenCalled();
+  });
+
+  it("プリセット読み込みで旧カラムIDのWebViewが削除される", async () => {
+    // 旧カラム（store の現在のカラム）の WebView が作成済みの状態を再現する
+    const currentColumns = useAppStore.getState().columns;
+    for (const col of currentColumns) {
+      await createColumnWebview(col, "/data/acc-1", {
+        x: 0,
+        y: 0,
+        width: 350,
+        height: 800,
+      });
+    }
+    const { result } = renderHook(() => useColumns());
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    // loadPreset 相当: プリセットのカラム ID（保存時の ID）は現在のカラム ID と異なる
+    const presetColumn: Column = {
+      ...currentColumns[0],
+      id: "preset-col-1",
+    };
+    useAppStore.setState({ columns: [presetColumn] });
+
+    await act(async () => {
+      await result.current.recreateAllWebviews();
+    });
+
+    // 画面上に実在する旧 ID の WebView が削除対象になる（新 ID だけでは旧 WebView が残留する）
+    const removedIds = mockInvoke.mock.calls
+      .filter((c) => c[0] === "remove_column_webview")
+      .map((c) => (c[1] as { columnId: string }).columnId);
+    expect(removedIds).toContain("col-1");
+    expect(removedIds).toContain("col-2");
   });
 
   it("handleRemoveColumn でアクティブ列を削除すると order が最小の列がアクティブになる", async () => {

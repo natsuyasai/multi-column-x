@@ -10,6 +10,18 @@ import type { ColumnBounds } from "../lib/gridLayout";
 import { logError } from "../lib/log";
 import type { Column, ColumnSettings } from "../types";
 
+/**
+ * 作成に成功したカラム WebView の columnId 台帳。
+ * プリセット読み込み等で store のカラムが差し替わった後でも、
+ * 画面上に実在する WebView を確実に削除できるようにするために追跡する。
+ */
+const activeColumnWebviewIds = new Set<string>();
+
+/** 作成済み（未削除）のカラム WebView の columnId 一覧を返す */
+export function getActiveColumnWebviewIds(): string[] {
+  return [...activeColumnWebviewIds];
+}
+
 /** カラム WebView を作成する */
 export async function createColumnWebview(
   column: Column,
@@ -19,6 +31,7 @@ export async function createColumnWebview(
   await invoke(IPC_COMMANDS.CREATE_COLUMN_WEBVIEW, {
     args: { column, dataDirectory, ...bounds },
   });
+  activeColumnWebviewIds.add(column.id);
 }
 
 /** カラム WebView の位置・サイズを更新する */
@@ -33,7 +46,12 @@ export async function resizeColumnWebview(
 
 /** カラム WebView を削除する */
 export async function removeColumnWebview(columnId: string): Promise<void> {
-  await invoke(IPC_COMMANDS.REMOVE_COLUMN_WEBVIEW, { columnId });
+  try {
+    await invoke(IPC_COMMANDS.REMOVE_COLUMN_WEBVIEW, { columnId });
+  } finally {
+    // 削除失敗の主因は「WebView が既に存在しない」ため、意図どおり追跡から外す
+    activeColumnWebviewIds.delete(columnId);
+  }
 }
 
 /** アクティブカラムのアカウントに Cookie を切り替える（Android のみ実体動作） */

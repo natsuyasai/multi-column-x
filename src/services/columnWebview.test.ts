@@ -5,10 +5,25 @@ import type { Column } from "../types";
 import {
   applyColumnSettingsScripts,
   createColumnWebview,
+  getActiveColumnWebviewIds,
   removeColumnWebview,
   resizeColumnWebview,
   setColumnCookies,
 } from "./columnWebview";
+
+const baseColumn = {
+  id: "col-1",
+  accountId: "acc-1",
+  pageType: "home",
+  width: 350,
+  order: 0,
+  gridRow: 1,
+  gridCol: 1,
+  heightMode: "auto",
+  settings: DEFAULT_COLUMN_SETTINGS,
+} as Column;
+
+const baseBounds = { x: 0, y: 36, width: 350, height: 800 };
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
@@ -91,5 +106,43 @@ describe("columnWebview service", () => {
     await applyColumnSettingsScripts("col-1", DEFAULT_COLUMN_SETTINGS, []);
     expect(invoke).toHaveBeenCalledTimes(4);
     consoleError.mockRestore();
+  });
+});
+
+describe("columnWebview 作成済みWebView IDの追跡", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    vi.mocked(invoke).mockResolvedValue(undefined);
+    // 前のテストで追跡された ID を掃除して自己完結にする
+    for (const id of getActiveColumnWebviewIds()) {
+      await removeColumnWebview(id);
+    }
+    vi.clearAllMocks();
+  });
+
+  it("createColumnWebviewが成功するとIDが追跡される", async () => {
+    await createColumnWebview(baseColumn, "/data/acc-1", baseBounds);
+    expect(getActiveColumnWebviewIds()).toContain("col-1");
+  });
+
+  it("createColumnWebviewが失敗した場合はIDを追跡しない", async () => {
+    vi.mocked(invoke).mockRejectedValueOnce(new Error("create failed"));
+    await createColumnWebview(baseColumn, "/data/acc-1", baseBounds).catch(
+      () => {},
+    );
+    expect(getActiveColumnWebviewIds()).not.toContain("col-1");
+  });
+
+  it("removeColumnWebviewで追跡からIDが除去される", async () => {
+    await createColumnWebview(baseColumn, "/data/acc-1", baseBounds);
+    await removeColumnWebview("col-1");
+    expect(getActiveColumnWebviewIds()).not.toContain("col-1");
+  });
+
+  it("removeColumnWebviewが失敗しても追跡からIDが除去される", async () => {
+    await createColumnWebview(baseColumn, "/data/acc-1", baseBounds);
+    vi.mocked(invoke).mockRejectedValueOnce(new Error("remove failed"));
+    await removeColumnWebview("col-1").catch(() => {});
+    expect(getActiveColumnWebviewIds()).not.toContain("col-1");
   });
 });

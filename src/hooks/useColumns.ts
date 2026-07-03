@@ -13,6 +13,7 @@ import {
 import { logError } from "../lib/log";
 import {
   createColumnWebview,
+  getActiveColumnWebviewIds,
   removeColumnWebview,
   resizeColumnWebview,
 } from "../services/columnWebview";
@@ -303,8 +304,15 @@ export function useColumns() {
 
   const recreateAllWebviews = useCallback(async () => {
     const { columns: currentColumns, topBarExpanded } = useAppStore.getState();
-    for (const column of currentColumns) {
-      await removeColumnWebview(column.id).catch(
+    // プリセット読み込み等で store のカラムが差し替わった後に呼ばれるケースでは、
+    // 現カラム ID だけを削除すると画面上に実在する旧 ID の WebView が残留する。
+    // 作成済み WebView の台帳と現カラム ID の和集合を削除対象にする。
+    const idsToRemove = new Set([
+      ...getActiveColumnWebviewIds(),
+      ...currentColumns.map((c) => c.id),
+    ]);
+    for (const columnId of idsToRemove) {
+      await removeColumnWebview(columnId).catch(
         logError("recreateAllWebviews:removeColumnWebview"),
       );
     }
