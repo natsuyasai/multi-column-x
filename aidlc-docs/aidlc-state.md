@@ -26,7 +26,7 @@
 | 9        | AppSettingsPanel リファクタ（R1）                           | `refactor/app-settings-panel` | 🔄 実行中（コミット未、settingsDraft.ts 検討中。セッション上限で一度中断→再開済み）                                                                                                |
 | 6        | アカウント操作のダイアログ化（U1）                          | `feat/account-dialogs`        | ✅ 完了・検証済み（f2929cc, ea189e0。ダイアログ2種+アカウント編集、テスト26件追加、Vitest 481件を再検証済み。**PR #32**。実機確認未了）                                            |     |
 | 7        | カラムヘッダー直接移動（U2+R3）                             | `feat/column-header-move`     | ✅ 完了・検証済み（228fe84。テスト2件追加、Vitest 482件を再検証済み、差分4ファイルのみ。**PR #33**（#32へのスタック））                                                            |     |
-| 8        | ショートカット拡充 r/?（U3）                                | `feat/shortcut-reload-help`   | 🔄 実行中（rキーは a19f9d3 でコミット済み、?キーのヘルプダイアログ作業中。セッション上限で一度中断→再開済み）                                                                      |
+| 8        | ショートカット拡充 r/?（U3）                                | `feat/shortcut-reload-help`   | ✅ 完了・検証済み（a19f9d3, fee26d0。テスト27件追加、Vitest 505件を再検証済み、3箇所同期実施。**PR #34**（#33へのスタック））                                                      |
 | 10       | 通知対象拡大（U4）/ プリセットモバイル（U5）                | `feat/notify-any-column`      | ⏳ ウェーブ4 待機（フェーズ9完了後。AppSettingsPanel 依存）                                                                                                                        |
 
 凡例: ✅ 完了・検証済み / 🔄 実行中 / ⏳ 待機 / ❌ 失敗・要対応
