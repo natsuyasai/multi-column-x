@@ -35,7 +35,13 @@ pub async fn get_mobile_insets() -> serde_json::Value {
 }
 
 #[tauri::command]
-pub async fn eval_in_webview(app: AppHandle, label: String, script: String) -> Result<(), String> {
+pub async fn eval_in_webview(
+    caller: tauri::Webview,
+    app: AppHandle,
+    label: String,
+    script: String,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     // Android のカラム WebView はネイティブ Android WebView で管理しているため
     // Tauri の get_webview では見つからない。android_bridge 経由で評価する。
     #[cfg(target_os = "android")]

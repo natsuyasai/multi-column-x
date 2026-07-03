@@ -222,6 +222,14 @@ x.com などの外部 URL を表示するカラム / ポップアップ WebView 
 
 なお、ログイン完了の検出だけは IPC ではなく、デスクトップでは Rust 側の tokio タスクが URL を 500ms ごとにポーリングして行う（ログイン画面の遷移を JS 注入に依存させないため）。
 
+### remote capability のドメイン限定
+
+`src-tauri/capabilities/column-webview.json` の `remote.urls` はカラム/ポップアップ WebView に IPC（`window.__TAURI__`）を注入する対象を制御する。inject スクリプト（`auto_reload.ts` / `scroll_event.ts` / `image_popup.ts` 等）が x.com 上で `invoke` を使うため IPC 注入自体は必要だが、`https://*` のような全ドメイン許可はリモートページに全カスタムコマンドの呼び出しを許してしまう（サプライチェーン侵害・任意 https サイトへのリンクポップアップ経由での攻撃面拡大）。
+
+- **対象ドメイン**: `https://x.com/*` / `https://*.x.com/*` / `https://twitter.com/*` / `https://*.twitter.com/*` のみ。`http://*` は許可しない。
+- **縮退挙動**: 上記以外のドメイン（リンクポップアップで開いた外部サイト等）では IPC が注入されないため、ページ表示自体は正常に行われるが、ツールバーの invoke 系機能（新着バッジ通知・画像ポップアップ等）は無効化される。inject スクリプトは `if (invoke)` 等のガードで未注入時も例外を出さない設計。
+- **多層防御**: ドメイン限定に加え、破壊的コマンド（`delete_account_data` / `eval_in_webview` / `close_window` / `save_settings`）は呼び出し元ウィンドウが `main` であることを要求する（`commands::require_main_caller`）。x.com 自体がリモートコンテンツであるため、ドメイン限定だけに依存せず両輪で防御する。
+
 ### serde の camelCase / snake_case
 
 Tauri v2 は JS → Rust の自動ケース変換を行わない。JS 側が camelCase で送るフィールドには `#[serde(rename = "camelCaseName")]` が必要。
