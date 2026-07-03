@@ -37,6 +37,12 @@ export interface SettingsDraft {
   globalNgWordsText: string;
 }
 
+/** ドラフトの単一フィールドを更新するヘルパーの型（子セクションへ props で渡す） */
+export type SetSettingsDraft = <K extends keyof SettingsDraft>(
+  key: K,
+  value: SettingsDraft[K],
+) => void;
+
 /**
  * GlobalSettings からフォームドラフトの初期値を組み立てる。
  */
