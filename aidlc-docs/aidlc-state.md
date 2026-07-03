@@ -42,6 +42,8 @@
 | #30 | フェーズ2 Rust リファクタ                               | **fix/security-hardening** | #27 の後（マージ後 develop へ retarget） |
 | #31 | フェーズ5 Rust テスト                                   | **fix/security-hardening** | #27 の後（マージ後 develop へ retarget） |
 
+**CI 状況（2026-07-03 確認）: PR #26〜#34 すべて frontend / rust / android の 3 ジョブがグリーン**（Ubuntu 上の Linux 固有コード・prettier・test:story・Android ビルドを含む）。
+
 #30 と #31 は相互に独立だが、どちらも #27 に積んである。フェーズ 6〜10 は完了・検証のたびに同様に PR を作成する（6→7→8 はスタック予定）。
 
 ## ウェーブ完了時の検証手順（メインセッションの仕事）
