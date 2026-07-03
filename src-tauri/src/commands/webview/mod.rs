@@ -86,3 +86,22 @@ pub async fn report_keyboard_shortcut(app: AppHandle, key: String) -> Result<(),
 pub async fn open_in_browser(url: String) -> Result<(), String> {
     tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn httpsのurlをパースできる() {
+        let result = parse_url("https://x.com/home");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().as_str(), "https://x.com/home");
+    }
+
+    #[test]
+    fn 不正なurlはエラーメッセージを返す() {
+        let result = parse_url("not a url");
+        assert!(result.is_err());
+        assert!(!result.unwrap_err().is_empty());
+    }
+}
