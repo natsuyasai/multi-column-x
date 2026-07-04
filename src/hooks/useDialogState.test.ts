@@ -53,4 +53,29 @@ describe("useDialogState", () => {
     });
     expect(result.current.dialogOpen).toBe(false);
   });
+
+  it("初期状態では showShortcutHelp が false", () => {
+    const { result } = renderHook(() => useDialogState());
+    expect(result.current.showShortcutHelp).toBe(false);
+  });
+
+  it("showShortcutHelp を true にすると dialogOpen が true になる", () => {
+    const { result } = renderHook(() => useDialogState());
+    act(() => {
+      result.current.setShowShortcutHelp(true);
+    });
+    expect(result.current.dialogOpen).toBe(true);
+  });
+
+  it("showShortcutHelp を false に戻すと dialogOpen が false に戻る", () => {
+    const { result } = renderHook(() => useDialogState());
+    act(() => {
+      result.current.setShowShortcutHelp(true);
+    });
+    expect(result.current.dialogOpen).toBe(true);
+    act(() => {
+      result.current.setShowShortcutHelp(false);
+    });
+    expect(result.current.dialogOpen).toBe(false);
+  });
 });

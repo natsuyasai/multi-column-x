@@ -14,6 +14,7 @@ import { LinkPopupDialog } from "./components/LinkPopupDialog/LinkPopupDialog";
 import { MobileSwipeBar } from "./components/MobileSwipeBar/MobileSwipeBar";
 import { MobileTabBar } from "./components/MobileTabBar/MobileTabBar";
 import { SettingsPanel } from "./components/SettingsPanel/SettingsPanel";
+import { ShortcutHelpDialog } from "./components/ShortcutHelpDialog/ShortcutHelpDialog";
 import { TabActionDialog } from "./components/TabActionDialog/TabActionDialog";
 import { TopBar } from "./components/TopBar/TopBar";
 import { UpdateDialog } from "./components/UpdateDialog/UpdateDialog";
@@ -104,6 +105,8 @@ const App: React.FC = () => {
     setShowLinkPopupDialog,
     tabActionColumnId,
     setTabActionColumnId,
+    showShortcutHelp,
+    setShowShortcutHelp,
     dialogOpen,
   } = useDialogState();
 
@@ -222,8 +225,15 @@ const App: React.FC = () => {
     setTimeout(() => recalculateAllBounds(), 220);
   }, [topBarExpanded, setTopBarExpanded, recalculateAllBounds]);
 
+  // 「フォーカスカラム」= 最後に 1-9 ジャンプ／TopBar クリックでジャンプしたカラム。
+  // r キーでのリロード対象を決めるために使う（無ければ order 最小の先頭カラムにフォールバック）。
+  const [lastFocusedColumnId, setLastFocusedColumnId] = useState<string | null>(
+    null,
+  );
+
   const handleJumpToColumn = useCallback(
     (columnId: string) => {
+      setLastFocusedColumnId(columnId);
       const el = scrollbarRef.current;
       if (!el) return;
       const bounds = columnBounds[columnId];
@@ -255,9 +265,21 @@ const App: React.FC = () => {
     setShowAppSettings(true);
   }, [setShowAppSettings]);
 
+  const handleToggleShortcutHelp = useCallback(() => {
+    setShowShortcutHelp(true);
+  }, [setShowShortcutHelp]);
+
   const handleReload = useCallback(async (columnId: string) => {
     await evalInColumn(columnId, WEBVIEW_SCRIPTS.TRIGGER_RELOAD);
   }, []);
+
+  // r キー用: フォーカスカラム（無ければ order 最小の先頭カラム）をリロードする
+  const handleReloadFocusedColumn = useCallback(() => {
+    const sorted = [...columns].sort((a, b) => a.order - b.order);
+    const target =
+      columns.find((c) => c.id === lastFocusedColumnId) ?? sorted[0];
+    if (target) handleReload(target.id);
+  }, [columns, lastFocusedColumnId, handleReload]);
 
   const handleReloadPage = useCallback(
     async (columnId: string) => {
@@ -332,6 +354,8 @@ const App: React.FC = () => {
     onAppSettings: handleOpenAppSettings,
     onToggleTopBar: handleToggleTopBar,
     onJumpToColumn: handleJumpToColumnByIndex,
+    onReloadColumn: handleReloadFocusedColumn,
+    onToggleHelp: handleToggleShortcutHelp,
     disabled: dialogOpen,
   });
 
@@ -579,6 +603,10 @@ const App: React.FC = () => {
           notes={whatsNew.notes}
           onClose={whatsNew.dismiss}
         />
+      )}
+
+      {showShortcutHelp && (
+        <ShortcutHelpDialog onClose={() => setShowShortcutHelp(false)} />
       )}
     </div>
   );
