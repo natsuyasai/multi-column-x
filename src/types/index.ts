@@ -23,6 +23,7 @@ export interface ColumnSettings {
   blurImageEnabled: boolean;
   blurImageAmount: string;
   ngWords: string[];
+  desktopNotifyEnabled?: boolean;
 }
 
 export interface Column {
@@ -111,6 +112,7 @@ export interface AppSettings {
  * | smallImageWidth         | small_image_width           | "50%"       |
  * | blurImageEnabled        | blur_image_enabled          | false       |
  * | blurImageAmount         | blur_image_amount           | "10px"      |
+ * | desktopNotifyEnabled    | desktop_notify_enabled      | false       |
  */
 export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
   autoReloadEnabled: true,
@@ -126,6 +128,7 @@ export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   ngWords: [],
+  desktopNotifyEnabled: false,
 };
 
 /**

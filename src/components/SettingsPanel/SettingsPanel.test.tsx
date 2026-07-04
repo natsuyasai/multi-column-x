@@ -126,3 +126,37 @@ describe("SettingsPanel NGワード", () => {
     );
   });
 });
+
+describe("SettingsPanel 新着デスクトップ通知", () => {
+  it("新着通知トグルが表示される", () => {
+    render(<SettingsPanel {...defaultProps} />);
+    expect(
+      screen.getByRole("checkbox", { name: "新着をデスクトップ通知する" }),
+    ).toBeInTheDocument();
+  });
+
+  it("既存のdesktopNotifyEnabledがトグルの初期状態に反映される", () => {
+    const col = {
+      ...mockColumn,
+      settings: { ...baseSettings, desktopNotifyEnabled: true },
+    };
+    render(<SettingsPanel {...defaultProps} column={col} />);
+    expect(
+      screen.getByRole("checkbox", { name: "新着をデスクトップ通知する" }),
+    ).toBeChecked();
+  });
+
+  it("新着通知トグルが設定に反映される", async () => {
+    const onApply = vi.fn();
+    render(<SettingsPanel {...defaultProps} onApply={onApply} />);
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: "新着をデスクトップ通知する" }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.objectContaining({ desktopNotifyEnabled: true }),
+      350,
+    );
+  });
+});
