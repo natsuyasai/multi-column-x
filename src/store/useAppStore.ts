@@ -55,7 +55,6 @@ interface AppStore {
   removeColumn: (id: string) => void;
   updateColumn: (id: string, patch: Partial<Column>) => void;
   updateGlobalSettings: (patch: Partial<GlobalSettings>) => void;
-  moveColumn: (columnId: string, direction: "left" | "right") => void;
   replaceColumns: (columns: Column[]) => void;
   savePreset: (name: string) => void;
   loadPreset: (id: string) => void;
@@ -145,19 +144,6 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   updateGlobalSettings: (patch) => {
     set((state) => ({ globalSettings: { ...state.globalSettings, ...patch } }));
-    get().saveSettings();
-  },
-
-  moveColumn: (columnId, direction) => {
-    set((state) => {
-      const sorted = [...state.columns].sort((a, b) => a.order - b.order);
-      const idx = sorted.findIndex((c) => c.id === columnId);
-      const neighborIdx = direction === "left" ? idx - 1 : idx + 1;
-      if (neighborIdx < 0 || neighborIdx >= sorted.length) return state;
-      [sorted[idx], sorted[neighborIdx]] = [sorted[neighborIdx], sorted[idx]];
-      const reordered = sorted.map((c, i) => ({ ...c, order: i }));
-      return { columns: reordered };
-    });
     get().saveSettings();
   },
 
