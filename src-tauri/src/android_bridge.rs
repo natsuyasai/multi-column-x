@@ -17,7 +17,7 @@ static POPUP_COUNT: AtomicI32 = AtomicI32::new(0);
 
 /// アプリ起動時に AppHandle を保存する。
 pub fn store_app_handle(app: tauri::AppHandle) {
-    *TAURI_APP.lock().unwrap() = Some(app);
+    *TAURI_APP.lock().expect("TAURI_APP mutex poisoned") = Some(app);
 }
 
 /// ポップアップ/コンポーズウィンドウが開かれたときに呼ぶ。
@@ -45,7 +45,7 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_closeTopPopu
     if POPUP_COUNT.load(Ordering::Relaxed) <= 0 {
         return 0;
     }
-    let guard = TAURI_APP.lock().unwrap();
+    let guard = TAURI_APP.lock().expect("TAURI_APP mutex poisoned");
     if let Some(app) = guard.as_ref() {
         let _ = app.emit(crate::ipc_constants::events::CLOSE_TOPMOST_POPUP, ());
         1
@@ -62,7 +62,7 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onDoubleTap<
     _class: JClass<'local>,
 ) {
     use tauri::Emitter;
-    let guard = TAURI_APP.lock().unwrap();
+    let guard = TAURI_APP.lock().expect("TAURI_APP mutex poisoned");
     if let Some(app) = guard.as_ref() {
         let _ = app.emit(crate::ipc_constants::events::COLUMN_DOUBLE_TAP, ());
     }
@@ -93,7 +93,7 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onPopupSwitc
     ) else {
         return;
     };
-    let app = TAURI_APP.lock().unwrap().clone();
+    let app = TAURI_APP.lock().expect("TAURI_APP mutex poisoned").clone();
     let Some(app) = app else {
         eprintln!("[AppBridge.onPopupSwitchSession] app handle not initialized");
         return;
@@ -158,7 +158,7 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_initContext<
             return;
         }
     };
-    *MAIN_ACTIVITY.lock().unwrap() = Some((vm, global_ref));
+    *MAIN_ACTIVITY.lock().expect("MAIN_ACTIVITY mutex poisoned") = Some((vm, global_ref));
     println!("[AppBridge] context initialized");
 }
 
