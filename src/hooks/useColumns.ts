@@ -34,14 +34,8 @@ export {
 export type { ColumnBounds } from "../lib/gridLayout";
 
 export function useColumns() {
-  const {
-    columns,
-    accounts,
-    addColumn,
-    removeColumn,
-    updateColumn,
-    moveColumn,
-  } = useAppStore();
+  const { columns, accounts, addColumn, removeColumn, updateColumn } =
+    useAppStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollbarRef = useRef<HTMLDivElement>(null); // 下部スクロールバーコンテナ
   // ダイアログが開いている間はリサイズによる WebView 再配置を抑制するためのフラグ
@@ -220,15 +214,6 @@ export function useColumns() {
     [updateColumn],
   );
 
-  // カラム移動
-  const handleMoveColumn = useCallback(
-    async (columnId: string, direction: "left" | "right") => {
-      moveColumn(columnId, direction);
-      await recalculateAllBounds();
-    },
-    [moveColumn, recalculateAllBounds],
-  );
-
   const setDialogOpen = useCallback((open: boolean) => {
     dialogOpenRef.current = open;
   }, []);
@@ -319,7 +304,6 @@ export function useColumns() {
     restoreColumns,
     handleAddColumn,
     handleRemoveColumn,
-    handleMoveColumn,
     handleUpdateColumn,
     recalculateAllBounds,
     hideColumnWebviews,
