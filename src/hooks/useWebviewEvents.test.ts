@@ -261,14 +261,7 @@ describe("useNewPostsNotification", () => {
   });
 
   it("desktopNotifyEnabledが有効なカラムは通知される", async () => {
-    const notificationSpy = vi.fn();
-    class MockNotification {
-      static permission = "granted";
-      constructor(title: string, options?: NotificationOptions) {
-        notificationSpy(title, options);
-      }
-    }
-    vi.stubGlobal("Notification", MockNotification);
+    isPermissionGrantedMock.mockResolvedValue(true);
     useAppStore.setState({
       columns: [
         makeColumn({
@@ -287,20 +280,14 @@ describe("useNewPostsNotification", () => {
     await act(async () => {
       emitNewPosts("column-col-1", 2);
     });
-    expect(notificationSpy).toHaveBeenCalledWith("新着通知", {
+    expect(sendNotificationMock).toHaveBeenCalledWith({
+      title: "新着通知",
       body: "2件の新しい通知があります",
     });
   });
 
   it("desktopNotifyEnabledが無効なカラムはバッジのみ更新される", async () => {
-    const notificationSpy = vi.fn();
-    class MockNotification {
-      static permission = "granted";
-      constructor(title: string, options?: NotificationOptions) {
-        notificationSpy(title, options);
-      }
-    }
-    vi.stubGlobal("Notification", MockNotification);
+    isPermissionGrantedMock.mockResolvedValue(true);
     useAppStore.setState({
       columns: [
         makeColumn({
@@ -320,18 +307,11 @@ describe("useNewPostsNotification", () => {
       emitNewPosts("column-col-1", 2);
     });
     expect(setUnreadCount).toHaveBeenCalledWith("col-1", 2);
-    expect(notificationSpy).not.toHaveBeenCalled();
+    expect(sendNotificationMock).not.toHaveBeenCalled();
   });
 
   it("notificationsカラムはdesktopNotifyEnabled未設定でも従来どおり通知される", async () => {
-    const notificationSpy = vi.fn();
-    class MockNotification {
-      static permission = "granted";
-      constructor(title: string, options?: NotificationOptions) {
-        notificationSpy(title, options);
-      }
-    }
-    vi.stubGlobal("Notification", MockNotification);
+    isPermissionGrantedMock.mockResolvedValue(true);
     useAppStore.setState({
       columns: [
         makeColumn({
@@ -346,7 +326,8 @@ describe("useNewPostsNotification", () => {
     await act(async () => {
       emitNewPosts("column-col-1", 4);
     });
-    expect(notificationSpy).toHaveBeenCalledWith("新着通知", {
+    expect(sendNotificationMock).toHaveBeenCalledWith({
+      title: "新着通知",
       body: "4件の新しい通知があります",
     });
   });
