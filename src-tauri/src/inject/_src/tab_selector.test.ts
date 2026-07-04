@@ -2,8 +2,8 @@
 //
 // tab_selector.ts は IIFE のため import 時に実行され、URL のクエリ（例:
 // https://x.com/home?Following）からタブ名を読み取ってタブをクリックする。
-// window.__multiColumnX.selectHomeTab も公開されるが空関数（no-op）であり、
-// 実際の選択処理は import 時の initializeTab() が担う。そのため各テストは
+// 公開 API は無く、実際の選択処理は import 時の initializeTab() と
+// URL 変化検知（MutationObserver）が担う。そのため各テストは
 // 「特定の URL で import したときの副作用」として検証する（vi.resetModules）。
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
