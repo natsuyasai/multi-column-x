@@ -1,6 +1,11 @@
 // src/hooks/useWebviewEvents.ts
 // カラム WebView から emit されるイベントの listen をまとめたフック
 import { listen } from "@tauri-apps/api/event";
+import {
+  isPermissionGranted,
+  requestPermission,
+  sendNotification,
+} from "@tauri-apps/plugin-notification";
 import { useEffect } from "react";
 import { IPC_EVENTS, WEBVIEW_LABELS } from "../constants/ipc";
 import { useAppStore } from "../store/useAppStore";
@@ -52,6 +57,45 @@ export function useColumnCrashRecovery(
   }, [recreateColumnWebview]);
 }
 
+/**
+ * 通知許可のリクエスト試行済みフラグ（モジュールレベルでキャッシュ）。
+ * 一度リクエストして拒否された場合、新着のたびに OS 許可ダイアログを
+ * 繰り返し要求しないようにするためのガード。
+ * OS 設定側で後から許可された場合は isPermissionGranted() が true を返すため
+ * このフラグに関わらず通知は送信される。
+ */
+let hasRequestedNotificationPermission = false;
+
+/**
+ * テスト専用: モジュールレベルの許可リクエスト試行済みフラグをリセットする。
+ * 本体コードから呼び出してはいけない。
+ */
+export function __resetNotificationPermissionCacheForTests(): void {
+  hasRequestedNotificationPermission = false;
+}
+
+/** 通知を送る直前に許可状態を確認し、未許可なら一度だけ許可をリクエストする */
+async function ensureNotificationPermissionGranted(): Promise<boolean> {
+  if (await isPermissionGranted()) {
+    return true;
+  }
+  if (hasRequestedNotificationPermission) {
+    return false;
+  }
+  hasRequestedNotificationPermission = true;
+  const permission = await requestPermission();
+  return permission === "granted";
+}
+
+async function notifyNewPosts(count: number): Promise<void> {
+  const granted = await ensureNotificationPermissionGranted();
+  if (!granted) return;
+  sendNotification({
+    title: "新着通知",
+    body: `${count}件の新しい通知があります`,
+  });
+}
+
 /** inject script からの新着カウントでバッジ更新、通知カラムはデスクトップ通知 */
 export function useNewPostsNotification(
   setUnreadCount: (columnId: string, count: number) => void,
@@ -70,13 +114,9 @@ export function useNewPostsNotification(
         if (
           col?.pageType === "notifications" &&
           col.settings.autoReloadEnabled &&
-          count > 0 &&
-          "Notification" in window &&
-          Notification.permission === "granted"
+          count > 0
         ) {
-          new Notification("新着通知", {
-            body: `${count}件の新しい通知があります`,
-          });
+          void notifyNewPosts(count);
         }
       },
     );
