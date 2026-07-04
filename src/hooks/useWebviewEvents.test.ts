@@ -5,6 +5,7 @@ import { useAppStore } from "../store/useAppStore";
 import { DEFAULT_COLUMN_SETTINGS } from "../types";
 import type { Column } from "../types";
 import {
+  __resetNotificationPermissionCacheForTests,
   useColumnCrashRecovery,
   useNewPostsNotification,
   useWebviewScrollRelay,
@@ -19,6 +20,16 @@ vi.mock("@tauri-apps/api/event", () => ({
     capturedCallbacks.set(event, cb);
     return Promise.resolve(mockUnlisten);
   }),
+}));
+
+const isPermissionGrantedMock = vi.fn<() => Promise<boolean>>();
+const requestPermissionMock = vi.fn<() => Promise<NotificationPermission>>();
+const sendNotificationMock = vi.fn();
+
+vi.mock("@tauri-apps/plugin-notification", () => ({
+  isPermissionGranted: (...args: []) => isPermissionGrantedMock(...args),
+  requestPermission: (...args: []) => requestPermissionMock(...args),
+  sendNotification: (...args: [unknown]) => sendNotificationMock(...args),
 }));
 
 function makeColumn(overrides: Partial<Column> & Pick<Column, "id">): Column {
@@ -127,6 +138,10 @@ describe("useNewPostsNotification", () => {
   beforeEach(() => {
     capturedCallbacks.clear();
     mockUnlisten.mockReset();
+    isPermissionGrantedMock.mockReset();
+    requestPermissionMock.mockReset();
+    sendNotificationMock.mockReset();
+    __resetNotificationPermissionCacheForTests();
     useAppStore.setState({ columns: [makeColumn({ id: "col-1" })] });
   });
 
@@ -140,7 +155,21 @@ describe("useNewPostsNotification", () => {
     });
   }
 
+  function setNotificationColumn() {
+    useAppStore.setState({
+      columns: [
+        makeColumn({
+          id: "col-1",
+          pageType: "notifications",
+          settings: { ...DEFAULT_COLUMN_SETTINGS, autoReloadEnabled: true },
+        }),
+      ],
+    });
+  }
+
   it("label から column- プレフィックスを除いた columnId で setUnreadCount を呼ぶ", async () => {
+    isPermissionGrantedMock.mockResolvedValue(false);
+    requestPermissionMock.mockResolvedValue("denied");
     const setUnreadCount = vi.fn();
     renderHook(() => useNewPostsNotification(setUnreadCount));
     await act(async () => {
@@ -149,77 +178,86 @@ describe("useNewPostsNotification", () => {
     expect(setUnreadCount).toHaveBeenCalledWith("col-1", 3);
   });
 
-  it("通知カラムで autoReload 有効・許可済みならデスクトップ通知を出す", async () => {
-    const notificationSpy = vi.fn();
-    class MockNotification {
-      static permission = "granted";
-      constructor(title: string, options?: NotificationOptions) {
-        notificationSpy(title, options);
-      }
-    }
-    vi.stubGlobal("Notification", MockNotification);
-    useAppStore.setState({
-      columns: [
-        makeColumn({
-          id: "col-1",
-          pageType: "notifications",
-          settings: { ...DEFAULT_COLUMN_SETTINGS, autoReloadEnabled: true },
-        }),
-      ],
-    });
+  it("新着があるとsendNotificationが呼ばれる", async () => {
+    isPermissionGrantedMock.mockResolvedValue(true);
+    setNotificationColumn();
     const setUnreadCount = vi.fn();
     renderHook(() => useNewPostsNotification(setUnreadCount));
     await act(async () => {
       emitNewPosts("column-col-1", 5);
     });
-    expect(notificationSpy).toHaveBeenCalledWith("新着通知", {
+    expect(sendNotificationMock).toHaveBeenCalledWith({
+      title: "新着通知",
       body: "5件の新しい通知があります",
+    });
+    expect(requestPermissionMock).not.toHaveBeenCalled();
+  });
+
+  it("未許可の場合はrequestPermissionを呼び、許可されればsendNotificationを呼ぶ", async () => {
+    isPermissionGrantedMock.mockResolvedValue(false);
+    requestPermissionMock.mockResolvedValue("granted");
+    setNotificationColumn();
+    const setUnreadCount = vi.fn();
+    renderHook(() => useNewPostsNotification(setUnreadCount));
+    await act(async () => {
+      emitNewPosts("column-col-1", 2);
+    });
+    expect(requestPermissionMock).toHaveBeenCalled();
+    expect(sendNotificationMock).toHaveBeenCalledWith({
+      title: "新着通知",
+      body: "2件の新しい通知があります",
     });
   });
 
-  it("通知カラムでないカラムはデスクトップ通知を出さない", async () => {
-    const notificationSpy = vi.fn();
-    class MockNotification {
-      static permission = "granted";
-      constructor(title: string, options?: NotificationOptions) {
-        notificationSpy(title, options);
-      }
-    }
-    vi.stubGlobal("Notification", MockNotification);
+  it("権限が拒否された場合は通知しない", async () => {
+    isPermissionGrantedMock.mockResolvedValue(false);
+    requestPermissionMock.mockResolvedValue("denied");
+    setNotificationColumn();
+    const setUnreadCount = vi.fn();
+    renderHook(() => useNewPostsNotification(setUnreadCount));
+    await act(async () => {
+      emitNewPosts("column-col-1", 5);
+    });
+    expect(sendNotificationMock).not.toHaveBeenCalled();
+  });
+
+  it("拒否された後に再度新着が来てもrequestPermissionは再度呼ばれない", async () => {
+    isPermissionGrantedMock.mockResolvedValue(false);
+    requestPermissionMock.mockResolvedValue("denied");
+    setNotificationColumn();
+    const setUnreadCount = vi.fn();
+    renderHook(() => useNewPostsNotification(setUnreadCount));
+    await act(async () => {
+      emitNewPosts("column-col-1", 1);
+    });
+    await act(async () => {
+      emitNewPosts("column-col-1", 2);
+    });
+    expect(requestPermissionMock).toHaveBeenCalledTimes(1);
+    expect(sendNotificationMock).not.toHaveBeenCalled();
+  });
+
+  it("通知カラムでないカラムは通知を送らない", async () => {
+    isPermissionGrantedMock.mockResolvedValue(true);
     const setUnreadCount = vi.fn();
     renderHook(() => useNewPostsNotification(setUnreadCount));
     await act(async () => {
       emitNewPosts("column-col-1", 5);
     });
     expect(setUnreadCount).toHaveBeenCalledWith("col-1", 5);
-    expect(notificationSpy).not.toHaveBeenCalled();
+    expect(sendNotificationMock).not.toHaveBeenCalled();
   });
 
-  it("count が 0 のときはデスクトップ通知を出さない", async () => {
-    const notificationSpy = vi.fn();
-    class MockNotification {
-      static permission = "granted";
-      constructor(title: string, options?: NotificationOptions) {
-        notificationSpy(title, options);
-      }
-    }
-    vi.stubGlobal("Notification", MockNotification);
-    useAppStore.setState({
-      columns: [
-        makeColumn({
-          id: "col-1",
-          pageType: "notifications",
-          settings: { ...DEFAULT_COLUMN_SETTINGS, autoReloadEnabled: true },
-        }),
-      ],
-    });
+  it("count が 0 のときは通知を送らない", async () => {
+    isPermissionGrantedMock.mockResolvedValue(true);
+    setNotificationColumn();
     const setUnreadCount = vi.fn();
     renderHook(() => useNewPostsNotification(setUnreadCount));
     await act(async () => {
       emitNewPosts("column-col-1", 0);
     });
     expect(setUnreadCount).toHaveBeenCalledWith("col-1", 0);
-    expect(notificationSpy).not.toHaveBeenCalled();
+    expect(sendNotificationMock).not.toHaveBeenCalled();
   });
 
   it("desktopNotifyEnabledが有効なカラムは通知される", async () => {
