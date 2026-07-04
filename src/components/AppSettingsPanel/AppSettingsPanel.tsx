@@ -145,12 +145,14 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
           >
             カラム配置
           </button>
-          <button
-            className={`${styles.tab} ${activeTab === "presets" ? styles.tabActive : ""}`}
-            onClick={() => setActiveTab("presets")}
-          >
-            プリセット
-          </button>
+          {!isMobile && (
+            <button
+              className={`${styles.tab} ${activeTab === "presets" ? styles.tabActive : ""}`}
+              onClick={() => setActiveTab("presets")}
+            >
+              プリセット
+            </button>
+          )}
         </div>
 
         <div className={styles.tabContent}>
@@ -200,16 +202,14 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
             />
           )}
 
-          {activeTab === "presets" && (
+          {!isMobile && activeTab === "presets" && (
             <PresetsTab
               presets={settings.presets ?? []}
-              isMobile={isMobile}
               onSave={(name) => savePreset(name)}
               onLoad={(id) => {
                 loadPreset(id);
                 // プリセットで置き換わったカラム構成に合わせて WebView を作り直す。
-                // デスクトップ／モバイル問わず、store の columns が変わるだけでは
-                // 既存のネイティブ WebView は入れ替わらないため必須。
+                // store の columns が変わるだけでは既存のネイティブ WebView は入れ替わらないため必須。
                 onReloadAllWebviews();
                 onClose();
               }}

@@ -138,36 +138,4 @@ describe("PresetsTab", () => {
       screen.getByText("保存済みプリセットはありません"),
     ).toBeInTheDocument();
   });
-
-  it("モバイルではプリセットの保存ボタンが表示されない", () => {
-    render(
-      <PresetsTab
-        presets={mockPresets}
-        isMobile
-        onSave={vi.fn()}
-        onLoad={vi.fn()}
-        onDelete={vi.fn()}
-      />,
-    );
-    expect(
-      screen.queryByRole("button", { name: "現在のレイアウトを保存" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByPlaceholderText("プリセット名を入力"),
-    ).not.toBeInTheDocument();
-  });
-
-  it("モバイルでも読み込み・削除ボタンは表示される", () => {
-    render(
-      <PresetsTab
-        presets={mockPresets}
-        isMobile
-        onSave={vi.fn()}
-        onLoad={vi.fn()}
-        onDelete={vi.fn()}
-      />,
-    );
-    expect(screen.getAllByRole("button", { name: "読み込む" })).toHaveLength(2);
-    expect(screen.getAllByRole("button", { name: "削除" })).toHaveLength(2);
-  });
 });

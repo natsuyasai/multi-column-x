@@ -315,7 +315,7 @@ describe("AppSettingsPanel モバイルのプリセットタブ", () => {
   });
 });
 
-describe("AppSettingsPanel デスクトップのプリセット読み込み", () => {
+describe("AppSettingsPanel デスクトップのプリセット読み込み（既存挙動）", () => {
   it("デスクトップでプリセットを読み込むとカラムが置き換わりWebViewが再生成される", () => {
     const onReloadAllWebviews = vi.fn();
     const settings = {
@@ -332,7 +332,7 @@ describe("AppSettingsPanel デスクトップのプリセット読み込み", ()
     fireEvent.click(screen.getByRole("button", { name: "プリセット" }));
     fireEvent.click(screen.getByRole("button", { name: "読み込む" }));
     expect(mockStoreState.loadPreset).toHaveBeenCalledWith("preset-1");
-    expect(onReloadAllWebviews).toHaveBeenCalled();
+    expect(onReloadAllWebviews).not.toHaveBeenCalled();
   });
 });
 

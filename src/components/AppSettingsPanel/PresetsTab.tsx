@@ -7,8 +7,6 @@ interface PresetsTabProps {
   onSave: (name: string) => void;
   onLoad: (id: string) => void;
   onDelete: (id: string) => void;
-  /** モバイルでは保存UIを非表示にする（保存はデスクトップのグリッドレイアウト前提のため） */
-  isMobile?: boolean;
 }
 
 export const PresetsTab: React.FC<PresetsTabProps> = ({
@@ -16,7 +14,6 @@ export const PresetsTab: React.FC<PresetsTabProps> = ({
   onSave,
   onLoad,
   onDelete,
-  isMobile = false,
 }) => {
   const [presetName, setPresetName] = useState("");
 
@@ -29,27 +26,25 @@ export const PresetsTab: React.FC<PresetsTabProps> = ({
 
   return (
     <div className={styles.container}>
-      {!isMobile && (
-        <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>現在のレイアウトを保存</h3>
-          <div className={styles.saveRow}>
-            <input
-              type="text"
-              className={styles.nameInput}
-              placeholder="プリセット名を入力"
-              value={presetName}
-              onChange={(e) => setPresetName(e.target.value)}
-            />
-            <button
-              className={styles.saveBtn}
-              onClick={handleSave}
-              disabled={!presetName.trim()}
-            >
-              現在のレイアウトを保存
-            </button>
-          </div>
-        </section>
-      )}
+      <section className={styles.section}>
+        <h3 className={styles.sectionTitle}>現在のレイアウトを保存</h3>
+        <div className={styles.saveRow}>
+          <input
+            type="text"
+            className={styles.nameInput}
+            placeholder="プリセット名を入力"
+            value={presetName}
+            onChange={(e) => setPresetName(e.target.value)}
+          />
+          <button
+            className={styles.saveBtn}
+            onClick={handleSave}
+            disabled={!presetName.trim()}
+          >
+            現在のレイアウトを保存
+          </button>
+        </div>
+      </section>
 
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>保存済みプリセット</h3>

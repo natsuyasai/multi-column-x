@@ -70,24 +70,6 @@ export const Default: Story = {
   },
 };
 
-export const MobileReadOnly: Story = {
-  name: "モバイル（読み込み・削除のみ）",
-  args: {
-    isMobile: true,
-  },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    // モバイルでは保存UIが表示されない
-    await expect(
-      canvas.queryByPlaceholderText("プリセット名を入力"),
-    ).not.toBeInTheDocument();
-    // 読み込み・削除は引き続き可能
-    await expect(
-      canvas.getAllByRole("button", { name: "読み込む" }),
-    ).toHaveLength(2);
-  },
-};
-
 export const LightTheme: Story = {
   name: "ライトテーマ",
   decorators: [
