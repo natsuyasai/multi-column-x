@@ -16,6 +16,7 @@
   const FINGERPRINT_LENGTH = 100;
   const ID_MARKER_PREFIX = "id:";
   const TEXT_MARKER_PREFIX = "text:";
+  const TIME_MARKER_SEPARATOR = "|t:";
 
   function isScrolling(): boolean {
     return document.scrollingElement
@@ -62,6 +63,45 @@
     return match ? match[1] : null;
   }
 
+  // ポストの投稿時刻（ISO8601 文字列）。取得できなければ null。
+  function getArticleTime(article: HTMLElement): string | null {
+    const time = article.querySelector<HTMLTimeElement>("time[datetime]");
+    return time?.getAttribute("datetime") ?? null;
+  }
+
+  // 視覚順ポスト列のうち、閾値 ISO 時刻より新しい投稿時刻を持つものの数を数える。
+  // 時刻が取得できないポスト（広告など）は数えない。
+  function countArticlesNewerThan(
+    articles: HTMLElement[],
+    thresholdIso: string,
+  ): number {
+    const threshold = Date.parse(thresholdIso);
+    if (Number.isNaN(threshold)) return 0;
+    let count = 0;
+    for (const article of articles) {
+      const iso = getArticleTime(article);
+      if (!iso) continue;
+      const time = Date.parse(iso);
+      if (!Number.isNaN(time) && time > threshold) count += 1;
+    }
+    return count;
+  }
+
+  // `id:<statusId>|t:<datetime>` 形式のマーカーを id と time に分解する。
+  // 旧形式（`id:<statusId>` のみ）の場合 time は null。
+  function parseArticleMarker(marker: string): {
+    id: string;
+    time: string | null;
+  } {
+    const body = marker.slice(ID_MARKER_PREFIX.length);
+    const sepIndex = body.indexOf(TIME_MARKER_SEPARATOR);
+    if (sepIndex === -1) return { id: body, time: null };
+    return {
+      id: body.slice(0, sepIndex),
+      time: body.slice(sepIndex + TIME_MARKER_SEPARATOR.length),
+    };
+  }
+
   function getCellFingerprint(cell: HTMLElement): string {
     return (cell.textContent ?? "").slice(0, FINGERPRINT_LENGTH);
   }
@@ -72,7 +112,14 @@
     const articles = getVisibleArticles();
     if (articles.length > 0) {
       const id = getStatusIdFromArticle(articles[0]);
-      if (id) return `${ID_MARKER_PREFIX}${id}`;
+      if (id) {
+        const time = getArticleTime(articles[0]);
+        // 投稿時刻を併記して、リロード後に「マーカーより新しいポストだけ」を数える。
+        // 時刻が取れない場合は旧形式（id のみ）にフォールバックする。
+        return time
+          ? `${ID_MARKER_PREFIX}${id}${TIME_MARKER_SEPARATOR}${time}`
+          : `${ID_MARKER_PREFIX}${id}`;
+      }
     }
     const cells = getVisibleCells();
     if (cells.length > 0) {
@@ -127,16 +174,29 @@
     marker: string,
     articles: HTMLElement[],
   ): void {
-    const markerId = marker.slice(ID_MARKER_PREFIX.length);
+    const { id, time } = parseArticleMarker(marker);
     const index = articles.findIndex(
-      (article) => getStatusIdFromArticle(article) === markerId,
+      (article) => getStatusIdFromArticle(article) === id,
     );
     if (index === -1) {
-      // 描画ウィンドウ外に流れて見つからない場合は、読み込まれているポスト数を
-      // 「それ以上」の意味の下限値として報告する。
-      reportNewPostsCount(articles.length);
+      // 前回先頭が描画ウィンドウ外に流れて見つからない場合。X は読書位置を復元する
+      // ため、単に読み込み済み件数を報告すると新着ゼロでも誤検知する。マーカーに
+      // 時刻があるときのみ「その時刻より新しいポスト数」を数え、無い（旧形式）場合は
+      // 保守的に報告しない。
+      if (time) {
+        reportNewPostsCount(countArticlesNewerThan(articles, time));
+      }
       return;
     }
+    if (time) {
+      // index より視覚的に上（前）にあるポストのうち、マーカー時刻より新しいものだけを
+      // 数える。広告・ピン留めなど古い挿入物を新着から除外する。
+      reportNewPostsCount(
+        countArticlesNewerThan(articles.slice(0, index), time),
+      );
+      return;
+    }
+    // 旧形式マーカー（時刻なし）は従来どおり index を新着数とする。
     // index === 0 なら先頭は変わっていないので報告しない。
     reportNewPostsCount(index);
   }
@@ -158,12 +218,10 @@
 
     const articles = getVisibleArticles();
     if (articles.length > 0) {
+      // 前回が article 無しページで今回は article 有り等の想定外ケースでは
+      // 比較不能なため報告しない（誤検知回避）。
       if (marker.startsWith(ID_MARKER_PREFIX)) {
         reportForArticleMarker(marker, articles);
-      } else {
-        // 前回は article が無いページだったが今回は存在する等の想定外ケース。
-        // 比較不能なため読み込まれている件数を報告する。
-        reportNewPostsCount(articles.length);
       }
       return;
     }

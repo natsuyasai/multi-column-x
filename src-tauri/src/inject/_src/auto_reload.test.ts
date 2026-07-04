@@ -58,12 +58,18 @@ function addArticle(
   section: HTMLElement,
   statusId: string | null,
   top: number,
+  isoTime?: string,
 ): HTMLElement {
   const article = document.createElement("article");
   if (statusId) {
     const link = document.createElement("a");
     link.setAttribute("href", `/someone/status/${statusId}`);
     article.appendChild(link);
+  }
+  if (isoTime) {
+    const time = document.createElement("time");
+    time.setAttribute("datetime", isoTime);
+    article.appendChild(time);
   }
   stubGetBoundingClientRect(article, top);
   section.appendChild(article);
@@ -147,6 +153,18 @@ describe("inject/auto_reload", () => {
       expect(sessionStorage.getItem(MARKER_KEY)).toBe("id:200");
       expect(reloadMock).toHaveBeenCalledTimes(1);
     });
+
+    it("先頭ポストに投稿時刻があればマーカーにidと時刻を併記する", async () => {
+      const section = addSection();
+      addArticle(section, "200", 0, "2026-07-04T06:00:00.000Z");
+      await importAutoReload();
+
+      window.__multiColumnX.triggerReload();
+
+      expect(sessionStorage.getItem(MARKER_KEY)).toBe(
+        "id:200|t:2026-07-04T06:00:00.000Z",
+      );
+    });
   });
 
   describe("リロード後の新着数算出（import時の初期化処理）", () => {
@@ -186,11 +204,31 @@ describe("inject/auto_reload", () => {
       expect(sessionStorage.getItem(MARKER_KEY)).toBeNull();
     });
 
-    it("前回先頭が見つからない場合は読み込み済みポスト数を報告する", async () => {
-      sessionStorage.setItem(MARKER_KEY, "id:999");
+    it("時刻付きマーカーでは前回先頭より上でも古い挿入物（広告など）は数えない", async () => {
+      // 前回先頭 id:100 は 06:00。リロード後、その上に「新しい投稿(06:05)」と
+      // 「時刻の無い広告」と「古いピン留め(05:00)」が挟まっても、新着は 06:05 の1件のみ。
+      sessionStorage.setItem(MARKER_KEY, "id:100|t:2026-07-04T06:00:00.000Z");
       const section = addSection();
-      addArticle(section, "300", 0);
-      addArticle(section, "200", 50);
+      addArticle(section, "300", 0, "2026-07-04T06:05:00.000Z");
+      addArticle(section, null, 30); // 時刻なし（広告想定）
+      addArticle(section, "50", 60, "2026-07-04T05:00:00.000Z"); // 古いピン留め想定
+      addArticle(section, "100", 90, "2026-07-04T06:00:00.000Z");
+
+      await importAutoReload();
+
+      expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
+        label: "column-1",
+        count: 1,
+      });
+    });
+
+    it("マーカー未検出でも時刻より新しいポストだけを数える", async () => {
+      // 前回先頭 id:999 が描画ウィンドウ外。時刻 06:00 より新しい 06:05・06:10 の2件のみ新着。
+      sessionStorage.setItem(MARKER_KEY, "id:999|t:2026-07-04T06:00:00.000Z");
+      const section = addSection();
+      addArticle(section, "300", 0, "2026-07-04T06:10:00.000Z");
+      addArticle(section, "250", 50, "2026-07-04T06:05:00.000Z");
+      addArticle(section, "200", 100, "2026-07-04T05:55:00.000Z");
 
       await importAutoReload();
 
@@ -198,6 +236,18 @@ describe("inject/auto_reload", () => {
         label: "column-1",
         count: 2,
       });
+    });
+
+    it("マーカー未検出かつ時刻情報が無い旧形式では報告しない", async () => {
+      // 読書位置復元でウィンドウがずれただけの誤検知を防ぐため、時刻が無ければ報告しない。
+      sessionStorage.setItem(MARKER_KEY, "id:999");
+      const section = addSection();
+      addArticle(section, "300", 0);
+      addArticle(section, "200", 50);
+
+      await importAutoReload();
+
+      expect(invokeMock).not.toHaveBeenCalled();
     });
 
     it("通知ページでは先頭セルの変化でcount1を報告する", async () => {
