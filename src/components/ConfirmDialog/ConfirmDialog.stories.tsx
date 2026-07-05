@@ -64,6 +64,22 @@ export const CancelByButton: Story = {
   },
 };
 
+export const SingleButton: Story = {
+  name: "単一ボタン",
+  args: {
+    singleButton: true,
+    title: "再認証",
+    message: "再認証に失敗しました（アカウント識別子を取得できませんでした）",
+    confirmLabel: "OK",
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.queryByText("キャンセル")).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByText("OK"));
+    await expect(args.onConfirm).toHaveBeenCalled();
+  },
+};
+
 export const LightTheme: Story = {
   name: "ライトテーマ",
   decorators: [

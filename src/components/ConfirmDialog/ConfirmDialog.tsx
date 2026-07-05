@@ -9,6 +9,7 @@ interface ConfirmDialogProps {
   cancelLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
+  singleButton?: boolean;
 }
 
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
@@ -18,6 +19,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   cancelLabel = "キャンセル",
   onConfirm,
   onCancel,
+  singleButton = false,
 }) => {
   useEscapeKey(onCancel);
 
@@ -28,9 +30,15 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         <p className={styles.message}>{message}</p>
 
         <div className={styles.actions}>
-          <button type="button" className={styles.cancelBtn} onClick={onCancel}>
-            {cancelLabel}
-          </button>
+          {!singleButton && (
+            <button
+              type="button"
+              className={styles.cancelBtn}
+              onClick={onCancel}
+            >
+              {cancelLabel}
+            </button>
+          )}
           <button
             type="button"
             className={styles.confirmBtn}

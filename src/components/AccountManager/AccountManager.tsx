@@ -18,6 +18,7 @@ interface AccountManagerProps {
     patch: Partial<Pick<Account, "label" | "color">>,
   ) => void;
   onClose: () => void;
+  onReauthAccount: (id: string) => void;
 }
 
 export const AccountManager: React.FC<AccountManagerProps> = ({
@@ -28,6 +29,7 @@ export const AccountManager: React.FC<AccountManagerProps> = ({
   onSetDefault,
   onUpdateAccount,
   onClose,
+  onReauthAccount,
 }) => {
   useEscapeKey(onClose);
 
@@ -139,6 +141,13 @@ export const AccountManager: React.FC<AccountManagerProps> = ({
                   aria-label={`${account.label} を編集`}
                 >
                   編集
+                </button>
+                <button
+                  className={styles.editBtn}
+                  onClick={() => onReauthAccount(account.id)}
+                  aria-label={`${account.label} を再認証`}
+                >
+                  再認証
                 </button>
                 <button
                   className={`${styles.defaultBtn}${isDefault ? ` ${styles.defaultBtnActive}` : ""}`}

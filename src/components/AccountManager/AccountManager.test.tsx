@@ -23,6 +23,7 @@ describe("AccountManager", () => {
         onSetDefault={vi.fn()}
         onUpdateAccount={vi.fn()}
         onClose={vi.fn()}
+        onReauthAccount={vi.fn()}
       />,
     );
     expect(screen.getByText("アカウントA")).toBeInTheDocument();
@@ -38,6 +39,7 @@ describe("AccountManager", () => {
         onSetDefault={vi.fn()}
         onUpdateAccount={onUpdateAccount}
         onClose={vi.fn()}
+        onReauthAccount={vi.fn()}
       />,
     );
     fireEvent.click(screen.getByLabelText("アカウントA を編集"));
@@ -57,6 +59,7 @@ describe("AccountManager", () => {
         onSetDefault={vi.fn()}
         onUpdateAccount={onUpdateAccount}
         onClose={vi.fn()}
+        onReauthAccount={vi.fn()}
       />,
     );
     fireEvent.click(screen.getByLabelText("アカウントA を編集"));
@@ -77,6 +80,7 @@ describe("AccountManager", () => {
         onSetDefault={vi.fn()}
         onUpdateAccount={onUpdateAccount}
         onClose={vi.fn()}
+        onReauthAccount={vi.fn()}
       />,
     );
     fireEvent.click(screen.getByLabelText("アカウントA を編集"));
@@ -96,10 +100,28 @@ describe("AccountManager", () => {
         onSetDefault={vi.fn()}
         onUpdateAccount={vi.fn()}
         onClose={vi.fn()}
+        onReauthAccount={vi.fn()}
       />,
     );
     fireEvent.click(screen.getByLabelText("アカウントA を削除"));
     expect(onRemoveAccount).toHaveBeenCalledWith("acc-1");
+  });
+
+  it("再認証ボタンでonReauthAccountが呼ばれる", () => {
+    const onReauthAccount = vi.fn();
+    render(
+      <AccountManager
+        accounts={mockAccounts}
+        onAddAccount={vi.fn()}
+        onRemoveAccount={vi.fn()}
+        onSetDefault={vi.fn()}
+        onUpdateAccount={vi.fn()}
+        onClose={vi.fn()}
+        onReauthAccount={onReauthAccount}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText("アカウントA を再認証"));
+    expect(onReauthAccount).toHaveBeenCalledWith("acc-1");
   });
 
   it("デフォルトアカウントのスターボタンに star SVG が表示される", () => {
@@ -112,6 +134,7 @@ describe("AccountManager", () => {
         onSetDefault={vi.fn()}
         onUpdateAccount={vi.fn()}
         onClose={vi.fn()}
+        onReauthAccount={vi.fn()}
       />,
     );
     expect(
@@ -136,6 +159,7 @@ describe("AccountManager", () => {
         onSetDefault={vi.fn()}
         onUpdateAccount={vi.fn()}
         onClose={vi.fn()}
+        onReauthAccount={vi.fn()}
       />,
     );
     expect(
@@ -153,6 +177,7 @@ describe("AccountManager", () => {
         onSetDefault={vi.fn()}
         onUpdateAccount={vi.fn()}
         onClose={onClose}
+        onReauthAccount={vi.fn()}
       />,
     );
     fireEvent.keyDown(document, { key: "Escape" });
@@ -168,6 +193,7 @@ describe("AccountManager", () => {
         onSetDefault={vi.fn()}
         onUpdateAccount={vi.fn()}
         onClose={vi.fn()}
+        onReauthAccount={vi.fn()}
       />,
     );
     expect(
