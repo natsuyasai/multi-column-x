@@ -526,3 +526,129 @@ describe("useAccounts (desktop reauth)", () => {
     expect(mockReload).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("useAccounts (mobile reauth)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("一致(match)の場合、xUserIdが更新されreloadAllWebviewsが呼ばれる", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: true,
+    });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "reauth_account_window"
+        ? JSON.stringify({ accountId: "acc-1", xUserId: "123" })
+        : undefined,
+    );
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    await act(async () => {
+      await result.current.startReauth("acc-1");
+    });
+
+    expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
+    expect(mockReload).toHaveBeenCalledTimes(1);
+    expect(result.current.reauthNotice).toBeNull();
+  });
+
+  it("初回(skip)の場合、xUserIdが記録されreloadAllWebviewsが呼ばれスキップ通知がセットされる", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount()],
+      isMobile: true,
+    });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "reauth_account_window"
+        ? JSON.stringify({ accountId: "acc-1", xUserId: "123" })
+        : undefined,
+    );
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    await act(async () => {
+      await result.current.startReauth("acc-1");
+    });
+
+    expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
+    expect(mockReload).toHaveBeenCalledTimes(1);
+    expect(result.current.reauthNotice).toBe(
+      "初回の再認証のため同一性の照合をスキップし、アカウント識別子を記録しました",
+    );
+  });
+
+  it("不一致の場合、invokeがaccount-mismatchでrejectされxUserIdは更新されず警告がセットされる", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: true,
+    });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "reauth_account_window"
+        ? Promise.reject(new Error("account-mismatch"))
+        : undefined,
+    );
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    await act(async () => {
+      await result.current.startReauth("acc-1");
+    });
+
+    expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
+    expect(mockReload).not.toHaveBeenCalled();
+    expect(result.current.reauthNotice).toBe(
+      "登録済みと異なるアカウントでログインされたため、セッションを更新しませんでした",
+    );
+  });
+
+  it("キャンセルの場合、invokeがcancelledでrejectされ何も起きない", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: true,
+    });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "reauth_account_window"
+        ? Promise.reject(new Error("cancelled"))
+        : undefined,
+    );
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    await act(async () => {
+      await result.current.startReauth("acc-1");
+    });
+
+    expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
+    expect(mockReload).not.toHaveBeenCalled();
+    expect(result.current.reauthNotice).toBeNull();
+  });
+
+  it("xUserIdがnullで返る場合、更新もリロードもされず失敗通知がセットされる", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: true,
+    });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "reauth_account_window"
+        ? JSON.stringify({ accountId: "acc-1", xUserId: null })
+        : undefined,
+    );
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    await act(async () => {
+      await result.current.startReauth("acc-1");
+    });
+
+    expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
+    expect(mockReload).not.toHaveBeenCalled();
+    expect(result.current.reauthNotice).toBe(
+      "再認証に失敗しました（アカウント識別子を取得できませんでした）",
+    );
+  });
+});

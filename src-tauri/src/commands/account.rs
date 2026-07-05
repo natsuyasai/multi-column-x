@@ -251,11 +251,87 @@ pub async fn reauth_account_window(
 #[cfg(mobile)]
 #[tauri::command]
 pub async fn reauth_account_window(
-    _app: AppHandle,
-    _account_id: String,
-    _data_directory: String,
+    app: AppHandle,
+    account_id: String,
+    data_directory: String,
+    expected_user_id: Option<String>,
 ) -> Result<String, String> {
-    Err("not implemented".to_string()) // Task 8 で本実装に置換
+    // mobile では Kotlin 側が accountId でプロファイル（WebView Profile）を特定するため未使用。
+    let _ = &data_directory;
+
+    let sentinel_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let complete_sentinel = sentinel_dir.join("reauth_complete");
+    let mismatch_sentinel = sentinel_dir.join("reauth_mismatch");
+    let cancelled_sentinel = sentinel_dir.join("reauth_cancelled");
+    let _ = std::fs::remove_file(&complete_sentinel);
+    let _ = std::fs::remove_file(&mismatch_sentinel);
+    let _ = std::fs::remove_file(&cancelled_sentinel);
+    log::info!(
+        "[reauth_account_window] sentinel_dir={} account_id={account_id}",
+        sentinel_dir.display()
+    );
+
+    // AddAccount Activity を再認証モードで JNI 経由で起動する
+    #[cfg(target_os = "android")]
+    {
+        log::info!(
+            "[reauth_account_window] launching AddAccount Activity (reauth) via JNI, account_id={account_id}"
+        );
+        match crate::android_bridge::launch_reauth_account_activity(
+            &account_id,
+            expected_user_id.as_deref(),
+        ) {
+            Ok(()) => log::info!("[reauth_account_window] AddAccount Activity launched"),
+            Err(e) => log::warn!("[reauth_account_window] JNI launch error: {e}"),
+        }
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = &expected_user_id;
+    }
+
+    log::info!("[reauth_account_window] entering poll loop");
+
+    // AddAccount.kt がセンチネルファイルを書き込むまでブロックして待機する。
+    const POLL_MS: u64 = 500;
+    const MAX_POLLS: u64 = 10 * 60 * 1000 / POLL_MS; // 最大 10 分
+    for i in 0..MAX_POLLS {
+        tokio::time::sleep(std::time::Duration::from_millis(POLL_MS)).await;
+
+        if complete_sentinel.exists() {
+            log::info!("[reauth_account_window] complete sentinel found at poll #{i}");
+            let content = std::fs::read_to_string(&complete_sentinel).unwrap_or_default();
+            let _ = std::fs::remove_file(&complete_sentinel);
+            let xid = content.trim();
+            let x_user_id = if xid.is_empty() {
+                serde_json::Value::Null
+            } else {
+                serde_json::Value::String(xid.to_string())
+            };
+            return Ok(serde_json::json!({
+                "accountId": account_id,
+                "xUserId": x_user_id,
+            })
+            .to_string());
+        }
+        if mismatch_sentinel.exists() {
+            log::info!("[reauth_account_window] mismatch sentinel found at poll #{i}");
+            let _ = std::fs::remove_file(&mismatch_sentinel);
+            return Err("account-mismatch".to_string());
+        }
+        if cancelled_sentinel.exists() {
+            log::info!("[reauth_account_window] cancelled sentinel found at poll #{i}");
+            let _ = std::fs::remove_file(&cancelled_sentinel);
+            return Err("cancelled".to_string());
+        }
+
+        if i % 20 == 0 {
+            log::info!("[reauth_account_window] poll #{i}: still waiting...");
+        }
+    }
+
+    log::warn!("[reauth_account_window] timeout");
+    Err("timeout".to_string())
 }
 
 /// 削除対象パスが accounts ルートの「配下」であることを検証する（ルート自体・外部・.. 参照は拒否）。

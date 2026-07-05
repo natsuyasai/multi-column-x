@@ -198,12 +198,40 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
 
   const startReauth = useCallback(
     async (accountId: string) => {
-      if (isReauthingRef.current || isMobile) return;
+      if (isReauthingRef.current) return;
       const account = accounts.find((a) => a.id === accountId);
       if (!account) return;
 
       isReauthingRef.current = true;
       try {
+        if (isMobile) {
+          // -----------------------------------------------
+          // mobile 専用フロー
+          // -----------------------------------------------
+          // reauth_account_window は AddAccount Activity（reauth モード）が
+          // 終了するまでブロックする。Kotlin 側で twid 照合済みのため、
+          // ここでは skip 通知の要否だけ evaluateReauthIdentity で判定する。
+          const raw = await invoke<string>(IPC_COMMANDS.REAUTH_ACCOUNT_WINDOW, {
+            accountId,
+            dataDirectory: account.dataDirectory,
+            expectedUserId: account.xUserId ?? null,
+          });
+          const payload = JSON.parse(raw) as ReauthCompletePayload;
+          const xUserId = payload.xUserId;
+          if (!xUserId) {
+            setReauthNotice(REAUTH_FAILED_MESSAGE);
+            return;
+          }
+
+          const verdict = evaluateReauthIdentity(account.xUserId, xUserId);
+          updateAccount(accountId, { xUserId });
+          await reloadAllWebviews?.();
+          if (verdict === "skip") {
+            setReauthNotice(REAUTH_SKIP_MESSAGE);
+          }
+          return;
+        }
+
         const raw = await invoke<string>(IPC_COMMANDS.REAUTH_ACCOUNT_WINDOW, {
           accountId,
           dataDirectory: account.dataDirectory,
@@ -289,8 +317,12 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
             })
             .catch(() => {});
         });
-      } catch {
-        // ウィンドウを閉じた場合（キャンセル）も含め、エラー表示は不要。
+      } catch (e) {
+        // mobile: Kotlin 側で不一致と判定された場合は Rust が "account-mismatch" で reject する。
+        // それ以外（cancelled/timeout、desktop のウィンドウclose）はエラー表示不要。
+        if (isMobile && String(e).includes("account-mismatch")) {
+          setReauthNotice(REAUTH_MISMATCH_MESSAGE);
+        }
       } finally {
         isReauthingRef.current = false;
       }
