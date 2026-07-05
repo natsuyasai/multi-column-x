@@ -129,6 +129,23 @@ pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
     Err("timeout".to_string())
 }
 
+/// twid Cookie の値（`twid=` を剥がした後の部分）から数値ユーザーIDを抽出する。
+/// `u%3D<id>`（URLエンコード生値）/ `u=<id>`（デコード後）のどちらの形式にも対応する。
+/// `u=` 以降が1文字以上のASCII数字のみの場合に限り `Some` を返し、それ以外は `None`。
+/// 呼び出し元（desktop/mobile の再認証コマンド）は後続タスクで追加するため、
+/// 現時点では `commands` モジュールが非公開でクレート内からも未使用となり dead_code
+/// 警告が出る。将来の呼び出しが確定しているため許容する。
+#[allow(dead_code)]
+pub fn parse_twid_user_id(twid_value: &str) -> Option<String> {
+    let normalized = twid_value.replace("%3D", "=").replace("%3d", "=");
+    let id = normalized.strip_prefix("u=")?;
+    if !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit()) {
+        Some(id.to_string())
+    } else {
+        None
+    }
+}
+
 /// 削除対象パスが accounts ルートの「配下」であることを検証する（ルート自体・外部・.. 参照は拒否）。
 /// canonicalize は存在しないパスで失敗するため、字句的な正規化（components ベース）で判定する。
 fn is_safe_account_dir(path: &Path, accounts_root: &Path) -> bool {
@@ -185,6 +202,50 @@ mod tests {
     use super::*;
 
     #[test]
+    fn urlエンコード済みtwidから数値idを抽出する() {
+        assert_eq!(
+            parse_twid_user_id("u%3D118318317"),
+            Some("118318317".to_string())
+        );
+    }
+
+    #[test]
+    fn urlデコード済みtwidから数値idを抽出する() {
+        assert_eq!(
+            parse_twid_user_id("u=118318317"),
+            Some("118318317".to_string())
+        );
+    }
+
+    #[test]
+    fn 小文字エンコードのtwidからも数値idを抽出する() {
+        assert_eq!(
+            parse_twid_user_id("u%3d118318317"),
+            Some("118318317".to_string())
+        );
+    }
+
+    #[test]
+    fn idが空のtwidはnoneを返す() {
+        assert_eq!(parse_twid_user_id("u="), None);
+    }
+
+    #[test]
+    fn idが数字以外を含むtwidはnoneを返す() {
+        assert_eq!(parse_twid_user_id("u=abc"), None);
+    }
+
+    #[test]
+    fn uプレフィックスが無いtwidはnoneを返す() {
+        assert_eq!(parse_twid_user_id("118318317"), None);
+    }
+
+    #[test]
+    fn 空文字のtwidはnoneを返す() {
+        assert_eq!(parse_twid_user_id(""), None);
+    }
+
+    #[test]
     fn accounts配下のディレクトリは削除を許可する() {
         let root = Path::new("/data/app/accounts");
         assert!(is_safe_account_dir(
@@ -213,5 +274,29 @@ mod tests {
     fn accountsルート自体は拒否する() {
         let root = Path::new("/data/app/accounts");
         assert!(!is_safe_account_dir(root, root));
+    }
+
+    mod properties {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            /// u= 形式・u%3D 形式のどちらも、任意の非負整数をそのままユーザーIDとして復元できる。
+            #[test]
+            fn 非負整数を含むtwid値から同じ数値idを復元できる(n in any::<u64>()) {
+                let expected = Some(n.to_string());
+                prop_assert_eq!(parse_twid_user_id(&format!("u={n}")), expected.clone());
+                prop_assert_eq!(parse_twid_user_id(&format!("u%3D{n}")), expected);
+            }
+
+            /// u=/u%3D/u%3d のいずれのプレフィックスも持たない任意の文字列はnoneを返す。
+            #[test]
+            fn uプレフィックスを持たない文字列はnoneを返す(s in any::<String>()) {
+                prop_assume!(
+                    !s.starts_with("u=") && !s.starts_with("u%3D") && !s.starts_with("u%3d")
+                );
+                prop_assert_eq!(parse_twid_user_id(&s), None);
+            }
+        }
     }
 }
