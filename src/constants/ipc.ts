@@ -29,6 +29,7 @@ export const IPC_COMMANDS = {
 
   // アカウント管理
   OPEN_ADD_ACCOUNT_WINDOW: "open_add_account_window",
+  REAUTH_ACCOUNT_WINDOW: "reauth_account_window",
   DELETE_ACCOUNT_DATA: "delete_account_data",
   CLOSE_WINDOW: "close_window",
 

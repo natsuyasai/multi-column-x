@@ -132,10 +132,6 @@ pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
 /// twid Cookie の値（`twid=` を剥がした後の部分）から数値ユーザーIDを抽出する。
 /// `u%3D<id>`（URLエンコード生値）/ `u=<id>`（デコード後）のどちらの形式にも対応する。
 /// `u=` 以降が1文字以上のASCII数字のみの場合に限り `Some` を返し、それ以外は `None`。
-/// 呼び出し元（desktop/mobile の再認証コマンド）は後続タスクで追加するため、
-/// 現時点では `commands` モジュールが非公開でクレート内からも未使用となり dead_code
-/// 警告が出る。将来の呼び出しが確定しているため許容する。
-#[allow(dead_code)]
 pub fn parse_twid_user_id(twid_value: &str) -> Option<String> {
     let normalized = twid_value.replace("%3D", "=").replace("%3d", "=");
     let id = normalized.strip_prefix("u=")?;
@@ -144,6 +140,122 @@ pub fn parse_twid_user_id(twid_value: &str) -> Option<String> {
     } else {
         None
     }
+}
+
+/// cookie の (name, value) 列から twid を探して数値ユーザーIDを取り出す。
+fn twid_user_id_from_cookies<'a>(
+    cookies: impl IntoIterator<Item = (&'a str, &'a str)>,
+) -> Option<String> {
+    for (name, value) in cookies {
+        if name == "twid" {
+            return parse_twid_user_id(value);
+        }
+    }
+    None
+}
+
+/// 再認証完了イベント（ACCOUNT_REAUTH_COMPLETE）の payload。
+#[derive(Clone, serde::Serialize)]
+struct ReauthCompletePayload {
+    #[serde(rename = "accountId")]
+    account_id: String,
+    #[serde(rename = "xUserId")]
+    x_user_id: Option<String>,
+}
+
+/// 登録済みアカウントの data_directory を再利用して x.com に再ログインし、
+/// ログイン完了（/home 到達）時に twid Cookie から数値ユーザーIDを読んで
+/// ACCOUNT_REAUTH_COMPLETE イベントを emit する。
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn reauth_account_window(
+    app: AppHandle,
+    account_id: String,
+    data_directory: String,
+) -> Result<String, String> {
+    let window_label = format!("{}{}", labels::ADD_ACCOUNT_PREFIX, &account_id[..8]);
+
+    tauri::WebviewWindowBuilder::new(
+        &app,
+        &window_label,
+        WebviewUrl::External(
+            "https://x.com/login"
+                .parse()
+                .map_err(|e: url::ParseError| e.to_string())?,
+        ),
+    )
+    .title("アカウントを再認証")
+    .inner_size(500.0, 700.0)
+    .data_directory(std::path::PathBuf::from(&data_directory))
+    .build()
+    .map_err(|e| e.to_string())?;
+
+    // Rust側でURLをポーリングしてログイン完了を検出する。cookies_for_url は
+    // Windows で同期コマンド内から呼ぶとデッドロックするため、必ず tokio::spawn
+    // した非同期タスク内で読む（open_add_account_window と同じ構造）。
+    let app_clone = app.clone();
+    let window_label_clone = window_label.clone();
+    let account_id_clone = account_id.clone();
+    tokio::spawn(async move {
+        const POLL_MS: u64 = 500;
+        const MAX_POLLS: u64 = 10 * 60 * 1000 / POLL_MS; // 最大10分
+        for _ in 0..MAX_POLLS {
+            tokio::time::sleep(std::time::Duration::from_millis(POLL_MS)).await;
+            match app_clone.get_webview_window(&window_label_clone) {
+                Some(w) => {
+                    if let Ok(url) = w.url() {
+                        if url.path() == "/home" {
+                            let x_user_id = match "https://x.com".parse() {
+                                Ok(cookie_url) => {
+                                    match w.cookies_for_url(cookie_url) {
+                                        Ok(cookies) => twid_user_id_from_cookies(
+                                            cookies.iter().map(|c| (c.name(), c.value())),
+                                        ),
+                                        Err(e) => {
+                                            log::warn!("[reauth_account_window] cookies_for_url error: {e}");
+                                            None
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    log::warn!(
+                                        "[reauth_account_window] cookie url parse error: {e}"
+                                    );
+                                    None
+                                }
+                            };
+                            let _ = app_clone.emit(
+                                events::ACCOUNT_REAUTH_COMPLETE,
+                                ReauthCompletePayload {
+                                    account_id: account_id_clone.clone(),
+                                    x_user_id,
+                                },
+                            );
+                            break;
+                        }
+                    }
+                }
+                None => break,
+            }
+        }
+    });
+
+    Ok(serde_json::json!({
+        "accountId": account_id,
+        "dataDirectory": data_directory,
+        "windowLabel": window_label,
+    })
+    .to_string())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn reauth_account_window(
+    _app: AppHandle,
+    _account_id: String,
+    _data_directory: String,
+) -> Result<String, String> {
+    Err("not implemented".to_string()) // Task 8 で本実装に置換
 }
 
 /// 削除対象パスが accounts ルートの「配下」であることを検証する（ルート自体・外部・.. 参照は拒否）。
@@ -243,6 +355,40 @@ mod tests {
     #[test]
     fn 空文字のtwidはnoneを返す() {
         assert_eq!(parse_twid_user_id(""), None);
+    }
+
+    #[test]
+    fn twidを含むcookie列から数値idを抽出する() {
+        let cookies = vec![("twid", "u=118318317")];
+        assert_eq!(
+            twid_user_id_from_cookies(cookies),
+            Some("118318317".to_string())
+        );
+    }
+
+    #[test]
+    fn twidが無いcookie列はnoneを返す() {
+        let cookies = vec![("ct0", "abc"), ("auth_token", "xyz")];
+        assert_eq!(twid_user_id_from_cookies(cookies), None);
+    }
+
+    #[test]
+    fn 複数cookieに紛れていてもtwidを抽出する() {
+        let cookies = vec![
+            ("ct0", "abc"),
+            ("twid", "u%3D118318317"),
+            ("auth_token", "xyz"),
+        ];
+        assert_eq!(
+            twid_user_id_from_cookies(cookies),
+            Some("118318317".to_string())
+        );
+    }
+
+    #[test]
+    fn twid値が不正な場合はnoneを返す() {
+        let cookies = vec![("twid", "invalid")];
+        assert_eq!(twid_user_id_from_cookies(cookies), None);
     }
 
     #[test]
