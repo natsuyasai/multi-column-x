@@ -1,22 +1,13 @@
 // auto_reload.ts は IIFE のため、import 時に実行されて window.__multiColumnX に
-// triggerReload が公開されると同時に、新着ポスト検知（マーカー消費・比較・
-// report_new_posts_count 報告）が初期化処理として走る。
-//
-// 新設計（2026-07-04 実DOM調査に基づく）: 「新しいポストを表示」ピルは合成イベントを
-// 受け付けず選択中タブの再クリックもリフレッシュ効果が無いため、確実に最新タイムラインを
-// 取得できる location.reload() 方式に書き換えた。triggerReload() は
-// (1) スクロール中はスキップ (2) リロード前に視覚的先頭ポストのマーカーを sessionStorage
-// に保存して location.reload() する、の 2 責務のみを持つ。
-// 新着数の算出は import 時（＝リロード後の再読み込み時）に自動実行されるため、
-// ng_word.ts 等と同様に「特定の DOM/sessionStorage 状態で import したときの副作用」として
-// vi.resetModules で都度再 import して検証する（tab_selector.test.ts のパターンを踏襲）。
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+// triggerReload が公開される。スクロール中スキップ・フォロー中タブの新着報告・
+// 通常タブの再選択という 3 つの分岐を検証する。
+// 一定間隔でのリロード実行自体は src/hooks/useAutoReload.ts（呼び出し元）の責務であり、
+// この inject スクリプトは triggerReload() の 1 回分の振る舞いのみを担う。
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 
 const invokeMock = vi.fn((_cmd: string, _args?: Record<string, unknown>) =>
   Promise.resolve<unknown>(undefined),
 );
-
-const MARKER_KEY = "mcx_prevTopMarker";
 
 // jsdom はレイアウトエンジンを持たず document.scrollingElement が常に null を返すため、
 // scrollTop を持つダミー要素で差し替えて isScrolling() / scrollToTop 分岐を検証する。
@@ -30,267 +21,151 @@ function setScrolling(scrollTop: number): void {
   });
 }
 
-function stubGetBoundingClientRect(el: HTMLElement, top: number): void {
-  el.getBoundingClientRect = vi.fn(
-    () =>
-      ({
-        top,
-        left: 0,
-        right: 0,
-        bottom: top,
-        width: 0,
-        height: 0,
-        x: 0,
-        y: top,
-        toJSON: () => ({}),
-      }) as DOMRect,
-  );
+function addTab(selected: boolean, expanded: boolean): HTMLElement {
+  const tab = document.createElement("div");
+  tab.setAttribute("role", "tab");
+  tab.setAttribute("aria-selected", String(selected));
+  if (expanded) {
+    tab.setAttribute("aria-expanded", "true");
+  }
+  document.body.appendChild(tab);
+  return tab;
 }
 
-function addSection(): HTMLElement {
-  const section = document.createElement("section");
-  section.setAttribute("aria-labelledby", "timeline");
-  document.body.appendChild(section);
-  return section;
-}
-
-function addArticle(
+function addNewPostsButton(
   section: HTMLElement,
-  statusId: string | null,
-  top: number,
-  isoTime?: string,
-): HTMLElement {
-  const article = document.createElement("article");
-  if (statusId) {
-    const link = document.createElement("a");
-    link.setAttribute("href", `/someone/status/${statusId}`);
-    article.appendChild(link);
-  }
-  if (isoTime) {
-    const time = document.createElement("time");
-    time.setAttribute("datetime", isoTime);
-    article.appendChild(time);
-  }
-  stubGetBoundingClientRect(article, top);
-  section.appendChild(article);
-  return article;
-}
-
-function addCell(section: HTMLElement, text: string, top: number): HTMLElement {
+  label: string,
+): HTMLButtonElement {
   const cell = document.createElement("div");
   cell.dataset.testid = "cellInnerDiv";
-  cell.textContent = text;
-  stubGetBoundingClientRect(cell, top);
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.textContent = label;
+  cell.appendChild(btn);
   section.appendChild(cell);
-  return cell;
+  return btn;
 }
 
-// DOM/sessionStorage のセットアップ後に呼び、init 時の副作用を発火させる。
-async function importAutoReload(): Promise<void> {
-  vi.resetModules();
-  await import("./auto_reload");
+function triggerReload(scrollToTop?: boolean): void {
+  window.__multiColumnX.triggerReload(scrollToTop);
 }
 
 describe("inject/auto_reload", () => {
-  let reloadMock: ReturnType<typeof vi.fn>;
-  const originalLocation = window.location;
+  beforeAll(async () => {
+    await import("./auto_reload");
+  });
 
   beforeEach(() => {
     document.body.innerHTML = "";
-    sessionStorage.clear();
     invokeMock.mockClear();
     setScrolling(0);
     window.__TAURI_INTERNALS__ = {
       metadata: { currentWebview: { label: "column-1" } },
     };
     window.__TAURI__ = { core: { invoke: invokeMock } };
+  });
 
-    reloadMock = vi.fn();
-    Object.defineProperty(window, "location", {
-      value: { ...originalLocation, reload: reloadMock },
-      writable: true,
-      configurable: true,
+  it("スクロール中は自動リロードをスキップする", () => {
+    setScrolling(100);
+    const tab = addTab(true, false);
+    const clickSpy = vi.fn();
+    tab.addEventListener("click", clickSpy);
+
+    triggerReload();
+
+    expect(clickSpy).not.toHaveBeenCalled();
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("フォロー中タブがアクティブな場合は新着ボタンをクリックし新着数をreport_new_posts_countで報告する", () => {
+    addTab(true, true);
+    const section = document.createElement("section");
+    section.setAttribute("aria-labelledby", "timeline");
+    document.body.appendChild(section);
+    const btn = addNewPostsButton(section, "5 posts");
+    const clickSpy = vi.fn();
+    btn.addEventListener("click", clickSpy);
+
+    triggerReload();
+
+    expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
+      label: "column-1",
+      count: 5,
+    });
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("新着数が数字なしの場合は1件として報告する", () => {
+    addTab(true, true);
+    const section = document.createElement("section");
+    section.setAttribute("aria-labelledby", "timeline");
+    document.body.appendChild(section);
+    addNewPostsButton(section, "新しいポストを見る");
+
+    triggerReload();
+
+    expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
+      label: "column-1",
+      count: 1,
     });
   });
 
-  afterEach(() => {
-    Object.defineProperty(window, "location", {
-      value: originalLocation,
-      writable: true,
-      configurable: true,
-    });
+  it("フォロー中タブでない場合は選択中タブを再選択する", () => {
+    const tab = addTab(true, false);
+    const clickSpy = vi.fn();
+    tab.addEventListener("click", clickSpy);
+
+    triggerReload();
+
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+    expect(invokeMock).not.toHaveBeenCalled();
   });
 
-  describe("triggerReload", () => {
-    it("スクロール中は自動リロードをスキップする", async () => {
-      await importAutoReload();
-      setScrolling(100);
+  it("フォロー中タブがアクティブで新着ボタンが無い場合は何もしない", () => {
+    // aria-selected かつ aria-expanded を持つタブがあると isFollowingTabActive が true になり、
+    // reselectTab（通常タブの再選択）ではなく新着ボタン探索の分岐に進む。
+    // section が無く新着ボタンも見つからないため、クリックも report も発生しない。
+    const tab = addTab(true, true);
+    const clickSpy = vi.fn();
+    tab.addEventListener("click", clickSpy);
 
-      window.__multiColumnX.triggerReload();
+    triggerReload();
 
-      expect(reloadMock).not.toHaveBeenCalled();
-      expect(sessionStorage.getItem(MARKER_KEY)).toBeNull();
-    });
-
-    it("scrollToTopを指定するとスクロール位置を先頭に戻してからリロードする", async () => {
-      await importAutoReload();
-      setScrolling(300);
-
-      window.__multiColumnX.triggerReload(true);
-
-      expect(document.documentElement.scrollTop).toBe(0);
-      expect(reloadMock).toHaveBeenCalledTimes(1);
-    });
-
-    it("リロード前に先頭ポストのマーカーをsessionStorageへ保存する", async () => {
-      const section = addSection();
-      addArticle(section, "200", 0);
-      addArticle(section, "100", 50);
-      await importAutoReload();
-
-      window.__multiColumnX.triggerReload();
-
-      expect(sessionStorage.getItem(MARKER_KEY)).toBe("id:200");
-      expect(reloadMock).toHaveBeenCalledTimes(1);
-    });
-
-    it("先頭ポストに投稿時刻があればマーカーにidと時刻を併記する", async () => {
-      const section = addSection();
-      addArticle(section, "200", 0, "2026-07-04T06:00:00.000Z");
-      await importAutoReload();
-
-      window.__multiColumnX.triggerReload();
-
-      expect(sessionStorage.getItem(MARKER_KEY)).toBe(
-        "id:200|t:2026-07-04T06:00:00.000Z",
-      );
-    });
+    expect(clickSpy).not.toHaveBeenCalled();
+    expect(invokeMock).not.toHaveBeenCalled();
   });
 
-  describe("リロード後の新着数算出（import時の初期化処理）", () => {
-    it("マーカーが無い初回起動では報告しない", async () => {
-      const section = addSection();
-      addArticle(section, "100", 0);
+  it("scrollToTopを指定するとスクロール位置を先頭に戻してから判定する", () => {
+    setScrolling(300);
+    const tab = addTab(true, false);
+    const clickSpy = vi.fn();
+    tab.addEventListener("click", clickSpy);
 
-      await importAutoReload();
+    triggerReload(true);
 
-      expect(invokeMock).not.toHaveBeenCalled();
-    });
+    expect(document.documentElement.scrollTop).toBe(0);
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+  });
 
-    it("リロード後にマーカーより上のポスト数をreport_new_posts_countで報告する", async () => {
-      sessionStorage.setItem(MARKER_KEY, "id:100");
-      const section = addSection();
-      addArticle(section, "300", 0);
-      addArticle(section, "200", 50);
-      addArticle(section, "100", 100);
+  it("新着ボタンが後から追加された場合はMutationObserverで検知して報告する", async () => {
+    addTab(true, true);
+    const section = document.createElement("section");
+    section.setAttribute("aria-labelledby", "timeline");
+    document.body.appendChild(section);
 
-      await importAutoReload();
+    triggerReload();
+    expect(invokeMock).not.toHaveBeenCalled();
 
-      expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
-        label: "column-1",
-        count: 2,
-      });
-      expect(sessionStorage.getItem(MARKER_KEY)).toBeNull();
-    });
+    const btn = addNewPostsButton(section, "3 posts");
+    const clickSpy = vi.fn();
+    btn.addEventListener("click", clickSpy);
 
-    it("前回先頭が現在の先頭と同じ場合は報告しない", async () => {
-      sessionStorage.setItem(MARKER_KEY, "id:100");
-      const section = addSection();
-      addArticle(section, "100", 0);
-
-      await importAutoReload();
-
-      expect(invokeMock).not.toHaveBeenCalled();
-      expect(sessionStorage.getItem(MARKER_KEY)).toBeNull();
-    });
-
-    it("時刻付きマーカーでは前回先頭より上でも古い挿入物（広告など）は数えない", async () => {
-      // 前回先頭 id:100 は 06:00。リロード後、その上に「新しい投稿(06:05)」と
-      // 「時刻の無い広告」と「古いピン留め(05:00)」が挟まっても、新着は 06:05 の1件のみ。
-      sessionStorage.setItem(MARKER_KEY, "id:100|t:2026-07-04T06:00:00.000Z");
-      const section = addSection();
-      addArticle(section, "300", 0, "2026-07-04T06:05:00.000Z");
-      addArticle(section, null, 30); // 時刻なし（広告想定）
-      addArticle(section, "50", 60, "2026-07-04T05:00:00.000Z"); // 古いピン留め想定
-      addArticle(section, "100", 90, "2026-07-04T06:00:00.000Z");
-
-      await importAutoReload();
-
-      expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
-        label: "column-1",
-        count: 1,
-      });
-    });
-
-    it("マーカー未検出でも時刻より新しいポストだけを数える", async () => {
-      // 前回先頭 id:999 が描画ウィンドウ外。時刻 06:00 より新しい 06:05・06:10 の2件のみ新着。
-      sessionStorage.setItem(MARKER_KEY, "id:999|t:2026-07-04T06:00:00.000Z");
-      const section = addSection();
-      addArticle(section, "300", 0, "2026-07-04T06:10:00.000Z");
-      addArticle(section, "250", 50, "2026-07-04T06:05:00.000Z");
-      addArticle(section, "200", 100, "2026-07-04T05:55:00.000Z");
-
-      await importAutoReload();
-
-      expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
-        label: "column-1",
-        count: 2,
-      });
-    });
-
-    it("マーカー未検出かつ時刻情報が無い旧形式では報告しない", async () => {
-      // 読書位置復元でウィンドウがずれただけの誤検知を防ぐため、時刻が無ければ報告しない。
-      sessionStorage.setItem(MARKER_KEY, "id:999");
-      const section = addSection();
-      addArticle(section, "300", 0);
-      addArticle(section, "200", 50);
-
-      await importAutoReload();
-
-      expect(invokeMock).not.toHaveBeenCalled();
-    });
-
-    it("通知ページでは先頭セルの変化でcount1を報告する", async () => {
-      sessionStorage.setItem(MARKER_KEY, "text:古い通知の本文");
-      const section = addSection();
-      addCell(section, "新しい通知の本文", 0);
-
-      await importAutoReload();
-
-      expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
-        label: "column-1",
-        count: 1,
-      });
-    });
-
-    it("通知ページで先頭セルの内容が変わっていなければ報告しない", async () => {
-      sessionStorage.setItem(MARKER_KEY, "text:同じ通知の本文");
-      const section = addSection();
-      addCell(section, "同じ通知の本文", 0);
-
-      await importAutoReload();
-
-      expect(invokeMock).not.toHaveBeenCalled();
-      expect(sessionStorage.getItem(MARKER_KEY)).toBeNull();
-    });
-
-    it("通知ページで未読バッジの数値が取得できればその値を優先して報告する", async () => {
-      sessionStorage.setItem(MARKER_KEY, "text:古い通知の本文");
-      const section = addSection();
-      addCell(section, "新しい通知の本文", 0);
-      const link = document.createElement("a");
-      link.dataset.testid = "AppTabBar_Notifications_Link";
-      const badge = document.createElement("span");
-      badge.setAttribute("aria-label", "3件の未読通知");
-      link.appendChild(badge);
-      document.body.appendChild(link);
-
-      await importAutoReload();
-
+    await vi.waitFor(() => {
       expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
         label: "column-1",
         count: 3,
       });
     });
+    expect(clickSpy).toHaveBeenCalledTimes(1);
   });
 });
