@@ -21,6 +21,9 @@ pub mod events {
     /// カラム WebView の WebProcess クラッシュ通知（Linux: Rust emit → TS listen）
     /// payload はクラッシュしたカラム ID 文字列。TS 側で当該カラムを再生成する。
     pub const COLUMN_WEBVIEW_CRASHED: &str = "column-webview-crashed";
+    /// 再認証完了（desktop: Rust emit → TS listen）payload { accountId, xUserId }。
+    /// account-login-complete とは別イベント。
+    pub const ACCOUNT_REAUTH_COMPLETE: &str = "account-reauth-complete";
 }
 
 /// WebView / ウィンドウラベルのプレフィックス
@@ -79,6 +82,7 @@ mod tests {
                 events::WEBVIEW_KEYBOARD_SHORTCUT,
             ),
             ("COLUMN_WEBVIEW_CRASHED", events::COLUMN_WEBVIEW_CRASHED),
+            ("ACCOUNT_REAUTH_COMPLETE", events::ACCOUNT_REAUTH_COMPLETE),
         ];
         assert_eq!(
             expected.as_object().unwrap().len(),
