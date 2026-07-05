@@ -114,6 +114,16 @@ describe("useAppStore", () => {
     expect(result.current.accounts[0].color).toBe("#e0245e");
   });
 
+  it("アカウントのxUserIdを変更できる", () => {
+    const { result } = renderHook(() => useAppStore());
+    act(() => {
+      result.current.addAccount(mockAccount);
+      result.current.updateAccount("acc-1", { xUserId: "118318317" });
+    });
+    expect(result.current.accounts[0].xUserId).toBe("118318317");
+    expect(mockInvoke).toHaveBeenCalledWith("save_settings", expect.anything());
+  });
+
   it("updateAccountで存在しないIDを指定してもアカウントは変わらない", () => {
     const { result } = renderHook(() => useAppStore());
     act(() => {

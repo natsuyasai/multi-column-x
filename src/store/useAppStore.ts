@@ -48,7 +48,7 @@ interface AppStore {
   addAccount: (account: Account) => void;
   updateAccount: (
     id: string,
-    patch: Partial<Pick<Account, "label" | "color">>,
+    patch: Partial<Pick<Account, "label" | "color" | "xUserId">>,
   ) => void;
   removeAccount: (id: string) => void;
   addColumn: (column: Column) => void;

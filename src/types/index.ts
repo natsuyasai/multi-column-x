@@ -7,6 +7,7 @@ export interface Account {
   dataDirectory: string;
   color: string;
   createdAt: string;
+  xUserId?: string;
 }
 
 export interface ColumnSettings {
