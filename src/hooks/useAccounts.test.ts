@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { IPC_EVENTS } from "../constants/ipc";
 import { useAppStore } from "../store/useAppStore";
 import { useAccounts } from "./useAccounts";
 
@@ -8,11 +10,45 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
 
+// listen に渡されたコールバックを捕捉して手動発火できるようにする
+const listenCallbacks = new Map<
+  string,
+  (event: { payload: unknown }) => void
+>();
+
 vi.mock("@tauri-apps/api/event", () => ({
-  listen: vi.fn().mockResolvedValue(() => {}),
+  listen: vi.fn(
+    (eventName: string, callback: (event: { payload: unknown }) => void) => {
+      listenCallbacks.set(eventName, callback);
+      return Promise.resolve(() => {
+        listenCallbacks.delete(eventName);
+      });
+    },
+  ),
+}));
+
+// desktop フロー（reauth/addAccount）がログインウィンドウの close 検出に使う
+vi.mock("@tauri-apps/api/webviewWindow", () => ({
+  WebviewWindow: {
+    getByLabel: vi.fn(async () => ({
+      once: vi.fn(async () => () => {}),
+    })),
+  },
 }));
 
 const mockInvoke = vi.mocked(invoke);
+const mockListen = vi.mocked(listen);
+
+// listen 登録が非同期(invokeのawait後)に行われるまでマイクロタスクを消化する
+async function flushMicrotasks() {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function fireListenEvent(eventName: string, payload: unknown) {
+  const callback = listenCallbacks.get(eventName);
+  if (!callback) throw new Error(`listen(${eventName}) is not registered yet`);
+  callback({ payload });
+}
 
 const addAccountResult = JSON.stringify({
   accountId: "acc-new",
@@ -249,5 +285,244 @@ describe("useAccounts (mobile)", () => {
     });
     expect(useAppStore.getState().accounts).toHaveLength(0);
     expect(result.current.pendingRemoval).toBeNull();
+  });
+});
+
+const reauthWindowResult = JSON.stringify({
+  accountId: "acc-1",
+  dataDirectory: "/data/acc-1",
+  windowLabel: "reauth-acc-1",
+});
+
+function makeReauthAccount(xUserId?: string) {
+  return {
+    id: "acc-1",
+    label: "Test",
+    dataDirectory: "/data/acc-1",
+    color: "#1d9bf0",
+    createdAt: "2026-01-01T00:00:00Z",
+    ...(xUserId !== undefined ? { xUserId } : {}),
+  };
+}
+
+describe("useAccounts (desktop reauth)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("一致(match)の場合、xUserIdが更新されウィンドウが閉じられreloadAllWebviewsが呼ばれる", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+    });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "reauth_account_window" ? reauthWindowResult : undefined,
+    );
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: "123",
+      });
+      await reauthPromise;
+    });
+
+    expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
+    expect(mockInvoke).toHaveBeenCalledWith("close_window", {
+      label: "reauth-acc-1",
+    });
+    expect(mockReload).toHaveBeenCalledTimes(1);
+    expect(result.current.reauthNotice).toBeNull();
+    expect(mockListen).toHaveBeenCalledWith(
+      IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE,
+      expect.any(Function),
+    );
+  });
+
+  it("初回(skip)の場合、xUserIdが記録されreloadAllWebviewsが呼ばれスキップ通知がセットされる", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount()],
+      isMobile: false,
+    });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "reauth_account_window" ? reauthWindowResult : undefined,
+    );
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: "123",
+      });
+      await reauthPromise;
+    });
+
+    expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
+    expect(mockReload).toHaveBeenCalledTimes(1);
+    expect(result.current.reauthNotice).toBe(
+      "初回の再認証のため同一性の照合をスキップし、アカウント識別子を記録しました",
+    );
+  });
+
+  it("不一致(mismatch)の場合、xUserIdは更新されずreloadAllWebviewsも呼ばれず警告がセットされる", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+    });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "reauth_account_window" ? reauthWindowResult : undefined,
+    );
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: "999",
+      });
+      await reauthPromise;
+    });
+
+    expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
+    expect(mockReload).not.toHaveBeenCalled();
+    expect(mockInvoke).toHaveBeenCalledWith("close_window", {
+      label: "reauth-acc-1",
+    });
+    expect(result.current.reauthNotice).toBe(
+      "登録済みと異なるアカウントでログインされたため、セッションを更新しませんでした",
+    );
+  });
+
+  it("識別子取得失敗の場合、更新もリロードもされず失敗通知がセットされる", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+    });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "reauth_account_window" ? reauthWindowResult : undefined,
+    );
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: null,
+      });
+      await reauthPromise;
+    });
+
+    expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
+    expect(mockReload).not.toHaveBeenCalled();
+    expect(mockInvoke).toHaveBeenCalledWith("close_window", {
+      label: "reauth-acc-1",
+    });
+    expect(result.current.reauthNotice).toBe(
+      "再認証に失敗しました（アカウント識別子を取得できませんでした）",
+    );
+  });
+
+  it("dismissReauthNoticeを呼ぶとreauthNoticeがnullに戻る", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+    });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "reauth_account_window" ? reauthWindowResult : undefined,
+    );
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: "999",
+      });
+      await reauthPromise;
+    });
+    expect(result.current.reauthNotice).not.toBeNull();
+
+    act(() => {
+      result.current.dismissReauthNotice();
+    });
+
+    expect(result.current.reauthNotice).toBeNull();
+  });
+
+  it("reloadAllWebviewsを渡さずuseAccounts()で呼んでもmatch時にエラーにならない", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+    });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "reauth_account_window" ? reauthWindowResult : undefined,
+    );
+    const { result } = renderHook(() => useAccounts());
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: "123",
+      });
+      await reauthPromise;
+    });
+
+    expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
+    expect(result.current.reauthNotice).toBeNull();
+  });
+
+  it("対象外accountIdのイベントは無視される", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+    });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "reauth_account_window" ? reauthWindowResult : undefined,
+    );
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "other-account",
+        xUserId: "123",
+      });
+      // 対象外イベントでは resolve されないため、一致イベントを追加で発火して完了させる
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: "123",
+      });
+      await reauthPromise;
+    });
+
+    expect(mockReload).toHaveBeenCalledTimes(1);
   });
 });
