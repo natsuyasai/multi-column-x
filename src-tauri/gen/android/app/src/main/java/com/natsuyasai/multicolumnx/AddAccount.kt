@@ -21,6 +21,8 @@ class AddAccount : AppCompatActivity() {
   private var webViewRef: WebView? = null
   private var pollCount = 0
   private var accountId = "unknown"
+  private var mode = "add"
+  private var expectedUserId: String? = null
 
   // ページ遷移中フラグ（shouldOverrideUrlLoading / onPageStarted で true、onPageFinished で false）
   private var isPageLoading = false
@@ -32,7 +34,9 @@ class AddAccount : AppCompatActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     accountId = intent.getStringExtra("accountId") ?: "unknown"
-    Log.d(TAG, "onCreate: accountId=$accountId dataDir=${dataDir.absolutePath}")
+    mode = intent.getStringExtra("mode") ?: "add"
+    expectedUserId = intent.getStringExtra("expectedUserId")
+    Log.d(TAG, "onCreate: accountId=$accountId mode=$mode dataDir=${dataDir.absolutePath}")
 
     val wv =
       WebView(this).apply {
@@ -95,7 +99,11 @@ class AddAccount : AppCompatActivity() {
             wv.goBack()
           } else {
             Log.d(TAG, "onBackPressed: cancel")
-            finishWithResult(success = false)
+            if (mode == "reauth") {
+              finishReauthWithSentinel("reauth_cancelled")
+            } else {
+              finishWithResult(success = false)
+            }
           }
         }
       },
@@ -145,6 +153,59 @@ class AddAccount : AppCompatActivity() {
     finish()
   }
 
+  // 再認証モードの完了処理。X の識別子（xUserId）を Cookie から取得し、
+  // 既存アカウントと同一かどうかを検証したうえで結果別のセンチネルを書く。
+  // - xUserId が取得できない場合は検証不能のため保存せず mismatch 扱い。
+  // - expectedUserId が指定されていて xUserId と一致しない場合も保存せず mismatch 扱い。
+  // - それ以外（一致、または expectedUserId 未指定＝初回）は Cookie を保存して complete。
+  private fun finishReauth() {
+    if (finished) return
+
+    val cookieString = CookieManager.getInstance().getCookie("https://x.com")
+    val xUserId = twidUserIdFromCookieString(cookieString ?: "")
+
+    val expected = expectedUserId
+    when {
+      xUserId == null -> {
+        Log.w(TAG, "finishReauth: xUserId not found in cookies, treating as mismatch")
+        finishReauthWithSentinel("reauth_mismatch")
+      }
+      !expected.isNullOrEmpty() && expected != xUserId -> {
+        Log.w(TAG, "finishReauth: expectedUserId=$expected does not match xUserId=$xUserId")
+        finishReauthWithSentinel("reauth_mismatch")
+      }
+      else -> {
+        Log.d(TAG, "finishReauth: xUserId=$xUserId matches (or no expectedUserId), saving cookies")
+        saveCookies()
+        finishReauthWithSentinel("reauth_complete", xUserId)
+      }
+    }
+  }
+
+  // 再認証結果のセンチネルファイルを書き、MainActivity へ戻る共通処理。
+  // finishWithResult と同様の finished ガード・後処理を行う。
+  private fun finishReauthWithSentinel(
+    fileName: String,
+    body: String = "",
+  ) {
+    if (finished) return
+    finished = true
+    polling = false
+    handler.removeCallbacksAndMessages(null)
+
+    val sentinelFile = File(dataDir, fileName)
+    try {
+      sentinelFile.writeText(body)
+      Log.d(TAG, "finishReauthWithSentinel: wrote sentinel ${sentinelFile.absolutePath}")
+    } catch (e: Exception) {
+      Log.e(TAG, "finishReauthWithSentinel: failed to write sentinel: $e")
+    }
+
+    Log.d(TAG, "finishReauthWithSentinel: starting MainActivity, fileName=$fileName")
+    startActivity(Intent(this, MainActivity::class.java))
+    finish()
+  }
+
   // ログイン成功後の x.com Cookie をアカウントのデータディレクトリに保存する。
   // MainActivity.setCookieForAccount でカラム表示時に復元する。
   private fun saveCookies() {
@@ -183,7 +244,13 @@ class AddAccount : AppCompatActivity() {
         }
         if (path == "/home") {
           Log.d(TAG, "schedulePoll: /home detected! finishing with success")
-          handler.post { finishWithResult(success = true) }
+          handler.post {
+            if (mode == "reauth") {
+              finishReauth()
+            } else {
+              finishWithResult(success = true)
+            }
+          }
         } else {
           schedulePoll()
         }

@@ -146,6 +146,20 @@ class MainActivity : TauriActivity() {
     startActivity(intent)
   }
 
+  // AddAccount Activity を再認証モードで起動する。expectedUserId が指定されている場合、
+  // AddAccount 側でログイン後の xUserId と照合し、不一致なら Cookie を保存せず
+  // reauth_mismatch センチネルを書く（アカウント誤認証によるなりすまし防止）。
+  fun launchReauthAccount(
+    accountId: String,
+    expectedUserId: String?,
+  ) {
+    val intent = Intent(this, AddAccount::class.java)
+    intent.putExtra("accountId", accountId)
+    intent.putExtra("mode", "reauth")
+    if (expectedUserId != null) intent.putExtra("expectedUserId", expectedUserId)
+    startActivity(intent)
+  }
+
   // GitHub Releases からダウンロードした APK でアプリを自己更新する。
   // 提供元不明アプリのインストール許可が無ければ設定画面へ誘導する。
   // ダウンロードはバックグラウンドスレッドで行い、完了後に UI スレッドでインストーラを起動する。
