@@ -8,17 +8,17 @@ import org.junit.Test
 class TwidUtilsTest {
   @Test
   fun `urlエンコード済みtwidから数値idを抽出する`() {
-    assertEquals("118318317", parseTwidUserId("u%3D118318317"))
+    assertEquals("1234567890", parseTwidUserId("u%3D1234567890"))
   }
 
   @Test
   fun `urlデコード済みtwidから数値idを抽出する`() {
-    assertEquals("118318317", parseTwidUserId("u=118318317"))
+    assertEquals("1234567890", parseTwidUserId("u=1234567890"))
   }
 
   @Test
   fun `小文字エンコードのtwidからも数値idを抽出する`() {
-    assertEquals("118318317", parseTwidUserId("u%3d118318317"))
+    assertEquals("1234567890", parseTwidUserId("u%3d1234567890"))
   }
 
   @Test
@@ -33,7 +33,7 @@ class TwidUtilsTest {
 
   @Test
   fun `uプレフィックスが無いtwidはnullを返す`() {
-    assertNull(parseTwidUserId("118318317"))
+    assertNull(parseTwidUserId("1234567890"))
   }
 
   @Test
@@ -44,8 +44,8 @@ class TwidUtilsTest {
   @Test
   fun `twidを含むcookie文字列から数値idを抽出する`() {
     assertEquals(
-      "118318317",
-      twidUserIdFromCookieString("ct0=abc; twid=u%3D118318317; lang=en"),
+      "1234567890",
+      twidUserIdFromCookieString("ct0=abc; twid=u%3D1234567890; lang=en"),
     )
   }
 

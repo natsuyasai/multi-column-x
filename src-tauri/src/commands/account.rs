@@ -392,24 +392,24 @@ mod tests {
     #[test]
     fn urlエンコード済みtwidから数値idを抽出する() {
         assert_eq!(
-            parse_twid_user_id("u%3D118318317"),
-            Some("118318317".to_string())
+            parse_twid_user_id("u%3D1234567890"),
+            Some("1234567890".to_string())
         );
     }
 
     #[test]
     fn urlデコード済みtwidから数値idを抽出する() {
         assert_eq!(
-            parse_twid_user_id("u=118318317"),
-            Some("118318317".to_string())
+            parse_twid_user_id("u=1234567890"),
+            Some("1234567890".to_string())
         );
     }
 
     #[test]
     fn 小文字エンコードのtwidからも数値idを抽出する() {
         assert_eq!(
-            parse_twid_user_id("u%3d118318317"),
-            Some("118318317".to_string())
+            parse_twid_user_id("u%3d1234567890"),
+            Some("1234567890".to_string())
         );
     }
 
@@ -425,7 +425,7 @@ mod tests {
 
     #[test]
     fn uプレフィックスが無いtwidはnoneを返す() {
-        assert_eq!(parse_twid_user_id("118318317"), None);
+        assert_eq!(parse_twid_user_id("1234567890"), None);
     }
 
     #[test]
@@ -435,10 +435,10 @@ mod tests {
 
     #[test]
     fn twidを含むcookie列から数値idを抽出する() {
-        let cookies = vec![("twid", "u=118318317")];
+        let cookies = vec![("twid", "u=1234567890")];
         assert_eq!(
             twid_user_id_from_cookies(cookies),
-            Some("118318317".to_string())
+            Some("1234567890".to_string())
         );
     }
 
@@ -452,12 +452,12 @@ mod tests {
     fn 複数cookieに紛れていてもtwidを抽出する() {
         let cookies = vec![
             ("ct0", "abc"),
-            ("twid", "u%3D118318317"),
+            ("twid", "u%3D1234567890"),
             ("auth_token", "xyz"),
         ];
         assert_eq!(
             twid_user_id_from_cookies(cookies),
-            Some("118318317".to_string())
+            Some("1234567890".to_string())
         );
     }
 

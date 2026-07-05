@@ -118,9 +118,9 @@ describe("useAppStore", () => {
     const { result } = renderHook(() => useAppStore());
     act(() => {
       result.current.addAccount(mockAccount);
-      result.current.updateAccount("acc-1", { xUserId: "118318317" });
+      result.current.updateAccount("acc-1", { xUserId: "1234567890" });
     });
-    expect(result.current.accounts[0].xUserId).toBe("118318317");
+    expect(result.current.accounts[0].xUserId).toBe("1234567890");
     expect(mockInvoke).toHaveBeenCalledWith("save_settings", expect.anything());
   });
 

@@ -422,9 +422,9 @@ mod tests {
             "dataDirectory": "/path/to/data",
             "color": "#1d9bf0",
             "createdAt": "2026-05-02T00:00:00Z",
-            "xUserId": "118318317",
+            "xUserId": "1234567890",
         });
         let account: AccountData = serde_json::from_value(json).unwrap();
-        assert_eq!(account.x_user_id, Some("118318317".to_string()));
+        assert_eq!(account.x_user_id, Some("1234567890".to_string()));
     }
 }
