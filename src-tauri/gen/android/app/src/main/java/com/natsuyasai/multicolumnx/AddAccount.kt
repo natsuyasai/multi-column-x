@@ -12,7 +12,9 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.webkit.Profile
 import java.io.File
+import java.util.UUID
 
 class AddAccount : AppCompatActivity() {
   private val handler = Handler(Looper.getMainLooper())
@@ -23,6 +25,8 @@ class AddAccount : AppCompatActivity() {
   private var accountId = "unknown"
   private var mode = "add"
   private var expectedUserId: String? = null
+  private var reauthProfile: Profile? = null
+  private var reauthTempProfileName: String? = null
 
   // ページ遷移中フラグ（shouldOverrideUrlLoading / onPageStarted で true、onPageFinished で false）
   private var isPageLoading = false
@@ -43,9 +47,21 @@ class AddAccount : AppCompatActivity() {
         // アカウントごとに独立した WebView Profile を割り当て、セッションを分離する。
         // setProfile は「WebView 使用前」に呼ぶ制約があるため、settings 変更や
         // Cookie 操作より先に WebView 生成直後の最初の操作として適用する。
+        // reauth モードでは対象アカウントのライブプロファイルを再利用せず、まっさらな
+        // 一時プロファイルで新規ログインさせる（成功時に commitReauthCookies で転記）。
         val profileSet =
-          WebViewProfiles.isSupported &&
-            WebViewProfiles.apply(this, accountId, "add-account", filesDir)
+          if (WebViewProfiles.isSupported) {
+            if (mode == "reauth") {
+              val tempName = reauthTempProfileId(UUID.randomUUID().toString())
+              reauthTempProfileName = tempName
+              reauthProfile = WebViewProfiles.applyNamed(this, tempName, "reauth")
+              reauthProfile != null
+            } else {
+              WebViewProfiles.apply(this, accountId, "add-account", filesDir)
+            }
+          } else {
+            false
+          }
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
         settings.databaseEnabled = true
@@ -153,32 +169,65 @@ class AddAccount : AppCompatActivity() {
     finish()
   }
 
-  // 再認証モードの完了処理。X の識別子（xUserId）を Cookie から取得し、
+  // 再認証モードの完了処理。一時プロファイルの Cookie から X の識別子（xUserId）を取得し、
   // 既存アカウントと同一かどうかを検証したうえで結果別のセンチネルを書く。
-  // - xUserId が取得できない場合は検証不能のため保存せず mismatch 扱い。
-  // - expectedUserId が指定されていて xUserId と一致しない場合も保存せず mismatch 扱い。
-  // - それ以外（一致、または expectedUserId 未指定＝初回）は Cookie を保存して complete。
+  // - xUserId が取得できない場合は検証不能のため転記せず mismatch 扱い。
+  // - expectedUserId が指定されていて xUserId と一致しない場合も転記せず mismatch 扱い。
+  // - それ以外（一致、または expectedUserId 未指定＝初回）は対象プロファイルへ Cookie を転記して complete。
   private fun finishReauth() {
     if (finished) return
 
-    val cookieString = CookieManager.getInstance().getCookie("https://x.com")
-    val xUserId = twidUserIdFromCookieString(cookieString ?: "")
+    val cm = reauthProfile?.cookieManager ?: CookieManager.getInstance()
+    val cookieString = cm.getCookie("https://x.com") ?: ""
+    val xUserId = twidUserIdFromCookieString(cookieString)
 
-    val expected = expectedUserId
-    when {
-      xUserId == null -> {
-        Log.w(TAG, "finishReauth: xUserId not found in cookies, treating as mismatch")
-        finishReauthWithSentinel("reauth_mismatch")
-      }
-      !expected.isNullOrEmpty() && expected != xUserId -> {
-        Log.w(TAG, "finishReauth: expectedUserId=$expected does not match xUserId=$xUserId")
-        finishReauthWithSentinel("reauth_mismatch")
+    when (reauthSentinelName(xUserId, expectedUserId)) {
+      "reauth_complete" -> {
+        Log.d(TAG, "finishReauth: xUserId=$xUserId matches (or no expectedUserId), committing cookies")
+        commitReauthCookies(cookieString)
+        finishReauthWithSentinel("reauth_complete", xUserId ?: "")
       }
       else -> {
-        Log.d(TAG, "finishReauth: xUserId=$xUserId matches (or no expectedUserId), saving cookies")
-        saveCookies()
-        finishReauthWithSentinel("reauth_complete", xUserId)
+        Log.w(TAG, "finishReauth: mismatch (expected=$expectedUserId, actual=$xUserId)")
+        finishReauthWithSentinel("reauth_mismatch")
       }
+    }
+  }
+
+  // 一時プロファイルから読んだ Cookie を対象アカウントのライブプロファイルへ転記する。
+  // 併せて非対応端末フォールバック用のスナップショット（x_cookies.txt）も更新する。
+  private fun commitReauthCookies(cookieString: String) {
+    if (cookieString.isEmpty()) return
+    try {
+      val cookies = parseCookieString(cookieString)
+      val targetName = getCookieProfileName(accountId)
+      val cm =
+        if (WebViewProfiles.isSupported) {
+          WebViewProfiles.getProfileByName(targetName)?.cookieManager
+            ?: CookieManager.getInstance()
+        } else {
+          CookieManager.getInstance()
+        }
+      // 古い Cookie をクリアしてから新しい Cookie を注入する（removeAllCookies は非同期のため
+      // 完了コールバック内で設定する）。
+      cm.removeAllCookies {
+        for (cookie in cookies) {
+          cm.setCookie("https://x.com", cookie)
+          cm.setCookie("https://twitter.com", cookie)
+        }
+        cm.flush()
+      }
+    } catch (e: Exception) {
+      Log.w(TAG, "commitReauthCookies: failed to transfer cookies: ${e.message}")
+    }
+
+    // 非対応端末フォールバック用スナップショット（accounts/account-{accountId}/x_cookies.txt）も更新する。
+    try {
+      val accountDataDir = File(filesDir, "accounts/account-$accountId")
+      if (!accountDataDir.exists()) accountDataDir.mkdirs()
+      File(accountDataDir, "x_cookies.txt").writeText(cookieString)
+    } catch (e: Exception) {
+      Log.w(TAG, "commitReauthCookies: failed to write snapshot: ${e.message}")
     }
   }
 
@@ -199,6 +248,15 @@ class AddAccount : AppCompatActivity() {
       Log.d(TAG, "finishReauthWithSentinel: wrote sentinel ${sentinelFile.absolutePath}")
     } catch (e: Exception) {
       Log.e(TAG, "finishReauthWithSentinel: failed to write sentinel: $e")
+    }
+
+    // 一時プロファイルの後始末（best-effort）。使用中などで失敗しても許容する。
+    reauthTempProfileName?.let {
+      try {
+        WebViewProfiles.deleteProfile(it)
+      } catch (e: Exception) {
+        Log.w(TAG, "finishReauthWithSentinel: temp profile cleanup failed: ${e.message}")
+      }
     }
 
     Log.d(TAG, "finishReauthWithSentinel: starting MainActivity, fileName=$fileName")
