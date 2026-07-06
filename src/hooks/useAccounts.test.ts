@@ -619,7 +619,7 @@ describe("useAccounts (mobile reauth)", () => {
     vi.unstubAllGlobals();
   });
 
-  it("一致(match)の場合、xUserIdが更新されreloadAllWebviewsが呼ばれる", async () => {
+  it("一致(match)の場合、xUserIdが更新されreloadAllWebviewsが呼ばれるがdataDirectoryは据え置かれる", async () => {
     useAppStore.setState({
       accounts: [makeReauthAccount("123")],
       isMobile: true,
@@ -637,11 +637,18 @@ describe("useAccounts (mobile reauth)", () => {
     });
 
     expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
+    expect(useAppStore.getState().accounts[0].dataDirectory).toBe(
+      OLD_DATA_DIRECTORY,
+    );
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "delete_account_data",
+      expect.anything(),
+    );
     expect(mockReload).toHaveBeenCalledTimes(1);
     expect(result.current.reauthNotice).toBeNull();
   });
 
-  it("初回(skip)の場合、xUserIdが記録されreloadAllWebviewsが呼ばれスキップ通知がセットされる", async () => {
+  it("初回(skip)の場合、xUserIdが記録されreloadAllWebviewsが呼ばれスキップ通知がセットされるがdataDirectoryは据え置かれる", async () => {
     useAppStore.setState({
       accounts: [makeReauthAccount()],
       isMobile: true,
@@ -659,6 +666,13 @@ describe("useAccounts (mobile reauth)", () => {
     });
 
     expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
+    expect(useAppStore.getState().accounts[0].dataDirectory).toBe(
+      OLD_DATA_DIRECTORY,
+    );
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "delete_account_data",
+      expect.anything(),
+    );
     expect(mockReload).toHaveBeenCalledTimes(1);
     expect(result.current.reauthNotice).toBe(
       "初回の再認証のため同一性の照合をスキップし、アカウント識別子を記録しました",
