@@ -19,6 +19,28 @@ interface ReauthCompletePayload {
   xUserId: string | null;
 }
 
+// desktop 再認証: reauth_account_window の戻り（新規ログイン用の新しい空ディレクトリを含む）
+interface ReauthWindowResult {
+  accountId: string;
+  windowLabel: string;
+  newDataDirectory: string;
+}
+
+// desktop 再認証: ACCOUNT_REAUTH_COMPLETE イベントの payload
+interface ReauthEventPayload {
+  accountId: string;
+  xUserId: string | null;
+  newDataDirectory: string;
+}
+
+function parseReauthWindowResult(raw: string): ReauthWindowResult {
+  try {
+    return JSON.parse(raw) as ReauthWindowResult;
+  } catch {
+    throw new Error("Failed to parse reauth window response");
+  }
+}
+
 function parseAccountWindowResult(raw: string): AccountWindowResult {
   try {
     return JSON.parse(raw) as AccountWindowResult;
@@ -232,14 +254,17 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
           return;
         }
 
+        const oldDataDirectory = account.dataDirectory;
         const raw = await invoke<string>(IPC_COMMANDS.REAUTH_ACCOUNT_WINDOW, {
           accountId,
           dataDirectory: account.dataDirectory,
         });
-        const { windowLabel } = parseAccountWindowResult(raw);
+        const { windowLabel, newDataDirectory: initialNewDataDirectory } =
+          parseReauthWindowResult(raw);
 
         await new Promise<void>((resolve, reject) => {
           let settled = false;
+          let newDataDirectory = initialNewDataDirectory;
           let unlistenComplete: (() => void) | null = null;
           let unlistenDestroyed: (() => void) | null = null;
 
@@ -256,24 +281,36 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
             );
           };
 
+          const deleteDataDirectory = (dataDirectory: string) => {
+            invoke(IPC_COMMANDS.DELETE_ACCOUNT_DATA, { dataDirectory }).catch(
+              () => {},
+            );
+          };
+
           const handleComplete = async (xUserId: string | null) => {
             if (!xUserId) {
-              setReauthNotice(REAUTH_FAILED_MESSAGE);
               closeReauthWindow();
+              deleteDataDirectory(newDataDirectory);
+              setReauthNotice(REAUTH_FAILED_MESSAGE);
               resolve();
               return;
             }
 
             const verdict = evaluateReauthIdentity(account.xUserId, xUserId);
             if (verdict === "mismatch") {
-              setReauthNotice(REAUTH_MISMATCH_MESSAGE);
               closeReauthWindow();
+              deleteDataDirectory(newDataDirectory);
+              setReauthNotice(REAUTH_MISMATCH_MESSAGE);
               resolve();
               return;
             }
 
-            updateAccount(accountId, { xUserId });
             closeReauthWindow();
+            updateAccount(accountId, {
+              xUserId,
+              dataDirectory: newDataDirectory,
+            });
+            deleteDataDirectory(oldDataDirectory);
             await reloadAllWebviews?.();
             if (verdict === "skip") {
               setReauthNotice(REAUTH_SKIP_MESSAGE);
@@ -281,11 +318,12 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
             resolve();
           };
 
-          listen<ReauthCompletePayload>(
+          listen<ReauthEventPayload>(
             IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE,
             (event) => {
               if (settled || event.payload.accountId !== accountId) return;
               settled = true;
+              newDataDirectory = event.payload.newDataDirectory;
               cleanup();
               void handleComplete(event.payload.xUserId);
             },
@@ -306,6 +344,7 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
                       if (settled) return;
                       settled = true;
                       cleanup();
+                      deleteDataDirectory(newDataDirectory);
                       resolve();
                     })
                     .then((fn) => {

@@ -28,13 +28,31 @@ vi.mock("@tauri-apps/api/event", () => ({
 }));
 
 // desktop フロー（reauth/addAccount）がログインウィンドウの close 検出に使う
+// once に渡された "tauri://destroyed" コールバックを捕捉し、テストから手動発火できるようにする。
+// 捕捉しない他のイベント名（想定上は使われないが将来の拡張に備え）は従来通り no-op を返す。
+const destroyedCallbacks = new Map<string, () => void>();
+
 vi.mock("@tauri-apps/api/webviewWindow", () => ({
   WebviewWindow: {
-    getByLabel: vi.fn(async () => ({
-      once: vi.fn(async () => () => {}),
+    getByLabel: vi.fn(async (label: string) => ({
+      once: vi.fn(async (eventName: string, callback: () => void) => {
+        if (eventName === "tauri://destroyed") {
+          destroyedCallbacks.set(label, callback);
+        }
+        return () => {
+          destroyedCallbacks.delete(label);
+        };
+      }),
     })),
   },
 }));
+
+function fireDestroyedEvent(label: string) {
+  const callback = destroyedCallbacks.get(label);
+  if (!callback)
+    throw new Error(`destroyed callback for ${label} is not registered yet`);
+  callback();
+}
 
 const mockInvoke = vi.mocked(invoke);
 const mockListen = vi.mocked(listen);
@@ -288,17 +306,20 @@ describe("useAccounts (mobile)", () => {
   });
 });
 
+const OLD_DATA_DIRECTORY = "/data/acc-1";
+const NEW_DATA_DIRECTORY = "/data/accounts/account-new";
+
 const reauthWindowResult = JSON.stringify({
   accountId: "acc-1",
-  dataDirectory: "/data/acc-1",
   windowLabel: "reauth-acc-1",
+  newDataDirectory: NEW_DATA_DIRECTORY,
 });
 
 function makeReauthAccount(xUserId?: string) {
   return {
     id: "acc-1",
     label: "Test",
-    dataDirectory: "/data/acc-1",
+    dataDirectory: OLD_DATA_DIRECTORY,
     color: "#1d9bf0",
     createdAt: "2026-01-01T00:00:00Z",
     ...(xUserId !== undefined ? { xUserId } : {}),
@@ -314,7 +335,7 @@ describe("useAccounts (desktop reauth)", () => {
     vi.unstubAllGlobals();
   });
 
-  it("一致(match)の場合、xUserIdが更新されウィンドウが閉じられreloadAllWebviewsが呼ばれる", async () => {
+  it("一致(match)の場合、xUserIdとdataDirectoryが更新されウィンドウが閉じられ旧dirが削除されreloadAllWebviewsが呼ばれる", async () => {
     useAppStore.setState({
       accounts: [makeReauthAccount("123")],
       isMobile: false,
@@ -332,13 +353,20 @@ describe("useAccounts (desktop reauth)", () => {
       fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
         accountId: "acc-1",
         xUserId: "123",
+        newDataDirectory: NEW_DATA_DIRECTORY,
       });
       await reauthPromise;
     });
 
     expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
+    expect(useAppStore.getState().accounts[0].dataDirectory).toBe(
+      NEW_DATA_DIRECTORY,
+    );
     expect(mockInvoke).toHaveBeenCalledWith("close_window", {
       label: "reauth-acc-1",
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("delete_account_data", {
+      dataDirectory: OLD_DATA_DIRECTORY,
     });
     expect(mockReload).toHaveBeenCalledTimes(1);
     expect(result.current.reauthNotice).toBeNull();
@@ -348,7 +376,7 @@ describe("useAccounts (desktop reauth)", () => {
     );
   });
 
-  it("初回(skip)の場合、xUserIdが記録されreloadAllWebviewsが呼ばれスキップ通知がセットされる", async () => {
+  it("初回(skip)の場合、xUserIdとdataDirectoryが記録され旧dirが削除されreloadAllWebviewsが呼ばれスキップ通知がセットされる", async () => {
     useAppStore.setState({
       accounts: [makeReauthAccount()],
       isMobile: false,
@@ -366,18 +394,25 @@ describe("useAccounts (desktop reauth)", () => {
       fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
         accountId: "acc-1",
         xUserId: "123",
+        newDataDirectory: NEW_DATA_DIRECTORY,
       });
       await reauthPromise;
     });
 
     expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
+    expect(useAppStore.getState().accounts[0].dataDirectory).toBe(
+      NEW_DATA_DIRECTORY,
+    );
+    expect(mockInvoke).toHaveBeenCalledWith("delete_account_data", {
+      dataDirectory: OLD_DATA_DIRECTORY,
+    });
     expect(mockReload).toHaveBeenCalledTimes(1);
     expect(result.current.reauthNotice).toBe(
       "初回の再認証のため同一性の照合をスキップし、アカウント識別子を記録しました",
     );
   });
 
-  it("不一致(mismatch)の場合、xUserIdは更新されずreloadAllWebviewsも呼ばれず警告がセットされる", async () => {
+  it("不一致(mismatch)の場合、xUserIdとdataDirectoryは据え置かれ新dirが削除されreloadAllWebviewsも呼ばれず警告がセットされる", async () => {
     useAppStore.setState({
       accounts: [makeReauthAccount("123")],
       isMobile: false,
@@ -395,21 +430,28 @@ describe("useAccounts (desktop reauth)", () => {
       fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
         accountId: "acc-1",
         xUserId: "999",
+        newDataDirectory: NEW_DATA_DIRECTORY,
       });
       await reauthPromise;
     });
 
     expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
+    expect(useAppStore.getState().accounts[0].dataDirectory).toBe(
+      OLD_DATA_DIRECTORY,
+    );
     expect(mockReload).not.toHaveBeenCalled();
     expect(mockInvoke).toHaveBeenCalledWith("close_window", {
       label: "reauth-acc-1",
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("delete_account_data", {
+      dataDirectory: NEW_DATA_DIRECTORY,
     });
     expect(result.current.reauthNotice).toBe(
       "登録済みと異なるアカウントでログインされたため、セッションを更新しませんでした",
     );
   });
 
-  it("識別子取得失敗の場合、更新もリロードもされず失敗通知がセットされる", async () => {
+  it("識別子取得失敗の場合、更新もリロードもされず新dirが削除され失敗通知がセットされる", async () => {
     useAppStore.setState({
       accounts: [makeReauthAccount("123")],
       isMobile: false,
@@ -427,14 +469,21 @@ describe("useAccounts (desktop reauth)", () => {
       fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
         accountId: "acc-1",
         xUserId: null,
+        newDataDirectory: NEW_DATA_DIRECTORY,
       });
       await reauthPromise;
     });
 
     expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
+    expect(useAppStore.getState().accounts[0].dataDirectory).toBe(
+      OLD_DATA_DIRECTORY,
+    );
     expect(mockReload).not.toHaveBeenCalled();
     expect(mockInvoke).toHaveBeenCalledWith("close_window", {
       label: "reauth-acc-1",
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("delete_account_data", {
+      dataDirectory: NEW_DATA_DIRECTORY,
     });
     expect(result.current.reauthNotice).toBe(
       "再認証に失敗しました（アカウント識別子を取得できませんでした）",
@@ -459,6 +508,7 @@ describe("useAccounts (desktop reauth)", () => {
       fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
         accountId: "acc-1",
         xUserId: "999",
+        newDataDirectory: NEW_DATA_DIRECTORY,
       });
       await reauthPromise;
     });
@@ -488,6 +538,7 @@ describe("useAccounts (desktop reauth)", () => {
       fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
         accountId: "acc-1",
         xUserId: "123",
+        newDataDirectory: NEW_DATA_DIRECTORY,
       });
       await reauthPromise;
     });
@@ -514,16 +565,48 @@ describe("useAccounts (desktop reauth)", () => {
       fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
         accountId: "other-account",
         xUserId: "123",
+        newDataDirectory: NEW_DATA_DIRECTORY,
       });
       // 対象外イベントでは resolve されないため、一致イベントを追加で発火して完了させる
       fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
         accountId: "acc-1",
         xUserId: "123",
+        newDataDirectory: NEW_DATA_DIRECTORY,
       });
       await reauthPromise;
     });
 
     expect(mockReload).toHaveBeenCalledTimes(1);
+  });
+
+  it("キャンセル(tauri://destroyed)の場合、新dirが削除され通知なし・更新なし", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+    });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "reauth_account_window" ? reauthWindowResult : undefined,
+    );
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireDestroyedEvent("reauth-acc-1");
+      await reauthPromise;
+    });
+
+    expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
+    expect(useAppStore.getState().accounts[0].dataDirectory).toBe(
+      OLD_DATA_DIRECTORY,
+    );
+    expect(mockInvoke).toHaveBeenCalledWith("delete_account_data", {
+      dataDirectory: NEW_DATA_DIRECTORY,
+    });
+    expect(mockReload).not.toHaveBeenCalled();
+    expect(result.current.reauthNotice).toBeNull();
   });
 });
 
