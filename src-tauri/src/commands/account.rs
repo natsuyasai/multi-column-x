@@ -161,11 +161,15 @@ struct ReauthCompletePayload {
     account_id: String,
     #[serde(rename = "xUserId")]
     x_user_id: Option<String>,
+    #[serde(rename = "newDataDirectory")]
+    new_data_directory: String,
 }
 
-/// 登録済みアカウントの data_directory を再利用して x.com に再ログインし、
-/// ログイン完了（/home 到達）時に twid Cookie から数値ユーザーIDを読んで
-/// ACCOUNT_REAUTH_COMPLETE イベントを emit する。
+/// 新規 UUID の空ディレクトリで x.com/login を開き、まっさらな新規ログインとして再認証する。
+/// 旧セッション（`data_directory` 引数）は再利用せず、ログイン完了（/home 到達）時に
+/// twid Cookie から数値ユーザーIDを読んで ACCOUNT_REAUTH_COMPLETE イベントを emit する。
+/// 新セッションのディレクトリは呼び出し元が対象アカウントへ上書きできるよう
+/// 戻り値・イベント payload の双方に含める。
 #[cfg(desktop)]
 #[tauri::command]
 pub async fn reauth_account_window(
@@ -173,7 +177,18 @@ pub async fn reauth_account_window(
     account_id: String,
     data_directory: String,
 ) -> Result<String, String> {
+    // 旧セッションのディレクトリは新規ログインでは使わない（呼び出し元が引き続き渡すため引数は維持）。
+    let _ = &data_directory;
+
     let window_label = format!("{}{}", labels::ADD_ACCOUNT_PREFIX, &account_id[..8]);
+
+    let new_account_id = uuid::Uuid::new_v4().to_string();
+    let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let new_data_dir = app_data
+        .join("accounts")
+        .join(format!("account-{}", &new_account_id));
+    std::fs::create_dir_all(&new_data_dir).map_err(|e| e.to_string())?;
+    let new_data_directory = new_data_dir.to_string_lossy().to_string();
 
     tauri::WebviewWindowBuilder::new(
         &app,
@@ -186,7 +201,7 @@ pub async fn reauth_account_window(
     )
     .title("アカウントを再認証")
     .inner_size(500.0, 700.0)
-    .data_directory(std::path::PathBuf::from(&data_directory))
+    .data_directory(new_data_dir.clone())
     .build()
     .map_err(|e| e.to_string())?;
 
@@ -196,6 +211,7 @@ pub async fn reauth_account_window(
     let app_clone = app.clone();
     let window_label_clone = window_label.clone();
     let account_id_clone = account_id.clone();
+    let new_data_directory_clone = new_data_directory.clone();
     tokio::spawn(async move {
         const POLL_MS: u64 = 500;
         const MAX_POLLS: u64 = 10 * 60 * 1000 / POLL_MS; // 最大10分
@@ -229,6 +245,7 @@ pub async fn reauth_account_window(
                                 ReauthCompletePayload {
                                     account_id: account_id_clone.clone(),
                                     x_user_id,
+                                    new_data_directory: new_data_directory_clone.clone(),
                                 },
                             );
                             break;
@@ -242,8 +259,8 @@ pub async fn reauth_account_window(
 
     Ok(serde_json::json!({
         "accountId": account_id,
-        "dataDirectory": data_directory,
         "windowLabel": window_label,
+        "newDataDirectory": new_data_directory,
     })
     .to_string())
 }
@@ -496,6 +513,19 @@ mod tests {
     fn accountsルート自体は拒否する() {
         let root = Path::new("/data/app/accounts");
         assert!(!is_safe_account_dir(root, root));
+    }
+
+    #[test]
+    fn 再認証完了payloadはnewdatadirectoryをキャメルケースで含む() {
+        let payload = ReauthCompletePayload {
+            account_id: "acc-1".to_string(),
+            x_user_id: Some("123".to_string()),
+            new_data_directory: "/data/accounts/account-xyz".to_string(),
+        };
+        let json = serde_json::to_value(&payload).unwrap();
+        assert_eq!(json["accountId"], "acc-1");
+        assert_eq!(json["xUserId"], "123");
+        assert_eq!(json["newDataDirectory"], "/data/accounts/account-xyz");
     }
 
     mod properties {
