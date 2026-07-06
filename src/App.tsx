@@ -395,6 +395,7 @@ const App: React.FC = () => {
           onComposeTweet={handleComposeTweet}
           onOpenLinkPopup={handleOpenLinkPopup}
           onJumpToColumn={handleJumpToColumn}
+          onClose={handleRemoveColumn}
         />
       )}
       {isMobile && (

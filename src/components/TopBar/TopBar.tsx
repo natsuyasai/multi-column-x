@@ -1,4 +1,5 @@
 import React from "react";
+import CloseIcon from "../../assets/icons/close.svg?react";
 import CustomIcon from "../../assets/icons/custom.svg?react";
 import HomeIcon from "../../assets/icons/home.svg?react";
 import LinkIcon from "../../assets/icons/link.svg?react";
@@ -23,6 +24,7 @@ interface TopBarProps {
   onComposeTweet: () => void;
   onOpenLinkPopup: () => void;
   onJumpToColumn: (columnId: string) => void;
+  onClose: (columnId: string) => void;
 }
 
 function getColumnIcon(pageType: PageType): React.ReactElement {
@@ -78,6 +80,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onComposeTweet,
   onOpenLinkPopup,
   onJumpToColumn,
+  onClose,
 }) => {
   const sorted = [...columns].sort((a, b) => a.order - b.order);
 
@@ -192,21 +195,33 @@ export const TopBar: React.FC<TopBarProps> = ({
       {expanded && (
         <div className={styles.row2} data-testid="topbar-row2">
           {sorted.map((col, index) => (
-            <button
-              key={col.id}
-              className={`${styles.btn} ${styles.btnExpanded}`}
-              onClick={() => onJumpToColumn(col.id)}
-              title={
-                index < 9
-                  ? `${columnDisplayName(col, accounts)} (Ctrl+${index + 1})`
-                  : columnDisplayName(col, accounts)
-              }
-            >
-              <span className={styles.icon}>{getColumnIcon(col.pageType)}</span>
-              <span className={styles.label}>
-                {columnDisplayName(col, accounts)}
-              </span>
-            </button>
+            <div className={styles.columnItem} key={col.id}>
+              <button
+                key={col.id}
+                className={`${styles.btn} ${styles.btnExpanded}`}
+                onClick={() => onJumpToColumn(col.id)}
+                title={
+                  index < 9
+                    ? `${columnDisplayName(col, accounts)} (Ctrl+${index + 1})`
+                    : columnDisplayName(col, accounts)
+                }
+              >
+                <span className={styles.icon}>
+                  {getColumnIcon(col.pageType)}
+                </span>
+                <span className={styles.label}>
+                  {columnDisplayName(col, accounts)}
+                </span>
+              </button>
+              <button
+                className={styles.btn}
+                onClick={() => onClose(col.id)}
+                aria-label="カラムを閉じる"
+                title="カラムを閉じる"
+              >
+                <CloseIcon width={14} height={14} data-testid="icon-close" />
+              </button>
+            </div>
           ))}
         </div>
       )}
