@@ -146,6 +146,15 @@ describe("TopBar", () => {
     expect(screen.getByTitle("マイホーム (Ctrl+1)")).toBeInTheDocument();
   });
 
+  it("expanded=true のとき各カラムにカラムを閉じるボタンが表示される", () => {
+    const { container } = render(<TopBar {...defaultProps} expanded={true} />);
+      expect(
+        container
+          .querySelector('[title="カラムを閉じる"]')
+          ?.querySelector('[data-testid="icon-close"]'),
+      ).toBeInTheDocument();
+  });
+
   describe("アクションボタンの SVG アイコン", () => {
     it("ツイートボタンに pencil SVG が表示される", () => {
       const { container } = render(<TopBar {...defaultProps} />);
