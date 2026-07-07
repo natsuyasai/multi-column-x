@@ -63,6 +63,7 @@ const defaultProps = {
   onComposeTweet: vi.fn(),
   onOpenLinkPopup: vi.fn(),
   onJumpToColumn: vi.fn(),
+  onClose: vi.fn(),
 };
 
 describe("TopBar", () => {
@@ -143,6 +144,15 @@ describe("TopBar", () => {
     const labeled: Column = { ...col1, label: "マイホーム" };
     render(<TopBar {...defaultProps} columns={[labeled]} />);
     expect(screen.getByTitle("マイホーム (Ctrl+1)")).toBeInTheDocument();
+  });
+
+  it("expanded=true のとき各カラムにカラムを閉じるボタンが表示される", () => {
+    const { container } = render(<TopBar {...defaultProps} expanded={true} />);
+    expect(
+      container
+        .querySelector('[title="カラムを閉じる"]')
+        ?.querySelector('[data-testid="icon-close"]'),
+    ).toBeInTheDocument();
   });
 
   describe("アクションボタンの SVG アイコン", () => {
