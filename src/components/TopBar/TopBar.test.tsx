@@ -63,6 +63,7 @@ const defaultProps = {
   onComposeTweet: vi.fn(),
   onOpenLinkPopup: vi.fn(),
   onJumpToColumn: vi.fn(),
+  onClose: vi.fn(),
 };
 
 describe("TopBar", () => {
