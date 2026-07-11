@@ -11,7 +11,7 @@ pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
     let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let data_dir = app_data
         .join("accounts")
-        .join(format!("account-{}", &account_id));
+        .join(format!("account-{account_id}"));
     std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
 
     tauri::WebviewWindowBuilder::new(
@@ -186,7 +186,7 @@ pub async fn reauth_account_window(
     let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let new_data_dir = app_data
         .join("accounts")
-        .join(format!("account-{}", &new_account_id));
+        .join(format!("account-{new_account_id}"));
     std::fs::create_dir_all(&new_data_dir).map_err(|e| e.to_string())?;
     let new_data_directory = new_data_dir.to_string_lossy().to_string();
 
