@@ -1,7 +1,7 @@
 ---
 description: "現在のセッション状態をまとめた引き継ぎファイルを生成する"
 user-invocable: true
-arg: "追加メモ（省略可）"
+argument-hint: "追加メモ（省略可）"
 ---
 
 # セッション引き継ぎファイル生成
@@ -40,7 +40,7 @@ git -C $projectRoot log --oneline -15
 
 ### Step 3: メモリインデックスの読み込み
 
-`{projectRoot}/memory/MEMORY.md` が存在すれば Read ツールで読み込む。存在しない場合はスキップ。
+システムプロンプトの Memory セクションに示される自動メモリディレクトリ（`~/.claude/projects/<プロジェクトスラッグ>/memory/`）の `MEMORY.md` が存在すれば Read ツールで読み込む。存在しない場合はスキップ。プロジェクトルート直下に `memory/` は存在しないので探さないこと。
 
 ### Step 4: 引き継ぎファイルの書き出し
 

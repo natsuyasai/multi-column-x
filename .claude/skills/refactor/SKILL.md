@@ -1,7 +1,7 @@
 ---
 description: "Martin Fowlerが推奨するリファクタリング手法でコードを改善する"
 user-invocable: true
-arg: "リファクタリング対象のファイルパスまたはモジュール名"
+argument-hint: "リファクタリング対象のファイルパスまたはモジュール名"
 ---
 
 # リファクタリング

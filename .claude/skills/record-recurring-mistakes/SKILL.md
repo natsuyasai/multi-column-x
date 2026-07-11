@@ -1,7 +1,7 @@
 ---
 description: "同様のミスの指摘がレビューや作業中に複数回発生したとき、再発防止ルールをCLAUDE.mdに追記する"
 user-invocable: true
-arg: "再発しているミスの内容"
+argument-hint: "再発しているミスの内容"
 ---
 
 # 再発ミスのCLAUDE.md追記（横断ルール）
