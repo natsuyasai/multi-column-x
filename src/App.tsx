@@ -91,7 +91,10 @@ const App: React.FC = () => {
     pendingRemoval,
     confirmRemoval,
     cancelRemoval,
-  } = useAccounts();
+    startReauth,
+    reauthNotice,
+    dismissReauthNotice,
+  } = useAccounts(recreateAllWebviews);
   const {
     showAddColumn,
     setShowAddColumn,
@@ -208,7 +211,8 @@ const App: React.FC = () => {
     !!updater.available ||
     !!whatsNew.notes ||
     !!pendingAccountName ||
-    !!pendingRemoval;
+    !!pendingRemoval ||
+    !!reauthNotice;
   useEffect(() => {
     setDialogOpen(anyDialogOpen);
     if (anyDialogOpen) {
@@ -510,6 +514,7 @@ const App: React.FC = () => {
           onSetDefault={handleSetDefaultAccount}
           onUpdateAccount={updateAccount}
           onClose={() => setShowAccountManager(false)}
+          onReauthAccount={startReauth}
         />
       )}
 
@@ -529,6 +534,17 @@ const App: React.FC = () => {
           confirmLabel="削除する"
           onConfirm={confirmRemoval}
           onCancel={cancelRemoval}
+        />
+      )}
+
+      {reauthNotice && (
+        <ConfirmDialog
+          singleButton
+          title="再認証"
+          message={reauthNotice}
+          confirmLabel="OK"
+          onConfirm={dismissReauthNotice}
+          onCancel={dismissReauthNotice}
         />
       )}
 

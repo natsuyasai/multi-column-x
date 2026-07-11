@@ -29,6 +29,7 @@ export const IPC_COMMANDS = {
 
   // アカウント管理
   OPEN_ADD_ACCOUNT_WINDOW: "open_add_account_window",
+  REAUTH_ACCOUNT_WINDOW: "reauth_account_window",
   DELETE_ACCOUNT_DATA: "delete_account_data",
   CLOSE_WINDOW: "close_window",
 
@@ -60,6 +61,8 @@ export const IPC_EVENTS = {
   WEBVIEW_KEYBOARD_SHORTCUT: "webview-keyboard-shortcut",
   /** カラム WebView の WebProcess クラッシュ通知（Linux: Rust emit → TS listen）payload=columnId */
   COLUMN_WEBVIEW_CRASHED: "column-webview-crashed",
+  /** 再認証完了（desktop: Rust emit → TS listen）payload { accountId, xUserId }。account-login-complete とは別イベント。 */
+  ACCOUNT_REAUTH_COMPLETE: "account-reauth-complete",
 } as const;
 
 /** WebView / ウィンドウラベルのプレフィックスと生成ヘルパー */

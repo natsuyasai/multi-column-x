@@ -190,6 +190,30 @@ pub fn launch_add_account_activity(account_id: &str) -> Result<(), String> {
     })
 }
 
+/// MainActivity.launchReauthAccount(accountId, expectedUserId) 経由で
+/// AddAccount Activity を再認証モードで起動する。expectedUserId は null 可。
+pub fn launch_reauth_account_activity(
+    account_id: &str,
+    expected_user_id: Option<&str>,
+) -> Result<(), String> {
+    call_activity_method(|env, activity| {
+        let j_account_id = env.new_string(account_id).map_err(|e| e.to_string())?;
+        // expected_user_id が None のときは Java null を渡す（Kotlin 側 String? = null）
+        let j_expected: JObject = match expected_user_id {
+            Some(s) => env.new_string(s).map_err(|e| e.to_string())?.into(),
+            None => JObject::null(),
+        };
+        env.call_method(
+            activity,
+            "launchReauthAccount",
+            "(Ljava/lang/String;Ljava/lang/String;)V",
+            &[JValue::Object(&*j_account_id), JValue::Object(&j_expected)],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
 /// MainActivity.downloadAndInstallApk(url) 経由で APK を DL してインストーラを起動する。
 /// アプリ内 APK 自己更新（Android）で使う。
 pub fn download_and_install_apk(url: &str) -> Result<(), String> {

@@ -70,4 +70,30 @@ describe("ConfirmDialog", () => {
     expect(screen.getByText("削除する")).toBeInTheDocument();
     expect(screen.getByText("やめる")).toBeInTheDocument();
   });
+
+  it("singleButton未指定時は確定・キャンセル両方のボタンが表示される", () => {
+    render(
+      <ConfirmDialog
+        message="このアカウントを削除しますか？"
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("OK")).toBeInTheDocument();
+    expect(screen.getByText("キャンセル")).toBeInTheDocument();
+  });
+
+  it("singleButtonのときキャンセルボタンが表示されない", () => {
+    render(
+      <ConfirmDialog
+        singleButton
+        message="再認証に失敗しました"
+        confirmLabel="OK"
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("OK")).toBeInTheDocument();
+    expect(screen.queryByText("キャンセル")).not.toBeInTheDocument();
+  });
 });

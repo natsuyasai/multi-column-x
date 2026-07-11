@@ -54,6 +54,7 @@ const meta: Meta<typeof AccountManager> = {
     onSetDefault: fn(),
     onUpdateAccount: fn(),
     onClose: fn(),
+    onReauthAccount: fn(),
   },
 };
 
@@ -68,6 +69,16 @@ export const Default: Story = {
     // 削除ボタンを押すと対象アカウント ID で onRemoveAccount が呼ばれる
     await userEvent.click(canvas.getByLabelText("アカウントB を削除"));
     await expect(args.onRemoveAccount).toHaveBeenCalledWith("acc-2");
+  },
+};
+
+export const ReauthAccount: Story = {
+  name: "アカウント再認証",
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    // 再認証ボタンを押すと対象アカウント ID で onReauthAccount が呼ばれる
+    await userEvent.click(canvas.getByLabelText("アカウントA を再認証"));
+    await expect(args.onReauthAccount).toHaveBeenCalledWith("acc-1");
   },
 };
 

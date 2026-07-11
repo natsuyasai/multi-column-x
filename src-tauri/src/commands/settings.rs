@@ -11,6 +11,8 @@ pub struct AccountData {
     pub color: String,
     #[serde(rename = "createdAt")]
     pub created_at: String,
+    #[serde(rename = "xUserId", default)]
+    pub x_user_id: Option<String>,
 }
 
 // ColumnSettings の #[serde(default)] はカラム設定 JSON にフィールドが存在しない場合のフォールバック値。
@@ -395,5 +397,34 @@ mod tests {
             restored.global_settings.column_scale,
             settings.global_settings.column_scale
         );
+    }
+
+    /// xUserId 追加前に保存された旧 account JSON をデシリアライズしてもエラーにならず、
+    /// x_user_id が None にフォールバックすることを確認する。
+    #[test]
+    fn xuserid無しの既存jsonをデシリアライズできる() {
+        let json = serde_json::json!({
+            "id": "acc-1",
+            "label": "テストアカウント",
+            "dataDirectory": "/path/to/data",
+            "color": "#1d9bf0",
+            "createdAt": "2026-05-02T00:00:00Z",
+        });
+        let account: AccountData = serde_json::from_value(json).unwrap();
+        assert_eq!(account.x_user_id, None);
+    }
+
+    #[test]
+    fn xuserid有りのjsonをデシリアライズできる() {
+        let json = serde_json::json!({
+            "id": "acc-1",
+            "label": "テストアカウント",
+            "dataDirectory": "/path/to/data",
+            "color": "#1d9bf0",
+            "createdAt": "2026-05-02T00:00:00Z",
+            "xUserId": "1234567890",
+        });
+        let account: AccountData = serde_json::from_value(json).unwrap();
+        assert_eq!(account.x_user_id, Some("1234567890".to_string()));
     }
 }

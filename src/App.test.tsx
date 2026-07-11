@@ -113,6 +113,12 @@ describe("App (desktop)", () => {
       });
     });
   });
+
+  it("アカウント管理を開くと各アカウント行に再認証ボタンが表示される", () => {
+    render(<App />);
+    fireEvent.click(screen.getByTitle("アカウント管理 (Ctrl+Shift+A)"));
+    expect(screen.getByLabelText("アカウントA を再認証")).toBeInTheDocument();
+  });
 });
 
 describe("App (mobile)", () => {

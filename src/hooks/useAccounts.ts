@@ -4,22 +4,57 @@ import { listen } from "@tauri-apps/api/event";
 import { useCallback, useRef, useState } from "react";
 import { ACCOUNT_COLORS } from "../constants/accountColors";
 import { IPC_COMMANDS, IPC_EVENTS } from "../constants/ipc";
+import { evaluateReauthIdentity } from "../lib/reauthIdentity";
 import { useAppStore } from "../store/useAppStore";
 import type { Account } from "../types";
 
-interface AddAccountResult {
+interface AccountWindowResult {
   accountId: string;
   dataDirectory: string;
   windowLabel: string;
 }
 
-function parseAddAccountResult(raw: string): AddAccountResult {
+interface ReauthCompletePayload {
+  accountId: string;
+  xUserId: string | null;
+}
+
+// desktop 再認証: reauth_account_window の戻り（新規ログイン用の新しい空ディレクトリを含む）
+interface ReauthWindowResult {
+  accountId: string;
+  windowLabel: string;
+  newDataDirectory: string;
+}
+
+// desktop 再認証: ACCOUNT_REAUTH_COMPLETE イベントの payload
+interface ReauthEventPayload {
+  accountId: string;
+  xUserId: string | null;
+  newDataDirectory: string;
+}
+
+function parseReauthWindowResult(raw: string): ReauthWindowResult {
   try {
-    return JSON.parse(raw) as AddAccountResult;
+    return JSON.parse(raw) as ReauthWindowResult;
   } catch {
-    throw new Error("Failed to parse open_add_account_window response");
+    throw new Error("Failed to parse reauth window response");
   }
 }
+
+function parseAccountWindowResult(raw: string): AccountWindowResult {
+  try {
+    return JSON.parse(raw) as AccountWindowResult;
+  } catch {
+    throw new Error("Failed to parse account window response");
+  }
+}
+
+const REAUTH_FAILED_MESSAGE =
+  "再認証に失敗しました（アカウント識別子を取得できませんでした）";
+const REAUTH_MISMATCH_MESSAGE =
+  "登録済みと異なるアカウントでログインされたため、セッションを更新しませんでした";
+const REAUTH_SKIP_MESSAGE =
+  "初回の再認証のため同一性の照合をスキップし、アカウント識別子を記録しました";
 
 // ログイン完了後、アカウント名の入力待ちであることを表す状態。
 // AccountNameDialog はこの値の有無で表示・非表示を切り替える。
@@ -38,13 +73,16 @@ export interface PendingAccountRemoval {
   dataDirectory: string;
 }
 
-export function useAccounts() {
-  const { accounts, addAccount, removeAccount, isMobile } = useAppStore();
+export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
+  const { accounts, addAccount, removeAccount, updateAccount, isMobile } =
+    useAppStore();
   const isAddingRef = useRef(false);
+  const isReauthingRef = useRef(false);
   const [pendingAccountName, setPendingAccountName] =
     useState<PendingAccountName | null>(null);
   const [pendingRemoval, setPendingRemoval] =
     useState<PendingAccountRemoval | null>(null);
+  const [reauthNotice, setReauthNotice] = useState<string | null>(null);
 
   const requestAccountName = useCallback(
     (accountId: string, dataDirectory: string, windowLabel: string) => {
@@ -110,7 +148,7 @@ export function useAccounts() {
         // 成功: resolve → アカウント名入力ダイアログ表示へ
         // キャンセル（バックボタン）: reject → 何もしない
         const raw = await invoke<string>(IPC_COMMANDS.OPEN_ADD_ACCOUNT_WINDOW);
-        const parsed = parseAddAccountResult(raw);
+        const parsed = parseAccountWindowResult(raw);
         requestAccountName(
           parsed.accountId,
           parsed.dataDirectory,
@@ -124,7 +162,7 @@ export function useAccounts() {
         // Rust の URL ポーリングがログイン完了を検出して emit するイベントを listen する。
         const raw = await invoke<string>(IPC_COMMANDS.OPEN_ADD_ACCOUNT_WINDOW);
         const { accountId, dataDirectory, windowLabel } =
-          parseAddAccountResult(raw);
+          parseAccountWindowResult(raw);
 
         await new Promise<void>((resolve, reject) => {
           let unlistenLogin: (() => void) | null = null;
@@ -176,6 +214,161 @@ export function useAccounts() {
     }
   }, [isMobile, pendingAccountName, requestAccountName]);
 
+  const dismissReauthNotice = useCallback(() => {
+    setReauthNotice(null);
+  }, []);
+
+  const startReauth = useCallback(
+    async (accountId: string) => {
+      if (isReauthingRef.current) return;
+      const account = accounts.find((a) => a.id === accountId);
+      if (!account) return;
+
+      isReauthingRef.current = true;
+      try {
+        if (isMobile) {
+          // -----------------------------------------------
+          // mobile 専用フロー
+          // -----------------------------------------------
+          // reauth_account_window は AddAccount Activity（reauth モード）が
+          // 終了するまでブロックする。Kotlin 側で twid 照合済みのため、
+          // ここでは skip 通知の要否だけ evaluateReauthIdentity で判定する。
+          const raw = await invoke<string>(IPC_COMMANDS.REAUTH_ACCOUNT_WINDOW, {
+            accountId,
+            dataDirectory: account.dataDirectory,
+            expectedUserId: account.xUserId ?? null,
+          });
+          const payload = JSON.parse(raw) as ReauthCompletePayload;
+          const xUserId = payload.xUserId;
+          if (!xUserId) {
+            setReauthNotice(REAUTH_FAILED_MESSAGE);
+            return;
+          }
+
+          const verdict = evaluateReauthIdentity(account.xUserId, xUserId);
+          updateAccount(accountId, { xUserId });
+          await reloadAllWebviews?.();
+          if (verdict === "skip") {
+            setReauthNotice(REAUTH_SKIP_MESSAGE);
+          }
+          return;
+        }
+
+        const oldDataDirectory = account.dataDirectory;
+        const raw = await invoke<string>(IPC_COMMANDS.REAUTH_ACCOUNT_WINDOW, {
+          accountId,
+          dataDirectory: account.dataDirectory,
+        });
+        const { windowLabel, newDataDirectory: initialNewDataDirectory } =
+          parseReauthWindowResult(raw);
+
+        await new Promise<void>((resolve, reject) => {
+          let settled = false;
+          let newDataDirectory = initialNewDataDirectory;
+          let unlistenComplete: (() => void) | null = null;
+          let unlistenDestroyed: (() => void) | null = null;
+
+          const cleanup = () => {
+            unlistenComplete?.();
+            unlistenComplete = null;
+            unlistenDestroyed?.();
+            unlistenDestroyed = null;
+          };
+
+          const closeReauthWindow = () => {
+            invoke(IPC_COMMANDS.CLOSE_WINDOW, { label: windowLabel }).catch(
+              () => {},
+            );
+          };
+
+          const deleteDataDirectory = (dataDirectory: string) => {
+            invoke(IPC_COMMANDS.DELETE_ACCOUNT_DATA, { dataDirectory }).catch(
+              () => {},
+            );
+          };
+
+          const handleComplete = async (xUserId: string | null) => {
+            if (!xUserId) {
+              closeReauthWindow();
+              deleteDataDirectory(newDataDirectory);
+              setReauthNotice(REAUTH_FAILED_MESSAGE);
+              resolve();
+              return;
+            }
+
+            const verdict = evaluateReauthIdentity(account.xUserId, xUserId);
+            if (verdict === "mismatch") {
+              closeReauthWindow();
+              deleteDataDirectory(newDataDirectory);
+              setReauthNotice(REAUTH_MISMATCH_MESSAGE);
+              resolve();
+              return;
+            }
+
+            closeReauthWindow();
+            updateAccount(accountId, {
+              xUserId,
+              dataDirectory: newDataDirectory,
+            });
+            deleteDataDirectory(oldDataDirectory);
+            await reloadAllWebviews?.();
+            if (verdict === "skip") {
+              setReauthNotice(REAUTH_SKIP_MESSAGE);
+            }
+            resolve();
+          };
+
+          listen<ReauthEventPayload>(
+            IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE,
+            (event) => {
+              if (settled || event.payload.accountId !== accountId) return;
+              settled = true;
+              newDataDirectory = event.payload.newDataDirectory;
+              cleanup();
+              void handleComplete(event.payload.xUserId);
+            },
+          )
+            .then((fn) => {
+              unlistenComplete = fn;
+            })
+            .catch(reject);
+
+          // 再認証ウィンドウを閉じたことを検出（ユーザーがキャンセル）
+          import("@tauri-apps/api/webviewWindow")
+            .then(({ WebviewWindow }) => {
+              WebviewWindow.getByLabel(windowLabel)
+                .then((reauthWindow) => {
+                  if (!reauthWindow) return;
+                  reauthWindow
+                    .once("tauri://destroyed", () => {
+                      if (settled) return;
+                      settled = true;
+                      cleanup();
+                      deleteDataDirectory(newDataDirectory);
+                      resolve();
+                    })
+                    .then((fn) => {
+                      unlistenDestroyed = fn;
+                    })
+                    .catch(() => {});
+                })
+                .catch(() => {});
+            })
+            .catch(() => {});
+        });
+      } catch (e) {
+        // mobile: Kotlin 側で不一致と判定された場合は Rust が "account-mismatch" で reject する。
+        // それ以外（cancelled/timeout、desktop のウィンドウclose）はエラー表示不要。
+        if (isMobile && String(e).includes("account-mismatch")) {
+          setReauthNotice(REAUTH_MISMATCH_MESSAGE);
+        }
+      } finally {
+        isReauthingRef.current = false;
+      }
+    },
+    [accounts, isMobile, reloadAllWebviews, updateAccount],
+  );
+
   const requestRemoveAccount = useCallback(
     (id: string) => {
       const account = accounts.find((a) => a.id === id);
@@ -213,5 +406,8 @@ export function useAccounts() {
     pendingRemoval,
     confirmRemoval,
     cancelRemoval,
+    startReauth,
+    reauthNotice,
+    dismissReauthNotice,
   };
 }

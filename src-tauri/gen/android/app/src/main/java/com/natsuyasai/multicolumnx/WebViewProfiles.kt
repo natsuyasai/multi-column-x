@@ -79,6 +79,58 @@ object WebViewProfiles {
       false
     }
 
+  /**
+   * 指定したプロファイル名でプロファイルを作成し webView に適用する（Cookie 移行は行わない）。
+   * 再認証の一時プロファイルなど、新規ログイン用の空セッションが欲しい場合に使う。
+   *
+   * setProfile は「WebView を使用する前」に呼ぶ必要がある点は [apply] と同様。
+   *
+   * @return 成功した場合は適用済みの [Profile]。失敗時は警告ログを残して null。
+   */
+  fun applyNamed(
+    webView: WebView,
+    profileName: String,
+    contextName: String,
+  ): Profile? =
+    try {
+      val store = ProfileStore.getInstance()
+      val profile = store.getOrCreateProfile(profileName)
+      WebViewCompat.setProfile(webView, profileName)
+      profile.cookieManager.setAcceptThirdPartyCookies(webView, true)
+      profile
+    } catch (e: Exception) {
+      Log.w(TAG, "Profile API unavailable for $contextName: ${e.message}")
+      null
+    }
+
+  /**
+   * 名前を指定してプロファイルを取得する（存在しなければ作成）。
+   * 再認証の commit 先（対象アカウントのライブプロファイル）取得に使う。
+   *
+   * @return 取得できた [Profile]。失敗時は警告ログを残して null。
+   */
+  fun getProfileByName(profileName: String): Profile? =
+    try {
+      ProfileStore.getInstance().getOrCreateProfile(profileName)
+    } catch (e: Exception) {
+      Log.w(TAG, "getProfileByName: failed for $profileName: ${e.message}")
+      null
+    }
+
+  /**
+   * 指定したプロファイルを削除する（best-effort）。再認証用の一時プロファイルの後始末に使う。
+   * 使用中などで削除に失敗しても致命的ではないため警告ログに留める。
+   *
+   * @return 削除に成功したら true。
+   */
+  fun deleteProfile(profileName: String): Boolean =
+    try {
+      ProfileStore.getInstance().deleteProfile(profileName)
+    } catch (e: Exception) {
+      Log.w(TAG, "deleteProfile: failed for $profileName: ${e.message}")
+      false
+    }
+
   // AddAccount ログイン時に保存した Cookie スナップショットを新規プロファイルの
   // CookieManager へ流し込む。auth_token は長寿命のため概ねセッションを引き継げる。
   // 移行に失敗してもログイン画面から再ログインすれば回復するため、例外は警告に留める。
