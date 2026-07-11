@@ -28,6 +28,7 @@ import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useTheme } from "./hooks/useTheme";
 import {
   useColumnCrashRecovery,
+  useColumnFocusClearsUnread,
   useNewPostsNotification,
   useWebviewScrollRelay,
 } from "./hooks/useWebviewEvents";
@@ -182,6 +183,7 @@ const App: React.FC = () => {
   useWebviewScrollRelay(scrollbarRef);
   useNewPostsNotification(setUnreadCount);
   useColumnCrashRecovery(recreateColumnWebview);
+  useColumnFocusClearsUnread(clearUnreadCount);
 
   const handleOpenLinkPopup = useCallback(() => {
     setShowLinkPopupDialog(true);

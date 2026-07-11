@@ -61,6 +61,8 @@ export const IPC_EVENTS = {
   WEBVIEW_KEYBOARD_SHORTCUT: "webview-keyboard-shortcut",
   /** カラム WebView の WebProcess クラッシュ通知（Linux: Rust emit → TS listen）payload=columnId */
   COLUMN_WEBVIEW_CRASHED: "column-webview-crashed",
+  /** カラム WebView がOSフォーカスを得た通知（Windows: Rust emit → TS listen）payload=columnId */
+  COLUMN_WEBVIEW_FOCUSED: "column-webview-focused",
   /** 再認証完了（desktop: Rust emit → TS listen）payload { accountId, xUserId }。account-login-complete とは別イベント。 */
   ACCOUNT_REAUTH_COMPLETE: "account-reauth-complete",
 } as const;

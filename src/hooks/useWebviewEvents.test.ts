@@ -7,6 +7,7 @@ import type { Column } from "../types";
 import {
   __resetNotificationPermissionCacheForTests,
   useColumnCrashRecovery,
+  useColumnFocusClearsUnread,
   useNewPostsNotification,
   useWebviewScrollRelay,
 } from "./useWebviewEvents";
@@ -131,6 +132,40 @@ describe("useColumnCrashRecovery", () => {
     expect(recreate).toHaveBeenCalledWith("col-1");
     expect(recreate).toHaveBeenCalledWith("col-2");
     expect(recreate).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("useColumnFocusClearsUnread", () => {
+  beforeEach(() => {
+    capturedCallbacks.clear();
+    mockUnlisten.mockReset();
+  });
+
+  function emitFocus(columnId: string) {
+    capturedCallbacks.get(IPC_EVENTS.COLUMN_WEBVIEW_FOCUSED)?.({
+      payload: columnId,
+    });
+  }
+
+  it("column-webview-focusedイベント受信時payloadのcolumnIdでclearUnreadCountを呼ぶ", async () => {
+    const clearUnreadCount = vi.fn();
+    renderHook(() => useColumnFocusClearsUnread(clearUnreadCount));
+    await act(async () => {
+      emitFocus("col-1");
+    });
+    expect(clearUnreadCount).toHaveBeenCalledWith("col-1");
+  });
+
+  it("異なるcolumnIdのイベントが複数回来た場合それぞれ正しいcolumnIdで呼ばれる", async () => {
+    const clearUnreadCount = vi.fn();
+    renderHook(() => useColumnFocusClearsUnread(clearUnreadCount));
+    await act(async () => {
+      emitFocus("col-1");
+      emitFocus("col-2");
+    });
+    expect(clearUnreadCount).toHaveBeenCalledWith("col-1");
+    expect(clearUnreadCount).toHaveBeenCalledWith("col-2");
+    expect(clearUnreadCount).toHaveBeenCalledTimes(2);
   });
 });
 

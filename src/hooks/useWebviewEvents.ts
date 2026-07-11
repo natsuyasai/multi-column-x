@@ -59,6 +59,24 @@ export function useColumnCrashRecovery(
 }
 
 /**
+ * カラム WebView がOSフォーカスを得た（Windowsのみ発火）ことを検知して、
+ * 対象カラムの未読バッジを自動的にクリアする。
+ * Rust が WebView2 の GotFocus イベントから emit する column-webview-focused を listen する。
+ */
+export function useColumnFocusClearsUnread(
+  clearUnreadCount: (columnId: string) => void,
+) {
+  useEffect(() => {
+    const unlisten = listen<string>(IPC_EVENTS.COLUMN_WEBVIEW_FOCUSED, (e) => {
+      clearUnreadCount(e.payload);
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [clearUnreadCount]);
+}
+
+/**
  * 通知許可のリクエスト試行済みフラグ（モジュールレベルでキャッシュ）。
  * 一度リクエストして拒否された場合、新着のたびに OS 許可ダイアログを
  * 繰り返し要求しないようにするためのガード。
