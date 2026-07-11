@@ -1,7 +1,7 @@
 ---
 description: "実装完了後、変更内容と仕様から結合テスト（手動QA）の動作確認観点を構造化して出力する"
 user-invocable: true
-arg: "対象のプラン名や対象範囲（省略時は現在のブランチのgit diffと直近のtmp/plansから判断する）"
+argument-hint: "対象のプラン名や対象範囲（省略時は現在のブランチのgit diffと直近のtmp/plansから判断する）"
 ---
 
 # 結合テスト観点出力
