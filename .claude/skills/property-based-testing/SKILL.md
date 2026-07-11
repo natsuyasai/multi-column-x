@@ -1,7 +1,7 @@
 ---
 description: "アプリ開発フローのフェーズ4。実装完了後、仕様が明確かつ対応コードから実装可能ならプロパティベーステストを作成する（TS=fast-check / Rust=proptest / Kotlin=kotest-property）"
 user-invocable: true
-arg: "プロパティテストの対象"
+argument-hint: "プロパティテストの対象"
 ---
 
 # プロパティベーステスト（フェーズ4）

@@ -1,7 +1,7 @@
 ---
 description: "機能追加・修正・挙動変更などアプリ開発を始めるときの全体フロー（要求明確化→プラン→実装→テスト→完了）"
 user-invocable: true
-arg: "実装したい機能や対応したい内容"
+argument-hint: "実装したい機能や対応したい内容"
 ---
 
 # アプリ開発フロー
@@ -52,7 +52,7 @@ digraph flow {
 ## このプロジェクト特有の留意点
 
 - **desktop / mobile**: 同名コマンドでも `#[cfg(desktop)]` / `#[cfg(mobile)]` で実装が異なる。両方確認する。
-- **inject スクリプト**: `src-tauri/src/inject/_src/` を変更したら `npm run build:inject`。ビルド済み `.js` は編集禁止。
+- **inject スクリプト**: `src-tauri/src/inject/_src/` を変更したら `npm run build:inject`。ビルド済み `.js` は編集禁止。inject の開発手順は `inject-script-dev` スキルに従う。
 - **serde 命名**: JS側 camelCase には `#[serde(rename)]` が必須。
 - **Android**: `MainActivity.kt` のメソッド変更時は ProGuard keep ルールを同期（リリースビルドで動作確認）。
 

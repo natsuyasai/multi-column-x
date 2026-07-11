@@ -1,7 +1,7 @@
 ---
 description: "プロジェクト規約に準拠したReactコンポーネント一式を作成する"
 user-invocable: true
-arg: "コンポーネント名（PascalCase）"
+argument-hint: "コンポーネント名（PascalCase）"
 ---
 
 # Reactコンポーネント作成

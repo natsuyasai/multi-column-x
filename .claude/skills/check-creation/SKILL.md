@@ -45,6 +45,25 @@ npm run build
 - inject スクリプトを変更した場合は `npm run build:inject` も確認する（`build` の前段で実行される）。
 - Rust / Android 側を変更した場合は、該当プラットフォームのビルド（`npm run tauri:build` / `npm run tauri:android:build`）も確認する。Android はリリースビルドで ProGuard keep ルールの不整合が初めて顕在化する点に注意（CLAUDE.md参照）。
 
+### Rust / Kotlin を変更した場合（該当する場合のみ）
+
+- **`src-tauri/` を変更した場合**:
+
+  ```bash
+  npm run lint:rust
+  cargo test --manifest-path src-tauri/Cargo.toml
+  ```
+
+  `lint:rust` は `cargo clippy --all-targets -- -D warnings` で、テスト関数名の ASCII 大文字（`non_snake_case`）も検出する。
+
+- **Kotlin/Android を変更した場合**:
+
+  ```bash
+  cd src-tauri/gen/android && ./gradlew.bat :app:testUniversalDebugUnitTest
+  ```
+
+  app モジュールは universal フレーバー付きのため `testDebugUnitTest` では app のテストが実行されない（CLAUDE.md参照）。
+
 ## エラー修正の優先順位
 
 1. **型エラー (typecheck)**: 最優先。型定義の不整合はビルドエラーに直結する

@@ -1,7 +1,7 @@
 ---
 description: "Storybook駆動でUI開発を行う（Story-Firstワークフロー）"
 user-invocable: true
-arg: "開発対象のコンポーネント名や機能の説明"
+argument-hint: "開発対象のコンポーネント名や機能の説明"
 ---
 
 # Storybook駆動UI開発
@@ -12,7 +12,7 @@ UI/フロントエンド/React開発を、Story を先に書く Story-First ワ�
 
 > Story・テストは対象コンポーネントと**同じディレクトリ**に隣り合わせて配置する（コロケーション）。
 
-### 2a. 既存コンポーネントの修正
+### 既存コンポーネントの修正
 
 1. 対象コンポーネントの既存 Story を確認する (`src/components/<Name>/<Name>.stories.tsx`)
 2. 必要に応じて新しい Story バリエーションを追加
@@ -20,7 +20,7 @@ UI/フロントエンド/React開発を、Story を先に書く Story-First ワ�
 4. コンポーネントを修正
 5. `npm run test:story` で確認
 
-### 2b. 新規コンポーネントの作成
+### 新規コンポーネントの作成
 
 1. `component-create` スキルでテンプレートを生成
 2. Story（`src/components/<Name>/<Name>.stories.tsx`）を先に書く
