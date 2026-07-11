@@ -38,11 +38,12 @@ proptest = "1"
 [target.'cfg(target_os = "android")'.dependencies]
 jni = { version = "0.21", default-features = false }
 
-# Linux: カラム WebView（独立 WebviewWindow）の WebProcess クラッシュを
-# connect_web_process_terminated で検知するため、wry と同一バージョン/機能の
-# webkit2gtk を直接参照する（型を一致させるためバージョンをピン留め）。
+# Linux: カラム WebView（独立 WebviewWindow）の WebProcess クラッシュ検知
+# （connect_web_process_terminated）とフォーカス検知（connect_focus_in_event）のため、
+# wry と同一バージョンの webkit2gtk / gtk を直接参照する（型を一致させるためピン留め）。
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = { version = "=2.0.2", features = ["v2_40"] }
+gtk = { version = "=0.18.2" }
 
 # Windows: カラム WebView がフォーカスを得たことを検知するため、tauri-runtime-wry
 # と同一バージョンの webview2-com を直接参照する（型を一致させるためバージョンをピン留め）。

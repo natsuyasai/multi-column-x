@@ -138,13 +138,21 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         // フロントへ通知する。TS 側が当該カラムの WebView を再生成して復旧する。
         let crash_app = app.clone();
         let crash_column_id = args.column.id.clone();
+        // カラム WebView が OS フォーカスを得たら column-webview-focused を emit する。
+        // TS 側はこれを listen して、フォーカスが当たったカラムの未読バッジを自動的に消す。
+        let focus_app = app.clone();
+        let focus_column_id = args.column.id.clone();
         let _ = webview_window.with_webview(move |platform_webview| {
+            use gtk::prelude::WidgetExt;
             use webkit2gtk::WebViewExt;
-            platform_webview
-                .inner()
-                .connect_web_process_terminated(move |_webview, _reason| {
-                    let _ = crash_app.emit(events::COLUMN_WEBVIEW_CRASHED, &crash_column_id);
-                });
+            let webview = platform_webview.inner();
+            webview.connect_web_process_terminated(move |_webview, _reason| {
+                let _ = crash_app.emit(events::COLUMN_WEBVIEW_CRASHED, &crash_column_id);
+            });
+            webview.connect_focus_in_event(move |_widget, _event| {
+                let _ = focus_app.emit(events::COLUMN_WEBVIEW_FOCUSED, &focus_column_id);
+                gtk::glib::Propagation::Proceed
+            });
         });
     }
 
