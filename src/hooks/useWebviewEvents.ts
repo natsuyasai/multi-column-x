@@ -9,6 +9,7 @@ import {
 import { useEffect } from "react";
 import { IPC_EVENTS, WEBVIEW_LABELS } from "../constants/ipc";
 import { useAppStore } from "../store/useAppStore";
+import { getColumnLabel } from "../types";
 
 /** WebView 内の横ホイールを受け取ってスクロールバーを動かす */
 export function useWebviewScrollRelay(
@@ -87,12 +88,12 @@ async function ensureNotificationPermissionGranted(): Promise<boolean> {
   return permission === "granted";
 }
 
-async function notifyNewPosts(count: number): Promise<void> {
+async function notifyNewPosts(columnName: string): Promise<void> {
   const granted = await ensureNotificationPermissionGranted();
   if (!granted) return;
   sendNotification({
     title: "新着通知",
-    body: `${count}件の新しい通知があります`,
+    body: `${columnName}に新着があります`,
   });
 }
 
@@ -122,7 +123,8 @@ export function useNewPostsNotification(
           col.settings.autoReloadEnabled &&
           count > 0
         ) {
-          void notifyNewPosts(count);
+          const columnName = getColumnLabel(col);
+          void notifyNewPosts(columnName);
         }
       },
     );
