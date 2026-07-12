@@ -115,7 +115,7 @@ async function notifyNewPosts(columnName: string): Promise<void> {
   });
 }
 
-/** inject script からの新着カウントでバッジ更新、通知カラムはデスクトップ通知 */
+/** inject script からの新着カウントを受け、desktopNotifyEnabled が有効なカラムのみバッジ更新とデスクトップ通知を行う */
 export function useNewPostsNotification(
   setUnreadCount: (columnId: string, count: number) => void,
 ) {
@@ -125,17 +125,15 @@ export function useNewPostsNotification(
       (e) => {
         const { label, count } = e.payload;
         const columnId = label.replace(WEBVIEW_LABELS.COLUMN_PREFIX, "");
-        setUnreadCount(columnId, count);
 
         const col = useAppStore
           .getState()
           .columns.find((c) => c.id === columnId);
-        if (
-          col &&
-          col.settings.desktopNotifyEnabled &&
-          col.settings.autoReloadEnabled &&
-          count > 0
-        ) {
+        if (!col?.settings.desktopNotifyEnabled) return;
+
+        setUnreadCount(columnId, count);
+
+        if (col.settings.autoReloadEnabled && count > 0) {
           const columnName = getColumnLabel(col);
           void notifyNewPosts(columnName);
         }

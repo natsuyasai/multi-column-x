@@ -209,6 +209,14 @@ describe("useNewPostsNotification", () => {
   it("label から column- プレフィックスを除いた columnId で setUnreadCount を呼ぶ", async () => {
     isPermissionGrantedMock.mockResolvedValue(false);
     requestPermissionMock.mockResolvedValue("denied");
+    useAppStore.setState({
+      columns: [
+        makeColumn({
+          id: "col-1",
+          settings: { ...DEFAULT_COLUMN_SETTINGS, desktopNotifyEnabled: true },
+        }),
+      ],
+    });
     const setUnreadCount = vi.fn();
     renderHook(() => useNewPostsNotification(setUnreadCount));
     await act(async () => {
@@ -300,14 +308,14 @@ describe("useNewPostsNotification", () => {
     expect(sendNotificationMock).not.toHaveBeenCalled();
   });
 
-  it("通知カラムでないカラムは通知を送らない", async () => {
+  it("desktopNotifyEnabledが無効なカラム（デフォルト設定）はバッジも通知も送らない", async () => {
     isPermissionGrantedMock.mockResolvedValue(true);
     const setUnreadCount = vi.fn();
     renderHook(() => useNewPostsNotification(setUnreadCount));
     await act(async () => {
       emitNewPosts("column-col-1", 5);
     });
-    expect(setUnreadCount).toHaveBeenCalledWith("col-1", 5);
+    expect(setUnreadCount).not.toHaveBeenCalled();
     expect(sendNotificationMock).not.toHaveBeenCalled();
   });
 
@@ -349,7 +357,7 @@ describe("useNewPostsNotification", () => {
     );
   });
 
-  it("desktopNotifyEnabledが無効なカラムはバッジのみ更新される", async () => {
+  it("desktopNotifyEnabledが無効なカラムはバッジも通知も更新されない", async () => {
     isPermissionGrantedMock.mockResolvedValue(true);
     useAppStore.setState({
       columns: [
@@ -369,11 +377,11 @@ describe("useNewPostsNotification", () => {
     await act(async () => {
       emitNewPosts("column-col-1", 2);
     });
-    expect(setUnreadCount).toHaveBeenCalledWith("col-1", 2);
+    expect(setUnreadCount).not.toHaveBeenCalled();
     expect(sendNotificationMock).not.toHaveBeenCalled();
   });
 
-  it("notificationsカラムでもdesktopNotifyEnabledが無効なら通知されない", async () => {
+  it("notificationsカラムでもdesktopNotifyEnabledが無効ならバッジも通知も更新されない", async () => {
     isPermissionGrantedMock.mockResolvedValue(true);
     const col = makeColumn({
       id: "col-1",
@@ -386,7 +394,7 @@ describe("useNewPostsNotification", () => {
     await act(async () => {
       emitNewPosts("column-col-1", 1);
     });
-    expect(setUnreadCount).toHaveBeenCalledWith("col-1", 1);
+    expect(setUnreadCount).not.toHaveBeenCalled();
     expect(sendNotificationMock).not.toHaveBeenCalled();
   });
 
