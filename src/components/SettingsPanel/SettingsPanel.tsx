@@ -236,6 +236,23 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </section>
 
           <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>通知</h3>
+            <label className={styles.checkLabel}>
+              <input
+                type="checkbox"
+                checked={settings.desktopNotifyEnabled ?? false}
+                onChange={(e) =>
+                  setSettings((s) => ({
+                    ...s,
+                    desktopNotifyEnabled: e.target.checked,
+                  }))
+                }
+              />
+              新着をデスクトップ通知する
+            </label>
+          </section>
+
+          <section className={styles.section}>
             <h3 className={styles.sectionTitle}>NGワード</h3>
             <textarea
               className={styles.cssTextarea}

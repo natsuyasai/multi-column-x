@@ -74,6 +74,10 @@ export const Default: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByText("カラム設定")).toBeInTheDocument();
+    // 新着デスクトップ通知トグルをオンにして適用すると設定に反映される
+    await userEvent.click(
+      canvas.getByRole("checkbox", { name: "新着をデスクトップ通知する" }),
+    );
     // NGワードを入力して適用すると配列として onApply に渡される
     const textarea = canvas.getByPlaceholderText("1行に1ワードで入力");
     await userEvent.clear(textarea);
@@ -81,7 +85,10 @@ export const Default: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "適用" }));
     await expect(args.onApply).toHaveBeenCalledWith(
       "col-1",
-      expect.objectContaining({ ngWords: ["spam", "bot"] }),
+      expect.objectContaining({
+        ngWords: ["spam", "bot"],
+        desktopNotifyEnabled: true,
+      }),
       350,
     );
   },

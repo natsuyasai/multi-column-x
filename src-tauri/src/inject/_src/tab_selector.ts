@@ -104,8 +104,4 @@
   } else {
     startUrlObserver();
   }
-
-  window.__multiColumnX =
-    window.__multiColumnX || ({} as Window["__multiColumnX"]);
-  window.__multiColumnX.selectHomeTab = function () {};
 })();

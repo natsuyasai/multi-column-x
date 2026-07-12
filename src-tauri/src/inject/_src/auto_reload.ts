@@ -1,5 +1,9 @@
 // src-tauri/src/inject/_src/auto_reload.ts
 (function () {
+  // tweetText 差分監視用の observer。waitAndClickNewPostsButton のボタン出現待ち
+  // observer とは別物であり、互いに干渉しないよう独立した変数で管理する。
+  let currentTweetObserver: MutationObserver | null = null;
+
   function isScrolling(): boolean {
     return document.scrollingElement
       ? document.scrollingElement.scrollTop > 0
@@ -33,12 +37,6 @@
     return null;
   }
 
-  function extractNewPostsCount(btn: HTMLButtonElement): number {
-    const text = btn.textContent ?? "";
-    const match = text.match(/\d+/);
-    return match ? parseInt(match[0], 10) : 1;
-  }
-
   function getWebviewLabel(): string {
     return (
       window.__TAURI_INTERNALS__?.metadata?.currentWebview?.label ??
@@ -58,11 +56,52 @@
     invoke("report_new_posts_count", { label, count }).catch(() => {});
   }
 
+  function getTweetTextElement(): HTMLElement | null {
+    const elements = document.querySelectorAll('[data-testid="tweetText"]');
+    if (elements.length === 0) return null;
+    return elements[0] as HTMLElement;
+  }
+
+  function waitForTweetTextChange(before: string | null): void {
+    const section = document.querySelector("section[aria-labelledby]");
+    if (!section) return;
+
+    // 前回の tweetText 差分監視 observer が残っていれば disconnect
+    if (currentTweetObserver) {
+      currentTweetObserver.disconnect();
+    }
+
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const cleanUp = (): void => {
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
+      currentTweetObserver = null;
+    };
+
+    const observer = new MutationObserver(function () {
+      const after = getTweetTextElement()?.innerHTML ?? null;
+      if (before !== after) {
+        observer.disconnect();
+        cleanUp();
+        reportNewPostsCount(1);
+      }
+    });
+
+    observer.observe(section, { childList: true, subtree: true });
+
+    timeoutId = setTimeout(function () {
+      observer.disconnect();
+      cleanUp();
+    }, 30000);
+
+    currentTweetObserver = observer;
+  }
+
   function waitAndClickNewPostsButton(): void {
     const btn = findNewPostsButton();
     if (btn) {
-      const count = extractNewPostsCount(btn);
-      reportNewPostsCount(count);
       btn.click();
       return;
     }
@@ -72,8 +111,6 @@
       const found = findNewPostsButton();
       if (found) {
         observer.disconnect();
-        const count = extractNewPostsCount(found);
-        reportNewPostsCount(count);
         found.click();
       }
     });
@@ -105,11 +142,18 @@
       document.scrollingElement.scrollTop = 0;
     }
     if (isScrolling()) return;
+
+    // before を取得してから、トリガーを実行
+    const before = getTweetTextElement()?.innerHTML ?? null;
+
     if (isFollowingTabActive()) {
       triggerFollowingRefresh();
     } else {
       reselectTab();
     }
+
+    // トリガー実行後、差分監視を開始
+    waitForTweetTextChange(before);
   }
 
   window.__multiColumnX =

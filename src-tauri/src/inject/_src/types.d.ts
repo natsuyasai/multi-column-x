@@ -2,7 +2,6 @@
 
 declare global {
   interface MultiColumnXAPI {
-    selectHomeTab: () => void;
     applyCustomCSS: (css: string) => void;
     triggerReload: (scrollToTop?: boolean) => void;
     applyAreaRemove: (enabled: boolean) => void;

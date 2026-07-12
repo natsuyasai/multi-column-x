@@ -144,3 +144,11 @@ $transition: 200ms ease;
     background: var(--mcx-surface-hover);
   }
 }
+
+.columnItem {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}

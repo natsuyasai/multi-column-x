@@ -11,6 +11,8 @@ pub struct AccountData {
     pub color: String,
     #[serde(rename = "createdAt")]
     pub created_at: String,
+    #[serde(rename = "xUserId", default)]
+    pub x_user_id: Option<String>,
 }
 
 // ColumnSettings の #[serde(default)] はカラム設定 JSON にフィールドが存在しない場合のフォールバック値。
@@ -53,6 +55,9 @@ pub struct ColumnSettings {
     #[serde(rename = "ngWords")]
     #[serde(default)]
     pub ng_words: Vec<String>,
+    #[serde(rename = "desktopNotifyEnabled")]
+    #[serde(default)]
+    pub desktop_notify_enabled: bool,
 }
 
 // デシリアライズ時のデフォルト値ヘルパー関数。
@@ -277,7 +282,12 @@ pub async fn load_settings(app: AppHandle) -> Result<AppSettingsData, String> {
 }
 
 #[tauri::command]
-pub async fn save_settings(app: AppHandle, settings: AppSettingsData) -> Result<(), String> {
+pub async fn save_settings(
+    caller: tauri::Webview,
+    app: AppHandle,
+    settings: AppSettingsData,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let store = app.store("settings.json").map_err(|e| e.to_string())?;
     store.set(
         "appSettings",
@@ -360,6 +370,20 @@ mod tests {
         assert_eq!(actual, fixture);
     }
 
+    /// 新フィールド追加前に保存された旧カラム設定 JSON（desktopNotifyEnabled 欠落）を
+    /// デシリアライズしてもエラーにならず、デフォルト値 false にフォールバックすることを確認する。
+    #[test]
+    fn 通知設定フィールドが無い旧カラム設定はデフォルトで通知しない() {
+        let json = serde_json::json!({
+            "autoReloadEnabled": true,
+            "autoReloadInterval": 600,
+            "areaRemoveEnabled": true,
+            "customCSS": "",
+        });
+        let settings: ColumnSettings = serde_json::from_value(json).unwrap();
+        assert!(!settings.desktop_notify_enabled);
+    }
+
     #[test]
     fn app_settings_default_roundtrips_through_json() {
         let settings = AppSettingsData::default();
@@ -373,5 +397,34 @@ mod tests {
             restored.global_settings.column_scale,
             settings.global_settings.column_scale
         );
+    }
+
+    /// xUserId 追加前に保存された旧 account JSON をデシリアライズしてもエラーにならず、
+    /// x_user_id が None にフォールバックすることを確認する。
+    #[test]
+    fn xuserid無しの既存jsonをデシリアライズできる() {
+        let json = serde_json::json!({
+            "id": "acc-1",
+            "label": "テストアカウント",
+            "dataDirectory": "/path/to/data",
+            "color": "#1d9bf0",
+            "createdAt": "2026-05-02T00:00:00Z",
+        });
+        let account: AccountData = serde_json::from_value(json).unwrap();
+        assert_eq!(account.x_user_id, None);
+    }
+
+    #[test]
+    fn xuserid有りのjsonをデシリアライズできる() {
+        let json = serde_json::json!({
+            "id": "acc-1",
+            "label": "テストアカウント",
+            "dataDirectory": "/path/to/data",
+            "color": "#1d9bf0",
+            "createdAt": "2026-05-02T00:00:00Z",
+            "xUserId": "1234567890",
+        });
+        let account: AccountData = serde_json::from_value(json).unwrap();
+        assert_eq!(account.x_user_id, Some("1234567890".to_string()));
     }
 }

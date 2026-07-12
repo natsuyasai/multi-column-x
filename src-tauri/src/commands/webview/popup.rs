@@ -97,7 +97,7 @@ pub async fn open_popup_window(
 ) -> Result<(), String> {
     let state = app.state::<AppState>();
     let (data_dir, current_account_id) = {
-        let registry = state.registry.lock().unwrap();
+        let registry = state.registry.lock().expect("registry mutex poisoned");
         let data_dir = registry
             .get_data_directory(&webview_label_caller)
             .map(PathBuf::from)
@@ -136,7 +136,7 @@ pub async fn open_popup_window(
 ) -> Result<(), String> {
     let state = app.state::<AppState>();
     let current_account_id = {
-        let registry = state.registry.lock().unwrap();
+        let registry = state.registry.lock().expect("registry mutex poisoned");
         registry
             .get_account_id(&webview_label_caller)
             .unwrap_or("")
@@ -162,7 +162,7 @@ pub async fn open_popup_window(
     #[cfg(not(target_os = "android"))]
     {
         let data_dir = {
-            let registry = state.registry.lock().unwrap();
+            let registry = state.registry.lock().expect("registry mutex poisoned");
             registry
                 .get_data_directory(&webview_label_caller)
                 .map(PathBuf::from)
@@ -195,7 +195,7 @@ pub async fn open_link_popup_window(
     } else {
         let label = webview_label_caller.unwrap_or_default();
         let state = app.state::<AppState>();
-        let registry = state.registry.lock().unwrap();
+        let registry = state.registry.lock().expect("registry mutex poisoned");
         let dd = registry
             .get_data_directory(&label)
             .map(PathBuf::from)
@@ -241,7 +241,7 @@ pub async fn open_link_popup_window(
     } else {
         let label = webview_label_caller.clone().unwrap_or_default();
         let state = app.state::<AppState>();
-        let registry = state.registry.lock().unwrap();
+        let registry = state.registry.lock().expect("registry mutex poisoned");
         registry.get_account_id(&label).unwrap_or("").to_string()
     };
 
@@ -268,7 +268,7 @@ pub async fn open_link_popup_window(
         } else {
             let label = webview_label_caller.unwrap_or_default();
             let state = app.state::<AppState>();
-            let registry = state.registry.lock().unwrap();
+            let registry = state.registry.lock().expect("registry mutex poisoned");
             registry
                 .get_data_directory(&label)
                 .map(PathBuf::from)

@@ -34,14 +34,8 @@ export {
 export type { ColumnBounds } from "../lib/gridLayout";
 
 export function useColumns() {
-  const {
-    columns,
-    accounts,
-    addColumn,
-    removeColumn,
-    updateColumn,
-    moveColumn,
-  } = useAppStore();
+  const { columns, accounts, addColumn, removeColumn, updateColumn } =
+    useAppStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollbarRef = useRef<HTMLDivElement>(null); // 下部スクロールバーコンテナ
   // ダイアログが開いている間はリサイズによる WebView 再配置を抑制するためのフラグ
@@ -220,15 +214,6 @@ export function useColumns() {
     [updateColumn],
   );
 
-  // カラム移動
-  const handleMoveColumn = useCallback(
-    async (columnId: string, direction: "left" | "right") => {
-      moveColumn(columnId, direction);
-      await recalculateAllBounds();
-    },
-    [moveColumn, recalculateAllBounds],
-  );
-
   const setDialogOpen = useCallback((open: boolean) => {
     dialogOpenRef.current = open;
   }, []);
@@ -309,7 +294,15 @@ export function useColumns() {
       );
     }
     await restoreColumns(getTopBarHeight(topBarExpanded));
-  }, [restoreColumns]);
+    // ダイアログ表示中（再認証や GlobalSettings の全再読込など）に呼ばれた場合、
+    // restoreColumns は列 WebView を通常座標に表示してしまう。native WebView は
+    // z-index を無視するため、そのままだと TopBar やダイアログの前面に居座り操作
+    // 不能になる。ダイアログを閉じた時点で App 側の anyDialogOpen effect が
+    // recalculateAllBounds で正しく再表示するので、ここでは退避状態を維持する。
+    if (dialogOpenRef.current) {
+      await hideColumnWebviews();
+    }
+  }, [restoreColumns, hideColumnWebviews]);
 
   return {
     columns,
@@ -319,7 +312,6 @@ export function useColumns() {
     restoreColumns,
     handleAddColumn,
     handleRemoveColumn,
-    handleMoveColumn,
     handleUpdateColumn,
     recalculateAllBounds,
     hideColumnWebviews,

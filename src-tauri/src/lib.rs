@@ -48,6 +48,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
         .plugin(
             tauri_plugin_log::Builder::new()
                 .target(tauri_plugin_log::Target::new(
@@ -154,6 +155,7 @@ pub fn run() {
             commands::webview::set_column_cookies,
             commands::webview::open_in_browser,
             commands::account::open_add_account_window,
+            commands::account::reauth_account_window,
             commands::account::delete_account_data,
             commands::account::close_window,
             commands::webview::open_compose_window,

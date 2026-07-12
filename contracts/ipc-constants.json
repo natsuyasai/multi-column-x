@@ -13,6 +13,7 @@
     "open_compose_window",
     "open_in_browser",
     "open_add_account_window",
+    "reauth_account_window",
     "delete_account_data",
     "close_window",
     "report_webview_scroll",
@@ -28,7 +29,9 @@
     "COLUMN_DOUBLE_TAP": "column-double-tap",
     "WEBVIEW_NEW_POSTS_COUNT": "webview-new-posts-count",
     "WEBVIEW_KEYBOARD_SHORTCUT": "webview-keyboard-shortcut",
-    "COLUMN_WEBVIEW_CRASHED": "column-webview-crashed"
+    "COLUMN_WEBVIEW_CRASHED": "column-webview-crashed",
+    "COLUMN_WEBVIEW_FOCUSED": "column-webview-focused",
+    "ACCOUNT_REAUTH_COMPLETE": "account-reauth-complete"
   },
   "labels": {
     "MAIN": "main",

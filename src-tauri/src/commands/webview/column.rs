@@ -7,13 +7,13 @@ use crate::commands::settings_store::{
     load_video_auto_play_stop_enabled, load_video_popup_enabled,
 };
 use crate::inject::{build_init_script, InitScriptParams};
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", windows))]
 use crate::ipc_constants::events;
 use crate::ipc_constants::labels;
 use crate::state::AppState;
 #[cfg(desktop)]
 use std::path::PathBuf;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", windows))]
 use tauri::Emitter;
 #[cfg(all(desktop, not(target_os = "linux")))]
 use tauri::WebviewBuilder;
@@ -59,6 +59,34 @@ pub struct CreateWebviewArgs {
     pub height: f64,
 }
 
+/// カラム WebView に注入する init script を、設定ストアの読み出しを含めて構築する。
+/// desktop / mobile 双方の `create_column_webview` から呼ばれ、挙動差分は `is_mobile` のみ。
+fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: bool) -> String {
+    let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(app);
+    let hide_ad_enabled = load_hide_ad_enabled(app);
+    let image_popup_enabled = load_image_popup_enabled(app);
+    let video_popup_enabled = load_video_popup_enabled(app);
+    let global_ng_words = load_global_ng_words(app);
+    build_init_script(&InitScriptParams {
+        is_mobile,
+        area_remove_enabled: column.settings.area_remove_enabled,
+        show_custom_menu: column.settings.show_custom_menu,
+        scroll_pos_restore_enabled: column.settings.scroll_pos_restore_enabled,
+        video_auto_play_stop_enabled,
+        small_image_enabled: column.settings.small_image_enabled,
+        small_image_width: &column.settings.small_image_width,
+        blur_image_enabled: column.settings.blur_image_enabled,
+        blur_image_amount: &column.settings.blur_image_amount,
+        hide_ad_enabled,
+        image_popup_enabled,
+        video_popup_enabled,
+        custom_css: &column.settings.custom_css,
+        visible_links: &column.settings.visible_links,
+        ng_words: &column.settings.ng_words,
+        global_ng_words: &global_ng_words,
+    })
+}
+
 #[cfg(desktop)]
 #[tauri::command]
 pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> Result<(), String> {
@@ -66,29 +94,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
     let label = webview_label(&args.column.id);
     let data_dir = PathBuf::from(&args.data_directory);
 
-    let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(&app);
-    let hide_ad_enabled = load_hide_ad_enabled(&app);
-    let image_popup_enabled = load_image_popup_enabled(&app);
-    let video_popup_enabled = load_video_popup_enabled(&app);
-    let global_ng_words = load_global_ng_words(&app);
-    let init_script = build_init_script(&InitScriptParams {
-        is_mobile: false,
-        area_remove_enabled: args.column.settings.area_remove_enabled,
-        show_custom_menu: args.column.settings.show_custom_menu,
-        scroll_pos_restore_enabled: args.column.settings.scroll_pos_restore_enabled,
-        video_auto_play_stop_enabled,
-        small_image_enabled: args.column.settings.small_image_enabled,
-        small_image_width: &args.column.settings.small_image_width,
-        blur_image_enabled: args.column.settings.blur_image_enabled,
-        blur_image_amount: &args.column.settings.blur_image_amount,
-        hide_ad_enabled,
-        image_popup_enabled,
-        video_popup_enabled,
-        custom_css: &args.column.settings.custom_css,
-        visible_links: &args.column.settings.visible_links,
-        ng_words: &args.column.settings.ng_words,
-        global_ng_words: &global_ng_words,
-    });
+    let init_script = build_column_init_script(&app, &args.column, false);
 
     // parent() は &WebviewWindow を要求するため、Linux では get_webview_window を使う。
     // 非Linux の場合は一般の Window を取得して add_child を呼び出す。
@@ -132,18 +138,26 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         // フロントへ通知する。TS 側が当該カラムの WebView を再生成して復旧する。
         let crash_app = app.clone();
         let crash_column_id = args.column.id.clone();
+        // カラム WebView が OS フォーカスを得たら column-webview-focused を emit する。
+        // TS 側はこれを listen して、フォーカスが当たったカラムの未読バッジを自動的に消す。
+        let focus_app = app.clone();
+        let focus_column_id = args.column.id.clone();
         let _ = webview_window.with_webview(move |platform_webview| {
+            use gtk::prelude::WidgetExt;
             use webkit2gtk::WebViewExt;
-            platform_webview
-                .inner()
-                .connect_web_process_terminated(move |_webview, _reason| {
-                    let _ = crash_app.emit(events::COLUMN_WEBVIEW_CRASHED, &crash_column_id);
-                });
+            let webview = platform_webview.inner();
+            webview.connect_web_process_terminated(move |_webview, _reason| {
+                let _ = crash_app.emit(events::COLUMN_WEBVIEW_CRASHED, &crash_column_id);
+            });
+            webview.connect_focus_in_event(move |_widget, _event| {
+                let _ = focus_app.emit(events::COLUMN_WEBVIEW_FOCUSED, &focus_column_id);
+                gtk::glib::Propagation::Proceed
+            });
         });
     }
 
     #[cfg(not(target_os = "linux"))]
-    window
+    let child_webview = window
         .add_child(
             WebviewBuilder::new(&label, WebviewUrl::External(parse_url(&url)?))
                 .initialization_script(&init_script)
@@ -153,8 +167,28 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         )
         .map_err(|e| e.to_string())?;
 
+    // Windows: カラム WebView が OS フォーカスを得たら column-webview-focused を emit する。
+    // TS 側はこれを listen して、フォーカスが当たったカラムの未読バッジを自動的に消す。
+    #[cfg(windows)]
+    {
+        let focus_app = app.clone();
+        let focus_column_id = args.column.id.clone();
+        let _ = child_webview.with_webview(move |platform_webview| {
+            let controller = platform_webview.controller();
+            let mut token: i64 = 0;
+            let handler =
+                webview2_com::FocusChangedEventHandler::create(Box::new(move |_sender, _args| {
+                    let _ = focus_app.emit(events::COLUMN_WEBVIEW_FOCUSED, &focus_column_id);
+                    Ok(())
+                }));
+            unsafe {
+                let _ = controller.add_GotFocus(&handler, &mut token);
+            }
+        });
+    }
+
     let state = app.state::<AppState>();
-    let mut registry = state.registry.lock().unwrap();
+    let mut registry = state.registry.lock().expect("registry mutex poisoned");
     registry.register(
         label,
         args.column.id.clone(),
@@ -171,29 +205,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
     let url = resolve_url(&args.column);
     let label = webview_label(&args.column.id);
 
-    let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(&app);
-    let hide_ad_enabled = load_hide_ad_enabled(&app);
-    let image_popup_enabled = load_image_popup_enabled(&app);
-    let video_popup_enabled = load_video_popup_enabled(&app);
-    let global_ng_words = load_global_ng_words(&app);
-    let init_script = build_init_script(&InitScriptParams {
-        is_mobile: true,
-        area_remove_enabled: args.column.settings.area_remove_enabled,
-        show_custom_menu: args.column.settings.show_custom_menu,
-        scroll_pos_restore_enabled: args.column.settings.scroll_pos_restore_enabled,
-        video_auto_play_stop_enabled,
-        small_image_enabled: args.column.settings.small_image_enabled,
-        small_image_width: &args.column.settings.small_image_width,
-        blur_image_enabled: args.column.settings.blur_image_enabled,
-        blur_image_amount: &args.column.settings.blur_image_amount,
-        hide_ad_enabled,
-        image_popup_enabled,
-        video_popup_enabled,
-        custom_css: &args.column.settings.custom_css,
-        visible_links: &args.column.settings.visible_links,
-        ng_words: &args.column.settings.ng_words,
-        global_ng_words: &global_ng_words,
-    });
+    let init_script = build_column_init_script(&app, &args.column, true);
 
     // Android では Tauri WebviewWindowBuilder を使わず、
     // ネイティブ Android WebView を content FrameLayout のオーバーレイとして追加する。
@@ -214,7 +226,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
     }
 
     let state = app.state::<AppState>();
-    let mut registry = state.registry.lock().unwrap();
+    let mut registry = state.registry.lock().expect("registry mutex poisoned");
     registry.register(
         label,
         args.column.id.clone(),
@@ -238,7 +250,7 @@ pub async fn remove_column_webview(app: AppHandle, column_id: String) -> Result<
     }
 
     let state = app.state::<AppState>();
-    let mut registry = state.registry.lock().unwrap();
+    let mut registry = state.registry.lock().expect("registry mutex poisoned");
     registry.unregister(&label);
 
     Ok(())
@@ -255,7 +267,7 @@ pub async fn remove_column_webview(app: AppHandle, column_id: String) -> Result<
     }
 
     let state = app.state::<AppState>();
-    let mut registry = state.registry.lock().unwrap();
+    let mut registry = state.registry.lock().expect("registry mutex poisoned");
     registry.unregister(&label);
 
     Ok(())

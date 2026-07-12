@@ -47,9 +47,8 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
           data-testid="unread-badge"
           onClick={() => onClearUnread?.(column.id)}
           title="未読をクリア"
-        >
-          {unreadCount}
-        </button>
+          aria-label="未読あり"
+        />
       )}
       {showCountdown && (
         <span className={styles.countdown} title="次の自動更新まで">

@@ -35,7 +35,13 @@ pub async fn get_mobile_insets() -> serde_json::Value {
 }
 
 #[tauri::command]
-pub async fn eval_in_webview(app: AppHandle, label: String, script: String) -> Result<(), String> {
+pub async fn eval_in_webview(
+    caller: tauri::Webview,
+    app: AppHandle,
+    label: String,
+    script: String,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     // Android のカラム WebView はネイティブ Android WebView で管理しているため
     // Tauri の get_webview では見つからない。android_bridge 経由で評価する。
     #[cfg(target_os = "android")]
@@ -79,4 +85,23 @@ pub async fn report_keyboard_shortcut(app: AppHandle, key: String) -> Result<(),
 #[tauri::command]
 pub async fn open_in_browser(url: String) -> Result<(), String> {
     tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn httpsのurlをパースできる() {
+        let result = parse_url("https://x.com/home");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().as_str(), "https://x.com/home");
+    }
+
+    #[test]
+    fn 不正なurlはエラーメッセージを返す() {
+        let result = parse_url("not a url");
+        assert!(result.is_err());
+        assert!(!result.unwrap_err().is_empty());
+    }
 }

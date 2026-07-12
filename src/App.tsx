@@ -5,13 +5,16 @@ import { platform } from "@tauri-apps/plugin-os";
 import React, { useEffect, useCallback, useMemo, useState } from "react";
 import styles from "./App.module.scss";
 import { AccountManager } from "./components/AccountManager/AccountManager";
+import { AccountNameDialog } from "./components/AccountNameDialog/AccountNameDialog";
 import { AddColumnDialog } from "./components/AddColumnDialog/AddColumnDialog";
 import { AppSettingsPanel } from "./components/AppSettingsPanel/AppSettingsPanel";
 import { ColumnHeader } from "./components/ColumnHeader/ColumnHeader";
+import { ConfirmDialog } from "./components/ConfirmDialog/ConfirmDialog";
 import { LinkPopupDialog } from "./components/LinkPopupDialog/LinkPopupDialog";
 import { MobileSwipeBar } from "./components/MobileSwipeBar/MobileSwipeBar";
 import { MobileTabBar } from "./components/MobileTabBar/MobileTabBar";
 import { SettingsPanel } from "./components/SettingsPanel/SettingsPanel";
+import { ShortcutHelpDialog } from "./components/ShortcutHelpDialog/ShortcutHelpDialog";
 import { TabActionDialog } from "./components/TabActionDialog/TabActionDialog";
 import { TopBar } from "./components/TopBar/TopBar";
 import { UpdateDialog } from "./components/UpdateDialog/UpdateDialog";
@@ -25,6 +28,7 @@ import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useTheme } from "./hooks/useTheme";
 import {
   useColumnCrashRecovery,
+  useColumnFocusClearsUnread,
   useNewPostsNotification,
   useWebviewScrollRelay,
 } from "./hooks/useWebviewEvents";
@@ -49,6 +53,7 @@ const App: React.FC = () => {
     accounts,
     globalSettings,
     updateGlobalSettings,
+    updateAccount,
     topBarExpanded,
     setTopBarExpanded,
     replaceColumns,
@@ -78,7 +83,19 @@ const App: React.FC = () => {
     recreateAllWebviews,
     recreateColumnWebview,
   } = useColumns();
-  const { startAddAccount, removeAccount } = useAccounts();
+  const {
+    startAddAccount,
+    removeAccount,
+    pendingAccountName,
+    submitAccountName,
+    cancelAccountName,
+    pendingRemoval,
+    confirmRemoval,
+    cancelRemoval,
+    startReauth,
+    reauthNotice,
+    dismissReauthNotice,
+  } = useAccounts(recreateAllWebviews);
   const {
     showAddColumn,
     setShowAddColumn,
@@ -92,6 +109,8 @@ const App: React.FC = () => {
     setShowLinkPopupDialog,
     tabActionColumnId,
     setTabActionColumnId,
+    showShortcutHelp,
+    setShowShortcutHelp,
     dialogOpen,
   } = useDialogState();
 
@@ -164,6 +183,7 @@ const App: React.FC = () => {
   useWebviewScrollRelay(scrollbarRef);
   useNewPostsNotification(setUnreadCount);
   useColumnCrashRecovery(recreateColumnWebview);
+  useColumnFocusClearsUnread(clearUnreadCount);
 
   const handleOpenLinkPopup = useCallback(() => {
     setShowLinkPopupDialog(true);
@@ -187,8 +207,14 @@ const App: React.FC = () => {
   );
 
   // ダイアログ表示中は列WebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
-  // 更新ポップアップも同様に退避対象に含める。
-  const anyDialogOpen = dialogOpen || !!updater.available || !!whatsNew.notes;
+  // 更新ポップアップ・アカウント名入力ダイアログも同様に退避対象に含める。
+  const anyDialogOpen =
+    dialogOpen ||
+    !!updater.available ||
+    !!whatsNew.notes ||
+    !!pendingAccountName ||
+    !!pendingRemoval ||
+    !!reauthNotice;
   useEffect(() => {
     setDialogOpen(anyDialogOpen);
     if (anyDialogOpen) {
@@ -205,8 +231,15 @@ const App: React.FC = () => {
     setTimeout(() => recalculateAllBounds(), 220);
   }, [topBarExpanded, setTopBarExpanded, recalculateAllBounds]);
 
+  // 「フォーカスカラム」= 最後に 1-9 ジャンプ／TopBar クリックでジャンプしたカラム。
+  // r キーでのリロード対象を決めるために使う（無ければ order 最小の先頭カラムにフォールバック）。
+  const [lastFocusedColumnId, setLastFocusedColumnId] = useState<string | null>(
+    null,
+  );
+
   const handleJumpToColumn = useCallback(
     (columnId: string) => {
+      setLastFocusedColumnId(columnId);
       const el = scrollbarRef.current;
       if (!el) return;
       const bounds = columnBounds[columnId];
@@ -238,9 +271,21 @@ const App: React.FC = () => {
     setShowAppSettings(true);
   }, [setShowAppSettings]);
 
+  const handleToggleShortcutHelp = useCallback(() => {
+    setShowShortcutHelp(true);
+  }, [setShowShortcutHelp]);
+
   const handleReload = useCallback(async (columnId: string) => {
     await evalInColumn(columnId, WEBVIEW_SCRIPTS.TRIGGER_RELOAD);
   }, []);
+
+  // r キー用: フォーカスカラム（無ければ order 最小の先頭カラム）をリロードする
+  const handleReloadFocusedColumn = useCallback(() => {
+    const sorted = [...columns].sort((a, b) => a.order - b.order);
+    const target =
+      columns.find((c) => c.id === lastFocusedColumnId) ?? sorted[0];
+    if (target) handleReload(target.id);
+  }, [columns, lastFocusedColumnId, handleReload]);
 
   const handleReloadPage = useCallback(
     async (columnId: string) => {
@@ -315,6 +360,8 @@ const App: React.FC = () => {
     onAppSettings: handleOpenAppSettings,
     onToggleTopBar: handleToggleTopBar,
     onJumpToColumn: handleJumpToColumnByIndex,
+    onReloadColumn: handleReloadFocusedColumn,
+    onToggleHelp: handleToggleShortcutHelp,
     disabled: dialogOpen,
   });
 
@@ -354,6 +401,7 @@ const App: React.FC = () => {
           onComposeTweet={handleComposeTweet}
           onOpenLinkPopup={handleOpenLinkPopup}
           onJumpToColumn={handleJumpToColumn}
+          onClose={handleRemoveColumn}
         />
       )}
       {isMobile && (
@@ -466,7 +514,39 @@ const App: React.FC = () => {
           onAddAccount={startAddAccount}
           onRemoveAccount={removeAccount}
           onSetDefault={handleSetDefaultAccount}
+          onUpdateAccount={updateAccount}
           onClose={() => setShowAccountManager(false)}
+          onReauthAccount={startReauth}
+        />
+      )}
+
+      {pendingAccountName && (
+        <AccountNameDialog
+          defaultValue={pendingAccountName.defaultValue}
+          title="アカウント名を入力"
+          onSubmit={submitAccountName}
+          onCancel={cancelAccountName}
+        />
+      )}
+
+      {pendingRemoval && (
+        <ConfirmDialog
+          title="アカウントの削除"
+          message={`「${pendingRemoval.label}」を削除しますか？セッションデータも削除されます。`}
+          confirmLabel="削除する"
+          onConfirm={confirmRemoval}
+          onCancel={cancelRemoval}
+        />
+      )}
+
+      {reauthNotice && (
+        <ConfirmDialog
+          singleButton
+          title="再認証"
+          message={reauthNotice}
+          confirmLabel="OK"
+          onConfirm={dismissReauthNotice}
+          onCancel={dismissReauthNotice}
         />
       )}
 
@@ -542,6 +622,10 @@ const App: React.FC = () => {
           notes={whatsNew.notes}
           onClose={whatsNew.dismiss}
         />
+      )}
+
+      {showShortcutHelp && (
+        <ShortcutHelpDialog onClose={() => setShowShortcutHelp(false)} />
       )}
     </div>
   );

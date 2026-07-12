@@ -19,7 +19,6 @@
   border: 1px solid var(--mcx-border);
   border-radius: 8px;
   padding: 24px;
-  width: min(360px, 100%);
   max-height: calc(100% - 32px);
   overflow-y: auto;
   display: flex;
@@ -127,4 +126,86 @@
 
 .defaultBtnActive {
   color: var(--mcx-warning);
+}
+
+.editBtn {
+  background: none;
+  border: 1px solid var(--mcx-border-strong);
+  border-radius: 4px;
+  color: var(--mcx-text-tertiary);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 10px;
+  &:hover {
+    background: var(--mcx-surface-muted);
+  }
+}
+
+.editForm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.editLabel {
+  font-size: 12px;
+  color: var(--mcx-text-tertiary);
+}
+
+.editInput {
+  background: var(--mcx-surface);
+  border: 1px solid var(--mcx-border);
+  border-radius: 4px;
+  color: var(--mcx-text);
+  font-size: 13px;
+  padding: 6px 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.colorSwatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.colorSwatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.colorSwatchActive {
+  border-color: var(--mcx-text);
+}
+
+.editActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.cancelEditBtn {
+  background: var(--mcx-surface-muted);
+  border: 1px solid var(--mcx-border-strong);
+  border-radius: 4px;
+  color: var(--mcx-text-tertiary);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 6px 12px;
+}
+
+.saveEditBtn {
+  background: var(--mcx-accent);
+  border: none;
+  border-radius: 4px;
+  color: var(--mcx-text-on-accent);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  padding: 6px 12px;
 }

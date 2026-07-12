@@ -115,7 +115,14 @@ describe("ColumnHeader", () => {
   it("unreadCount が 1 以上のとき未読バッジが表示される", () => {
     render(<ColumnHeader {...defaultProps} unreadCount={5} />);
     expect(screen.getByTestId("unread-badge")).toBeInTheDocument();
-    expect(screen.getByTestId("unread-badge").textContent).toBe("5");
+    // バッジはドット表示のため、テキストは数字ではなく空
+    expect(screen.getByTestId("unread-badge").textContent).toBe("");
+  });
+
+  it("未読バッジに未読ありを示す aria-label が付与される", () => {
+    render(<ColumnHeader {...defaultProps} unreadCount={1} />);
+    const badge = screen.getByTestId("unread-badge");
+    expect(badge).toHaveAttribute("aria-label", "未読あり");
   });
 
   it("バッジをクリックすると onClearUnread が呼ばれる", async () => {

@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { Account, Column } from "../types";
@@ -7,6 +8,8 @@ import { useAppStore, migrateColumn } from "./useAppStore";
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue(undefined),
 }));
+
+const mockInvoke = vi.mocked(invoke);
 
 const mockAccount: Account = {
   id: "acc-1",
@@ -90,6 +93,54 @@ describe("useAppStore", () => {
       result.current.addAccount(mockAccount);
     });
     expect(result.current.accounts).toContainEqual(mockAccount);
+  });
+
+  it("アカウント名を変更できる", () => {
+    const { result } = renderHook(() => useAppStore());
+    act(() => {
+      result.current.addAccount(mockAccount);
+      result.current.updateAccount("acc-1", { label: "新しい名前" });
+    });
+    expect(result.current.accounts[0].label).toBe("新しい名前");
+    expect(mockInvoke).toHaveBeenCalledWith("save_settings", expect.anything());
+  });
+
+  it("アカウントの色を変更できる", () => {
+    const { result } = renderHook(() => useAppStore());
+    act(() => {
+      result.current.addAccount(mockAccount);
+      result.current.updateAccount("acc-1", { color: "#e0245e" });
+    });
+    expect(result.current.accounts[0].color).toBe("#e0245e");
+  });
+
+  it("アカウントのxUserIdを変更できる", () => {
+    const { result } = renderHook(() => useAppStore());
+    act(() => {
+      result.current.addAccount(mockAccount);
+      result.current.updateAccount("acc-1", { xUserId: "1234567890" });
+    });
+    expect(result.current.accounts[0].xUserId).toBe("1234567890");
+    expect(mockInvoke).toHaveBeenCalledWith("save_settings", expect.anything());
+  });
+
+  it("アカウントのdataDirectoryを変更できる", () => {
+    const { result } = renderHook(() => useAppStore());
+    act(() => {
+      result.current.addAccount(mockAccount);
+      result.current.updateAccount("acc-1", { dataDirectory: "/data/new-dir" });
+    });
+    expect(result.current.accounts[0].dataDirectory).toBe("/data/new-dir");
+    expect(mockInvoke).toHaveBeenCalledWith("save_settings", expect.anything());
+  });
+
+  it("updateAccountで存在しないIDを指定してもアカウントは変わらない", () => {
+    const { result } = renderHook(() => useAppStore());
+    act(() => {
+      result.current.addAccount(mockAccount);
+      result.current.updateAccount("non-existent-id", { label: "無視される" });
+    });
+    expect(result.current.accounts).toEqual([mockAccount]);
   });
 
   it("アカウントを削除できる", () => {

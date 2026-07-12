@@ -19,7 +19,11 @@ CLAUDE.mdの「セキュリティルールに従うこと」を、本プロジ�
 
 ### 2. CSP / WebView 設定（`src-tauri/tauri.conf.json`）
 
-- [ ] `app.security.csp` の値を確認する。**現状 `null`（CSP無効）**。アプリ自身の WebView に外部リソースを読み込む箇所があれば CSP 設定を検討する
+- [ ] `app.security.csp` の**現在値**を都度確認し、その内容で評価する（過去のレビュー結果を鵜呑みにしない）
+  - `null`（CSP無効）→ **High** として報告
+  - `script-src` に `'unsafe-inline'` や `*` が含まれる → 報告（インラインスクリプト注入・任意スクリプト読み込みのリスク）
+  - `connect-src https:` / `img-src https:` のような広い許可 → アプリの実際の通信先と比べて妥当か評価（不要に広ければ Medium 程度で報告）
+  - `default-src 'self'` を起点に、各ディレクティブが必要最小限に絞られているか確認
 - [ ] `withGlobalTauri: true` の影響範囲を確認（`window.__TAURI__` が WebView に露出する）。x.com を表示する column WebView から Tauri API が呼べる状態になっていないか（`dangerousRemoteDomainIpcAccess` 等の設定有無）
 - [ ] 外部 URL を WebView にロードする際、信頼ドメインの検証があるか
 

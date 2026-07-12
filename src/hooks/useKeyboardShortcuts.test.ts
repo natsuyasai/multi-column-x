@@ -22,6 +22,8 @@ function makeProps(
     onAppSettings: () => void;
     onToggleTopBar: () => void;
     onJumpToColumn: (index: number) => void;
+    onReloadColumn: () => void;
+    onToggleHelp: () => void;
     disabled: boolean;
   }> = {},
 ) {
@@ -33,6 +35,8 @@ function makeProps(
     onAppSettings: vi.fn(),
     onToggleTopBar: vi.fn(),
     onJumpToColumn: vi.fn(),
+    onReloadColumn: vi.fn(),
+    onToggleHelp: vi.fn(),
     disabled: false,
     ...overrides,
   };
@@ -304,5 +308,125 @@ describe("useKeyboardShortcuts", () => {
       new KeyboardEvent("keydown", { key: "0", ctrlKey: true }),
     );
     expect(props.onJumpToColumn).not.toHaveBeenCalled();
+  });
+
+  it("r キーを押すと onReloadColumn が呼ばれる", () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "r", ctrlKey: false }),
+    );
+    expect(props.onReloadColumn).toHaveBeenCalledOnce();
+  });
+
+  it("r キー（大文字R）を押すと onReloadColumn が呼ばれる", () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "R", ctrlKey: false }),
+    );
+    expect(props.onReloadColumn).toHaveBeenCalledOnce();
+  });
+
+  it("Ctrl+r では onReloadColumn が呼ばれない", () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "r", ctrlKey: true }),
+    );
+    expect(props.onReloadColumn).not.toHaveBeenCalled();
+  });
+
+  it("input要素にフォーカス中は r キーを押しても onReloadColumn が呼ばれない", () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    input.focus();
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "r", ctrlKey: false, bubbles: true }),
+    );
+    expect(props.onReloadColumn).not.toHaveBeenCalled();
+    document.body.removeChild(input);
+  });
+
+  it("textarea要素にフォーカス中は r キーを押しても onReloadColumn が呼ばれない", () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    const textarea = document.createElement("textarea");
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "r", ctrlKey: false, bubbles: true }),
+    );
+    expect(props.onReloadColumn).not.toHaveBeenCalled();
+    document.body.removeChild(textarea);
+  });
+
+  it("disabled=true のとき r キーを押しても onReloadColumn が呼ばれない", () => {
+    const props = makeProps({ disabled: true });
+    renderHook(() => useKeyboardShortcuts(props));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "r", ctrlKey: false }),
+    );
+    expect(props.onReloadColumn).not.toHaveBeenCalled();
+  });
+
+  it("WebView から reload_column イベントを受信すると onReloadColumn が呼ばれる", async () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    await act(async () => {
+      capturedListenCallback?.({ payload: "reload_column" });
+    });
+    expect(props.onReloadColumn).toHaveBeenCalledOnce();
+  });
+
+  it("disabled=true のとき reload_column イベントを受信しても onReloadColumn が呼ばれない", async () => {
+    const props = makeProps({ disabled: true });
+    renderHook(() => useKeyboardShortcuts(props));
+    await act(async () => {
+      capturedListenCallback?.({ payload: "reload_column" });
+    });
+    expect(props.onReloadColumn).not.toHaveBeenCalled();
+  });
+
+  it("? キーを押すと onToggleHelp が呼ばれる", () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "?", ctrlKey: false }),
+    );
+    expect(props.onToggleHelp).toHaveBeenCalledOnce();
+  });
+
+  it("input要素にフォーカス中は ? キーを押しても onToggleHelp が呼ばれない", () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    input.focus();
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "?", ctrlKey: false, bubbles: true }),
+    );
+    expect(props.onToggleHelp).not.toHaveBeenCalled();
+    document.body.removeChild(input);
+  });
+
+  it("disabled=true のとき ? キーを押しても onToggleHelp が呼ばれない", () => {
+    const props = makeProps({ disabled: true });
+    renderHook(() => useKeyboardShortcuts(props));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "?", ctrlKey: false }),
+    );
+    expect(props.onToggleHelp).not.toHaveBeenCalled();
+  });
+
+  it("WebView から show_shortcut_help イベントを受信すると onToggleHelp が呼ばれる", async () => {
+    const props = makeProps();
+    renderHook(() => useKeyboardShortcuts(props));
+    await act(async () => {
+      capturedListenCallback?.({ payload: "show_shortcut_help" });
+    });
+    expect(props.onToggleHelp).toHaveBeenCalledOnce();
   });
 });

@@ -1,7 +1,7 @@
 ---
 description: "t-wada推奨TDDワークフローで機能を実装する"
 user-invocable: true
-arg: "実装する機能の名前や説明"
+argument-hint: "実装する機能の名前や説明"
 ---
 
 # TDD（テスト駆動開発）ワークフロー
