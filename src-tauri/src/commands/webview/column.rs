@@ -7,13 +7,13 @@ use crate::commands::settings_store::{
     load_video_auto_play_stop_enabled, load_video_popup_enabled,
 };
 use crate::inject::{build_init_script, InitScriptParams};
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", windows))]
 use crate::ipc_constants::events;
 use crate::ipc_constants::labels;
 use crate::state::AppState;
 #[cfg(desktop)]
 use std::path::PathBuf;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", windows))]
 use tauri::Emitter;
 #[cfg(all(desktop, not(target_os = "linux")))]
 use tauri::WebviewBuilder;
@@ -138,18 +138,26 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
         // フロントへ通知する。TS 側が当該カラムの WebView を再生成して復旧する。
         let crash_app = app.clone();
         let crash_column_id = args.column.id.clone();
+        // カラム WebView が OS フォーカスを得たら column-webview-focused を emit する。
+        // TS 側はこれを listen して、フォーカスが当たったカラムの未読バッジを自動的に消す。
+        let focus_app = app.clone();
+        let focus_column_id = args.column.id.clone();
         let _ = webview_window.with_webview(move |platform_webview| {
+            use gtk::prelude::WidgetExt;
             use webkit2gtk::WebViewExt;
-            platform_webview
-                .inner()
-                .connect_web_process_terminated(move |_webview, _reason| {
-                    let _ = crash_app.emit(events::COLUMN_WEBVIEW_CRASHED, &crash_column_id);
-                });
+            let webview = platform_webview.inner();
+            webview.connect_web_process_terminated(move |_webview, _reason| {
+                let _ = crash_app.emit(events::COLUMN_WEBVIEW_CRASHED, &crash_column_id);
+            });
+            webview.connect_focus_in_event(move |_widget, _event| {
+                let _ = focus_app.emit(events::COLUMN_WEBVIEW_FOCUSED, &focus_column_id);
+                gtk::glib::Propagation::Proceed
+            });
         });
     }
 
     #[cfg(not(target_os = "linux"))]
-    window
+    let child_webview = window
         .add_child(
             WebviewBuilder::new(&label, WebviewUrl::External(parse_url(&url)?))
                 .initialization_script(&init_script)
@@ -158,6 +166,26 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
             LogicalSize::new(args.width, args.height),
         )
         .map_err(|e| e.to_string())?;
+
+    // Windows: カラム WebView が OS フォーカスを得たら column-webview-focused を emit する。
+    // TS 側はこれを listen して、フォーカスが当たったカラムの未読バッジを自動的に消す。
+    #[cfg(windows)]
+    {
+        let focus_app = app.clone();
+        let focus_column_id = args.column.id.clone();
+        let _ = child_webview.with_webview(move |platform_webview| {
+            let controller = platform_webview.controller();
+            let mut token: i64 = 0;
+            let handler =
+                webview2_com::FocusChangedEventHandler::create(Box::new(move |_sender, _args| {
+                    let _ = focus_app.emit(events::COLUMN_WEBVIEW_FOCUSED, &focus_column_id);
+                    Ok(())
+                }));
+            unsafe {
+                let _ = controller.add_GotFocus(&handler, &mut token);
+            }
+        });
+    }
 
     let state = app.state::<AppState>();
     let mut registry = state.registry.lock().expect("registry mutex poisoned");

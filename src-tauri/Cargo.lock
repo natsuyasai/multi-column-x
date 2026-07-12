@@ -2288,6 +2288,7 @@ dependencies = [
 name = "multicolumnx"
 version = "0.1.8"
 dependencies = [
+ "gtk",
  "jni 0.21.1",
  "log",
  "proptest",
@@ -2308,6 +2309,7 @@ dependencies = [
  "urlencoding",
  "uuid",
  "webkit2gtk",
+ "webview2-com",
 ]
 
 [[package]]

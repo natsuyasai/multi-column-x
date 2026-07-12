@@ -9,6 +9,7 @@ import {
 import { useEffect } from "react";
 import { IPC_EVENTS, WEBVIEW_LABELS } from "../constants/ipc";
 import { useAppStore } from "../store/useAppStore";
+import { getColumnLabel } from "../types";
 
 /** WebView 内の横ホイールを受け取ってスクロールバーを動かす */
 export function useWebviewScrollRelay(
@@ -58,6 +59,24 @@ export function useColumnCrashRecovery(
 }
 
 /**
+ * カラム WebView がOSフォーカスを得た（Windowsのみ発火）ことを検知して、
+ * 対象カラムの未読バッジを自動的にクリアする。
+ * Rust が WebView2 の GotFocus イベントから emit する column-webview-focused を listen する。
+ */
+export function useColumnFocusClearsUnread(
+  clearUnreadCount: (columnId: string) => void,
+) {
+  useEffect(() => {
+    const unlisten = listen<string>(IPC_EVENTS.COLUMN_WEBVIEW_FOCUSED, (e) => {
+      clearUnreadCount(e.payload);
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [clearUnreadCount]);
+}
+
+/**
  * 通知許可のリクエスト試行済みフラグ（モジュールレベルでキャッシュ）。
  * 一度リクエストして拒否された場合、新着のたびに OS 許可ダイアログを
  * 繰り返し要求しないようにするためのガード。
@@ -87,12 +106,12 @@ async function ensureNotificationPermissionGranted(): Promise<boolean> {
   return permission === "granted";
 }
 
-async function notifyNewPosts(count: number): Promise<void> {
+async function notifyNewPosts(columnName: string): Promise<void> {
   const granted = await ensureNotificationPermissionGranted();
   if (!granted) return;
   sendNotification({
     title: "新着通知",
-    body: `${count}件の新しい通知があります`,
+    body: `${columnName}に新着があります`,
   });
 }
 
@@ -122,7 +141,8 @@ export function useNewPostsNotification(
           col.settings.autoReloadEnabled &&
           count > 0
         ) {
-          void notifyNewPosts(count);
+          const columnName = getColumnLabel(col);
+          void notifyNewPosts(columnName);
         }
       },
     );

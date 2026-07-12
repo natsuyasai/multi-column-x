@@ -2,11 +2,12 @@ import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { IPC_EVENTS } from "../constants/ipc";
 import { useAppStore } from "../store/useAppStore";
-import { DEFAULT_COLUMN_SETTINGS } from "../types";
+import { DEFAULT_COLUMN_SETTINGS, getColumnLabel } from "../types";
 import type { Column } from "../types";
 import {
   __resetNotificationPermissionCacheForTests,
   useColumnCrashRecovery,
+  useColumnFocusClearsUnread,
   useNewPostsNotification,
   useWebviewScrollRelay,
 } from "./useWebviewEvents";
@@ -134,6 +135,40 @@ describe("useColumnCrashRecovery", () => {
   });
 });
 
+describe("useColumnFocusClearsUnread", () => {
+  beforeEach(() => {
+    capturedCallbacks.clear();
+    mockUnlisten.mockReset();
+  });
+
+  function emitFocus(columnId: string) {
+    capturedCallbacks.get(IPC_EVENTS.COLUMN_WEBVIEW_FOCUSED)?.({
+      payload: columnId,
+    });
+  }
+
+  it("column-webview-focusedイベント受信時payloadのcolumnIdでclearUnreadCountを呼ぶ", async () => {
+    const clearUnreadCount = vi.fn();
+    renderHook(() => useColumnFocusClearsUnread(clearUnreadCount));
+    await act(async () => {
+      emitFocus("col-1");
+    });
+    expect(clearUnreadCount).toHaveBeenCalledWith("col-1");
+  });
+
+  it("異なるcolumnIdのイベントが複数回来た場合それぞれ正しいcolumnIdで呼ばれる", async () => {
+    const clearUnreadCount = vi.fn();
+    renderHook(() => useColumnFocusClearsUnread(clearUnreadCount));
+    await act(async () => {
+      emitFocus("col-1");
+      emitFocus("col-2");
+    });
+    expect(clearUnreadCount).toHaveBeenCalledWith("col-1");
+    expect(clearUnreadCount).toHaveBeenCalledWith("col-2");
+    expect(clearUnreadCount).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("useNewPostsNotification", () => {
   beforeEach(() => {
     capturedCallbacks.clear();
@@ -178,35 +213,53 @@ describe("useNewPostsNotification", () => {
     expect(setUnreadCount).toHaveBeenCalledWith("col-1", 3);
   });
 
-  it("新着があるとsendNotificationが呼ばれる", async () => {
+  it("新着があるとsendNotificationが呼ばれて本文にカラム名が含まれる", async () => {
     isPermissionGrantedMock.mockResolvedValue(true);
     setNotificationColumn();
+    const col = makeColumn({
+      id: "col-1",
+      pageType: "notifications",
+      settings: { ...DEFAULT_COLUMN_SETTINGS, autoReloadEnabled: true },
+    });
+    useAppStore.setState({ columns: [col] });
     const setUnreadCount = vi.fn();
     renderHook(() => useNewPostsNotification(setUnreadCount));
     await act(async () => {
-      emitNewPosts("column-col-1", 5);
+      emitNewPosts("column-col-1", 1);
     });
-    expect(sendNotificationMock).toHaveBeenCalledWith({
-      title: "新着通知",
-      body: "5件の新しい通知があります",
-    });
+    const expectedColumnName = getColumnLabel(col);
+    expect(sendNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "新着通知",
+        body: expect.stringContaining(expectedColumnName),
+      }),
+    );
     expect(requestPermissionMock).not.toHaveBeenCalled();
   });
 
-  it("未許可の場合はrequestPermissionを呼び、許可されればsendNotificationを呼ぶ", async () => {
+  it("未許可の場合はrequestPermissionを呼び、許可されればsendNotificationを呼ぶ（本文にカラム名が含まれる）", async () => {
     isPermissionGrantedMock.mockResolvedValue(false);
     requestPermissionMock.mockResolvedValue("granted");
     setNotificationColumn();
+    const col = makeColumn({
+      id: "col-1",
+      pageType: "notifications",
+      settings: { ...DEFAULT_COLUMN_SETTINGS, autoReloadEnabled: true },
+    });
+    useAppStore.setState({ columns: [col] });
     const setUnreadCount = vi.fn();
     renderHook(() => useNewPostsNotification(setUnreadCount));
     await act(async () => {
-      emitNewPosts("column-col-1", 2);
+      emitNewPosts("column-col-1", 1);
     });
     expect(requestPermissionMock).toHaveBeenCalled();
-    expect(sendNotificationMock).toHaveBeenCalledWith({
-      title: "新着通知",
-      body: "2件の新しい通知があります",
-    });
+    const expectedColumnName = getColumnLabel(col);
+    expect(sendNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "新着通知",
+        body: expect.stringContaining(expectedColumnName),
+      }),
+    );
   });
 
   it("権限が拒否された場合は通知しない", async () => {
@@ -260,30 +313,30 @@ describe("useNewPostsNotification", () => {
     expect(sendNotificationMock).not.toHaveBeenCalled();
   });
 
-  it("desktopNotifyEnabledが有効なカラムは通知される", async () => {
+  it("desktopNotifyEnabledが有効なカラムは通知される（本文にカラム名が含まれる）", async () => {
     isPermissionGrantedMock.mockResolvedValue(true);
-    useAppStore.setState({
-      columns: [
-        makeColumn({
-          id: "col-1",
-          pageType: "search",
-          settings: {
-            ...DEFAULT_COLUMN_SETTINGS,
-            autoReloadEnabled: true,
-            desktopNotifyEnabled: true,
-          },
-        }),
-      ],
+    const col = makeColumn({
+      id: "col-1",
+      pageType: "search",
+      settings: {
+        ...DEFAULT_COLUMN_SETTINGS,
+        autoReloadEnabled: true,
+        desktopNotifyEnabled: true,
+      },
     });
+    useAppStore.setState({ columns: [col] });
     const setUnreadCount = vi.fn();
     renderHook(() => useNewPostsNotification(setUnreadCount));
     await act(async () => {
-      emitNewPosts("column-col-1", 2);
+      emitNewPosts("column-col-1", 1);
     });
-    expect(sendNotificationMock).toHaveBeenCalledWith({
-      title: "新着通知",
-      body: "2件の新しい通知があります",
-    });
+    const expectedColumnName = getColumnLabel(col);
+    expect(sendNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "新着通知",
+        body: expect.stringContaining(expectedColumnName),
+      }),
+    );
   });
 
   it("desktopNotifyEnabledが無効なカラムはバッジのみ更新される", async () => {
@@ -310,25 +363,73 @@ describe("useNewPostsNotification", () => {
     expect(sendNotificationMock).not.toHaveBeenCalled();
   });
 
-  it("notificationsカラムはdesktopNotifyEnabled未設定でも従来どおり通知される", async () => {
+  it("notificationsカラムはdesktopNotifyEnabled未設定でも従来どおり通知される（本文にカラム名が含まれる）", async () => {
     isPermissionGrantedMock.mockResolvedValue(true);
-    useAppStore.setState({
-      columns: [
-        makeColumn({
-          id: "col-1",
-          pageType: "notifications",
-          settings: { ...DEFAULT_COLUMN_SETTINGS, autoReloadEnabled: true },
-        }),
-      ],
+    const col = makeColumn({
+      id: "col-1",
+      pageType: "notifications",
+      settings: { ...DEFAULT_COLUMN_SETTINGS, autoReloadEnabled: true },
     });
+    useAppStore.setState({ columns: [col] });
     const setUnreadCount = vi.fn();
     renderHook(() => useNewPostsNotification(setUnreadCount));
     await act(async () => {
-      emitNewPosts("column-col-1", 4);
+      emitNewPosts("column-col-1", 1);
     });
-    expect(sendNotificationMock).toHaveBeenCalledWith({
-      title: "新着通知",
-      body: "4件の新しい通知があります",
+    const expectedColumnName = getColumnLabel(col);
+    expect(sendNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "新着通知",
+        body: expect.stringContaining(expectedColumnName),
+      }),
+    );
+  });
+
+  it("カラムにlabelが設定されている場合、通知本文にそのlabelが含まれる", async () => {
+    isPermissionGrantedMock.mockResolvedValue(true);
+    const col = makeColumn({
+      id: "col-1",
+      label: "My Custom Column",
+      pageType: "home",
+      settings: {
+        ...DEFAULT_COLUMN_SETTINGS,
+        autoReloadEnabled: true,
+        desktopNotifyEnabled: true,
+      },
     });
+    useAppStore.setState({ columns: [col] });
+    const setUnreadCount = vi.fn();
+    renderHook(() => useNewPostsNotification(setUnreadCount));
+    await act(async () => {
+      emitNewPosts("column-col-1", 1);
+    });
+    expect(sendNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "新着通知",
+        body: expect.stringContaining("My Custom Column"),
+      }),
+    );
+  });
+
+  it("カラムにlabelが設定されていない場合、通知本文にページタイプラベルが含まれる", async () => {
+    isPermissionGrantedMock.mockResolvedValue(true);
+    const col = makeColumn({
+      id: "col-1",
+      pageType: "notifications",
+      settings: { ...DEFAULT_COLUMN_SETTINGS, autoReloadEnabled: true },
+    });
+    useAppStore.setState({ columns: [col] });
+    const setUnreadCount = vi.fn();
+    renderHook(() => useNewPostsNotification(setUnreadCount));
+    await act(async () => {
+      emitNewPosts("column-col-1", 1);
+    });
+    // notifications ページタイプのラベルは "通知"
+    expect(sendNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "新着通知",
+        body: expect.stringContaining("通知"),
+      }),
+    );
   });
 });
