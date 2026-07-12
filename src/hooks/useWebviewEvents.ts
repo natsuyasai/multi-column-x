@@ -130,14 +130,9 @@ export function useNewPostsNotification(
         const col = useAppStore
           .getState()
           .columns.find((c) => c.id === columnId);
-        // notifications カラムは従来どおり常に通知対象（後方互換）。
-        // それ以外のカラムはカラム設定の desktopNotifyEnabled で任意に拡大できる。
-        const isNotifyTarget =
-          col?.pageType === "notifications" ||
-          col?.settings.desktopNotifyEnabled;
         if (
           col &&
-          isNotifyTarget &&
+          col.settings.desktopNotifyEnabled &&
           col.settings.autoReloadEnabled &&
           count > 0
         ) {
