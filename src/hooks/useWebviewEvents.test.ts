@@ -196,7 +196,11 @@ describe("useNewPostsNotification", () => {
         makeColumn({
           id: "col-1",
           pageType: "notifications",
-          settings: { ...DEFAULT_COLUMN_SETTINGS, autoReloadEnabled: true },
+          settings: {
+            ...DEFAULT_COLUMN_SETTINGS,
+            autoReloadEnabled: true,
+            desktopNotifyEnabled: true,
+          },
         }),
       ],
     });
@@ -205,6 +209,14 @@ describe("useNewPostsNotification", () => {
   it("label から column- プレフィックスを除いた columnId で setUnreadCount を呼ぶ", async () => {
     isPermissionGrantedMock.mockResolvedValue(false);
     requestPermissionMock.mockResolvedValue("denied");
+    useAppStore.setState({
+      columns: [
+        makeColumn({
+          id: "col-1",
+          settings: { ...DEFAULT_COLUMN_SETTINGS, desktopNotifyEnabled: true },
+        }),
+      ],
+    });
     const setUnreadCount = vi.fn();
     renderHook(() => useNewPostsNotification(setUnreadCount));
     await act(async () => {
@@ -215,11 +227,14 @@ describe("useNewPostsNotification", () => {
 
   it("新着があるとsendNotificationが呼ばれて本文にカラム名が含まれる", async () => {
     isPermissionGrantedMock.mockResolvedValue(true);
-    setNotificationColumn();
     const col = makeColumn({
       id: "col-1",
       pageType: "notifications",
-      settings: { ...DEFAULT_COLUMN_SETTINGS, autoReloadEnabled: true },
+      settings: {
+        ...DEFAULT_COLUMN_SETTINGS,
+        autoReloadEnabled: true,
+        desktopNotifyEnabled: true,
+      },
     });
     useAppStore.setState({ columns: [col] });
     const setUnreadCount = vi.fn();
@@ -240,11 +255,14 @@ describe("useNewPostsNotification", () => {
   it("未許可の場合はrequestPermissionを呼び、許可されればsendNotificationを呼ぶ（本文にカラム名が含まれる）", async () => {
     isPermissionGrantedMock.mockResolvedValue(false);
     requestPermissionMock.mockResolvedValue("granted");
-    setNotificationColumn();
     const col = makeColumn({
       id: "col-1",
       pageType: "notifications",
-      settings: { ...DEFAULT_COLUMN_SETTINGS, autoReloadEnabled: true },
+      settings: {
+        ...DEFAULT_COLUMN_SETTINGS,
+        autoReloadEnabled: true,
+        desktopNotifyEnabled: true,
+      },
     });
     useAppStore.setState({ columns: [col] });
     const setUnreadCount = vi.fn();
@@ -290,14 +308,14 @@ describe("useNewPostsNotification", () => {
     expect(sendNotificationMock).not.toHaveBeenCalled();
   });
 
-  it("通知カラムでないカラムは通知を送らない", async () => {
+  it("desktopNotifyEnabledが無効なカラム（デフォルト設定）はバッジも通知も送らない", async () => {
     isPermissionGrantedMock.mockResolvedValue(true);
     const setUnreadCount = vi.fn();
     renderHook(() => useNewPostsNotification(setUnreadCount));
     await act(async () => {
       emitNewPosts("column-col-1", 5);
     });
-    expect(setUnreadCount).toHaveBeenCalledWith("col-1", 5);
+    expect(setUnreadCount).not.toHaveBeenCalled();
     expect(sendNotificationMock).not.toHaveBeenCalled();
   });
 
@@ -339,7 +357,7 @@ describe("useNewPostsNotification", () => {
     );
   });
 
-  it("desktopNotifyEnabledが無効なカラムはバッジのみ更新される", async () => {
+  it("desktopNotifyEnabledが無効なカラムはバッジも通知も更新されない", async () => {
     isPermissionGrantedMock.mockResolvedValue(true);
     useAppStore.setState({
       columns: [
@@ -359,16 +377,37 @@ describe("useNewPostsNotification", () => {
     await act(async () => {
       emitNewPosts("column-col-1", 2);
     });
-    expect(setUnreadCount).toHaveBeenCalledWith("col-1", 2);
+    expect(setUnreadCount).not.toHaveBeenCalled();
     expect(sendNotificationMock).not.toHaveBeenCalled();
   });
 
-  it("notificationsカラムはdesktopNotifyEnabled未設定でも従来どおり通知される（本文にカラム名が含まれる）", async () => {
+  it("notificationsカラムでもdesktopNotifyEnabledが無効ならバッジも通知も更新されない", async () => {
     isPermissionGrantedMock.mockResolvedValue(true);
     const col = makeColumn({
       id: "col-1",
       pageType: "notifications",
       settings: { ...DEFAULT_COLUMN_SETTINGS, autoReloadEnabled: true },
+    });
+    useAppStore.setState({ columns: [col] });
+    const setUnreadCount = vi.fn();
+    renderHook(() => useNewPostsNotification(setUnreadCount));
+    await act(async () => {
+      emitNewPosts("column-col-1", 1);
+    });
+    expect(setUnreadCount).not.toHaveBeenCalled();
+    expect(sendNotificationMock).not.toHaveBeenCalled();
+  });
+
+  it("notificationsカラムでdesktopNotifyEnabledが有効なら通知される（本文にカラム名が含まれる）", async () => {
+    isPermissionGrantedMock.mockResolvedValue(true);
+    const col = makeColumn({
+      id: "col-1",
+      pageType: "notifications",
+      settings: {
+        ...DEFAULT_COLUMN_SETTINGS,
+        autoReloadEnabled: true,
+        desktopNotifyEnabled: true,
+      },
     });
     useAppStore.setState({ columns: [col] });
     const setUnreadCount = vi.fn();
@@ -416,7 +455,11 @@ describe("useNewPostsNotification", () => {
     const col = makeColumn({
       id: "col-1",
       pageType: "notifications",
-      settings: { ...DEFAULT_COLUMN_SETTINGS, autoReloadEnabled: true },
+      settings: {
+        ...DEFAULT_COLUMN_SETTINGS,
+        autoReloadEnabled: true,
+        desktopNotifyEnabled: true,
+      },
     });
     useAppStore.setState({ columns: [col] });
     const setUnreadCount = vi.fn();
