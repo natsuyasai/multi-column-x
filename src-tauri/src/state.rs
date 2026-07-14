@@ -14,8 +14,47 @@ pub struct WebviewEntry {
     pub data_directory: String,
 }
 
+/// 常駐コンポーズ WebView の状態（デスクトップ / Android 共通）。
+pub struct ComposeSession {
+    #[allow(dead_code)]
+    pub label: String,
+    #[allow(dead_code)]
+    pub account_id: String,
+}
+
+/// open_compose_window が取るべきアクション。
+#[derive(Debug, PartialEq)]
+#[allow(dead_code)]
+pub enum ComposeAction {
+    /// 既存の常駐を再表示して /compose/post へ遷移する
+    Reuse { label: String },
+    /// アカウントが変わったため旧常駐を破棄して作り直す
+    Replace { old_label: String },
+    /// 常駐が無いので新規作成する
+    CreateNew,
+}
+
+/// 現在の常駐コンポーズ状態と要求されたアカウントIDから、取るべきアクションを判定する。
+#[allow(dead_code)]
+pub fn decide_compose_action(
+    current: Option<&ComposeSession>,
+    requested_account_id: &str,
+) -> ComposeAction {
+    match current {
+        None => ComposeAction::CreateNew,
+        Some(session) if session.account_id == requested_account_id => ComposeAction::Reuse {
+            label: session.label.clone(),
+        },
+        Some(session) => ComposeAction::Replace {
+            old_label: session.label.clone(),
+        },
+    }
+}
+
 pub struct AppState {
     pub registry: Mutex<WebviewRegistry>,
+    #[allow(dead_code)]
+    pub compose: Mutex<Option<ComposeSession>>,
 }
 
 impl AppState {
@@ -24,6 +63,7 @@ impl AppState {
             registry: Mutex::new(WebviewRegistry {
                 entries: HashMap::new(),
             }),
+            compose: Mutex::new(None),
         }
     }
 }
@@ -157,5 +197,48 @@ mod tests {
         let state = AppState::new();
         let registry = state.registry.lock().unwrap();
         assert!(registry.entries.is_empty());
+    }
+
+    #[test]
+    fn app_state_newはcomposeがnoneである() {
+        let state = AppState::new();
+        let compose = state.compose.lock().unwrap();
+        assert!(compose.is_none());
+    }
+
+    #[test]
+    fn decide_compose_actionは常駐なしのときcreate_newを返す() {
+        let action = decide_compose_action(None, "account-1");
+        assert_eq!(action, ComposeAction::CreateNew);
+    }
+
+    #[test]
+    fn decide_compose_actionは同一アカウントのときreuseを返しlabelが一致する() {
+        let current = ComposeSession {
+            label: "compose-1".to_string(),
+            account_id: "account-1".to_string(),
+        };
+        let action = decide_compose_action(Some(&current), "account-1");
+        assert_eq!(
+            action,
+            ComposeAction::Reuse {
+                label: "compose-1".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn decide_compose_actionは別アカウントのときreplaceを返しold_labelが旧常駐のlabelである() {
+        let current = ComposeSession {
+            label: "compose-1".to_string(),
+            account_id: "account-old".to_string(),
+        };
+        let action = decide_compose_action(Some(&current), "account-new");
+        assert_eq!(
+            action,
+            ComposeAction::Replace {
+                old_label: "compose-1".to_string()
+            }
+        );
     }
 }
