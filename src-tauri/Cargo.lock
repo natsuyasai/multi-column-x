@@ -2286,7 +2286,7 @@ dependencies = [
 
 [[package]]
 name = "multicolumnx"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "gtk",
  "jni 0.21.1",

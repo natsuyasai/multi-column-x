@@ -376,6 +376,56 @@ pub fn remove_popup_webview(id: &str) -> Result<(), String> {
     })
 }
 
+/// MainActivity.hidePopupWebView を呼び出して常駐コンポーズ WebView を破棄せず非表示退避する。
+/// アプリ終了以外の「閉じる」操作（戻るボタン / close_popup_window）から呼ばれる。
+pub fn hide_popup_webview(id: &str) -> Result<(), String> {
+    call_activity_method(|env, activity| {
+        let j_id = env.new_string(id).map_err(|e| e.to_string())?;
+        env.call_method(
+            activity,
+            "hidePopupWebView",
+            "(Ljava/lang/String;)V",
+            &[JValue::Object(&*j_id)],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
+/// MainActivity.reshowPopupWebView を呼び出して退避中の常駐コンポーズ WebView を再表示し、
+/// 指定 URL へ遷移する。対象が退避されていなければ `Ok(false)` を返し、
+/// 呼び出し側（open_compose_window）で新規作成にフォールバックする。
+/// 注意: `call_activity_method` ヘルパーは戻り値 `()` 固定のため使えず、
+/// bool 戻り値を受け取るために attach ロジックをここで直接書く。
+pub fn reshow_popup_webview(id: &str, url: &str) -> Result<bool, String> {
+    let guard = MAIN_ACTIVITY
+        .lock()
+        .map_err(|e| format!("mutex lock: {e}"))?;
+    let (vm, activity_ref) = guard.as_ref().ok_or("android context not initialized")?;
+    let mut env = vm
+        .attach_current_thread()
+        .map_err(|e| format!("attach_current_thread: {e}"))?;
+    // pending exception をクリアしてから呼び出し、後続 JNI 呼び出しへの影響を防ぐ
+    if env.exception_check().unwrap_or(false) {
+        let _ = env.exception_clear();
+    }
+    let j_id = env.new_string(id).map_err(|e| e.to_string())?;
+    let j_url = env.new_string(url).map_err(|e| e.to_string())?;
+    let result = env
+        .call_method(
+            activity_ref.as_obj(),
+            "reshowPopupWebView",
+            "(Ljava/lang/String;Ljava/lang/String;)Z",
+            &[JValue::Object(&*j_id), JValue::Object(&*j_url)],
+        )
+        .and_then(|v| v.z())
+        .map_err(|e| e.to_string());
+    if env.exception_check().unwrap_or(false) {
+        let _ = env.exception_clear();
+    }
+    result
+}
+
 /// MainActivity.setAccountCookies を呼び出して CookieManager を指定アカウントに切り替える。
 /// showColumnWebView とは独立しているため、WebView の表示状態に影響しない。
 pub fn set_account_cookies(account_id: &str) -> Result<(), String> {

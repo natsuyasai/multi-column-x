@@ -4,6 +4,8 @@ use super::parse_url;
 use crate::commands::settings_store::{load_accounts_json, load_popup_esc_close_enabled};
 use crate::ipc_constants::labels;
 use crate::state::AppState;
+#[cfg(target_os = "android")]
+use crate::state::ComposeSession;
 #[cfg(not(target_os = "android"))]
 use std::path::PathBuf;
 #[cfg(not(target_os = "android"))]
@@ -298,6 +300,32 @@ pub fn switch_popup_session_android(
     account_id: &str,
     url: &str,
 ) -> Result<(), String> {
+    // compose（COMPOSE_PREFIX）のセッション切替は「常駐の置換」として扱う。
+    // POPUP_PREFIX 固定で再作成すると常駐ラベルが popup- になり compose 扱いから
+    // 外れてしまう（旧バグ）ため、COMPOSE_PREFIX を維持し常駐状態も更新する。
+    if is_compose_popup_label(popup_label) {
+        // compose は常に新規作成ページへ遷移する（渡された url は使わない）。
+        const COMPOSE_URL: &str = "https://x.com/compose/post";
+        // 退避中（hide）の旧常駐でも破棄する（Kotlin 側 removePopupWebView の退避分対応）。
+        crate::android_bridge::remove_popup_webview(popup_label)?;
+        let PopupInit {
+            label: new_label,
+            init_script: popup_init,
+        } = build_popup_init(app, labels::COMPOSE_PREFIX, account_id, "");
+        crate::android_bridge::create_popup_webview(
+            &new_label,
+            COMPOSE_URL,
+            &popup_init,
+            account_id,
+        )?;
+        let state = app.state::<AppState>();
+        *state.compose.lock().expect("compose mutex poisoned") = Some(ComposeSession {
+            label: new_label,
+            account_id: account_id.to_string(),
+        });
+        return Ok(());
+    }
+
     crate::android_bridge::remove_popup_webview(popup_label)?;
     let PopupInit {
         label: new_label,
@@ -324,6 +352,14 @@ pub async fn switch_popup_session(
     switch_popup_session_window(app, popupLabel, accountId, dataDirectory, url).await
 }
 
+/// popup ラベルが常駐コンポーズ用ラベル（`COMPOSE_PREFIX`）かどうかを判定する。
+/// `switch_popup_session_window`（desktop）/ `switch_popup_session_android`（Android）で
+/// 「popup として再作成するか compose として常駐再作成するか」を決めるために使う。
+#[cfg(any(desktop, target_os = "android"))]
+fn is_compose_popup_label(label: &str) -> bool {
+    label.starts_with(labels::COMPOSE_PREFIX)
+}
+
 /// デスクトップ / iOS: Tauri ウィンドウとしてのポップアップを閉じて再作成する。
 #[cfg(not(target_os = "android"))]
 async fn switch_popup_session_window(
@@ -333,6 +369,26 @@ async fn switch_popup_session_window(
     #[allow(non_snake_case)] dataDirectory: String,
     url: String,
 ) -> Result<(), String> {
+    // compose（COMPOSE_PREFIX）のセッション切替は「常駐の置換」として扱う。
+    // popup として再作成すると常駐ラベルが POPUP_PREFIX になり compose 扱いから
+    // 外れてしまう（旧バグ）ため、create_compose_window で常駐登録込みに作り直す。
+    // iOS（#[cfg(mobile)] かつ非 android）は本対応の対象外のため従来どおり。
+    #[cfg(desktop)]
+    if is_compose_popup_label(&popupLabel) {
+        if let Some(window) = app.get_webview_window(&popupLabel) {
+            // close() は常駐用の CloseRequested ハンドラに拾われて非表示化されてしまう
+            // ため、置換時は destroy() で確実に破棄する。
+            window.destroy().map_err(|e| e.to_string())?;
+        }
+        let _ = url; // compose は常に COMPOSE_URL へ遷移するため url は使わない
+        return super::compose::create_compose_window(
+            &app,
+            &accountId,
+            PathBuf::from(&dataDirectory),
+        )
+        .map(|_| ());
+    }
+
     let (pos, size) = if let Some(window) = app.get_webview_window(&popupLabel) {
         let pos = window.outer_position().ok();
         let size = window.outer_size().ok();
@@ -374,12 +430,39 @@ async fn switch_popup_session_window(
 
 #[tauri::command]
 pub async fn close_popup_window(app: AppHandle, label: String) -> Result<(), String> {
+    // 常駐コンポーズは破棄せず非表示にして退避する（戻るボタン／Esc キー経路の対応）。
+    // それ以外（popup-）は従来どおり破棄する。
     #[cfg(target_os = "android")]
     {
-        crate::android_bridge::remove_popup_webview(&label).ok();
-        let _ = app;
+        let is_persistent_compose = {
+            let state = app.state::<AppState>();
+            let guard = state.compose.lock().expect("compose mutex poisoned");
+            crate::state::is_persistent_compose_label(guard.as_ref(), &label)
+        };
+        if is_persistent_compose {
+            crate::android_bridge::hide_popup_webview(&label).ok();
+        } else {
+            crate::android_bridge::remove_popup_webview(&label).ok();
+        }
         return Ok(());
     }
+
+    // 常駐コンポーズは破棄せず非表示にする（Esc キー経路の対応）。
+    #[cfg(desktop)]
+    {
+        let is_persistent_compose = {
+            let state = app.state::<AppState>();
+            let guard = state.compose.lock().expect("compose mutex poisoned");
+            crate::state::is_persistent_compose_label(guard.as_ref(), &label)
+        };
+        if is_persistent_compose {
+            if let Some(w) = app.get_webview_window(&label) {
+                w.hide().map_err(|e| e.to_string())?;
+                return Ok(());
+            }
+        }
+    }
+
     if let Some(window) = app.get_webview_window(&label) {
         window.close().map_err(|e| e.to_string())?;
         return Ok(());
@@ -407,6 +490,16 @@ mod tests {
         let (pos, size) = padded_popup_bounds(0.0, 0.0, 800.0, 600.0);
         assert_eq!((pos.x, pos.y), (50.0, 50.0));
         assert_eq!((size.width, size.height), (700.0, 500.0));
+    }
+
+    #[test]
+    fn is_compose_popup_labelはcompose_prefixで始まるlabelでtrueを返す() {
+        assert!(is_compose_popup_label("compose-abc123"));
+    }
+
+    #[test]
+    fn is_compose_popup_labelはpopup_prefixで始まるlabelでfalseを返す() {
+        assert!(!is_compose_popup_label("popup-abc123"));
     }
 
     #[test]

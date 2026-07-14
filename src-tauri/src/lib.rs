@@ -117,16 +117,27 @@ pub fn run() {
         if let tauri::WindowEvent::CloseRequested { .. } = event {
             if window.label() == crate::ipc_constants::labels::MAIN {
                 save_window_bounds(window);
+
+                use crate::ipc_constants::labels;
+
+                // 常駐コンポーズは CloseRequested を prevent_close + hide で握るため、
+                // close() では閉じられず非表示のまま残ってアプリ終了を妨げる。destroy() で明示破棄する。
+                // （全デスクトップ OS 共通）
+                let app = window.app_handle();
+                for (label, ww) in app.webview_windows() {
+                    if label.starts_with(labels::COMPOSE_PREFIX) {
+                        let _ = ww.destroy();
+                    }
+                }
+
                 // Linux ではカラム/ポップアップ WebView が独立ウィンドウのため明示的に閉じる。
                 // 他の OS では子 WebView として管理されるため不要。
                 #[cfg(target_os = "linux")]
                 {
-                    use crate::ipc_constants::labels;
                     let app = window.app_handle();
                     for (label, ww) in app.webview_windows() {
                         if label.starts_with(labels::COLUMN_PREFIX)
                             || label.starts_with(labels::POPUP_PREFIX)
-                            || label.starts_with(labels::COMPOSE_PREFIX)
                         {
                             let _ = ww.close();
                         }
