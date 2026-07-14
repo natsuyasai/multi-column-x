@@ -36,7 +36,7 @@
     public void launchReauthAccount(java.lang.String, java.lang.String);
     public void createColumnWebView(java.lang.String, java.lang.String, int, int, java.lang.String, boolean, java.lang.String);
     public void removeColumnWebView(java.lang.String);
-    public void showColumnWebView(java.lang.String, int, int);
+    public void showColumnWebView(java.lang.String, int, int, int, int);
     public void hideColumnWebView(java.lang.String);
     public void evalInColumnWebView(java.lang.String, java.lang.String);
     public void createPopupWebView(java.lang.String, java.lang.String, java.lang.String, java.lang.String);
@@ -44,6 +44,7 @@
     public void hidePopupWebView(java.lang.String);
     public boolean reshowPopupWebView(java.lang.String, java.lang.String);
     public void setAccountCookies(java.lang.String);
+    public boolean isWebViewProfileSupported();
     public void launchComposeTweet();
     public void downloadAndInstallApk(java.lang.String);
 }

@@ -385,10 +385,12 @@ class MainActivity : TauriActivity() {
     }
   }
 
-  // カラム WebView を表示し、サイズを更新する（常に左上原点に配置）。
+  // カラム WebView を表示し、位置・サイズを更新する（xDp/yDp は CSS px = dp）。
   // onResume() で JS タイマーを再開してから表示する。
   fun showColumnWebView(
     id: String,
+    xDp: Int,
+    yDp: Int,
     widthDp: Int,
     heightDp: Int,
   ) {
@@ -399,8 +401,8 @@ class MainActivity : TauriActivity() {
         (wv.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
           params.width = (widthDp * density).toInt()
           params.height = (heightDp * density).toInt()
-          params.leftMargin = 0
-          params.topMargin = 0
+          params.leftMargin = (xDp * density).toInt()
+          params.topMargin = (yDp * density).toInt()
           wv.layoutParams = params
         }
         wv.onResume()
@@ -437,6 +439,10 @@ class MainActivity : TauriActivity() {
     if (WebViewProfiles.isSupported || accountId.isEmpty()) return
     setCookieForAccount(accountId)
   }
+
+  // Profile API（アカウントごとのセッション分離）対応可否を返す。
+  // Rust の is_webview_profile_supported コマンドから JNI 経由で呼ばれる。
+  fun isWebViewProfileSupported(): Boolean = WebViewProfiles.isSupported
 
   // newConfiguredWebView の結果。loadUrl 時の Cookie フォールバック要否判定に
   // プロファイル適用結果が必要なため、WebView と合わせて返す。
