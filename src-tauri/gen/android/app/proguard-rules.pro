@@ -41,6 +41,8 @@
     public void evalInColumnWebView(java.lang.String, java.lang.String);
     public void createPopupWebView(java.lang.String, java.lang.String, java.lang.String, java.lang.String);
     public void removePopupWebView(java.lang.String);
+    public void hidePopupWebView(java.lang.String);
+    public boolean reshowPopupWebView(java.lang.String, java.lang.String);
     public void setAccountCookies(java.lang.String);
     public void launchComposeTweet();
     public void downloadAndInstallApk(java.lang.String);
