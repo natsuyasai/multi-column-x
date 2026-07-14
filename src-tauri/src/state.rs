@@ -16,15 +16,12 @@ pub struct WebviewEntry {
 
 /// 常駐コンポーズ WebView の状態（デスクトップ / Android 共通）。
 pub struct ComposeSession {
-    #[allow(dead_code)]
     pub label: String,
-    #[allow(dead_code)]
     pub account_id: String,
 }
 
 /// open_compose_window が取るべきアクション。
 #[derive(Debug, PartialEq)]
-#[allow(dead_code)]
 pub enum ComposeAction {
     /// 既存の常駐を再表示して /compose/post へ遷移する
     Reuse { label: String },
@@ -35,7 +32,6 @@ pub enum ComposeAction {
 }
 
 /// 現在の常駐コンポーズ状態と要求されたアカウントIDから、取るべきアクションを判定する。
-#[allow(dead_code)]
 pub fn decide_compose_action(
     current: Option<&ComposeSession>,
     requested_account_id: &str,
@@ -51,9 +47,14 @@ pub fn decide_compose_action(
     }
 }
 
+/// 指定した label が現在常駐しているコンポーズ WebView のものかどうかを判定する。
+/// close_popup_window の Esc 経路で「破棄せず非表示にする」対象かどうかの判定に使う。
+pub fn is_persistent_compose_label(compose: Option<&ComposeSession>, label: &str) -> bool {
+    compose.is_some_and(|session| session.label == label)
+}
+
 pub struct AppState {
     pub registry: Mutex<WebviewRegistry>,
-    #[allow(dead_code)]
     pub compose: Mutex<Option<ComposeSession>>,
 }
 
@@ -240,5 +241,28 @@ mod tests {
                 old_label: "compose-1".to_string()
             }
         );
+    }
+
+    #[test]
+    fn is_persistent_compose_labelは常駐なしのときfalseを返す() {
+        assert!(!is_persistent_compose_label(None, "compose-1"));
+    }
+
+    #[test]
+    fn is_persistent_compose_labelは常駐labelと一致するときtrueを返す() {
+        let current = ComposeSession {
+            label: "compose-1".to_string(),
+            account_id: "account-1".to_string(),
+        };
+        assert!(is_persistent_compose_label(Some(&current), "compose-1"));
+    }
+
+    #[test]
+    fn is_persistent_compose_labelは常駐labelと不一致のときfalseを返す() {
+        let current = ComposeSession {
+            label: "compose-1".to_string(),
+            account_id: "account-1".to_string(),
+        };
+        assert!(!is_persistent_compose_label(Some(&current), "popup-2"));
     }
 }
