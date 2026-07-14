@@ -12,8 +12,6 @@ pub mod events {
     pub const WEBVIEW_SCROLL: &str = "webview-scroll";
     /// 最前面ポップアップを閉じる（Android JNI → TS listen）
     pub const CLOSE_TOPMOST_POPUP: &str = "close-topmost-popup";
-    /// アクティブカラムのダブルタップ（Android JNI → TS listen）
-    pub const COLUMN_DOUBLE_TAP: &str = "column-double-tap";
     /// 新着投稿カウント（inject script invoke → TS listen）{ label, count }
     pub const WEBVIEW_NEW_POSTS_COUNT: &str = "webview-new-posts-count";
     /// キーボードショートカット（inject script invoke → TS listen）キー種別文字列
@@ -78,7 +76,6 @@ mod tests {
             ("ACCOUNT_LOGIN_COMPLETE", events::ACCOUNT_LOGIN_COMPLETE),
             ("WEBVIEW_SCROLL", events::WEBVIEW_SCROLL),
             ("CLOSE_TOPMOST_POPUP", events::CLOSE_TOPMOST_POPUP),
-            ("COLUMN_DOUBLE_TAP", events::COLUMN_DOUBLE_TAP),
             ("WEBVIEW_NEW_POSTS_COUNT", events::WEBVIEW_NEW_POSTS_COUNT),
             (
                 "WEBVIEW_KEYBOARD_SHORTCUT",

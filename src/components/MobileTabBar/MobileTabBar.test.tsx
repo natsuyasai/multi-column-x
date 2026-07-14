@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import type { Column, Account } from "../../types";
 import { MobileTabBar } from "./MobileTabBar";
 
@@ -62,6 +62,7 @@ const defaultProps = {
   onOpenLinkPopup: vi.fn(),
   onComposeTweet: vi.fn(),
   onTabAction: vi.fn(),
+  onDoubleTapColumn: vi.fn(),
 };
 
 describe("MobileTabBar", () => {
@@ -217,6 +218,82 @@ describe("MobileTabBar", () => {
           .querySelector('[title="カラムを追加"]')
           ?.querySelector('[data-testid="icon-plus"]'),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("タブのダブルタップ検出", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("同一タブを300ms以内に2回クリックすると onDoubleTapColumn が列IDで呼ばれる", () => {
+      vi.useFakeTimers();
+      const onDoubleTapColumn = vi.fn();
+      render(
+        <MobileTabBar
+          {...defaultProps}
+          columns={[col1]}
+          onDoubleTapColumn={onDoubleTapColumn}
+        />,
+      );
+      const tab = screen.getByText("ホーム");
+      fireEvent.click(tab);
+      vi.advanceTimersByTime(100);
+      fireEvent.click(tab);
+      expect(onDoubleTapColumn).toHaveBeenCalledWith("col-1");
+    });
+
+    it("同一タブを300ms以内に2回クリックしたとき、2回目では onSelectColumn は呼ばれない", () => {
+      vi.useFakeTimers();
+      const onSelect = vi.fn();
+      render(
+        <MobileTabBar
+          {...defaultProps}
+          columns={[col1]}
+          onSelectColumn={onSelect}
+        />,
+      );
+      const tab = screen.getByText("ホーム");
+      fireEvent.click(tab);
+      vi.advanceTimersByTime(100);
+      fireEvent.click(tab);
+      expect(onSelect).toHaveBeenCalledTimes(1);
+    });
+
+    it("300ms以上間隔を空けて2回クリックしても onDoubleTapColumn は呼ばれない（通常の2回の選択として扱われる）", () => {
+      vi.useFakeTimers();
+      const onDoubleTapColumn = vi.fn();
+      const onSelect = vi.fn();
+      render(
+        <MobileTabBar
+          {...defaultProps}
+          columns={[col1]}
+          onDoubleTapColumn={onDoubleTapColumn}
+          onSelectColumn={onSelect}
+        />,
+      );
+      const tab = screen.getByText("ホーム");
+      fireEvent.click(tab);
+      vi.advanceTimersByTime(400);
+      fireEvent.click(tab);
+      expect(onDoubleTapColumn).not.toHaveBeenCalled();
+      expect(onSelect).toHaveBeenCalledTimes(2);
+    });
+
+    it("異なるタブを連続でクリックしてもダブルタップとして扱われない", () => {
+      vi.useFakeTimers();
+      const onDoubleTapColumn = vi.fn();
+      render(
+        <MobileTabBar
+          {...defaultProps}
+          columns={[col1, col2]}
+          onDoubleTapColumn={onDoubleTapColumn}
+        />,
+      );
+      fireEvent.click(screen.getByText("ホーム"));
+      vi.advanceTimersByTime(50);
+      fireEvent.click(screen.getByText("通知"));
+      expect(onDoubleTapColumn).not.toHaveBeenCalled();
     });
   });
 });

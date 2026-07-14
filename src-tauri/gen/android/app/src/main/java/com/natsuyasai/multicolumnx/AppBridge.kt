@@ -36,13 +36,6 @@ object AppBridge {
   external fun closeTopPopup(): Boolean
 
   /**
-   * アクティブカラム領域でダブルタップを検出したときに呼ぶ。
-   * column-double-tap イベントを emit してページリロードをトリガーする。
-   */
-  @JvmStatic
-  external fun onDoubleTap()
-
-  /**
    * ポップアップ内のアカウント切替セレクタが変更されたときに PopupSessionBridge から呼ぶ。
    * Rust 側で既存ポップアップを削除し、選択アカウントのセッションで再作成する。
    */

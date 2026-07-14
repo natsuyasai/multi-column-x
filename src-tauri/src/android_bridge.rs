@@ -54,20 +54,6 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_closeTopPopu
     }
 }
 
-/// AppBridge.onDoubleTap() から呼ばれる JNI エントリポイント。
-/// アクティブカラムのダブルタップを column-double-tap イベントとして React に通知する。
-#[no_mangle]
-pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onDoubleTap<'local>(
-    _env: JNIEnv<'local>,
-    _class: JClass<'local>,
-) {
-    use tauri::Emitter;
-    let guard = TAURI_APP.lock().expect("TAURI_APP mutex poisoned");
-    if let Some(app) = guard.as_ref() {
-        let _ = app.emit(crate::ipc_constants::events::COLUMN_DOUBLE_TAP, ());
-    }
-}
-
 /// AppBridge.onPopupSwitchSession(popupId, accountId, url) から呼ばれる JNI エントリポイント。
 /// ポップアップツールバーのアカウント切替を受け取り、ポップアップを選択アカウントの
 /// セッションで再作成する。

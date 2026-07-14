@@ -27,7 +27,11 @@ interface TabItemProps {
   swipeActivated: boolean;
   onSelect: () => void;
   onLongPress: () => void;
+  onDoubleTap: () => void;
 }
+
+// ネイティブ側の旧実装（DoubleTapGestureDetector.kt）と同じ 300ms 閾値
+const DOUBLE_TAP_MAX_MS = 300;
 
 const TabItem: React.FC<TabItemProps> = ({
   column,
@@ -36,6 +40,7 @@ const TabItem: React.FC<TabItemProps> = ({
   swipeActivated,
   onSelect,
   onLongPress,
+  onDoubleTap,
 }) => {
   const { remaining } = useAutoReload({
     columnId: column.id,
@@ -47,6 +52,7 @@ const TabItem: React.FC<TabItemProps> = ({
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressNextClick = useRef(false);
   const touchStartPos = useRef<{ x: number; y: number } | null>(null);
+  const lastTapTimeRef = useRef(0);
 
   const fireLongPress = () => {
     suppressNextClick.current = true;
@@ -78,6 +84,14 @@ const TabItem: React.FC<TabItemProps> = ({
       onClick={() => {
         if (suppressNextClick.current) {
           suppressNextClick.current = false;
+          return;
+        }
+        const now = Date.now();
+        const isDoubleTap = now - lastTapTimeRef.current < DOUBLE_TAP_MAX_MS;
+        // 3 回目の素早いクリックが誤ってダブルタップ扱いにならないようリセットする
+        lastTapTimeRef.current = isDoubleTap ? 0 : now;
+        if (isDoubleTap) {
+          onDoubleTap();
           return;
         }
         onSelect();
@@ -132,6 +146,7 @@ interface Props {
   onOpenLinkPopup: () => void;
   onComposeTweet: () => void;
   onTabAction: (columnId: string) => void;
+  onDoubleTapColumn: (columnId: string) => void;
 }
 
 export const MobileTabBar: React.FC<Props> = ({
@@ -146,6 +161,7 @@ export const MobileTabBar: React.FC<Props> = ({
   onOpenLinkPopup,
   onComposeTweet,
   onTabAction,
+  onDoubleTapColumn,
 }) => {
   const sorted = [...columns].sort((a, b) => a.order - b.order);
   const [expanded, setExpanded] = useState(false);
@@ -180,6 +196,7 @@ export const MobileTabBar: React.FC<Props> = ({
               swipeActivated={isActive && swipeState?.phase === "switching"}
               onSelect={() => onSelectColumn(col.id)}
               onLongPress={() => onTabAction(col.id)}
+              onDoubleTap={() => onDoubleTapColumn(col.id)}
             />
           );
         })}
