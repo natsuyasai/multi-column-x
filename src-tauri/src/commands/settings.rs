@@ -127,6 +127,7 @@ impl Default for GlobalSettingsData {
             use_x_app_for_compose: false,
             mobile_swipe_area_enabled: true,
             mobile_swipe_area_height: 28,
+            mobile_two_column_enabled: true,
             presets: vec![],
             ng_words: vec![],
         }
@@ -254,6 +255,9 @@ pub struct GlobalSettingsData {
     #[serde(rename = "mobileSwipeAreaHeight")]
     #[serde(default = "default_mobile_swipe_area_height")]
     pub mobile_swipe_area_height: u32,
+    #[serde(rename = "mobileTwoColumnEnabled")]
+    #[serde(default = "default_true")]
+    pub mobile_two_column_enabled: bool,
     #[serde(default)]
     pub presets: Vec<ColumnPresetData>,
     #[serde(rename = "ngWords")]
@@ -345,6 +349,26 @@ mod tests {
         let gs = GlobalSettingsData::default();
         assert!(gs.mobile_swipe_area_enabled);
         assert_eq!(gs.mobile_swipe_area_height, 28);
+    }
+
+    #[test]
+    fn global_settings_default_mobile_two_column_enabled() {
+        let gs = GlobalSettingsData::default();
+        assert!(gs.mobile_two_column_enabled);
+    }
+
+    /// mobileTwoColumnEnabled 追加前に保存された旧 GlobalSettings JSON を
+    /// デシリアライズしてもエラーにならず、デフォルト値 true にフォールバックすることを確認する。
+    #[test]
+    fn mobile_two_column_enabledが無い旧設定はデフォルトでtrueになる() {
+        let json = serde_json::json!({
+            "theme": "dark",
+            "customCSS": "",
+            "windowBounds": { "x": 0.0, "y": 0.0, "width": 1400.0, "height": 900.0 },
+            "defaultAccountId": null,
+        });
+        let settings: GlobalSettingsData = serde_json::from_value(json).unwrap();
+        assert!(settings.mobile_two_column_enabled);
     }
 
     #[test]
