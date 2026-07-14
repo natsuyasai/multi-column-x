@@ -36,6 +36,10 @@ class MainActivity : TauriActivity() {
   // ポップアップ WebView スタック（表示順に積む）。UI スレッドからのみ操作する。
   private val popupWebViews = ArrayDeque<Pair<String, WebView>>()
 
+  // 常駐コンポーズ WebView（閉じる操作で destroy せず退避し、次回表示で再利用する）。
+  // UI スレッドからのみ操作する。
+  private var persistentComposeWebView: Pair<String, WebView>? = null
+
   // ポップアップ表示中のジェスチャー無効化。判定待ちが完了しないまま 3 秒経過したら
   // ジェスチャー判定をリセットし、全ジェスチャーが永久に受け付けられなくなる状態を防ぐ。
   private val popupGestureBlock = PopupGestureBlock()
@@ -244,6 +248,8 @@ class MainActivity : TauriActivity() {
   }
 
   // 指定 id のポップアップ WebView を削除する。JNI スレッドから呼ばれる。
+  // スタックに無い場合、退避中の常駐コンポーズ（persistentComposeWebView）の id と
+  // 一致すればそれを破棄する（アカウント切替の Replace で退避中の旧 compose を破棄するため）。
   fun removePopupWebView(id: String) {
     runOnUiThreadSync {
       val idx = popupWebViews.indexOfFirst { it.first == id }
@@ -252,19 +258,75 @@ class MainActivity : TauriActivity() {
         contentRoot.removeView(wv)
         wv.destroy()
         popupGestureBlock.onPopupCountChanged(popupWebViews.size)
+        return@runOnUiThreadSync
+      }
+      persistentComposeWebView?.takeIf { it.first == id }?.let { pair ->
+        contentRoot.removeView(pair.second)
+        pair.second.destroy()
+        persistentComposeWebView = null
       }
     }
   }
 
+  // ポップアップ WebView を破棄せず非表示にして退避する（コンポーズ常駐用）。JNI スレッドから呼ばれる。
+  fun hidePopupWebView(id: String) {
+    runOnUiThreadSync { hidePopupWebViewInternal(id) }
+  }
+
+  // hidePopupWebView の内部実装。UI スレッドから直接呼ぶ場合（closeTopPopupWebView 経由）は
+  // こちらを使い、runOnUiThreadSync の二重ラップを避ける。
+  private fun hidePopupWebViewInternal(id: String) {
+    val idx = popupWebViews.indexOfFirst { it.first == id }
+    if (idx < 0) return
+    val pair = popupWebViews.removeAt(idx)
+    pair.second.onPause() // 非表示中の JS タイマー・API コールを抑制
+    pair.second.visibility = View.GONE
+    // 旧退避分が残っていれば destroy してから置き換える（リーク防止）
+    persistentComposeWebView?.takeIf { it.first != pair.first }?.second?.let {
+      contentRoot.removeView(it)
+      it.destroy()
+    }
+    persistentComposeWebView = pair
+    popupGestureBlock.onPopupCountChanged(popupWebViews.size)
+  }
+
   // 最前面のポップアップ WebView を閉じる。UI スレッド（OnBackPressedCallback）から呼ばれる。
   // ポップアップがあれば閉じて true を返し、なければ false を返す。
+  // 最上位が常駐コンポーズ（"compose-" プレフィックス）の場合は destroy せず非表示にして退避する。
   fun closeTopPopupWebView(): Boolean {
     if (popupWebViews.isEmpty()) return false
+    val id = popupWebViews.last().first
+    if (id.startsWith(COMPOSE_LABEL_PREFIX)) {
+      hidePopupWebViewInternal(id)
+      return true
+    }
     val wv = popupWebViews.removeLast().second
     contentRoot.removeView(wv)
     wv.destroy()
     popupGestureBlock.onPopupCountChanged(popupWebViews.size)
     return true
+  }
+
+  // 退避中の常駐コンポーズ WebView を再表示し、URL へ遷移する。JNI スレッドから呼ばれる。
+  // 対象が無ければ false を返し、呼び出し側（Rust）が新規作成にフォールバックする。
+  fun reshowPopupWebView(
+    id: String,
+    url: String,
+  ): Boolean {
+    var shown = false
+    runOnUiThreadSync {
+      val pair = persistentComposeWebView
+      if (pair != null && pair.first == id) {
+        persistentComposeWebView = null
+        pair.second.onResume()
+        pair.second.visibility = View.VISIBLE
+        pair.second.loadUrl(url) // 再表示のたびに新規作成ページへ遷移（確定要求5）
+        popupWebViews.addLast(pair)
+        popupGestureBlock.onPopupCountChanged(popupWebViews.size)
+        shown = true
+      }
+    }
+    return shown
   }
 
   // カラム WebView を content FrameLayout のオーバーレイとして追加する。
@@ -554,5 +616,8 @@ class MainActivity : TauriActivity() {
 
     // popup_toolbar.ts が参照する window.__mcxPopupBridge と一致させること。
     private const val POPUP_BRIDGE_JS_NAME = "__mcxPopupBridge"
+
+    // 常駐コンポーズ WebView のラベルプレフィックス。Rust 側 labels::COMPOSE_PREFIX と一致させること。
+    private const val COMPOSE_LABEL_PREFIX = "compose-"
   }
 }
