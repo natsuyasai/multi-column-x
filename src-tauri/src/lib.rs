@@ -164,6 +164,7 @@ pub fn run() {
             commands::webview::report_keyboard_shortcut,
             commands::webview::get_mobile_insets,
             commands::webview::set_column_cookies,
+            commands::webview::is_webview_profile_supported,
             commands::webview::open_in_browser,
             commands::account::open_add_account_window,
             commands::account::reauth_account_window,

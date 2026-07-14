@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { IPC_COMMANDS, STORAGE_KEYS } from "../constants/ipc";
+import { IPC_COMMANDS, OFFSCREEN, STORAGE_KEYS } from "../constants/ipc";
 import { useAppStore } from "../store/useAppStore";
 import { DEFAULT_COLUMN_SETTINGS, DEFAULT_GLOBAL_SETTINGS } from "../types";
 import { useMobileColumns } from "./useMobileColumns";
@@ -80,11 +80,78 @@ describe("useMobileColumns", () => {
       isLoaded: true,
       isMobile: true,
       topBarExpanded: false,
+      profileApiSupported: false,
     });
   });
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  /** columnId ごとの resize_column_webview 呼び出し順・bounds を取得する。 */
+  function resizeCallsByColumn() {
+    const calls = mockInvoke.mock.calls.filter(
+      (c) => c[0] === IPC_COMMANDS.RESIZE_COLUMN_WEBVIEW,
+    );
+    const order = calls.map(
+      (c) => (c[1] as { bounds: { columnId: string } }).bounds.columnId,
+    );
+    const byId: Record<string, { x: number }> = {};
+    for (const c of calls) {
+      const bounds = (c[1] as { bounds: { columnId: string; x: number } })
+        .bounds;
+      byId[bounds.columnId] = bounds;
+    }
+    return { order, byId };
+  }
+
+  it("2カラム条件成立時、setActiveColumnがペア2枚を表示boundsでresizeし、アクティブカラムのresizeが最後に呼ばれる", async () => {
+    useAppStore.setState({ profileApiSupported: true });
+    const { result } = renderMobileColumns();
+
+    await act(async () => {
+      await result.current.setActiveColumn("col-1");
+    });
+
+    const { order, byId } = resizeCallsByColumn();
+    expect(order).toContain("col-1");
+    expect(order).toContain("col-2");
+    // アクティブカラム(col-1)のresizeが最後に呼ばれる（Kotlin側 activeColumnWebViewId が最後の show で決まるため）
+    expect(order[order.length - 1]).toBe("col-1");
+    expect(byId["col-1"].x).toBeGreaterThanOrEqual(0);
+    expect(byId["col-2"].x).toBeGreaterThanOrEqual(0);
+  });
+
+  it("Profile非対応（profileApiSupported=false）では従来どおり1枚のみ表示する", async () => {
+    useAppStore.setState({ profileApiSupported: false });
+    const { result } = renderMobileColumns();
+
+    await act(async () => {
+      await result.current.setActiveColumn("col-1");
+    });
+
+    const { byId } = resizeCallsByColumn();
+    expect(byId["col-1"].x).toBe(0);
+    expect(byId["col-2"].x).toBe(OFFSCREEN.MOBILE_X);
+  });
+
+  it("設定OFF（mobileTwoColumnEnabled=false）でも1枚のみ表示する", async () => {
+    useAppStore.setState({
+      profileApiSupported: true,
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        mobileTwoColumnEnabled: false,
+      },
+    });
+    const { result } = renderMobileColumns();
+
+    await act(async () => {
+      await result.current.setActiveColumn("col-1");
+    });
+
+    const { byId } = resizeCallsByColumn();
+    expect(byId["col-1"].x).toBe(0);
+    expect(byId["col-2"].x).toBe(OFFSCREEN.MOBILE_X);
   });
 
   it("setActiveColumnはリサイズ前にアクティブカラムのCookieを切り替える", async () => {

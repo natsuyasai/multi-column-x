@@ -124,29 +124,86 @@ export function resolveSwipeAreaHeight(s: SwipeAreaSettings): number {
   return s.mobileSwipeAreaEnabled ? s.mobileSwipeAreaHeight : 0;
 }
 
-interface MobileColumnBoundsInput {
-  isActive: boolean;
-  swipeAreaHeight: number;
+/** 2カラム表示に切り替える最小ビューポート幅（CSS px ≒ dp。Android sw600dp タブレット基準） */
+export const MOBILE_TWO_COLUMN_MIN_WIDTH = 600;
+
+interface MobileColumnLayoutInput {
+  /** order 順ソート不要（関数内でソートする） */
+  columns: Pick<Column, "id" | "order">[];
+  /** null なら全カラム非表示（hideColumnWebviews 用途） */
+  activeColumnId: string | null;
+  /** 設定 ON && Profile API 対応 を呼び出し側で合成して渡す */
+  twoColumnEnabled: boolean;
   viewportWidth: number;
   viewportHeight: number;
+  swipeAreaHeight: number;
 }
 
 /**
- * モバイル column WebView の配置を算出する純粋関数。
- * 下部に タブバー(56px) + スワイプ帯(swipeAreaHeight) を確保し、
- * 非アクティブは画面外(x=OFFSCREEN.MOBILE_X)へ退避する。
+ * モバイルの全カラム WebView 配置を一元決定する純粋関数。
+ * 戻り値は Record<columnId, ColumnBounds>。非表示カラムは x=OFFSCREEN.MOBILE_X。
  */
-export function mobileColumnBounds(input: MobileColumnBoundsInput): {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-} {
-  const reservedBottom = MOBILE_TAB_BAR_HEIGHT + input.swipeAreaHeight;
-  return {
-    x: input.isActive ? 0 : OFFSCREEN.MOBILE_X,
+export function mobileColumnLayout(
+  input: MobileColumnLayoutInput,
+): Record<string, ColumnBounds> {
+  const {
+    columns,
+    activeColumnId,
+    twoColumnEnabled,
+    viewportWidth,
+    viewportHeight,
+    swipeAreaHeight,
+  } = input;
+
+  const height = viewportHeight - (MOBILE_TAB_BAR_HEIGHT + swipeAreaHeight);
+  const offscreenBounds = (): ColumnBounds => ({
+    x: OFFSCREEN.MOBILE_X,
     y: 0,
-    width: input.viewportWidth,
-    height: input.viewportHeight - reservedBottom,
-  };
+    width: viewportWidth,
+    height,
+  });
+
+  const result: Record<string, ColumnBounds> = {};
+  for (const col of columns) {
+    result[col.id] = offscreenBounds();
+  }
+
+  if (activeColumnId == null) {
+    return result;
+  }
+
+  const sorted = [...columns].sort((a, b) => a.order - b.order);
+  const activeIdx = sorted.findIndex((c) => c.id === activeColumnId);
+  if (activeIdx === -1) {
+    // フォールバックせず安全側（全カラム非表示のまま）
+    return result;
+  }
+
+  const twoColumnActive =
+    twoColumnEnabled &&
+    viewportWidth >= MOBILE_TWO_COLUMN_MIN_WIDTH &&
+    sorted.length >= 2;
+
+  if (!twoColumnActive) {
+    result[activeColumnId] = {
+      x: 0,
+      y: 0,
+      width: viewportWidth,
+      height,
+    };
+    return result;
+  }
+
+  // ペア窓の先頭 index を決める。末尾要素がアクティブならクランプして左隣とペアにする。
+  const pairStartIdx = Math.min(activeIdx, sorted.length - 2);
+  const leftWidth = Math.floor(viewportWidth / 2);
+  const rightWidth = viewportWidth - leftWidth;
+
+  const leftCol = sorted[pairStartIdx];
+  const rightCol = sorted[pairStartIdx + 1];
+
+  result[leftCol.id] = { x: 0, y: 0, width: leftWidth, height };
+  result[rightCol.id] = { x: leftWidth, y: 0, width: rightWidth, height };
+
+  return result;
 }

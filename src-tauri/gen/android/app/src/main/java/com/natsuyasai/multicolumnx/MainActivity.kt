@@ -113,11 +113,33 @@ class MainActivity : TauriActivity() {
     )
   }
 
+  // タッチ開始位置がアクティブカラムの矩形内だったか。ACTION_DOWN で判定し、
+  // 以降の MOVE/UP でも同じ判定を使い回す（指が矩形を跨いで動いても一貫させるため）。
+  private var touchStartedWithinActiveColumn = true
+
   // アクティブカラムのダブルタップ（先頭スクロール＋リロード）を検出する。
   // 検出ロジックは DoubleTapGestureDetector に委譲する。
+  // 2カラム表示時、非アクティブ（右隣）カラム上のタップでアクティブカラムが誤反応しないよう、
+  // タッチ開始位置がアクティブカラムの矩形内の場合のみ検出器へイベントを渡す。
   override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-    gestureDetector.onTouchEvent(ev)
+    if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
+      touchStartedWithinActiveColumn = isTouchWithinActiveColumn(ev.x, ev.y)
+    }
+    if (touchStartedWithinActiveColumn) {
+      gestureDetector.onTouchEvent(ev)
+    }
     return super.dispatchTouchEvent(ev)
+  }
+
+  // タッチ座標がアクティブカラム WebView の現在の矩形内かを判定する。
+  // アクティブカラム未設定や layoutParams 取得不可の場合は安全側（true=検出する）に倒す。
+  private fun isTouchWithinActiveColumn(
+    x: Float,
+    y: Float,
+  ): Boolean {
+    val activeWv = activeColumnWebViewId?.let { columnWebViews[it] } ?: return true
+    val params = activeWv.layoutParams as? FrameLayout.LayoutParams ?: return true
+    return isPointWithinBounds(x, y, params.leftMargin, params.topMargin, params.width, params.height)
   }
 
   // AddAccount Activity を account_id を Intent Extra として渡して起動する。
@@ -385,10 +407,12 @@ class MainActivity : TauriActivity() {
     }
   }
 
-  // カラム WebView を表示し、サイズを更新する（常に左上原点に配置）。
+  // カラム WebView を表示し、位置・サイズを更新する（xDp/yDp は CSS px = dp）。
   // onResume() で JS タイマーを再開してから表示する。
   fun showColumnWebView(
     id: String,
+    xDp: Int,
+    yDp: Int,
     widthDp: Int,
     heightDp: Int,
   ) {
@@ -399,8 +423,8 @@ class MainActivity : TauriActivity() {
         (wv.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
           params.width = (widthDp * density).toInt()
           params.height = (heightDp * density).toInt()
-          params.leftMargin = 0
-          params.topMargin = 0
+          params.leftMargin = (xDp * density).toInt()
+          params.topMargin = (yDp * density).toInt()
           wv.layoutParams = params
         }
         wv.onResume()
@@ -437,6 +461,10 @@ class MainActivity : TauriActivity() {
     if (WebViewProfiles.isSupported || accountId.isEmpty()) return
     setCookieForAccount(accountId)
   }
+
+  // Profile API（アカウントごとのセッション分離）対応可否を返す。
+  // Rust の is_webview_profile_supported コマンドから JNI 経由で呼ばれる。
+  fun isWebViewProfileSupported(): Boolean = WebViewProfiles.isSupported
 
   // newConfiguredWebView の結果。loadUrl 時の Cookie フォールバック要否判定に
   // プロファイル適用結果が必要なため、WebView と合わせて返す。

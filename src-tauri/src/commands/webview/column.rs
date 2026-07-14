@@ -351,6 +351,8 @@ pub async fn resize_column_webview(_app: AppHandle, bounds: ResizeBounds) -> Res
         if bounds.x >= 0.0 {
             crate::android_bridge::show_column_webview(
                 &label,
+                bounds.x as i32,
+                bounds.y as i32,
                 bounds.width as i32,
                 bounds.height as i32,
             )

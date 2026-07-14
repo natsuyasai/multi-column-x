@@ -38,6 +38,7 @@ const mockGlobalSettings: GlobalSettings = {
   useXAppForCompose: false,
   mobileSwipeAreaEnabled: true,
   mobileSwipeAreaHeight: 28,
+  mobileTwoColumnEnabled: true,
   presets: [],
   ngWords: [],
 };

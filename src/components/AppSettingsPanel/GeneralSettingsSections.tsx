@@ -115,6 +115,14 @@ export const GeneralSettingsSections: React.FC<
             }
           />
         </label>
+        <label className={styles.checkLabel}>
+          <input
+            type="checkbox"
+            checked={draft.mobileTwoColumnEnabled}
+            onChange={(e) => set("mobileTwoColumnEnabled", e.target.checked)}
+          />
+          広い画面で2カラム表示（タブレット・横向き）
+        </label>
       </section>
     )}
 

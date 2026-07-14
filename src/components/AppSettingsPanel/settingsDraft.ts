@@ -33,6 +33,7 @@ export interface SettingsDraft {
   mobileSwipeAreaEnabled: boolean;
   /** number入力欄への入力中文字列をそのまま保持するため string で持つ */
   mobileSwipeAreaHeight: string;
+  mobileTwoColumnEnabled: boolean;
   /** textarea への入力中文字列をそのまま保持するため string で持つ */
   globalNgWordsText: string;
 }
@@ -69,6 +70,7 @@ export function createSettingsDraft(settings: GlobalSettings): SettingsDraft {
     useXAppForCompose: settings.useXAppForCompose ?? false,
     mobileSwipeAreaEnabled: settings.mobileSwipeAreaEnabled,
     mobileSwipeAreaHeight: String(settings.mobileSwipeAreaHeight),
+    mobileTwoColumnEnabled: settings.mobileTwoColumnEnabled,
     globalNgWordsText: (settings.ngWords ?? []).join("\n"),
   };
 }

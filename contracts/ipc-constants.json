@@ -19,6 +19,7 @@
     "report_webview_scroll",
     "get_mobile_insets",
     "set_column_cookies",
+    "is_webview_profile_supported",
     "report_new_posts_count",
     "report_keyboard_shortcut"
   ],

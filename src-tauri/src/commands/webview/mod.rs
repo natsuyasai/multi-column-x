@@ -34,6 +34,21 @@ pub async fn get_mobile_insets() -> serde_json::Value {
     }
 }
 
+/// WebView Profile API（アカウントごとのセッション分離）の対応可否を返す。
+/// Android 以外（デスクトップ）は常に false（2カラム判定はモバイル専用のため未使用）。
+/// 取得失敗時も false（シングル表示へ安全側フォールバック）。
+#[tauri::command]
+pub async fn is_webview_profile_supported() -> bool {
+    #[cfg(target_os = "android")]
+    {
+        crate::android_bridge::is_webview_profile_supported().unwrap_or(false)
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        false
+    }
+}
+
 #[tauri::command]
 pub async fn eval_in_webview(
     caller: tauri::Webview,

@@ -284,15 +284,24 @@ pub fn remove_column_webview(id: &str) -> Result<(), String> {
 }
 
 /// MainActivity.showColumnWebView を呼び出してカラム WebView を表示する。
-pub fn show_column_webview(id: &str, width_dp: i32, height_dp: i32) -> Result<(), String> {
+/// x_dp / y_dp / width_dp / height_dp は CSS px（= dp）。
+pub fn show_column_webview(
+    id: &str,
+    x_dp: i32,
+    y_dp: i32,
+    width_dp: i32,
+    height_dp: i32,
+) -> Result<(), String> {
     call_activity_method(|env, activity| {
         let j_id = env.new_string(id).map_err(|e| e.to_string())?;
         env.call_method(
             activity,
             "showColumnWebView",
-            "(Ljava/lang/String;II)V",
+            "(Ljava/lang/String;IIII)V",
             &[
                 JValue::Object(&*j_id),
+                JValue::Int(x_dp),
+                JValue::Int(y_dp),
                 JValue::Int(width_dp),
                 JValue::Int(height_dp),
             ],
@@ -440,6 +449,36 @@ pub fn set_account_cookies(account_id: &str) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
         Ok(())
     })
+}
+
+/// MainActivity.isWebViewProfileSupported() を呼び出し、Profile API 対応可否を返す。
+/// 取得失敗時は Err（呼び出し側で false にフォールバックする）。
+/// 注意: `call_activity_method` ヘルパーは戻り値 `()` 固定のため使えず、
+/// bool 戻り値を受け取るために attach ロジックをここで直接書く。
+pub fn is_webview_profile_supported() -> Result<bool, String> {
+    let guard = MAIN_ACTIVITY
+        .lock()
+        .map_err(|e| format!("mutex lock: {e}"))?;
+    let (vm, activity_ref) = guard.as_ref().ok_or("android context not initialized")?;
+    let mut env = vm
+        .attach_current_thread()
+        .map_err(|e| format!("attach_current_thread: {e}"))?;
+    if env.exception_check().unwrap_or(false) {
+        let _ = env.exception_clear();
+    }
+    let result = env
+        .call_method(
+            activity_ref.as_obj(),
+            "isWebViewProfileSupported",
+            "()Z",
+            &[],
+        )
+        .and_then(|v| v.z())
+        .map_err(|e| e.to_string());
+    if env.exception_check().unwrap_or(false) {
+        let _ = env.exception_clear();
+    }
+    result
 }
 
 /// MAIN_ACTIVITY の JavaVM / GlobalRef を使って JNI 処理を実行するヘルパー。

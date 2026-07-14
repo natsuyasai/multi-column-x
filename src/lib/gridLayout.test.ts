@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
+import { OFFSCREEN } from "../constants/ipc";
 import type { Column } from "../types";
 import {
   calculateGridBounds,
   MOBILE_TAB_BAR_HEIGHT,
-  mobileColumnBounds,
+  MOBILE_TWO_COLUMN_MIN_WIDTH,
+  mobileColumnLayout,
   resolveSwipeAreaHeight,
 } from "./gridLayout";
 
@@ -169,27 +171,234 @@ describe("resolveSwipeAreaHeight", () => {
   });
 });
 
-describe("mobileColumnBounds", () => {
-  it("アクティブはx=0,y=0で高さからタブバーと帯を引く", () => {
-    expect(
-      mobileColumnBounds({
-        isActive: true,
-        swipeAreaHeight: 28,
-        viewportWidth: 400,
-        viewportHeight: 800,
-      }),
-    ).toEqual({ x: 0, y: 0, width: 400, height: 800 - 56 - 28 });
+describe("MOBILE_TWO_COLUMN_MIN_WIDTH", () => {
+  it("600 px で定義されている", () => {
+    expect(MOBILE_TWO_COLUMN_MIN_WIDTH).toBe(600);
+  });
+});
+
+describe("mobileColumnLayout", () => {
+  const cols3 = [
+    { id: "c1", order: 0 },
+    { id: "c2", order: 1 },
+    { id: "c3", order: 2 },
+  ];
+
+  // 仕様 #1
+  it("activeColumnIdがnullのとき、全カラムが画面外に退避する", () => {
+    const result = mobileColumnLayout({
+      columns: cols3,
+      activeColumnId: null,
+      twoColumnEnabled: true,
+      viewportWidth: 800,
+      viewportHeight: 1000,
+      swipeAreaHeight: 0,
+    });
+    expect(result["c1"].x).toBe(OFFSCREEN.MOBILE_X);
+    expect(result["c2"].x).toBe(OFFSCREEN.MOBILE_X);
+    expect(result["c3"].x).toBe(OFFSCREEN.MOBILE_X);
   });
 
-  it("非アクティブはxが画面外", () => {
-    const b = mobileColumnBounds({
-      isActive: false,
+  // 仕様 #2
+  it("activeColumnIdがcolumnsに存在しないIDのとき、フォールバックせず全カラムが画面外になる", () => {
+    const result = mobileColumnLayout({
+      columns: cols3,
+      activeColumnId: "unknown-id",
+      twoColumnEnabled: true,
+      viewportWidth: 800,
+      viewportHeight: 1000,
       swipeAreaHeight: 0,
-      viewportWidth: 400,
-      viewportHeight: 800,
     });
-    expect(b.x).toBeLessThan(0);
-    expect(b.y).toBe(0);
-    expect(b.height).toBe(800 - 56);
+    expect(result["c1"].x).toBe(OFFSCREEN.MOBILE_X);
+    expect(result["c2"].x).toBe(OFFSCREEN.MOBILE_X);
+    expect(result["c3"].x).toBe(OFFSCREEN.MOBILE_X);
+  });
+
+  // 仕様 #3: twoColumnEnabled=false
+  it("twoColumnEnabledがfalseのとき、アクティブのみ全幅表示で他は画面外になる", () => {
+    const result = mobileColumnLayout({
+      columns: cols3,
+      activeColumnId: "c2",
+      twoColumnEnabled: false,
+      viewportWidth: 800,
+      viewportHeight: 1000,
+      swipeAreaHeight: 20,
+    });
+    expect(result["c2"]).toEqual({
+      x: 0,
+      y: 0,
+      width: 800,
+      height: 1000 - (56 + 20),
+    });
+    expect(result["c1"].x).toBe(OFFSCREEN.MOBILE_X);
+    expect(result["c3"].x).toBe(OFFSCREEN.MOBILE_X);
+  });
+
+  // 仕様 #3: viewportWidthが600未満
+  it("viewportWidthが600未満のとき、アクティブのみ全幅表示で他は画面外になる", () => {
+    const result = mobileColumnLayout({
+      columns: cols3,
+      activeColumnId: "c2",
+      twoColumnEnabled: true,
+      viewportWidth: 599,
+      viewportHeight: 1000,
+      swipeAreaHeight: 0,
+    });
+    expect(result["c2"]).toEqual({
+      x: 0,
+      y: 0,
+      width: 599,
+      height: 1000 - 56,
+    });
+    expect(result["c1"].x).toBe(OFFSCREEN.MOBILE_X);
+    expect(result["c3"].x).toBe(OFFSCREEN.MOBILE_X);
+  });
+
+  // 仕様 #3: columns.lengthが1未満(1のみ)
+  it("columnsが1件のとき、アクティブのみ全幅表示になる", () => {
+    const result = mobileColumnLayout({
+      columns: [{ id: "c1", order: 0 }],
+      activeColumnId: "c1",
+      twoColumnEnabled: true,
+      viewportWidth: 800,
+      viewportHeight: 1000,
+      swipeAreaHeight: 0,
+    });
+    expect(result["c1"]).toEqual({
+      x: 0,
+      y: 0,
+      width: 800,
+      height: 1000 - 56,
+    });
+  });
+
+  // 仕様 #4
+  it("2カラム条件成立時、order順でアクティブとその右隣が左右に並ぶ", () => {
+    const result = mobileColumnLayout({
+      columns: cols3,
+      activeColumnId: "c1",
+      twoColumnEnabled: true,
+      viewportWidth: 800,
+      viewportHeight: 1000,
+      swipeAreaHeight: 0,
+    });
+    expect(result["c1"]).toEqual({ x: 0, y: 0, width: 400, height: 944 });
+    expect(result["c2"]).toEqual({ x: 400, y: 0, width: 400, height: 944 });
+    expect(result["c3"].x).toBe(OFFSCREEN.MOBILE_X);
+  });
+
+  // 仕様 #4: 幅合計が厳密一致することの確認
+  it("2カラム表示の幅の合計はviewportWidthに厳密一致する", () => {
+    const result = mobileColumnLayout({
+      columns: cols3,
+      activeColumnId: "c1",
+      twoColumnEnabled: true,
+      viewportWidth: 800,
+      viewportHeight: 1000,
+      swipeAreaHeight: 0,
+    });
+    expect(result["c1"].width + result["c2"].width).toBe(800);
+  });
+
+  // 仕様 #5
+  it("アクティブがorder末尾のとき、ペア窓は左隣とアクティブにクランプされる", () => {
+    const result = mobileColumnLayout({
+      columns: cols3,
+      activeColumnId: "c3",
+      twoColumnEnabled: true,
+      viewportWidth: 800,
+      viewportHeight: 1000,
+      swipeAreaHeight: 0,
+    });
+    expect(result["c1"].x).toBe(OFFSCREEN.MOBILE_X);
+    expect(result["c2"]).toEqual({ x: 0, y: 0, width: 400, height: 944 });
+    expect(result["c3"]).toEqual({ x: 400, y: 0, width: 400, height: 944 });
+  });
+
+  // 仕様 #6: viewportWidth === 600 の境界値
+  it("viewportWidthがちょうど600のとき、2カラム表示になる", () => {
+    const result = mobileColumnLayout({
+      columns: cols3,
+      activeColumnId: "c1",
+      twoColumnEnabled: true,
+      viewportWidth: 600,
+      viewportHeight: 1000,
+      swipeAreaHeight: 0,
+    });
+    expect(result["c1"].width).toBe(300);
+    expect(result["c2"].width).toBe(300);
+    expect(result["c2"].x).toBe(300);
+  });
+
+  // 仕様 #7: 奇数幅
+  it("奇数幅のとき、左は切り捨て・右は残り幅になる", () => {
+    const result = mobileColumnLayout({
+      columns: cols3,
+      activeColumnId: "c1",
+      twoColumnEnabled: true,
+      viewportWidth: 601,
+      viewportHeight: 1000,
+      swipeAreaHeight: 0,
+    });
+    expect(result["c1"].width).toBe(300);
+    expect(result["c2"].width).toBe(301);
+    expect(result["c1"].width + result["c2"].width).toBe(601);
+  });
+
+  // 仕様 #8
+  it("表示カラムのyは常に0、heightはタブバーとスワイプ帯を引いた値になる", () => {
+    const result = mobileColumnLayout({
+      columns: cols3,
+      activeColumnId: "c1",
+      twoColumnEnabled: true,
+      viewportWidth: 800,
+      viewportHeight: 1000,
+      swipeAreaHeight: 30,
+    });
+    expect(result["c1"].y).toBe(0);
+    expect(result["c2"].y).toBe(0);
+    expect(result["c1"].height).toBe(1000 - (56 + 30));
+    expect(result["c2"].height).toBe(1000 - (56 + 30));
+  });
+
+  // 仕様 #9
+  it("表示ペア以外のカラムはすべて画面外x座標になる", () => {
+    const cols4 = [
+      { id: "c1", order: 0 },
+      { id: "c2", order: 1 },
+      { id: "c3", order: 2 },
+      { id: "c4", order: 3 },
+    ];
+    const result = mobileColumnLayout({
+      columns: cols4,
+      activeColumnId: "c2",
+      twoColumnEnabled: true,
+      viewportWidth: 800,
+      viewportHeight: 1000,
+      swipeAreaHeight: 0,
+    });
+    expect(result["c1"].x).toBe(OFFSCREEN.MOBILE_X);
+    expect(result["c2"].x).toBe(0);
+    expect(result["c3"].x).toBe(400);
+    expect(result["c4"].x).toBe(OFFSCREEN.MOBILE_X);
+  });
+
+  it("columns順がorder順でなくても内部でソートして正しくペアを組む", () => {
+    const shuffled = [
+      { id: "c3", order: 2 },
+      { id: "c1", order: 0 },
+      { id: "c2", order: 1 },
+    ];
+    const result = mobileColumnLayout({
+      columns: shuffled,
+      activeColumnId: "c2",
+      twoColumnEnabled: true,
+      viewportWidth: 800,
+      viewportHeight: 1000,
+      swipeAreaHeight: 0,
+    });
+    expect(result["c2"]).toEqual({ x: 0, y: 0, width: 400, height: 944 });
+    expect(result["c3"]).toEqual({ x: 400, y: 0, width: 400, height: 944 });
+    expect(result["c1"].x).toBe(OFFSCREEN.MOBILE_X);
   });
 });
