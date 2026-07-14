@@ -285,6 +285,11 @@ const App: React.FC = () => {
     await evalInColumn(columnId, WEBVIEW_SCRIPTS.TRIGGER_RELOAD);
   }, []);
 
+  // タブバーでのダブルタップ: 対象カラムを先頭スクロール＋リロードする
+  const handleDoubleTapColumn = useCallback((columnId: string) => {
+    evalInColumn(columnId, WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD);
+  }, []);
+
   // r キー用: フォーカスカラム（無ければ order 最小の先頭カラム）をリロードする
   const handleReloadFocusedColumn = useCallback(() => {
     const sorted = [...columns].sort((a, b) => a.order - b.order);
@@ -422,6 +427,7 @@ const App: React.FC = () => {
           onOpenLinkPopup={handleOpenLinkPopup}
           onComposeTweet={handleComposeTweet}
           onTabAction={handleTabAction}
+          onDoubleTapColumn={handleDoubleTapColumn}
           swipeState={swipeState}
         />
       )}
