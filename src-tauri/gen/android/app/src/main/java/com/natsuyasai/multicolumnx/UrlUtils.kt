@@ -17,3 +17,15 @@ fun isLoginUrl(url: String): Boolean {
     url.contains("x.com/i/flow/login") ||
     url.contains("twitter.com/login")
 }
+
+/**
+ * コンポーズ新規作成ページ（https://x.com/compose/post）を表示中かどうかを判定する。
+ * クエリ・ハッシュの差異は無視し、origin と pathname の一致のみを見る。
+ */
+fun isComposePostUrl(url: String?): Boolean {
+  if (url == null) return false
+  val prefix = "https://x.com/compose/post"
+  if (!url.startsWith(prefix)) return false
+  val rest = url.substring(prefix.length)
+  return rest.isEmpty() || rest.startsWith("?") || rest.startsWith("#")
+}
