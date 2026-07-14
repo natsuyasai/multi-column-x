@@ -123,6 +123,7 @@ describe("useColumns mobile", () => {
       },
       isLoaded: true,
       isMobile: true,
+      profileApiSupported: false,
     });
   });
 

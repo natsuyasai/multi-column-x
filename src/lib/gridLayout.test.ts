@@ -5,7 +5,6 @@ import {
   calculateGridBounds,
   MOBILE_TAB_BAR_HEIGHT,
   MOBILE_TWO_COLUMN_MIN_WIDTH,
-  mobileColumnBounds,
   mobileColumnLayout,
   resolveSwipeAreaHeight,
 } from "./gridLayout";
@@ -169,31 +168,6 @@ describe("resolveSwipeAreaHeight", () => {
         mobileSwipeAreaHeight: 28,
       }),
     ).toBe(0);
-  });
-});
-
-describe("mobileColumnBounds", () => {
-  it("アクティブはx=0,y=0で高さからタブバーと帯を引く", () => {
-    expect(
-      mobileColumnBounds({
-        isActive: true,
-        swipeAreaHeight: 28,
-        viewportWidth: 400,
-        viewportHeight: 800,
-      }),
-    ).toEqual({ x: 0, y: 0, width: 400, height: 800 - 56 - 28 });
-  });
-
-  it("非アクティブはxが画面外", () => {
-    const b = mobileColumnBounds({
-      isActive: false,
-      swipeAreaHeight: 0,
-      viewportWidth: 400,
-      viewportHeight: 800,
-    });
-    expect(b.x).toBeLessThan(0);
-    expect(b.y).toBe(0);
-    expect(b.height).toBe(800 - 56);
   });
 });
 

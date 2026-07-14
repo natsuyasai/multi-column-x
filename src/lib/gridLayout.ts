@@ -124,33 +124,6 @@ export function resolveSwipeAreaHeight(s: SwipeAreaSettings): number {
   return s.mobileSwipeAreaEnabled ? s.mobileSwipeAreaHeight : 0;
 }
 
-interface MobileColumnBoundsInput {
-  isActive: boolean;
-  swipeAreaHeight: number;
-  viewportWidth: number;
-  viewportHeight: number;
-}
-
-/**
- * モバイル column WebView の配置を算出する純粋関数。
- * 下部に タブバー(56px) + スワイプ帯(swipeAreaHeight) を確保し、
- * 非アクティブは画面外(x=OFFSCREEN.MOBILE_X)へ退避する。
- */
-export function mobileColumnBounds(input: MobileColumnBoundsInput): {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-} {
-  const reservedBottom = MOBILE_TAB_BAR_HEIGHT + input.swipeAreaHeight;
-  return {
-    x: input.isActive ? 0 : OFFSCREEN.MOBILE_X,
-    y: 0,
-    width: input.viewportWidth,
-    height: input.viewportHeight - reservedBottom,
-  };
-}
-
 /** 2カラム表示に切り替える最小ビューポート幅（CSS px ≒ dp。Android sw600dp タブレット基準） */
 export const MOBILE_TWO_COLUMN_MIN_WIDTH = 600;
 

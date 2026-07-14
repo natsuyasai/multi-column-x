@@ -3,7 +3,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useState } from "react";
 import { IPC_EVENTS, STORAGE_KEYS, WEBVIEW_SCRIPTS } from "../constants/ipc";
-import { mobileColumnBounds, resolveSwipeAreaHeight } from "../lib/gridLayout";
+import { mobileColumnLayout, resolveSwipeAreaHeight } from "../lib/gridLayout";
 import { logError } from "../lib/log";
 import {
   createColumnWebview,
@@ -17,6 +17,12 @@ import type { Column } from "../types";
 export interface SwipeState {
   direction: "left" | "right";
   phase: "progress" | "switching";
+}
+
+/** 設定 ON && Profile API 対応（Android）を合成した2カラム有効判定 */
+export function resolveTwoColumnEnabled(): boolean {
+  const { globalSettings, profileApiSupported } = useAppStore.getState();
+  return globalSettings.mobileTwoColumnEnabled && profileApiSupported;
 }
 
 export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
@@ -50,19 +56,33 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
       }
     }
 
+    const layout = mobileColumnLayout({
+      columns: currentColumns,
+      activeColumnId: id,
+      twoColumnEnabled: resolveTwoColumnEnabled(),
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+      swipeAreaHeight,
+    });
+    // 非表示（hide）分は並列でよい。表示（show）分は Kotlin 側
+    // activeColumnWebViewId（戻るボタン/ダブルタップ対象）が最後の
+    // showColumnWebView で決まるため、アクティブカラムを必ず最後に送る。
+    const hidden = currentColumns.filter((c) => layout[c.id].x < 0);
+    const shown = currentColumns
+      .filter((c) => layout[c.id].x >= 0)
+      .sort((a, b) => (a.id === id ? 1 : b.id === id ? -1 : 0)); // active を末尾へ
     await Promise.all(
-      currentColumns.map((col) => {
-        const bounds = mobileColumnBounds({
-          isActive: col.id === id,
-          swipeAreaHeight,
-          viewportWidth: window.innerWidth,
-          viewportHeight: window.innerHeight,
-        });
-        return resizeColumnWebview(col.id, bounds).catch(
+      hidden.map((col) =>
+        resizeColumnWebview(col.id, layout[col.id]).catch(
           logError("setActiveColumn:resizeColumnWebview"),
-        );
-      }),
+        ),
+      ),
     );
+    for (const col of shown) {
+      await resizeColumnWebview(col.id, layout[col.id]).catch(
+        logError("setActiveColumn:resizeColumnWebview"),
+      );
+    }
   }, []);
 
   // 全カラムのWebViewを作成（起動時に呼ぶ）
@@ -85,23 +105,27 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
         firstColumn;
       const { globalSettings } = useAppStore.getState();
       const swipeAreaHeight = resolveSwipeAreaHeight(globalSettings);
-      // 全カラムを並列作成して loadUrl を一斉に開始する
+      const layout = mobileColumnLayout({
+        columns: sortedByOrder,
+        activeColumnId: targetColumn?.id ?? null,
+        twoColumnEnabled: resolveTwoColumnEnabled(),
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+        swipeAreaHeight,
+      });
+      // 全カラムを並列作成して loadUrl を一斉に開始する。mobile の
+      // create_column_webview は visible = args.x >= 0.0 で可視判定するため、
+      // 表示ペア（1〜2枚）が visible で作成される。
       await Promise.all(
         sortedByOrder.map(async (column) => {
           const account = currentAccounts.find(
             (a) => a.id === column.accountId,
           );
           if (!account) return;
-          const isActive = column.id === targetColumn?.id;
           await createColumnWebview(
             column,
             account.dataDirectory,
-            mobileColumnBounds({
-              isActive,
-              swipeAreaHeight,
-              viewportWidth: window.innerWidth,
-              viewportHeight: window.innerHeight,
-            }),
+            layout[column.id],
           ).catch(logError("restoreMobileColumns:createColumnWebview"));
         }),
       );
@@ -115,17 +139,19 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
         await setColumnCookies(targetColumn.accountId).catch(
           logError("restoreMobileColumns:setColumnCookies"),
         );
-        // アクティブカラムのみ表示。非アクティブカラムには RESIZE を送らず
-        // onPause() を呼ばせないことでバックグラウンド読み込みを継続させる。
-        await resizeColumnWebview(
-          targetColumn.id,
-          mobileColumnBounds({
-            isActive: true,
-            swipeAreaHeight,
-            viewportWidth: window.innerWidth,
-            viewportHeight: window.innerHeight,
-          }),
-        ).catch(logError("restoreMobileColumns:resizeColumnWebview"));
+        // 表示ペアのみ resize する（アクティブを最後に送る。理由は setActiveColumn と同じ）。
+        // 非表示カラムには従来どおり resize を送らず、onPause() を呼ばせないことで
+        // バックグラウンド読み込みを継続させる。
+        const shown = sortedByOrder
+          .filter((col) => layout[col.id].x >= 0)
+          .sort((a, b) =>
+            a.id === targetColumn.id ? 1 : b.id === targetColumn.id ? -1 : 0,
+          );
+        for (const col of shown) {
+          await resizeColumnWebview(col.id, layout[col.id]).catch(
+            logError("restoreMobileColumns:resizeColumnWebview"),
+          );
+        }
       }
     },
     [],

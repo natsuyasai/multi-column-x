@@ -59,6 +59,7 @@ const App: React.FC = () => {
     replaceColumns,
     isMobile,
     setIsMobile,
+    setProfileApiSupported,
     unreadCounts,
     setUnreadCount,
     clearUnreadCount,
@@ -138,10 +139,15 @@ const App: React.FC = () => {
     try {
       const mobile = platform() === "android";
       setIsMobile(mobile);
+      if (mobile) {
+        invoke<boolean>(IPC_COMMANDS.IS_WEBVIEW_PROFILE_SUPPORTED)
+          .then(setProfileApiSupported)
+          .catch(logError("is_webview_profile_supported"));
+      }
     } catch (e) {
       logError("platform()")(e);
     }
-  }, [setIsMobile]);
+  }, [setIsMobile, setProfileApiSupported]);
 
   // マウント時のみ設定をロードする（loadSettings 変化で再実行させない）
   useEffect(() => {

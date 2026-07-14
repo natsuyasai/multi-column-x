@@ -7,7 +7,7 @@ import {
   SCROLLBAR_HEIGHT,
   getTopBarHeight,
   calculateGridBounds,
-  mobileColumnBounds,
+  mobileColumnLayout,
   resolveSwipeAreaHeight,
 } from "../lib/gridLayout";
 import { logError } from "../lib/log";
@@ -19,7 +19,7 @@ import {
 import { useAppStore } from "../store/useAppStore";
 import type { Column } from "../types";
 import { useDesktopColumns } from "./useDesktopColumns";
-import { useMobileColumns } from "./useMobileColumns";
+import { resolveTwoColumnEnabled, useMobileColumns } from "./useMobileColumns";
 
 // グリッド座標計算は src/lib/gridLayout.ts へ移動した。既存 import 互換のため re-export する。
 export {
@@ -104,15 +104,19 @@ export function useColumns() {
         const swipeAreaHeight = resolveSwipeAreaHeight(
           useAppStore.getState().globalSettings,
         );
+        // 追加カラムは非表示で作成する（activeColumnId: null なので必ず画面外 bounds になる）
+        const offscreenLayout = mobileColumnLayout({
+          columns: [column],
+          activeColumnId: null,
+          twoColumnEnabled: resolveTwoColumnEnabled(),
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
+          swipeAreaHeight,
+        });
         await createColumnWebview(
           column,
           account.dataDirectory,
-          mobileColumnBounds({
-            isActive: false,
-            swipeAreaHeight,
-            viewportWidth: window.innerWidth,
-            viewportHeight: window.innerHeight,
-          }),
+          offscreenLayout[column.id],
         ).catch(logError("handleAddColumn:createColumnWebview(mobile)"));
         if (activeColumnId === null) {
           await setActiveColumn(column.id);
@@ -147,20 +151,27 @@ export function useColumns() {
 
   // ダイアログ表示時に全カラムWebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
   const hideColumnWebviews = useCallback(async () => {
-    const { columns: currentColumns, isMobile } = useAppStore.getState();
+    const {
+      columns: currentColumns,
+      isMobile,
+      globalSettings,
+    } = useAppStore.getState();
+    const mobileLayout = isMobile
+      ? mobileColumnLayout({
+          columns: currentColumns,
+          activeColumnId: null,
+          twoColumnEnabled: resolveTwoColumnEnabled(),
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
+          swipeAreaHeight: resolveSwipeAreaHeight(globalSettings),
+        })
+      : null;
     await Promise.all(
       currentColumns.map((col) =>
         resizeColumnWebview(
           col.id,
-          isMobile
-            ? mobileColumnBounds({
-                isActive: false,
-                swipeAreaHeight: resolveSwipeAreaHeight(
-                  useAppStore.getState().globalSettings,
-                ),
-                viewportWidth: window.innerWidth,
-                viewportHeight: window.innerHeight,
-              })
+          mobileLayout
+            ? mobileLayout[col.id]
             : {
                 x: OFFSCREEN.DESKTOP_X,
                 y:
@@ -240,19 +251,34 @@ export function useColumns() {
       );
 
       if (isMobile) {
+        const swipeAreaHeight = resolveSwipeAreaHeight(globalSettings);
+        const offscreenLayout = mobileColumnLayout({
+          columns: [column],
+          activeColumnId: null,
+          twoColumnEnabled: resolveTwoColumnEnabled(),
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
+          swipeAreaHeight,
+        });
         await createColumnWebview(
           column,
           account.dataDirectory,
-          mobileColumnBounds({
-            isActive: false,
-            swipeAreaHeight: resolveSwipeAreaHeight(globalSettings),
+          offscreenLayout[column.id],
+        ).catch(logError("recreateColumnWebview:createColumnWebview(mobile)"));
+        // 再作成したカラムが現在の表示ペア（アクティブ or その隣）に含まれるなら
+        // setActiveColumn で再配置して可視化する（2カラム時、右隣カラムの再作成でも必要）
+        if (activeColumnId) {
+          const displayLayout = mobileColumnLayout({
+            columns: currentColumns,
+            activeColumnId,
+            twoColumnEnabled: resolveTwoColumnEnabled(),
             viewportWidth: window.innerWidth,
             viewportHeight: window.innerHeight,
-          }),
-        ).catch(logError("recreateColumnWebview:createColumnWebview(mobile)"));
-        // アクティブカラムを作り直した場合は再配置して可視化する
-        if (activeColumnId === columnId) {
-          await setActiveColumn(columnId);
+            swipeAreaHeight,
+          });
+          if (displayLayout[columnId].x >= 0) {
+            await setActiveColumn(activeColumnId);
+          }
         }
         return;
       }
