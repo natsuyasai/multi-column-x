@@ -27,7 +27,6 @@
     "ACCOUNT_LOGIN_COMPLETE": "account-login-complete",
     "WEBVIEW_SCROLL": "webview-scroll",
     "CLOSE_TOPMOST_POPUP": "close-topmost-popup",
-    "COLUMN_DOUBLE_TAP": "column-double-tap",
     "WEBVIEW_NEW_POSTS_COUNT": "webview-new-posts-count",
     "WEBVIEW_KEYBOARD_SHORTCUT": "webview-keyboard-shortcut",
     "COLUMN_WEBVIEW_CRASHED": "column-webview-crashed",

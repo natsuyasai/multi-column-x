@@ -54,8 +54,6 @@ export const IPC_EVENTS = {
   WEBVIEW_SCROLL: "webview-scroll",
   /** 最前面ポップアップを閉じる（Android JNI → TS listen） */
   CLOSE_TOPMOST_POPUP: "close-topmost-popup",
-  /** アクティブカラムのダブルタップ（Android JNI → TS listen） */
-  COLUMN_DOUBLE_TAP: "column-double-tap",
   /** 新着投稿カウント（inject script invoke → TS listen）{ label, count } */
   WEBVIEW_NEW_POSTS_COUNT: "webview-new-posts-count",
   /** キーボードショートカット（inject script invoke → TS listen）キー種別文字列 */

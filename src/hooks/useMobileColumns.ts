@@ -1,13 +1,11 @@
 // src/hooks/useMobileColumns.ts
 // モバイル（Android）のアクティブカラム管理・スワイプナビゲーション・起動時復元
-import { listen } from "@tauri-apps/api/event";
-import { useCallback, useEffect, useState } from "react";
-import { IPC_EVENTS, STORAGE_KEYS, WEBVIEW_SCRIPTS } from "../constants/ipc";
+import { useCallback, useState } from "react";
+import { STORAGE_KEYS } from "../constants/ipc";
 import { mobileColumnLayout, resolveSwipeAreaHeight } from "../lib/gridLayout";
 import { logError } from "../lib/log";
 import {
   createColumnWebview,
-  evalInColumn,
   resizeColumnWebview,
   setColumnCookies,
 } from "../services/columnWebview";
@@ -26,7 +24,6 @@ export function resolveTwoColumnEnabled(): boolean {
 }
 
 export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
-  const isMobile = useAppStore((s) => s.isMobile);
   const [activeColumnId, setActiveColumnIdState] = useState<string | null>(
     null,
   );
@@ -173,21 +170,6 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
     },
     [activeColumnId, setActiveColumn, dialogOpenRef],
   );
-
-  // アクティブカラムのダブルタップ（先頭スクロール＋リロード）。
-  // 横スワイプによるカラム切替は MobileSwipeBar（navigateColumn）が担うため、
-  // ここではネイティブのダブルタップイベントのみを購読する。
-  useEffect(() => {
-    if (!isMobile) return;
-    const unlistenDoubleTap = listen(IPC_EVENTS.COLUMN_DOUBLE_TAP, () => {
-      if (dialogOpenRef.current) return;
-      if (!activeColumnId) return;
-      evalInColumn(activeColumnId, WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD);
-    });
-    return () => {
-      unlistenDoubleTap.then((fn) => fn());
-    };
-  }, [isMobile, activeColumnId, dialogOpenRef]);
 
   return {
     activeColumnId,

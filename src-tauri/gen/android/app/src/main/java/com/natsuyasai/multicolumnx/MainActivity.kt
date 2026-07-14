@@ -7,7 +7,6 @@ import android.os.Bundle
 import android.os.Message
 import android.provider.Settings
 import android.util.Log
-import android.view.MotionEvent
 import android.view.View
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
@@ -40,28 +39,9 @@ class MainActivity : TauriActivity() {
   // UI スレッドからのみ操作する。
   private var persistentComposeWebView: Pair<String, WebView>? = null
 
-  // ポップアップ表示中のジェスチャー無効化。判定待ちが完了しないまま 3 秒経過したら
-  // ジェスチャー判定をリセットし、全ジェスチャーが永久に受け付けられなくなる状態を防ぐ。
-  private val popupGestureBlock = PopupGestureBlock()
-
   // 現在表示中のカラム WebView の ID（showColumnWebView 呼び出し時に更新）。
   // 戻るボタン時の canGoBack 判定に使う。UI スレッドからのみアクセスする。
   private var activeColumnWebViewId: String? = null
-
-  // アクティブカラム領域のダブルタップ検出器（先頭スクロール＋リロード用）。
-  // 横スワイプによるカラム切替は React の MobileSwipeBar が担うため、
-  // ネイティブのジェスチャー検出はダブルタップのみを扱う。
-  // 確定時のコールバックを AppBridge へ転送し、ポップアップ表示中は無効化する。
-  private val gestureDetector by lazy {
-    DoubleTapGestureDetector(
-      resources.displayMetrics.density,
-      object : DoubleTapGestureDetector.Callbacks {
-        override fun onDoubleTap() = AppBridge.onDoubleTap()
-
-        override fun isGestureBlocked(): Boolean = popupGestureBlock.isBlocked()
-      },
-    )
-  }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
@@ -111,42 +91,6 @@ class MainActivity : TauriActivity() {
         }
       },
     )
-  }
-
-  // タッチ開始位置がアクティブカラムの矩形内だったか。ACTION_DOWN で判定し、
-  // 以降の MOVE/UP でも同じ判定を使い回す（指が矩形を跨いで動いても一貫させるため）。
-  private var touchStartedWithinActiveColumn = true
-
-  // アクティブカラムのダブルタップ（先頭スクロール＋リロード）を検出する。
-  // 検出ロジックは DoubleTapGestureDetector に委譲する。
-  // 2カラム表示時、非アクティブ（右隣）カラム上のタップでアクティブカラムが誤反応しないよう、
-  // タッチ開始位置がアクティブカラムの矩形内の場合のみ検出器へイベントを渡す。
-  override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-    if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
-      touchStartedWithinActiveColumn = isTouchWithinActiveColumn(ev.x, ev.y)
-    }
-    if (touchStartedWithinActiveColumn) {
-      gestureDetector.onTouchEvent(ev)
-    }
-    return super.dispatchTouchEvent(ev)
-  }
-
-  // タッチ座標がアクティブカラム WebView の現在の矩形内かを判定する。
-  // getLocationInWindow でウィンドウ座標系（MotionEvent と同じ座標系）での
-  // WebView の実際の画面上の位置を取得する。contentRoot に対する insets 分の
-  // padding オフセットの影響を受けないようにするため、layoutParams（親ビュー
-  // ローカル座標）ではなくこちらを使う。
-  // アクティブカラム未設定・非表示・サイズ未確定の場合は安全側（true=検出する）に倒す。
-  private fun isTouchWithinActiveColumn(
-    x: Float,
-    y: Float,
-  ): Boolean {
-    val activeWv = activeColumnWebViewId?.let { columnWebViews[it] } ?: return true
-    if (activeWv.visibility != View.VISIBLE) return true
-    if (activeWv.width <= 0 || activeWv.height <= 0) return true
-    val location = IntArray(2)
-    activeWv.getLocationInWindow(location)
-    return isPointWithinBounds(x, y, location[0], location[1], activeWv.width, activeWv.height)
   }
 
   // AddAccount Activity を account_id を Intent Extra として渡して起動する。
@@ -271,7 +215,6 @@ class MainActivity : TauriActivity() {
         )
       contentRoot.addView(webView, params)
       popupWebViews.addLast(Pair(id, webView))
-      popupGestureBlock.onPopupCountChanged(popupWebViews.size)
       loadUrlForAccount(webView, url, accountId, profileApplied)
     }
   }
@@ -286,7 +229,6 @@ class MainActivity : TauriActivity() {
         val wv = popupWebViews.removeAt(idx).second
         contentRoot.removeView(wv)
         wv.destroy()
-        popupGestureBlock.onPopupCountChanged(popupWebViews.size)
         return@runOnUiThreadSync
       }
       persistentComposeWebView?.takeIf { it.first == id }?.let { pair ->
@@ -316,7 +258,6 @@ class MainActivity : TauriActivity() {
       it.destroy()
     }
     persistentComposeWebView = pair
-    popupGestureBlock.onPopupCountChanged(popupWebViews.size)
   }
 
   // 最前面のポップアップ WebView を閉じる。UI スレッド（OnBackPressedCallback）から呼ばれる。
@@ -332,7 +273,6 @@ class MainActivity : TauriActivity() {
     val wv = popupWebViews.removeLast().second
     contentRoot.removeView(wv)
     wv.destroy()
-    popupGestureBlock.onPopupCountChanged(popupWebViews.size)
     return true
   }
 
@@ -354,7 +294,6 @@ class MainActivity : TauriActivity() {
           pair.second.loadUrl(url)
         }
         popupWebViews.addLast(pair)
-        popupGestureBlock.onPopupCountChanged(popupWebViews.size)
         shown = true
       }
     }
