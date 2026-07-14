@@ -132,14 +132,21 @@ class MainActivity : TauriActivity() {
   }
 
   // タッチ座標がアクティブカラム WebView の現在の矩形内かを判定する。
-  // アクティブカラム未設定や layoutParams 取得不可の場合は安全側（true=検出する）に倒す。
+  // getLocationInWindow でウィンドウ座標系（MotionEvent と同じ座標系）での
+  // WebView の実際の画面上の位置を取得する。contentRoot に対する insets 分の
+  // padding オフセットの影響を受けないようにするため、layoutParams（親ビュー
+  // ローカル座標）ではなくこちらを使う。
+  // アクティブカラム未設定・非表示・サイズ未確定の場合は安全側（true=検出する）に倒す。
   private fun isTouchWithinActiveColumn(
     x: Float,
     y: Float,
   ): Boolean {
     val activeWv = activeColumnWebViewId?.let { columnWebViews[it] } ?: return true
-    val params = activeWv.layoutParams as? FrameLayout.LayoutParams ?: return true
-    return isPointWithinBounds(x, y, params.leftMargin, params.topMargin, params.width, params.height)
+    if (activeWv.visibility != View.VISIBLE) return true
+    if (activeWv.width <= 0 || activeWv.height <= 0) return true
+    val location = IntArray(2)
+    activeWv.getLocationInWindow(location)
+    return isPointWithinBounds(x, y, location[0], location[1], activeWv.width, activeWv.height)
   }
 
   // AddAccount Activity を account_id を Intent Extra として渡して起動する。
