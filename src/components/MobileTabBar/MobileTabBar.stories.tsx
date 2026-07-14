@@ -89,6 +89,7 @@ const meta: Meta<typeof MobileTabBar> = {
     onOpenLinkPopup: fn(),
     onComposeTweet: fn(),
     onTabAction: fn(),
+    onDoubleTapColumn: fn(),
   },
 };
 
