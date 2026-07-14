@@ -91,6 +91,32 @@ describe("useColumns mobile", () => {
             ngWords: [],
           },
         },
+        {
+          id: "col-3",
+          accountId: "acc-1",
+          pageType: "home",
+          homeTabName: "フォロー中",
+          width: 350,
+          order: 2,
+          gridRow: 1,
+          gridCol: 3,
+          heightMode: "auto",
+          settings: {
+            autoReloadEnabled: true,
+            autoReloadInterval: 60,
+            showCountdown: true,
+            areaRemoveEnabled: true,
+            showCustomMenu: false,
+            scrollPosRestoreEnabled: true,
+            customCSS: "",
+            visibleLinks: [],
+            smallImageEnabled: false,
+            smallImageWidth: "50%",
+            blurImageEnabled: false,
+            blurImageAmount: "10px",
+            ngWords: [],
+          },
+        },
       ],
       globalSettings: {
         theme: "dark",
@@ -203,6 +229,79 @@ describe("useColumns mobile", () => {
     });
     // col-2 should become active
     expect(result.current.activeColumnId).toBe("col-2");
+  });
+
+  it("2カラム表示中に非アクティブな右隣カラムを削除すると、アクティブカラムはそのままで新しい右隣が再配置される", async () => {
+    useAppStore.setState({ profileApiSupported: true });
+    const { result } = renderHook(() => useColumns());
+    // col-1 をアクティブにする（2カラム条件成立 → 表示ペアは col-1/col-2）
+    await act(async () => {
+      await result.current.setActiveColumn("col-1");
+    });
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    // 非アクティブな右隣（col-2）を削除する
+    await act(async () => {
+      await result.current.handleRemoveColumn("col-2");
+    });
+
+    // アクティブカラムは col-1 のまま
+    expect(result.current.activeColumnId).toBe("col-1");
+    // 再配置がトリガーされ、新しい右隣 col-3 が表示座標（x >= 0）で resize される
+    const calls = mockInvoke.mock.calls.filter(
+      (c) => c[0] === "resize_column_webview",
+    );
+    const col1Call = calls.find(
+      (c) => (c[1] as any).bounds.columnId === "col-1",
+    );
+    const col3Call = calls.find(
+      (c) => (c[1] as any).bounds.columnId === "col-3",
+    );
+    expect(col1Call?.[1]).toMatchObject({
+      bounds: { columnId: "col-1", x: 0 },
+    });
+    expect((col3Call?.[1] as any).bounds.x).toBeGreaterThanOrEqual(0);
+  });
+
+  it("2カラム表示中にアクティブカラムを削除すると、従来どおり次のカラムに切り替わる", async () => {
+    useAppStore.setState({ profileApiSupported: true });
+    const { result } = renderHook(() => useColumns());
+    await act(async () => {
+      await result.current.setActiveColumn("col-1");
+    });
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    // アクティブカラム（col-1）を削除する
+    await act(async () => {
+      await result.current.handleRemoveColumn("col-1");
+    });
+
+    // order が次に小さい col-2 がアクティブになる（既存動作の回帰確認）
+    expect(result.current.activeColumnId).toBe("col-2");
+  });
+
+  it("表示ペアに含まれないカラムを削除しても余分な再配置は発生しない", async () => {
+    // profileApiSupported が false のため 1カラム表示（表示ペアは col-1 のみ）
+    const { result } = renderHook(() => useColumns());
+    await act(async () => {
+      await result.current.setActiveColumn("col-1");
+    });
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    // 表示ペアに含まれない col-3（非表示状態）を削除する
+    await act(async () => {
+      await result.current.handleRemoveColumn("col-3");
+    });
+
+    // アクティブカラムは変化せず、余分な resize_column_webview 呼び出しも発生しない
+    expect(result.current.activeColumnId).toBe("col-1");
+    const resizeCalls = mockInvoke.mock.calls.filter(
+      (c) => c[0] === "resize_column_webview",
+    );
+    expect(resizeCalls).toHaveLength(0);
   });
 });
 

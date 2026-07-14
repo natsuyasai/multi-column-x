@@ -188,11 +188,34 @@ export function useColumns() {
   // カラム削除
   const handleRemoveColumn = useCallback(
     async (columnId: string) => {
+      const {
+        isMobile,
+        columns: columnsBeforeRemoval,
+        globalSettings,
+      } = useAppStore.getState();
+
+      // 削除カラムが現在の表示ペア（アクティブ or その隣）に含まれていたかを、
+      // 削除前のカラム構成で判定する。removeColumn 後だと右隣の判定基準が
+      // ずれるため、必ず removeColumn 呼び出し前に計算する（recreateColumnWebview
+      // と同じ判定パターン）。
+      const wasInDisplayPair =
+        isMobile &&
+        activeColumnId != null &&
+        activeColumnId !== columnId &&
+        mobileColumnLayout({
+          columns: columnsBeforeRemoval,
+          activeColumnId,
+          twoColumnEnabled: resolveTwoColumnEnabled(),
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
+          swipeAreaHeight: resolveSwipeAreaHeight(globalSettings),
+        })[columnId]?.x >= 0;
+
       await removeColumnWebview(columnId).catch(
         logError("handleRemoveColumn:removeColumnWebview"),
       );
       removeColumn(columnId);
-      const { isMobile, columns: remainingColumns } = useAppStore.getState();
+      const { columns: remainingColumns } = useAppStore.getState();
       if (isMobile) {
         if (activeColumnId === columnId) {
           const next = [...remainingColumns].sort(
@@ -203,6 +226,10 @@ export function useColumns() {
           } else {
             setActiveColumnIdState(null);
           }
+        } else if (wasInDisplayPair && activeColumnId) {
+          // 削除したのは非アクティブな表示ペア相手（2カラム時の右隣）。
+          // アクティブ列はそのまま、新しい隣を表示させるため再配置する。
+          await setActiveColumn(activeColumnId);
         }
         return;
       }
