@@ -307,8 +307,8 @@ class MainActivity : TauriActivity() {
     return true
   }
 
-  // 退避中の常駐コンポーズ WebView を再表示し、URL へ遷移する。JNI スレッドから呼ばれる。
-  // 対象が無ければ false を返し、呼び出し側（Rust）が新規作成にフォールバックする。
+  // 退避中の常駐コンポーズ WebView を再表示する。表示中 URL がコンポーズページ以外なら URL へ遷移する。
+  // JNI スレッドから呼ばれる。対象が無ければ false を返し、呼び出し側（Rust）が新規作成にフォールバックする。
   fun reshowPopupWebView(
     id: String,
     url: String,
@@ -320,7 +320,10 @@ class MainActivity : TauriActivity() {
         persistentComposeWebView = null
         pair.second.onResume()
         pair.second.visibility = View.VISIBLE
-        pair.second.loadUrl(url) // 再表示のたびに新規作成ページへ遷移（確定要求5）
+        // 既にコンポーズページを表示中なら遷移せず再表示のみ（下書きもそのまま維持）
+        if (!isComposePostUrl(pair.second.url)) {
+          pair.second.loadUrl(url)
+        }
         popupWebViews.addLast(pair)
         popupGestureBlock.onPopupCountChanged(popupWebViews.size)
         shown = true
