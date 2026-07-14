@@ -41,6 +41,7 @@ const baseGlobalSettings: GlobalSettings = {
   useXAppForCompose: false,
   mobileSwipeAreaEnabled: true,
   mobileSwipeAreaHeight: 28,
+  mobileTwoColumnEnabled: true,
   presets: [],
   ngWords: [],
 };
@@ -180,6 +181,19 @@ describe("AppSettingsPanel スワイプ切替設定", () => {
     fireEvent.click(screen.getByRole("button", { name: "適用" }));
     expect(onApply).toHaveBeenCalledWith(
       expect.objectContaining({ mobileSwipeAreaEnabled: false }),
+    );
+  });
+
+  it("広い画面で2カラム表示トグルを切り替えるとonApplyに反映される", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    const checkbox = screen.getByRole("checkbox", {
+      name: "広い画面で2カラム表示（タブレット・横向き）",
+    });
+    fireEvent.click(checkbox);
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ mobileTwoColumnEnabled: false }),
     );
   });
 

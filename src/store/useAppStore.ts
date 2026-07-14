@@ -40,6 +40,8 @@ interface AppStore {
   setTopBarExpanded: (v: boolean) => void;
   isMobile: boolean;
   setIsMobile: (v: boolean) => void;
+  profileApiSupported: boolean;
+  setProfileApiSupported: (v: boolean) => void;
   unreadCounts: Record<string, number>;
   setUnreadCount: (columnId: string, count: number) => void;
   clearUnreadCount: (columnId: string) => void;
@@ -72,6 +74,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   setTopBarExpanded: (v) => set({ topBarExpanded: v }),
   isMobile: false,
   setIsMobile: (v) => set({ isMobile: v }),
+  profileApiSupported: false,
+  setProfileApiSupported: (v) => set({ profileApiSupported: v }),
   unreadCounts: {},
   setUnreadCount: (columnId, count) =>
     set((state) => ({

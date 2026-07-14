@@ -37,6 +37,7 @@ export const IPC_COMMANDS = {
   REPORT_WEBVIEW_SCROLL: "report_webview_scroll",
   GET_MOBILE_INSETS: "get_mobile_insets",
   SET_COLUMN_COOKIES: "set_column_cookies",
+  IS_WEBVIEW_PROFILE_SUPPORTED: "is_webview_profile_supported",
 
   // 未読カウント
   REPORT_NEW_POSTS_COUNT: "report_new_posts_count",
