@@ -267,4 +267,40 @@ mod tests {
     fn httpならfalseを返す() {
         assert!(!is_compose_post_url(&parse("http://x.com/compose/post")));
     }
+
+    /// is_compose_post_url のプロパティテスト。
+    /// 仕様「origin が https://x.com かつ pathname が /compose/post のときのみ true。
+    /// クエリ・ハッシュの差異は無視」を任意入力の広い入力域で検証する。
+    mod properties {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            #[test]
+            fn 任意のクエリを付けてもtrueのまま(q in "[a-z0-9=&_-]{0,30}") {
+                let url = parse(&format!("https://x.com/compose/post?{q}"));
+                prop_assert!(is_compose_post_url(&url));
+            }
+
+            #[test]
+            fn 任意のハッシュを付けてもtrueのまま(f in "[a-z0-9=&_-]{0,30}") {
+                let url = parse(&format!("https://x.com/compose/post#{f}"));
+                prop_assert!(is_compose_post_url(&url));
+            }
+
+            #[test]
+            fn パスがcompose_post以外なら常にfalse(p in "[a-z0-9/_-]{0,30}") {
+                let url = parse(&format!("https://x.com/{p}"));
+                prop_assume!(url.path() != "/compose/post");
+                prop_assert!(!is_compose_post_url(&url));
+            }
+
+            #[test]
+            fn ホストがx_com以外なら常にfalse(h in "[a-z0-9-]{1,20}\\.(com|net|org)") {
+                prop_assume!(h != "x.com");
+                let url = parse(&format!("https://{h}/compose/post"));
+                prop_assert!(!is_compose_post_url(&url));
+            }
+        }
+    }
 }
