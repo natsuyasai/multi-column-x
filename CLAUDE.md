@@ -14,8 +14,8 @@ React 19 + TypeScript フロントエンドと Rust バックエンドで構成�
 
 必ず以下のワークフローの内容に従って作業を進めること
 
-- 各フェーズ実行時は `./steering/details/aws-aidlc-rule-details/` 配下の該当ルールファイルを読み込む
-- 共通ルール（`./steering/details/common/`）はワークフロー開始時に必ず読み込む
+- 各フェーズ実行時は `./.steering/details/aws-aidlc-rule-details/` 配下の該当ルールファイルを読み込む
+- 共通ルール（`./.steering/details/common/`）はワークフロー開始時に必ず読み込む
 - セキュリティルールは全フェーズで必須の横断的制約として適用する（未充足はブロッキング）
 
 セッション中に生成したすべての成果物は `aidlc-docs/` に保存します。
