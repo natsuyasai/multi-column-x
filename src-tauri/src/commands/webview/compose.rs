@@ -5,17 +5,18 @@ use super::popup::{build_popup_init, PopupInit};
 #[cfg(target_os = "android")]
 use crate::commands::settings_store::load_use_x_app_for_compose;
 use crate::ipc_constants::labels;
-#[cfg(desktop)]
+#[cfg(any(desktop, target_os = "android"))]
 use crate::state::{decide_compose_action, AppState, ComposeAction, ComposeSession};
 #[cfg(desktop)]
 use std::path::PathBuf;
 use tauri::AppHandle;
-#[cfg(desktop)]
+#[cfg(any(desktop, target_os = "android"))]
 use tauri::Manager;
 #[cfg(not(target_os = "android"))]
 use tauri::WebviewUrl;
 
-#[cfg(desktop)]
+// desktop / android 共通のコンポーズ遷移先。常駐再表示のたびにここへ遷移する（確定要求5）。
+#[cfg(any(desktop, target_os = "android"))]
 const COMPOSE_URL: &str = "https://x.com/compose/post";
 
 /// デスクトップ用: ツイート作成ウィンドウを新規作成し、常駐状態（`AppState.compose`）に登録する。
@@ -143,12 +144,46 @@ pub async fn open_compose_window(
         if load_use_x_app_for_compose(&app) {
             return crate::android_bridge::launch_compose_tweet_intent();
         }
-        return crate::android_bridge::create_popup_webview(
+
+        let action = {
+            let state = app.state::<AppState>();
+            let guard = state.compose.lock().expect("compose mutex poisoned");
+            decide_compose_action(guard.as_ref(), &accountId)
+        };
+
+        match action {
+            ComposeAction::Reuse { label } => {
+                match crate::android_bridge::reshow_popup_webview(&label, COMPOSE_URL) {
+                    Ok(true) => return Ok(()),
+                    _ => {
+                        // 再表示に失敗（退避が見つからない／JNI エラー等）
+                        // → 常駐状態をクリアして新規作成へフォールスルーする。
+                        let state = app.state::<AppState>();
+                        *state.compose.lock().expect("compose mutex poisoned") = None;
+                    }
+                }
+            }
+            ComposeAction::Replace { old_label } => {
+                // 退避中（hide）の旧常駐でも破棄する（Kotlin 側 removePopupWebView の退避分対応）。
+                crate::android_bridge::remove_popup_webview(&old_label).ok();
+            }
+            ComposeAction::CreateNew => {}
+        }
+
+        crate::android_bridge::create_popup_webview(
             &compose_label,
-            "https://x.com/compose/post",
+            COMPOSE_URL,
             &popup_init,
             &accountId,
-        );
+        )?;
+
+        let state = app.state::<AppState>();
+        *state.compose.lock().expect("compose mutex poisoned") = Some(ComposeSession {
+            label: compose_label,
+            account_id: accountId,
+        });
+
+        return Ok(());
     }
 
     #[cfg(not(target_os = "android"))]
