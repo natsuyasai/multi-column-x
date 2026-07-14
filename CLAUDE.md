@@ -34,6 +34,13 @@ React 19 + TypeScript フロントエンドと Rust バックエンドで構成�
 - javascriptはモダンな記載をすること
   - varは使用しない
 
+## サブエージェント運用（実装委譲の基本ルール）
+
+- 実装作業（フェーズ3）は必ずサブエージェント（`model: sonnet`）に委譲し、メインエージェントは統括（レビュー・進行管理・コミット・品質チェック実行・ドキュメント整備）に徹する。メインが自分で実装を書かない
+- `Agent` 委譲の前に「メイン=<モデル名> / サブエージェント=sonnet」を必ずテキスト出力する
+- Sonnet では対応が難しい作業が出た場合は、**ユーザーの承認を得てから**メインが対応する
+- 実装プラン（フェーズ2の `plan.md`）は Sonnet が単独で実行できる詳細度で書く（自己完結・現状コードの引用・変更後のコード断片・正確なファイルパス・落とし穴チェックリスト）
+
 ## 作業手順
 
 - 新規ブランチを作成するべきかまず確認すること
@@ -87,6 +94,13 @@ WebKitGTK の WebProcess は横スクロールでの `resize_column_webview` 連
 - **自動復旧**: カラム作成時に webkit2gtk `connect_web_process_terminated` を接続 → `column-webview-crashed`（payload=columnId）emit → TS `useColumnCrashRecovery` が再生成（同一カラム `CRASH_RECOVERY_COOLDOWN_MS` クールダウン）。
 - **手動復旧**: ヘッダ「⟳」はデスクトップで `recreateColumnWebview`（WebView 再生成）。モバイルは従来の `location.reload`。
 - webkit2gtk は wry と同一 `=2.0.2`/`v2_40` をピン留め（`PlatformWebview::inner()` の型一致のため）。
+
+### Tauri ウィンドウの close() と destroy()（常駐ウィンドウの破棄）
+
+`WebviewWindow::close()` は `CloseRequested` を発火してから閉じるため、`prevent_close()` + `hide()` で閉じる操作を握っている常駐ウィンドウ（例: 常駐コンポーズ `compose-`）には効かず、**破棄したつもりが非表示にすり替わる**。
+
+- プログラムから確実に破棄する経路（置換・失敗時フォールバック・アプリ終了）は `destroy()` を使うこと
+- `prevent_close` を使う常駐ウィンドウを新設したら、メインウィンドウの `CloseRequested`（`lib.rs`）に明示 `destroy()` を必ず追加すること。忘れると不可視ウィンドウが残りアプリプロセスが終了しなくなる
 
 ### アカウントログイン検出（desktop vs mobile）
 
