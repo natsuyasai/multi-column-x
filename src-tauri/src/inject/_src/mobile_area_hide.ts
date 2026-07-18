@@ -52,9 +52,27 @@
     }
   }
 
+  // header[role='banner'] の高さを div[role='tablist'] の高さに同期する
+  function applyHeaderHeightSync(): void {
+    const header = document.querySelector<HTMLElement>("header[role='banner']");
+    if (!header) return;
+
+    const tablist = document.querySelector<HTMLElement>("div[role='tablist']");
+    if (!tablist) return;
+
+    const tablistHeight = tablist.offsetHeight;
+    if (tablistHeight <= 0) return;
+
+    const heightPx = `${tablistHeight}px`;
+    if (header.style.height !== heightPx) {
+      header.style.setProperty("height", heightPx, "important");
+    }
+  }
+
   function apply(): void {
     applyTopNavHide();
     applyLayersHide();
+    applyHeaderHeightSync();
   }
 
   let applyTimer: ReturnType<typeof setTimeout> | undefined;

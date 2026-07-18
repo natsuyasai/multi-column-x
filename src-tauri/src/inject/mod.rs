@@ -59,7 +59,11 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     };
     let video_control = include_str!("video_control.js");
     let sidebar_hide = include_str!("sidebar_hide.js");
-    let mobile_area_hide = include_str!("mobile_area_hide.js");
+    let mobile_area_hide = if params.is_mobile {
+        include_str!("mobile_area_hide.js")
+    } else {
+        ""
+    };
 
     let visible_links_json =
         serde_json::to_string(params.visible_links).unwrap_or_else(|_| "[]".to_string());
@@ -283,6 +287,20 @@ mod tests {
         let mobile_script = build_init_script(&params);
         // image_popup.js はデスクトップのみ含まれる
         assert!(desktop_script.len() > mobile_script.len() || !mobile_script.is_empty());
+    }
+
+    #[test]
+    fn build_init_script_mobile_includes_mobile_area_hide() {
+        let mut params = default_params();
+        params.is_mobile = true;
+        let script = build_init_script(&params);
+        assert!(script.contains("TopNavBar"));
+    }
+
+    #[test]
+    fn build_init_script_desktop_excludes_mobile_area_hide() {
+        let script = build_init_script(&default_params()); // is_mobile: false
+        assert!(!script.contains("TopNavBar"));
     }
 
     #[test]
