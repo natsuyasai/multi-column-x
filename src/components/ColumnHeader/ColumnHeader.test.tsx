@@ -46,6 +46,7 @@ const defaultProps = {
   onReloadPage: vi.fn(),
   onSettings: vi.fn(),
   onClose: vi.fn(),
+  onScrollTop: vi.fn(),
 };
 
 describe("ColumnHeader", () => {
@@ -136,5 +137,21 @@ describe("ColumnHeader", () => {
     );
     await userEvent.click(screen.getByTestId("unread-badge"));
     expect(onClearUnread).toHaveBeenCalledWith("col-1");
+  });
+
+  it("先頭までスクロールボタンクリックで onScrollTop が呼ばれる", () => {
+    const onScrollTop = vi.fn();
+    render(<ColumnHeader {...defaultProps} onScrollTop={onScrollTop} />);
+    fireEvent.click(screen.getByLabelText("先頭までスクロール"));
+    expect(onScrollTop).toHaveBeenCalledWith("col-1");
+  });
+
+  it("先頭までスクロールボタンに chevrons-up SVG が表示される", () => {
+    const { container } = render(<ColumnHeader {...defaultProps} />);
+    expect(
+      container
+        .querySelector('[title="先頭までスクロール"]')
+        ?.querySelector('[data-testid="icon-chevrons-up"]'),
+    ).toBeInTheDocument();
   });
 });

@@ -1,4 +1,5 @@
 import React from "react";
+import ChevronsUpIcon from "../../assets/icons/chevrons-up.svg?react";
 import CloseIcon from "../../assets/icons/close.svg?react";
 import SettingsIcon from "../../assets/icons/settings.svg?react";
 import { useAutoReload } from "../../hooks/useAutoReload";
@@ -11,6 +12,7 @@ interface ColumnHeaderProps {
   account: Account;
   onReload: (columnId: string) => void;
   onReloadPage: (columnId: string) => void;
+  onScrollTop: (columnId: string) => void;
   onSettings: (columnId: string) => void;
   onClose: (columnId: string) => void;
   unreadCount?: number;
@@ -22,6 +24,7 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
   account,
   onReload,
   onReloadPage,
+  onScrollTop,
   onSettings,
   onClose,
   unreadCount = 0,
@@ -56,6 +59,18 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
         </span>
       )}
       <div className={styles.actions}>
+        <button
+          className={styles.actionBtn}
+          onClick={() => onScrollTop(column.id)}
+          aria-label="先頭までスクロール"
+          title="先頭までスクロール"
+        >
+          <ChevronsUpIcon
+            width={14}
+            height={14}
+            data-testid="icon-chevrons-up"
+          />
+        </button>
         <button
           className={styles.actionBtn}
           onClick={() => {

@@ -71,6 +71,7 @@ const meta: Meta<typeof ColumnHeader> = {
     unreadCount: 3,
     onReload: fn(),
     onReloadPage: fn(),
+    onScrollTop: fn(),
     onSettings: fn(),
     onClose: fn(),
     onClearUnread: fn(),
