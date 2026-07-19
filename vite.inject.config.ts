@@ -25,6 +25,7 @@ const plainEntries = [
   "blur_image",
   "sidebar_hide",
   "mobile_area_hide",
+  "notification_header_hide",
 ];
 
 // React を含む header_customizer は IIFE + inlineDynamicImports で個別ビルド
