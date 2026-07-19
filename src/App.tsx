@@ -285,7 +285,7 @@ const App: React.FC = () => {
     await evalInColumn(columnId, WEBVIEW_SCRIPTS.TRIGGER_RELOAD);
   }, []);
 
-  // タブバーでのダブルタップ: 対象カラムを先頭スクロール＋リロードする
+  // タブバーのダブルタップ／カラムヘッダーの先頭スクロールボタン共通: 対象カラムを先頭スクロール＋リロードする
   const handleDoubleTapColumn = useCallback((columnId: string) => {
     evalInColumn(columnId, WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD);
   }, []);
@@ -460,6 +460,7 @@ const App: React.FC = () => {
                 account={account}
                 onReload={handleReload}
                 onReloadPage={handleReloadPage}
+                onScrollTop={handleDoubleTapColumn}
                 onSettings={setSettingsColumnId}
                 onClose={handleRemoveColumn}
                 unreadCount={unreadCounts[column.id] ?? 0}
