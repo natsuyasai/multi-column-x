@@ -2,7 +2,7 @@ export interface LatestRelease {
   version: string;
   notes?: string;
   apkUrl: string;
-  sha256Url?: string;
+  apkSha256?: string;
 }
 
 const LATEST_RELEASE_API =
@@ -14,6 +14,16 @@ const RELEASE_BY_TAG_API =
 interface GhAsset {
   name?: string;
   browser_download_url?: string;
+  digest?: string;
+}
+
+/** GitHub アセットの digest("sha256:<hex>") から小文字64桁hexを取り出す。不正・非sha256ならnull。 */
+export function parseDigestSha256(digest: string | undefined): string | null {
+  if (!digest) return null;
+  const prefix = "sha256:";
+  if (!digest.startsWith(prefix)) return null;
+  const hex = digest.slice(prefix.length);
+  return /^[0-9a-f]{64}$/i.test(hex) ? hex.toLowerCase() : null;
 }
 
 /** GitHub Releases API の latest レスポンスから更新情報を抽出する。 */
@@ -23,28 +33,12 @@ export function parseLatestRelease(json: unknown): LatestRelease | null {
   if (!obj.tag_name) return null;
   const apk = (obj.assets ?? []).find((a) => a.name?.endsWith(".apk"));
   if (!apk?.browser_download_url) return null;
-  const sha256 = (obj.assets ?? []).find((a) =>
-    a.name?.endsWith(".apk.sha256"),
-  );
   return {
     version: obj.tag_name.replace(/^v/i, ""),
     notes: obj.body || undefined,
     apkUrl: apk.browser_download_url,
-    sha256Url: sha256?.browser_download_url,
+    apkSha256: parseDigestSha256(apk.digest) ?? undefined,
   };
-}
-
-/** .sha256 アセットのテキストから 64 桁 hex を取り出す。不正なら null。 */
-export function parseSha256Text(text: string): string | null {
-  const token = text.trim().split(/\s+/)[0] ?? "";
-  return /^[0-9a-f]{64}$/i.test(token) ? token.toLowerCase() : null;
-}
-
-/** sha256 アセット URL から期待ハッシュ(小文字64桁hex)を取得する。取得失敗・不正なら null。 */
-export async function fetchApkSha256(url: string): Promise<string | null> {
-  const res = await fetch(url);
-  if (!res.ok) return null;
-  return parseSha256Text(await res.text());
 }
 
 /** 指定バージョンのリリースノート(body)を取得する。無ければ null。 */

@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check } from "@tauri-apps/plugin-updater";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fetchApkSha256, fetchLatestRelease } from "../lib/githubRelease";
+import { fetchLatestRelease } from "../lib/githubRelease";
 import { createUpdater } from "./updater";
 
 vi.mock("@tauri-apps/plugin-updater", () => ({ check: vi.fn() }));
@@ -12,7 +12,6 @@ vi.mock("@tauri-apps/api/app", () => ({ getVersion: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("../lib/githubRelease", () => ({
   fetchLatestRelease: vi.fn(),
-  fetchApkSha256: vi.fn(),
 }));
 
 const DUMMY_SHA256 = "0123456789abcdef".repeat(4);
@@ -126,14 +125,13 @@ describe("mobile updater", () => {
     expect(await u.check()).toBeNull();
   });
 
-  it("installはcheckで得たapkUrlとsha256でinstall_apk_updateを呼ぶ", async () => {
+  it("installはcheckで得たapkUrlとdigest由来のsha256でinstall_apk_updateを呼ぶ", async () => {
     vi.mocked(getVersion).mockResolvedValue("1.0.0");
     vi.mocked(fetchLatestRelease).mockResolvedValue({
       version: "1.2.0",
       apkUrl: "https://x/app.apk",
-      sha256Url: "https://x/app.apk.sha256",
+      apkSha256: DUMMY_SHA256,
     });
-    vi.mocked(fetchApkSha256).mockResolvedValue(DUMMY_SHA256);
     const u = createUpdater(true);
     await u.check();
     await u.install();
@@ -148,9 +146,8 @@ describe("mobile updater", () => {
     vi.mocked(fetchLatestRelease).mockResolvedValue({
       version: "1.2.0",
       apkUrl: "https://x/app.apk",
-      sha256Url: "https://x/app.apk.sha256",
+      apkSha256: DUMMY_SHA256,
     });
-    vi.mocked(fetchApkSha256).mockResolvedValue(DUMMY_SHA256);
     const u = createUpdater(true);
     await u.check();
     const progress = vi.fn();
@@ -167,9 +164,8 @@ describe("mobile updater", () => {
     vi.mocked(fetchLatestRelease).mockResolvedValue({
       version: "1.2.0",
       apkUrl: "https://x/app.apk",
-      sha256Url: "https://x/app.apk.sha256",
+      apkSha256: DUMMY_SHA256,
     });
-    vi.mocked(fetchApkSha256).mockResolvedValue(DUMMY_SHA256);
     const u = createUpdater(true);
     await u.check();
     const progress = vi.fn();
@@ -180,26 +176,12 @@ describe("mobile updater", () => {
     ]);
   });
 
-  it("sha256Urlが無ければinstallはエラーを投げる", async () => {
+  it("apkSha256が無ければinstallはエラーを投げる", async () => {
     vi.mocked(getVersion).mockResolvedValue("1.0.0");
     vi.mocked(fetchLatestRelease).mockResolvedValue({
       version: "1.2.0",
       apkUrl: "https://x/app.apk",
     });
-    const u = createUpdater(true);
-    await u.check();
-    await expect(u.install()).rejects.toThrow();
-    expect(invoke).not.toHaveBeenCalled();
-  });
-
-  it("fetchApkSha256がnullならinstallはエラーを投げる", async () => {
-    vi.mocked(getVersion).mockResolvedValue("1.0.0");
-    vi.mocked(fetchLatestRelease).mockResolvedValue({
-      version: "1.2.0",
-      apkUrl: "https://x/app.apk",
-      sha256Url: "https://x/app.apk.sha256",
-    });
-    vi.mocked(fetchApkSha256).mockResolvedValue(null);
     const u = createUpdater(true);
     await u.check();
     await expect(u.install()).rejects.toThrow();

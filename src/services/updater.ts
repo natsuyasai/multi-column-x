@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check } from "@tauri-apps/plugin-updater";
 import type { Update } from "@tauri-apps/plugin-updater";
-import { fetchApkSha256, fetchLatestRelease } from "../lib/githubRelease";
+import { fetchLatestRelease } from "../lib/githubRelease";
 import { isNewerVersion } from "../lib/version";
 
 export interface AppUpdate {
@@ -65,14 +65,14 @@ function createDesktopUpdater(): Updater {
 // Android: GitHub Releases API で最新版を検出し、APK をインストーラ経由で適用する。
 function createMobileUpdater(): Updater {
   let apkUrl: string | null = null;
-  let sha256Url: string | null = null;
+  let apkSha256: string | null = null;
   return {
     async check() {
       const current = await getVersion();
       const release = await fetchLatestRelease();
       if (!release || !isNewerVersion(release.version, current)) return null;
       apkUrl = release.apkUrl;
-      sha256Url = release.sha256Url ?? null;
+      apkSha256 = release.apkSha256 ?? null;
       return { version: release.version, notes: release.notes };
     },
     async install(onProgress) {
@@ -80,13 +80,12 @@ function createMobileUpdater(): Updater {
       // Android はネイティブ側にダウンロードを委ねるため進捗チャネルが無い。
       // 不確定のダウンロード状態を通知してフリーズに見えないようにする。
       onProgress?.({ phase: "downloading", downloaded: 0, total: null });
-      // strict: sha256 アセットが取得できないリリースはインストールしない（改ざん・欠落を fail-closed に倒す）
-      if (!sha256Url)
-        throw new Error("update rejected: sha256 asset not found");
-      const expectedSha256 = await fetchApkSha256(sha256Url);
-      if (!expectedSha256)
-        throw new Error("update rejected: invalid sha256 asset");
-      await invoke("install_apk_update", { url: apkUrl, expectedSha256 });
+      // fail-closed: APIのdigestから得た期待ハッシュが無ければインストールしない（改ざん・欠落を fail-closed に倒す）
+      if (!apkSha256) throw new Error("update rejected: apk digest not found");
+      await invoke("install_apk_update", {
+        url: apkUrl,
+        expectedSha256: apkSha256,
+      });
       // invoke はバックグラウンド Thread を起動して即 return する fire-and-forget。
       // OS がダウンロードを引き継いだことを UI に伝え、ボタン再押下を防ぐ。
       onProgress?.({ phase: "awaitingInstall" });
