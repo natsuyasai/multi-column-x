@@ -1,9 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  fetchApkSha256,
   fetchReleaseNotes,
+  parseDigestSha256,
   parseLatestRelease,
-  parseSha256Text,
 } from "./githubRelease";
 
 const VALID_SHA256 = "0123456789abcdef".repeat(4);
@@ -36,7 +35,7 @@ describe("parseLatestRelease", () => {
     expect(parseLatestRelease({ assets: [] })).toBeNull();
   });
 
-  it("apk.sha256資産があればsha256Urlに設定する", () => {
+  it("apkアセットのdigestからapkSha256(小文字hex)を設定する", () => {
     const json = {
       tag_name: "v1.2.0",
       body: "修正",
@@ -44,10 +43,7 @@ describe("parseLatestRelease", () => {
         {
           name: "MultiColumnX_1.2.0_universal.apk",
           browser_download_url: "https://x/app.apk",
-        },
-        {
-          name: "MultiColumnX_1.2.0_universal.apk.sha256",
-          browser_download_url: "https://x/app.apk.sha256",
+          digest: `sha256:${VALID_SHA256.toUpperCase()}`,
         },
       ],
     };
@@ -55,11 +51,11 @@ describe("parseLatestRelease", () => {
       version: "1.2.0",
       notes: "修正",
       apkUrl: "https://x/app.apk",
-      sha256Url: "https://x/app.apk.sha256",
+      apkSha256: VALID_SHA256,
     });
   });
 
-  it("apk.sha256資産が無ければsha256Urlはundefined", () => {
+  it("digestが無ければapkSha256はundefined", () => {
     const json = {
       tag_name: "v1.2.0",
       body: "修正",
@@ -70,7 +66,22 @@ describe("parseLatestRelease", () => {
         },
       ],
     };
-    expect(parseLatestRelease(json)?.sha256Url).toBeUndefined();
+    expect(parseLatestRelease(json)?.apkSha256).toBeUndefined();
+  });
+
+  it("digestがsha256でなければapkSha256はundefined", () => {
+    const json = {
+      tag_name: "v1.2.0",
+      body: "修正",
+      assets: [
+        {
+          name: "MultiColumnX_1.2.0_universal.apk",
+          browser_download_url: "https://x/app.apk",
+          digest: `sha512:${VALID_SHA256}`,
+        },
+      ],
+    };
+    expect(parseLatestRelease(json)?.apkSha256).toBeUndefined();
   });
 });
 
@@ -144,80 +155,40 @@ describe("fetchReleaseNotes", () => {
   });
 });
 
-describe("parseSha256Text", () => {
-  it("64桁hexのみのテキストをそのまま小文字で返す", () => {
-    expect(parseSha256Text(VALID_SHA256)).toBe(VALID_SHA256);
+describe("parseDigestSha256", () => {
+  it("sha256プレフィックス付き64桁hexを小文字で返す", () => {
+    expect(parseDigestSha256(`sha256:${VALID_SHA256}`)).toBe(VALID_SHA256);
   });
 
-  it("hashとファイル名がスペース区切りのテキストから先頭のhashを返す", () => {
-    expect(parseSha256Text(`${VALID_SHA256}  MultiColumnX.apk`)).toBe(
+  it("大文字hexを小文字に正規化する", () => {
+    expect(parseDigestSha256(`sha256:${VALID_SHA256.toUpperCase()}`)).toBe(
       VALID_SHA256,
     );
   });
 
-  it("前後の空白・改行をtrimする", () => {
-    expect(parseSha256Text(`\n  ${VALID_SHA256}  \n`)).toBe(VALID_SHA256);
+  it("undefinedはnull", () => {
+    expect(parseDigestSha256(undefined)).toBeNull();
   });
 
-  it("大文字hexを小文字に正規化する", () => {
-    expect(parseSha256Text(VALID_SHA256.toUpperCase())).toBe(VALID_SHA256);
+  it("プレフィックスが無ければnull", () => {
+    expect(parseDigestSha256(VALID_SHA256)).toBeNull();
   });
 
-  it("64桁でないテキストはnull(短い)", () => {
-    expect(parseSha256Text(VALID_SHA256.slice(0, 63))).toBeNull();
+  it("sha256以外のアルゴリズム(sha512:)はnull", () => {
+    expect(parseDigestSha256(`sha512:${VALID_SHA256}`)).toBeNull();
   });
 
-  it("64桁でないテキストはnull(長い)", () => {
-    expect(parseSha256Text(`${VALID_SHA256}0`)).toBeNull();
+  it("hexが64桁でなければnull(短い)", () => {
+    expect(parseDigestSha256(`sha256:${VALID_SHA256.slice(0, 63)}`)).toBeNull();
   });
 
-  it("非hex文字を含むテキストはnull", () => {
-    expect(parseSha256Text(`${VALID_SHA256.slice(0, 63)}g`)).toBeNull();
+  it("hexが64桁でなければnull(長い)", () => {
+    expect(parseDigestSha256(`sha256:${VALID_SHA256}0`)).toBeNull();
   });
 
-  it("空文字はnull", () => {
-    expect(parseSha256Text("")).toBeNull();
-  });
-});
-
-describe("fetchApkSha256", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it("res.okでparseSha256Textの結果を返す", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        text: async () => `${VALID_SHA256}  MultiColumnX.apk\n`,
-      }),
-    );
-
-    const result = await fetchApkSha256("https://x/app.apk.sha256");
-
-    expect(result).toBe(VALID_SHA256);
-  });
-
-  it("res.okがfalseならnull", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
-
-    const result = await fetchApkSha256("https://x/app.apk.sha256");
-
-    expect(result).toBeNull();
-  });
-
-  it("本文が不正フォーマットならnull", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        text: async () => "not a hash",
-      }),
-    );
-
-    const result = await fetchApkSha256("https://x/app.apk.sha256");
-
-    expect(result).toBeNull();
+  it("非hex文字を含めばnull", () => {
+    expect(
+      parseDigestSha256(`sha256:${VALID_SHA256.slice(0, 63)}g`),
+    ).toBeNull();
   });
 });
