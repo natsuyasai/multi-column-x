@@ -8,6 +8,7 @@ import {
 } from "@tauri-apps/plugin-notification";
 import { useEffect } from "react";
 import { IPC_EVENTS, WEBVIEW_LABELS } from "../constants/ipc";
+import { logError } from "../lib/log";
 import { useAppStore } from "../store/useAppStore";
 import { getColumnLabel } from "../types";
 
@@ -34,22 +35,61 @@ export function useWebviewScrollRelay(
 export const CRASH_RECOVERY_COOLDOWN_MS = 5000;
 
 /**
+ * 同一カラムを自動再生成する連続試行の上限。これを超えたら自動復旧を諦め手動再読込に委ねる。
+ */
+export const MAX_CRASH_RECOVERY_ATTEMPTS = 3;
+
+/**
+ * 直近再生成からこの時間以上安定して稼働していたら、次のクラッシュは新規事象として
+ * 試行回数をリセットする（スリープ復帰など）。
+ */
+export const CRASH_RECOVERY_STABILITY_RESET_MS = 60000;
+
+interface CrashRecoveryRecord {
+  attempts: number;
+  lastRecreatedAt: number;
+}
+
+/**
  * カラム WebView の WebProcess クラッシュ（Linux）を検知して当該カラムを再生成する。
  * Rust が connect_web_process_terminated で emit する column-webview-crashed を listen する。
+ *
+ * 連続再生成には上限（MAX_CRASH_RECOVERY_ATTEMPTS）を設け、上限到達後は自動復旧を諦める。
+ * 最後の再生成から CRASH_RECOVERY_STABILITY_RESET_MS 以上安定していた場合は、
+ * 新規のクラッシュ事象とみなして試行回数をリセットする（バックオフからの復帰）。
  */
 export function useColumnCrashRecovery(
   recreateColumnWebview: (columnId: string) => void | Promise<void>,
 ) {
   useEffect(() => {
-    const lastRecreatedAt: Record<string, number> = {};
+    const records: Record<string, CrashRecoveryRecord> = {};
     const unlisten = listen<string>(IPC_EVENTS.COLUMN_WEBVIEW_CRASHED, (e) => {
       const columnId = e.payload;
       const now = Date.now();
-      const last = lastRecreatedAt[columnId];
-      if (last !== undefined && now - last < CRASH_RECOVERY_COOLDOWN_MS) {
-        return;
+      const record = records[columnId];
+
+      if (record !== undefined) {
+        const elapsed = now - record.lastRecreatedAt;
+        if (elapsed < CRASH_RECOVERY_COOLDOWN_MS) {
+          return;
+        }
+        if (elapsed >= CRASH_RECOVERY_STABILITY_RESET_MS) {
+          record.attempts = 0;
+        }
+        if (record.attempts >= MAX_CRASH_RECOVERY_ATTEMPTS) {
+          logError("useColumnCrashRecovery")(
+            new Error(
+              `column ${columnId} crashed ${record.attempts} times consecutively; giving up auto-recovery until it stabilizes`,
+            ),
+          );
+          return;
+        }
       }
-      lastRecreatedAt[columnId] = now;
+
+      const next = records[columnId] ?? { attempts: 0, lastRecreatedAt: now };
+      next.attempts += 1;
+      next.lastRecreatedAt = now;
+      records[columnId] = next;
       void recreateColumnWebview(columnId);
     });
     return () => {

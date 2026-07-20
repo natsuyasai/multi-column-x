@@ -133,6 +133,56 @@ describe("useColumnCrashRecovery", () => {
     expect(recreate).toHaveBeenCalledWith("col-2");
     expect(recreate).toHaveBeenCalledTimes(2);
   });
+
+  it("連続再生成が上限に達したら自動復旧を諦める", async () => {
+    const recreate = vi.fn();
+    renderHook(() => useColumnCrashRecovery(recreate));
+    await act(async () => {
+      vi.setSystemTime(0);
+      emitCrash("col-1");
+    });
+    await act(async () => {
+      vi.setSystemTime(6000);
+      emitCrash("col-1");
+    });
+    await act(async () => {
+      vi.setSystemTime(12000);
+      emitCrash("col-1");
+    });
+    await act(async () => {
+      vi.setSystemTime(18000);
+      emitCrash("col-1");
+    });
+    expect(recreate).toHaveBeenCalledTimes(3);
+  });
+
+  it("上限到達後も安定稼働時間が経過すれば再度復旧する", async () => {
+    const recreate = vi.fn();
+    renderHook(() => useColumnCrashRecovery(recreate));
+    await act(async () => {
+      vi.setSystemTime(0);
+      emitCrash("col-1");
+    });
+    await act(async () => {
+      vi.setSystemTime(6000);
+      emitCrash("col-1");
+    });
+    await act(async () => {
+      vi.setSystemTime(12000);
+      emitCrash("col-1");
+    });
+    await act(async () => {
+      vi.setSystemTime(18000);
+      emitCrash("col-1");
+    });
+    expect(recreate).toHaveBeenCalledTimes(3);
+
+    await act(async () => {
+      vi.setSystemTime(72000);
+      emitCrash("col-1");
+    });
+    expect(recreate).toHaveBeenCalledTimes(4);
+  });
 });
 
 describe("useColumnFocusClearsUnread", () => {

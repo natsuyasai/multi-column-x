@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "MultiColumnX",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "identifier": "com.natsuyasai.multicolumnx",
   "build": {
     "frontendDist": "../dist",
@@ -50,6 +50,19 @@
     ],
     "android": {
       "minSdkVersion": 24
+    },
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": true
+      },
+      "deb": {
+        "depends": [
+          "gstreamer1.0-plugins-base",
+          "gstreamer1.0-plugins-good",
+          "gstreamer1.0-plugins-bad",
+          "gstreamer1.0-libav"
+        ]
+      }
     }
   }
 }
