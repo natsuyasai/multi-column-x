@@ -167,4 +167,59 @@ mod tests {
         let result = validate_install_request("main", VALID_URL, mixed_case);
         assert_eq!(result, Ok(()));
     }
+
+    mod properties {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            /// okを返すなら、urlは許可プレフィックスで始まりapkで終わり、
+            /// window_labelはmain、expected_sha256は64文字である（安全側の事後条件）。
+            #[test]
+            fn okを返すときの事後条件が常に成り立つ(
+                window_label in any::<String>(),
+                url in any::<String>(),
+                expected_sha256 in any::<String>(),
+            ) {
+                if validate_install_request(&window_label, &url, &expected_sha256).is_ok() {
+                    prop_assert_eq!(window_label, "main");
+                    prop_assert!(url.starts_with(ALLOWED_APK_URL_PREFIX));
+                    prop_assert!(url.ends_with(".apk"));
+                    prop_assert_eq!(expected_sha256.len(), 64);
+                }
+            }
+
+            /// 許可プレフィックス配下でも、禁止文字を含むsuffixを持つapk urlは
+            /// window・shaが有効でも常にエラーになる。
+            #[test]
+            fn 禁止文字を含むurlは常にエラーになる(
+                suffix in any::<String>(),
+                forbidden in prop::sample::select(vec!["..", "\\", "?", "#", "@", " "]),
+            ) {
+                let url = format!("{ALLOWED_APK_URL_PREFIX}{suffix}{forbidden}dummy.apk");
+                let result = validate_install_request("main", &url, VALID_SHA256);
+                prop_assert!(result.is_err());
+            }
+
+            /// 64文字でない、または非hexを含む任意文字列をexpected_sha256に与えると、
+            /// 他が有効でも常にエラーになる。
+            #[test]
+            fn 不正なsha256は常にエラーになる(invalid_sha in any::<String>()) {
+                prop_assume!(
+                    invalid_sha.len() != 64 || !invalid_sha.chars().all(|c| c.is_ascii_hexdigit())
+                );
+                let result = validate_install_request("main", VALID_URL, &invalid_sha);
+                prop_assert!(result.is_err());
+            }
+
+            /// 64桁ちょうどのhex文字列は、常に有効なsha256として受け入れられる。
+            #[test]
+            fn hex64桁ちょうどの文字列は常に受け入れられる(
+                valid_sha in proptest::string::string_regex("[0-9a-fA-F]{64}").unwrap(),
+            ) {
+                let result = validate_install_request("main", VALID_URL, &valid_sha);
+                prop_assert_eq!(result, Ok(()));
+            }
+        }
+    }
 }
