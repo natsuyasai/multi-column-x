@@ -59,7 +59,12 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     };
     let video_control = include_str!("video_control.js");
     let sidebar_hide = include_str!("sidebar_hide.js");
-    let mobile_area_hide = include_str!("mobile_area_hide.js");
+    let mobile_area_hide = if params.is_mobile {
+        include_str!("mobile_area_hide.js")
+    } else {
+        ""
+    };
+    let notification_header_hide = include_str!("notification_header_hide.js");
 
     let visible_links_json =
         serde_json::to_string(params.visible_links).unwrap_or_else(|_| "[]".to_string());
@@ -96,7 +101,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     };
 
     let mut script = format!(
-        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
+        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
         config,
         tab_selector,
         header_part,
@@ -113,7 +118,8 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         scroll_event,
         keyboard_shortcut,
         sidebar_hide,
-        mobile_area_hide
+        mobile_area_hide,
+        notification_header_hide
     );
 
     if !params.custom_css.is_empty() {
@@ -283,6 +289,34 @@ mod tests {
         let mobile_script = build_init_script(&params);
         // image_popup.js はデスクトップのみ含まれる
         assert!(desktop_script.len() > mobile_script.len() || !mobile_script.is_empty());
+    }
+
+    #[test]
+    fn build_init_script_mobile_includes_mobile_area_hide() {
+        let mut params = default_params();
+        params.is_mobile = true;
+        let script = build_init_script(&params);
+        assert!(script.contains("TopNavBar"));
+    }
+
+    #[test]
+    fn build_init_script_desktop_excludes_mobile_area_hide() {
+        let script = build_init_script(&default_params()); // is_mobile: false
+        assert!(!script.contains("TopNavBar"));
+    }
+
+    #[test]
+    fn build_init_script_desktopでnotification_header_hideが含まれる() {
+        let script = build_init_script(&default_params()); // is_mobile: false
+        assert!(script.contains("multi-column-x-notification-header-hide"));
+    }
+
+    #[test]
+    fn build_init_script_mobileでnotification_header_hideが含まれる() {
+        let mut params = default_params();
+        params.is_mobile = true;
+        let script = build_init_script(&params);
+        assert!(script.contains("multi-column-x-notification-header-hide"));
     }
 
     #[test]

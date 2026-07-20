@@ -200,16 +200,17 @@ pub fn launch_reauth_account_activity(
     })
 }
 
-/// MainActivity.downloadAndInstallApk(url) 経由で APK を DL してインストーラを起動する。
-/// アプリ内 APK 自己更新（Android）で使う。
-pub fn download_and_install_apk(url: &str) -> Result<(), String> {
+/// MainActivity.downloadAndInstallApk(url, expectedSha256) 経由で APK を DL してインストーラを起動する。
+/// アプリ内 APK 自己更新（Android）で使う。expected_sha256 はダウンロード後の検証に使う。
+pub fn download_and_install_apk(url: &str, expected_sha256: &str) -> Result<(), String> {
     call_activity_method(|env, activity| {
         let j_url = env.new_string(url).map_err(|e| e.to_string())?;
+        let j_expected = env.new_string(expected_sha256).map_err(|e| e.to_string())?;
         env.call_method(
             activity,
             "downloadAndInstallApk",
-            "(Ljava/lang/String;)V",
-            &[JValue::Object(&*j_url)],
+            "(Ljava/lang/String;Ljava/lang/String;)V",
+            &[JValue::Object(&*j_url), JValue::Object(&*j_expected)],
         )
         .map_err(|e| e.to_string())?;
         Ok(())

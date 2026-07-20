@@ -15,7 +15,7 @@ jobs:
       release_id: ${{ steps.create.outputs.result }}
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
       - name: Read version from tauri.conf.json
@@ -53,7 +53,7 @@ jobs:
           echo "head=$head_ref" >> "$GITHUB_OUTPUT"
       - name: Create or update draft release with notes
         id: create
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         env:
           PREV_TAG: ${{ steps.prevtag.outputs.prev }}
           HEAD_REF: ${{ steps.prevtag.outputs.head }}
@@ -141,19 +141,24 @@ jobs:
 
   desktop:
     needs: create-release
+    # 署名鍵 Secrets へのアクセスに承認ゲートを設けるための environment。
+    # 未作成でも保護なし environment として動作するため、手動設定前でも release は壊れない。
+    environment: release
     strategy:
       fail-fast: false
       matrix:
         platform: [windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: src-tauri
       - name: Install Linux dependencies
@@ -162,7 +167,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
       - run: npm ci
-      - uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -170,7 +175,7 @@ jobs:
         with:
           releaseId: ${{ needs.create-release.outputs.release_id }}
       - name: Upload CI artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: desktop-${{ matrix.platform }}
           path: |
@@ -179,26 +184,29 @@ jobs:
 
   android:
     needs: create-release
+    # keystore Secrets へのアクセスに承認ゲートを設けるための environment。
+    environment: release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
         with:
           distribution: temurin
           java-version: "17"
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
       - name: Install Android NDK
         run: sdkmanager "ndk;26.1.10909125"
       - name: Set NDK_HOME
         run: echo "NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> "$GITHUB_ENV"
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
         with:
+          toolchain: stable
           targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: src-tauri
       - run: npm ci
@@ -228,9 +236,14 @@ jobs:
             exit 1
           fi
           cp "$apk" "MultiColumnX_${VERSION}_universal.apk"
-          gh release upload "v${VERSION}" "MultiColumnX_${VERSION}_universal.apk" --clobber
+          # アプリ内 APK 自己更新の SHA-256 検証（fail-closed）で参照するサイドカーアセット。
+          # 中身は hex 64 桁のみ 1 行（parseSha256Text は先頭トークンを取るためファイル名列があっても可）。
+          sha256sum "MultiColumnX_${VERSION}_universal.apk" | cut -d' ' -f1 > "MultiColumnX_${VERSION}_universal.apk.sha256"
+          gh release upload "v${VERSION}" \
+            "MultiColumnX_${VERSION}_universal.apk" \
+            "MultiColumnX_${VERSION}_universal.apk.sha256" --clobber
       - name: Upload CI artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: android-apk
           path: src-tauri/gen/android/app/build/outputs/apk/**/*release*.apk
@@ -240,12 +253,12 @@ jobs:
     needs: [create-release, desktop, android]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             await github.rest.repos.updateRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
               release_id: ${{ needs.create-release.outputs.release_id }},
-              draft: false,
+              draft: true,
             });
