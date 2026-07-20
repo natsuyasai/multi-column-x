@@ -238,7 +238,8 @@ x.com などの外部 URL を表示するカラム / ポップアップ WebView 
 - **Android（APK 自己更新）**: `install_apk_update` コマンドを 3 層で検証する。
   1. **呼び出し元制限**: 純関数 `validate_install_request`（`commands/update.rs`）が呼び出し元ウィンドウを `main` に限定する。x.com を表示するカラム/ポップアップ WebView（remote capability で IPC が注入される）からの invoke を拒否する。
   2. **URL 許可リスト**: ダウンロード URL は自リポジトリの GitHub Releases（`https://github.com/natsuyasai/multi-column-x/releases/download/` プレフィックス）配下の `.apk` のみ許可。`..` / `\` / `?` / `#` / `@` / 空白などパストラバーサル・リダイレクト誘導・userinfo トリックに使われる文字を拒否する。
-  3. **SHA-256 検証（fail-closed）**: リリースは APK と併せて `.apk.sha256` サイドカーアセットを併載する（`release.yml`）。TS 側（`updater.ts` / `githubRelease.ts`）が取得した期待ハッシュを `install_apk_update` に渡し、Kotlin の `ApkHashVerifier` がダウンロード後に照合してから OS インストーラを起動する。`.sha256` が取得できない・不正な場合はインストールを中止する。
+  3. **SHA-256 検証（fail-closed）**: 期待ハッシュは GitHub Releases API（`/releases/latest`）の APK アセットの `digest` フィールド（`sha256:<hex>`）から取得する（`githubRelease.ts` の `parseDigestSha256`）。API は CORS ヘッダ（`Access-Control-Allow-Origin: *`）を返すため WebView から読める。TS 側（`updater.ts` / `githubRelease.ts`）がこの期待ハッシュを `install_apk_update` に渡し、Kotlin の `ApkHashVerifier` がダウンロード後に照合してから OS インストーラを起動する。`digest` が取得できない・不正な場合はインストールを中止する。
+     - **なぜ API digest か**: リリースの `.apk` ダウンロード URL（`release-assets.githubusercontent.com`）は CORS ヘッダを返さないため、WebView の `fetch()` で直接ハッシュ（サイドカー等）を取得すると reject されて更新が中断する。CORS の効く API レスポンスに含まれる `digest` を使うことでこれを回避する。`release.yml` が併載する `.apk.sha256` はアプリでは使わず、`sha256sum -c` 等の手動検証用アーティファクトとして残している。
 - **CI/配信**: `release.yml` / `ci.yml` の GitHub Actions はすべてコミット SHA にピン留めし（タグ差し替え攻撃対策。特に署名鍵が渡る `tauri-action`）、署名鍵・keystore を扱う `desktop` / `android` ジョブは `environment: release` 下に置く（承認ゲート・Secrets 保護）。
 
 `MainActivity.downloadAndInstallApk` のシグネチャを変更した場合は、`proguard-rules.pro` の keep ルールも同時に更新すること（R8 難読化でのリリースビルド限定 `NoSuchMethodException` を防ぐ）。
