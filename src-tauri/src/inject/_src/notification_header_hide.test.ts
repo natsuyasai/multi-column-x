@@ -1,7 +1,7 @@
 // notification_header_hide.ts は IIFE のため、import 時に実行され、
 // 通知ページの重複ヘッダーを非表示にする CSS が head に追加される。
 // 副作用（追加された style 要素とその内容）を検証する。
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 const STYLE_ID = "multi-column-x-notification-header-hide";
 
@@ -59,5 +59,41 @@ describe("inject/notification_header_hide", () => {
 
     const styles = document.querySelectorAll(`#${CSS.escape(STYLE_ID)}`);
     expect(styles).toHaveLength(1);
+  });
+
+  describe("document.headが存在しない場合", () => {
+    afterEach(() => {
+      if (!document.head) {
+        document.documentElement.appendChild(document.createElement("head"));
+      }
+    });
+
+    it("document.headが存在しない状態でimportしてもエラーにならない", async () => {
+      document.head.remove();
+
+      await expect(importNotificationHeaderHide()).resolves.not.toThrow();
+    });
+
+    it("document.headが存在しない状態でimport後domcontentloadedイベント発火後にstyle要素が追加される", async () => {
+      document.head.remove();
+
+      await importNotificationHeaderHide();
+      expect(document.getElementById(STYLE_ID)).toBeNull();
+
+      document.documentElement.appendChild(document.createElement("head"));
+      document.dispatchEvent(new Event("DOMContentLoaded"));
+
+      const style = document.getElementById(STYLE_ID);
+      expect(style?.tagName).toBe("STYLE");
+      expect(style?.parentElement).toBe(document.head);
+    });
+
+    it("document.headが最初から存在する場合は従来通り即座にstyle要素が追加される", async () => {
+      await importNotificationHeaderHide();
+
+      const style = document.getElementById(STYLE_ID);
+      expect(style?.tagName).toBe("STYLE");
+      expect(style?.parentElement).toBe(document.head);
+    });
   });
 });
