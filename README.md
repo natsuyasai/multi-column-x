@@ -186,29 +186,29 @@ src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/
 
 ## Tauri コマンド一覧
 
-| コマンド                   | 説明                                                   |
-| -------------------------- | ------------------------------------------------------ |
-| `load_settings`            | 設定ファイルの読み込み                                 |
-| `save_settings`            | 設定ファイルへの書き込み                               |
-| `create_column_webview`    | カラム WebView の作成                                  |
-| `remove_column_webview`    | カラム WebView の削除                                  |
-| `resize_column_webview`    | カラム WebView のリサイズ・移動                        |
-| `open_popup_window`        | メディアポップアップを開く                             |
-| `open_link_popup_window`   | 任意 URL のリンクポップアップを開く                    |
-| `close_popup_window`       | ポップアップを閉じる                                   |
-| `switch_popup_session`     | ポップアップのアカウントを切り替え（ウィンドウ再作成） |
-| `eval_in_webview`          | 指定 WebView で JS を評価                              |
-| `report_webview_scroll`    | WebView からの横スクロールを main に中継               |
-| `report_new_posts_count`   | カラムの新着投稿数を main WebView に中継               |
-| `report_keyboard_shortcut` | inject から検出したキーボードショートカットを中継      |
-| `get_mobile_insets`        | Android システム UI のインセット（ノッチ等）を取得     |
-| `set_column_cookies`       | カラム WebView に Cookie を設定（Android）             |
-| `open_in_browser`          | URL をシステムブラウザで開く                           |
-| `open_compose_window`      | ツイート作成ウィンドウを開く                           |
-| `open_add_account_window`  | アカウント追加ウィンドウを開く（ログイン検出付き）     |
-| `delete_account_data`      | アカウントデータディレクトリを削除                     |
-| `close_window`             | 指定ラベルのウィンドウ / WebView を閉じる              |
-| `install_apk_update`       | APK をダウンロードしてインストーラを起動（Android）    |
+| コマンド                   | 説明                                                                                                        |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `load_settings`            | 設定ファイルの読み込み                                                                                      |
+| `save_settings`            | 設定ファイルへの書き込み                                                                                    |
+| `create_column_webview`    | カラム WebView の作成                                                                                       |
+| `remove_column_webview`    | カラム WebView の削除                                                                                       |
+| `resize_column_webview`    | カラム WebView のリサイズ・移動                                                                             |
+| `open_popup_window`        | メディアポップアップを開く                                                                                  |
+| `open_link_popup_window`   | 任意 URL のリンクポップアップを開く                                                                         |
+| `close_popup_window`       | ポップアップを閉じる                                                                                        |
+| `switch_popup_session`     | ポップアップのアカウントを切り替え（ウィンドウ再作成）                                                      |
+| `eval_in_webview`          | 指定 WebView で JS を評価                                                                                   |
+| `report_webview_scroll`    | WebView からの横スクロールを main に中継                                                                    |
+| `report_new_posts_count`   | カラムの新着投稿数を main WebView に中継                                                                    |
+| `report_keyboard_shortcut` | inject から検出したキーボードショートカットを中継                                                           |
+| `get_mobile_insets`        | Android システム UI のインセット（ノッチ等）を取得                                                          |
+| `set_column_cookies`       | カラム WebView に Cookie を設定（Android）                                                                  |
+| `open_in_browser`          | URL をシステムブラウザで開く                                                                                |
+| `open_compose_window`      | ツイート作成ウィンドウを開く                                                                                |
+| `open_add_account_window`  | アカウント追加ウィンドウを開く（ログイン検出付き）                                                          |
+| `delete_account_data`      | アカウントデータディレクトリを削除                                                                          |
+| `close_window`             | 指定ラベルのウィンドウ / WebView を閉じる                                                                   |
+| `install_apk_update`       | APK をダウンロードしてインストーラを起動（Android。呼び出し元 main 限定・URL 許可リスト・SHA-256 検証付き） |
 
 ## アーキテクチャ上の注意点
 
@@ -229,6 +229,19 @@ x.com などの外部 URL を表示するカラム / ポップアップ WebView 
 - **対象ドメイン**: `https://x.com/*` / `https://*.x.com/*` / `https://twitter.com/*` / `https://*.twitter.com/*` のみ。`http://*` は許可しない。
 - **縮退挙動**: 上記以外のドメイン（リンクポップアップで開いた外部サイト等）では IPC が注入されないため、ページ表示自体は正常に行われるが、ツールバーの invoke 系機能（新着バッジ通知・画像ポップアップ等）は無効化される。inject スクリプトは `if (invoke)` 等のガードで未注入時も例外を出さない設計。
 - **多層防御**: ドメイン限定に加え、破壊的コマンド（`delete_account_data` / `eval_in_webview` / `close_window` / `save_settings`）は呼び出し元ウィンドウが `main` であることを要求する（`commands::require_main_caller`）。x.com 自体がリモートコンテンツであるため、ドメイン限定だけに依存せず両輪で防御する。
+
+### アップデート方式のセキュリティ
+
+更新の配信・適用は改ざんを前提に多層で検証する。
+
+- **デスクトップ**: `tauri-plugin-updater` が `tauri.conf.json` の `pubkey`（minisign 公開鍵）で `latest.json` と成果物の署名を検証してから適用する。エンドポイントは自リポジトリの GitHub Releases（HTTPS）に固定。
+- **Android（APK 自己更新）**: `install_apk_update` コマンドを 3 層で検証する。
+  1. **呼び出し元制限**: 純関数 `validate_install_request`（`commands/update.rs`）が呼び出し元ウィンドウを `main` に限定する。x.com を表示するカラム/ポップアップ WebView（remote capability で IPC が注入される）からの invoke を拒否する。
+  2. **URL 許可リスト**: ダウンロード URL は自リポジトリの GitHub Releases（`https://github.com/natsuyasai/multi-column-x/releases/download/` プレフィックス）配下の `.apk` のみ許可。`..` / `\` / `?` / `#` / `@` / 空白などパストラバーサル・リダイレクト誘導・userinfo トリックに使われる文字を拒否する。
+  3. **SHA-256 検証（fail-closed）**: リリースは APK と併せて `.apk.sha256` サイドカーアセットを併載する（`release.yml`）。TS 側（`updater.ts` / `githubRelease.ts`）が取得した期待ハッシュを `install_apk_update` に渡し、Kotlin の `ApkHashVerifier` がダウンロード後に照合してから OS インストーラを起動する。`.sha256` が取得できない・不正な場合はインストールを中止する。
+- **CI/配信**: `release.yml` / `ci.yml` の GitHub Actions はすべてコミット SHA にピン留めし（タグ差し替え攻撃対策。特に署名鍵が渡る `tauri-action`）、署名鍵・keystore を扱う `desktop` / `android` ジョブは `environment: release` 下に置く（承認ゲート・Secrets 保護）。
+
+`MainActivity.downloadAndInstallApk` のシグネチャを変更した場合は、`proguard-rules.pro` の keep ルールも同時に更新すること（R8 難読化でのリリースビルド限定 `NoSuchMethodException` を防ぐ）。
 
 ### serde の camelCase / snake_case
 
