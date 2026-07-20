@@ -150,6 +150,8 @@
       triggerFollowingRefresh();
     } else {
       reselectTab();
+      // 「おすすめ」タブの場合はフォロー中と同様に最新取得用のボタンが表示される場合があるためここに対応を入れておく
+      waitAndClickNewPostsButton();
     }
 
     // トリガー実行後、差分監視を開始
