@@ -140,7 +140,10 @@ class MainActivity : TauriActivity() {
   // GitHub Releases からダウンロードした APK でアプリを自己更新する。
   // 提供元不明アプリのインストール許可が無ければ設定画面へ誘導する。
   // ダウンロードはバックグラウンドスレッドで行い、完了後に UI スレッドでインストーラを起動する。
-  fun downloadAndInstallApk(url: String) {
+  fun downloadAndInstallApk(
+    url: String,
+    expectedSha256: String,
+  ) {
     // Android 8.0+ は「提供元不明アプリのインストール」許可が必要。未許可なら設定へ誘導する。
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
       !packageManager.canRequestPackageInstalls()
@@ -169,6 +172,11 @@ class MainActivity : TauriActivity() {
         conn.instanceFollowRedirects = true
         conn.inputStream.use { input ->
           apk.outputStream().use { output -> input.copyTo(output) }
+        }
+        if (!ApkHashVerifier.verify(apk, expectedSha256)) {
+          Log.e(TAG, "downloadAndInstallApk: sha256 mismatch, aborting install")
+          apk.delete()
+          return@Thread
         }
         val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", apk)
         val intent =
