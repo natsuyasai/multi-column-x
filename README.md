@@ -280,7 +280,13 @@ Windows / macOS ではカラムは `window.add_child()` の子 WebView で、親
 Linux の独立 `WebviewWindow` は WebKitGTK の WebProcess で描画されるが、(1) 横スクロールで `resize_column_webview` が高頻度に連続発火したとき、(2) スリープ復帰後などに、WebProcess がクラッシュして白画面/フリーズになることがある。次の3層で予防と復旧を行う:
 
 - **予防（スクロール）**: スクロールバー操作 → 全カラム再配置を `rafThrottle`（`src/lib/rafThrottle.ts`）で 1 フレーム 1 回に間引き、`resize_column_webview` の連続発火を抑える（`useDesktopColumns.handleScrollbarScroll`）。
-- **自動復旧**: カラム作成時に webkit2gtk の `connect_web_process_terminated` を接続し、クラッシュ時に `column-webview-crashed`（payload=columnId）を emit する。TS 側 `useColumnCrashRecovery` が当該カラムを再生成して自動復旧する（同一カラムは `CRASH_RECOVERY_COOLDOWN_MS` 秒のクールダウンでクラッシュループを防止）。
+- **自動復旧**: カラム作成時に webkit2gtk の `connect_web_process_terminated` を接続し、クラッシュ時に `column-webview-crashed`（payload=columnId）を emit する。TS 側 `useColumnCrashRecovery` が当該カラムを再生成して自動復旧する。無限ループを防ぐため復旧には二重のガードを設ける: (a) 直近再生成から `CRASH_RECOVERY_COOLDOWN_MS`（5秒）以内の重複クラッシュは無視、(b) 同一カラムの連続再生成が `MAX_CRASH_RECOVERY_ATTEMPTS`（3回）に達したら自動復旧を諦めて手動再読込に委ねる。ただし `CRASH_RECOVERY_STABILITY_RESET_MS`（60秒）以上安定稼働してからのクラッシュは新規事象として試行回数をリセットする（スリープ復帰などでの再発は再び自動復旧できる=バックオフ）。
 - **手動復旧**: カラムヘッダの「⟳ ページを再読み込み」ボタンはデスクトップでは `location.reload` ではなく WebView 自体の再生成（`recreateColumnWebview`）を行い、`location.reload` が効かない白画面からも復旧できる。モバイル（Android ネイティブ WebView）は従来どおりページ再読み込み。
 
 webkit2gtk は wry と同一バージョン（`=2.0.2`, `v2_40`）を `[target.'cfg(target_os = "linux")'.dependencies]` でピン留めする（`PlatformWebview::inner()` の戻り型を一致させるため）。
+
+#### AppImage への GStreamer 同梱（必須）
+
+`tauri.conf.json` の `bundle.linux.appimage.bundleMediaFramework` は **`true` を維持すること**。AppImage は `LD_LIBRARY_PATH` を同梱ライブラリに向けて動作するため、GStreamer プラグイン（`appsink`=gst-plugins-base、`autoaudiosink`=gst-plugins-good ほか）を同梱しないと、同梱 WebKit が動画/音声再生時に見つからないメディア要素（NULL）へ `g_signal_connect` して **WebProcess がクラッシュ（reason=Crashed）** する。x.com の home タイムラインは動画を含むため、可視状態のカラムが起動直後からクラッシュ → 上記自動復旧が延々と再生成する無限ループに陥る（システムに GStreamer が入っていても AppImage 内からは参照されないため `npm run tauri:dev` や素のバイナリ実行では再現せず、AppImage 起動でのみ再現する点に注意）。
+
+同種の不足を deb 版でも防ぐため、`bundle.linux.deb.depends` に `gstreamer1.0-plugins-{base,good,bad}` と `gstreamer1.0-libav` を明記している。
