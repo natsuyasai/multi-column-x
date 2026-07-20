@@ -228,7 +228,12 @@ jobs:
             exit 1
           fi
           cp "$apk" "MultiColumnX_${VERSION}_universal.apk"
-          gh release upload "v${VERSION}" "MultiColumnX_${VERSION}_universal.apk" --clobber
+          # アプリ内 APK 自己更新の SHA-256 検証（fail-closed）で参照するサイドカーアセット。
+          # 中身は hex 64 桁のみ 1 行（parseSha256Text は先頭トークンを取るためファイル名列があっても可）。
+          sha256sum "MultiColumnX_${VERSION}_universal.apk" | cut -d' ' -f1 > "MultiColumnX_${VERSION}_universal.apk.sha256"
+          gh release upload "v${VERSION}" \
+            "MultiColumnX_${VERSION}_universal.apk" \
+            "MultiColumnX_${VERSION}_universal.apk.sha256" --clobber
       - name: Upload CI artifact
         uses: actions/upload-artifact@v4
         with:
