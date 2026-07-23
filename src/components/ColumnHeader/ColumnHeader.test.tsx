@@ -36,6 +36,7 @@ const mockColumn: Column = {
     blurImageEnabled: false,
     blurImageAmount: "10px",
     ngWords: [],
+    postPageRedirectEnabled: true,
   },
 };
 

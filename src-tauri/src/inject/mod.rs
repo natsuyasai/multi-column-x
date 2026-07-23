@@ -19,6 +19,7 @@ pub struct InitScriptParams<'a> {
     pub visible_links: &'a [String],
     pub ng_words: &'a [String],
     pub global_ng_words: &'a [String],
+    pub post_page_lock_enabled: bool,
 }
 
 pub fn build_init_script(params: &InitScriptParams) -> String {
@@ -65,6 +66,11 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         ""
     };
     let notification_header_hide = include_str!("notification_header_hide.js");
+    let post_page_lock = if params.post_page_lock_enabled {
+        include_str!("post_page_lock.js")
+    } else {
+        ""
+    };
 
     let visible_links_json =
         serde_json::to_string(params.visible_links).unwrap_or_else(|_| "[]".to_string());
@@ -101,7 +107,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     };
 
     let mut script = format!(
-        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
+        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
         config,
         tab_selector,
         header_part,
@@ -119,7 +125,8 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         keyboard_shortcut,
         sidebar_hide,
         mobile_area_hide,
-        notification_header_hide
+        notification_header_hide,
+        post_page_lock
     );
 
     if !params.custom_css.is_empty() {
@@ -178,6 +185,7 @@ mod tests {
             visible_links: &[],
             ng_words: &[],
             global_ng_words: &[],
+            post_page_lock_enabled: false,
         }
     }
 
@@ -317,6 +325,20 @@ mod tests {
         params.is_mobile = true;
         let script = build_init_script(&params);
         assert!(script.contains("multi-column-x-notification-header-hide"));
+    }
+
+    #[test]
+    fn post_page_lock_enabledがtrueのとき投稿ロックスクリプトが含まれる() {
+        let mut params = default_params();
+        params.post_page_lock_enabled = true;
+        let script = build_init_script(&params);
+        assert!(script.contains("/compose/post"));
+    }
+
+    #[test]
+    fn post_page_lock_enabledがfalseのとき投稿ロックスクリプトが含まれない() {
+        let script = build_init_script(&default_params());
+        assert!(!script.contains("compose/post"));
     }
 
     #[test]

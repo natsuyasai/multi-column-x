@@ -6,6 +6,12 @@ declare global {
     triggerReload: (scrollToTop?: boolean) => void;
     applyAreaRemove: (enabled: boolean) => void;
     recheckNgWords: () => void;
+    /**
+     * 投稿ページロックの実際のナビゲーション呼び出し。
+     * window.location.assign は WebIDL 上 Unforgeable でテストから直接
+     * spy/monkeypatch できないため、テストから検証できるよう間接呼び出しにする。
+     */
+    postPageLockNavigate?: (url: string) => void;
   }
 
   interface MultiColumnXConfig {

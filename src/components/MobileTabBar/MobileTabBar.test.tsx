@@ -18,6 +18,7 @@ const baseSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   ngWords: [],
+  postPageRedirectEnabled: true,
 };
 
 const acc1: Account = {
@@ -119,6 +120,12 @@ describe("MobileTabBar", () => {
     fireEvent.contextMenu(screen.getByText("ホーム"));
     expect(onTabAction).toHaveBeenCalledWith("col-1");
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("pageTypeがcomposeの場合は投稿を表示する", () => {
+    const composeCol: Column = { ...col1, pageType: "compose" };
+    render(<MobileTabBar {...defaultProps} columns={[composeCol]} />);
+    expect(screen.getByText("投稿")).toBeInTheDocument();
   });
 
   it("homeTabName がある場合はそれを表示する", () => {

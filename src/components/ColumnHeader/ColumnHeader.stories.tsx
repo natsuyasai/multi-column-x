@@ -19,6 +19,7 @@ const settings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   ngWords: [],
+  postPageRedirectEnabled: true,
 };
 
 const account: Account = {

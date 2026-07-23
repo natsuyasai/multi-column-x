@@ -1,4 +1,10 @@
-export type PageType = "home" | "notifications" | "search" | "list" | "custom";
+export type PageType =
+  | "home"
+  | "notifications"
+  | "search"
+  | "list"
+  | "custom"
+  | "compose";
 export type ColumnScale = "small" | "default" | "normal" | "large" | "xLarge";
 
 export interface Account {
@@ -25,6 +31,8 @@ export interface ColumnSettings {
   blurImageAmount: string;
   ngWords: string[];
   desktopNotifyEnabled?: boolean;
+  /** 投稿カラムでURL遷移が起きたとき投稿ページへ戻す（投稿カラムのみ有効） */
+  postPageRedirectEnabled: boolean;
 }
 
 export interface Column {
@@ -116,6 +124,7 @@ export interface AppSettings {
  * | blurImageEnabled        | blur_image_enabled          | false       |
  * | blurImageAmount         | blur_image_amount           | "10px"      |
  * | desktopNotifyEnabled    | desktop_notify_enabled      | false       |
+ * | postPageRedirectEnabled | post_page_redirect_enabled  | true        |
  */
 export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
   autoReloadEnabled: true,
@@ -132,6 +141,7 @@ export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
   blurImageAmount: "10px",
   ngWords: [],
   desktopNotifyEnabled: false,
+  postPageRedirectEnabled: true,
 };
 
 /**
@@ -193,6 +203,8 @@ export function getPageTypeLabel(input: GetPageTypeLabelInput): string {
       return "リスト";
     case "custom":
       return "カスタム";
+    case "compose":
+      return "投稿";
   }
 }
 

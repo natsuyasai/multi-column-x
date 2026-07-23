@@ -19,6 +19,7 @@ const columnSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   ngWords: [],
+  postPageRedirectEnabled: true,
 };
 
 const accounts: Account[] = [

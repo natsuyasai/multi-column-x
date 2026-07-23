@@ -235,6 +235,25 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </p>
           </section>
 
+          {column.pageType === "compose" && (
+            <section className={styles.section}>
+              <h3 className={styles.sectionTitle}>投稿ページ</h3>
+              <label className={styles.checkLabel}>
+                <input
+                  type="checkbox"
+                  checked={settings.postPageRedirectEnabled}
+                  onChange={(e) =>
+                    setSettings((s) => ({
+                      ...s,
+                      postPageRedirectEnabled: e.target.checked,
+                    }))
+                  }
+                />
+                他ページへ遷移したら投稿ページに戻す
+              </label>
+            </section>
+          )}
+
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>通知</h3>
             <label className={styles.checkLabel}>

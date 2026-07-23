@@ -44,6 +44,7 @@ fn resolve_url(column: &ColumnData) -> String {
             .custom_url
             .clone()
             .unwrap_or_else(|| "https://x.com/home".to_string()),
+        "compose" => "https://x.com/compose/post".to_string(),
         _ => "https://x.com/home".to_string(),
     }
 }
@@ -84,6 +85,8 @@ fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: boo
         visible_links: &column.settings.visible_links,
         ng_words: &column.settings.ng_words,
         global_ng_words: &global_ng_words,
+        post_page_lock_enabled: column.page_type == "compose"
+            && column.settings.post_page_redirect_enabled,
     })
 }
 
@@ -470,6 +473,14 @@ mod tests {
         let mut col = column("custom");
         col.custom_url = Some("https://x.com/i/bookmarks".into());
         assert_eq!(resolve_url(&col), "https://x.com/i/bookmarks");
+    }
+
+    #[test]
+    fn resolve_url_composeは投稿ページurlを返す() {
+        assert_eq!(
+            resolve_url(&column("compose")),
+            "https://x.com/compose/post"
+        );
     }
 
     #[test]
