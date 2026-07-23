@@ -33,10 +33,13 @@
 **ファイル: `src/types/index.ts`**
 
 1行目:
+
 ```ts
 export type PageType = "home" | "notifications" | "search" | "list" | "custom";
 ```
+
 →
+
 ```ts
 export type PageType =
   | "home"
@@ -48,6 +51,7 @@ export type PageType =
 ```
 
 `getPageTypeLabel`（184行付近）の switch に case を追加（`case "custom":` の後、`compose` を追加）:
+
 ```ts
     case "custom":
       return "カスタム";
@@ -62,6 +66,7 @@ export type PageType =
 **ファイル: `src/types/index.ts`**
 
 `ColumnSettings` interface（13行付近）に追加:
+
 ```ts
   desktopNotifyEnabled?: boolean;
   /** 投稿カラムでURL遷移が起きたとき投稿ページへ戻す（投稿カラムのみ有効） */
@@ -69,6 +74,7 @@ export type PageType =
 ```
 
 `DEFAULT_COLUMN_SETTINGS`（120行付近）に追加:
+
 ```ts
   desktopNotifyEnabled: false,
   postPageRedirectEnabled: true,
@@ -79,6 +85,7 @@ DEFAULT_COLUMN_SETTINGS 上部のフィールド対応表コメントにも1行�
 **ファイル: `src-tauri/src/commands/settings.rs`**
 
 `ColumnSettings` struct（`desktop_notify_enabled` の後、60行付近）に追加:
+
 ```rust
     #[serde(rename = "desktopNotifyEnabled")]
     #[serde(default)]
@@ -88,9 +95,11 @@ DEFAULT_COLUMN_SETTINGS 上部のフィールド対応表コメントにも1行�
     pub post_page_redirect_enabled: bool,
 }
 ```
+
 （`default_true` は既存ヘルパー。新規追加不要。）
 
 **注意（落とし穴）**:
+
 - `column.rs` のテストビルダー `column()`（417行付近）は `serde_json::from_str` で一部フィールドのみ指定 → 残りは serde default に委ねている。`post_page_redirect_enabled` は `default_true` があるので **既存テストは壊れない**（追加不要）。
 - ColumnSettings に `impl Default` は無い。リテラル構築箇所は grep 済みで無い（`ColumnSettings {` は struct 定義のみ）。
 
@@ -101,6 +110,7 @@ DEFAULT_COLUMN_SETTINGS 上部のフィールド対応表コメントにも1行�
 **ファイル: `src-tauri/src/commands/webview/column.rs`**
 
 `resolve_url`（28行）の `custom` の後に追加:
+
 ```rust
         "custom" => column
             .custom_url
@@ -111,6 +121,7 @@ DEFAULT_COLUMN_SETTINGS 上部のフィールド対応表コメントにも1行�
 ```
 
 **テスト**: 同ファイル tests に「resolve_url_compose_returns_compose_post」相当（日本語テスト名可、既存は英語snake_caseなので `resolve_url_composeは投稿ページを返す` の形式で。Rustテスト関数名にASCII大文字禁止に注意）:
+
 ```rust
     #[test]
     fn resolve_url_composeは投稿ページurlを返す() {
@@ -126,6 +137,7 @@ DEFAULT_COLUMN_SETTINGS 上部のフィールド対応表コメントにも1行�
 **新規ファイル: `src-tauri/src/inject/_src/post_page_lock.ts`**
 
 `scroll_pos_restore.ts` の監視パターンを踏襲。仕様:
+
 - 定数 `COMPOSE_URL = "https://x.com/compose/post"`、`COMPOSE_PATH = "/compose/post"`。
 - `isComposePage()`: `window.location.pathname === COMPOSE_PATH`。
 - `enforceLock()`: 投稿ページでなければ `window.location.assign(COMPOSE_URL)` を呼ぶ。**同じ href に対して連続 assign しないガード**（`lastAssignedHref` を保持し、直近に戻した先と同じなら再度呼ばない。実際にはassignで遷移が起きるが、jsdom/多重発火対策として `!isComposePage()` の時のみ呼ぶ + 直近の遷移元記録で二重呼び出しを避ける）。
@@ -133,6 +145,7 @@ DEFAULT_COLUMN_SETTINGS 上部のフィールド対応表コメントにも1行�
 - IIFE。注入されたら常時有効（有効/無効判定は Rust の注入可否で制御。`scroll_pos_restore.ts` と同じ思想）。
 
 実装（雛形）:
+
 ```ts
 (function () {
   const COMPOSE_URL = "https://x.com/compose/post";
@@ -180,6 +193,7 @@ DEFAULT_COLUMN_SETTINGS 上部のフィールド対応表コメントにも1行�
 **新規ファイル: `src-tauri/src/inject/_src/post_page_lock.test.ts`**
 
 `scroll_pos_restore.test.ts` を参考に。ポイント:
+
 - ファイル先頭に `// @vitest-environment-options { "url": "https://x.com/compose/post" }`。
 - `beforeAll` で `window.location.assign` を spy 化（jsdom は未実装で "not implemented" を出すため `vi.spyOn(window.location, "assign").mockImplementation(() => {})`）してから `await import("./post_page_lock")`。
 - テストケース（日本語名）:
@@ -197,6 +211,7 @@ DEFAULT_COLUMN_SETTINGS 上部のフィールド対応表コメントにも1行�
 **ファイル: `src-tauri/src/inject/mod.rs`**
 
 `InitScriptParams` struct に追加:
+
 ```rust
     pub global_ng_words: &'a [String],
     pub post_page_lock_enabled: bool,
@@ -204,6 +219,7 @@ DEFAULT_COLUMN_SETTINGS 上部のフィールド対応表コメントにも1行�
 ```
 
 `build_init_script` 内で include（`notification_header_hide` の近く、条件付き）:
+
 ```rust
     let post_page_lock = if params.post_page_lock_enabled {
         include_str!("post_page_lock.js")
@@ -217,6 +233,7 @@ DEFAULT_COLUMN_SETTINGS 上部のフィールド対応表コメントにも1行�
 **注意**: `default_params()`（テスト、163行付近）に `post_page_lock_enabled: false,` を追加（コンパイルエラー回避）。
 
 **テスト**: mod.rs tests に2件追加:
+
 - 「post_page_lock_enabledがtrueのとき投稿ロックスクリプトが含まれる」→ `params.post_page_lock_enabled = true; assert!(script.contains("/compose/post"));`
 - 「post_page_lock_enabledがfalseのとき含まれない」→ `assert!(!script.contains("compose/post"));`（default_params は false）
 
@@ -225,6 +242,7 @@ DEFAULT_COLUMN_SETTINGS 上部のフィールド対応表コメントにも1行�
 **ファイル: `src-tauri/src/commands/webview/column.rs`**
 
 `build_column_init_script`（64行）内、`build_init_script(&InitScriptParams { ... })` に追加。判定は「投稿カラム かつ 設定ON」:
+
 ```rust
         global_ng_words: &global_ng_words,
         post_page_lock_enabled: column.page_type == "compose"
@@ -239,6 +257,7 @@ DEFAULT_COLUMN_SETTINGS 上部のフィールド対応表コメントにも1行�
 **ファイル: `src/components/AddColumnDialog/AddColumnDialog.tsx`**
 
 ページタイプ select（106行付近）に option 追加:
+
 ```tsx
             <option value="custom">カスタムURL</option>
             <option value="compose">投稿</option>
@@ -253,26 +272,30 @@ DEFAULT_COLUMN_SETTINGS 上部のフィールド対応表コメントにも1行�
 **ファイル: `src/components/SettingsPanel/SettingsPanel.tsx`**
 
 投稿カラムのときだけ表示するセクションを追加（既存の checkLabel パターンを踏襲）。`column.pageType === "compose"` で条件表示:
+
 ```tsx
-          {column.pageType === "compose" && (
-            <section className={styles.section}>
-              <h3 className={styles.sectionTitle}>投稿ページ</h3>
-              <label className={styles.checkLabel}>
-                <input
-                  type="checkbox"
-                  checked={settings.postPageRedirectEnabled}
-                  onChange={(e) =>
-                    setSettings({
-                      ...settings,
-                      postPageRedirectEnabled: e.target.checked,
-                    })
-                  }
-                />
-                他ページへ遷移したら投稿ページに戻す
-              </label>
-            </section>
-          )}
+{
+  column.pageType === "compose" && (
+    <section className={styles.section}>
+      <h3 className={styles.sectionTitle}>投稿ページ</h3>
+      <label className={styles.checkLabel}>
+        <input
+          type="checkbox"
+          checked={settings.postPageRedirectEnabled}
+          onChange={(e) =>
+            setSettings({
+              ...settings,
+              postPageRedirectEnabled: e.target.checked,
+            })
+          }
+        />
+        他ページへ遷移したら投稿ページに戻す
+      </label>
+    </section>
+  );
+}
 ```
+
 配置場所は「自動更新」セクションの前後どこでもよいが、`<form>` 内・`カラム`セクションの直後が自然。
 
 **テスト**: `SettingsPanel.test.tsx` に「投稿カラムのときトグルが表示され、切替がonApplyに反映される」＋「投稿カラム以外では表示されない」を追加。
@@ -280,14 +303,18 @@ DEFAULT_COLUMN_SETTINGS 上部のフィールド対応表コメントにも1行�
 ### 単位9: TopBar / MobileTabBar の網羅スイッチに compose を追加（型エラー回避 + アイコン）
 
 **ファイル: `src/components/TopBar/TopBar.tsx`**
+
 - `getColumnIcon` の switch（36行）に追加。PencilIcon は既にimport済み:
+
 ```tsx
     case "custom":
       return <CustomIcon {...props} />;
     case "compose":
       return <PencilIcon {...props} />;
 ```
+
 - `getPageLabel` の switch（51行）に追加:
+
 ```tsx
     case "custom":
       return "カスタム";
@@ -296,7 +323,9 @@ DEFAULT_COLUMN_SETTINGS 上部のフィールド対応表コメントにも1行�
 ```
 
 **ファイル: `src/components/MobileTabBar/MobileTabBar.tsx`**
+
 - `labels: Record<PageType, string>`（15行）に追加:
+
 ```tsx
     custom: "カスタム",
     compose: "投稿",
@@ -309,6 +338,7 @@ DEFAULT_COLUMN_SETTINGS 上部のフィールド対応表コメントにも1行�
 ## 完了処理（メインエージェントが実行）
 
 各単位コミット後、最後に:
+
 1. `npm run build:inject`（post_page_lock.js 生成 — 必須）
 2. `npm run typecheck`
 3. `npm run lint`（必要なら `npm run lint:fix`）

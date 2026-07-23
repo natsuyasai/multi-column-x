@@ -2,8 +2,7 @@
   const COMPOSE_URL = "https://x.com/compose/post";
   const COMPOSE_PATH = "/compose/post";
 
-  window.__multiColumnX =
-    window.__multiColumnX || ({} as MultiColumnXAPI);
+  window.__multiColumnX = window.__multiColumnX || ({} as MultiColumnXAPI);
 
   // window.location.assign は WebIDL 上 Unforgeable なプロパティであり、
   // テスト（jsdom）でも実ブラウザでも直接 spy/monkeypatch できない。
