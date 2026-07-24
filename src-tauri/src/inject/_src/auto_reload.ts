@@ -32,7 +32,12 @@
       const btn = cell.querySelector<HTMLButtonElement>(
         'button[type="button"]',
       );
-      if (btn) return btn;
+      if (btn) {
+        if(btn.attributes.getNamedItem("data-testid")?.value === "UserCell" ) {
+          continue;
+        }
+        return btn;
+      }
     }
     return null;
   }
