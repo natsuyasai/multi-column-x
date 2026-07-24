@@ -104,6 +104,7 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
             <option value="search">検索</option>
             <option value="list">リスト</option>
             <option value="custom">カスタムURL</option>
+            <option value="compose">投稿</option>
           </select>
         </div>
 

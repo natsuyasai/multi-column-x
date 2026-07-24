@@ -44,6 +44,8 @@ function getColumnIcon(pageType: PageType): React.ReactElement {
       return <ListIcon {...props} />;
     case "custom":
       return <CustomIcon {...props} />;
+    case "compose":
+      return <PencilIcon {...props} />;
   }
 }
 
@@ -59,6 +61,8 @@ function getPageLabel(column: Column): string {
       return "リスト";
     case "custom":
       return "カスタム";
+    case "compose":
+      return "投稿";
   }
 }
 

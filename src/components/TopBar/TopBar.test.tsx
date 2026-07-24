@@ -203,7 +203,14 @@ describe("TopBar", () => {
   });
 
   describe("カラム種別アイコン（collapsed）", () => {
-    it.each(["home", "notifications", "search", "list", "custom"] as const)(
+    it.each([
+      "home",
+      "notifications",
+      "search",
+      "list",
+      "custom",
+      "compose",
+    ] as const)(
       "pageType=%s のとき collapsed ボタン内に SVG アイコンが表示される",
       (pageType) => {
         const col: Column = { ...col1, pageType };
@@ -218,7 +225,14 @@ describe("TopBar", () => {
   });
 
   describe("カラム種別アイコン（expanded）", () => {
-    it.each(["home", "notifications", "search", "list", "custom"] as const)(
+    it.each([
+      "home",
+      "notifications",
+      "search",
+      "list",
+      "custom",
+      "compose",
+    ] as const)(
       "pageType=%s のとき expanded 行2内に SVG アイコンが表示される",
       (pageType) => {
         const col: Column = { ...col1, pageType };

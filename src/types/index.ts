@@ -1,4 +1,10 @@
-export type PageType = "home" | "notifications" | "search" | "list" | "custom";
+export type PageType =
+  | "home"
+  | "notifications"
+  | "search"
+  | "list"
+  | "custom"
+  | "compose";
 export type ColumnScale = "small" | "default" | "normal" | "large" | "xLarge";
 
 export interface Account {
@@ -193,6 +199,8 @@ export function getPageTypeLabel(input: GetPageTypeLabelInput): string {
       return "リスト";
     case "custom":
       return "カスタム";
+    case "compose":
+      return "投稿";
   }
 }
 
