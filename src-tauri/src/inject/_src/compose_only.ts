@@ -20,17 +20,21 @@
   const TEXTAREA_SELECTOR = '[data-testid="tweetTextarea_0"]';
   const TIMELINE_CELL_SELECTOR = '[data-testid="cellInnerDiv"]';
   const TOAST_SELECTOR = '[data-testid="toast"]';
+  // MutationObserver の再適用スロットル（X の連続DOM変異での過剰再適用を抑制）。
+  const THROTTLE_MS = 250;
 
   window.__multiColumnX = window.__multiColumnX || ({} as MultiColumnXAPI);
 
+  // 非表示用スタイルは一度だけ生成する。
+  // 重要: textContent を再代入すると <style> 配下の childList が変化し、
+  // subtree を監視している MutationObserver を自己再発火させて無限ループになる。
+  // そのため既に存在する場合は一切触らない。
   function ensureStyle(): void {
-    let style = document.getElementById(STYLE_ID);
-    if (!style) {
-      style = document.createElement("style");
-      style.id = STYLE_ID;
-      (document.head || document.documentElement).appendChild(style);
-    }
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement("style");
+    style.id = STYLE_ID;
     style.textContent = `[${HIDDEN_ATTR}]{display:none !important;}`;
+    (document.head || document.documentElement).appendChild(style);
   }
 
   // 投稿フォーム領域（keep ノード）を特定する。見つからなければ null。
@@ -64,48 +68,65 @@
       .forEach((e) => e.removeAttribute(HIDDEN_ATTR));
   }
 
+  const observer = new MutationObserver(() => schedule());
+
+  function observeDom(): void {
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+    });
+  }
+
   // スポットライトを（再）適用する。テストからも呼べるよう公開する。
   function applyComposeOnly(): void {
     const keep = findKeepNode();
     // 投稿フォーム領域を特定できないとき（タイムライン読込中で cellInnerDiv が
-    // 一時的に無い等）は前回の適用状態を保持する。ここでクリアするとスポットライトが
-    // 点滅するため、keep が取れたときだけクリア→再マークする。
+    // 一時的に無い等）は前回の適用状態を保持する（ここでクリアすると点滅するため）。
     if (!keep) return;
-    clearMarkers();
-    ensureStyle();
-    let node: Element = keep;
-    while (node.parentElement && node !== document.body) {
-      const parent = node.parentElement;
-      for (const sibling of Array.from(parent.children)) {
-        if (sibling === node) continue;
-        if (isProtected(sibling)) continue;
-        sibling.setAttribute(HIDDEN_ATTR, "");
+    // 自身の DOM 変更（style 生成やマーカー付与）で MutationObserver を再発火させ、
+    // apply→mutation→apply の無限ループに陥らないよう、適用中は監視を止める。
+    observer.disconnect();
+    try {
+      clearMarkers();
+      ensureStyle();
+      let node: Element = keep;
+      while (node.parentElement && node !== document.body) {
+        const parent = node.parentElement;
+        for (const sibling of Array.from(parent.children)) {
+          if (sibling === node) continue;
+          if (isProtected(sibling)) continue;
+          sibling.setAttribute(HIDDEN_ATTR, "");
+        }
+        node = parent;
       }
-      node = parent;
+    } finally {
+      observeDom();
     }
   }
 
   window.__multiColumnX.applyComposeOnly = applyComposeOnly;
 
-  // React 再描画・SPA 更新に追従して再適用する（rAF で 1 フレーム 1 回に間引く）。
-  let scheduled = false;
+  // React 再描画・SPA 更新に追従して再適用する。leading + trailing のスロットルで、
+  // X の連続DOM変異でも最大 1 回 / THROTTLE_MS に抑える。
+  let lastApply = 0;
+  let trailingTimer: ReturnType<typeof setTimeout> | null = null;
   function schedule(): void {
-    if (scheduled) return;
-    scheduled = true;
-    requestAnimationFrame(() => {
-      scheduled = false;
+    const elapsed = Date.now() - lastApply;
+    if (elapsed >= THROTTLE_MS) {
+      lastApply = Date.now();
       applyComposeOnly();
-    });
+    } else if (trailingTimer === null) {
+      trailingTimer = setTimeout(() => {
+        trailingTimer = null;
+        lastApply = Date.now();
+        applyComposeOnly();
+      }, THROTTLE_MS - elapsed);
+    }
   }
-
-  const observer = new MutationObserver(schedule);
 
   function start(): void {
     applyComposeOnly();
-    observer.observe(document.documentElement, {
-      childList: true,
-      subtree: true,
-    });
+    observeDom();
   }
 
   if (document.body) {

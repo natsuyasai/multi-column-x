@@ -78,6 +78,25 @@ describe("inject/compose_only", () => {
     expect(isHidden("toastWrap")).toBe(false);
   });
 
+  it("再適用してもstyle要素を作り直さず内容も変えない（無限ループ防止）", () => {
+    buildHomeDom();
+    window.__multiColumnX.applyComposeOnly!();
+
+    const style1 = document.getElementById("mcx-compose-only");
+    const textNode1 = style1?.firstChild;
+    expect(style1).not.toBeNull();
+
+    // 再適用しても同一の style ノード・同一のテキストノードのまま
+    // （textContent を再代入すると子ノードが差し替わり MutationObserver を自己再発火させる）。
+    window.__multiColumnX.applyComposeOnly!();
+    window.__multiColumnX.applyComposeOnly!();
+
+    const style2 = document.getElementById("mcx-compose-only");
+    expect(style2).toBe(style1);
+    expect(style2?.firstChild).toBe(textNode1);
+    expect(document.querySelectorAll("style#mcx-compose-only").length).toBe(1);
+  });
+
   it("投稿フォームを特定できないときは前回の適用状態を保持する（点滅防止）", () => {
     buildHomeDom();
     window.__multiColumnX.applyComposeOnly!();
