@@ -22,6 +22,20 @@
   const TOAST_SELECTOR = '[data-testid="toast"]';
   // MutationObserver の再適用スロットル（X の連続DOM変異での過剰再適用を抑制）。
   const THROTTLE_MS = 250;
+  // 非描画要素。X は <script> 等を高頻度で付け外しするため、これらを非表示対象に
+  // 含めると差分が毎回発生して属性の付け外しが延々と繰り返される。描画もされないので
+  // そもそも隠す必要がなく、対象から除外する。
+  const NON_RENDERING_TAGS = new Set([
+    "SCRIPT",
+    "NOSCRIPT",
+    "STYLE",
+    "LINK",
+    "META",
+    "TEMPLATE",
+    "HEAD",
+    "TITLE",
+    "BASE",
+  ]);
 
   window.__multiColumnX = window.__multiColumnX || ({} as MultiColumnXAPI);
 
@@ -62,10 +76,22 @@
     return el.matches(TOAST_SELECTOR) || !!el.querySelector(TOAST_SELECTOR);
   }
 
-  function clearMarkers(): void {
-    document
-      .querySelectorAll(`[${HIDDEN_ATTR}]`)
-      .forEach((e) => e.removeAttribute(HIDDEN_ATTR));
+  // 非表示にすべき兄弟要素の集合を算出する（keep パス上の各階層の、経路外・
+  // 非描画でない・非トースト兄弟）。
+  function computeHiddenSet(keep: Element): Set<Element> {
+    const shouldHide = new Set<Element>();
+    let node: Element = keep;
+    while (node.parentElement && node !== document.body) {
+      const parent = node.parentElement;
+      for (const sibling of Array.from(parent.children)) {
+        if (sibling === node) continue;
+        if (NON_RENDERING_TAGS.has(sibling.tagName)) continue;
+        if (isProtected(sibling)) continue;
+        shouldHide.add(sibling);
+      }
+      node = parent;
+    }
+    return shouldHide;
   }
 
   const observer = new MutationObserver(() => schedule());
@@ -83,22 +109,19 @@
     // 投稿フォーム領域を特定できないとき（タイムライン読込中で cellInnerDiv が
     // 一時的に無い等）は前回の適用状態を保持する（ここでクリアすると点滅するため）。
     if (!keep) return;
-    // 自身の DOM 変更（style 生成やマーカー付与）で MutationObserver を再発火させ、
-    // apply→mutation→apply の無限ループに陥らないよう、適用中は監視を止める。
+    ensureStyle();
+    const shouldHide = computeHiddenSet(keep);
+    // 差分だけ反映する。既に正しい状態なら DOM を一切変更しない。これにより、
+    // X が背面を再描画し続けても不要な属性の付け外し（churn）や再適用ループを防ぐ。
+    // 属性変更で MutationObserver を再発火させないよう、変更中は監視を止める。
     observer.disconnect();
     try {
-      clearMarkers();
-      ensureStyle();
-      let node: Element = keep;
-      while (node.parentElement && node !== document.body) {
-        const parent = node.parentElement;
-        for (const sibling of Array.from(parent.children)) {
-          if (sibling === node) continue;
-          if (isProtected(sibling)) continue;
-          sibling.setAttribute(HIDDEN_ATTR, "");
-        }
-        node = parent;
-      }
+      document.querySelectorAll(`[${HIDDEN_ATTR}]`).forEach((el) => {
+        if (!shouldHide.has(el)) el.removeAttribute(HIDDEN_ATTR);
+      });
+      shouldHide.forEach((el) => {
+        if (!el.hasAttribute(HIDDEN_ATTR)) el.setAttribute(HIDDEN_ATTR, "");
+      });
     } finally {
       observeDom();
     }

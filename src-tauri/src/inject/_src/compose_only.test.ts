@@ -78,6 +78,24 @@ describe("inject/compose_only", () => {
     expect(isHidden("toastWrap")).toBe(false);
   });
 
+  it("非描画要素(script/style等)は隠さない（churn防止）", () => {
+    buildHomeDom();
+    // X が高頻度で付け外しする類の非描画要素を body 直下に追加。
+    const script = document.createElement("script");
+    script.id = "someScript";
+    document.body.appendChild(script);
+    const style = document.createElement("style");
+    style.id = "someStyle";
+    document.body.appendChild(style);
+
+    window.__multiColumnX.applyComposeOnly!();
+
+    // 描画要素は隠すが、非描画要素は対象外（付け外しによる churn を防ぐ）
+    expect(isHidden("sidebar")).toBe(true);
+    expect(isHidden("someScript")).toBe(false);
+    expect(isHidden("someStyle")).toBe(false);
+  });
+
   it("再適用してもstyle要素を作り直さず内容も変えない（無限ループ防止）", () => {
     buildHomeDom();
     window.__multiColumnX.applyComposeOnly!();
