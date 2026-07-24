@@ -7,11 +7,10 @@ declare global {
     applyAreaRemove: (enabled: boolean) => void;
     recheckNgWords: () => void;
     /**
-     * 投稿ページロックの実際のナビゲーション呼び出し。
-     * window.location.assign は WebIDL 上 Unforgeable でテストから直接
-     * spy/monkeypatch できないため、テストから検証できるよう間接呼び出しにする。
+     * 投稿カラム（/home）でインライン投稿フォーム以外を隠すスポットライトの再適用。
+     * compose_only.ts が公開し、テストからの検証にも用いる。
      */
-    postPageLockNavigate?: (url: string) => void;
+    applyComposeOnly?: () => void;
   }
 
   interface MultiColumnXConfig {

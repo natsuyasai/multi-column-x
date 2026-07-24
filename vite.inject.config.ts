@@ -26,7 +26,7 @@ const plainEntries = [
   "sidebar_hide",
   "mobile_area_hide",
   "notification_header_hide",
-  "post_page_lock",
+  "compose_only",
 ];
 
 // React を含む header_customizer は IIFE + inlineDynamicImports で個別ビルド

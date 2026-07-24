@@ -19,7 +19,7 @@ pub struct InitScriptParams<'a> {
     pub visible_links: &'a [String],
     pub ng_words: &'a [String],
     pub global_ng_words: &'a [String],
-    pub post_page_lock_enabled: bool,
+    pub compose_only_enabled: bool,
 }
 
 pub fn build_init_script(params: &InitScriptParams) -> String {
@@ -66,8 +66,8 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         ""
     };
     let notification_header_hide = include_str!("notification_header_hide.js");
-    let post_page_lock = if params.post_page_lock_enabled {
-        include_str!("post_page_lock.js")
+    let compose_only = if params.compose_only_enabled {
+        include_str!("compose_only.js")
     } else {
         ""
     };
@@ -126,7 +126,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         sidebar_hide,
         mobile_area_hide,
         notification_header_hide,
-        post_page_lock
+        compose_only
     );
 
     if !params.custom_css.is_empty() {
@@ -185,7 +185,7 @@ mod tests {
             visible_links: &[],
             ng_words: &[],
             global_ng_words: &[],
-            post_page_lock_enabled: false,
+            compose_only_enabled: false,
         }
     }
 
@@ -328,17 +328,17 @@ mod tests {
     }
 
     #[test]
-    fn post_page_lock_enabledがtrueのとき投稿ロックスクリプトが含まれる() {
+    fn compose_only_enabledがtrueのとき投稿専用スクリプトが含まれる() {
         let mut params = default_params();
-        params.post_page_lock_enabled = true;
+        params.compose_only_enabled = true;
         let script = build_init_script(&params);
-        assert!(script.contains("/compose/post"));
+        assert!(script.contains("mcx-compose-only"));
     }
 
     #[test]
-    fn post_page_lock_enabledがfalseのとき投稿ロックスクリプトが含まれない() {
+    fn compose_only_enabledがfalseのとき投稿専用スクリプトが含まれない() {
         let script = build_init_script(&default_params());
-        assert!(!script.contains("compose/post"));
+        assert!(!script.contains("mcx-compose-only"));
     }
 
     #[test]
