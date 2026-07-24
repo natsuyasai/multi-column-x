@@ -33,7 +33,7 @@
         'button[type="button"]',
       );
       if (btn) {
-        if(btn.attributes.getNamedItem("data-testid")?.value === "UserCell" ) {
+        if (btn.attributes.getNamedItem("data-testid")?.value === "UserCell") {
           continue;
         }
         return btn;
