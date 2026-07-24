@@ -21,7 +21,8 @@ const mockGlobalSettings: GlobalSettings = {
   defaultAutoReloadEnabled: true,
   defaultAutoReloadInterval: 60,
   defaultShowCountdown: true,
-  defaultAreaRemoveEnabled: true,
+  defaultHideHeaderEnabled: true,
+  defaultHideTweetInputEnabled: true,
   defaultShowCustomMenu: false,
   defaultScrollPosRestoreEnabled: true,
   defaultColumnCustomCSS: "",
@@ -107,6 +108,32 @@ describe("AddColumnDialog", () => {
     await userEvent.click(screen.getByRole("button", { name: "追加" }));
     expect(onAdd).toHaveBeenCalledWith(
       expect.objectContaining<Partial<Column>>({ pageType: "compose" }),
+    );
+  });
+
+  it("グローバル設定のdefaultHideHeaderEnabledとdefaultHideTweetInputEnabledがそれぞれ独立して新規カラムの設定にコピーされる", async () => {
+    const onAdd = vi.fn();
+    render(
+      <AddColumnDialog
+        accounts={mockAccounts}
+        globalSettings={{
+          ...mockGlobalSettings,
+          defaultHideHeaderEnabled: true,
+          defaultHideTweetInputEnabled: false,
+        }}
+        existingColumns={[]}
+        onAdd={onAdd}
+        onCancel={vi.fn()}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "追加" }));
+    expect(onAdd).toHaveBeenCalledWith(
+      expect.objectContaining<Partial<Column>>({
+        settings: expect.objectContaining({
+          hideHeaderEnabled: true,
+          hideTweetInputEnabled: false,
+        }) as Column["settings"],
+      }),
     );
   });
 
