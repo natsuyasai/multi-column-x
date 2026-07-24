@@ -27,10 +27,7 @@ interface AppSettingsPanelProps {
   onApply: (patch: Partial<GlobalSettings>) => void;
   onApplyLayout: (columns: Column[]) => void;
   onApplyColumnDefaults: (
-    patch: Omit<
-      ColumnSettings,
-      "visibleLinks" | "ngWords" | "postPageRedirectEnabled"
-    >,
+    patch: Omit<ColumnSettings, "visibleLinks" | "ngWords">,
   ) => void;
   onReloadAllWebviews: () => void;
   appVersion: string;

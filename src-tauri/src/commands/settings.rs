@@ -58,9 +58,6 @@ pub struct ColumnSettings {
     #[serde(rename = "desktopNotifyEnabled")]
     #[serde(default)]
     pub desktop_notify_enabled: bool,
-    #[serde(rename = "postPageRedirectEnabled")]
-    #[serde(default = "default_true")]
-    pub post_page_redirect_enabled: bool,
 }
 
 // デシリアライズ時のデフォルト値ヘルパー関数。
@@ -439,33 +436,6 @@ mod tests {
         });
         let account: AccountData = serde_json::from_value(json).unwrap();
         assert_eq!(account.x_user_id, None);
-    }
-
-    /// postPageRedirectEnabled 追加前に保存された旧カラム設定 JSON（フィールド欠落）を
-    /// デシリアライズしてもエラーにならず、デフォルト値 true にフォールバックすることを確認する。
-    #[test]
-    fn post_page_redirect_enabledが無い旧カラム設定はデフォルトでtrueになる() {
-        let json = serde_json::json!({
-            "autoReloadEnabled": true,
-            "autoReloadInterval": 600,
-            "areaRemoveEnabled": true,
-            "customCSS": "",
-        });
-        let settings: ColumnSettings = serde_json::from_value(json).unwrap();
-        assert!(settings.post_page_redirect_enabled);
-    }
-
-    #[test]
-    fn post_page_redirect_enabledの指定値を尊重する() {
-        let json = serde_json::json!({
-            "autoReloadEnabled": true,
-            "autoReloadInterval": 600,
-            "areaRemoveEnabled": true,
-            "customCSS": "",
-            "postPageRedirectEnabled": false,
-        });
-        let settings: ColumnSettings = serde_json::from_value(json).unwrap();
-        assert!(!settings.post_page_redirect_enabled);
     }
 
     #[test]

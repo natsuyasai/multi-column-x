@@ -18,7 +18,6 @@ const baseSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   ngWords: [],
-  postPageRedirectEnabled: true,
 };
 
 const mockColumn: Column = {
@@ -71,44 +70,6 @@ describe("SettingsPanel", () => {
     await userEvent.click(screen.getByRole("button", { name: "再読み込み" }));
     expect(onClose).toHaveBeenCalled();
     expect(onReload).toHaveBeenCalledWith("col-1");
-  });
-});
-
-describe("SettingsPanel 投稿ページロック", () => {
-  it("投稿カラム以外ではトグルが表示されない", () => {
-    render(<SettingsPanel {...defaultProps} />);
-    expect(
-      screen.queryByRole("checkbox", {
-        name: "他ページへ遷移したら投稿ページに戻す",
-      }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("投稿カラムのときトグルが表示される", () => {
-    const col = { ...mockColumn, pageType: "compose" as const };
-    render(<SettingsPanel {...defaultProps} column={col} />);
-    expect(
-      screen.getByRole("checkbox", {
-        name: "他ページへ遷移したら投稿ページに戻す",
-      }),
-    ).toBeInTheDocument();
-  });
-
-  it("投稿カラムのときトグルの切替がonApplyに反映される", async () => {
-    const onApply = vi.fn();
-    const col = { ...mockColumn, pageType: "compose" as const };
-    render(<SettingsPanel {...defaultProps} column={col} onApply={onApply} />);
-    await userEvent.click(
-      screen.getByRole("checkbox", {
-        name: "他ページへ遷移したら投稿ページに戻す",
-      }),
-    );
-    await userEvent.click(screen.getByRole("button", { name: "適用" }));
-    expect(onApply).toHaveBeenCalledWith(
-      "col-1",
-      expect.objectContaining({ postPageRedirectEnabled: false }),
-      350,
-    );
   });
 });
 

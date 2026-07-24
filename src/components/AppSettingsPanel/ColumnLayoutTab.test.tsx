@@ -17,7 +17,6 @@ const baseSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   ngWords: [],
-  postPageRedirectEnabled: true,
 };
 
 const mockAccounts: Account[] = [
