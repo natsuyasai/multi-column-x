@@ -72,7 +72,8 @@ fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: boo
     let global_ng_words = load_global_ng_words(app);
     build_init_script(&InitScriptParams {
         is_mobile,
-        area_remove_enabled: column.settings.area_remove_enabled,
+        hide_header_enabled: column.settings.hide_header_enabled,
+        hide_tweet_input_enabled: column.settings.hide_tweet_input_enabled,
         show_custom_menu: column.settings.show_custom_menu,
         scroll_pos_restore_enabled: column.settings.scroll_pos_restore_enabled,
         video_auto_play_stop_enabled,
@@ -432,7 +433,7 @@ mod tests {
             order: 0,
             label: None,
             settings: serde_json::from_str::<ColumnSettings>(
-                r#"{"autoReloadEnabled":true,"autoReloadInterval":600,"areaRemoveEnabled":true,"customCSS":""}"#,
+                r#"{"autoReloadEnabled":true,"autoReloadInterval":600,"hideHeaderEnabled":true,"hideTweetInputEnabled":true,"customCSS":""}"#,
             )
             .unwrap(),
             grid_row: 1,
