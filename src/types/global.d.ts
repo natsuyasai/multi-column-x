@@ -10,14 +10,19 @@ interface MultiColumnXAPI {
   triggerReload: (scrollToTop?: boolean) => void;
   /** カスタム CSS を適用する */
   applyCustomCSS: (css: string) => void;
-  /** ヘッダーカスタマイズ（エリア除去）の有効/無効を切り替える */
-  applyAreaRemove: (enabled: boolean) => void;
+  /** ヘッダー非表示・投稿欄非表示の有効/無効をそれぞれ切り替える */
+  applyAreaVisibility: (
+    hideHeaderEnabled: boolean,
+    hideTweetInputEnabled: boolean,
+  ) => void;
 }
 
 /** カラム WebView に inject される設定オブジェクト (window.__multiColumnXConfig) */
 interface MultiColumnXConfig {
-  /** ヘッダーカスタマイズ（エリア除去）が有効かどうか */
-  areaRemoveEnabled: boolean;
+  /** ヘッダーを非表示にするかどうか */
+  hideHeaderEnabled: boolean;
+  /** 投稿欄を非表示にするかどうか */
+  hideTweetInputEnabled: boolean;
   /** カスタムコンテキストメニューを表示するかどうか */
   showCustomMenu: boolean;
   /** 表示するナビゲーションリンク（空配列 = すべて表示） */

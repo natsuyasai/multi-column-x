@@ -15,7 +15,8 @@ export interface SettingsDraft {
   defaultAutoReloadEnabled: boolean;
   defaultAutoReloadInterval: number;
   defaultShowCountdown: boolean;
-  defaultAreaRemoveEnabled: boolean;
+  defaultHideHeaderEnabled: boolean;
+  defaultHideTweetInputEnabled: boolean;
   defaultShowCustomMenu: boolean;
   defaultScrollPosRestoreEnabled: boolean;
   defaultColumnCustomCSS: string;
@@ -53,7 +54,8 @@ export function createSettingsDraft(settings: GlobalSettings): SettingsDraft {
     defaultAutoReloadEnabled: settings.defaultAutoReloadEnabled,
     defaultAutoReloadInterval: settings.defaultAutoReloadInterval,
     defaultShowCountdown: settings.defaultShowCountdown,
-    defaultAreaRemoveEnabled: settings.defaultAreaRemoveEnabled,
+    defaultHideHeaderEnabled: settings.defaultHideHeaderEnabled,
+    defaultHideTweetInputEnabled: settings.defaultHideTweetInputEnabled,
     defaultShowCustomMenu: settings.defaultShowCustomMenu,
     defaultScrollPosRestoreEnabled: settings.defaultScrollPosRestoreEnabled,
     defaultColumnCustomCSS: settings.defaultColumnCustomCSS,

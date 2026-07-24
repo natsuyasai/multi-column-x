@@ -27,8 +27,12 @@ pub struct ColumnSettings {
     #[serde(rename = "showCountdown")]
     #[serde(default = "default_true")]
     pub show_countdown: bool,
-    #[serde(rename = "areaRemoveEnabled")]
-    pub area_remove_enabled: bool,
+    #[serde(rename = "hideHeaderEnabled")]
+    #[serde(default = "default_true")]
+    pub hide_header_enabled: bool,
+    #[serde(rename = "hideTweetInputEnabled")]
+    #[serde(default = "default_true")]
+    pub hide_tweet_input_enabled: bool,
     #[serde(rename = "showCustomMenu")]
     #[serde(default = "default_true")]
     pub show_custom_menu: bool,
@@ -109,7 +113,8 @@ impl Default for GlobalSettingsData {
             default_auto_reload_enabled: true,
             default_auto_reload_interval: 600,
             default_show_countdown: true,
-            default_area_remove_enabled: true,
+            default_hide_header_enabled: true,
+            default_hide_tweet_input_enabled: true,
             default_show_custom_menu: false,
             default_scroll_pos_restore_enabled: false,
             default_column_custom_css: String::new(),
@@ -216,9 +221,12 @@ pub struct GlobalSettingsData {
     #[serde(rename = "defaultShowCountdown")]
     #[serde(default = "default_true")]
     pub default_show_countdown: bool,
-    #[serde(rename = "defaultAreaRemoveEnabled")]
+    #[serde(rename = "defaultHideHeaderEnabled")]
     #[serde(default = "default_true")]
-    pub default_area_remove_enabled: bool,
+    pub default_hide_header_enabled: bool,
+    #[serde(rename = "defaultHideTweetInputEnabled")]
+    #[serde(default = "default_true")]
+    pub default_hide_tweet_input_enabled: bool,
     #[serde(rename = "defaultShowCustomMenu")]
     #[serde(default)]
     pub default_show_custom_menu: bool,
@@ -273,12 +281,76 @@ pub struct AppSettingsData {
     pub global_settings: GlobalSettingsData,
 }
 
+/// 旧 areaRemoveEnabled / defaultAreaRemoveEnabled を新フィールド
+/// (hideHeaderEnabled / hideTweetInputEnabled, defaultHideHeaderEnabled / defaultHideTweetInputEnabled)
+/// へ引き継ぐ。新フィールドが既に存在する場合は上書きしない（冪等）。
+/// globalSettings.defaultAreaRemoveEnabled、トップレベル columns[].settings、
+/// globalSettings.presets[].columns[].settings の3箇所を対象にする。
+fn migrate_area_remove_enabled(value: &mut serde_json::Value) {
+    fn migrate_column_settings(settings: &mut serde_json::Value) {
+        let Some(obj) = settings.as_object_mut() else {
+            return;
+        };
+        if let Some(old) = obj.get("areaRemoveEnabled").cloned() {
+            obj.entry("hideHeaderEnabled")
+                .or_insert_with(|| old.clone());
+            obj.entry("hideTweetInputEnabled").or_insert(old);
+        }
+    }
+
+    fn migrate_columns(columns: &mut serde_json::Value) {
+        let Some(arr) = columns.as_array_mut() else {
+            return;
+        };
+        for column in arr {
+            if let Some(settings) = column.get_mut("settings") {
+                migrate_column_settings(settings);
+            }
+        }
+    }
+
+    let Some(root) = value.as_object_mut() else {
+        return;
+    };
+
+    if let Some(columns) = root.get_mut("columns") {
+        migrate_columns(columns);
+    }
+
+    let Some(global) = root.get_mut("globalSettings") else {
+        return;
+    };
+    let Some(gobj) = global.as_object_mut() else {
+        return;
+    };
+
+    if let Some(old) = gobj.get("defaultAreaRemoveEnabled").cloned() {
+        gobj.entry("defaultHideHeaderEnabled")
+            .or_insert_with(|| old.clone());
+        gobj.entry("defaultHideTweetInputEnabled").or_insert(old);
+    }
+
+    if let Some(presets) = gobj.get_mut("presets") {
+        if let Some(parr) = presets.as_array_mut() {
+            for preset in parr {
+                if let Some(pcolumns) = preset.get_mut("columns") {
+                    migrate_columns(pcolumns);
+                }
+            }
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn load_settings(app: AppHandle) -> Result<AppSettingsData, String> {
     let store = app.store("settings.json").map_err(|e| e.to_string())?;
 
     let settings = store
         .get("appSettings")
+        .map(|mut v| {
+            migrate_area_remove_enabled(&mut v);
+            v
+        })
         .and_then(|v| serde_json::from_value(v).ok())
         .unwrap_or_default();
 
@@ -450,5 +522,210 @@ mod tests {
         });
         let account: AccountData = serde_json::from_value(json).unwrap();
         assert_eq!(account.x_user_id, Some("1234567890".to_string()));
+    }
+
+    /// トップレベル columns[].settings の旧 areaRemoveEnabled: false が、
+    /// 新フィールド hideHeaderEnabled / hideTweetInputEnabled の両方に false として移行されることを確認する。
+    #[test]
+    fn 旧arearemoveenabledがfalseの場合両方の新フィールドがfalseに移行される() {
+        let mut json = serde_json::json!({
+            "columns": [
+                {
+                    "id": "col-1",
+                    "settings": {
+                        "areaRemoveEnabled": false,
+                        "customCSS": "",
+                    }
+                }
+            ]
+        });
+
+        migrate_area_remove_enabled(&mut json);
+
+        let settings = &json["columns"][0]["settings"];
+        assert_eq!(settings["hideHeaderEnabled"], serde_json::json!(false));
+        assert_eq!(settings["hideTweetInputEnabled"], serde_json::json!(false));
+    }
+
+    /// areaRemoveEnabled: false と hideHeaderEnabled: true が両方存在する場合、
+    /// マイグレーション後も hideHeaderEnabled は true のまま変わらない（新フィールド優先・冪等性）。
+    #[test]
+    fn 新フィールドが既に存在する場合は旧フィールドで上書きされない() {
+        let mut json = serde_json::json!({
+            "columns": [
+                {
+                    "id": "col-1",
+                    "settings": {
+                        "areaRemoveEnabled": false,
+                        "hideHeaderEnabled": true,
+                        "customCSS": "",
+                    }
+                }
+            ]
+        });
+
+        migrate_area_remove_enabled(&mut json);
+
+        let settings = &json["columns"][0]["settings"];
+        assert_eq!(settings["hideHeaderEnabled"], serde_json::json!(true));
+        // hideTweetInputEnabled は未設定だったので areaRemoveEnabled の値(false)が移行される。
+        assert_eq!(settings["hideTweetInputEnabled"], serde_json::json!(false));
+    }
+
+    /// globalSettings.defaultAreaRemoveEnabled の値が defaultHideHeaderEnabled /
+    /// defaultHideTweetInputEnabled の両方に伝播することを確認する。
+    #[test]
+    fn globalsettingsのdefaultarearemoveenabledが両方の新フィールドに移行される() {
+        let mut json = serde_json::json!({
+            "globalSettings": {
+                "defaultAreaRemoveEnabled": false,
+            }
+        });
+
+        migrate_area_remove_enabled(&mut json);
+
+        let global = &json["globalSettings"];
+        assert_eq!(global["defaultHideHeaderEnabled"], serde_json::json!(false));
+        assert_eq!(
+            global["defaultHideTweetInputEnabled"],
+            serde_json::json!(false)
+        );
+    }
+
+    /// globalSettings.presets[].columns[].settings の areaRemoveEnabled も
+    /// トップレベル columns と同様に移行されることを確認する（見落としやすい箇所）。
+    #[test]
+    fn プリセット内カラム設定のarearemoveenabledも移行される() {
+        let mut json = serde_json::json!({
+            "globalSettings": {
+                "presets": [
+                    {
+                        "id": "preset-1",
+                        "name": "プリセット1",
+                        "columns": [
+                            {
+                                "id": "col-1",
+                                "settings": {
+                                    "areaRemoveEnabled": false,
+                                    "customCSS": "",
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        });
+
+        migrate_area_remove_enabled(&mut json);
+
+        let settings = &json["globalSettings"]["presets"][0]["columns"][0]["settings"];
+        assert_eq!(settings["hideHeaderEnabled"], serde_json::json!(false));
+        assert_eq!(settings["hideTweetInputEnabled"], serde_json::json!(false));
+    }
+
+    mod properties {
+        use super::*;
+        use proptest::prelude::*;
+
+        /// フィールドが「存在しない」「存在してtrue」「存在してfalse」の3状態を表現する。
+        fn maybe_bool() -> impl Strategy<Value = Option<bool>> {
+            prop_oneof![Just(None), any::<bool>().prop_map(Some)]
+        }
+
+        /// Option<bool> を settings オブジェクトへ、Some(b) なら該当キーを b で追加し、
+        /// None ならキー自体を追加しない、という形で組み立てるヘルパー。
+        fn insert_if_some(
+            obj: &mut serde_json::Map<String, serde_json::Value>,
+            key: &str,
+            v: Option<bool>,
+        ) {
+            if let Some(b) = v {
+                obj.insert(key.to_string(), serde_json::json!(b));
+            }
+        }
+
+        /// 任意個数(0〜3件)の column の settings に areaRemoveEnabled: old のみを設定した
+        /// (hideHeaderEnabled / hideTweetInputEnabled は未設定の) JSON を組み立てる。
+        fn build_columns_with_old_only(old: bool, count: usize) -> serde_json::Value {
+            let columns: Vec<serde_json::Value> = (0..count)
+                .map(|i| {
+                    serde_json::json!({
+                        "id": format!("col-{i}"),
+                        "settings": {
+                            "areaRemoveEnabled": old,
+                            "customCSS": "",
+                        }
+                    })
+                })
+                .collect();
+            serde_json::json!({ "columns": columns })
+        }
+
+        /// 任意の bool 値の組み合わせ(areaRemoveEnabled の値、hideHeaderEnabled /
+        /// hideTweetInputEnabled が既に存在するかどうかとその値)を持つ、単一 column の
+        /// settings JSON を組み立てる。
+        fn build_column_settings(
+            area_remove_enabled: Option<bool>,
+            hide_header_enabled: Option<bool>,
+            hide_tweet_input_enabled: Option<bool>,
+        ) -> serde_json::Value {
+            let mut obj = serde_json::Map::new();
+            obj.insert("customCSS".to_string(), serde_json::json!(""));
+            insert_if_some(&mut obj, "areaRemoveEnabled", area_remove_enabled);
+            insert_if_some(&mut obj, "hideHeaderEnabled", hide_header_enabled);
+            insert_if_some(&mut obj, "hideTweetInputEnabled", hide_tweet_input_enabled);
+            serde_json::json!({
+                "columns": [
+                    { "id": "col-1", "settings": serde_json::Value::Object(obj) }
+                ]
+            })
+        }
+
+        proptest! {
+            /// 性質1: 新フィールドが元々存在しない場合、areaRemoveEnabled(old) の値が
+            /// すべての column の hideHeaderEnabled / hideTweetInputEnabled 両方に伝播する。
+            #[test]
+            fn 新フィールド未設定なら旧フィールドの値が全columnの新フィールドへ伝播する(
+                old in any::<bool>(),
+                count in 0usize..=3,
+            ) {
+                let mut json = build_columns_with_old_only(old, count);
+
+                migrate_area_remove_enabled(&mut json);
+
+                let columns = json["columns"].as_array().unwrap();
+                prop_assert_eq!(columns.len(), count);
+                for column in columns {
+                    let settings = &column["settings"];
+                    prop_assert_eq!(&settings["hideHeaderEnabled"], &serde_json::json!(old));
+                    prop_assert_eq!(&settings["hideTweetInputEnabled"], &serde_json::json!(old));
+                }
+            }
+
+            /// 性質2: migrate_area_remove_enabled は冪等である。
+            /// areaRemoveEnabled / hideHeaderEnabled / hideTweetInputEnabled の
+            /// 存在有無・値の任意の組み合わせに対し、1回適用した結果と
+            /// さらにもう1回適用した結果が完全に一致する。
+            #[test]
+            fn マイグレーションは2回適用しても1回適用と同じ結果になる(
+                area_remove_enabled in maybe_bool(),
+                hide_header_enabled in maybe_bool(),
+                hide_tweet_input_enabled in maybe_bool(),
+            ) {
+                let mut json = build_column_settings(
+                    area_remove_enabled,
+                    hide_header_enabled,
+                    hide_tweet_input_enabled,
+                );
+
+                migrate_area_remove_enabled(&mut json);
+                let once = json.clone();
+
+                migrate_area_remove_enabled(&mut json);
+                let twice = json;
+
+                prop_assert_eq!(once, twice);
+            }
+        }
     }
 }

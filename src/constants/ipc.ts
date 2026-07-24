@@ -93,9 +93,12 @@ export const WEBVIEW_SCRIPTS = {
   SCROLL_TOP_AND_RELOAD:
     "window.__multiColumnX && window.__multiColumnX.triggerReload(true);",
 
-  /** ヘッダーカスタマイズ（エリア除去）の有効/無効を切り替える */
-  applyAreaRemove: (enabled: boolean) =>
-    `window.__multiColumnX && window.__multiColumnX.applyAreaRemove(${enabled});`,
+  /** ヘッダー非表示・投稿欄非表示の有効/無効をそれぞれ切り替える */
+  applyAreaVisibility: (
+    hideHeaderEnabled: boolean,
+    hideTweetInputEnabled: boolean,
+  ) =>
+    `window.__multiColumnX && window.__multiColumnX.applyAreaVisibility(${hideHeaderEnabled}, ${hideTweetInputEnabled});`,
 
   /** カスタム CSS を適用する */
   applyCustomCSS: (css: string) => {

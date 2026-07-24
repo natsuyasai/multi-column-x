@@ -60,7 +60,10 @@ export async function applyColumnSettingsScripts(
 ): Promise<void> {
   await evalInColumn(
     columnId,
-    WEBVIEW_SCRIPTS.applyAreaRemove(settings.areaRemoveEnabled),
+    WEBVIEW_SCRIPTS.applyAreaVisibility(
+      settings.hideHeaderEnabled,
+      settings.hideTweetInputEnabled,
+    ),
   );
   await evalInColumn(
     columnId,

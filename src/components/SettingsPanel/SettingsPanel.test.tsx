@@ -8,7 +8,8 @@ const baseSettings = {
   autoReloadEnabled: false,
   autoReloadInterval: 600,
   showCountdown: true,
-  areaRemoveEnabled: false,
+  hideHeaderEnabled: false,
+  hideTweetInputEnabled: false,
   showCustomMenu: false,
   scrollPosRestoreEnabled: false,
   customCSS: "",
@@ -124,6 +125,90 @@ describe("SettingsPanel NGワード", () => {
       expect.objectContaining({ ngWords: ["spam", "bot"] }),
       350,
     );
+  });
+});
+
+describe("SettingsPanel 表示設定", () => {
+  it("ヘッダーを非表示にするチェックボックスが表示される", () => {
+    render(<SettingsPanel {...defaultProps} />);
+    expect(
+      screen.getByRole("checkbox", { name: "ヘッダーを非表示にする" }),
+    ).toBeInTheDocument();
+  });
+
+  it("投稿欄を非表示にするチェックボックスが表示される", () => {
+    render(<SettingsPanel {...defaultProps} />);
+    expect(
+      screen.getByRole("checkbox", { name: "投稿欄を非表示にする" }),
+    ).toBeInTheDocument();
+  });
+
+  it("hideHeaderEnabledがfalseの場合カスタムメニューボタンのチェックボックスは表示されない", () => {
+    render(<SettingsPanel {...defaultProps} />);
+    expect(
+      screen.queryByRole("checkbox", {
+        name: "カスタムメニューボタンを表示する",
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("hideHeaderEnabledがtrueの場合カスタムメニューボタンのチェックボックスが表示される", () => {
+    const col = {
+      ...mockColumn,
+      settings: { ...baseSettings, hideHeaderEnabled: true },
+    };
+    render(<SettingsPanel {...defaultProps} column={col} />);
+    expect(
+      screen.getByRole("checkbox", {
+        name: "カスタムメニューボタンを表示する",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("ヘッダーを非表示にするチェックボックスを操作すると設定に反映される", async () => {
+    const onApply = vi.fn();
+    render(<SettingsPanel {...defaultProps} onApply={onApply} />);
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: "ヘッダーを非表示にする" }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.objectContaining({
+        hideHeaderEnabled: true,
+        hideTweetInputEnabled: false,
+      }),
+      350,
+    );
+  });
+
+  it("投稿欄を非表示にするチェックボックスを操作すると設定に反映される", async () => {
+    const onApply = vi.fn();
+    render(<SettingsPanel {...defaultProps} onApply={onApply} />);
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: "投稿欄を非表示にする" }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.objectContaining({
+        hideHeaderEnabled: false,
+        hideTweetInputEnabled: true,
+      }),
+      350,
+    );
+  });
+
+  it("ヘッダーのみ非表示にした場合、投稿欄は非表示にならないこと", async () => {
+    const onApply = vi.fn();
+    render(<SettingsPanel {...defaultProps} onApply={onApply} />);
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: "ヘッダーを非表示にする" }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    const appliedSettings = onApply.mock.calls[0][1];
+    expect(appliedSettings.hideHeaderEnabled).toBe(true);
+    expect(appliedSettings.hideTweetInputEnabled).toBe(false);
   });
 });
 

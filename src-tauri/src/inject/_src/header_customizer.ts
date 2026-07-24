@@ -31,15 +31,21 @@ import { HeaderCustomizer } from "./HeaderCustomizer";
 
   window.__multiColumnX =
     window.__multiColumnX || ({} as Window["__multiColumnX"]);
-  window.__multiColumnX.applyAreaRemove = function (enabled: boolean) {
-    if (enabled) {
+  window.__multiColumnX.applyAreaVisibility = function (
+    hideHeaderEnabled: boolean,
+    hideTweetInputEnabled: boolean,
+  ) {
+    if (hideHeaderEnabled || hideTweetInputEnabled) {
       mount();
     } else {
       unmount();
     }
   };
 
-  const shouldMount = window.__multiColumnXConfig?.areaRemoveEnabled;
+  const config = window.__multiColumnXConfig;
+  const shouldMount = Boolean(
+    config?.hideHeaderEnabled || config?.hideTweetInputEnabled,
+  );
 
   if (shouldMount) {
     if (document.readyState === "loading") {

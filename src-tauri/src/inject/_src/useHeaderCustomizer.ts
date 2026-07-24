@@ -25,6 +25,9 @@ export function useHeaderCustomizer() {
 
   // ヘッダーを非表示にする
   useEffect(() => {
+    const hideHeaderEnabled =
+      window.__multiColumnXConfig?.hideHeaderEnabled ?? true;
+    if (!hideHeaderEnabled) return;
     const existingStyle = document.getElementById(HEADER_HIDE_STYLE_ID);
     if (!existingStyle) {
       const style = document.createElement("style");
@@ -39,6 +42,9 @@ export function useHeaderCustomizer() {
 
   // ツイート入力エリアを非表示にする
   useEffect(() => {
+    const hideTweetInputEnabled =
+      window.__multiColumnXConfig?.hideTweetInputEnabled ?? true;
+    if (!hideTweetInputEnabled) return;
     const existingStyle = document.getElementById(TWEET_INPUT_HIDE_STYLE_ID);
     if (!existingStyle) {
       const style = document.createElement("style");

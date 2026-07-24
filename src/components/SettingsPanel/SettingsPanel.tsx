@@ -124,17 +124,30 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <label className={styles.checkLabel}>
               <input
                 type="checkbox"
-                checked={settings.areaRemoveEnabled}
+                checked={settings.hideHeaderEnabled}
                 onChange={(e) =>
                   setSettings((s) => ({
                     ...s,
-                    areaRemoveEnabled: e.target.checked,
+                    hideHeaderEnabled: e.target.checked,
                   }))
                 }
               />
-              ヘッダー・投稿欄を非表示にする
+              ヘッダーを非表示にする
             </label>
-            {settings.areaRemoveEnabled && (
+            <label className={styles.checkLabel}>
+              <input
+                type="checkbox"
+                checked={settings.hideTweetInputEnabled}
+                onChange={(e) =>
+                  setSettings((s) => ({
+                    ...s,
+                    hideTweetInputEnabled: e.target.checked,
+                  }))
+                }
+              />
+              投稿欄を非表示にする
+            </label>
+            {settings.hideHeaderEnabled && (
               <label className={styles.checkLabel}>
                 <input
                   type="checkbox"
