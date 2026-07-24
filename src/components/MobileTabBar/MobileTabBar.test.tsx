@@ -121,6 +121,12 @@ describe("MobileTabBar", () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
+  it("pageTypeがcomposeの場合は投稿を表示する", () => {
+    const composeCol: Column = { ...col1, pageType: "compose" };
+    render(<MobileTabBar {...defaultProps} columns={[composeCol]} />);
+    expect(screen.getByText("投稿")).toBeInTheDocument();
+  });
+
   it("homeTabName がある場合はそれを表示する", () => {
     const colWithTabName: Column = { ...col1, homeTabName: "フォロー中" };
     render(<MobileTabBar {...defaultProps} columns={[colWithTabName]} />);

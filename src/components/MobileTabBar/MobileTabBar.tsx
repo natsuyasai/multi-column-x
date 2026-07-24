@@ -16,6 +16,7 @@ function getTabLabel(column: Column): string {
     search: column.searchQuery ? `検索: ${column.searchQuery}` : "検索",
     list: "リスト",
     custom: "カスタム",
+    compose: "投稿",
   };
   return labels[column.pageType];
 }

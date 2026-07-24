@@ -6,6 +6,11 @@ declare global {
     triggerReload: (scrollToTop?: boolean) => void;
     applyAreaRemove: (enabled: boolean) => void;
     recheckNgWords: () => void;
+    /**
+     * 投稿カラム（/home）でインライン投稿フォーム以外を隠すスポットライトの再適用。
+     * compose_only.ts が公開し、テストからの検証にも用いる。
+     */
+    applyComposeOnly?: () => void;
   }
 
   interface MultiColumnXConfig {

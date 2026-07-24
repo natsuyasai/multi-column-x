@@ -65,6 +65,10 @@ describe("getPageTypeLabel", () => {
   it("customは「カスタム」を返す", () => {
     expect(getPageTypeLabel({ pageType: "custom" })).toBe("カスタム");
   });
+
+  it("pageTypeがcomposeのときラベルは投稿を返す", () => {
+    expect(getPageTypeLabel({ pageType: "compose" })).toBe("投稿");
+  });
 });
 
 describe("getColumnLabel", () => {
