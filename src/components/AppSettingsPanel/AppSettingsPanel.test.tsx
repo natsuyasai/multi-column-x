@@ -23,7 +23,8 @@ const baseGlobalSettings: GlobalSettings = {
   defaultAutoReloadEnabled: true,
   defaultAutoReloadInterval: 600,
   defaultShowCountdown: true,
-  defaultAreaRemoveEnabled: true,
+  defaultHideHeaderEnabled: true,
+  defaultHideTweetInputEnabled: true,
   defaultShowCustomMenu: false,
   defaultScrollPosRestoreEnabled: false,
   defaultColumnCustomCSS: "",
@@ -50,7 +51,8 @@ const baseSettings = {
   autoReloadEnabled: true,
   autoReloadInterval: 60,
   showCountdown: true,
-  areaRemoveEnabled: true,
+  hideHeaderEnabled: true,
+  hideTweetInputEnabled: true,
   showCustomMenu: false,
   scrollPosRestoreEnabled: true,
   customCSS: "",
@@ -348,6 +350,142 @@ describe("AppSettingsPanel ポップアップウィンドウ", () => {
     fireEvent.click(screen.getByRole("button", { name: "適用" }));
     expect(onApply).toHaveBeenCalledWith(
       expect.objectContaining({ videoPopupEnabled: false }),
+    );
+  });
+});
+
+describe("AppSettingsPanel カラムデフォルト - 表示", () => {
+  it("ヘッダーを非表示にするチェックボックスが表示される", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(
+      screen.getByRole("checkbox", { name: "ヘッダーを非表示にする" }),
+    ).toBeInTheDocument();
+  });
+
+  it("投稿欄を非表示にするチェックボックスが表示される", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(
+      screen.getByRole("checkbox", { name: "投稿欄を非表示にする" }),
+    ).toBeInTheDocument();
+  });
+
+  it("defaultHideHeaderEnabledがfalseの場合カスタムメニューボタンのチェックボックスは表示されない", () => {
+    const settings = { ...baseGlobalSettings, defaultHideHeaderEnabled: false };
+    render(<AppSettingsPanel {...defaultProps} settings={settings} />);
+    expect(
+      screen.queryByRole("checkbox", {
+        name: "カスタムメニューボタンを表示する",
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("defaultHideHeaderEnabledがtrueの場合カスタムメニューボタンのチェックボックスが表示される", () => {
+    const settings = { ...baseGlobalSettings, defaultHideHeaderEnabled: true };
+    render(<AppSettingsPanel {...defaultProps} settings={settings} />);
+    expect(
+      screen.getByRole("checkbox", {
+        name: "カスタムメニューボタンを表示する",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("ヘッダーを非表示にするチェックボックスを操作して適用するとonApplyに反映される", () => {
+    const onApply = vi.fn();
+    const settings = {
+      ...baseGlobalSettings,
+      defaultHideHeaderEnabled: false,
+      defaultHideTweetInputEnabled: false,
+    };
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={settings}
+        onApply={onApply}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "ヘッダーを非表示にする" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        defaultHideHeaderEnabled: true,
+        defaultHideTweetInputEnabled: false,
+      }),
+    );
+  });
+
+  it("投稿欄を非表示にするチェックボックスを操作して適用するとonApplyに反映される", () => {
+    const onApply = vi.fn();
+    const settings = {
+      ...baseGlobalSettings,
+      defaultHideHeaderEnabled: false,
+      defaultHideTweetInputEnabled: false,
+    };
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={settings}
+        onApply={onApply}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "投稿欄を非表示にする" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        defaultHideHeaderEnabled: false,
+        defaultHideTweetInputEnabled: true,
+      }),
+    );
+  });
+
+  it("ヘッダーのみ非表示のデフォルト設定にした場合、投稿欄はデフォルトで非表示にならないこと", () => {
+    const onApply = vi.fn();
+    const settings = {
+      ...baseGlobalSettings,
+      defaultHideHeaderEnabled: false,
+      defaultHideTweetInputEnabled: false,
+    };
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={settings}
+        onApply={onApply}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "ヘッダーを非表示にする" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    const appliedSettings = onApply.mock.calls[0][0];
+    expect(appliedSettings.defaultHideHeaderEnabled).toBe(true);
+    expect(appliedSettings.defaultHideTweetInputEnabled).toBe(false);
+  });
+
+  it("既存の全カラムに適用ボタンでhideHeaderEnabled/hideTweetInputEnabledがonApplyColumnDefaultsに渡される", () => {
+    const onApplyColumnDefaults = vi.fn();
+    const settings = {
+      ...baseGlobalSettings,
+      defaultHideHeaderEnabled: true,
+      defaultHideTweetInputEnabled: false,
+    };
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={settings}
+        onApplyColumnDefaults={onApplyColumnDefaults}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "既存の全カラムに適用" }),
+    );
+    expect(onApplyColumnDefaults).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hideHeaderEnabled: true,
+        hideTweetInputEnabled: false,
+      }),
     );
   });
 });

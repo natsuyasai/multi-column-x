@@ -53,7 +53,8 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
         autoReloadEnabled: globalSettings.defaultAutoReloadEnabled,
         autoReloadInterval: globalSettings.defaultAutoReloadInterval,
         showCountdown: globalSettings.defaultShowCountdown,
-        areaRemoveEnabled: globalSettings.defaultAreaRemoveEnabled,
+        hideHeaderEnabled: globalSettings.defaultHideHeaderEnabled,
+        hideTweetInputEnabled: globalSettings.defaultHideTweetInputEnabled,
         showCustomMenu: globalSettings.defaultShowCustomMenu,
         scrollPosRestoreEnabled: globalSettings.defaultScrollPosRestoreEnabled,
         customCSS: globalSettings.defaultColumnCustomCSS,
@@ -104,6 +105,7 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
             <option value="search">検索</option>
             <option value="list">リスト</option>
             <option value="custom">カスタムURL</option>
+            <option value="compose">投稿</option>
           </select>
         </div>
 

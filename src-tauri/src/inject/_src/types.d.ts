@@ -4,12 +4,21 @@ declare global {
   interface MultiColumnXAPI {
     applyCustomCSS: (css: string) => void;
     triggerReload: (scrollToTop?: boolean) => void;
-    applyAreaRemove: (enabled: boolean) => void;
+    applyAreaVisibility: (
+      hideHeaderEnabled: boolean,
+      hideTweetInputEnabled: boolean,
+    ) => void;
     recheckNgWords: () => void;
+    /**
+     * 投稿カラム（/home）でインライン投稿フォーム以外を隠すスポットライトの再適用。
+     * compose_only.ts が公開し、テストからの検証にも用いる。
+     */
+    applyComposeOnly?: () => void;
   }
 
   interface MultiColumnXConfig {
-    areaRemoveEnabled: boolean;
+    hideHeaderEnabled: boolean;
+    hideTweetInputEnabled: boolean;
     showCustomMenu: boolean;
     visibleLinks: string[];
     smallImageEnabled: boolean;

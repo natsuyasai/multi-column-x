@@ -44,6 +44,9 @@ fn resolve_url(column: &ColumnData) -> String {
             .custom_url
             .clone()
             .unwrap_or_else(|| "https://x.com/home".to_string()),
+        // 投稿カラムは /home を表示し、inject(compose_only) でインライン投稿フォーム以外を隠す。
+        // /compose/post は投稿完了時に遷移が発生しロック方式が破綻するため使わない。
+        "compose" => "https://x.com/home".to_string(),
         _ => "https://x.com/home".to_string(),
     }
 }
@@ -69,7 +72,8 @@ fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: boo
     let global_ng_words = load_global_ng_words(app);
     build_init_script(&InitScriptParams {
         is_mobile,
-        area_remove_enabled: column.settings.area_remove_enabled,
+        hide_header_enabled: column.settings.hide_header_enabled,
+        hide_tweet_input_enabled: column.settings.hide_tweet_input_enabled,
         show_custom_menu: column.settings.show_custom_menu,
         scroll_pos_restore_enabled: column.settings.scroll_pos_restore_enabled,
         video_auto_play_stop_enabled,
@@ -84,6 +88,8 @@ fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: boo
         visible_links: &column.settings.visible_links,
         ng_words: &column.settings.ng_words,
         global_ng_words: &global_ng_words,
+        // 投稿カラム（/home 表示）ではインライン投稿フォーム以外を隠す。
+        compose_only_enabled: column.page_type == "compose",
     })
 }
 
@@ -427,7 +433,7 @@ mod tests {
             order: 0,
             label: None,
             settings: serde_json::from_str::<ColumnSettings>(
-                r#"{"autoReloadEnabled":true,"autoReloadInterval":600,"areaRemoveEnabled":true,"customCSS":""}"#,
+                r#"{"autoReloadEnabled":true,"autoReloadInterval":600,"hideHeaderEnabled":true,"hideTweetInputEnabled":true,"customCSS":""}"#,
             )
             .unwrap(),
             grid_row: 1,
@@ -470,6 +476,11 @@ mod tests {
         let mut col = column("custom");
         col.custom_url = Some("https://x.com/i/bookmarks".into());
         assert_eq!(resolve_url(&col), "https://x.com/i/bookmarks");
+    }
+
+    #[test]
+    fn resolve_url_composeはhomeを返す() {
+        assert_eq!(resolve_url(&column("compose")), "https://x.com/home");
     }
 
     #[test]

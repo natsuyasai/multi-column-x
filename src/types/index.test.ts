@@ -20,7 +20,8 @@ const baseColumn: Column = {
     autoReloadEnabled: true,
     autoReloadInterval: 600,
     showCountdown: true,
-    areaRemoveEnabled: true,
+    hideHeaderEnabled: true,
+    hideTweetInputEnabled: true,
     showCustomMenu: false,
     scrollPosRestoreEnabled: true,
     customCSS: "",
@@ -64,6 +65,10 @@ describe("getPageTypeLabel", () => {
 
   it("customは「カスタム」を返す", () => {
     expect(getPageTypeLabel({ pageType: "custom" })).toBe("カスタム");
+  });
+
+  it("pageTypeがcomposeのときラベルは投稿を返す", () => {
+    expect(getPageTypeLabel({ pageType: "compose" })).toBe("投稿");
   });
 });
 

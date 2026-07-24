@@ -30,6 +30,34 @@ jobs:
             echo "tag ($tag) != tauri.conf.json version ($ver)"
             exit 1
           fi
+      - name: Create version tag
+        # workflow_dispatch 手動実行時はタグが存在しないため、ここで作成する。
+        # タグ push トリガー時は既にタグが存在するため不要。
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        with:
+          script: |
+            const tag = `v${process.env.VERSION}`;
+            const ref = `tags/${tag}`;
+            try {
+              await github.rest.git.getRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref,
+              });
+              console.log(`tag ${tag} already exists, skipping creation`);
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              await github.rest.git.createRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `refs/${ref}`,
+                sha: context.sha,
+              });
+              console.log(`created tag ${tag} at ${context.sha}`);
+            }
       - name: Determine previous tag
         id: prevtag
         run: |

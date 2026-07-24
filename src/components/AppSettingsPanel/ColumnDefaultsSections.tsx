@@ -57,12 +57,22 @@ export const ColumnDefaultsSections: React.FC<ColumnDefaultsSectionsProps> = ({
       <label className={styles.checkLabel}>
         <input
           type="checkbox"
-          checked={draft.defaultAreaRemoveEnabled}
-          onChange={(e) => set("defaultAreaRemoveEnabled", e.target.checked)}
+          checked={draft.defaultHideHeaderEnabled}
+          onChange={(e) => set("defaultHideHeaderEnabled", e.target.checked)}
         />
-        ヘッダー・投稿欄を非表示にする
+        ヘッダーを非表示にする
       </label>
-      {draft.defaultAreaRemoveEnabled && (
+      <label className={styles.checkLabel}>
+        <input
+          type="checkbox"
+          checked={draft.defaultHideTweetInputEnabled}
+          onChange={(e) =>
+            set("defaultHideTweetInputEnabled", e.target.checked)
+          }
+        />
+        投稿欄を非表示にする
+      </label>
+      {draft.defaultHideHeaderEnabled && (
         <label className={styles.checkLabel}>
           <input
             type="checkbox"

@@ -4,7 +4,8 @@ use crate::ipc_constants::globals;
 
 pub struct InitScriptParams<'a> {
     pub is_mobile: bool,
-    pub area_remove_enabled: bool,
+    pub hide_header_enabled: bool,
+    pub hide_tweet_input_enabled: bool,
     pub show_custom_menu: bool,
     pub scroll_pos_restore_enabled: bool,
     pub video_auto_play_stop_enabled: bool,
@@ -19,6 +20,7 @@ pub struct InitScriptParams<'a> {
     pub visible_links: &'a [String],
     pub ng_words: &'a [String],
     pub global_ng_words: &'a [String],
+    pub compose_only_enabled: bool,
 }
 
 pub fn build_init_script(params: &InitScriptParams) -> String {
@@ -65,17 +67,24 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         ""
     };
     let notification_header_hide = include_str!("notification_header_hide.js");
+    let compose_only = if params.compose_only_enabled {
+        include_str!("compose_only.js")
+    } else {
+        ""
+    };
 
     let visible_links_json =
         serde_json::to_string(params.visible_links).unwrap_or_else(|_| "[]".to_string());
     let ng_words_json = serde_json::to_string(params.ng_words).unwrap_or_else(|_| "[]".to_string());
     let global_ng_words_json =
         serde_json::to_string(params.global_ng_words).unwrap_or_else(|_| "[]".to_string());
+    let effective_show_custom_menu = params.hide_header_enabled && params.show_custom_menu;
     let config = format!(
-        "window.{} = {{ areaRemoveEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?}, blurImageEnabled: {}, blurImageAmount: {:?}, hideAdEnabled: {}, imagePopupEnabled: {}, videoPopupEnabled: {}, ngWords: {}, globalNgWords: {} }};",
+        "window.{} = {{ hideHeaderEnabled: {}, hideTweetInputEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?}, blurImageEnabled: {}, blurImageAmount: {:?}, hideAdEnabled: {}, imagePopupEnabled: {}, videoPopupEnabled: {}, ngWords: {}, globalNgWords: {} }};",
         globals::MULTI_COLUMN_X_CONFIG,
-        params.area_remove_enabled,
-        params.show_custom_menu,
+        params.hide_header_enabled,
+        params.hide_tweet_input_enabled,
+        effective_show_custom_menu,
         visible_links_json,
         params.small_image_enabled,
         params.small_image_width,
@@ -88,7 +97,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         global_ng_words_json
     );
 
-    let header_part = if params.area_remove_enabled {
+    let header_part = if params.hide_header_enabled || params.hide_tweet_input_enabled {
         format!("\n{}", header_customizer)
     } else {
         String::new()
@@ -101,7 +110,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     };
 
     let mut script = format!(
-        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
+        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
         config,
         tab_selector,
         header_part,
@@ -119,7 +128,8 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         keyboard_shortcut,
         sidebar_hide,
         mobile_area_hide,
-        notification_header_hide
+        notification_header_hide,
+        compose_only
     );
 
     if !params.custom_css.is_empty() {
@@ -163,7 +173,8 @@ mod tests {
     fn default_params() -> InitScriptParams<'static> {
         InitScriptParams {
             is_mobile: false,
-            area_remove_enabled: false,
+            hide_header_enabled: true,
+            hide_tweet_input_enabled: false,
             show_custom_menu: true,
             scroll_pos_restore_enabled: false,
             video_auto_play_stop_enabled: false,
@@ -178,6 +189,7 @@ mod tests {
             visible_links: &[],
             ng_words: &[],
             global_ng_words: &[],
+            compose_only_enabled: false,
         }
     }
 
@@ -217,10 +229,40 @@ mod tests {
     fn build_init_script_config_contains_all_flags() {
         let script = build_init_script(&default_params());
         assert!(script.contains("__multiColumnXConfig"));
-        assert!(script.contains("areaRemoveEnabled: false"));
+        assert!(script.contains("hideHeaderEnabled: true"));
+        assert!(script.contains("hideTweetInputEnabled: false"));
         assert!(script.contains("showCustomMenu: true"));
         assert!(script.contains("smallImageEnabled: false"));
         assert!(script.contains("hideAdEnabled: false"));
+    }
+
+    #[test]
+    fn hide_header_enabledがfalseのときshow_custom_menuがtrueでも実効値showcustommenuはfalseになる()
+    {
+        let mut params = default_params();
+        params.hide_header_enabled = false;
+        params.show_custom_menu = true;
+        let script = build_init_script(&params);
+        assert!(script.contains("showCustomMenu: false"));
+    }
+
+    #[test]
+    fn hide_tweet_input_enabledのみtrueのときheader_customizerバンドルが含まれる() {
+        let mut params = default_params();
+        params.hide_header_enabled = false;
+        params.hide_tweet_input_enabled = true;
+        let script = build_init_script(&params);
+        assert!(script.contains("multi-column-x-header-customizer-root"));
+    }
+
+    #[test]
+    fn hide_header_enabledとhide_tweet_input_enabledが両方falseのときheader_customizerバンドルが含まれない(
+    ) {
+        let mut params = default_params();
+        params.hide_header_enabled = false;
+        params.hide_tweet_input_enabled = false;
+        let script = build_init_script(&params);
+        assert!(!script.contains("multi-column-x-header-customizer-root"));
     }
 
     #[test]
@@ -317,6 +359,20 @@ mod tests {
         params.is_mobile = true;
         let script = build_init_script(&params);
         assert!(script.contains("multi-column-x-notification-header-hide"));
+    }
+
+    #[test]
+    fn compose_only_enabledがtrueのとき投稿専用スクリプトが含まれる() {
+        let mut params = default_params();
+        params.compose_only_enabled = true;
+        let script = build_init_script(&params);
+        assert!(script.contains("mcx-compose-only"));
+    }
+
+    #[test]
+    fn compose_only_enabledがfalseのとき投稿専用スクリプトが含まれない() {
+        let script = build_init_script(&default_params());
+        assert!(!script.contains("mcx-compose-only"));
     }
 
     #[test]

@@ -8,7 +8,8 @@ const baseSettings = {
   autoReloadEnabled: true,
   autoReloadInterval: 600,
   showCountdown: true,
-  areaRemoveEnabled: true,
+  hideHeaderEnabled: true,
+  hideTweetInputEnabled: true,
   showCustomMenu: false,
   scrollPosRestoreEnabled: true,
   customCSS: "",
@@ -119,6 +120,12 @@ describe("MobileTabBar", () => {
     fireEvent.contextMenu(screen.getByText("ホーム"));
     expect(onTabAction).toHaveBeenCalledWith("col-1");
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("pageTypeがcomposeの場合は投稿を表示する", () => {
+    const composeCol: Column = { ...col1, pageType: "compose" };
+    render(<MobileTabBar {...defaultProps} columns={[composeCol]} />);
+    expect(screen.getByText("投稿")).toBeInTheDocument();
   });
 
   it("homeTabName がある場合はそれを表示する", () => {
