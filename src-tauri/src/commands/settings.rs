@@ -27,8 +27,12 @@ pub struct ColumnSettings {
     #[serde(rename = "showCountdown")]
     #[serde(default = "default_true")]
     pub show_countdown: bool,
-    #[serde(rename = "areaRemoveEnabled")]
-    pub area_remove_enabled: bool,
+    #[serde(rename = "hideHeaderEnabled")]
+    #[serde(default = "default_true")]
+    pub hide_header_enabled: bool,
+    #[serde(rename = "hideTweetInputEnabled")]
+    #[serde(default = "default_true")]
+    pub hide_tweet_input_enabled: bool,
     #[serde(rename = "showCustomMenu")]
     #[serde(default = "default_true")]
     pub show_custom_menu: bool,
@@ -109,7 +113,8 @@ impl Default for GlobalSettingsData {
             default_auto_reload_enabled: true,
             default_auto_reload_interval: 600,
             default_show_countdown: true,
-            default_area_remove_enabled: true,
+            default_hide_header_enabled: true,
+            default_hide_tweet_input_enabled: true,
             default_show_custom_menu: false,
             default_scroll_pos_restore_enabled: false,
             default_column_custom_css: String::new(),
@@ -216,9 +221,12 @@ pub struct GlobalSettingsData {
     #[serde(rename = "defaultShowCountdown")]
     #[serde(default = "default_true")]
     pub default_show_countdown: bool,
-    #[serde(rename = "defaultAreaRemoveEnabled")]
+    #[serde(rename = "defaultHideHeaderEnabled")]
     #[serde(default = "default_true")]
-    pub default_area_remove_enabled: bool,
+    pub default_hide_header_enabled: bool,
+    #[serde(rename = "defaultHideTweetInputEnabled")]
+    #[serde(default = "default_true")]
+    pub default_hide_tweet_input_enabled: bool,
     #[serde(rename = "defaultShowCustomMenu")]
     #[serde(default)]
     pub default_show_custom_menu: bool,
@@ -273,12 +281,76 @@ pub struct AppSettingsData {
     pub global_settings: GlobalSettingsData,
 }
 
+/// 旧 areaRemoveEnabled / defaultAreaRemoveEnabled を新フィールド
+/// (hideHeaderEnabled / hideTweetInputEnabled, defaultHideHeaderEnabled / defaultHideTweetInputEnabled)
+/// へ引き継ぐ。新フィールドが既に存在する場合は上書きしない（冪等）。
+/// globalSettings.defaultAreaRemoveEnabled、トップレベル columns[].settings、
+/// globalSettings.presets[].columns[].settings の3箇所を対象にする。
+fn migrate_area_remove_enabled(value: &mut serde_json::Value) {
+    fn migrate_column_settings(settings: &mut serde_json::Value) {
+        let Some(obj) = settings.as_object_mut() else {
+            return;
+        };
+        if let Some(old) = obj.get("areaRemoveEnabled").cloned() {
+            obj.entry("hideHeaderEnabled")
+                .or_insert_with(|| old.clone());
+            obj.entry("hideTweetInputEnabled").or_insert(old);
+        }
+    }
+
+    fn migrate_columns(columns: &mut serde_json::Value) {
+        let Some(arr) = columns.as_array_mut() else {
+            return;
+        };
+        for column in arr {
+            if let Some(settings) = column.get_mut("settings") {
+                migrate_column_settings(settings);
+            }
+        }
+    }
+
+    let Some(root) = value.as_object_mut() else {
+        return;
+    };
+
+    if let Some(columns) = root.get_mut("columns") {
+        migrate_columns(columns);
+    }
+
+    let Some(global) = root.get_mut("globalSettings") else {
+        return;
+    };
+    let Some(gobj) = global.as_object_mut() else {
+        return;
+    };
+
+    if let Some(old) = gobj.get("defaultAreaRemoveEnabled").cloned() {
+        gobj.entry("defaultHideHeaderEnabled")
+            .or_insert_with(|| old.clone());
+        gobj.entry("defaultHideTweetInputEnabled").or_insert(old);
+    }
+
+    if let Some(presets) = gobj.get_mut("presets") {
+        if let Some(parr) = presets.as_array_mut() {
+            for preset in parr {
+                if let Some(pcolumns) = preset.get_mut("columns") {
+                    migrate_columns(pcolumns);
+                }
+            }
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn load_settings(app: AppHandle) -> Result<AppSettingsData, String> {
     let store = app.store("settings.json").map_err(|e| e.to_string())?;
 
     let settings = store
         .get("appSettings")
+        .map(|mut v| {
+            migrate_area_remove_enabled(&mut v);
+            v
+        })
         .and_then(|v| serde_json::from_value(v).ok())
         .unwrap_or_default();
 
@@ -450,5 +522,104 @@ mod tests {
         });
         let account: AccountData = serde_json::from_value(json).unwrap();
         assert_eq!(account.x_user_id, Some("1234567890".to_string()));
+    }
+
+    /// トップレベル columns[].settings の旧 areaRemoveEnabled: false が、
+    /// 新フィールド hideHeaderEnabled / hideTweetInputEnabled の両方に false として移行されることを確認する。
+    #[test]
+    fn 旧arearemoveenabledがfalseの場合両方の新フィールドがfalseに移行される() {
+        let mut json = serde_json::json!({
+            "columns": [
+                {
+                    "id": "col-1",
+                    "settings": {
+                        "areaRemoveEnabled": false,
+                        "customCSS": "",
+                    }
+                }
+            ]
+        });
+
+        migrate_area_remove_enabled(&mut json);
+
+        let settings = &json["columns"][0]["settings"];
+        assert_eq!(settings["hideHeaderEnabled"], serde_json::json!(false));
+        assert_eq!(settings["hideTweetInputEnabled"], serde_json::json!(false));
+    }
+
+    /// areaRemoveEnabled: false と hideHeaderEnabled: true が両方存在する場合、
+    /// マイグレーション後も hideHeaderEnabled は true のまま変わらない（新フィールド優先・冪等性）。
+    #[test]
+    fn 新フィールドが既に存在する場合は旧フィールドで上書きされない() {
+        let mut json = serde_json::json!({
+            "columns": [
+                {
+                    "id": "col-1",
+                    "settings": {
+                        "areaRemoveEnabled": false,
+                        "hideHeaderEnabled": true,
+                        "customCSS": "",
+                    }
+                }
+            ]
+        });
+
+        migrate_area_remove_enabled(&mut json);
+
+        let settings = &json["columns"][0]["settings"];
+        assert_eq!(settings["hideHeaderEnabled"], serde_json::json!(true));
+        // hideTweetInputEnabled は未設定だったので areaRemoveEnabled の値(false)が移行される。
+        assert_eq!(settings["hideTweetInputEnabled"], serde_json::json!(false));
+    }
+
+    /// globalSettings.defaultAreaRemoveEnabled の値が defaultHideHeaderEnabled /
+    /// defaultHideTweetInputEnabled の両方に伝播することを確認する。
+    #[test]
+    fn globalsettingsのdefaultarearemoveenabledが両方の新フィールドに移行される() {
+        let mut json = serde_json::json!({
+            "globalSettings": {
+                "defaultAreaRemoveEnabled": false,
+            }
+        });
+
+        migrate_area_remove_enabled(&mut json);
+
+        let global = &json["globalSettings"];
+        assert_eq!(global["defaultHideHeaderEnabled"], serde_json::json!(false));
+        assert_eq!(
+            global["defaultHideTweetInputEnabled"],
+            serde_json::json!(false)
+        );
+    }
+
+    /// globalSettings.presets[].columns[].settings の areaRemoveEnabled も
+    /// トップレベル columns と同様に移行されることを確認する（見落としやすい箇所）。
+    #[test]
+    fn プリセット内カラム設定のarearemoveenabledも移行される() {
+        let mut json = serde_json::json!({
+            "globalSettings": {
+                "presets": [
+                    {
+                        "id": "preset-1",
+                        "name": "プリセット1",
+                        "columns": [
+                            {
+                                "id": "col-1",
+                                "settings": {
+                                    "areaRemoveEnabled": false,
+                                    "customCSS": "",
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        });
+
+        migrate_area_remove_enabled(&mut json);
+
+        let settings = &json["globalSettings"]["presets"][0]["columns"][0]["settings"];
+        assert_eq!(settings["hideHeaderEnabled"], serde_json::json!(false));
+        assert_eq!(settings["hideTweetInputEnabled"], serde_json::json!(false));
     }
 }
