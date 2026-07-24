@@ -20,7 +20,8 @@ export interface ColumnSettings {
   autoReloadEnabled: boolean;
   autoReloadInterval: number; // 秒
   showCountdown: boolean;
-  areaRemoveEnabled: boolean;
+  hideHeaderEnabled: boolean;
+  hideTweetInputEnabled: boolean;
   showCustomMenu: boolean;
   scrollPosRestoreEnabled: boolean;
   customCSS: string;
@@ -60,7 +61,8 @@ export interface GlobalSettings {
   defaultAutoReloadEnabled: boolean;
   defaultAutoReloadInterval: number; // 秒
   defaultShowCountdown: boolean;
-  defaultAreaRemoveEnabled: boolean;
+  defaultHideHeaderEnabled: boolean;
+  defaultHideTweetInputEnabled: boolean;
   defaultShowCustomMenu: boolean;
   defaultScrollPosRestoreEnabled: boolean;
   defaultColumnCustomCSS: string;
@@ -112,7 +114,8 @@ export interface AppSettings {
  * | autoReloadEnabled       | auto_reload_enabled         | true        |
  * | autoReloadInterval      | auto_reload_interval        | 600         |
  * | showCountdown           | show_countdown              | true        |
- * | areaRemoveEnabled       | area_remove_enabled         | true        |
+ * | hideHeaderEnabled       | hide_header_enabled         | true        |
+ * | hideTweetInputEnabled   | hide_tweet_input_enabled    | true        |
  * | showCustomMenu          | show_custom_menu            | false       |
  * | scrollPosRestoreEnabled | scroll_pos_restore_enabled  | true        |
  * | customCSS               | custom_css                  | ""          |
@@ -127,7 +130,8 @@ export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
   autoReloadEnabled: true,
   autoReloadInterval: 600,
   showCountdown: true,
-  areaRemoveEnabled: true,
+  hideHeaderEnabled: true,
+  hideTweetInputEnabled: true,
   showCustomMenu: false,
   scrollPosRestoreEnabled: true,
   customCSS: "",
@@ -158,7 +162,8 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   defaultAutoReloadEnabled: true,
   defaultAutoReloadInterval: 600,
   defaultShowCountdown: true,
-  defaultAreaRemoveEnabled: true,
+  defaultHideHeaderEnabled: true,
+  defaultHideTweetInputEnabled: true,
   defaultShowCustomMenu: false,
   defaultScrollPosRestoreEnabled: false,
   defaultColumnCustomCSS: "",
