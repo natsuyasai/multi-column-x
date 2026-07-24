@@ -622,4 +622,110 @@ mod tests {
         assert_eq!(settings["hideHeaderEnabled"], serde_json::json!(false));
         assert_eq!(settings["hideTweetInputEnabled"], serde_json::json!(false));
     }
+
+    mod properties {
+        use super::*;
+        use proptest::prelude::*;
+
+        /// フィールドが「存在しない」「存在してtrue」「存在してfalse」の3状態を表現する。
+        fn maybe_bool() -> impl Strategy<Value = Option<bool>> {
+            prop_oneof![Just(None), any::<bool>().prop_map(Some)]
+        }
+
+        /// Option<bool> を settings オブジェクトへ、Some(b) なら該当キーを b で追加し、
+        /// None ならキー自体を追加しない、という形で組み立てるヘルパー。
+        fn insert_if_some(
+            obj: &mut serde_json::Map<String, serde_json::Value>,
+            key: &str,
+            v: Option<bool>,
+        ) {
+            if let Some(b) = v {
+                obj.insert(key.to_string(), serde_json::json!(b));
+            }
+        }
+
+        /// 任意個数(0〜3件)の column の settings に areaRemoveEnabled: old のみを設定した
+        /// (hideHeaderEnabled / hideTweetInputEnabled は未設定の) JSON を組み立てる。
+        fn build_columns_with_old_only(old: bool, count: usize) -> serde_json::Value {
+            let columns: Vec<serde_json::Value> = (0..count)
+                .map(|i| {
+                    serde_json::json!({
+                        "id": format!("col-{i}"),
+                        "settings": {
+                            "areaRemoveEnabled": old,
+                            "customCSS": "",
+                        }
+                    })
+                })
+                .collect();
+            serde_json::json!({ "columns": columns })
+        }
+
+        /// 任意の bool 値の組み合わせ(areaRemoveEnabled の値、hideHeaderEnabled /
+        /// hideTweetInputEnabled が既に存在するかどうかとその値)を持つ、単一 column の
+        /// settings JSON を組み立てる。
+        fn build_column_settings(
+            area_remove_enabled: Option<bool>,
+            hide_header_enabled: Option<bool>,
+            hide_tweet_input_enabled: Option<bool>,
+        ) -> serde_json::Value {
+            let mut obj = serde_json::Map::new();
+            obj.insert("customCSS".to_string(), serde_json::json!(""));
+            insert_if_some(&mut obj, "areaRemoveEnabled", area_remove_enabled);
+            insert_if_some(&mut obj, "hideHeaderEnabled", hide_header_enabled);
+            insert_if_some(&mut obj, "hideTweetInputEnabled", hide_tweet_input_enabled);
+            serde_json::json!({
+                "columns": [
+                    { "id": "col-1", "settings": serde_json::Value::Object(obj) }
+                ]
+            })
+        }
+
+        proptest! {
+            /// 性質1: 新フィールドが元々存在しない場合、areaRemoveEnabled(old) の値が
+            /// すべての column の hideHeaderEnabled / hideTweetInputEnabled 両方に伝播する。
+            #[test]
+            fn 新フィールド未設定なら旧フィールドの値が全columnの新フィールドへ伝播する(
+                old in any::<bool>(),
+                count in 0usize..=3,
+            ) {
+                let mut json = build_columns_with_old_only(old, count);
+
+                migrate_area_remove_enabled(&mut json);
+
+                let columns = json["columns"].as_array().unwrap();
+                prop_assert_eq!(columns.len(), count);
+                for column in columns {
+                    let settings = &column["settings"];
+                    prop_assert_eq!(&settings["hideHeaderEnabled"], &serde_json::json!(old));
+                    prop_assert_eq!(&settings["hideTweetInputEnabled"], &serde_json::json!(old));
+                }
+            }
+
+            /// 性質2: migrate_area_remove_enabled は冪等である。
+            /// areaRemoveEnabled / hideHeaderEnabled / hideTweetInputEnabled の
+            /// 存在有無・値の任意の組み合わせに対し、1回適用した結果と
+            /// さらにもう1回適用した結果が完全に一致する。
+            #[test]
+            fn マイグレーションは2回適用しても1回適用と同じ結果になる(
+                area_remove_enabled in maybe_bool(),
+                hide_header_enabled in maybe_bool(),
+                hide_tweet_input_enabled in maybe_bool(),
+            ) {
+                let mut json = build_column_settings(
+                    area_remove_enabled,
+                    hide_header_enabled,
+                    hide_tweet_input_enabled,
+                );
+
+                migrate_area_remove_enabled(&mut json);
+                let once = json.clone();
+
+                migrate_area_remove_enabled(&mut json);
+                let twice = json;
+
+                prop_assert_eq!(once, twice);
+            }
+        }
+    }
 }
