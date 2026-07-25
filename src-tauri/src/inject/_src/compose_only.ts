@@ -14,6 +14,13 @@
 //   これによりサイドバー・ヘッダー・タイムライン・右カラム等が自然に隠れる。
 // 例外（whitelist）:
 //   投稿完了トースト [data-testid="toast"] を含む枝は隠さない（投稿成功フィードバックを残す）。
+// 狭幅フォールバック（モバイル）:
+//   モバイル狭幅レイアウトでは /home にインライン投稿フォームが存在しない。
+//   その場合はコンポーズFAB（FAB_SELECTOR）を自動タップし、/compose/post への
+//   フルページ遷移（モーダルではない）でフォームを表示させる。/compose/post にも
+//   同じ tweetTextarea_0 があるため、同じスポットライトロジックがそのまま適用される。
+//   投稿完了等で textarea が消えたときも、再適用時に同じ条件でFABを再タップし
+//   常に投稿画面へ戻す（詳細は tryNavigateToComposePost 関数のコメント参照）。
 (function () {
   const HIDDEN_ATTR = "data-mcx-compose-hidden";
   const STYLE_ID = "mcx-compose-only";
