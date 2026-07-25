@@ -52,9 +52,7 @@
   }
 
   // 投稿フォーム領域（keep ノード）を特定する。見つからなければ null。
-  function findKeepNode(): Element | null {
-    const textarea = document.querySelector(TEXTAREA_SELECTOR);
-    if (!textarea) return null;
+  function findKeepNode(textarea: Element): Element | null {
     let node: Element = textarea;
     while (node.parentElement && node !== document.body) {
       const parent = node.parentElement;
@@ -105,7 +103,9 @@
 
   // スポットライトを（再）適用する。テストからも呼べるよう公開する。
   function applyComposeOnly(): void {
-    const keep = findKeepNode();
+    const textarea = document.querySelector(TEXTAREA_SELECTOR);
+    if (!textarea) return;
+    const keep = findKeepNode(textarea);
     // 投稿フォーム領域を特定できないとき（タイムライン読込中で cellInnerDiv が
     // 一時的に無い等）は前回の適用状態を保持する（ここでクリアすると点滅するため）。
     if (!keep) return;
