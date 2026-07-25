@@ -20,6 +20,8 @@
   const TEXTAREA_SELECTOR = '[data-testid="tweetTextarea_0"]';
   const TIMELINE_CELL_SELECTOR = '[data-testid="cellInnerDiv"]';
   const TOAST_SELECTOR = '[data-testid="toast"]';
+  const FAB_SELECTOR = '[data-testid="FloatingActionButtons_Tweet_Button"]';
+  const COMPOSE_POST_PATH = "/compose/post";
   // MutationObserver の再適用スロットル（X の連続DOM変異での過剰再適用を抑制）。
   const THROTTLE_MS = 250;
   // 非描画要素。X は <script> 等を高頻度で付け外しするため、これらを非表示対象に
@@ -101,10 +103,26 @@
     });
   }
 
+  // インライン投稿フォームがない狭幅レイアウトでは、コンポーズFABをタップして
+  // `/compose/post` のフルページ投稿画面に遷移する（FABタップは通常のSPAルート
+  // 遷移でモーダルではなく、遷移先にも同じ tweetTextarea_0 が存在する）。
+  // 投稿完了等で離脱して textarea が消えた場合も、次回の再適用でこの関数が
+  // 再度呼ばれ、同じ条件でFABを再タップして `/compose/post` に戻る
+  // （＝常に投稿画面を維持する）。既に `/compose/post` にいる間は、画面構築待ちの
+  // 状態で再タップしてしまわないよう何もしない。
+  function tryNavigateToComposePost(): void {
+    if (location.pathname === COMPOSE_POST_PATH) return;
+    const fab = document.querySelector<HTMLElement>(FAB_SELECTOR);
+    fab?.click();
+  }
+
   // スポットライトを（再）適用する。テストからも呼べるよう公開する。
   function applyComposeOnly(): void {
     const textarea = document.querySelector(TEXTAREA_SELECTOR);
-    if (!textarea) return;
+    if (!textarea) {
+      tryNavigateToComposePost();
+      return;
+    }
     const keep = findKeepNode(textarea);
     // 投稿フォーム領域を特定できないとき（タイムライン読込中で cellInnerDiv が
     // 一時的に無い等）は前回の適用状態を保持する（ここでクリアすると点滅するため）。
