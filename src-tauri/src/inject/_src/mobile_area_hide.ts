@@ -34,21 +34,38 @@
     }
   }
 
-  // #layers 配下の div のうち position:absolute の子要素を複数持つものを非表示にする
+  const COMPOSE_LINK_SELECTOR = 'a[href="/compose/post"]';
+
+  // #layers 配下の div のうち position:absolute の子要素を複数持つものを探し、
+  // 子要素ごとに「投稿ボタン（a[href="/compose/post"]を含む）」か「ヘッダー要素（それ以外）」かを
+  // 判定し、hideTweetInputEnabled / hideHeaderEnabled に応じて個別に非表示にする。
   function applyLayersHide(): void {
     const layers = document.getElementById("layers");
     if (!layers) return;
+
+    const hideTweetInputEnabled =
+      window.__multiColumnXConfig?.hideTweetInputEnabled ?? true;
+    const hideHeaderEnabled =
+      window.__multiColumnXConfig?.hideHeaderEnabled ?? true;
 
     for (const child of Array.from(layers.children)) {
       if (child.tagName !== "DIV") continue;
       const el = child as HTMLElement;
       const absoluteChildren = Array.from(el.children).filter(
         (c) => getComputedStyle(c as HTMLElement).position === "absolute",
-      );
-      if (absoluteChildren.length >= 2 && el.style.display !== "none") {
-        el.style.setProperty("display", "none", "important");
-        return;
+      ) as HTMLElement[];
+      if (absoluteChildren.length < 2) continue;
+
+      for (const absChild of absoluteChildren) {
+        const isComposeButton = !!absChild.querySelector(COMPOSE_LINK_SELECTOR);
+        const shouldHide = isComposeButton
+          ? hideTweetInputEnabled
+          : hideHeaderEnabled;
+        if (shouldHide && absChild.style.display !== "none") {
+          absChild.style.setProperty("display", "none", "important");
+        }
       }
+      return;
     }
   }
 
