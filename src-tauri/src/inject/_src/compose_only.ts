@@ -14,12 +14,21 @@
 //   これによりサイドバー・ヘッダー・タイムライン・右カラム等が自然に隠れる。
 // 例外（whitelist）:
 //   投稿完了トースト [data-testid="toast"] を含む枝は隠さない（投稿成功フィードバックを残す）。
+// 狭幅フォールバック（モバイル）:
+//   モバイル狭幅レイアウトでは /home にインライン投稿フォームが存在しない。
+//   その場合はコンポーズFAB（FAB_SELECTOR）を自動タップし、/compose/post への
+//   フルページ遷移（モーダルではない）でフォームを表示させる。/compose/post にも
+//   同じ tweetTextarea_0 があるため、同じスポットライトロジックがそのまま適用される。
+//   投稿完了等で textarea が消えたときも、再適用時に同じ条件でFABを再タップし
+//   常に投稿画面へ戻す（詳細は tryNavigateToComposePost 関数のコメント参照）。
 (function () {
   const HIDDEN_ATTR = "data-mcx-compose-hidden";
   const STYLE_ID = "mcx-compose-only";
   const TEXTAREA_SELECTOR = '[data-testid="tweetTextarea_0"]';
   const TIMELINE_CELL_SELECTOR = '[data-testid="cellInnerDiv"]';
   const TOAST_SELECTOR = '[data-testid="toast"]';
+  const FAB_SELECTOR = '[data-testid="FloatingActionButtons_Tweet_Button"]';
+  const COMPOSE_POST_PATH = "/compose/post";
   // MutationObserver の再適用スロットル（X の連続DOM変異での過剰再適用を抑制）。
   const THROTTLE_MS = 250;
   // 非描画要素。X は <script> 等を高頻度で付け外しするため、これらを非表示対象に
@@ -52,9 +61,7 @@
   }
 
   // 投稿フォーム領域（keep ノード）を特定する。見つからなければ null。
-  function findKeepNode(): Element | null {
-    const textarea = document.querySelector(TEXTAREA_SELECTOR);
-    if (!textarea) return null;
+  function findKeepNode(textarea: Element): Element | null {
     let node: Element = textarea;
     while (node.parentElement && node !== document.body) {
       const parent = node.parentElement;
@@ -103,9 +110,27 @@
     });
   }
 
+  // インライン投稿フォームがない狭幅レイアウトでは、コンポーズFABをタップして
+  // `/compose/post` のフルページ投稿画面に遷移する（FABタップは通常のSPAルート
+  // 遷移でモーダルではなく、遷移先にも同じ tweetTextarea_0 が存在する）。
+  // 投稿完了等で離脱して textarea が消えた場合も、次回の再適用でこの関数が
+  // 再度呼ばれ、同じ条件でFABを再タップして `/compose/post` に戻る
+  // （＝常に投稿画面を維持する）。既に `/compose/post` にいる間は、画面構築待ちの
+  // 状態で再タップしてしまわないよう何もしない。
+  function tryNavigateToComposePost(): void {
+    if (location.pathname === COMPOSE_POST_PATH) return;
+    const fab = document.querySelector<HTMLElement>(FAB_SELECTOR);
+    fab?.click();
+  }
+
   // スポットライトを（再）適用する。テストからも呼べるよう公開する。
   function applyComposeOnly(): void {
-    const keep = findKeepNode();
+    const textarea = document.querySelector(TEXTAREA_SELECTOR);
+    if (!textarea) {
+      tryNavigateToComposePost();
+      return;
+    }
+    const keep = findKeepNode(textarea);
     // 投稿フォーム領域を特定できないとき（タイムライン読込中で cellInnerDiv が
     // 一時的に無い等）は前回の適用状態を保持する（ここでクリアすると点滅するため）。
     if (!keep) return;

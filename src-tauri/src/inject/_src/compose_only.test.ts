@@ -4,9 +4,18 @@
 // 以外をスポットライトCSS（data 属性 + 注入 style）で隠す副作用を登録する。
 // 再適用関数を window.__multiColumnX.applyComposeOnly として公開しているため、
 // テストは DOM を組んでからこれを呼び、どの要素が隠されるかを検証する。
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  beforeEach,
+  afterEach,
+  vi,
+} from "vitest";
 
 const HIDDEN_ATTR = "data-mcx-compose-hidden";
+const FAB_SELECTOR = '[data-testid="FloatingActionButtons_Tweet_Button"]';
 
 function isHidden(id: string): boolean {
   return !!document.getElementById(id)?.hasAttribute(HIDDEN_ATTR);
@@ -43,6 +52,12 @@ describe("inject/compose_only", () => {
 
   beforeEach(() => {
     document.body.innerHTML = "";
+  });
+
+  // /compose/post への pushState を行うテストがあるため、他テストの前提
+  // （このファイルは https://x.com/home 固定）に影響しないよう毎回 /home に戻す。
+  afterEach(() => {
+    history.pushState(null, "", "/home");
   });
 
   it("投稿フォーム領域だけ残し、ヘッダー・タイムライン・サイドバーを隠す", () => {
@@ -117,6 +132,15 @@ describe("inject/compose_only", () => {
 
   it("投稿フォームを特定できないときは前回の適用状態を保持する（点滅防止）", () => {
     buildHomeDom();
+    // このケースは tweetTextarea_0 自体は存在するため、FAB フォールバックには
+    // 入らないはずである。それを明示するため FAB を配置し click spy を仕込む。
+    const fab = document.createElement("a");
+    fab.setAttribute("data-testid", "FloatingActionButtons_Tweet_Button");
+    fab.setAttribute("href", "/compose/post");
+    document.body.appendChild(fab);
+    const clickSpy = vi.fn();
+    fab.addEventListener("click", clickSpy);
+
     window.__multiColumnX.applyComposeOnly!();
     expect(isHidden("timeline")).toBe(true);
     expect(isHidden("sidebar")).toBe(true);
@@ -128,5 +152,39 @@ describe("inject/compose_only", () => {
     // 前回のマーカーが保持され、スポットライトが解除（点滅）しない
     expect(isHidden("timeline")).toBe(true);
     expect(isHidden("sidebar")).toBe(true);
+    // textarea 自体は存在し続けているため FAB フォールバックには入らない
+    expect(clickSpy).not.toHaveBeenCalled();
+  });
+
+  it("インライン投稿フォームがない場合、コンポーズFABを自動タップする", () => {
+    document.body.innerHTML =
+      '<a data-testid="FloatingActionButtons_Tweet_Button" href="/compose/post">ポストを作成</a>';
+    const fab = document.querySelector(FAB_SELECTOR) as HTMLElement;
+    const clickSpy = vi.fn();
+    fab.addEventListener("click", clickSpy);
+
+    window.__multiColumnX.applyComposeOnly!();
+
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("既に/compose/postに遷移済みの場合はFABを再タップしない", () => {
+    document.body.innerHTML =
+      '<a data-testid="FloatingActionButtons_Tweet_Button" href="/compose/post">ポストを作成</a>';
+    const fab = document.querySelector(FAB_SELECTOR) as HTMLElement;
+    const clickSpy = vi.fn();
+    fab.addEventListener("click", clickSpy);
+    history.pushState(null, "", "/compose/post");
+
+    window.__multiColumnX.applyComposeOnly!();
+
+    expect(clickSpy).not.toHaveBeenCalled();
+  });
+
+  it("FABが見つからない場合は何もしない（エラーにならない）", () => {
+    document.body.innerHTML = '<div id="x">a</div>';
+
+    expect(() => window.__multiColumnX.applyComposeOnly!()).not.toThrow();
+    expect(document.querySelectorAll(`[${HIDDEN_ATTR}]`).length).toBe(0);
   });
 });
