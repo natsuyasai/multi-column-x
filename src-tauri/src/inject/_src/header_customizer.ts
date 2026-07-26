@@ -35,10 +35,12 @@ import { HeaderCustomizer } from "./HeaderCustomizer";
     hideHeaderEnabled: boolean,
     hideTweetInputEnabled: boolean,
   ) {
+    // useHeaderCustomizer.ts の CSS 適用 useEffect は空配列依存のためマウント時に
+    // 一度しか実行されない。既にマウント済みの状態で設定値だけ変わった場合でも
+    // 新しい設定を反映させるため、常に一度アンマウントしてから必要なら再マウントする。
+    unmount();
     if (hideHeaderEnabled || hideTweetInputEnabled) {
       mount();
-    } else {
-      unmount();
     }
   };
 

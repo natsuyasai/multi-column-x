@@ -38,6 +38,41 @@ function addTablist(height: number): HTMLElement {
   return tablist;
 }
 
+function setConfig(config: Partial<MultiColumnXConfig>): void {
+  window.__multiColumnXConfig = config as MultiColumnXConfig;
+}
+
+// #layers > (position:absolute な子2つを持つ div) という、applyLayersHide が
+// 検出対象とする実DOM相当の最小構成を組み立てる。
+// composeButton は投稿ボタン（a[href="/compose/post"]を子孫に持つ）、
+// bottomBar はそれ以外のヘッダー要素（Home等のナビリンク）を模している。
+function addLayersTarget(): {
+  composeButton: HTMLElement;
+  bottomBar: HTMLElement;
+} {
+  const layers = document.createElement("div");
+  layers.id = "layers";
+  document.body.appendChild(layers);
+
+  const target = document.createElement("div");
+  target.id = "target";
+  layers.appendChild(target);
+
+  const composeButton = document.createElement("div");
+  composeButton.id = "composeButton";
+  composeButton.style.position = "absolute";
+  composeButton.innerHTML = '<a href="/compose/post">ポストを作成</a>';
+  target.appendChild(composeButton);
+
+  const bottomBar = document.createElement("div");
+  bottomBar.id = "bottomBar";
+  bottomBar.style.position = "absolute";
+  bottomBar.innerHTML = '<a href="/home">ホーム</a>';
+  target.appendChild(bottomBar);
+
+  return { composeButton, bottomBar };
+}
+
 async function importMobileAreaHide(): Promise<void> {
   vi.resetModules();
   await import("./mobile_area_hide");
@@ -130,5 +165,139 @@ describe("inject/mobile_area_hide のapplyHeaderHeightSync", () => {
     await vi.waitFor(() => {
       expect(header.style.height).toBe("60px");
     });
+  });
+});
+
+describe("inject/mobile_area_hide のapplyLayersHide", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    delete window.__multiColumnXConfig;
+  });
+
+  afterEach(() => {
+    createdObservers.forEach((observer) => observer.disconnect());
+    createdObservers.clear();
+  });
+
+  it("hideTweetInputEnabledがtrueのとき投稿ボタン要素を非表示にする", async () => {
+    setConfig({ hideTweetInputEnabled: true, hideHeaderEnabled: false });
+    const { composeButton } = addLayersTarget();
+
+    await importMobileAreaHide();
+
+    expect(composeButton.style.display).toBe("none");
+    expect(composeButton.style.getPropertyPriority("display")).toBe(
+      "important",
+    );
+  });
+
+  it("hideTweetInputEnabledがfalseのとき投稿ボタン要素を非表示にしない", async () => {
+    setConfig({ hideTweetInputEnabled: false, hideHeaderEnabled: false });
+    const { composeButton } = addLayersTarget();
+
+    await importMobileAreaHide();
+
+    expect(composeButton.style.display).toBe("");
+  });
+
+  it("hideHeaderEnabledがtrueのとき投稿ボタン以外の要素を非表示にする", async () => {
+    setConfig({ hideTweetInputEnabled: false, hideHeaderEnabled: true });
+    const { bottomBar } = addLayersTarget();
+
+    await importMobileAreaHide();
+
+    expect(bottomBar.style.display).toBe("none");
+    expect(bottomBar.style.getPropertyPriority("display")).toBe("important");
+  });
+
+  it("hideHeaderEnabledがfalseのとき投稿ボタン以外の要素を非表示にしない", async () => {
+    setConfig({ hideTweetInputEnabled: false, hideHeaderEnabled: false });
+    const { bottomBar } = addLayersTarget();
+
+    await importMobileAreaHide();
+
+    expect(bottomBar.style.display).toBe("");
+  });
+
+  it("両方falseのときどちらも非表示にしない", async () => {
+    setConfig({ hideTweetInputEnabled: false, hideHeaderEnabled: false });
+    const { composeButton, bottomBar } = addLayersTarget();
+
+    await importMobileAreaHide();
+
+    expect(composeButton.style.display).toBe("");
+    expect(bottomBar.style.display).toBe("");
+  });
+
+  it("設定が未指定のときデフォルトで両方非表示にする", async () => {
+    const { composeButton, bottomBar } = addLayersTarget();
+
+    await importMobileAreaHide();
+
+    expect(composeButton.style.display).toBe("none");
+    expect(bottomBar.style.display).toBe("none");
+  });
+
+  it("position:absoluteな子要素が1つ以下のdivは対象外のまま", async () => {
+    setConfig({ hideTweetInputEnabled: true, hideHeaderEnabled: true });
+
+    const layers = document.createElement("div");
+    layers.id = "layers";
+    document.body.appendChild(layers);
+
+    const target = document.createElement("div");
+    target.id = "target";
+    layers.appendChild(target);
+
+    const onlyChild = document.createElement("div");
+    onlyChild.id = "onlyChild";
+    onlyChild.style.position = "absolute";
+    onlyChild.innerHTML = '<a href="/compose/post">ポストを作成</a>';
+    target.appendChild(onlyChild);
+
+    await importMobileAreaHide();
+
+    expect(onlyChild.style.display).toBe("");
+  });
+
+  it("hideTweetInputEnabledがtrueからfalseに変わったとき、非表示にしていた投稿ボタン要素を再表示する", async () => {
+    setConfig({ hideTweetInputEnabled: true, hideHeaderEnabled: false });
+    const { composeButton } = addLayersTarget();
+
+    await importMobileAreaHide();
+    expect(composeButton.style.display).toBe("none");
+
+    window.__multiColumnXConfig = {
+      hideTweetInputEnabled: false,
+      hideHeaderEnabled: false,
+    } as MultiColumnXConfig;
+    window.__multiColumnX.applyLayersHide!();
+
+    expect(composeButton.style.display).toBe("");
+  });
+
+  it("hideHeaderEnabledがtrueからfalseに変わったとき、非表示にしていたヘッダー要素を再表示する", async () => {
+    setConfig({ hideTweetInputEnabled: false, hideHeaderEnabled: true });
+    const { bottomBar } = addLayersTarget();
+
+    await importMobileAreaHide();
+    expect(bottomBar.style.display).toBe("none");
+
+    window.__multiColumnXConfig = {
+      hideTweetInputEnabled: false,
+      hideHeaderEnabled: false,
+    } as MultiColumnXConfig;
+    window.__multiColumnX.applyLayersHide!();
+
+    expect(bottomBar.style.display).toBe("");
+  });
+
+  it("window.__multiColumnX.applyLayersHideが公開されている", async () => {
+    setConfig({ hideTweetInputEnabled: true, hideHeaderEnabled: true });
+    addLayersTarget();
+
+    await importMobileAreaHide();
+
+    expect(typeof window.__multiColumnX.applyLayersHide).toBe("function");
   });
 });
