@@ -34,6 +34,8 @@
     }
   }
 
+  window.__multiColumnX = window.__multiColumnX || ({} as MultiColumnXAPI);
+
   const COMPOSE_LINK_SELECTOR = 'a[href="/compose/post"]';
 
   // #layers 配下の div のうち position:absolute の子要素を複数持つものを探し、
@@ -61,13 +63,19 @@
         const shouldHide = isComposeButton
           ? hideTweetInputEnabled
           : hideHeaderEnabled;
-        if (shouldHide && absChild.style.display !== "none") {
-          absChild.style.setProperty("display", "none", "important");
+        if (shouldHide) {
+          if (absChild.style.display !== "none") {
+            absChild.style.setProperty("display", "none", "important");
+          }
+        } else if (absChild.style.display === "none") {
+          absChild.style.removeProperty("display");
         }
       }
       return;
     }
   }
+
+  window.__multiColumnX.applyLayersHide = applyLayersHide;
 
   // header[role='banner'] の高さを div[role='tablist'] の高さに同期する
   function applyHeaderHeightSync(): void {

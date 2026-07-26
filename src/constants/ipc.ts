@@ -93,12 +93,12 @@ export const WEBVIEW_SCRIPTS = {
   SCROLL_TOP_AND_RELOAD:
     "window.__multiColumnX && window.__multiColumnX.triggerReload(true);",
 
-  /** ヘッダー非表示・投稿欄非表示の有効/無効をそれぞれ切り替える */
+  /** ヘッダー非表示・投稿欄非表示の有効/無効をそれぞれ切り替える（設定を__multiColumnXConfigにも反映し即時適用する） */
   applyAreaVisibility: (
     hideHeaderEnabled: boolean,
     hideTweetInputEnabled: boolean,
   ) =>
-    `window.__multiColumnX && window.__multiColumnX.applyAreaVisibility(${hideHeaderEnabled}, ${hideTweetInputEnabled});`,
+    `if(window.__multiColumnXConfig){window.__multiColumnXConfig.hideHeaderEnabled=${hideHeaderEnabled};window.__multiColumnXConfig.hideTweetInputEnabled=${hideTweetInputEnabled};}window.__multiColumnX&&window.__multiColumnX.applyAreaVisibility&&window.__multiColumnX.applyAreaVisibility(${hideHeaderEnabled}, ${hideTweetInputEnabled});window.__multiColumnX&&window.__multiColumnX.applyLayersHide&&window.__multiColumnX.applyLayersHide();`,
 
   /** カスタム CSS を適用する */
   applyCustomCSS: (css: string) => {
