@@ -6,7 +6,8 @@
 // useEffect(() => {...}, []) を再実行させ、最新の設定値を読み直させる。
 // テストは「import した／applyAreaVisibility を呼んだ結果の副作用」として検証する
 // （mobile_area_hide.test.ts / compose_only.test.ts と同様のパターン）。
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { act } from "@testing-library/react";
 
 const CONTAINER_ID = "multi-column-x-header-customizer-root";
 
@@ -20,13 +21,21 @@ function getContainer(): HTMLElement | null {
 
 async function importHeaderCustomizer(): Promise<void> {
   vi.resetModules();
-  await import("./header_customizer");
+  await act(async () => {
+    await import("./header_customizer");
+  });
 }
 
 describe("inject/header_customizer のapplyAreaVisibility", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
     delete window.__multiColumnXConfig;
+  });
+
+  afterEach(() => {
+    act(() => {
+      window.__multiColumnX?.applyAreaVisibility?.(false, false);
+    });
   });
 
   it("applyAreaVisibilityを呼ぶと、既にマウント済みでも一度アンマウントしてから再マウントする", async () => {
@@ -37,7 +46,9 @@ describe("inject/header_customizer のapplyAreaVisibility", () => {
     expect(firstContainer).not.toBeNull();
 
     // 設定値は変わらないが、既にマウント済みの状態での呼び出しをシミュレートする
-    window.__multiColumnX.applyAreaVisibility(true, true);
+    act(() => {
+      window.__multiColumnX.applyAreaVisibility(true, true);
+    });
 
     const secondContainer = getContainer();
     expect(secondContainer).not.toBeNull();
@@ -51,7 +62,9 @@ describe("inject/header_customizer のapplyAreaVisibility", () => {
     await importHeaderCustomizer();
     expect(getContainer()).not.toBeNull();
 
-    window.__multiColumnX.applyAreaVisibility(false, false);
+    act(() => {
+      window.__multiColumnX.applyAreaVisibility(false, false);
+    });
 
     expect(getContainer()).toBeNull();
   });
@@ -63,7 +76,9 @@ describe("inject/header_customizer のapplyAreaVisibility", () => {
     const firstContainer = getContainer();
     expect(firstContainer).not.toBeNull();
 
-    window.__multiColumnX.applyAreaVisibility(true, false);
+    act(() => {
+      window.__multiColumnX.applyAreaVisibility(true, false);
+    });
 
     const secondContainer = getContainer();
     expect(secondContainer).not.toBeNull();
