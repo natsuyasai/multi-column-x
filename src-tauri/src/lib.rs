@@ -11,9 +11,40 @@ use tauri::{Manager, PhysicalPosition, PhysicalSize};
 #[cfg(desktop)]
 use tauri_plugin_store::StoreExt;
 
+/// `settings`（`appSettings` ストア全体）の `globalSettings.windowBounds` だけを
+/// `bounds` に差し替えた新しい値を返す純粋関数。
+///
+/// `accounts` / `columns` / `globalSettings` 内の他フィールド（`customCSS`,
+/// `ngWords` など）には一切触れない。`settings` がオブジェクトでない場合や
+/// `globalSettings` が存在しない・オブジェクトでない場合も panic せず、
+/// 空オブジェクトから安全に構築する。
+#[cfg(desktop)]
+fn merge_window_bounds(
+    settings: serde_json::Value,
+    bounds: serde_json::Value,
+) -> serde_json::Value {
+    let mut settings = match settings {
+        serde_json::Value::Object(map) => serde_json::Value::Object(map),
+        _ => serde_json::json!({}),
+    };
+    let root = settings
+        .as_object_mut()
+        .expect("settings was just normalized into an object");
+    let global = root
+        .entry("globalSettings")
+        .or_insert_with(|| serde_json::json!({}));
+    if !global.is_object() {
+        *global = serde_json::json!({});
+    }
+    global
+        .as_object_mut()
+        .expect("global was just normalized into an object")
+        .insert("windowBounds".to_string(), bounds);
+    settings
+}
+
 #[cfg(desktop)]
 fn save_window_bounds(window: &tauri::Window) {
-    use crate::commands::settings::{AppSettingsData, WindowBounds};
     let Ok(pos) = window.outer_position() else {
         return;
     };
@@ -23,19 +54,16 @@ fn save_window_bounds(window: &tauri::Window) {
     let Ok(store) = window.app_handle().store("settings.json") else {
         return;
     };
-    let mut settings = store
+    let settings = store
         .get("appSettings")
-        .and_then(|v| serde_json::from_value::<AppSettingsData>(v).ok())
-        .unwrap_or_default();
-    settings.global_settings.window_bounds = WindowBounds {
-        x: pos.x as f64,
-        y: pos.y as f64,
-        width: size.width as f64,
-        height: size.height as f64,
-    };
-    let Ok(value) = serde_json::to_value(&settings) else {
-        return;
-    };
+        .unwrap_or_else(|| serde_json::json!({}));
+    let bounds = serde_json::json!({
+        "x": pos.x as f64,
+        "y": pos.y as f64,
+        "width": size.width as f64,
+        "height": size.height as f64,
+    });
+    let value = merge_window_bounds(settings, bounds);
     store.set("appSettings", value);
     if let Err(e) = store.save() {
         log::error!("failed to save window bounds: {e}");
@@ -175,4 +203,81 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(all(test, desktop))]
+mod tests {
+    use super::*;
+
+    fn sample_bounds() -> serde_json::Value {
+        serde_json::json!({
+            "x": 10.0,
+            "y": 20.0,
+            "width": 800.0,
+            "height": 600.0,
+        })
+    }
+
+    #[test]
+    fn globalsettingsの他フィールドを保持したままwindowboundsだけ更新する() {
+        let settings = serde_json::json!({
+            "accounts": [],
+            "columns": [],
+            "globalSettings": {
+                "customCSS": "body { color: red; }",
+                "ngWords": ["spam", "ad"],
+                "windowBounds": { "x": 0.0, "y": 0.0, "width": 1400.0, "height": 900.0 },
+            },
+        });
+
+        let merged = merge_window_bounds(settings, sample_bounds());
+
+        assert_eq!(
+            merged["globalSettings"]["customCSS"],
+            "body { color: red; }"
+        );
+        assert_eq!(
+            merged["globalSettings"]["ngWords"],
+            serde_json::json!(["spam", "ad"])
+        );
+        assert_eq!(merged["globalSettings"]["windowBounds"], sample_bounds());
+    }
+
+    #[test]
+    fn columnsとaccountsは変更前のまま保持される() {
+        let settings = serde_json::json!({
+            "accounts": [{ "id": "acc1", "dataDirectory": "dir1" }],
+            "columns": [{ "id": "col1", "gridRow": 0, "gridCol": 0 }],
+            "globalSettings": {},
+        });
+
+        let merged = merge_window_bounds(settings.clone(), sample_bounds());
+
+        assert_eq!(merged["accounts"], settings["accounts"]);
+        assert_eq!(merged["columns"], settings["columns"]);
+    }
+
+    #[test]
+    fn globalsettingsキーが存在しない空オブジェクトでもwindowboundsが追加される() {
+        let settings = serde_json::json!({});
+
+        let merged = merge_window_bounds(settings, sample_bounds());
+
+        assert_eq!(merged["globalSettings"]["windowBounds"], sample_bounds());
+    }
+
+    #[test]
+    fn settingsがオブジェクトでない場合でもpanicせずwindowboundsを含む構造が返る() {
+        let merged_from_null = merge_window_bounds(serde_json::Value::Null, sample_bounds());
+        assert_eq!(
+            merged_from_null["globalSettings"]["windowBounds"],
+            sample_bounds()
+        );
+
+        let merged_from_array = merge_window_bounds(serde_json::json!([1, 2, 3]), sample_bounds());
+        assert_eq!(
+            merged_from_array["globalSettings"]["windowBounds"],
+            sample_bounds()
+        );
+    }
 }
