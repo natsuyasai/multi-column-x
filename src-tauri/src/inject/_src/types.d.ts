@@ -14,6 +14,11 @@ declare global {
      * compose_only.ts が公開し、テストからの検証にも用いる。
      */
     applyComposeOnly?: () => void;
+    /**
+     * #layers配下の投稿ボタン/ヘッダー要素の個別表示切替の再適用。
+     * mobile_area_hide.ts が公開し、設定変更時の即時反映に用いる。
+     */
+    applyLayersHide?: () => void;
   }
 
   interface MultiColumnXConfig {

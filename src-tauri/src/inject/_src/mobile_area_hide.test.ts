@@ -259,4 +259,45 @@ describe("inject/mobile_area_hide のapplyLayersHide", () => {
 
     expect(onlyChild.style.display).toBe("");
   });
+
+  it("hideTweetInputEnabledがtrueからfalseに変わったとき、非表示にしていた投稿ボタン要素を再表示する", async () => {
+    setConfig({ hideTweetInputEnabled: true, hideHeaderEnabled: false });
+    const { composeButton } = addLayersTarget();
+
+    await importMobileAreaHide();
+    expect(composeButton.style.display).toBe("none");
+
+    window.__multiColumnXConfig = {
+      hideTweetInputEnabled: false,
+      hideHeaderEnabled: false,
+    } as MultiColumnXConfig;
+    window.__multiColumnX.applyLayersHide!();
+
+    expect(composeButton.style.display).toBe("");
+  });
+
+  it("hideHeaderEnabledがtrueからfalseに変わったとき、非表示にしていたヘッダー要素を再表示する", async () => {
+    setConfig({ hideTweetInputEnabled: false, hideHeaderEnabled: true });
+    const { bottomBar } = addLayersTarget();
+
+    await importMobileAreaHide();
+    expect(bottomBar.style.display).toBe("none");
+
+    window.__multiColumnXConfig = {
+      hideTweetInputEnabled: false,
+      hideHeaderEnabled: false,
+    } as MultiColumnXConfig;
+    window.__multiColumnX.applyLayersHide!();
+
+    expect(bottomBar.style.display).toBe("");
+  });
+
+  it("window.__multiColumnX.applyLayersHideが公開されている", async () => {
+    setConfig({ hideTweetInputEnabled: true, hideHeaderEnabled: true });
+    addLayersTarget();
+
+    await importMobileAreaHide();
+
+    expect(typeof window.__multiColumnX.applyLayersHide).toBe("function");
+  });
 });
