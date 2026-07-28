@@ -8,17 +8,17 @@ React 19 + TypeScript フロントエンドと Rust バックエンドで構成�
 
 詳細は `README.md` を参照。
 
-## .steering ディレクトリ（AIエージェント向けルールセット）
+このプロジェクトではCodeGraphを利用しています。
 
-### 利用ガイドライン
+コード調査では、grep / glob / Read を多用する前に、まずCodeGraphで以下を確認してください。
 
-必ず以下のワークフローの内容に従って作業を進めること
+- 対象シンボルの定義
+- 呼び出し元
+- 呼び出し先
+- 影響範囲
+- 関連テスト
 
-- 各フェーズ実行時は `./.steering/details/aws-aidlc-rule-details/` 配下の該当ルールファイルを読み込む
-- 共通ルール（`./.steering/details/common/`）はワークフロー開始時に必ず読み込む
-- セキュリティルールは全フェーズで必須の横断的制約として適用する（未充足はブロッキング）
-
-セッション中に生成したすべての成果物は `aidlc-docs/` に保存します。
+その後、必要最小限のファイルだけを読んでください。
 
 ## 実装ガイドライン
 
@@ -31,8 +31,6 @@ React 19 + TypeScript フロントエンドと Rust バックエンドで構成�
 - セキュリティルールに従うこと。
 - エラーや警告が発生する場合は、必ず修正してください。
 - SKILLとして定義が必要なものが出てきた場合は、skilsフォルダに専用のskillとして保存してください
-- javascriptはモダンな記載をすること
-  - varは使用しない
 
 ## サブエージェント運用（実装委譲の基本ルール）
 
@@ -61,13 +59,11 @@ Rust コードは `#[cfg(desktop)]` / `#[cfg(mobile)]` で分岐する。同一�
 
 ### inject スクリプトのビルド
 
-WebView に注入する JS は `src-tauri/src/inject/_src/` に TypeScript で書き、Vite でバンドルして `src-tauri/src/inject/*.js` に出力する。`_src` を変更した後は `npm run build:inject` が必要。ビルド済み `.js` は gitignore されており直接編集禁止。`npm run build:inject` で生成する。
-
-inject スクリプトは X(twitter.com) の実 DOM 構造に依存する。X の DOM はセレクタ・React 内部構造とも変更されやすく、ユニットテスト（jsdom の合成 DOM）だけでは実際の挙動を保証できない。**inject スクリプトを新規作成・DOM 依存ロジックを変更する場合は、Chrome を実際に操作して実 DOM で動作確認すべきか否かをユーザーに必ず問い合わせ、必要と判断されたら claude-in-chrome で実 X ページの DOM を調査・検証してから完了とすること。**（例: 引用RT の動画は引用ツイートに属し、status リンクが DOM 上に無く React fiber の `tweet.id_str` からのみ id を取得できる、といった事実は実 DOM 調査でしか判明しない）
+`src-tauri/src/inject/_src/**` を変更する場合の詳細（ビルドフロー・実 DOM 検証ルール）は `docs/development/inject-ipc-shortcuts-notes.md` を参照。
 
 ### カラム WebView と z-index
 
-Tauri v2 の子 WebView は OS ネイティブウィンドウのため、CSS `z-index` が機能しない。ダイアログ表示中は `hideColumnWebviews()` で全 WebView を画面外に退避し、閉じると `recalculateAllBounds()` で復元する。この挙動は `App.tsx` の `dialogOpen` effect で制御している。
+Tauri v2 の子 WebView は OS ネイティブウィンドウのため、CSS `z-index` が機能しない。`src/App.tsx` を変更する場合の詳細は `docs/development/column-layout-notes.md` を参照。
 
 ### serde のフィールド命名
 
@@ -75,55 +71,24 @@ Tauri v2 は JS→Rust のケース変換を行わない。JS 側 camelCase フ�
 
 ### グリッドレイアウト
 
-カラムは `gridRow` / `gridCol` でマトリクス配置する。座標計算は `src/lib/gridLayout.ts` の `calculateGridBounds`（純粋関数）が担当し、各カラムの絶対座標を Rust の `create_column_webview` / `resize_column_webview` に渡す。WebView への IPC 呼び出しは `src/services/columnWebview.ts` に集約されている。
+カラムは `gridRow` / `gridCol` でマトリクス配置する。`src/lib/gridLayout.ts` / `src/services/columnWebview.ts` を変更する場合の詳細は `docs/development/column-layout-notes.md` を参照。
 
-### Linux カラム WebView のクリッピング（デグレ注意）
+### Linux カラム WebView のクリッピング・WebProcess クラッシュ対策（デグレ注意）
 
-Linux ではカラムが独立 `WebviewWindow`（親クリップが効かない）ため、横スクロール時のはみ出し表示を `resize_column_webview` の純粋関数 `linux_column_layout`（`src-tauri/src/commands/webview/column.rs`）で制御する。仕様は **README.md「Linux カラム WebView の配置・クリッピング仕様」** に明記。要点:
-
-- ウィンドウは**常に論理 X 座標 `>= 0` に配置**する。Linux WM が負座標をクランプするため、「負の `screen_x` でスクリーン左端クリップ」方式は機能しない（左端カラムが全幅のまま居座るデグレードになる）。
-- 左右対称の**幅クリップ**（はみ出し分だけ幅を縮める）。完全に画面外は `hide()`。起動時は `visible(false)` 作成 → 全カラム作成後に `recalculateAllBounds` で配置してから `show()`（誤座標可視化での WebKit 空白カラム対策）。
-
-**この挙動は過去にインライン実装・テスト無しで複数回デグレードしている。変更する場合は必ず `linux_column_layout` のテスト（example＋プロパティ `x_offset>=0`＋左右の「全幅で居座らない」回帰テスト）で先に仕様を表現すること。テストは実装をなぞらず仕様をエンコードする（案A時はテストが実装に追従して壊れていた）。**
-
-### Linux WebProcess クラッシュ対策（横スクロール・スリープ復帰）
-
-WebKitGTK の WebProcess は横スクロールでの `resize_column_webview` 連続発火やスリープ復帰でクラッシュ（白画面/フリーズ）し得る。3層で予防・復旧する（詳細は README.md「WebProcess クラッシュ対策」）:
-
-- **予防**: スクロール → 再配置を `src/lib/rafThrottle.ts` で 1 フレーム 1 回に間引く（`useDesktopColumns.handleScrollbarScroll`）。
-- **自動復旧**: カラム作成時に webkit2gtk `connect_web_process_terminated` を接続 → `column-webview-crashed`（payload=columnId）emit → TS `useColumnCrashRecovery` が再生成（同一カラム `CRASH_RECOVERY_COOLDOWN_MS` クールダウン）。
-- **手動復旧**: ヘッダ「⟳」はデスクトップで `recreateColumnWebview`（WebView 再生成）。モバイルは従来の `location.reload`。
-- webkit2gtk は wry と同一 `=2.0.2`/`v2_40` をピン留め（`PlatformWebview::inner()` の型一致のため）。
+Linux ではカラムが独立 `WebviewWindow`（親クリップが効かない）ため、横スクロール時のはみ出し表示を `linux_column_layout`（`src-tauri/src/commands/webview/column.rs`）で制御する。正式仕様は **README.md「Linux カラム WebView の配置・クリッピング仕様」** に明記。実装ファイル・落とし穴・テスト方針の詳細は `docs/development/linux-webview-notes.md` を参照。**過去にインライン実装・テスト無しで複数回デグレードしている領域のため、変更する場合は必ず参照ノートのテスト方針に従うこと。**
 
 ### Tauri ウィンドウの close() と destroy()（常駐ウィンドウの破棄）
 
-`WebviewWindow::close()` は `CloseRequested` を発火してから閉じるため、`prevent_close()` + `hide()` で閉じる操作を握っている常駐ウィンドウ（例: 常駐コンポーズ `compose-`）には効かず、**破棄したつもりが非表示にすり替わる**。
-
-- プログラムから確実に破棄する経路（置換・失敗時フォールバック・アプリ終了）は `destroy()` を使うこと
-- `prevent_close` を使う常駐ウィンドウを新設したら、メインウィンドウの `CloseRequested`（`lib.rs`）に明示 `destroy()` を必ず追加すること。忘れると不可視ウィンドウが残りアプリプロセスが終了しなくなる
+`WebviewWindow::close()` は `prevent_close()` + `hide()` で閉じる操作を握っている常駐ウィンドウ（例: 常駐コンポーズ `compose-`）には効かない。`src-tauri/src/lib.rs` を変更する場合の詳細は `docs/development/compose-popup-sidebar-notes.md` を参照。`prevent_close` を使う常駐ウィンドウを新設したら、メインウィンドウの `CloseRequested`（`lib.rs`）に明示 `destroy()` を必ず追加すること。
 
 ### アカウントログイン検出（desktop vs mobile）
 
 - **desktop**: tokio タスクが URL を 500ms ポーリング → `account-login-complete` イベントを emit
 - **mobile**: `open_add_account_window` が tokio でセンチネルファイルをポーリングしてブロック。AddAccount.kt が `add_account_login_complete` ファイルを書き込んで通知する。
 
-### Android の単体テスト実行
+### Android の単体テスト実行・ProGuard keep ルールの同期
 
-app モジュールの variant は universal フレーバー付きのため、`./gradlew.bat testDebugUnitTest` では **app のテストは実行されない**。`cd src-tauri/gen/android && ./gradlew.bat :app:testUniversalDebugUnitTest` を使うこと。
-
-### Android ProGuard keep ルールの同期
-
-`android_bridge.rs` が `env.call_method()` で文字列指定して呼び出す `MainActivity` のメソッドは、リリースビルドで R8 に難読化されると `NoSuchMethodException` が発生して WebView が作成されない。
-
-**`MainActivity.kt` のメソッドシグネチャを変更したら、必ず `src-tauri/gen/android/app/proguard-rules.pro` も同時に更新すること。**
-
-対象操作と対応ルール：
-
-- メソッドを追加 → `-keepclassmembers` に同じシグネチャのエントリを追加
-- 引数を追加・削除 → keep ルールの型リストを新シグネチャに合わせて更新
-- メソッドを削除 → keep ルールからそのエントリを削除
-
-デバッグビルドでは R8 が無効なため症状が出ず、リリースビルドで初めてクラッシュする。変更後はリリースビルドで動作確認すること。
+`src-tauri/gen/android/**` を変更する場合の詳細（単体テストコマンド、`MainActivity.kt` とのシグネチャ同期ルール）は `docs/development/android-notes.md` を参照。**`MainActivity.kt` のメソッドシグネチャを変更したら、必ず `proguard-rules.pro` も同時に更新すること**（リリースビルドでしか症状が出ないため注意）。
 
 ### フロントエンドの品質ツール（ESLint / Storybook / プロパティテスト）
 
