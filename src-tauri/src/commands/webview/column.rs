@@ -62,6 +62,17 @@ pub struct CreateWebviewArgs {
     pub height: f64,
 }
 
+/// 投稿専用カラム（page_type == "compose"）ではインライン投稿フォームが本体機能のため、
+/// ユーザーが `hideTweetInputEnabled` を true にしていても投稿欄を隠さない（常に false 扱い）。
+/// それ以外のカラム種別では設定値をそのまま反映する。
+fn effective_hide_tweet_input_enabled(column: &ColumnData) -> bool {
+    if column.page_type == "compose" {
+        false
+    } else {
+        column.settings.hide_tweet_input_enabled
+    }
+}
+
 /// カラム WebView に注入する init script を、設定ストアの読み出しを含めて構築する。
 /// desktop / mobile 双方の `create_column_webview` から呼ばれ、挙動差分は `is_mobile` のみ。
 fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: bool) -> String {
@@ -73,7 +84,7 @@ fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: boo
     build_init_script(&InitScriptParams {
         is_mobile,
         hide_header_enabled: column.settings.hide_header_enabled,
-        hide_tweet_input_enabled: column.settings.hide_tweet_input_enabled,
+        hide_tweet_input_enabled: effective_hide_tweet_input_enabled(column),
         show_custom_menu: column.settings.show_custom_menu,
         scroll_pos_restore_enabled: column.settings.scroll_pos_restore_enabled,
         video_auto_play_stop_enabled,
@@ -491,6 +502,27 @@ mod tests {
     #[test]
     fn webview_label_uses_column_prefix() {
         assert_eq!(webview_label("abc"), "column-abc");
+    }
+
+    #[test]
+    fn effective_hide_tweet_input_enabledはcomposeカラムでtrue設定を無視してfalseになる() {
+        let mut col = column("compose");
+        col.settings.hide_tweet_input_enabled = true;
+        assert!(!effective_hide_tweet_input_enabled(&col));
+    }
+
+    #[test]
+    fn effective_hide_tweet_input_enabledはhomeカラムでtrue設定がそのまま反映される() {
+        let mut col = column("home");
+        col.settings.hide_tweet_input_enabled = true;
+        assert!(effective_hide_tweet_input_enabled(&col));
+    }
+
+    #[test]
+    fn effective_hide_tweet_input_enabledはhomeカラムでfalse設定がそのまま反映される() {
+        let mut col = column("home");
+        col.settings.hide_tweet_input_enabled = false;
+        assert!(!effective_hide_tweet_input_enabled(&col));
     }
 
     #[cfg(target_os = "linux")]
