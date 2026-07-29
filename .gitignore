@@ -22,5 +22,7 @@ upload-keystore.jks
 *storybook.log
 storybook-static
 
+.codegraph/
+
 # 一時的な実装プラン等（implementation-planning スキル）
 tmp/
