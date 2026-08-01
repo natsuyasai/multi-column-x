@@ -16,6 +16,8 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -42,6 +44,40 @@ class MainActivity : TauriActivity() {
   // 現在表示中のカラム WebView の ID（showColumnWebView 呼び出し時に更新）。
   // 戻るボタン時の canGoBack 判定に使う。UI スレッドからのみアクセスする。
   private var activeColumnWebViewId: String? = null
+
+  // saveDownloadedVideo で起動した SAF 保存ダイアログの結果を受け取るまでの間、
+  // コピー元の一時ファイルパスと後処理（一時ファイル削除など）を保持する。
+  // UI スレッドからのみアクセスする。
+  private var pendingVideoSaveRequest: PendingVideoSaveRequest? = null
+
+  private data class PendingVideoSaveRequest(
+    val tempPath: String,
+    // 保存の成否に関わらず行う後処理（一時ファイル削除など）
+    val onDone: () -> Unit,
+  )
+
+  // SAF（Storage Access Framework）の「名前を付けて保存」ダイアログ。
+  // ダウンロードした動画/音声の一時ファイルをユーザーが選んだ場所へコピーする。
+  // registerForActivityResult は Activity 生成完了前（onCreate 前）に呼ぶ必要があるため
+  // プロパティ初期化子で登録する。
+  private val saveVideoLauncher: ActivityResultLauncher<String> =
+    registerForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri ->
+      val request = pendingVideoSaveRequest
+      pendingVideoSaveRequest = null
+      if (request == null) return@registerForActivityResult
+      try {
+        // uri == null はユーザーがキャンセルした場合。エラー扱いにしない。
+        if (uri != null) {
+          contentResolver.openOutputStream(uri)?.use { output ->
+            File(request.tempPath).inputStream().use { input -> input.copyTo(output) }
+          } ?: Log.e(TAG, "saveDownloadedVideo: failed to open output stream for $uri")
+        }
+      } catch (e: Exception) {
+        Log.e(TAG, "saveDownloadedVideo: failed to copy to $uri: ${e.message}")
+      } finally {
+        request.onDone()
+      }
+    }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
@@ -190,6 +226,29 @@ class MainActivity : TauriActivity() {
         Log.e(TAG, "downloadAndInstallApk failed: ${e.message}")
       }
     }.start()
+  }
+
+  // Rust 側で HTTP ダウンロード済みの一時ファイル（tempPath）を、SAF の保存ダイアログで
+  // ユーザーが選んだ場所へコピーする。動画ダウンロード機能（Android）で使う。
+  // JNI スレッドから呼ばれるため、ActivityResultLauncher.launch は UI スレッドで実行する。
+  // mimeType は CreateDocument("*/*") を使う現状は未使用だが、将来 MIME を絞り込む拡張に
+  // 備えて JNI 呼び出しシグネチャとして受け取っておく。
+  fun saveDownloadedVideo(
+    tempPath: String,
+    suggestedFileName: String,
+    @Suppress("UNUSED_PARAMETER") mimeType: String,
+  ) {
+    runOnUiThread {
+      if (!File(tempPath).exists()) {
+        Log.e(TAG, "saveDownloadedVideo: temp file not found: $tempPath")
+        return@runOnUiThread
+      }
+      pendingVideoSaveRequest =
+        PendingVideoSaveRequest(tempPath) {
+          File(tempPath).delete()
+        }
+      saveVideoLauncher.launch(suggestedFileName)
+    }
   }
 
   // ポップアップ WebView を全画面オーバーレイとして追加する。
