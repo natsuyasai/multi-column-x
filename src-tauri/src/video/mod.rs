@@ -7,6 +7,8 @@
 //! それまでの間は dead_code 警告を抑止する。
 #![allow(dead_code)]
 
+pub mod hls;
+
 use serde::Deserialize;
 
 /// inject スクリプトから渡される動画 variant 情報（React Fiber解析で取得した `video_info.variants`）。
