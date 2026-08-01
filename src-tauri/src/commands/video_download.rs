@@ -4,6 +4,127 @@
 
 use crate::video::{self, hls, http};
 
+#[cfg(desktop)]
+use tauri::Emitter;
+
+/// 進捗イベントの発行間隔の下限。この間隔未満での連続発行は間引く
+/// （`video::should_emit_progress` を参照。ただし初回・最終は必ず発行する）。
+#[cfg(desktop)]
+const MIN_PROGRESS_EMIT_INTERVAL: std::time::Duration = std::time::Duration::from_millis(200);
+
+/// 動画ダウンロード進捗のイベントペイロード。JS側はcamelCaseで受け取る。
+#[derive(serde::Serialize, Clone, Debug, PartialEq)]
+pub(crate) struct VideoDownloadProgress {
+    /// 1-based。mp4なら常に1、HLS映像=1、HLS音声=2。
+    #[serde(rename = "fileIndex")]
+    pub(crate) file_index: u32,
+    /// mp4なら1、HLS(映像+音声)なら2、HLS(映像のみ)なら1。
+    #[serde(rename = "fileCount")]
+    pub(crate) file_count: u32,
+    /// mp4: ダウンロード済みバイト数 / HLS: 完了セグメント数。
+    pub(crate) current: u64,
+    /// mp4: Content-Length（無ければNone） / HLS: 全セグメント数。
+    pub(crate) total: Option<u64>,
+    /// "downloading" | "completed" | "failed"
+    pub(crate) phase: String,
+}
+
+/// (file_index, file_count, current, total, phase) から `VideoDownloadProgress` を組み立てる純粋関数。
+/// mp4のバイト単位コールバック `(u64, Option<u64>)` とHLSのセグメント単位コールバック `(u32, u32)` の
+/// 両方から呼べるよう、`current`/`total` は呼び出し側で `u64`/`Option<u64>` に変換してから渡す。
+#[cfg(desktop)]
+fn build_progress_payload(
+    file_index: u32,
+    file_count: u32,
+    current: u64,
+    total: Option<u64>,
+    phase: &str,
+) -> VideoDownloadProgress {
+    VideoDownloadProgress {
+        file_index,
+        file_count,
+        current,
+        total,
+        phase: phase.to_string(),
+    }
+}
+
+/// 進捗発行の間引き状態（前回emit時刻・初回フラグ・直近の進捗値）を保持し、
+/// `video::should_emit_progress` による間引き判定つきで `app.emit_to` する。
+/// mp4用・HLS用それぞれの進捗コールバックはこの構造体を介してイベントを発行する。
+#[cfg(desktop)]
+struct ProgressEmitter<'a> {
+    app: &'a tauri::AppHandle,
+    window_label: String,
+    file_index: u32,
+    file_count: u32,
+    last_emit_at: Option<std::time::Instant>,
+    is_first_call: bool,
+    last_current: u64,
+    last_total: Option<u64>,
+}
+
+#[cfg(desktop)]
+impl<'a> ProgressEmitter<'a> {
+    fn new(
+        app: &'a tauri::AppHandle,
+        window_label: String,
+        file_index: u32,
+        file_count: u32,
+    ) -> Self {
+        Self {
+            app,
+            window_label,
+            file_index,
+            file_count,
+            last_emit_at: None,
+            is_first_call: true,
+            last_current: 0,
+            last_total: None,
+        }
+    }
+
+    /// 進捗コールバックから呼ぶ。間引き判定（`video::should_emit_progress`）を通ったときのみ
+    /// `phase="downloading"` のイベントを発行する。
+    fn update(&mut self, current: u64, total: Option<u64>, is_last: bool) {
+        self.last_current = current;
+        self.last_total = total;
+
+        let now = std::time::Instant::now();
+        let elapsed = self
+            .last_emit_at
+            .map(|t| now.duration_since(t))
+            .unwrap_or(std::time::Duration::MAX);
+
+        if video::should_emit_progress(
+            self.is_first_call,
+            is_last,
+            elapsed,
+            MIN_PROGRESS_EMIT_INTERVAL,
+        ) {
+            self.emit(current, total, "downloading");
+            self.last_emit_at = Some(now);
+        }
+        self.is_first_call = false;
+    }
+
+    /// ダウンロード完了/失敗時に無条件で最終イベントを発行する。
+    /// 直近の進捗値（`update`で記録した`last_current`/`last_total`）をそのまま使う。
+    fn finish(&self, phase: &str) {
+        self.emit(self.last_current, self.last_total, phase);
+    }
+
+    fn emit(&self, current: u64, total: Option<u64>, phase: &str) {
+        let payload =
+            build_progress_payload(self.file_index, self.file_count, current, total, phase);
+        let _ = self.app.emit_to(
+            &self.window_label,
+            crate::ipc_constants::events::VIDEO_DOWNLOAD_PROGRESS,
+            payload,
+        );
+    }
+}
+
 /// variants から実際にダウンロードすべき対象を判定した結果。
 /// mp4 progressive があれば単一ファイル、無くHLSのみなら映像/音声の最大2ファイルになる。
 #[derive(Debug, Clone, PartialEq)]
@@ -40,10 +161,13 @@ pub(crate) fn plan_download(variants: &[video::VideoVariantInput]) -> Result<Dow
 #[tauri::command]
 pub async fn download_video(
     app: tauri::AppHandle,
+    window: tauri::Window,
     variants: Vec<video::VideoVariantInput>,
     #[allow(non_snake_case)] suggestedFileName: String,
 ) -> Result<(), String> {
     use tauri_plugin_dialog::DialogExt;
+
+    let window_label = window.label().to_string();
 
     let plan = plan_download(&variants)?;
     let base_name = video::sanitize_filename(&suggestedFileName);
@@ -65,8 +189,18 @@ pub async fn download_video(
 
             let client = http::build_client()?;
             let mut file = std::fs::File::create(&path).map_err(|e| e.to_string())?;
-            http::download_to_writer(&client, &url, &mut file, &mut |_, _| {}).await?;
-            Ok(())
+
+            let mut emitter = ProgressEmitter::new(&app, window_label.clone(), 1, 1);
+            let mut on_progress = |current: u64, total: Option<u64>| {
+                let is_last = total.is_some_and(|t| current >= t);
+                emitter.update(current, total, is_last);
+            };
+            let result = http::download_to_writer(&client, &url, &mut file, &mut on_progress).await;
+            match &result {
+                Ok(()) => emitter.finish("completed"),
+                Err(_) => emitter.finish("failed"),
+            }
+            result
         }
         DownloadPlan::HlsTracks {
             master_playlist_url,
@@ -86,6 +220,11 @@ pub async fn download_video(
                 .map_err(|e| format!("master playlist is not valid utf-8: {e}"))?;
 
             let tracks = hls::select_best_tracks(&master_text, &master_playlist_url)?;
+            let file_count = if tracks.audio_playlist_url.is_some() {
+                2
+            } else {
+                1
+            };
 
             if let Some(file_path) = app
                 .dialog()
@@ -95,13 +234,24 @@ pub async fn download_video(
             {
                 let path = file_path.into_path().map_err(|e| e.to_string())?;
                 let mut file = std::fs::File::create(&path).map_err(|e| e.to_string())?;
-                hls::download_track_to_writer(
+
+                let mut emitter = ProgressEmitter::new(&app, window_label.clone(), 1, file_count);
+                let mut on_progress = |current: u32, total: u32| {
+                    let is_last = current >= total;
+                    emitter.update(current as u64, Some(total as u64), is_last);
+                };
+                let result = hls::download_track_to_writer(
                     &client,
                     &tracks.video_playlist_url,
                     &mut file,
-                    &mut |_, _| {},
+                    &mut on_progress,
                 )
-                .await?;
+                .await;
+                match &result {
+                    Ok(()) => emitter.finish("completed"),
+                    Err(_) => emitter.finish("failed"),
+                }
+                result?;
             }
 
             if let Some(audio_url) = tracks.audio_playlist_url {
@@ -113,8 +263,25 @@ pub async fn download_video(
                 {
                     let path = file_path.into_path().map_err(|e| e.to_string())?;
                     let mut file = std::fs::File::create(&path).map_err(|e| e.to_string())?;
-                    hls::download_track_to_writer(&client, &audio_url, &mut file, &mut |_, _| {})
-                        .await?;
+
+                    let mut emitter =
+                        ProgressEmitter::new(&app, window_label.clone(), 2, file_count);
+                    let mut on_progress = |current: u32, total: u32| {
+                        let is_last = current >= total;
+                        emitter.update(current as u64, Some(total as u64), is_last);
+                    };
+                    let result = hls::download_track_to_writer(
+                        &client,
+                        &audio_url,
+                        &mut file,
+                        &mut on_progress,
+                    )
+                    .await;
+                    match &result {
+                        Ok(()) => emitter.finish("completed"),
+                        Err(_) => emitter.finish("failed"),
+                    }
+                    result?;
                 }
             }
 
@@ -257,6 +424,53 @@ mod tests {
             content_type: "application/x-mpegURL".to_string(),
             bitrate: None,
             url: url.to_string(),
+        }
+    }
+
+    mod build_progress_payloadのテスト {
+        use super::*;
+
+        #[test]
+        fn 各フィールドが引数通りに設定される() {
+            let result = build_progress_payload(1, 2, 512, Some(1024), "downloading");
+            assert_eq!(
+                result,
+                VideoDownloadProgress {
+                    file_index: 1,
+                    file_count: 2,
+                    current: 512,
+                    total: Some(1024),
+                    phase: "downloading".to_string(),
+                }
+            );
+        }
+
+        #[test]
+        fn totalがnoneのときはnoneのまま設定される() {
+            let result = build_progress_payload(1, 1, 100, None, "downloading");
+            assert_eq!(result.total, None);
+        }
+
+        #[test]
+        fn hlsのセグメント単位の値をu32からu64に変換できる() {
+            let current: u32 = 3;
+            let total: u32 = 10;
+            let result =
+                build_progress_payload(1, 2, current as u64, Some(total as u64), "downloading");
+            assert_eq!(result.current, 3u64);
+            assert_eq!(result.total, Some(10u64));
+        }
+
+        #[test]
+        fn phaseにcompletedを指定できる() {
+            let result = build_progress_payload(1, 1, 100, Some(100), "completed");
+            assert_eq!(result.phase, "completed");
+        }
+
+        #[test]
+        fn phaseにfailedを指定できる() {
+            let result = build_progress_payload(1, 1, 50, Some(100), "failed");
+            assert_eq!(result.phase, "failed");
         }
     }
 

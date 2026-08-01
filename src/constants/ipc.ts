@@ -67,6 +67,8 @@ export const IPC_EVENTS = {
   COLUMN_WEBVIEW_FOCUSED: "column-webview-focused",
   /** 再認証完了（desktop: Rust emit → TS listen）payload { accountId, xUserId }。account-login-complete とは別イベント。 */
   ACCOUNT_REAUTH_COMPLETE: "account-reauth-complete",
+  /** 動画ダウンロード進捗（desktop: Rust emit_to → TS listen）payload { fileIndex, fileCount, current, total, phase } */
+  VIDEO_DOWNLOAD_PROGRESS: "video-download-progress",
 } as const;
 
 /** WebView / ウィンドウラベルのプレフィックスと生成ヘルパー */

@@ -25,6 +25,9 @@ pub mod events {
     /// 再認証完了（desktop: Rust emit → TS listen）payload { accountId, xUserId }。
     /// account-login-complete とは別イベント。
     pub const ACCOUNT_REAUTH_COMPLETE: &str = "account-reauth-complete";
+    /// 動画ダウンロード進捗通知（desktop: Rust emit_to → TS listen）
+    /// payload { fileIndex, fileCount, current, total, phase }。
+    pub const VIDEO_DOWNLOAD_PROGRESS: &str = "video-download-progress";
 }
 
 /// WebView / ウィンドウラベルのプレフィックス
@@ -84,6 +87,7 @@ mod tests {
             ("COLUMN_WEBVIEW_CRASHED", events::COLUMN_WEBVIEW_CRASHED),
             ("COLUMN_WEBVIEW_FOCUSED", events::COLUMN_WEBVIEW_FOCUSED),
             ("ACCOUNT_REAUTH_COMPLETE", events::ACCOUNT_REAUTH_COMPLETE),
+            ("VIDEO_DOWNLOAD_PROGRESS", events::VIDEO_DOWNLOAD_PROGRESS),
         ];
         assert_eq!(
             expected.as_object().unwrap().len(),
