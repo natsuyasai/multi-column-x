@@ -61,6 +61,11 @@ declare global {
     switchPopupSession: (accountId: string, url: string) => void;
   }
 
+  // Android で MainActivity が addJavascriptInterface で公開する動画DL要求ブリッジ
+  interface McxVideoDownloadBridge {
+    downloadVideo: (payloadJson: string) => void;
+  }
+
   interface TvAccountInfo {
     id: string;
     label: string;
@@ -78,6 +83,7 @@ declare global {
     __mcxTargetHref?: string;
     __mcxEscCloseEnabled?: boolean;
     __mcxPopupBridge?: McxPopupBridge;
+    __mcxVideoDownloadBridge?: McxVideoDownloadBridge;
     __mobileTopInset?: number;
     __mobileBottomInset?: number;
   }

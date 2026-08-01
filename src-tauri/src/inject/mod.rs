@@ -72,6 +72,11 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     } else {
         ""
     };
+    let video_long_press_menu = if params.is_mobile {
+        include_str!("video_long_press_menu.js")
+    } else {
+        ""
+    };
 
     let visible_links_json =
         serde_json::to_string(params.visible_links).unwrap_or_else(|_| "[]".to_string());
@@ -110,7 +115,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     };
 
     let mut script = format!(
-        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
+        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
         config,
         tab_selector,
         header_part,
@@ -129,7 +134,8 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         sidebar_hide,
         mobile_area_hide,
         notification_header_hide,
-        compose_only
+        compose_only,
+        video_long_press_menu
     );
 
     if !params.custom_css.is_empty() {
@@ -373,6 +379,20 @@ mod tests {
     fn compose_only_enabledがfalseのとき投稿専用スクリプトが含まれない() {
         let script = build_init_script(&default_params());
         assert!(!script.contains("mcx-compose-only"));
+    }
+
+    #[test]
+    fn is_mobileがtrueのとき動画長押しメニュースクリプトが含まれる() {
+        let mut params = default_params();
+        params.is_mobile = true;
+        let script = build_init_script(&params);
+        assert!(script.contains("tv-video-long-press-menu"));
+    }
+
+    #[test]
+    fn is_mobileがfalseのとき動画長押しメニュースクリプトが含まれない() {
+        let script = build_init_script(&default_params()); // is_mobile: false
+        assert!(!script.contains("tv-video-long-press-menu"));
     }
 
     #[test]
