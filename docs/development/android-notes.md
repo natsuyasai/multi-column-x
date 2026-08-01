@@ -54,6 +54,18 @@ app モジュールの variant は universal フレーバー付きのため、`.
 - Profile API 非対応端末では「WebView 生成時 → loadUrl 前に Cookie 設定」という順序が必須。共通化ヘルパーを触る際もこの順序を壊さないこと。
 - 再認証（既存アカウントの Cookie を新規ログイン結果で上書きする機能）まわりでは、プロファイル対応端末においてアカウント追加用 WebView とカラム用 WebView が同一の `account-{accountId}` プロファイルを共有しており、`x_cookies.txt` は非対応端末向けのフォールバックスナップショットに過ぎない点に注意する。`migrateLegacyCookies` はプロファイル初回作成時のみ実行されるため、上書きはファイル更新だけでは既存プロファイルに反映されず、一時プロファイルの Cookie を対象プロファイルの `CookieManager` へ明示的に転記（クリア → 注入 → flush）する必要がある。
 
+## 動画ダウンロード（column WebViewへの新規JavaScriptブリッジ追加）
+
+- 動画長押しメニュー（`video_long_press_menu.ts`）から Rust へダウンロード要求を送るため、column WebView にも popup と同様の `addJavascriptInterface` ブリッジ（`VideoDownloadRequestBridge`）を新設した。**column WebView には元々 Tauri IPC もこの種のブリッジも一切無かった**（モバイルタブバーの節参照）ため、column WebView に何らかの操作を Rust へ届けたくなった場合、popup 用ブリッジ（`PopupSessionBridge`）をそのまま転用することはできず、`MainActivity.createColumnWebView` 内で個別に `addJavascriptInterface` を登録する対応が必要になる。今後同様のニーズが出た場合の前例として記録する。
+- 保存処理は SAF（Storage Access Framework、`ActivityResultContracts.CreateDocument`）を使用。`registerForActivityResult` は **Activity 生成完了前（`onCreate` より前）に登録する制約**があるため、`MainActivity` のプロパティ初期化子で `ActivityResultLauncher` を宣言する必要がある。`onCreate` 内で呼ぶと実行時エラーになる。
+- Rust 側でダウンロード → Kotlin 側で SAF 保存という非同期の往復があるため、launch と結果コールバックの間で「どの一時ファイルを保存対象にしているか」を保持する必要がある（`pendingVideoSaveRequest` のようなクラスプロパティ）。この処理は Rust→Kotlin の一方向呼び出し（`downloadAndInstallApk` と同じパターン）であり、双方向の `@JavascriptInterface` ブリッジ（`PopupSessionBridge` パターン）とは異なる点に注意。混同すると不要なクラスを作ってしまう（本機能でも当初の実装プランは誤って `VideoDownloadBridge.kt`（JSインターフェース）を作る想定だったが、実際は MainActivity 本体への直接追加が正しい設計だった）。
+- X の動画がHLS配信のみ（mp4 progressiveが無い）場合、映像・音声が別々のHLSストリームに分離されている（fMP4/CMAF、`.m4s`セグメント）。ffmpeg等を同梱しない制約下では、映像・音声を1本の音声付き動画に多重化（mux）することはできず、別ファイルとして保存する設計にせざるを得ない。この制約は desktop 側にも共通する。
+
+## reqwest 等ネイティブ依存クレートの Android クロスビルド
+
+- `reqwest`（`rustls-tls` feature）が依存する `ring` crate は Android ターゲットのビルド時にネイティブ C コードのコンパイルが必要で、`ANDROID_NDK_HOME`（または `NDK_HOME`）環境変数と NDK の `clang` が見つからないとビルドに失敗する。**`cargo check`（デフォルトのdesktopターゲット）だけでは検出できず**、`cargo check --target aarch64-linux-android` や実際の `npm run tauri:android:build[:debug]` を通さないと問題が判明しない。ローカル開発機でこの手のネイティブ依存クレートを新規追加した場合は、Androidターゲットでのビルドも一度は試すこと（Android SDK/NDK が `AppData/Local/Android/Sdk` 等にインストール済みでも、シェルの環境変数 `ANDROID_HOME` / `ANDROID_NDK_HOME` が未設定だと同じエラーになる点に注意）。
+- `#[tauri::command]` に `#[cfg(desktop)]` を付けたコマンドを `generate_handler!` マクロへ登録する際は、マクロの引数リストの中でもそのコマンドの直前に同じ `#[cfg(desktop)]` を付ける必要がある。付け忘れると、Android ビルド時に「そのコマンドが `mobile` cfg では存在しない」ため `generate_handler!` がマクロ展開に失敗し `cannot find __tauri_command_name_<cmd>` のようなコンパイルエラーになる。**これも `cargo check`（desktopターゲット）では検出されず、Android向けビルドで初めて顕在化する**。新規コマンドを `#[cfg(desktop)]` 限定で追加したら、`generate_handler!` 側にも同じ `#[cfg]` を付け忘れていないか確認すること。
+
 ## デバッグビルドでは検出できない不具合
 
 - デバッグビルドは R8（難読化・最適化）が無効なため、ProGuard keep ルール漏れなどの不具合はリリースビルドでしか再現しない。Android 実機確認が必要なタスク（JNI 呼び出し・ProGuard 絡みの変更）は、必ずリリースビルドで最終確認すること。
