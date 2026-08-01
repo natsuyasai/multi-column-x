@@ -468,6 +468,75 @@ pub fn is_webview_profile_supported() -> Result<bool, String> {
     result
 }
 
+// ── 動画ダウンロード（Android） ──────────────────────────────────────────
+
+/// MainActivity.saveDownloadedVideo(tempPath, suggestedFileName, mimeType) を呼び出す。
+/// Rust側でダウンロード済みの一時ファイルをKotlin側のSAF保存ダイアログでユーザー選択先へ
+/// コピーしてもらう（動画ダウンロード機能・Android）。
+pub fn save_downloaded_video(
+    temp_path: &str,
+    suggested_file_name: &str,
+    mime_type: &str,
+) -> Result<(), String> {
+    call_activity_method(|env, activity| {
+        let j_temp_path = env.new_string(temp_path).map_err(|e| e.to_string())?;
+        let j_suggested = env
+            .new_string(suggested_file_name)
+            .map_err(|e| e.to_string())?;
+        let j_mime = env.new_string(mime_type).map_err(|e| e.to_string())?;
+        env.call_method(
+            activity,
+            "saveDownloadedVideo",
+            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+            &[
+                JValue::Object(&*j_temp_path),
+                JValue::Object(&*j_suggested),
+                JValue::Object(&*j_mime),
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
+/// AppBridge.onVideoDownloadRequest(payloadJson) から呼ばれるJNIエントリポイント。
+/// column WebView 内の video_long_press_menu.ts（後続ステップで実装）が
+/// window.__mcxVideoDownloadBridge 経由でダウンロード要求を送ってくる。
+///
+/// WebView の JavaBridge スレッドから呼ばれ、ダウンロード処理はHTTP I/Oを伴うため、
+/// ブロックせず別タスクへ逃がしてから即座に返す。
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onVideoDownloadRequest<
+    'local,
+>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    payload_json: jni::objects::JString<'local>,
+) {
+    fn to_string(env: &mut JNIEnv, s: &jni::objects::JString) -> Option<String> {
+        env.get_string(s).ok().map(|v| v.into())
+    }
+    let Some(payload_json) = to_string(&mut env, &payload_json) else {
+        return;
+    };
+    let app = TAURI_APP.lock().expect("TAURI_APP mutex poisoned").clone();
+    let Some(app) = app else {
+        eprintln!("[AppBridge.onVideoDownloadRequest] app handle not initialized");
+        return;
+    };
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = crate::commands::video_download::handle_android_video_download_request(
+            &app,
+            &payload_json,
+        )
+        .await
+        {
+            eprintln!("[AppBridge.onVideoDownloadRequest] {e}");
+        }
+    });
+}
+
 /// MAIN_ACTIVITY の JavaVM / GlobalRef を使って JNI 処理を実行するヘルパー。
 fn call_activity_method<F>(f: F) -> Result<(), String>
 where

@@ -45,4 +45,11 @@ object AppBridge {
     accountId: String,
     url: String,
   )
+
+  /**
+   * column WebView 内の動画長押しメニューから、動画ダウンロード要求が来たときに
+   * VideoDownloadRequestBridge から呼ぶ。
+   */
+  @JvmStatic
+  external fun onVideoDownloadRequest(payloadJson: String)
 }

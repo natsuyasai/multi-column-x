@@ -56,6 +56,12 @@
     @android.webkit.JavascriptInterface <methods>;
 }
 
+# video_long_press_menu.ts が window.__mcxVideoDownloadBridge 経由で呼び出す JavascriptInterface メソッド。
+# AGP デフォルトの @JavascriptInterface keep ルールに依存せず明示的に保護する。
+-keepclassmembers class com.natsuyasai.multicolumnx.VideoDownloadRequestBridge {
+    @android.webkit.JavascriptInterface <methods>;
+}
+
 # wry (main_pipe.rs) が env.call_method() で呼び出す RustWebView のカスタムメソッド。
 # proguard-wry.pro に記載がないため難読化されると実行時に NoSuchMethodException でクラッシュする。
 -keepclassmembers class com.natsuyasai.multicolumnx.RustWebView {

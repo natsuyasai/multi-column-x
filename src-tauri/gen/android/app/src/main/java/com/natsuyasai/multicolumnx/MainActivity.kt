@@ -393,6 +393,14 @@ class MainActivity : TauriActivity() {
           wv.webViewClient = ExternalLinkWebViewClient(url)
           wv.webChromeClient = ExternalLinkWebChromeClient()
           wv.visibility = if (visible) View.VISIBLE else View.GONE
+          // ネイティブ WebView には Tauri IPC が無いため、動画長押しメニューの
+          // ダウンロード要求を Rust へ届けるブリッジを公開する（loadUrl 前に設定が必要）。
+          wv.addJavascriptInterface(
+            VideoDownloadRequestBridge { payloadJson ->
+              AppBridge.onVideoDownloadRequest(payloadJson)
+            },
+            VIDEO_DOWNLOAD_BRIDGE_JS_NAME,
+          )
         }
 
       val density = resources.displayMetrics.density
@@ -660,6 +668,9 @@ class MainActivity : TauriActivity() {
 
     // popup_toolbar.ts が参照する window.__mcxPopupBridge と一致させること。
     private const val POPUP_BRIDGE_JS_NAME = "__mcxPopupBridge"
+
+    // video_long_press_menu.ts が参照する window.__mcxVideoDownloadBridge と一致させること。
+    private const val VIDEO_DOWNLOAD_BRIDGE_JS_NAME = "__mcxVideoDownloadBridge"
 
     // 常駐コンポーズ WebView のラベルプレフィックス。Rust 側 labels::COMPOSE_PREFIX と一致させること。
     private const val COMPOSE_LABEL_PREFIX = "compose-"
