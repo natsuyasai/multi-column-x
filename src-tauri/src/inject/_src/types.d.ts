@@ -41,8 +41,21 @@ declare global {
     invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
   }
 
+  interface TauriEventPayload<T> {
+    event: string;
+    payload: T;
+  }
+
+  interface TauriEvent {
+    listen: <T>(
+      event: string,
+      handler: (payload: TauriEventPayload<T>) => void,
+    ) => Promise<() => void>;
+  }
+
   interface TauriGlobal {
     core?: TauriCore;
+    event?: TauriEvent;
     invoke?: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
   }
 

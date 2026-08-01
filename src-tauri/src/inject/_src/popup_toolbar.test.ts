@@ -1,12 +1,30 @@
 // popup_toolbar.ts は IIFE のため、import 時にツールバーが DOM へ注入される。
 // vi.resetModules で再 import し、Android ブリッジ有無それぞれの転送先を検証する。
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { formatVideoDownloadProgressText } from "./popup_toolbar";
 
 const tauriInvokeMock = vi.fn((_cmd: string, _args?: Record<string, unknown>) =>
   Promise.resolve<unknown>(undefined),
 );
 
 const switchPopupSessionMock = vi.fn();
+
+type VideoDownloadProgressPayload = {
+  fileIndex: number;
+  fileCount: number;
+  current: number;
+  total: number | null;
+  phase: "downloading" | "completed" | "failed";
+};
+
+const tauriListenMock = vi.fn(
+  (
+    _event: string,
+    _handler: (
+      payload: TauriEventPayload<VideoDownloadProgressPayload>,
+    ) => void,
+  ) => Promise.resolve<() => void>(() => undefined),
+);
 
 const accounts: TvAccountInfo[] = [
   { id: "acc1", label: "アカウント1", color: "#fff", dataDirectory: "dir1" },
@@ -185,5 +203,233 @@ describe("inject/popup_toolbar の動画ダウンロードボタン", () => {
     expect(status?.textContent).toBe(
       "動画を再生してからダウンロードしてください",
     );
+  });
+});
+
+describe("formatVideoDownloadProgressText", () => {
+  it("downloadingかつtotalありの場合パーセンテージを表示する", () => {
+    expect(
+      formatVideoDownloadProgressText({
+        fileIndex: 1,
+        fileCount: 1,
+        current: 45,
+        total: 100,
+        phase: "downloading",
+      }),
+    ).toBe("ダウンロード中 45%");
+  });
+
+  it("downloadingかつtotalなしの場合パーセンテージを省略する", () => {
+    expect(
+      formatVideoDownloadProgressText({
+        fileIndex: 1,
+        fileCount: 1,
+        current: 45,
+        total: null,
+        phase: "downloading",
+      }),
+    ).toBe("ダウンロード中");
+  });
+
+  it("completedの場合完了メッセージを表示する", () => {
+    expect(
+      formatVideoDownloadProgressText({
+        fileIndex: 1,
+        fileCount: 1,
+        current: 100,
+        total: 100,
+        phase: "completed",
+      }),
+    ).toBe("ダウンロード完了");
+  });
+
+  it("failedの場合失敗メッセージを表示する", () => {
+    expect(
+      formatVideoDownloadProgressText({
+        fileIndex: 1,
+        fileCount: 1,
+        current: 10,
+        total: 100,
+        phase: "failed",
+      }),
+    ).toBe("ダウンロード失敗");
+  });
+
+  it("fileCountが1より大きい場合ファイル番号ラベルを併記する", () => {
+    expect(
+      formatVideoDownloadProgressText({
+        fileIndex: 1,
+        fileCount: 2,
+        current: 50,
+        total: 100,
+        phase: "downloading",
+      }),
+    ).toBe("ダウンロード中 (1/2) 50%");
+  });
+
+  it("fileCountが1の場合ファイル番号ラベルを付けない", () => {
+    expect(
+      formatVideoDownloadProgressText({
+        fileIndex: 1,
+        fileCount: 1,
+        current: 50,
+        total: 100,
+        phase: "downloading",
+      }),
+    ).toBe("ダウンロード中 50%");
+  });
+
+  it("totalが0の場合ゼロ除算せず0%として扱う", () => {
+    expect(
+      formatVideoDownloadProgressText({
+        fileIndex: 1,
+        fileCount: 1,
+        current: 0,
+        total: 0,
+        phase: "downloading",
+      }),
+    ).toBe("ダウンロード中 0%");
+  });
+
+  it("completedかつfileCountが2の場合ファイル番号ラベルを併記する", () => {
+    expect(
+      formatVideoDownloadProgressText({
+        fileIndex: 2,
+        fileCount: 2,
+        current: 30,
+        total: 30,
+        phase: "completed",
+      }),
+    ).toBe("ダウンロード完了 (2/2)");
+  });
+});
+
+describe("inject/popup_toolbar の動画ダウンロード進捗イベント受信", () => {
+  function getListenHandler(): (
+    payload: TauriEventPayload<VideoDownloadProgressPayload>,
+  ) => void {
+    const call = tauriListenMock.mock.calls.find(
+      (c) => c[0] === "video-download-progress",
+    );
+    if (!call) {
+      throw new Error("listen not registered for video-download-progress");
+    }
+    return call[1];
+  }
+
+  function getStatus(): HTMLSpanElement {
+    const status = document.querySelector<HTMLSpanElement>(
+      "#tv-popup-download-status",
+    );
+    if (!status) throw new Error("status element not found");
+    return status;
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    tauriInvokeMock.mockClear();
+    tauriListenMock.mockClear();
+    window.__TAURI__ = {
+      core: { invoke: tauriInvokeMock },
+      event: { listen: tauriListenMock },
+    };
+    window.__mcxAccounts = accounts;
+    window.__mcxCurrentAccountId = "acc1";
+    window.__mcxTargetHref = "";
+    window.__mcxEscCloseEnabled = false;
+    delete window.__mcxPopupBridge;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("進捗イベントを受信するとdownloadStatusのテキストが更新される", async () => {
+    await importToolbar();
+    const handler = getListenHandler();
+
+    handler({
+      event: "video-download-progress",
+      payload: {
+        fileIndex: 1,
+        fileCount: 1,
+        current: 50,
+        total: 100,
+        phase: "downloading",
+      },
+    });
+
+    expect(getStatus().textContent).toBe("ダウンロード中 50%");
+  });
+
+  it("phaseがdownloadingの間はテキストが残り続ける（3秒消去が働かない）", async () => {
+    await importToolbar();
+    const handler = getListenHandler();
+
+    handler({
+      event: "video-download-progress",
+      payload: {
+        fileIndex: 1,
+        fileCount: 1,
+        current: 50,
+        total: 100,
+        phase: "downloading",
+      },
+    });
+
+    vi.advanceTimersByTime(3000);
+
+    expect(getStatus().textContent).toBe("ダウンロード中 50%");
+  });
+
+  it("phaseがcompletedを受信すると一定時間後にテキストが消える", async () => {
+    await importToolbar();
+    const handler = getListenHandler();
+
+    handler({
+      event: "video-download-progress",
+      payload: {
+        fileIndex: 1,
+        fileCount: 1,
+        current: 100,
+        total: 100,
+        phase: "completed",
+      },
+    });
+
+    expect(getStatus().textContent).toBe("ダウンロード完了");
+
+    vi.advanceTimersByTime(3000);
+
+    expect(getStatus().textContent).toBe("");
+  });
+
+  it("phaseがfailedを受信すると一定時間後にテキストが消える", async () => {
+    await importToolbar();
+    const handler = getListenHandler();
+
+    handler({
+      event: "video-download-progress",
+      payload: {
+        fileIndex: 1,
+        fileCount: 1,
+        current: 10,
+        total: 100,
+        phase: "failed",
+      },
+    });
+
+    expect(getStatus().textContent).toBe("ダウンロード失敗");
+
+    vi.advanceTimersByTime(3000);
+
+    expect(getStatus().textContent).toBe("");
+  });
+
+  it("window.__TAURI__.eventが存在しない場合でもエラーにならない", async () => {
+    window.__TAURI__ = { core: { invoke: tauriInvokeMock } };
+
+    await expect(importToolbar()).resolves.not.toThrow();
+    expect(tauriListenMock).not.toHaveBeenCalled();
   });
 });
