@@ -56,6 +56,21 @@ pub fn sanitize_filename(suggested: &str) -> String {
     }
 }
 
+/// 進捗コールバックの発火頻度を間引く判定（純粋関数）。
+/// 前回発行時刻から `min_interval` 未満しか経過していなければ発行を抑制する。
+/// ただし「初回」（is_first）と「最終」（is_last）は間引かず必ず発行する。
+/// 呼び出し元（desktopのイベント発行・AndroidのJNI通知更新）は後続の実装ステップで配線するため、
+/// 現時点ではこのモジュール内から直接呼ばれない。
+#[allow(dead_code)]
+pub fn should_emit_progress(
+    is_first: bool,
+    is_last: bool,
+    elapsed_since_last_emit: std::time::Duration,
+    min_interval: std::time::Duration,
+) -> bool {
+    is_first || is_last || elapsed_since_last_emit >= min_interval
+}
+
 const ALLOWED_VIDEO_HOST: &str = "video.twimg.com";
 
 /// ダウンロード対象URLの検証（SSRF対策）。
@@ -280,11 +295,98 @@ mod tests {
         }
     }
 
+    mod should_emit_progressのテスト {
+        use super::*;
+        use std::time::Duration;
+
+        #[test]
+        fn 初回は間引かれず必ずtrueを返す() {
+            let result =
+                should_emit_progress(true, false, Duration::ZERO, Duration::from_millis(100));
+            assert!(result);
+        }
+
+        #[test]
+        fn 最終は間引かれず必ずtrueを返す() {
+            let result =
+                should_emit_progress(false, true, Duration::ZERO, Duration::from_millis(100));
+            assert!(result);
+        }
+
+        #[test]
+        fn 間引き間隔未満の経過時間ではfalseを返す() {
+            let result = should_emit_progress(
+                false,
+                false,
+                Duration::from_millis(50),
+                Duration::from_millis(100),
+            );
+            assert!(!result);
+        }
+
+        #[test]
+        fn 間引き間隔以上経過していればtrueを返す() {
+            let result = should_emit_progress(
+                false,
+                false,
+                Duration::from_millis(100),
+                Duration::from_millis(100),
+            );
+            assert!(result);
+        }
+
+        #[test]
+        fn 間引き間隔を大きく超えていればtrueを返す() {
+            let result = should_emit_progress(
+                false,
+                false,
+                Duration::from_millis(500),
+                Duration::from_millis(100),
+            );
+            assert!(result);
+        }
+
+        #[test]
+        fn 初回かつ最終でも間引き間隔未満ならtrueを返す() {
+            let result =
+                should_emit_progress(true, true, Duration::ZERO, Duration::from_millis(100));
+            assert!(result);
+        }
+    }
+
     mod properties {
         use super::*;
         use proptest::prelude::*;
 
         proptest! {
+            /// is_first か is_last が真であれば、経過時間や間引き間隔にかかわらず常にtrueを返す（不変条件）。
+            #[test]
+            fn is_firstまたはis_lastが真なら常にtrueを返す(
+                is_first in any::<bool>(),
+                is_last in any::<bool>(),
+                elapsed_millis in 0u64..10_000,
+                min_interval_millis in 0u64..10_000,
+            ) {
+                let elapsed = std::time::Duration::from_millis(elapsed_millis);
+                let min_interval = std::time::Duration::from_millis(min_interval_millis);
+                let result = should_emit_progress(is_first, is_last, elapsed, min_interval);
+                if is_first || is_last {
+                    prop_assert!(result);
+                }
+            }
+
+            /// is_first と is_last が両方偽の場合、結果は「経過時間が間引き間隔以上か」と一致する。
+            #[test]
+            fn 初回でも最終でもない場合は経過時間と間引き間隔の比較と一致する(
+                elapsed_millis in 0u64..10_000,
+                min_interval_millis in 0u64..10_000,
+            ) {
+                let elapsed = std::time::Duration::from_millis(elapsed_millis);
+                let min_interval = std::time::Duration::from_millis(min_interval_millis);
+                let result = should_emit_progress(false, false, elapsed, min_interval);
+                prop_assert_eq!(result, elapsed >= min_interval);
+            }
+
             /// sanitize_filename の出力に危険文字・制御文字が含まれないことを保証する（不変条件）。
             #[test]
             fn 出力に危険文字と制御文字が含まれない(input in ".*") {

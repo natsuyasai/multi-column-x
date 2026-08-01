@@ -10,6 +10,11 @@ use m3u8_rs::Playlist;
 
 use crate::video::http;
 
+/// HLSトラックダウンロードの進捗コールバック。(完了セグメント数, 全セグメント数) を渡す。
+/// init segmentのダウンロードはセグメント数にカウントしない（0/N の状態から始まり、
+/// 最初のmedia segment完了時点で1/Nになる）。
+pub type SegmentProgressCallback<'a> = dyn FnMut(u32, u32) + Send + 'a;
+
 /// 選択された映像/音声トラックのプレイリストURL（絶対URL）のペア。
 /// `audio_playlist_url` は AUDIO グループが無い（または対応する EXT-X-MEDIA が無い）
 /// master playlist の場合 None になる。
@@ -130,10 +135,11 @@ async fn fetch_track_resource<W: Write>(
     writer: &mut W,
     validate: bool,
 ) -> Result<(), String> {
+    // HLSはセグメント単位の粗い進捗のみでよいため、バイト単位の進捗コールバックはno-opにする。
     if validate {
-        http::download_to_writer(client, url, writer).await
+        http::download_to_writer(client, url, writer, &mut |_, _| {}).await
     } else {
-        http::fetch_to_writer_unchecked(client, url, writer).await
+        http::fetch_to_writer_unchecked(client, url, writer, &mut |_, _| {}).await
     }
 }
 
@@ -146,6 +152,7 @@ async fn download_track_to_writer_impl<W: Write>(
     media_playlist_url: &str,
     writer: &mut W,
     validate: bool,
+    on_segment_progress: &mut SegmentProgressCallback<'_>,
 ) -> Result<(), String> {
     let mut playlist_bytes: Vec<u8> = Vec::new();
     fetch_track_resource(client, media_playlist_url, &mut playlist_bytes, validate).await?;
@@ -153,12 +160,14 @@ async fn download_track_to_writer_impl<W: Write>(
         .map_err(|e| format!("media playlist is not valid utf-8: {e}"))?;
 
     let segments = parse_media_segments(&playlist_text, media_playlist_url)?;
+    let total_segments = segments.segment_urls.len() as u32;
 
     if let Some(init_url) = &segments.init_segment_url {
         fetch_track_resource(client, init_url, writer, validate).await?;
     }
-    for segment_url in &segments.segment_urls {
+    for (index, segment_url) in segments.segment_urls.iter().enumerate() {
         fetch_track_resource(client, segment_url, writer, validate).await?;
+        on_segment_progress(index as u32 + 1, total_segments);
     }
 
     Ok(())
@@ -178,8 +187,16 @@ pub async fn download_track_to_writer<W: Write>(
     client: &reqwest::Client,
     media_playlist_url: &str,
     writer: &mut W,
+    on_segment_progress: &mut SegmentProgressCallback<'_>,
 ) -> Result<(), String> {
-    download_track_to_writer_impl(client, media_playlist_url, writer, true).await
+    download_track_to_writer_impl(
+        client,
+        media_playlist_url,
+        writer,
+        true,
+        on_segment_progress,
+    )
+    .await
 }
 
 #[cfg(all(test, not(target_os = "android")))]
@@ -442,10 +459,58 @@ seg1.ts
             let client = http::build_client().unwrap();
             let mut buf: Vec<u8> = Vec::new();
             let media_url = format!("{base}/media.m3u8");
-            let result = download_track_to_writer_impl(&client, &media_url, &mut buf, false).await;
+            let result =
+                download_track_to_writer_impl(&client, &media_url, &mut buf, false, &mut |_, _| {})
+                    .await;
 
             assert!(result.is_ok());
             assert_eq!(buf, b"INITSEG1SEG2");
+        }
+
+        #[tokio::test]
+        async fn セグメント完了ごとに正しいcurrentとtotalでコールバックが呼ばれる() {
+            let server = MockServer::start().await;
+            let base = server.uri();
+            let media_playlist = format!(
+                "#EXTM3U\n#EXT-X-VERSION:6\n#EXT-X-TARGETDURATION:5\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXT-X-MAP:URI=\"{base}/init.mp4\"\n#EXTINF:3.000,\n{base}/seg1.m4s\n#EXTINF:3.000,\n{base}/seg2.m4s\n#EXTINF:3.000,\n{base}/seg3.m4s\n#EXT-X-ENDLIST\n"
+            );
+
+            Mock::given(method("GET"))
+                .and(path("/media.m3u8"))
+                .respond_with(ResponseTemplate::new(200).set_body_string(media_playlist))
+                .mount(&server)
+                .await;
+            Mock::given(method("GET"))
+                .and(path("/init.mp4"))
+                .respond_with(ResponseTemplate::new(200).set_body_bytes(b"INIT".to_vec()))
+                .mount(&server)
+                .await;
+            for seg in ["seg1.m4s", "seg2.m4s", "seg3.m4s"] {
+                Mock::given(method("GET"))
+                    .and(path(format!("/{seg}")))
+                    .respond_with(ResponseTemplate::new(200).set_body_bytes(b"SEG".to_vec()))
+                    .mount(&server)
+                    .await;
+            }
+
+            let client = http::build_client().unwrap();
+            let mut buf: Vec<u8> = Vec::new();
+            let media_url = format!("{base}/media.m3u8");
+            let mut calls: Vec<(u32, u32)> = Vec::new();
+            let result = download_track_to_writer_impl(
+                &client,
+                &media_url,
+                &mut buf,
+                false,
+                &mut |current, total| {
+                    calls.push((current, total));
+                },
+            )
+            .await;
+
+            assert!(result.is_ok());
+            // init segmentの完了ではコールバックが呼ばれず、media segment完了ごとに1件ずつ呼ばれる。
+            assert_eq!(calls, vec![(1, 3), (2, 3), (3, 3)]);
         }
 
         #[tokio::test]
@@ -470,7 +535,9 @@ seg1.ts
             let client = http::build_client().unwrap();
             let mut buf: Vec<u8> = Vec::new();
             let media_url = format!("{base}/media.m3u8");
-            let result = download_track_to_writer_impl(&client, &media_url, &mut buf, false).await;
+            let result =
+                download_track_to_writer_impl(&client, &media_url, &mut buf, false, &mut |_, _| {})
+                    .await;
 
             assert!(result.is_ok());
             assert_eq!(buf, b"SEG1");
@@ -490,7 +557,9 @@ seg1.ts
             let client = http::build_client().unwrap();
             let mut buf: Vec<u8> = Vec::new();
             let media_url = format!("{base}/missing.m3u8");
-            let result = download_track_to_writer_impl(&client, &media_url, &mut buf, false).await;
+            let result =
+                download_track_to_writer_impl(&client, &media_url, &mut buf, false, &mut |_, _| {})
+                    .await;
 
             assert!(result.is_err());
         }
@@ -517,7 +586,9 @@ seg1.ts
             let client = http::build_client().unwrap();
             let mut buf: Vec<u8> = Vec::new();
             let media_url = format!("{base}/media.m3u8");
-            let result = download_track_to_writer_impl(&client, &media_url, &mut buf, false).await;
+            let result =
+                download_track_to_writer_impl(&client, &media_url, &mut buf, false, &mut |_, _| {})
+                    .await;
 
             assert!(result.is_err());
         }
@@ -530,9 +601,13 @@ seg1.ts
         async fn video_twimg_com以外のmedia_playlist_urlは実通信せずerrになる() {
             let client = http::build_client().unwrap();
             let mut buf: Vec<u8> = Vec::new();
-            let result =
-                download_track_to_writer(&client, "https://evil.example.com/media.m3u8", &mut buf)
-                    .await;
+            let result = download_track_to_writer(
+                &client,
+                "https://evil.example.com/media.m3u8",
+                &mut buf,
+                &mut |_, _| {},
+            )
+            .await;
 
             assert!(result.is_err());
             assert!(buf.is_empty());

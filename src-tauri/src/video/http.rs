@@ -17,6 +17,12 @@ use std::time::Duration;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// ダウンロード進捗のコールバック。呼ばれるたびに (受信済みバイト数, 総バイト数(不明ならNone)) を渡す。
+/// 呼び出し側で間引き（`crate::video::should_emit_progress`）を行うため、この関数自体は
+/// チャンク受信ごとに毎回呼んでよい。トレイトオブジェクト（`&mut dyn FnMut`）で受け取ることで、
+/// ジェネリクスの爆発（コンパイル時間増加・バイナリ肥大化）を避ける。
+pub type ProgressCallback<'a> = dyn FnMut(u64, Option<u64>) + Send + 'a;
+
 /// 動画ダウンロード用の共通 `reqwest::Client` を構築する。
 /// rustls-tls を使用し、接続/リクエスト全体のタイムアウトを設定する。
 pub fn build_client() -> Result<reqwest::Client, String> {
@@ -36,6 +42,7 @@ pub(crate) async fn fetch_to_writer_unchecked<W: Write>(
     client: &reqwest::Client,
     url: &str,
     writer: &mut W,
+    on_progress: &mut ProgressCallback<'_>,
 ) -> Result<(), String> {
     let mut response = client
         .get(url)
@@ -48,6 +55,9 @@ pub(crate) async fn fetch_to_writer_unchecked<W: Write>(
         return Err(format!("http request failed with status: {status}"));
     }
 
+    let total = response.content_length();
+    let mut received: u64 = 0;
+
     while let Some(chunk) = response
         .chunk()
         .await
@@ -56,6 +66,8 @@ pub(crate) async fn fetch_to_writer_unchecked<W: Write>(
         writer
             .write_all(&chunk)
             .map_err(|e| format!("failed to write response chunk: {e}"))?;
+        received += chunk.len() as u64;
+        on_progress(received, total);
     }
 
     Ok(())
@@ -68,9 +80,10 @@ pub async fn download_to_writer<W: Write>(
     client: &reqwest::Client,
     url: &str,
     writer: &mut W,
+    on_progress: &mut ProgressCallback<'_>,
 ) -> Result<(), String> {
     crate::video::validate_variant_url(url)?;
-    fetch_to_writer_unchecked(client, url, writer).await
+    fetch_to_writer_unchecked(client, url, writer, on_progress).await
 }
 
 #[cfg(all(test, not(target_os = "android")))]
@@ -94,7 +107,7 @@ mod tests {
             let client = build_client().unwrap();
             let mut buf: Vec<u8> = Vec::new();
             let url = format!("{}/video.mp4", server.uri());
-            let result = fetch_to_writer_unchecked(&client, &url, &mut buf).await;
+            let result = fetch_to_writer_unchecked(&client, &url, &mut buf, &mut |_, _| {}).await;
 
             assert!(result.is_ok());
             assert_eq!(buf, b"hello video");
@@ -112,7 +125,7 @@ mod tests {
             let client = build_client().unwrap();
             let mut buf: Vec<u8> = Vec::new();
             let url = format!("{}/missing.mp4", server.uri());
-            let result = fetch_to_writer_unchecked(&client, &url, &mut buf).await;
+            let result = fetch_to_writer_unchecked(&client, &url, &mut buf, &mut |_, _| {}).await;
 
             assert!(result.is_err());
         }
@@ -129,10 +142,73 @@ mod tests {
             let client = build_client().unwrap();
             let mut buf: Vec<u8> = Vec::new();
             let url = format!("{}/empty.mp4", server.uri());
-            let result = fetch_to_writer_unchecked(&client, &url, &mut buf).await;
+            let result = fetch_to_writer_unchecked(&client, &url, &mut buf, &mut |_, _| {}).await;
 
             assert!(result.is_ok());
             assert!(buf.is_empty());
+        }
+
+        #[tokio::test]
+        async fn 進捗コールバックが累積バイト数とcontent_lengthで呼ばれる() {
+            let server = MockServer::start().await;
+            Mock::given(method("GET"))
+                .and(path("/video.mp4"))
+                .respond_with(
+                    ResponseTemplate::new(200)
+                        .set_body_bytes(b"hello video".to_vec())
+                        .insert_header("content-length", "11"),
+                )
+                .mount(&server)
+                .await;
+
+            let client = build_client().unwrap();
+            let mut buf: Vec<u8> = Vec::new();
+            let url = format!("{}/video.mp4", server.uri());
+            let mut calls: Vec<(u64, Option<u64>)> = Vec::new();
+            let result =
+                fetch_to_writer_unchecked(&client, &url, &mut buf, &mut |received, total| {
+                    calls.push((received, total));
+                })
+                .await;
+
+            assert!(result.is_ok());
+            assert!(!calls.is_empty());
+            // 最終呼び出し時点で受信済みバイト数はボディ全体のサイズと一致する。
+            let (last_received, last_total) = *calls.last().unwrap();
+            assert_eq!(last_received, 11);
+            assert_eq!(last_total, Some(11));
+            // 受信済みバイト数は呼び出しごとに単調増加する。
+            for pair in calls.windows(2) {
+                assert!(pair[0].0 <= pair[1].0);
+            }
+        }
+
+        #[tokio::test]
+        async fn content_lengthヘッダが無ければ総バイト数はnoneで呼ばれる() {
+            let server = MockServer::start().await;
+            Mock::given(method("GET"))
+                .and(path("/chunked.mp4"))
+                .respond_with(
+                    ResponseTemplate::new(200)
+                        .set_body_bytes(b"chunked body".to_vec())
+                        .append_header("transfer-encoding", "chunked"),
+                )
+                .mount(&server)
+                .await;
+
+            let client = build_client().unwrap();
+            let mut buf: Vec<u8> = Vec::new();
+            let url = format!("{}/chunked.mp4", server.uri());
+            let mut calls: Vec<(u64, Option<u64>)> = Vec::new();
+            let result =
+                fetch_to_writer_unchecked(&client, &url, &mut buf, &mut |received, total| {
+                    calls.push((received, total));
+                })
+                .await;
+
+            assert!(result.is_ok());
+            assert!(!calls.is_empty());
+            assert!(calls.iter().all(|(_, total)| total.is_none()));
         }
     }
 
@@ -144,8 +220,13 @@ mod tests {
             // wiremockサーバは起動せず、不正ホストがvalidate_variant_urlで即座に弾かれることのみ検証する。
             let client = build_client().unwrap();
             let mut buf: Vec<u8> = Vec::new();
-            let result =
-                download_to_writer(&client, "https://evil.example.com/video.mp4", &mut buf).await;
+            let result = download_to_writer(
+                &client,
+                "https://evil.example.com/video.mp4",
+                &mut buf,
+                &mut |_, _| {},
+            )
+            .await;
 
             assert!(result.is_err());
             assert!(buf.is_empty());
@@ -155,8 +236,13 @@ mod tests {
         async fn httpスキームは実通信せずerrになる() {
             let client = build_client().unwrap();
             let mut buf: Vec<u8> = Vec::new();
-            let result =
-                download_to_writer(&client, "http://video.twimg.com/video.mp4", &mut buf).await;
+            let result = download_to_writer(
+                &client,
+                "http://video.twimg.com/video.mp4",
+                &mut buf,
+                &mut |_, _| {},
+            )
+            .await;
 
             assert!(result.is_err());
             assert!(buf.is_empty());

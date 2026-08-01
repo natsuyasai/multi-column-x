@@ -65,7 +65,7 @@ pub async fn download_video(
 
             let client = http::build_client()?;
             let mut file = std::fs::File::create(&path).map_err(|e| e.to_string())?;
-            http::download_to_writer(&client, &url, &mut file).await?;
+            http::download_to_writer(&client, &url, &mut file, &mut |_, _| {}).await?;
             Ok(())
         }
         DownloadPlan::HlsTracks {
@@ -75,7 +75,13 @@ pub async fn download_video(
             let client = http::build_client()?;
 
             let mut master_bytes: Vec<u8> = Vec::new();
-            http::download_to_writer(&client, &master_playlist_url, &mut master_bytes).await?;
+            http::download_to_writer(
+                &client,
+                &master_playlist_url,
+                &mut master_bytes,
+                &mut |_, _| {},
+            )
+            .await?;
             let master_text = String::from_utf8(master_bytes)
                 .map_err(|e| format!("master playlist is not valid utf-8: {e}"))?;
 
@@ -89,8 +95,13 @@ pub async fn download_video(
             {
                 let path = file_path.into_path().map_err(|e| e.to_string())?;
                 let mut file = std::fs::File::create(&path).map_err(|e| e.to_string())?;
-                hls::download_track_to_writer(&client, &tracks.video_playlist_url, &mut file)
-                    .await?;
+                hls::download_track_to_writer(
+                    &client,
+                    &tracks.video_playlist_url,
+                    &mut file,
+                    &mut |_, _| {},
+                )
+                .await?;
             }
 
             if let Some(audio_url) = tracks.audio_playlist_url {
@@ -102,7 +113,8 @@ pub async fn download_video(
                 {
                     let path = file_path.into_path().map_err(|e| e.to_string())?;
                     let mut file = std::fs::File::create(&path).map_err(|e| e.to_string())?;
-                    hls::download_track_to_writer(&client, &audio_url, &mut file).await?;
+                    hls::download_track_to_writer(&client, &audio_url, &mut file, &mut |_, _| {})
+                        .await?;
                 }
             }
 
@@ -162,7 +174,7 @@ pub async fn handle_android_video_download_request(
             let temp_path = cache_dir.join(&file_name);
             {
                 let mut file = std::fs::File::create(&temp_path).map_err(|e| e.to_string())?;
-                http::download_to_writer(&client, &url, &mut file).await?;
+                http::download_to_writer(&client, &url, &mut file, &mut |_, _| {}).await?;
             }
             crate::android_bridge::save_downloaded_video(
                 &temp_path.to_string_lossy(),
@@ -176,7 +188,13 @@ pub async fn handle_android_video_download_request(
             video::validate_variant_url(&master_playlist_url)?;
 
             let mut master_bytes: Vec<u8> = Vec::new();
-            http::download_to_writer(&client, &master_playlist_url, &mut master_bytes).await?;
+            http::download_to_writer(
+                &client,
+                &master_playlist_url,
+                &mut master_bytes,
+                &mut |_, _| {},
+            )
+            .await?;
             let master_text = String::from_utf8(master_bytes)
                 .map_err(|e| format!("master playlist is not valid utf-8: {e}"))?;
 
@@ -187,8 +205,13 @@ pub async fn handle_android_video_download_request(
             {
                 let mut file =
                     std::fs::File::create(&video_temp_path).map_err(|e| e.to_string())?;
-                hls::download_track_to_writer(&client, &tracks.video_playlist_url, &mut file)
-                    .await?;
+                hls::download_track_to_writer(
+                    &client,
+                    &tracks.video_playlist_url,
+                    &mut file,
+                    &mut |_, _| {},
+                )
+                .await?;
             }
             crate::android_bridge::save_downloaded_video(
                 &video_temp_path.to_string_lossy(),
@@ -202,7 +225,8 @@ pub async fn handle_android_video_download_request(
                 {
                     let mut file =
                         std::fs::File::create(&audio_temp_path).map_err(|e| e.to_string())?;
-                    hls::download_track_to_writer(&client, &audio_url, &mut file).await?;
+                    hls::download_track_to_writer(&client, &audio_url, &mut file, &mut |_, _| {})
+                        .await?;
                 }
                 crate::android_bridge::save_downloaded_video(
                     &audio_temp_path.to_string_lossy(),
