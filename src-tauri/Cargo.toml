@@ -36,6 +36,8 @@ m3u8-rs = "6"
 [dev-dependencies]
 # プロパティベーステスト（純粋関数の不変条件検証）
 proptest = "1"
+# 動画ダウンロードのHTTP I/O層のテスト用モックHTTPサーバ
+wiremock = "0.6"
 
 [target.'cfg(target_os = "android")'.dependencies]
 jni = { version = "0.21", default-features = false }

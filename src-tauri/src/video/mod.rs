@@ -8,6 +8,7 @@
 #![allow(dead_code)]
 
 pub mod hls;
+pub mod http;
 
 use serde::Deserialize;
 

@@ -7,7 +7,11 @@
 //! それまでの間は dead_code 警告を抑止する。
 #![allow(dead_code)]
 
+use std::io::Write;
+
 use m3u8_rs::Playlist;
+
+use crate::video::http;
 
 /// 選択された映像/音声トラックのプレイリストURL（絶対URL）のペア。
 /// `audio_playlist_url` は AUDIO グループが無い（または対応する EXT-X-MEDIA が無い）
@@ -117,6 +121,68 @@ pub fn resolve_playlist_url(base_url: &str, uri: &str) -> Result<String, String>
         .join(uri)
         .map_err(|e| format!("failed to resolve url: {e}"))?;
     Ok(resolved.to_string())
+}
+
+/// `validate` が true なら `crate::video::validate_variant_url` による検証を経てから、
+/// false ならSSRF検証を経ずに（テスト専用）、指定URLの内容を `writer` に書き込む。
+/// `download_track_to_writer_impl` から呼ばれる内部専用ヘルパーで、
+/// 「検証あり／なし」の2経路を1箇所に集約し実装の重複を避ける。
+async fn fetch_track_resource<W: Write>(
+    client: &reqwest::Client,
+    url: &str,
+    writer: &mut W,
+    validate: bool,
+) -> Result<(), String> {
+    if validate {
+        http::download_to_writer(client, url, writer).await
+    } else {
+        http::fetch_to_writer_unchecked(client, url, writer).await
+    }
+}
+
+/// `download_track_to_writer` の実処理本体。`validate` で
+/// SSRF検証（`crate::video::validate_variant_url`）を経由するかどうかを切り替える。
+/// `validate: false` はテスト専用（wiremockのモックサーバは `video.twimg.com` 以外のホストを
+/// 使うため、検証を経由すると常に弾かれてしまうことへの対処）。
+async fn download_track_to_writer_impl<W: Write>(
+    client: &reqwest::Client,
+    media_playlist_url: &str,
+    writer: &mut W,
+    validate: bool,
+) -> Result<(), String> {
+    let mut playlist_bytes: Vec<u8> = Vec::new();
+    fetch_track_resource(client, media_playlist_url, &mut playlist_bytes, validate).await?;
+    let playlist_text = String::from_utf8(playlist_bytes)
+        .map_err(|e| format!("media playlist is not valid utf-8: {e}"))?;
+
+    let segments = parse_media_segments(&playlist_text, media_playlist_url)?;
+
+    if let Some(init_url) = &segments.init_segment_url {
+        fetch_track_resource(client, init_url, writer, validate).await?;
+    }
+    for segment_url in &segments.segment_urls {
+        fetch_track_resource(client, segment_url, writer, validate).await?;
+    }
+
+    Ok(())
+}
+
+/// 映像 or 音声の1トラック分をダウンロードする。
+/// media playlist（`media_playlist_url`）を取得・パースし（`parse_media_segments` を使う）、
+/// init segment（あれば）→ 各media segment の順に取得して `writer` に連結書き込みする。
+/// fMP4のHLSは「init segment + 全media segmentsの単純バイナリ連結」で有効な1本の
+/// fragmented mp4になる特性を利用する（音声・映像は元々別トラックなので、この関数は
+/// どちらか一方のトラックを1ファイルとして書き出すことのみ担当する。2トラックの
+/// mux/多重化は本機能のスコープ外）。
+/// media playlist自体、および各セグメントURLは `crate::video::validate_variant_url` に
+/// よるSSRF検証を経る（呼び出し元がmaster playlistの `select_best_tracks` で得たURLを
+/// そのまま渡してくる想定だが、多重防御として本関数内部でも全URLを検証する）。
+pub async fn download_track_to_writer<W: Write>(
+    client: &reqwest::Client,
+    media_playlist_url: &str,
+    writer: &mut W,
+) -> Result<(), String> {
+    download_track_to_writer_impl(client, media_playlist_url, writer, true).await
 }
 
 #[cfg(all(test, not(target_os = "android")))]
@@ -335,6 +401,144 @@ seg1.ts
         fn media_playlistを渡すとエラーになる() {
             let result = select_best_tracks(MEDIA_PLAYLIST_VIDEO, MEDIA_PLAYLIST_BASE_URL);
             assert!(result.is_err());
+        }
+    }
+
+    mod download_track_to_writer_implのテスト {
+        use super::*;
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        // validate_variant_url は video.twimg.com 系ホストしか許可しないため、
+        // wiremock（127.0.0.1）を使う実通信テストは検証を経ない
+        // download_track_to_writer_impl(..., validate: false) を直接呼ぶ。
+
+        #[tokio::test]
+        async fn init_segmentと複数segmentが順序通り連結されてwriterに書き込まれる() {
+            let server = MockServer::start().await;
+            let base = server.uri();
+            let media_playlist = format!(
+                "#EXTM3U\n#EXT-X-VERSION:6\n#EXT-X-TARGETDURATION:5\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXT-X-MAP:URI=\"{base}/init.mp4\"\n#EXTINF:3.000,\n{base}/seg1.m4s\n#EXTINF:3.000,\n{base}/seg2.m4s\n#EXT-X-ENDLIST\n"
+            );
+
+            Mock::given(method("GET"))
+                .and(path("/media.m3u8"))
+                .respond_with(ResponseTemplate::new(200).set_body_string(media_playlist))
+                .mount(&server)
+                .await;
+            Mock::given(method("GET"))
+                .and(path("/init.mp4"))
+                .respond_with(ResponseTemplate::new(200).set_body_bytes(b"INIT".to_vec()))
+                .mount(&server)
+                .await;
+            Mock::given(method("GET"))
+                .and(path("/seg1.m4s"))
+                .respond_with(ResponseTemplate::new(200).set_body_bytes(b"SEG1".to_vec()))
+                .mount(&server)
+                .await;
+            Mock::given(method("GET"))
+                .and(path("/seg2.m4s"))
+                .respond_with(ResponseTemplate::new(200).set_body_bytes(b"SEG2".to_vec()))
+                .mount(&server)
+                .await;
+
+            let client = http::build_client().unwrap();
+            let mut buf: Vec<u8> = Vec::new();
+            let media_url = format!("{base}/media.m3u8");
+            let result = download_track_to_writer_impl(&client, &media_url, &mut buf, false).await;
+
+            assert!(result.is_ok());
+            assert_eq!(buf, b"INITSEG1SEG2");
+        }
+
+        #[tokio::test]
+        async fn init_segmentが無いmedia_playlistはsegmentのみ連結される() {
+            let server = MockServer::start().await;
+            let base = server.uri();
+            let media_playlist = format!(
+                "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:5\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXTINF:3.000,\n{base}/seg1.ts\n#EXT-X-ENDLIST\n"
+            );
+
+            Mock::given(method("GET"))
+                .and(path("/media.m3u8"))
+                .respond_with(ResponseTemplate::new(200).set_body_string(media_playlist))
+                .mount(&server)
+                .await;
+            Mock::given(method("GET"))
+                .and(path("/seg1.ts"))
+                .respond_with(ResponseTemplate::new(200).set_body_bytes(b"SEG1".to_vec()))
+                .mount(&server)
+                .await;
+
+            let client = http::build_client().unwrap();
+            let mut buf: Vec<u8> = Vec::new();
+            let media_url = format!("{base}/media.m3u8");
+            let result = download_track_to_writer_impl(&client, &media_url, &mut buf, false).await;
+
+            assert!(result.is_ok());
+            assert_eq!(buf, b"SEG1");
+        }
+
+        #[tokio::test]
+        async fn media_playlist自体の取得に失敗するとerrになる() {
+            let server = MockServer::start().await;
+            let base = server.uri();
+
+            Mock::given(method("GET"))
+                .and(path("/missing.m3u8"))
+                .respond_with(ResponseTemplate::new(404))
+                .mount(&server)
+                .await;
+
+            let client = http::build_client().unwrap();
+            let mut buf: Vec<u8> = Vec::new();
+            let media_url = format!("{base}/missing.m3u8");
+            let result = download_track_to_writer_impl(&client, &media_url, &mut buf, false).await;
+
+            assert!(result.is_err());
+        }
+
+        #[tokio::test]
+        async fn segmentの取得に失敗するとerrになる() {
+            let server = MockServer::start().await;
+            let base = server.uri();
+            let media_playlist = format!(
+                "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:5\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXTINF:3.000,\n{base}/missing-seg.ts\n#EXT-X-ENDLIST\n"
+            );
+
+            Mock::given(method("GET"))
+                .and(path("/media.m3u8"))
+                .respond_with(ResponseTemplate::new(200).set_body_string(media_playlist))
+                .mount(&server)
+                .await;
+            Mock::given(method("GET"))
+                .and(path("/missing-seg.ts"))
+                .respond_with(ResponseTemplate::new(500))
+                .mount(&server)
+                .await;
+
+            let client = http::build_client().unwrap();
+            let mut buf: Vec<u8> = Vec::new();
+            let media_url = format!("{base}/media.m3u8");
+            let result = download_track_to_writer_impl(&client, &media_url, &mut buf, false).await;
+
+            assert!(result.is_err());
+        }
+    }
+
+    mod download_track_to_writerのテスト {
+        use super::*;
+
+        #[tokio::test]
+        async fn video_twimg_com以外のmedia_playlist_urlは実通信せずerrになる() {
+            let client = http::build_client().unwrap();
+            let mut buf: Vec<u8> = Vec::new();
+            let result =
+                download_track_to_writer(&client, "https://evil.example.com/media.m3u8", &mut buf)
+                    .await;
+
+            assert!(result.is_err());
+            assert!(buf.is_empty());
         }
     }
 
