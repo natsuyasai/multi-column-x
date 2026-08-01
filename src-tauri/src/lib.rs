@@ -4,6 +4,7 @@ mod commands;
 mod inject;
 mod ipc_constants;
 mod state;
+mod video;
 
 use state::AppState;
 #[cfg(desktop)]
