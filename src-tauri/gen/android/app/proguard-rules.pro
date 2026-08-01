@@ -48,6 +48,9 @@
     public void launchComposeTweet();
     public void downloadAndInstallApk(java.lang.String, java.lang.String);
     public void saveDownloadedVideo(java.lang.String, java.lang.String, java.lang.String);
+    public void notifyVideoDownloadStarted();
+    public void notifyVideoDownloadProgress(int, int, long, long);
+    public void notifyVideoDownloadFinished();
 }
 
 # popup_toolbar.ts が window.__mcxPopupBridge 経由で呼び出す JavascriptInterface メソッド。

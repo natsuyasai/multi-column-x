@@ -18,6 +18,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -249,6 +250,42 @@ class MainActivity : TauriActivity() {
         }
       saveVideoLauncher.launch(suggestedFileName)
     }
+  }
+
+  // 動画ダウンロード（Android）の Foreground Service を起動する。
+  // アプリがバックグラウンドに回ってもOSにプロセスをkillされにくくするため、
+  // ダウンロード開始時に Rust 側から呼ぶ。
+  fun notifyVideoDownloadStarted() {
+    val intent =
+      Intent(this, VideoDownloadForegroundService::class.java)
+        .setAction(VideoDownloadForegroundService.ACTION_START)
+    ContextCompat.startForegroundService(this, intent)
+  }
+
+  // 動画ダウンロードの進捗を通知に反映する。total が不明な場合は 0 以下を渡すこと
+  // （VideoDownloadForegroundService 側で indeterminate 表示に切り替える）。
+  fun notifyVideoDownloadProgress(
+    fileIndex: Int,
+    fileCount: Int,
+    current: Long,
+    total: Long,
+  ) {
+    val intent =
+      Intent(this, VideoDownloadForegroundService::class.java)
+        .setAction(VideoDownloadForegroundService.ACTION_UPDATE)
+        .putExtra(VideoDownloadForegroundService.EXTRA_FILE_INDEX, fileIndex)
+        .putExtra(VideoDownloadForegroundService.EXTRA_FILE_COUNT, fileCount)
+        .putExtra(VideoDownloadForegroundService.EXTRA_CURRENT, current)
+        .putExtra(VideoDownloadForegroundService.EXTRA_TOTAL, total)
+    startService(intent)
+  }
+
+  // 動画ダウンロードの Foreground Service を終了する（成功/失敗いずれでも呼ぶ）。
+  fun notifyVideoDownloadFinished() {
+    val intent =
+      Intent(this, VideoDownloadForegroundService::class.java)
+        .setAction(VideoDownloadForegroundService.ACTION_FINISH)
+    startService(intent)
   }
 
   // ポップアップ WebView を全画面オーバーレイとして追加する。
