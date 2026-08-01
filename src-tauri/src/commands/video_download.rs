@@ -9,7 +9,7 @@ use tauri::Emitter;
 
 /// 進捗イベントの発行間隔の下限。この間隔未満での連続発行は間引く
 /// （`video::should_emit_progress` を参照。ただし初回・最終は必ず発行する）。
-#[cfg(desktop)]
+/// desktop版（`ProgressEmitter`）・Android版（`AndroidProgressNotifier`）で共通して使う。
 const MIN_PROGRESS_EMIT_INTERVAL: std::time::Duration = std::time::Duration::from_millis(200);
 
 /// 動画ダウンロード進捗のイベントペイロード。JS側はcamelCaseで受け取る。
@@ -305,6 +305,56 @@ struct AndroidVideoDownloadPayload {
     suggested_file_name: String,
 }
 
+/// Android版の進捗通知ヘルパー。desktop版の `ProgressEmitter` と対になる存在だが、
+/// `app.emit_to` の代わりに `android_bridge::notify_video_download_progress` をJNI経由で呼ぶ。
+/// 間引き判定は desktop版と同じ `video::should_emit_progress` + `MIN_PROGRESS_EMIT_INTERVAL` を使う。
+#[cfg(target_os = "android")]
+struct AndroidProgressNotifier {
+    file_index: i32,
+    file_count: i32,
+    last_emit_at: Option<std::time::Instant>,
+    is_first_call: bool,
+}
+
+#[cfg(target_os = "android")]
+impl AndroidProgressNotifier {
+    fn new(file_index: i32, file_count: i32) -> Self {
+        Self {
+            file_index,
+            file_count,
+            last_emit_at: None,
+            is_first_call: true,
+        }
+    }
+
+    /// 進捗コールバックから呼ぶ。間引き判定（`video::should_emit_progress`）を通ったときのみ
+    /// `notify_video_download_progress` をJNI経由で呼ぶ（エラーは無視する。通知はベストエフォート）。
+    /// `total` が None の場合は 0 を渡す（Kotlin側でindeterminate表示に切り替わるセンチネル値）。
+    fn update(&mut self, current: u64, total: Option<u64>, is_last: bool) {
+        let now = std::time::Instant::now();
+        let elapsed = self
+            .last_emit_at
+            .map(|t| now.duration_since(t))
+            .unwrap_or(std::time::Duration::MAX);
+
+        if video::should_emit_progress(
+            self.is_first_call,
+            is_last,
+            elapsed,
+            MIN_PROGRESS_EMIT_INTERVAL,
+        ) {
+            let _ = crate::android_bridge::notify_video_download_progress(
+                self.file_index,
+                self.file_count,
+                current as i64,
+                total.map(|t| t as i64).unwrap_or(0),
+            );
+            self.last_emit_at = Some(now);
+        }
+        self.is_first_call = false;
+    }
+}
+
 /// Android専用: JNIエントリポイント（android_bridge.rs の
 /// `Java_com_natsuyasai_multicolumnx_AppBridge_onVideoDownloadRequest`）から呼ばれる。
 /// `payload_json` は `{ variants, suggestedFileName }` 形式のJSON文字列。
@@ -315,6 +365,10 @@ struct AndroidVideoDownloadPayload {
 /// - mp4 progressive があれば1ファイルを保存依頼する。
 /// - mp4が無くHLSのみの場合は映像・音声を別ファイルとしてそれぞれ保存依頼する
 ///   （音声トラックが無ければ映像のみ）。
+///
+/// 処理本体は内部の async ブロックに切り出し、その成否に関わらず必ず
+/// `notify_video_download_finished` を呼んでからその結果を返す
+/// （`?` による早期returnが複数あるため、素直に書くとFinished通知漏れが起きるのを防ぐ）。
 #[cfg(target_os = "android")]
 pub async fn handle_android_video_download_request(
     app: &tauri::AppHandle,
@@ -322,89 +376,124 @@ pub async fn handle_android_video_download_request(
 ) -> Result<(), String> {
     use tauri::Manager;
 
-    let payload: AndroidVideoDownloadPayload = serde_json::from_str(payload_json)
-        .map_err(|e| format!("failed to parse video download payload: {e}"))?;
+    let result: Result<(), String> = async {
+        let payload: AndroidVideoDownloadPayload = serde_json::from_str(payload_json)
+            .map_err(|e| format!("failed to parse video download payload: {e}"))?;
 
-    let plan = plan_download(&payload.variants)?;
-    let base_name = video::sanitize_filename(&payload.suggested_file_name);
+        let plan = plan_download(&payload.variants)?;
+        let base_name = video::sanitize_filename(&payload.suggested_file_name);
 
-    let cache_dir = app.path().app_cache_dir().map_err(|e| e.to_string())?;
-    std::fs::create_dir_all(&cache_dir).map_err(|e| e.to_string())?;
+        // payload解析・plan_download成功後、実ダウンロード開始前にForeground Serviceを起動させる。
+        let _ = crate::android_bridge::notify_video_download_started();
 
-    let client = http::build_client()?;
+        let cache_dir = app.path().app_cache_dir().map_err(|e| e.to_string())?;
+        std::fs::create_dir_all(&cache_dir).map_err(|e| e.to_string())?;
 
-    match plan {
-        DownloadPlan::SingleMp4 { url } => {
-            video::validate_variant_url(&url)?;
+        let client = http::build_client()?;
 
-            let file_name = format!("{base_name}.mp4");
-            let temp_path = cache_dir.join(&file_name);
-            {
-                let mut file = std::fs::File::create(&temp_path).map_err(|e| e.to_string())?;
-                http::download_to_writer(&client, &url, &mut file, &mut |_, _| {}).await?;
+        match plan {
+            DownloadPlan::SingleMp4 { url } => {
+                video::validate_variant_url(&url)?;
+
+                let file_name = format!("{base_name}.mp4");
+                let temp_path = cache_dir.join(&file_name);
+                {
+                    let mut file = std::fs::File::create(&temp_path).map_err(|e| e.to_string())?;
+                    let mut notifier = AndroidProgressNotifier::new(1, 1);
+                    let mut on_progress = |current: u64, total: Option<u64>| {
+                        let is_last = total.is_some_and(|t| current >= t);
+                        notifier.update(current, total, is_last);
+                    };
+                    http::download_to_writer(&client, &url, &mut file, &mut on_progress).await?;
+                }
+                crate::android_bridge::save_downloaded_video(
+                    &temp_path.to_string_lossy(),
+                    &file_name,
+                    "video/mp4",
+                )
             }
-            crate::android_bridge::save_downloaded_video(
-                &temp_path.to_string_lossy(),
-                &file_name,
-                "video/mp4",
-            )
-        }
-        DownloadPlan::HlsTracks {
-            master_playlist_url,
-        } => {
-            video::validate_variant_url(&master_playlist_url)?;
+            DownloadPlan::HlsTracks {
+                master_playlist_url,
+            } => {
+                video::validate_variant_url(&master_playlist_url)?;
 
-            let mut master_bytes: Vec<u8> = Vec::new();
-            http::download_to_writer(
-                &client,
-                &master_playlist_url,
-                &mut master_bytes,
-                &mut |_, _| {},
-            )
-            .await?;
-            let master_text = String::from_utf8(master_bytes)
-                .map_err(|e| format!("master playlist is not valid utf-8: {e}"))?;
-
-            let tracks = hls::select_best_tracks(&master_text, &master_playlist_url)?;
-
-            let video_file_name = format!("{base_name}_video.mp4");
-            let video_temp_path = cache_dir.join(&video_file_name);
-            {
-                let mut file =
-                    std::fs::File::create(&video_temp_path).map_err(|e| e.to_string())?;
-                hls::download_track_to_writer(
+                let mut master_bytes: Vec<u8> = Vec::new();
+                http::download_to_writer(
                     &client,
-                    &tracks.video_playlist_url,
-                    &mut file,
+                    &master_playlist_url,
+                    &mut master_bytes,
                     &mut |_, _| {},
                 )
                 .await?;
-            }
-            crate::android_bridge::save_downloaded_video(
-                &video_temp_path.to_string_lossy(),
-                &video_file_name,
-                "video/mp4",
-            )?;
+                let master_text = String::from_utf8(master_bytes)
+                    .map_err(|e| format!("master playlist is not valid utf-8: {e}"))?;
 
-            if let Some(audio_url) = tracks.audio_playlist_url {
-                let audio_file_name = format!("{base_name}_audio.m4a");
-                let audio_temp_path = cache_dir.join(&audio_file_name);
+                let tracks = hls::select_best_tracks(&master_text, &master_playlist_url)?;
+                let file_count = if tracks.audio_playlist_url.is_some() {
+                    2
+                } else {
+                    1
+                };
+
+                let video_file_name = format!("{base_name}_video.mp4");
+                let video_temp_path = cache_dir.join(&video_file_name);
                 {
                     let mut file =
-                        std::fs::File::create(&audio_temp_path).map_err(|e| e.to_string())?;
-                    hls::download_track_to_writer(&client, &audio_url, &mut file, &mut |_, _| {})
-                        .await?;
+                        std::fs::File::create(&video_temp_path).map_err(|e| e.to_string())?;
+                    let mut notifier = AndroidProgressNotifier::new(1, file_count);
+                    let mut on_progress = |current: u32, total: u32| {
+                        let is_last = current >= total;
+                        notifier.update(current as u64, Some(total as u64), is_last);
+                    };
+                    hls::download_track_to_writer(
+                        &client,
+                        &tracks.video_playlist_url,
+                        &mut file,
+                        &mut on_progress,
+                    )
+                    .await?;
                 }
                 crate::android_bridge::save_downloaded_video(
-                    &audio_temp_path.to_string_lossy(),
-                    &audio_file_name,
-                    "audio/mp4",
+                    &video_temp_path.to_string_lossy(),
+                    &video_file_name,
+                    "video/mp4",
                 )?;
-            }
 
-            Ok(())
+                if let Some(audio_url) = tracks.audio_playlist_url {
+                    let audio_file_name = format!("{base_name}_audio.m4a");
+                    let audio_temp_path = cache_dir.join(&audio_file_name);
+                    {
+                        let mut file =
+                            std::fs::File::create(&audio_temp_path).map_err(|e| e.to_string())?;
+                        let mut notifier = AndroidProgressNotifier::new(2, file_count);
+                        let mut on_progress = |current: u32, total: u32| {
+                            let is_last = current >= total;
+                            notifier.update(current as u64, Some(total as u64), is_last);
+                        };
+                        hls::download_track_to_writer(
+                            &client,
+                            &audio_url,
+                            &mut file,
+                            &mut on_progress,
+                        )
+                        .await?;
+                    }
+                    crate::android_bridge::save_downloaded_video(
+                        &audio_temp_path.to_string_lossy(),
+                        &audio_file_name,
+                        "audio/mp4",
+                    )?;
+                }
+
+                Ok(())
+            }
         }
     }
+    .await;
+
+    // 成否に関わらず必ずForeground Serviceを終了させる。
+    let _ = crate::android_bridge::notify_video_download_finished();
+    result
 }
 
 #[cfg(all(test, not(target_os = "android")))]

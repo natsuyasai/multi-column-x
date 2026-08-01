@@ -499,6 +499,51 @@ pub fn save_downloaded_video(
     })
 }
 
+/// MainActivity.notifyVideoDownloadStarted() を呼び出す。
+/// 動画ダウンロード開始時にForeground Serviceを起動させる（バックグラウンド中断対策）。
+pub fn notify_video_download_started() -> Result<(), String> {
+    call_activity_method(|env, activity| {
+        env.call_method(activity, "notifyVideoDownloadStarted", "()V", &[])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
+/// MainActivity.notifyVideoDownloadProgress(fileIndex, fileCount, current, total) を呼び出す。
+/// total が不明な場合は 0 以下を渡すこと（Kotlin側でindeterminate表示に切り替わる）。
+pub fn notify_video_download_progress(
+    file_index: i32,
+    file_count: i32,
+    current: i64,
+    total: i64,
+) -> Result<(), String> {
+    call_activity_method(|env, activity| {
+        env.call_method(
+            activity,
+            "notifyVideoDownloadProgress",
+            "(IIJJ)V",
+            &[
+                JValue::Int(file_index),
+                JValue::Int(file_count),
+                JValue::Long(current),
+                JValue::Long(total),
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
+/// MainActivity.notifyVideoDownloadFinished() を呼び出す。
+/// ダウンロード処理全体（成功/失敗問わず）が終わったら必ず呼び、Foreground Serviceを終了させる。
+pub fn notify_video_download_finished() -> Result<(), String> {
+    call_activity_method(|env, activity| {
+        env.call_method(activity, "notifyVideoDownloadFinished", "()V", &[])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
 /// AppBridge.onVideoDownloadRequest(payloadJson) から呼ばれるJNIエントリポイント。
 /// column WebView 内の video_long_press_menu.ts（後続ステップで実装）が
 /// window.__mcxVideoDownloadBridge 経由でダウンロード要求を送ってくる。
