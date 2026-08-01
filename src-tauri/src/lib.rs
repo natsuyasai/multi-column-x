@@ -139,7 +139,8 @@ pub fn run() {
     #[cfg(desktop)]
     let builder = builder
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_process::init());
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_dialog::init());
 
     #[cfg(desktop)]
     let builder = builder.on_window_event(|window, event| {
@@ -201,6 +202,7 @@ pub fn run() {
             commands::account::close_window,
             commands::webview::open_compose_window,
             commands::update::install_apk_update,
+            commands::video_download::download_video,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

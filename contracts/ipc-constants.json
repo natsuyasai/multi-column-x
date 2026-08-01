@@ -21,7 +21,8 @@
     "set_column_cookies",
     "is_webview_profile_supported",
     "report_new_posts_count",
-    "report_keyboard_shortcut"
+    "report_keyboard_shortcut",
+    "download_video"
   ],
   "events": {
     "ACCOUNT_LOGIN_COMPLETE": "account-login-complete",

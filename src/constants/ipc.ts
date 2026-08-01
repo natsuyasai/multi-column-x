@@ -44,6 +44,9 @@ export const IPC_COMMANDS = {
 
   // キーボードショートカット
   REPORT_KEYBOARD_SHORTCUT: "report_keyboard_shortcut",
+
+  // 動画ダウンロード
+  DOWNLOAD_VIDEO: "download_video",
 } as const;
 
 /** Tauri イベント名 */

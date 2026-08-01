@@ -2,10 +2,7 @@
 //! master playlist から映像/音声トラックの選定、media playlist からセグメントURL一覧の抽出を行う。
 //! ネットワークI/O（実際のGET・セグメント結合）は別モジュールで扱う（このファイルは純粋関数のみ）。
 //!
-//! 実装計画（tmp/plans/2026-08-01-video-download/plan.md）の作業分割の都合上、
-//! 本ファイルはまだ `commands/video_download.rs` から呼び出されていない（後続コミットで配線する）。
-//! それまでの間は dead_code 警告を抑止する。
-#![allow(dead_code)]
+//! `commands::video_download::download_video`（desktop）から呼び出される。
 
 use std::io::Write;
 
