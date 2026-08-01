@@ -88,12 +88,20 @@ function buildArticleWithStatusLink(statusHref: string): HTMLElement {
   return article;
 }
 
+/** section 配下に status ID 付きの article を追加する。 */
+function addArticleWithStatusId(
+  section: HTMLElement,
+  statusId: string,
+): HTMLElement {
+  const article = buildArticleWithStatusLink(`/username/status/${statusId}`);
+  section.appendChild(article);
+  return article;
+}
+
 describe("inject/auto_reload の純粋関数", () => {
   describe("extractStatusId", () => {
     it("time子要素を持つstatusリンクからIDを抽出できる", () => {
-      const article = buildArticleWithStatusLink(
-        "/username/status/123456789",
-      );
+      const article = buildArticleWithStatusLink("/username/status/123456789");
 
       expect(extractStatusId(article)).toBe("123456789");
     });
@@ -110,10 +118,7 @@ describe("inject/auto_reload の純粋関数", () => {
     it("time子要素を持たないstatusリンクは対象外となる（いいねボタン等の誤検出防止）", () => {
       const article = document.createElement("article");
       const likeLink = document.createElement("a");
-      likeLink.setAttribute(
-        "href",
-        "/username/status/123456789/likes",
-      );
+      likeLink.setAttribute("href", "/username/status/123456789/likes");
       article.appendChild(likeLink);
 
       expect(extractStatusId(article)).toBeNull();
@@ -123,12 +128,8 @@ describe("inject/auto_reload の純粋関数", () => {
   describe("collectKnownStatusIds", () => {
     it("複数articleから複数のstatus IDを収集できる", () => {
       const section = document.createElement("section");
-      section.appendChild(
-        buildArticleWithStatusLink("/username/status/111"),
-      );
-      section.appendChild(
-        buildArticleWithStatusLink("/username/status/222"),
-      );
+      section.appendChild(buildArticleWithStatusLink("/username/status/111"));
+      section.appendChild(buildArticleWithStatusLink("/username/status/222"));
 
       const ids = collectKnownStatusIds(section);
 
@@ -143,12 +144,8 @@ describe("inject/auto_reload の純粋関数", () => {
 
     it("同一IDが複数articleに存在する場合は重複排除される", () => {
       const section = document.createElement("section");
-      section.appendChild(
-        buildArticleWithStatusLink("/username/status/111"),
-      );
-      section.appendChild(
-        buildArticleWithStatusLink("/username/status/111"),
-      );
+      section.appendChild(buildArticleWithStatusLink("/username/status/111"));
+      section.appendChild(buildArticleWithStatusLink("/username/status/111"));
 
       const ids = collectKnownStatusIds(section);
 
@@ -395,5 +392,62 @@ describe("inject/auto_reload", () => {
 
     // 最新の observer のみが報告する（重複報告なし）
     expect(invokeMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("inject/auto_reload の新着判定（status ID 集合比較方式）", () => {
+  beforeAll(async () => {
+    await import("./auto_reload");
+  });
+
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    invokeMock.mockClear();
+    setScrolling(0);
+    window.__TAURI_INTERNALS__ = {
+      metadata: { currentWebview: { label: "column-1" } },
+    };
+    window.__TAURI__ = { core: { invoke: invokeMock } };
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("監視開始後に未知のstatus IDを持つarticleが出現すると新着として報告される", async () => {
+    addTab(true, false);
+    const section = addSection();
+    addArticleWithStatusId(section, "111");
+
+    triggerReload();
+
+    // 既知IDに含まれない新しいarticleが追加される
+    addArticleWithStatusId(section, "222");
+
+    await vi.runAllTimersAsync();
+
+    expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
+      label: "column-1",
+      count: 1,
+    });
+  });
+
+  it("監視中にスクロールを検知すると新着報告せず判定を打ち切る", async () => {
+    addTab(true, false);
+    const section = addSection();
+    addArticleWithStatusId(section, "111");
+
+    triggerReload();
+
+    // 監視期間中にユーザーがスクロールする
+    setScrolling(100);
+
+    // 未知IDのarticleが追加され mutation が発火するが、スクロール中のため打ち切られる
+    addArticleWithStatusId(section, "222");
+
+    await vi.runAllTimersAsync();
+
+    expect(invokeMock).not.toHaveBeenCalled();
   });
 });

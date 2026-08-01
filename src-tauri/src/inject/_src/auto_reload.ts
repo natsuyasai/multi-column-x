@@ -97,13 +97,7 @@ export function collectKnownStatusIds(section: Element): Set<string> {
     invoke("report_new_posts_count", { label, count }).catch(() => {});
   }
 
-  function getTweetTextElement(): HTMLElement | null {
-    const elements = document.querySelectorAll('[data-testid="tweetText"]');
-    if (elements.length === 0) return null;
-    return elements[0] as HTMLElement;
-  }
-
-  function waitForTweetTextChange(before: string | null): void {
+  function waitForNewTweet(): void {
     const section = document.querySelector("section[aria-labelledby]");
     if (!section) return;
 
@@ -111,6 +105,11 @@ export function collectKnownStatusIds(section: Element): Set<string> {
     if (currentTweetObserver) {
       currentTweetObserver.disconnect();
     }
+
+    // 監視開始時点の status ID 群をスナップショットする。DOM順先頭要素の
+    // innerHTML比較では仮想化リストのDOM recycle（スクロール中の要素入れ替え）を
+    // 新着と誤検出してしまうため、ツイート固有IDの集合比較に切り替える。
+    const knownIds = collectKnownStatusIds(section);
 
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
@@ -122,8 +121,23 @@ export function collectKnownStatusIds(section: Element): Set<string> {
     };
 
     const observer = new MutationObserver(function () {
-      const after = getTweetTextElement()?.innerHTML ?? null;
-      if (before !== after) {
+      // 監視期間中（最大30秒）にユーザーがスクロールしていたら、DOM recycle による
+      // 誤検出を避けるためその回の判定を打ち切る（新着報告しない）。
+      if (isScrolling()) {
+        observer.disconnect();
+        cleanUp();
+        return;
+      }
+
+      const currentIds = collectKnownStatusIds(section);
+      let hasNewId = false;
+      for (const id of currentIds) {
+        if (!knownIds.has(id)) {
+          hasNewId = true;
+          break;
+        }
+      }
+      if (hasNewId) {
         observer.disconnect();
         cleanUp();
         reportNewPostsCount(1);
@@ -184,9 +198,6 @@ export function collectKnownStatusIds(section: Element): Set<string> {
     }
     if (isScrolling()) return;
 
-    // before を取得してから、トリガーを実行
-    const before = getTweetTextElement()?.innerHTML ?? null;
-
     if (isFollowingTabActive()) {
       triggerFollowingRefresh();
     } else {
@@ -195,8 +206,8 @@ export function collectKnownStatusIds(section: Element): Set<string> {
       waitAndClickNewPostsButton();
     }
 
-    // トリガー実行後、差分監視を開始
-    waitForTweetTextChange(before);
+    // トリガー実行後、status ID 集合のスナップショットを取り、未知IDの出現を監視する
+    waitForNewTweet();
   }
 
   window.__multiColumnX =
