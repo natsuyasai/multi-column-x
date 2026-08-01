@@ -202,6 +202,7 @@ pub fn run() {
             commands::account::close_window,
             commands::webview::open_compose_window,
             commands::update::install_apk_update,
+            #[cfg(desktop)]
             commands::video_download::download_video,
         ])
         .run(tauri::generate_context!())
