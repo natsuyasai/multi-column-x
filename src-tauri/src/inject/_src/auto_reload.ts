@@ -1,4 +1,40 @@
 // src-tauri/src/inject/_src/auto_reload.ts
+
+// --- 純粋関数（vitest で単体テストする） ---
+
+/**
+ * article 内の timestamp リンク（time 子要素を持つ status リンク）の href から
+ * status ID（数字文字列）を抽出する。time 子要素を持たない status リンク
+ * （いいね等のカウント表示リンク）は対象外とする。
+ */
+export function extractStatusId(article: Element): string | null {
+  const links = article.querySelectorAll<HTMLAnchorElement>(
+    'a[href*="/status/"]',
+  );
+  for (const link of Array.from(links)) {
+    if (!link.querySelector("time")) continue;
+    const href = link.getAttribute("href");
+    const match = href?.match(/\/status\/(\d+)/);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+/**
+ * section 配下の全 article から status ID を収集する。
+ */
+export function collectKnownStatusIds(section: Element): Set<string> {
+  const ids = new Set<string>();
+  const articles = section.querySelectorAll("article");
+  for (const article of Array.from(articles)) {
+    const id = extractStatusId(article);
+    if (id !== null) ids.add(id);
+  }
+  return ids;
+}
+
+// --- 副作用（import 時に実行される IIFE） ---
+
 (function () {
   // tweetText 差分監視用の observer。waitAndClickNewPostsButton のボタン出現待ち
   // observer とは別物であり、互いに干渉しないよう独立した変数で管理する。

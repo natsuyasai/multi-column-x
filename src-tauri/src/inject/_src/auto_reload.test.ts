@@ -12,6 +12,7 @@ import {
   beforeEach,
   afterEach,
 } from "vitest";
+import { extractStatusId, collectKnownStatusIds } from "./auto_reload";
 
 const invokeMock = vi.fn((_cmd: string, _args?: Record<string, unknown>) =>
   Promise.resolve<unknown>(undefined),
@@ -76,6 +77,85 @@ function addTweetTextElement(section: HTMLElement, text: string): HTMLElement {
 function triggerReload(scrollToTop?: boolean): void {
   window.__multiColumnX.triggerReload(scrollToTop);
 }
+
+/** timestamp リンク（time 子要素を持つ a）を備えた article を生成する。 */
+function buildArticleWithStatusLink(statusHref: string): HTMLElement {
+  const article = document.createElement("article");
+  const timeLink = document.createElement("a");
+  timeLink.setAttribute("href", statusHref);
+  timeLink.appendChild(document.createElement("time"));
+  article.appendChild(timeLink);
+  return article;
+}
+
+describe("inject/auto_reload の純粋関数", () => {
+  describe("extractStatusId", () => {
+    it("time子要素を持つstatusリンクからIDを抽出できる", () => {
+      const article = buildArticleWithStatusLink(
+        "/username/status/123456789",
+      );
+
+      expect(extractStatusId(article)).toBe("123456789");
+    });
+
+    it("該当するリンクが無い場合はnullを返す", () => {
+      const article = document.createElement("article");
+      const otherLink = document.createElement("a");
+      otherLink.setAttribute("href", "/username");
+      article.appendChild(otherLink);
+
+      expect(extractStatusId(article)).toBeNull();
+    });
+
+    it("time子要素を持たないstatusリンクは対象外となる（いいねボタン等の誤検出防止）", () => {
+      const article = document.createElement("article");
+      const likeLink = document.createElement("a");
+      likeLink.setAttribute(
+        "href",
+        "/username/status/123456789/likes",
+      );
+      article.appendChild(likeLink);
+
+      expect(extractStatusId(article)).toBeNull();
+    });
+  });
+
+  describe("collectKnownStatusIds", () => {
+    it("複数articleから複数のstatus IDを収集できる", () => {
+      const section = document.createElement("section");
+      section.appendChild(
+        buildArticleWithStatusLink("/username/status/111"),
+      );
+      section.appendChild(
+        buildArticleWithStatusLink("/username/status/222"),
+      );
+
+      const ids = collectKnownStatusIds(section);
+
+      expect(ids).toEqual(new Set(["111", "222"]));
+    });
+
+    it("articleが無い場合は空のSetを返す", () => {
+      const section = document.createElement("section");
+
+      expect(collectKnownStatusIds(section)).toEqual(new Set());
+    });
+
+    it("同一IDが複数articleに存在する場合は重複排除される", () => {
+      const section = document.createElement("section");
+      section.appendChild(
+        buildArticleWithStatusLink("/username/status/111"),
+      );
+      section.appendChild(
+        buildArticleWithStatusLink("/username/status/111"),
+      );
+
+      const ids = collectKnownStatusIds(section);
+
+      expect(ids).toEqual(new Set(["111"]));
+    });
+  });
+});
 
 describe("inject/auto_reload", () => {
   beforeAll(async () => {
