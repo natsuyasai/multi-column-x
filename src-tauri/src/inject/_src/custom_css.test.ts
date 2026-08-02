@@ -46,4 +46,37 @@ describe("inject/custom_css", () => {
 
     expect(document.getElementById(STYLE_ID)).toBeNull();
   });
+
+  // apply() の再実行は MutationObserver 通知（マイクロタスク）→ 100ms デバウンス
+  // を経るため、実タイマーで十分に待ってから検証する（mobile_area_hide.test.ts と同じ方針）。
+  function wait(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  it("CSS適用済みの状態でstyle要素が外部要因で削除されると、MutationObserverにより自動的に再作成され同じCSSが復元される", async () => {
+    apply("body { color: red; }");
+    document.getElementById(STYLE_ID)?.remove();
+    expect(document.getElementById(STYLE_ID)).toBeNull();
+
+    await wait(150);
+
+    const style = document.getElementById(STYLE_ID);
+    expect(style?.tagName).toBe("STYLE");
+    expect(style?.textContent).toBe("body { color: red; }");
+  });
+
+  it("CSSが未適用の状態でheadの子要素が変化してもstyle要素は新規作成されない", async () => {
+    // 直前のテストの状態を引き継がないよう、明示的に未適用状態にリセットする
+    apply("");
+    expect(document.getElementById(STYLE_ID)).toBeNull();
+
+    const marker = document.createElement("meta");
+    document.head.appendChild(marker);
+
+    await wait(150);
+
+    expect(document.getElementById(STYLE_ID)).toBeNull();
+
+    document.head.removeChild(marker);
+  });
 });
