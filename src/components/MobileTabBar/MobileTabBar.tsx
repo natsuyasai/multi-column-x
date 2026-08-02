@@ -19,7 +19,8 @@ function getExternalTabLabel(customUrl: string | undefined): string {
 
 function getTabLabel(column: Column): string {
   if (column.label) return column.label;
-  if (column.pageType === "external") return getExternalTabLabel(column.customUrl);
+  if (column.pageType === "external")
+    return getExternalTabLabel(column.customUrl);
   const labels: Record<Exclude<PageType, "external">, string> = {
     home: column.homeTabName ?? "ホーム",
     notifications: "通知",

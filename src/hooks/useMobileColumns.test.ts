@@ -16,9 +16,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 // 模したデフォルト実装でモックする（既存アカウント検索ロジックのテストは維持しつつ、
 // external カラムのテストではこのモックを上書きして解決済みパスを返させる）。
 vi.mock("../services/externalColumn", () => ({
-  isExternalColumn: vi.fn(
-    (column: Column) => column.pageType === "external",
-  ),
+  isExternalColumn: vi.fn((column: Column) => column.pageType === "external"),
   resolveColumnDataDirectory: vi.fn(
     async (column: Column, accounts: Account[]) =>
       accounts.find((a) => a.id === column.accountId)?.dataDirectory,
@@ -215,9 +213,7 @@ describe("useMobileColumns", () => {
       order: 2,
     };
     mockResolveColumnDataDirectory.mockImplementation(async (column) =>
-      column.id === "col-external"
-        ? "/data/external/col-external"
-        : undefined,
+      column.id === "col-external" ? "/data/external/col-external" : undefined,
     );
     const { result } = renderMobileColumns();
 

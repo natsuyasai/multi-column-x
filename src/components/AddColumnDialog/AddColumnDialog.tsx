@@ -64,7 +64,8 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
             hideHeaderEnabled: globalSettings.defaultHideHeaderEnabled,
             hideTweetInputEnabled: globalSettings.defaultHideTweetInputEnabled,
             showCustomMenu: globalSettings.defaultShowCustomMenu,
-            scrollPosRestoreEnabled: globalSettings.defaultScrollPosRestoreEnabled,
+            scrollPosRestoreEnabled:
+              globalSettings.defaultScrollPosRestoreEnabled,
             customCSS: globalSettings.defaultColumnCustomCSS,
             smallImageEnabled: globalSettings.smallImageEnabled,
             smallImageWidth: globalSettings.smallImageWidth,

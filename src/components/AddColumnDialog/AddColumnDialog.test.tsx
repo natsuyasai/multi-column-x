@@ -203,10 +203,7 @@ describe("AddColumnDialog", () => {
       screen.getByLabelText("ページタイプ"),
       "外部URL（アカウント非依存）",
     );
-    await userEvent.type(
-      screen.getByLabelText("URL"),
-      "https://example.com/",
-    );
+    await userEvent.type(screen.getByLabelText("URL"), "https://example.com/");
     await userEvent.click(screen.getByRole("button", { name: "追加" }));
     expect(onAdd).toHaveBeenCalled();
     const column = onAdd.mock.calls[0][0] as Column;
@@ -228,10 +225,7 @@ describe("AddColumnDialog", () => {
       screen.getByLabelText("ページタイプ"),
       "外部URL（アカウント非依存）",
     );
-    await userEvent.type(
-      screen.getByLabelText("URL"),
-      "https://example.com/",
-    );
+    await userEvent.type(screen.getByLabelText("URL"), "https://example.com/");
     await userEvent.click(screen.getByRole("button", { name: "追加" }));
     expect(onAdd).toHaveBeenCalledWith(
       expect.objectContaining<Partial<Column>>({
@@ -258,10 +252,7 @@ describe("AddColumnDialog", () => {
       screen.getByLabelText("ページタイプ"),
       "外部URL（アカウント非依存）",
     );
-    await userEvent.type(
-      screen.getByLabelText("URL"),
-      "https://example.com/",
-    );
+    await userEvent.type(screen.getByLabelText("URL"), "https://example.com/");
     await userEvent.click(screen.getByRole("button", { name: "追加" }));
     expect(onAdd).toHaveBeenCalledWith(
       expect.objectContaining<Partial<Column>>({

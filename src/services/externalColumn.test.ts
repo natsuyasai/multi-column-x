@@ -68,7 +68,10 @@ describe("externalColumn service", () => {
     });
 
     it("external以外のカラムでaccountが見つからない場合undefinedを返す", async () => {
-      const column = createColumn({ accountId: "acc-missing", pageType: "home" });
+      const column = createColumn({
+        accountId: "acc-missing",
+        pageType: "home",
+      });
       const accounts: Account[] = [
         { id: "acc-1", dataDirectory: "/data/acc-1" } as Account,
       ];
