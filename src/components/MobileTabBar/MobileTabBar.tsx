@@ -54,13 +54,17 @@ const TabItem: React.FC<TabItemProps> = ({
   onLongPress,
   onDoubleTap,
 }) => {
+  const isExternal = column.pageType === "external";
   const { remaining } = useAutoReload({
     columnId: column.id,
     enabled: column.settings.autoReloadEnabled,
     intervalSec: column.settings.autoReloadInterval,
   });
   const showCountdown =
-    isActive && column.settings.showCountdown && remaining !== null;
+    !isExternal &&
+    isActive &&
+    column.settings.showCountdown &&
+    remaining !== null;
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressNextClick = useRef(false);
   const touchStartPos = useRef<{ x: number; y: number } | null>(null);
