@@ -4,6 +4,7 @@ export type PageType =
   | "search"
   | "list"
   | "custom"
+  | "external"
   | "compose";
 export type ColumnScale = "small" | "default" | "normal" | "large" | "xLarge";
 
@@ -190,6 +191,7 @@ interface GetPageTypeLabelInput {
   pageType: PageType;
   homeTabName?: string;
   searchQuery?: string;
+  customUrl?: string;
 }
 
 export function getPageTypeLabel(input: GetPageTypeLabelInput): string {
@@ -204,6 +206,13 @@ export function getPageTypeLabel(input: GetPageTypeLabelInput): string {
       return "リスト";
     case "custom":
       return "カスタム";
+    case "external":
+      if (!input.customUrl) return "外部サイト";
+      try {
+        return `外部: ${new URL(input.customUrl).hostname}`;
+      } catch {
+        return "外部サイト";
+      }
     case "compose":
       return "投稿";
   }

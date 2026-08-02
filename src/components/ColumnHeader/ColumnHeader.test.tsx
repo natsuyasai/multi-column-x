@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import type { Column, Account } from "../../types";
 import { ColumnHeader } from "./ColumnHeader";
+import styles from "./ColumnHeader.module.scss";
 
 const mockAccount: Account = {
   id: "acc-1",
@@ -154,5 +155,66 @@ describe("ColumnHeader", () => {
         .querySelector('[title="先頭までスクロール"]')
         ?.querySelector('[data-testid="icon-chevrons-up"]'),
     ).toBeInTheDocument();
+  });
+
+  it("accountがundefinedの場合ラベルがページタイプのみになる", () => {
+    render(<ColumnHeader {...defaultProps} account={undefined} />);
+    expect(screen.getByText("フォロー中")).toBeInTheDocument();
+    expect(
+      screen.queryByText("テストアカウント - フォロー中"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("accountがundefinedの場合ドット色がフォールバック値になる", () => {
+    const { container } = render(
+      <ColumnHeader {...defaultProps} account={undefined} />,
+    );
+    const header = container.querySelector(`.${styles.header}`);
+    const dot = container.querySelector(`.${styles.dot}`);
+    expect(header).toHaveStyle({ borderTopColor: "#888" });
+    expect(dot).toHaveStyle({ backgroundColor: "#888" });
+  });
+
+  describe("pageTypeがexternalの場合", () => {
+    const externalColumn: Column = { ...mockColumn, pageType: "external" };
+
+    it("unreadCountが1以上でも未読バッジが表示されない", () => {
+      render(
+        <ColumnHeader
+          {...defaultProps}
+          column={externalColumn}
+          unreadCount={5}
+        />,
+      );
+      expect(screen.queryByTestId("unread-badge")).not.toBeInTheDocument();
+    });
+
+    it("自動更新のカウントダウンが表示されない", () => {
+      render(<ColumnHeader {...defaultProps} column={externalColumn} />);
+      expect(screen.queryByTitle("次の自動更新まで")).not.toBeInTheDocument();
+    });
+
+    it("先頭までスクロールボタンが表示されない", () => {
+      render(<ColumnHeader {...defaultProps} column={externalColumn} />);
+      expect(
+        screen.queryByLabelText("先頭までスクロール"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("更新ボタンが表示されない", () => {
+      render(<ColumnHeader {...defaultProps} column={externalColumn} />);
+      expect(screen.queryByLabelText("更新")).not.toBeInTheDocument();
+    });
+
+    it("ページ再読み込みボタンは表示される", () => {
+      render(<ColumnHeader {...defaultProps} column={externalColumn} />);
+      expect(screen.getByLabelText("ページを再読み込み")).toBeInTheDocument();
+    });
+
+    it("設定ボタンと閉じるボタンは表示される", () => {
+      render(<ColumnHeader {...defaultProps} column={externalColumn} />);
+      expect(screen.getByLabelText("設定")).toBeInTheDocument();
+      expect(screen.getByLabelText("カラムを閉じる")).toBeInTheDocument();
+    });
   });
 });

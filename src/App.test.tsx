@@ -119,6 +119,30 @@ describe("App (desktop)", () => {
     fireEvent.click(screen.getByTitle("アカウント管理 (Ctrl+Shift+A)"));
     expect(screen.getByLabelText("アカウントA を再認証")).toBeInTheDocument();
   });
+
+  it("accountIdに一致するアカウントが見つからない通常カラムは描画されない", () => {
+    const orphanColumn: Column = {
+      ...column,
+      id: "col-orphan",
+      accountId: "acc-missing",
+    };
+    useAppStore.setState({ columns: [orphanColumn] });
+    render(<App />);
+    expect(screen.queryByText("フォロー中")).not.toBeInTheDocument();
+  });
+
+  it("externalカラムはアカウントが見つからなくても描画される", () => {
+    const externalColumn: Column = {
+      ...column,
+      id: "col-external",
+      accountId: "acc-missing",
+      pageType: "external",
+      customUrl: "https://example.com",
+    };
+    useAppStore.setState({ columns: [externalColumn] });
+    render(<App />);
+    expect(screen.getByText("外部: example.com")).toBeInTheDocument();
+  });
 });
 
 describe("App (mobile)", () => {

@@ -212,6 +212,66 @@ describe("SettingsPanel 表示設定", () => {
   });
 });
 
+describe("SettingsPanel pageTypeがexternalの場合", () => {
+  const externalColumn: Column = {
+    ...mockColumn,
+    pageType: "external",
+    customUrl: "https://example.com",
+  };
+
+  it("pageTypeがexternalの場合自動更新セクションが表示されない", () => {
+    render(<SettingsPanel {...defaultProps} column={externalColumn} />);
+    expect(screen.queryByText("自動更新")).not.toBeInTheDocument();
+  });
+
+  it("pageTypeがexternalの場合表示セクションが表示されない", () => {
+    render(<SettingsPanel {...defaultProps} column={externalColumn} />);
+    expect(screen.queryByText("表示")).not.toBeInTheDocument();
+  });
+
+  it("pageTypeがexternalの場合画像セクションが表示されない", () => {
+    render(<SettingsPanel {...defaultProps} column={externalColumn} />);
+    expect(screen.queryByText("画像")).not.toBeInTheDocument();
+  });
+
+  it("pageTypeがexternalの場合画像ブラーセクションが表示されない", () => {
+    render(<SettingsPanel {...defaultProps} column={externalColumn} />);
+    expect(screen.queryByText("画像ブラー")).not.toBeInTheDocument();
+  });
+
+  it("pageTypeがexternalの場合通知セクションが表示されない", () => {
+    render(<SettingsPanel {...defaultProps} column={externalColumn} />);
+    expect(screen.queryByText("通知")).not.toBeInTheDocument();
+  });
+
+  it("pageTypeがexternalの場合ngワードセクションが表示されない", () => {
+    render(<SettingsPanel {...defaultProps} column={externalColumn} />);
+    expect(screen.queryByText("NGワード")).not.toBeInTheDocument();
+  });
+
+  it("pageTypeがexternalの場合カスタムcssセクションは表示される", () => {
+    render(<SettingsPanel {...defaultProps} column={externalColumn} />);
+    expect(screen.getByText("カスタム CSS")).toBeInTheDocument();
+  });
+
+  it("pageTypeがexternalの場合カラム幅セクションは表示される", () => {
+    render(<SettingsPanel {...defaultProps} column={externalColumn} />);
+    expect(screen.getByText("カラム")).toBeInTheDocument();
+  });
+
+  it("pageTypeがexternal以外の場合すべてのセクションが表示される", () => {
+    render(<SettingsPanel {...defaultProps} column={mockColumn} />);
+    expect(screen.getByText("カラム")).toBeInTheDocument();
+    expect(screen.getByText("自動更新")).toBeInTheDocument();
+    expect(screen.getByText("表示")).toBeInTheDocument();
+    expect(screen.getByText("画像")).toBeInTheDocument();
+    expect(screen.getByText("画像ブラー")).toBeInTheDocument();
+    expect(screen.getByText("通知")).toBeInTheDocument();
+    expect(screen.getByText("NGワード")).toBeInTheDocument();
+    expect(screen.getByText("カスタム CSS")).toBeInTheDocument();
+  });
+});
+
 describe("SettingsPanel 新着デスクトップ通知", () => {
   it("新着通知トグルが表示される", () => {
     render(<SettingsPanel {...defaultProps} />);

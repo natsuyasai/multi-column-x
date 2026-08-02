@@ -6,6 +6,7 @@
     "remove_column_webview",
     "resize_column_webview",
     "eval_in_webview",
+    "get_external_column_data_directory",
     "open_popup_window",
     "open_link_popup_window",
     "close_popup_window",
@@ -21,7 +22,8 @@
     "set_column_cookies",
     "is_webview_profile_supported",
     "report_new_posts_count",
-    "report_keyboard_shortcut"
+    "report_keyboard_shortcut",
+    "download_video"
   ],
   "events": {
     "ACCOUNT_LOGIN_COMPLETE": "account-login-complete",
@@ -31,7 +33,8 @@
     "WEBVIEW_KEYBOARD_SHORTCUT": "webview-keyboard-shortcut",
     "COLUMN_WEBVIEW_CRASHED": "column-webview-crashed",
     "COLUMN_WEBVIEW_FOCUSED": "column-webview-focused",
-    "ACCOUNT_REAUTH_COMPLETE": "account-reauth-complete"
+    "ACCOUNT_REAUTH_COMPLETE": "account-reauth-complete",
+    "VIDEO_DOWNLOAD_PROGRESS": "video-download-progress"
   },
   "labels": {
     "MAIN": "main",

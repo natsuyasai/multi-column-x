@@ -1,6 +1,6 @@
 [package]
 name = "multicolumnx"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -30,10 +30,14 @@ tokio = { version = "1", features = ["full"] }
 tauri-plugin-log = "2.8.0"
 tauri-plugin-notification = "2"
 log = "0.4"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
+m3u8-rs = "6"
 
 [dev-dependencies]
 # プロパティベーステスト（純粋関数の不変条件検証）
 proptest = "1"
+# 動画ダウンロードのHTTP I/O層のテスト用モックHTTPサーバ
+wiremock = "0.6"
 
 [target.'cfg(target_os = "android")'.dependencies]
 jni = { version = "0.21", default-features = false }
@@ -54,6 +58,8 @@ webview2-com = "=0.38.2"
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+# 動画ダウンロードの保存先ダイアログはデスクトップのみ。Android は Kotlin 側 SAF で別実装する。
+tauri-plugin-dialog = "2"
 
 [profile.release]
 panic = "abort"

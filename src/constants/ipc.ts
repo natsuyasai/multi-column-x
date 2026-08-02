@@ -14,6 +14,7 @@ export const IPC_COMMANDS = {
   REMOVE_COLUMN_WEBVIEW: "remove_column_webview",
   RESIZE_COLUMN_WEBVIEW: "resize_column_webview",
   EVAL_IN_WEBVIEW: "eval_in_webview",
+  GET_EXTERNAL_COLUMN_DATA_DIRECTORY: "get_external_column_data_directory",
 
   // ポップアップ
   OPEN_POPUP_WINDOW: "open_popup_window",
@@ -44,6 +45,9 @@ export const IPC_COMMANDS = {
 
   // キーボードショートカット
   REPORT_KEYBOARD_SHORTCUT: "report_keyboard_shortcut",
+
+  // 動画ダウンロード
+  DOWNLOAD_VIDEO: "download_video",
 } as const;
 
 /** Tauri イベント名 */
@@ -64,6 +68,8 @@ export const IPC_EVENTS = {
   COLUMN_WEBVIEW_FOCUSED: "column-webview-focused",
   /** 再認証完了（desktop: Rust emit → TS listen）payload { accountId, xUserId }。account-login-complete とは別イベント。 */
   ACCOUNT_REAUTH_COMPLETE: "account-reauth-complete",
+  /** 動画ダウンロード進捗（desktop: Rust emit_to → TS listen）payload { fileIndex, fileCount, current, total, phase } */
+  VIDEO_DOWNLOAD_PROGRESS: "video-download-progress",
 } as const;
 
 /** WebView / ウィンドウラベルのプレフィックスと生成ヘルパー */

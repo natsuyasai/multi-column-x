@@ -9,6 +9,7 @@ import {
   resizeColumnWebview,
   setColumnCookies,
 } from "../services/columnWebview";
+import { resolveColumnDataDirectory } from "../services/externalColumn";
 import { useAppStore } from "../store/useAppStore";
 import type { Column } from "../types";
 
@@ -115,13 +116,14 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
       // 表示ペア（1〜2枚）が visible で作成される。
       await Promise.all(
         sortedByOrder.map(async (column) => {
-          const account = currentAccounts.find(
-            (a) => a.id === column.accountId,
+          const dataDirectory = await resolveColumnDataDirectory(
+            column,
+            currentAccounts,
           );
-          if (!account) return;
+          if (dataDirectory === undefined) return;
           await createColumnWebview(
             column,
-            account.dataDirectory,
+            dataDirectory,
             layout[column.id],
           ).catch(logError("restoreMobileColumns:createColumnWebview"));
         }),

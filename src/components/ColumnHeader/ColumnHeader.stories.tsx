@@ -95,6 +95,24 @@ export const Default: Story = {
   },
 };
 
+export const ExternalWithoutAccount: Story = {
+  name: "外部カラム（アカウントなし）",
+  args: {
+    column: {
+      ...column,
+      id: "col-external",
+      accountId: "",
+      pageType: "external",
+      customUrl: "https://example.com",
+    },
+    account: undefined,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("外部: example.com")).toBeInTheDocument();
+  },
+};
+
 export const LightTheme: Story = {
   name: "ライトテーマ",
   decorators: [

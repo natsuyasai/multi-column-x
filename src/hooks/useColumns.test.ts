@@ -2,8 +2,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { OFFSCREEN } from "../constants/ipc";
+import { resolveColumnDataDirectory } from "../services/externalColumn";
 import { useAppStore } from "../store/useAppStore";
-import type { Column } from "../types";
+import type { Account, Column } from "../types";
 import { DEFAULT_COLUMN_SETTINGS, DEFAULT_GLOBAL_SETTINGS } from "../types";
 import { useColumns } from "./useColumns";
 
@@ -20,7 +21,20 @@ vi.mock("@tauri-apps/plugin-os", () => ({
   platform: vi.fn(() => "windows"),
 }));
 
+// resolveColumnDataDirectory は内部で invoke（IPC）を呼ぶため、実際の挙動を
+// 模したデフォルト実装でモックする（既存アカウント検索ロジックのテストは維持しつつ、
+// external カラムのテストではこのモックを上書きして解決済みパスを返させる）。
+vi.mock("../services/externalColumn", () => ({
+  isExternalColumn: vi.fn((column: Column) => column.pageType === "external"),
+  resolveColumnDataDirectory: vi.fn(
+    async (column: Column, accounts: Account[]) =>
+      accounts.find((a) => a.id === column.accountId)?.dataDirectory,
+  ),
+}));
+
 // calculateGridBounds のテストは src/lib/gridLayout.test.ts へ移動した
+
+const mockResolveColumnDataDirectory = vi.mocked(resolveColumnDataDirectory);
 
 describe("useColumns mobile", () => {
   const mockInvoke = vi.mocked(invoke);
@@ -28,6 +42,10 @@ describe("useColumns mobile", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockInvoke.mockResolvedValue(undefined);
+    mockResolveColumnDataDirectory.mockImplementation(
+      async (column, accounts) =>
+        accounts.find((a) => a.id === column.accountId)?.dataDirectory,
+    );
     useAppStore.setState({
       accounts: [
         {
@@ -344,6 +362,10 @@ describe("useColumns desktop recreateAllWebviews", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockInvoke.mockResolvedValue(undefined);
+    mockResolveColumnDataDirectory.mockImplementation(
+      async (column, accounts) =>
+        accounts.find((a) => a.id === column.accountId)?.dataDirectory,
+    );
     useAppStore.setState({
       accounts: [
         {
@@ -409,5 +431,110 @@ describe("useColumns desktop recreateAllWebviews", () => {
     const last = lastResizeBoundsById();
     expect(last["col-1"]?.x).not.toBe(OFFSCREEN.DESKTOP_X);
     expect(last["col-2"]?.x).not.toBe(OFFSCREEN.DESKTOP_X);
+  });
+});
+
+describe("useColumns handleAddColumn", () => {
+  const mockInvoke = vi.mocked(invoke);
+
+  function attachContainer(
+    ref: { current: HTMLDivElement | null },
+    clientHeight = 900,
+  ) {
+    const div = document.createElement("div");
+    Object.defineProperty(div, "clientHeight", {
+      value: clientHeight,
+      configurable: true,
+    });
+    ref.current = div;
+  }
+
+  function makeColumn(overrides: Partial<Column> & Pick<Column, "id">): Column {
+    return {
+      accountId: "acc-1",
+      pageType: "home",
+      homeTabName: "フォロー中",
+      width: 350,
+      order: 0,
+      gridRow: 1,
+      gridCol: 1,
+      heightMode: "auto",
+      settings: { ...DEFAULT_COLUMN_SETTINGS },
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+    mockResolveColumnDataDirectory.mockImplementation(
+      async (column, accounts) =>
+        accounts.find((a) => a.id === column.accountId)?.dataDirectory,
+    );
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-1",
+          label: "Test",
+          dataDirectory: "/data/acc-1",
+          color: "#1d9bf0",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      columns: [],
+      globalSettings: { ...DEFAULT_GLOBAL_SETTINGS },
+      isLoaded: true,
+      isMobile: false,
+      topBarExpanded: false,
+    });
+  });
+
+  it("handleAddColumnはexternalカラムをアカウントなしでも処理する", async () => {
+    const externalColumn = makeColumn({
+      id: "col-external",
+      pageType: "external",
+      accountId: "col-external",
+    });
+    mockResolveColumnDataDirectory.mockImplementation(async (column) =>
+      column.id === "col-external" ? "/data/external/col-external" : undefined,
+    );
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+
+    await act(async () => {
+      await result.current.handleAddColumn(externalColumn);
+    });
+
+    const createCall = mockInvoke.mock.calls.find(
+      (c) => c[0] === "create_column_webview",
+    );
+    expect(createCall).toBeDefined();
+    expect(
+      (createCall?.[1] as { args: { dataDirectory: string } }).args
+        .dataDirectory,
+    ).toBe("/data/external/col-external");
+    expect(
+      useAppStore.getState().columns.some((c) => c.id === "col-external"),
+    ).toBe(true);
+  });
+
+  it("handleAddColumnは通常カラムでアカウントが見つからない場合は従来通りスキップされる", async () => {
+    const orphanColumn = makeColumn({
+      id: "col-orphan",
+      accountId: "acc-missing",
+    });
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+
+    await act(async () => {
+      await result.current.handleAddColumn(orphanColumn);
+    });
+
+    expect(
+      mockInvoke.mock.calls.filter((c) => c[0] === "create_column_webview"),
+    ).toHaveLength(0);
+    expect(
+      useAppStore.getState().columns.some((c) => c.id === "col-orphan"),
+    ).toBe(false);
   });
 });

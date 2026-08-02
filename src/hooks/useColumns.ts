@@ -16,6 +16,7 @@ import {
   removeColumnWebview,
   resizeColumnWebview,
 } from "../services/columnWebview";
+import { resolveColumnDataDirectory } from "../services/externalColumn";
 import { useAppStore } from "../store/useAppStore";
 import type { Column } from "../types";
 import { useDesktopColumns } from "./useDesktopColumns";
@@ -94,8 +95,9 @@ export function useColumns() {
   // カラム追加
   const handleAddColumn = useCallback(
     async (column: Column) => {
-      const account = accounts.find((a) => a.id === column.accountId);
-      if (!account || !containerRef.current) return;
+      if (!containerRef.current) return;
+      const dataDirectory = await resolveColumnDataDirectory(column, accounts);
+      if (dataDirectory === undefined) return;
 
       addColumn(column);
 
@@ -115,7 +117,7 @@ export function useColumns() {
         });
         await createColumnWebview(
           column,
-          account.dataDirectory,
+          dataDirectory,
           offscreenLayout[column.id],
         ).catch(logError("handleAddColumn:createColumnWebview(mobile)"));
         if (activeColumnId === null) {
@@ -142,7 +144,7 @@ export function useColumns() {
       const b = bounds[column.id];
       if (!b) return;
 
-      await createColumnWebview(column, account.dataDirectory, b).catch(
+      await createColumnWebview(column, dataDirectory, b).catch(
         logError("handleAddColumn:createColumnWebview"),
       );
     },
@@ -270,8 +272,11 @@ export function useColumns() {
       } = useAppStore.getState();
       const column = currentColumns.find((c) => c.id === columnId);
       if (!column) return;
-      const account = currentAccounts.find((a) => a.id === column.accountId);
-      if (!account) return;
+      const dataDirectory = await resolveColumnDataDirectory(
+        column,
+        currentAccounts,
+      );
+      if (dataDirectory === undefined) return;
 
       await removeColumnWebview(columnId).catch(
         logError("recreateColumnWebview:removeColumnWebview"),
@@ -289,7 +294,7 @@ export function useColumns() {
         });
         await createColumnWebview(
           column,
-          account.dataDirectory,
+          dataDirectory,
           offscreenLayout[column.id],
         ).catch(logError("recreateColumnWebview:createColumnWebview(mobile)"));
         // 再作成したカラムが現在の表示ペア（アクティブ or その隣）に含まれるなら
@@ -323,7 +328,7 @@ export function useColumns() {
       const b = bounds[columnId];
       if (!b) return;
 
-      await createColumnWebview(column, account.dataDirectory, b).catch(
+      await createColumnWebview(column, dataDirectory, b).catch(
         logError("recreateColumnWebview:createColumnWebview"),
       );
       // Linux ではカラムを非表示で作成するため、作成後に recalculateAllBounds で

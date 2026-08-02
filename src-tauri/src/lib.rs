@@ -4,6 +4,7 @@ mod commands;
 mod inject;
 mod ipc_constants;
 mod state;
+mod video;
 
 use state::AppState;
 #[cfg(desktop)]
@@ -138,7 +139,8 @@ pub fn run() {
     #[cfg(desktop)]
     let builder = builder
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_process::init());
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_dialog::init());
 
     #[cfg(desktop)]
     let builder = builder.on_window_event(|window, event| {
@@ -180,6 +182,7 @@ pub fn run() {
             commands::settings::load_settings,
             commands::settings::save_settings,
             commands::webview::create_column_webview,
+            commands::webview::get_external_column_data_directory,
             commands::webview::remove_column_webview,
             commands::webview::resize_column_webview,
             commands::webview::open_popup_window,
@@ -200,6 +203,8 @@ pub fn run() {
             commands::account::close_window,
             commands::webview::open_compose_window,
             commands::update::install_apk_update,
+            #[cfg(desktop)]
+            commands::video_download::download_video,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

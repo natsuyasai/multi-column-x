@@ -128,6 +128,59 @@ describe("MobileTabBar", () => {
     expect(screen.getByText("投稿")).toBeInTheDocument();
   });
 
+  it("pageTypeがexternalでcustomUrlがある場合ホスト名を含むラベルを表示する", () => {
+    const externalCol: Column = {
+      ...col1,
+      pageType: "external",
+      customUrl: "https://example.com/path",
+    };
+    render(<MobileTabBar {...defaultProps} columns={[externalCol]} />);
+    expect(screen.getByText("外部: example.com")).toBeInTheDocument();
+  });
+
+  it("pageTypeがexternalでcustomUrlがない場合外部サイトを表示する", () => {
+    const externalCol: Column = { ...col1, pageType: "external" };
+    render(<MobileTabBar {...defaultProps} columns={[externalCol]} />);
+    expect(screen.getByText("外部サイト")).toBeInTheDocument();
+  });
+
+  it("pageTypeがexternalでcustomUrlが不正な形式の場合外部サイトを表示する", () => {
+    const externalCol: Column = {
+      ...col1,
+      pageType: "external",
+      customUrl: "not-a-url",
+    };
+    render(<MobileTabBar {...defaultProps} columns={[externalCol]} />);
+    expect(screen.getByText("外部サイト")).toBeInTheDocument();
+  });
+
+  it("pageTypeがhomeでアクティブかつ自動更新有効な場合カウントダウンが表示される", () => {
+    render(
+      <MobileTabBar
+        {...defaultProps}
+        columns={[col1]}
+        activeColumnId="col-1"
+      />,
+    );
+    expect(
+      screen.getByText(`${baseSettings.autoReloadInterval}s`),
+    ).toBeInTheDocument();
+  });
+
+  it("pageTypeがexternalの場合アクティブかつ自動更新有効でもカウントダウンが表示されない", () => {
+    const externalCol: Column = { ...col1, pageType: "external" };
+    render(
+      <MobileTabBar
+        {...defaultProps}
+        columns={[externalCol]}
+        activeColumnId="col-1"
+      />,
+    );
+    expect(
+      screen.queryByText(`${baseSettings.autoReloadInterval}s`),
+    ).not.toBeInTheDocument();
+  });
+
   it("homeTabName がある場合はそれを表示する", () => {
     const colWithTabName: Column = { ...col1, homeTabName: "フォロー中" };
     render(<MobileTabBar {...defaultProps} columns={[colWithTabName]} />);

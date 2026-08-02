@@ -9,7 +9,7 @@ import styles from "./ColumnHeader.module.scss";
 
 interface ColumnHeaderProps {
   column: Column;
-  account: Account;
+  account: Account | undefined;
   onReload: (columnId: string) => void;
   onReloadPage: (columnId: string) => void;
   onScrollTop: (columnId: string) => void;
@@ -30,21 +30,32 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
   unreadCount = 0,
   onClearUnread,
 }) => {
+  const isExternal = column.pageType === "external";
   const label =
-    column.label ?? `${account.label} - ${getPageTypeLabel(column)}`;
+    column.label ??
+    (account
+      ? `${account.label} - ${getPageTypeLabel(column)}`
+      : getPageTypeLabel(column));
   const { remaining, reset } = useAutoReload({
     columnId: column.id,
     enabled: column.settings.autoReloadEnabled,
     intervalSec: column.settings.autoReloadInterval,
   });
 
-  const showCountdown = column.settings.showCountdown && remaining !== null;
+  const showCountdown =
+    !isExternal && column.settings.showCountdown && remaining !== null;
 
   return (
-    <div className={styles.header} style={{ borderTopColor: account.color }}>
-      <span className={styles.dot} style={{ backgroundColor: account.color }} />
+    <div
+      className={styles.header}
+      style={{ borderTopColor: account?.color ?? "#888" }}
+    >
+      <span
+        className={styles.dot}
+        style={{ backgroundColor: account?.color ?? "#888" }}
+      />
       <span className={styles.label}>{label}</span>
-      {unreadCount > 0 && (
+      {!isExternal && unreadCount > 0 && (
         <button
           className={styles.unreadBadge}
           data-testid="unread-badge"
@@ -59,29 +70,33 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
         </span>
       )}
       <div className={styles.actions}>
-        <button
-          className={styles.actionBtn}
-          onClick={() => onScrollTop(column.id)}
-          aria-label="先頭までスクロール"
-          title="先頭までスクロール"
-        >
-          <ChevronsUpIcon
-            width={14}
-            height={14}
-            data-testid="icon-chevrons-up"
-          />
-        </button>
-        <button
-          className={styles.actionBtn}
-          onClick={() => {
-            onReload(column.id);
-            reset();
-          }}
-          aria-label="更新"
-          title="更新"
-        >
-          ↺
-        </button>
+        {!isExternal && (
+          <button
+            className={styles.actionBtn}
+            onClick={() => onScrollTop(column.id)}
+            aria-label="先頭までスクロール"
+            title="先頭までスクロール"
+          >
+            <ChevronsUpIcon
+              width={14}
+              height={14}
+              data-testid="icon-chevrons-up"
+            />
+          </button>
+        )}
+        {!isExternal && (
+          <button
+            className={styles.actionBtn}
+            onClick={() => {
+              onReload(column.id);
+              reset();
+            }}
+            aria-label="更新"
+            title="更新"
+          >
+            ↺
+          </button>
+        )}
         <button
           className={styles.actionBtn}
           onClick={() => {

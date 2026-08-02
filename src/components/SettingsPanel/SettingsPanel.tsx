@@ -20,6 +20,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 }) => {
   useEscapeKey(onClose);
 
+  const isExternal = column.pageType === "external";
+
   const [settings, setSettings] = useState<ColumnSettings>({
     ...column.settings,
   });
@@ -69,212 +71,224 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </section>
           )}
 
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>自動更新</h3>
-            <label className={styles.checkLabel}>
-              <input
-                type="checkbox"
-                checked={settings.autoReloadEnabled}
-                onChange={(e) =>
-                  setSettings((s) => ({
-                    ...s,
-                    autoReloadEnabled: e.target.checked,
-                  }))
-                }
-              />
-              自動更新を有効にする
-            </label>
-            {settings.autoReloadEnabled && (
-              <>
-                <label className={styles.fieldLabel}>
-                  更新間隔（秒）
-                  <input
-                    type="number"
-                    className={styles.numberInput}
-                    min={10}
-                    max={3600}
-                    value={settings.autoReloadInterval}
-                    onChange={(e) =>
-                      setSettings((s) => ({
-                        ...s,
-                        autoReloadInterval: Number(e.target.value),
-                      }))
-                    }
-                  />
-                </label>
-                <label className={styles.checkLabel}>
-                  <input
-                    type="checkbox"
-                    checked={settings.showCountdown}
-                    onChange={(e) =>
-                      setSettings((s) => ({
-                        ...s,
-                        showCountdown: e.target.checked,
-                      }))
-                    }
-                  />
-                  カウントダウンを表示する
-                </label>
-              </>
-            )}
-          </section>
-
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>表示</h3>
-            <label className={styles.checkLabel}>
-              <input
-                type="checkbox"
-                checked={settings.hideHeaderEnabled}
-                onChange={(e) =>
-                  setSettings((s) => ({
-                    ...s,
-                    hideHeaderEnabled: e.target.checked,
-                  }))
-                }
-              />
-              ヘッダーを非表示にする
-            </label>
-            <label className={styles.checkLabel}>
-              <input
-                type="checkbox"
-                checked={settings.hideTweetInputEnabled}
-                onChange={(e) =>
-                  setSettings((s) => ({
-                    ...s,
-                    hideTweetInputEnabled: e.target.checked,
-                  }))
-                }
-              />
-              投稿欄を非表示にする
-            </label>
-            {settings.hideHeaderEnabled && (
+          {!isExternal && (
+            <section className={styles.section}>
+              <h3 className={styles.sectionTitle}>自動更新</h3>
               <label className={styles.checkLabel}>
                 <input
                   type="checkbox"
-                  checked={settings.showCustomMenu}
+                  checked={settings.autoReloadEnabled}
                   onChange={(e) =>
                     setSettings((s) => ({
                       ...s,
-                      showCustomMenu: e.target.checked,
+                      autoReloadEnabled: e.target.checked,
                     }))
                   }
                 />
-                カスタムメニューボタンを表示する
+                自動更新を有効にする
               </label>
-            )}
-            <label className={styles.checkLabel}>
-              <input
-                type="checkbox"
-                checked={settings.scrollPosRestoreEnabled}
-                onChange={(e) =>
-                  setSettings((s) => ({
-                    ...s,
-                    scrollPosRestoreEnabled: e.target.checked,
-                  }))
-                }
-              />
-              写真閲覧後のスクロール位置を復元する
-            </label>
-          </section>
+              {settings.autoReloadEnabled && (
+                <>
+                  <label className={styles.fieldLabel}>
+                    更新間隔（秒）
+                    <input
+                      type="number"
+                      className={styles.numberInput}
+                      min={10}
+                      max={3600}
+                      value={settings.autoReloadInterval}
+                      onChange={(e) =>
+                        setSettings((s) => ({
+                          ...s,
+                          autoReloadInterval: Number(e.target.value),
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className={styles.checkLabel}>
+                    <input
+                      type="checkbox"
+                      checked={settings.showCountdown}
+                      onChange={(e) =>
+                        setSettings((s) => ({
+                          ...s,
+                          showCountdown: e.target.checked,
+                        }))
+                      }
+                    />
+                    カウントダウンを表示する
+                  </label>
+                </>
+              )}
+            </section>
+          )}
 
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>画像</h3>
-            <label className={styles.checkLabel}>
-              <input
-                type="checkbox"
-                checked={settings.smallImageEnabled}
-                onChange={(e) =>
-                  setSettings((s) => ({
-                    ...s,
-                    smallImageEnabled: e.target.checked,
-                  }))
-                }
-              />
-              画像を縮小表示する
-            </label>
-            {settings.smallImageEnabled && (
-              <label className={styles.fieldLabel}>
-                幅（例: 50%, 200px）
+          {!isExternal && (
+            <section className={styles.section}>
+              <h3 className={styles.sectionTitle}>表示</h3>
+              <label className={styles.checkLabel}>
                 <input
-                  type="text"
-                  className={styles.numberInput}
-                  value={settings.smallImageWidth}
+                  type="checkbox"
+                  checked={settings.hideHeaderEnabled}
                   onChange={(e) =>
                     setSettings((s) => ({
                       ...s,
-                      smallImageWidth: e.target.value,
+                      hideHeaderEnabled: e.target.checked,
                     }))
                   }
-                  placeholder="50%"
                 />
+                ヘッダーを非表示にする
               </label>
-            )}
-          </section>
-
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>画像ブラー</h3>
-            <label className={styles.checkLabel}>
-              <input
-                type="checkbox"
-                checked={settings.blurImageEnabled}
-                onChange={(e) =>
-                  setSettings((s) => ({
-                    ...s,
-                    blurImageEnabled: e.target.checked,
-                  }))
-                }
-              />
-              画像をぼかして表示する
-            </label>
-            {settings.blurImageEnabled && (
-              <label className={styles.fieldLabel}>
-                ブラー量（例: 10px）
+              <label className={styles.checkLabel}>
                 <input
-                  type="text"
-                  className={styles.textInput}
-                  value={settings.blurImageAmount}
+                  type="checkbox"
+                  checked={settings.hideTweetInputEnabled}
                   onChange={(e) =>
                     setSettings((s) => ({
                       ...s,
-                      blurImageAmount: e.target.value,
+                      hideTweetInputEnabled: e.target.checked,
                     }))
                   }
-                  placeholder="10px"
                 />
+                投稿欄を非表示にする
               </label>
-            )}
-            <p className={styles.fieldLabel}>
-              右クリック（PC）または長押し（モバイル）でブラーを解除できます
-            </p>
-          </section>
+              {settings.hideHeaderEnabled && (
+                <label className={styles.checkLabel}>
+                  <input
+                    type="checkbox"
+                    checked={settings.showCustomMenu}
+                    onChange={(e) =>
+                      setSettings((s) => ({
+                        ...s,
+                        showCustomMenu: e.target.checked,
+                      }))
+                    }
+                  />
+                  カスタムメニューボタンを表示する
+                </label>
+              )}
+              <label className={styles.checkLabel}>
+                <input
+                  type="checkbox"
+                  checked={settings.scrollPosRestoreEnabled}
+                  onChange={(e) =>
+                    setSettings((s) => ({
+                      ...s,
+                      scrollPosRestoreEnabled: e.target.checked,
+                    }))
+                  }
+                />
+                写真閲覧後のスクロール位置を復元する
+              </label>
+            </section>
+          )}
 
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>通知</h3>
-            <label className={styles.checkLabel}>
-              <input
-                type="checkbox"
-                checked={settings.desktopNotifyEnabled ?? false}
-                onChange={(e) =>
-                  setSettings((s) => ({
-                    ...s,
-                    desktopNotifyEnabled: e.target.checked,
-                  }))
-                }
+          {!isExternal && (
+            <section className={styles.section}>
+              <h3 className={styles.sectionTitle}>画像</h3>
+              <label className={styles.checkLabel}>
+                <input
+                  type="checkbox"
+                  checked={settings.smallImageEnabled}
+                  onChange={(e) =>
+                    setSettings((s) => ({
+                      ...s,
+                      smallImageEnabled: e.target.checked,
+                    }))
+                  }
+                />
+                画像を縮小表示する
+              </label>
+              {settings.smallImageEnabled && (
+                <label className={styles.fieldLabel}>
+                  幅（例: 50%, 200px）
+                  <input
+                    type="text"
+                    className={styles.numberInput}
+                    value={settings.smallImageWidth}
+                    onChange={(e) =>
+                      setSettings((s) => ({
+                        ...s,
+                        smallImageWidth: e.target.value,
+                      }))
+                    }
+                    placeholder="50%"
+                  />
+                </label>
+              )}
+            </section>
+          )}
+
+          {!isExternal && (
+            <section className={styles.section}>
+              <h3 className={styles.sectionTitle}>画像ブラー</h3>
+              <label className={styles.checkLabel}>
+                <input
+                  type="checkbox"
+                  checked={settings.blurImageEnabled}
+                  onChange={(e) =>
+                    setSettings((s) => ({
+                      ...s,
+                      blurImageEnabled: e.target.checked,
+                    }))
+                  }
+                />
+                画像をぼかして表示する
+              </label>
+              {settings.blurImageEnabled && (
+                <label className={styles.fieldLabel}>
+                  ブラー量（例: 10px）
+                  <input
+                    type="text"
+                    className={styles.textInput}
+                    value={settings.blurImageAmount}
+                    onChange={(e) =>
+                      setSettings((s) => ({
+                        ...s,
+                        blurImageAmount: e.target.value,
+                      }))
+                    }
+                    placeholder="10px"
+                  />
+                </label>
+              )}
+              <p className={styles.fieldLabel}>
+                右クリック（PC）または長押し（モバイル）でブラーを解除できます
+              </p>
+            </section>
+          )}
+
+          {!isExternal && (
+            <section className={styles.section}>
+              <h3 className={styles.sectionTitle}>通知</h3>
+              <label className={styles.checkLabel}>
+                <input
+                  type="checkbox"
+                  checked={settings.desktopNotifyEnabled ?? false}
+                  onChange={(e) =>
+                    setSettings((s) => ({
+                      ...s,
+                      desktopNotifyEnabled: e.target.checked,
+                    }))
+                  }
+                />
+                新着をデスクトップ通知する
+              </label>
+            </section>
+          )}
+
+          {!isExternal && (
+            <section className={styles.section}>
+              <h3 className={styles.sectionTitle}>NGワード</h3>
+              <textarea
+                className={styles.cssTextarea}
+                value={ngWordsText}
+                onChange={(e) => setNgWordsText(e.target.value)}
+                placeholder="1行に1ワードで入力"
+                spellCheck={false}
               />
-              新着をデスクトップ通知する
-            </label>
-          </section>
-
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>NGワード</h3>
-            <textarea
-              className={styles.cssTextarea}
-              value={ngWordsText}
-              onChange={(e) => setNgWordsText(e.target.value)}
-              placeholder="1行に1ワードで入力"
-              spellCheck={false}
-            />
-          </section>
+            </section>
+          )}
 
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>カスタム CSS</h3>

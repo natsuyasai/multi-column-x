@@ -70,6 +70,25 @@ describe("getPageTypeLabel", () => {
   it("pageTypeがcomposeのときラベルは投稿を返す", () => {
     expect(getPageTypeLabel({ pageType: "compose" })).toBe("投稿");
   });
+
+  it("pageTypeがexternalでcustomUrlがある場合ホスト名を含むラベルを返す", () => {
+    expect(
+      getPageTypeLabel({
+        pageType: "external",
+        customUrl: "https://example.com/path",
+      }),
+    ).toBe("外部: example.com");
+  });
+
+  it("pageTypeがexternalでcustomUrlがない場合外部サイトを返す", () => {
+    expect(getPageTypeLabel({ pageType: "external" })).toBe("外部サイト");
+  });
+
+  it("pageTypeがexternalでcustomUrlが不正な形式の場合外部サイトを返す", () => {
+    expect(
+      getPageTypeLabel({ pageType: "external", customUrl: "not-a-url" }),
+    ).toBe("外部サイト");
+  });
 });
 
 describe("getColumnLabel", () => {

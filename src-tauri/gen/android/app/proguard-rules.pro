@@ -47,11 +47,21 @@
     public boolean isWebViewProfileSupported();
     public void launchComposeTweet();
     public void downloadAndInstallApk(java.lang.String, java.lang.String);
+    public void saveDownloadedVideo(java.lang.String, java.lang.String, java.lang.String);
+    public void notifyVideoDownloadStarted();
+    public void notifyVideoDownloadProgress(int, int, long, long);
+    public void notifyVideoDownloadFinished();
 }
 
 # popup_toolbar.ts が window.__mcxPopupBridge 経由で呼び出す JavascriptInterface メソッド。
 # AGP デフォルトの @JavascriptInterface keep ルールに依存せず明示的に保護する。
 -keepclassmembers class com.natsuyasai.multicolumnx.PopupSessionBridge {
+    @android.webkit.JavascriptInterface <methods>;
+}
+
+# video_long_press_menu.ts が window.__mcxVideoDownloadBridge 経由で呼び出す JavascriptInterface メソッド。
+# AGP デフォルトの @JavascriptInterface keep ルールに依存せず明示的に保護する。
+-keepclassmembers class com.natsuyasai.multicolumnx.VideoDownloadRequestBridge {
     @android.webkit.JavascriptInterface <methods>;
 }
 
