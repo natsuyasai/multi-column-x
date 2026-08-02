@@ -14,6 +14,7 @@ export const IPC_COMMANDS = {
   REMOVE_COLUMN_WEBVIEW: "remove_column_webview",
   RESIZE_COLUMN_WEBVIEW: "resize_column_webview",
   EVAL_IN_WEBVIEW: "eval_in_webview",
+  GET_EXTERNAL_COLUMN_DATA_DIRECTORY: "get_external_column_data_directory",
 
   // ポップアップ
   OPEN_POPUP_WINDOW: "open_popup_window",

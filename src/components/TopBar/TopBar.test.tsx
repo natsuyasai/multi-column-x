@@ -203,6 +203,43 @@ describe("TopBar", () => {
     });
   });
 
+  describe("pageTypeがexternalのときのラベル", () => {
+    it("customUrlがある場合はホスト名を含むラベルがtitleに出る", () => {
+      const externalCol: Column = {
+        ...col1,
+        pageType: "external",
+        customUrl: "https://example.com/path",
+      };
+      render(<TopBar {...defaultProps} columns={[externalCol]} />);
+      expect(
+        screen.getByTitle("アカウント1 - 外部: example.com (Ctrl+1)"),
+      ).toBeInTheDocument();
+    });
+
+    it("customUrlがない場合は外部サイトがtitleに出る", () => {
+      const externalCol: Column = {
+        ...col1,
+        pageType: "external",
+      };
+      render(<TopBar {...defaultProps} columns={[externalCol]} />);
+      expect(
+        screen.getByTitle("アカウント1 - 外部サイト (Ctrl+1)"),
+      ).toBeInTheDocument();
+    });
+
+    it("customUrlが不正な形式の場合は外部サイトがtitleに出る", () => {
+      const externalCol: Column = {
+        ...col1,
+        pageType: "external",
+        customUrl: "not-a-url",
+      };
+      render(<TopBar {...defaultProps} columns={[externalCol]} />);
+      expect(
+        screen.getByTitle("アカウント1 - 外部サイト (Ctrl+1)"),
+      ).toBeInTheDocument();
+    });
+  });
+
   describe("カラム種別アイコン（collapsed）", () => {
     it.each([
       "home",
@@ -210,6 +247,7 @@ describe("TopBar", () => {
       "search",
       "list",
       "custom",
+      "external",
       "compose",
     ] as const)(
       "pageType=%s のとき collapsed ボタン内に SVG アイコンが表示される",
@@ -232,6 +270,7 @@ describe("TopBar", () => {
       "search",
       "list",
       "custom",
+      "external",
       "compose",
     ] as const)(
       "pageType=%s のとき expanded 行2内に SVG アイコンが表示される",

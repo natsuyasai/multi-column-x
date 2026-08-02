@@ -6,6 +6,7 @@
     "remove_column_webview",
     "resize_column_webview",
     "eval_in_webview",
+    "get_external_column_data_directory",
     "open_popup_window",
     "open_link_popup_window",
     "close_popup_window",
