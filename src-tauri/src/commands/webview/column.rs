@@ -101,6 +101,7 @@ fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: boo
         global_ng_words: &global_ng_words,
         // 投稿カラム（/home 表示）ではインライン投稿フォーム以外を隠す。
         compose_only_enabled: column.page_type == "compose",
+        minimal_injection: false,
     })
 }
 

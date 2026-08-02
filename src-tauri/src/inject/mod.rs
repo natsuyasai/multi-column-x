@@ -21,9 +21,23 @@ pub struct InitScriptParams<'a> {
     pub ng_words: &'a [String],
     pub global_ng_words: &'a [String],
     pub compose_only_enabled: bool,
+    pub minimal_injection: bool,
 }
 
 pub fn build_init_script(params: &InitScriptParams) -> String {
+    if params.minimal_injection {
+        let custom_css_js = include_str!("custom_css.js");
+        let mut script = custom_css_js.to_string();
+        if !params.custom_css.is_empty() {
+            script.push_str(&format!(
+                "\nwindow.{}.applyCustomCSS({:?});",
+                globals::MULTI_COLUMN_X,
+                params.custom_css
+            ));
+        }
+        return script;
+    }
+
     let tab_selector = include_str!("tab_selector.js");
     let header_customizer = include_str!("header_customizer.js");
     let auto_reload = include_str!("auto_reload.js");
@@ -196,6 +210,7 @@ mod tests {
             ng_words: &[],
             global_ng_words: &[],
             compose_only_enabled: false,
+            minimal_injection: false,
         }
     }
 
@@ -424,5 +439,48 @@ mod tests {
     fn build_popup_init_script_esc_close_disabled() {
         let script = build_popup_init_script("[]", "acc1", "", false);
         assert!(script.contains("false"));
+    }
+
+    #[test]
+    fn minimal_injectionがtrueのときcustom_css_jsのみ含まれ他のスクリプトは含まれない() {
+        let mut params = default_params();
+        params.minimal_injection = true;
+        let script = build_init_script(&params);
+        assert!(script.contains("multi-column-x-custom-css"));
+        assert!(script.contains("applyCustomCSS"));
+        assert!(!script.contains("multi-column-x-header-customizer-root"));
+        assert!(!script.contains("recheckNgWords"));
+        assert!(!script.contains("__multiColumnXConfig"));
+    }
+
+    #[test]
+    fn minimal_injectionがtrueかつcustom_cssが空でない場合applycustomcss呼び出しが含まれる() {
+        let mut params = default_params();
+        params.minimal_injection = true;
+        params.custom_css = "body{color:red}";
+        let script = build_init_script(&params);
+        assert!(script.contains("applyCustomCSS"));
+        assert!(script.contains("body{color:red}"));
+    }
+
+    #[test]
+    fn minimal_injectionがtrueかつcustom_cssが空の場合applycustomcss呼び出しが含まれない() {
+        let mut params = default_params();
+        params.minimal_injection = true;
+        params.custom_css = "";
+        let script = build_init_script(&params);
+        // custom_css.js には applyCustomCSS 関数定義自体が含まれるため、
+        // 呼び出し (window.__multiColumnX.applyCustomCSS(...)) の有無で判定する
+        assert!(!script.contains("window.__multiColumnX.applyCustomCSS("));
+    }
+
+    #[test]
+    fn minimal_injectionがfalseの場合既存動作を維持する() {
+        let mut params = default_params();
+        params.minimal_injection = false;
+        params.hide_header_enabled = true;
+        let script = build_init_script(&params);
+        assert!(script.contains("multi-column-x-header-customizer-root"));
+        assert!(script.contains("__multiColumnXConfig"));
     }
 }
