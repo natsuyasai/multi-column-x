@@ -27,6 +27,7 @@ const plainEntries = [
   "mobile_area_hide",
   "notification_header_hide",
   "compose_only",
+  "video_long_press_menu",
 ];
 
 // React を含む header_customizer は IIFE + inlineDynamicImports で個別ビルド

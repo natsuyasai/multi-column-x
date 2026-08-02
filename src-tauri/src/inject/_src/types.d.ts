@@ -41,8 +41,21 @@ declare global {
     invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
   }
 
+  interface TauriEventPayload<T> {
+    event: string;
+    payload: T;
+  }
+
+  interface TauriEvent {
+    listen: <T>(
+      event: string,
+      handler: (payload: TauriEventPayload<T>) => void,
+    ) => Promise<() => void>;
+  }
+
   interface TauriGlobal {
     core?: TauriCore;
+    event?: TauriEvent;
     invoke?: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
   }
 
@@ -59,6 +72,11 @@ declare global {
   // Android で MainActivity が addJavascriptInterface で公開するポップアップ操作ブリッジ
   interface McxPopupBridge {
     switchPopupSession: (accountId: string, url: string) => void;
+  }
+
+  // Android で MainActivity が addJavascriptInterface で公開する動画DL要求ブリッジ
+  interface McxVideoDownloadBridge {
+    downloadVideo: (payloadJson: string) => void;
   }
 
   interface TvAccountInfo {
@@ -78,6 +96,7 @@ declare global {
     __mcxTargetHref?: string;
     __mcxEscCloseEnabled?: boolean;
     __mcxPopupBridge?: McxPopupBridge;
+    __mcxVideoDownloadBridge?: McxVideoDownloadBridge;
     __mobileTopInset?: number;
     __mobileBottomInset?: number;
   }
