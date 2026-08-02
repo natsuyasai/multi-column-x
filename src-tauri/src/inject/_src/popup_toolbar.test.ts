@@ -204,6 +204,103 @@ describe("inject/popup_toolbar の動画ダウンロードボタン", () => {
       "動画を再生してからダウンロードしてください",
     );
   });
+
+  it("variantsが取得できる場合、クリック直後にボタンがdisabledになる", async () => {
+    const videoComponent = document.createElement("div");
+    videoComponent.dataset.testid = "videoComponent";
+    document.body.appendChild(videoComponent);
+    attachFiber(videoComponent, PLAYER_PROPS);
+
+    await importToolbar();
+    const button = document.querySelector<HTMLButtonElement>(
+      "#tv-popup-download-button",
+    );
+    if (!button) throw new Error("download button not found");
+
+    clickDownloadButton();
+
+    expect(button.disabled).toBe(true);
+  });
+
+  it("download_videoのinvokeが成功した場合、ボタンが再度disabled=falseになる", async () => {
+    const videoComponent = document.createElement("div");
+    videoComponent.dataset.testid = "videoComponent";
+    document.body.appendChild(videoComponent);
+    attachFiber(videoComponent, PLAYER_PROPS);
+
+    await importToolbar();
+    const button = document.querySelector<HTMLButtonElement>(
+      "#tv-popup-download-button",
+    );
+    if (!button) throw new Error("download button not found");
+
+    clickDownloadButton();
+    expect(button.disabled).toBe(true);
+
+    // invoke().catch().finally() のマイクロタスクをflushする
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(button.disabled).toBe(false);
+  });
+
+  it("download_videoのinvokeが失敗した場合でも、ボタンが再度disabled=falseになる", async () => {
+    const videoComponent = document.createElement("div");
+    videoComponent.dataset.testid = "videoComponent";
+    document.body.appendChild(videoComponent);
+    attachFiber(videoComponent, PLAYER_PROPS);
+    tauriInvokeMock.mockRejectedValueOnce(new Error("dialog closed"));
+
+    await importToolbar();
+    const button = document.querySelector<HTMLButtonElement>(
+      "#tv-popup-download-button",
+    );
+    if (!button) throw new Error("download button not found");
+
+    clickDownloadButton();
+    expect(button.disabled).toBe(true);
+
+    // invoke().catch().finally() のマイクロタスクをflushする
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(button.disabled).toBe(false);
+  });
+
+  it("variantsが取得できない場合、ボタンはdisabledにならない", async () => {
+    await importToolbar();
+    const button = document.querySelector<HTMLButtonElement>(
+      "#tv-popup-download-button",
+    );
+    if (!button) throw new Error("download button not found");
+
+    clickDownloadButton();
+
+    expect(button.disabled).toBe(false);
+    expect(tauriInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it("連続クリックしても1回目のinvoke呼び出し中は2回目が受け付けられない", async () => {
+    const videoComponent = document.createElement("div");
+    videoComponent.dataset.testid = "videoComponent";
+    document.body.appendChild(videoComponent);
+    attachFiber(videoComponent, PLAYER_PROPS);
+
+    await importToolbar();
+    const button = document.querySelector<HTMLButtonElement>(
+      "#tv-popup-download-button",
+    );
+    if (!button) throw new Error("download button not found");
+
+    // 1回目のクリック（disabledになりinvokeが呼ばれる）
+    clickDownloadButton();
+    // 2回目のクリック（disabled状態のためブラウザ標準の挙動でイベントが発火しない）
+    clickDownloadButton();
+
+    expect(tauriInvokeMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("formatVideoDownloadProgressText", () => {

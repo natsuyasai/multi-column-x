@@ -139,12 +139,22 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
 
   if (accounts.length === 0) return;
 
-  function tauriInvoke(cmd: string, args: Record<string, unknown>): void {
+  function tauriInvoke(
+    cmd: string,
+    args: Record<string, unknown>,
+    onSettled?: () => void,
+  ): void {
     const invoke = window.__TAURI__?.core?.invoke ?? window.__TAURI__?.invoke;
     if (invoke) {
-      invoke(cmd, args).catch(function (err: unknown) {
-        console.error("[popup_toolbar]", err);
-      });
+      invoke(cmd, args)
+        .catch(function (err: unknown) {
+          console.error("[popup_toolbar]", err);
+        })
+        .finally(function () {
+          onSettled?.();
+        });
+    } else {
+      onSettled?.();
     }
   }
 
@@ -262,7 +272,10 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
       return;
     }
     const suggestedFileName = extractVideoIdFromPlayer() ?? "";
-    tauriInvoke(DOWNLOAD_VIDEO, { variants, suggestedFileName });
+    downloadButton.disabled = true;
+    tauriInvoke(DOWNLOAD_VIDEO, { variants, suggestedFileName }, function () {
+      downloadButton.disabled = false;
+    });
   });
 
   toolbar.appendChild(label);
