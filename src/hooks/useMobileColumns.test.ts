@@ -2,7 +2,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { IPC_COMMANDS, OFFSCREEN, STORAGE_KEYS } from "../constants/ipc";
+import { resolveColumnDataDirectory } from "../services/externalColumn";
 import { useAppStore } from "../store/useAppStore";
+import type { Account, Column } from "../types";
 import { DEFAULT_COLUMN_SETTINGS, DEFAULT_GLOBAL_SETTINGS } from "../types";
 import { useMobileColumns } from "./useMobileColumns";
 
@@ -10,7 +12,21 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
 
+// resolveColumnDataDirectory は内部で invoke（IPC）を呼ぶため、実際の挙動を
+// 模したデフォルト実装でモックする（既存アカウント検索ロジックのテストは維持しつつ、
+// external カラムのテストではこのモックを上書きして解決済みパスを返させる）。
+vi.mock("../services/externalColumn", () => ({
+  isExternalColumn: vi.fn(
+    (column: Column) => column.pageType === "external",
+  ),
+  resolveColumnDataDirectory: vi.fn(
+    async (column: Column, accounts: Account[]) =>
+      accounts.find((a) => a.id === column.accountId)?.dataDirectory,
+  ),
+}));
+
 const mockInvoke = vi.mocked(invoke);
+const mockResolveColumnDataDirectory = vi.mocked(resolveColumnDataDirectory);
 
 const account1 = {
   id: "acc-1",
@@ -64,6 +80,10 @@ describe("useMobileColumns", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockInvoke.mockResolvedValue(undefined);
+    mockResolveColumnDataDirectory.mockImplementation(
+      async (column, accounts) =>
+        accounts.find((a) => a.id === column.accountId)?.dataDirectory,
+    );
     localStorage.clear();
     useAppStore.setState({
       accounts: [account1, account2],
@@ -184,6 +204,35 @@ describe("useMobileColumns", () => {
     expect(mockInvoke).toHaveBeenCalledWith(IPC_COMMANDS.SET_COLUMN_COOKIES, {
       accountId: "acc-2",
     });
+  });
+
+  it("restoreMobileColumnsはexternalカラムをアカウントなしでもcreateColumnWebviewを呼び出す", async () => {
+    const externalColumn = {
+      ...column1,
+      id: "col-external",
+      pageType: "external" as const,
+      accountId: "col-external",
+      order: 2,
+    };
+    mockResolveColumnDataDirectory.mockImplementation(async (column) =>
+      column.id === "col-external"
+        ? "/data/external/col-external"
+        : undefined,
+    );
+    const { result } = renderMobileColumns();
+
+    await act(async () => {
+      await result.current.restoreMobileColumns([externalColumn], []);
+    });
+
+    const createCall = mockInvoke.mock.calls.find(
+      (c) => c[0] === IPC_COMMANDS.CREATE_COLUMN_WEBVIEW,
+    );
+    expect(createCall).toBeDefined();
+    expect(
+      (createCall?.[1] as { args: { dataDirectory: string } }).args
+        .dataDirectory,
+    ).toBe("/data/external/col-external");
   });
 
   it("保存されたアクティブカラムIDが存在しない場合はorder最小のカラムにフォールバックする", async () => {
