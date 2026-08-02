@@ -44,6 +44,8 @@ function getColumnIcon(pageType: PageType): React.ReactElement {
       return <ListIcon {...props} />;
     case "custom":
       return <CustomIcon {...props} />;
+    case "external":
+      return <LinkIcon {...props} />;
     case "compose":
       return <PencilIcon {...props} />;
   }
@@ -61,6 +63,13 @@ function getPageLabel(column: Column): string {
       return "リスト";
     case "custom":
       return "カスタム";
+    case "external":
+      if (!column.customUrl) return "外部サイト";
+      try {
+        return `外部: ${new URL(column.customUrl).hostname}`;
+      } catch {
+        return "外部サイト";
+      }
     case "compose":
       return "投稿";
   }

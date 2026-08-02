@@ -44,6 +44,12 @@
   color: var(--mcx-text-tertiary);
 }
 
+.hint {
+  font-size: 11px;
+  color: var(--mcx-text-tertiary);
+  margin: 0;
+}
+
 .select,
 .input {
   background: var(--mcx-surface-sunken);

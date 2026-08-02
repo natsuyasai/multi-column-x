@@ -28,41 +28,50 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
   const [listId, setListId] = useState("");
   const [customUrl, setCustomUrl] = useState("");
 
+  const isExternal = pageType === "external";
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const newId = crypto.randomUUID();
     const occupiedCols = existingColumns
       .map((c) => c.gridCol)
       .filter((g) => g >= 1);
     const nextGridCol =
       occupiedCols.length > 0 ? Math.max(...occupiedCols) + 1 : 1;
     const column: Column = {
-      id: crypto.randomUUID(),
-      accountId,
+      id: newId,
+      accountId: isExternal ? newId : accountId,
       pageType,
       homeTabName: pageType === "home" && homeTabName ? homeTabName : undefined,
       searchQuery: pageType === "search" ? searchQuery : undefined,
       listId: pageType === "list" ? listId : undefined,
-      customUrl: pageType === "custom" ? customUrl : undefined,
+      customUrl: pageType === "custom" || isExternal ? customUrl : undefined,
       width: 350,
       order: 9999,
       gridRow: 1,
       gridCol: nextGridCol,
       heightMode: "auto",
-      settings: {
-        ...DEFAULT_COLUMN_SETTINGS,
-        autoReloadEnabled: globalSettings.defaultAutoReloadEnabled,
-        autoReloadInterval: globalSettings.defaultAutoReloadInterval,
-        showCountdown: globalSettings.defaultShowCountdown,
-        hideHeaderEnabled: globalSettings.defaultHideHeaderEnabled,
-        hideTweetInputEnabled: globalSettings.defaultHideTweetInputEnabled,
-        showCustomMenu: globalSettings.defaultShowCustomMenu,
-        scrollPosRestoreEnabled: globalSettings.defaultScrollPosRestoreEnabled,
-        customCSS: globalSettings.defaultColumnCustomCSS,
-        smallImageEnabled: globalSettings.smallImageEnabled,
-        smallImageWidth: globalSettings.smallImageWidth,
-        blurImageEnabled: globalSettings.blurImageEnabled,
-        blurImageAmount: globalSettings.blurImageAmount,
-      },
+      settings: isExternal
+        ? {
+            ...DEFAULT_COLUMN_SETTINGS,
+            customCSS: globalSettings.defaultColumnCustomCSS,
+          }
+        : {
+            ...DEFAULT_COLUMN_SETTINGS,
+            autoReloadEnabled: globalSettings.defaultAutoReloadEnabled,
+            autoReloadInterval: globalSettings.defaultAutoReloadInterval,
+            showCountdown: globalSettings.defaultShowCountdown,
+            hideHeaderEnabled: globalSettings.defaultHideHeaderEnabled,
+            hideTweetInputEnabled: globalSettings.defaultHideTweetInputEnabled,
+            showCustomMenu: globalSettings.defaultShowCustomMenu,
+            scrollPosRestoreEnabled:
+              globalSettings.defaultScrollPosRestoreEnabled,
+            customCSS: globalSettings.defaultColumnCustomCSS,
+            smallImageEnabled: globalSettings.smallImageEnabled,
+            smallImageWidth: globalSettings.smallImageWidth,
+            blurImageEnabled: globalSettings.blurImageEnabled,
+            blurImageAmount: globalSettings.blurImageAmount,
+          },
     };
     onAdd(column);
   };
@@ -72,23 +81,25 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
       <form className={styles.dialog} onSubmit={handleSubmit}>
         <h2 className={styles.title}>カラムを追加</h2>
 
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="account-select">
-            アカウント
-          </label>
-          <select
-            id="account-select"
-            className={styles.select}
-            value={accountId}
-            onChange={(e) => setAccountId(e.target.value)}
-          >
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        {!isExternal && (
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="account-select">
+              アカウント
+            </label>
+            <select
+              id="account-select"
+              className={styles.select}
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
+            >
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className={styles.field}>
           <label className={styles.label} htmlFor="page-type-select">
@@ -105,6 +116,7 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
             <option value="search">検索</option>
             <option value="list">リスト</option>
             <option value="custom">カスタムURL</option>
+            <option value="external">外部URL（アカウント非依存）</option>
             <option value="compose">投稿</option>
           </select>
         </div>
@@ -161,7 +173,7 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
           </div>
         )}
 
-        {pageType === "custom" && (
+        {(pageType === "custom" || isExternal) && (
           <div className={styles.field}>
             <label className={styles.label} htmlFor="custom-url">
               URL
@@ -174,6 +186,11 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
               placeholder="https://x.com/..."
               required
             />
+            {isExternal && (
+              <p className={styles.hint}>
+                アカウントに依存しない専用セッションで開きます。カスタムCSS以外の設定は無効になります。
+              </p>
+            )}
           </div>
         )}
 
@@ -184,7 +201,7 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
           <button
             type="submit"
             className={styles.submitBtn}
-            disabled={accounts.length === 0}
+            disabled={pageType !== "external" && accounts.length === 0}
           >
             追加
           </button>

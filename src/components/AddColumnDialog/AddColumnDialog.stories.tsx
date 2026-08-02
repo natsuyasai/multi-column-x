@@ -73,6 +73,24 @@ export const Default: Story = {
   },
 };
 
+export const ExternalUrl: Story = {
+  name: "外部URL（アカウント非依存）",
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.selectOptions(
+      canvas.getByLabelText("ページタイプ"),
+      "外部URL（アカウント非依存）",
+    );
+    // アカウント非依存のためアカウント選択欄は表示されない
+    expect(canvas.queryByLabelText("アカウント")).not.toBeInTheDocument();
+    const urlInput = canvas.getByLabelText("URL");
+    await userEvent.type(urlInput, "https://example.com/");
+    await expect(urlInput).toHaveValue("https://example.com/");
+    await userEvent.click(canvas.getByRole("button", { name: "追加" }));
+    await expect(args.onAdd).toHaveBeenCalled();
+  },
+};
+
 export const LightTheme: Story = {
   name: "ライトテーマ",
   decorators: [

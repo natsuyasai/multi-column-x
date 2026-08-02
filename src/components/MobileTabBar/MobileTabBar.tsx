@@ -8,9 +8,20 @@ import { useAutoReload } from "../../hooks/useAutoReload";
 import type { Column, Account, PageType } from "../../types";
 import styles from "./MobileTabBar.module.scss";
 
+function getExternalTabLabel(customUrl: string | undefined): string {
+  if (!customUrl) return "外部サイト";
+  try {
+    return `外部: ${new URL(customUrl).hostname}`;
+  } catch {
+    return "外部サイト";
+  }
+}
+
 function getTabLabel(column: Column): string {
   if (column.label) return column.label;
-  const labels: Record<PageType, string> = {
+  if (column.pageType === "external")
+    return getExternalTabLabel(column.customUrl);
+  const labels: Record<Exclude<PageType, "external">, string> = {
     home: column.homeTabName ?? "ホーム",
     notifications: "通知",
     search: column.searchQuery ? `検索: ${column.searchQuery}` : "検索",

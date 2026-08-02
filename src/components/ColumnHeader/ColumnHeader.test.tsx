@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import type { Column, Account } from "../../types";
 import { ColumnHeader } from "./ColumnHeader";
+import styles from "./ColumnHeader.module.scss";
 
 const mockAccount: Account = {
   id: "acc-1",
@@ -154,5 +155,23 @@ describe("ColumnHeader", () => {
         .querySelector('[title="先頭までスクロール"]')
         ?.querySelector('[data-testid="icon-chevrons-up"]'),
     ).toBeInTheDocument();
+  });
+
+  it("accountがundefinedの場合ラベルがページタイプのみになる", () => {
+    render(<ColumnHeader {...defaultProps} account={undefined} />);
+    expect(screen.getByText("フォロー中")).toBeInTheDocument();
+    expect(
+      screen.queryByText("テストアカウント - フォロー中"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("accountがundefinedの場合ドット色がフォールバック値になる", () => {
+    const { container } = render(
+      <ColumnHeader {...defaultProps} account={undefined} />,
+    );
+    const header = container.querySelector(`.${styles.header}`);
+    const dot = container.querySelector(`.${styles.dot}`);
+    expect(header).toHaveStyle({ borderTopColor: "#888" });
+    expect(dot).toHaveStyle({ backgroundColor: "#888" });
   });
 });

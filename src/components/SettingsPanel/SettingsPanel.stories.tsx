@@ -95,6 +95,31 @@ export const Default: Story = {
   },
 };
 
+export const ExternalColumn: Story = {
+  name: "外部URLカラム",
+  args: {
+    column: {
+      ...column,
+      pageType: "external",
+      customUrl: "https://example.com",
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("カラム設定")).toBeInTheDocument();
+    // externalカラムではカスタムCSS以外の設定項目は表示されない
+    await expect(canvas.queryByText("自動更新")).not.toBeInTheDocument();
+    await expect(canvas.queryByText("表示")).not.toBeInTheDocument();
+    await expect(canvas.queryByText("画像")).not.toBeInTheDocument();
+    await expect(canvas.queryByText("画像ブラー")).not.toBeInTheDocument();
+    await expect(canvas.queryByText("通知")).not.toBeInTheDocument();
+    await expect(canvas.queryByText("NGワード")).not.toBeInTheDocument();
+    // カラム幅とカスタムCSSは表示される
+    await expect(canvas.getByText("カラム")).toBeInTheDocument();
+    await expect(canvas.getByText("カスタム CSS")).toBeInTheDocument();
+  },
+};
+
 export const LightTheme: Story = {
   name: "ライトテーマ",
   decorators: [

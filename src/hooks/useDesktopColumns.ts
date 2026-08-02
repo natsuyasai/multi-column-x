@@ -16,6 +16,7 @@ import {
   createColumnWebview,
   resizeColumnWebview,
 } from "../services/columnWebview";
+import { resolveColumnDataDirectory } from "../services/externalColumn";
 import { useAppStore } from "../store/useAppStore";
 import type { Column } from "../types";
 
@@ -95,11 +96,14 @@ export function useDesktopColumns({
       setColumnBounds(bounds);
 
       for (const column of currentColumns) {
-        const account = currentAccounts.find((a) => a.id === column.accountId);
-        if (!account) continue;
         const b = bounds[column.id];
         if (!b) continue;
-        await createColumnWebview(column, account.dataDirectory, b).catch(
+        const dataDirectory = await resolveColumnDataDirectory(
+          column,
+          currentAccounts,
+        );
+        if (dataDirectory === undefined) continue;
+        await createColumnWebview(column, dataDirectory, b).catch(
           logError("restoreDesktopColumns:createColumnWebview"),
         );
       }

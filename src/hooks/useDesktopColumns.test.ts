@@ -2,8 +2,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { IPC_COMMANDS } from "../constants/ipc";
+import { resolveColumnDataDirectory } from "../services/externalColumn";
 import { useAppStore } from "../store/useAppStore";
-import type { Column } from "../types";
+import type { Account, Column } from "../types";
 import { DEFAULT_COLUMN_SETTINGS, DEFAULT_GLOBAL_SETTINGS } from "../types";
 import { useDesktopColumns } from "./useDesktopColumns";
 
@@ -21,7 +22,19 @@ vi.mock("@tauri-apps/plugin-os", () => ({
   platform: vi.fn(() => "windows"),
 }));
 
+// resolveColumnDataDirectory は内部で invoke（IPC）を呼ぶため、実際の挙動を
+// 模したデフォルト実装でモックする（既存アカウント検索ロジックのテストは維持しつつ、
+// external カラムのテストではこのモックを上書きして解決済みパスを返させる）。
+vi.mock("../services/externalColumn", () => ({
+  isExternalColumn: vi.fn((column: Column) => column.pageType === "external"),
+  resolveColumnDataDirectory: vi.fn(
+    async (column: Column, accounts: Account[]) =>
+      accounts.find((a) => a.id === column.accountId)?.dataDirectory,
+  ),
+}));
+
 const mockInvoke = vi.mocked(invoke);
+const mockResolveColumnDataDirectory = vi.mocked(resolveColumnDataDirectory);
 
 /** clientHeight を固定した div を持つ RefObject を作る（jsdom は clientHeight を計測しないため）。 */
 function makeContainerRef(clientHeight: number) {
@@ -96,6 +109,10 @@ describe("useDesktopColumns", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockInvoke.mockResolvedValue(undefined);
+    mockResolveColumnDataDirectory.mockImplementation(
+      async (column, accounts) =>
+        accounts.find((a) => a.id === column.accountId)?.dataDirectory,
+    );
     useAppStore.setState({
       accounts: [account1],
       columns: [
@@ -255,5 +272,37 @@ describe("useDesktopColumns", () => {
         (c) => c[0] === IPC_COMMANDS.CREATE_COLUMN_WEBVIEW,
       ),
     ).toHaveLength(0);
+  });
+
+  it("restoreDesktopColumnsはexternalカラムをアカウントなしでもcreateColumnWebviewを呼び出す", async () => {
+    const externalColumn = makeColumn({
+      id: "col-external",
+      gridCol: 1,
+      pageType: "external",
+      accountId: "col-external",
+    });
+    mockResolveColumnDataDirectory.mockImplementation(async (column) =>
+      column.id === "col-external" ? "/data/external/col-external" : undefined,
+    );
+    const { result } = renderDesktopColumns();
+
+    await act(async () => {
+      await result.current.restoreDesktopColumns(
+        [externalColumn],
+        [],
+        900,
+        0,
+        32,
+      );
+    });
+
+    const createCall = mockInvoke.mock.calls.find(
+      (c) => c[0] === IPC_COMMANDS.CREATE_COLUMN_WEBVIEW,
+    );
+    expect(createCall).toBeDefined();
+    expect(
+      (createCall?.[1] as { args: { dataDirectory: string } }).args
+        .dataDirectory,
+    ).toBe("/data/external/col-external");
   });
 });
