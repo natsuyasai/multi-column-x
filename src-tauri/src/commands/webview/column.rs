@@ -44,6 +44,12 @@ fn resolve_url(column: &ColumnData) -> String {
             .custom_url
             .clone()
             .unwrap_or_else(|| "https://x.com/home".to_string()),
+        // external カラムはアカウント非依存・X非依存の任意サイト表示が目的のため、
+        // custom_url 未指定時のフォールバックも X関連URLにせず about:blank にする。
+        "external" => column
+            .custom_url
+            .clone()
+            .unwrap_or_else(|| "about:blank".to_string()),
         // 投稿カラムは /home を表示し、inject(compose_only) でインライン投稿フォーム以外を隠す。
         // /compose/post は投稿完了時に遷移が発生しロック方式が破綻するため使わない。
         "compose" => "https://x.com/home".to_string(),
@@ -101,8 +107,38 @@ fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: boo
         global_ng_words: &global_ng_words,
         // 投稿カラム（/home 表示）ではインライン投稿フォーム以外を隠す。
         compose_only_enabled: column.page_type == "compose",
-        minimal_injection: false,
+        minimal_injection: column.page_type == "external",
     })
+}
+
+/// column_id がファイルパスとして安全か（パス区切り文字・親ディレクトリ参照を含まないか）を判定する。
+/// IPC 経由で任意の文字列を受け取る `column_id` に対するパストラバーサル対策の純粋関数部分。
+fn is_safe_column_id(column_id: &str) -> bool {
+    !column_id.is_empty()
+        && !column_id.contains('/')
+        && !column_id.contains('\\')
+        && !column_id.contains("..")
+}
+
+/// external カラム（アカウント非依存の任意URLカラム）専用のデータディレクトリを解決する。
+/// カラムIDごとに固有のディレクトリを作成し、WebView のセッション（Cookie等）を
+/// 他のカラム・アカウントと完全に分離する。
+/// column_id は IPC 経由で任意の文字列を受け取るため、パストラバーサル対策として
+/// パス区切り文字・親ディレクトリ参照を含む値は拒否する。
+#[tauri::command]
+pub async fn get_external_column_data_directory(
+    app: AppHandle,
+    column_id: String,
+) -> Result<String, String> {
+    if !is_safe_column_id(&column_id) {
+        return Err("invalid column id".to_string());
+    }
+    let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let data_dir = app_data
+        .join("external_columns")
+        .join(format!("column-{column_id}"));
+    std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
+    Ok(data_dir.to_string_lossy().to_string())
 }
 
 #[cfg(desktop)]
@@ -491,6 +527,18 @@ mod tests {
     }
 
     #[test]
+    fn resolve_url_external_uses_custom_url() {
+        let mut col = column("external");
+        col.custom_url = Some("https://example.com".into());
+        assert_eq!(resolve_url(&col), "https://example.com");
+    }
+
+    #[test]
+    fn resolve_url_externalはcustom_url未指定時about_blankを返す() {
+        assert_eq!(resolve_url(&column("external")), "about:blank");
+    }
+
+    #[test]
     fn resolve_url_composeはhomeを返す() {
         assert_eq!(resolve_url(&column("compose")), "https://x.com/home");
     }
@@ -524,6 +572,31 @@ mod tests {
         let mut col = column("home");
         col.settings.hide_tweet_input_enabled = false;
         assert!(!effective_hide_tweet_input_enabled(&col));
+    }
+
+    #[test]
+    fn is_safe_column_idは通常のuuidを許可する() {
+        assert!(is_safe_column_id("550e8400-e29b-41d4-a716-446655440000"));
+    }
+
+    #[test]
+    fn is_safe_column_idはスラッシュを含む値を拒否する() {
+        assert!(!is_safe_column_id("abc/def"));
+    }
+
+    #[test]
+    fn is_safe_column_idはバックスラッシュを含む値を拒否する() {
+        assert!(!is_safe_column_id("abc\\def"));
+    }
+
+    #[test]
+    fn is_safe_column_idは親ディレクトリ参照を含む値を拒否する() {
+        assert!(!is_safe_column_id("../../etc/passwd"));
+    }
+
+    #[test]
+    fn is_safe_column_idは空文字を拒否する() {
+        assert!(!is_safe_column_id(""));
     }
 
     #[cfg(target_os = "linux")]
