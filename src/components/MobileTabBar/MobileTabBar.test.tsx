@@ -154,6 +154,33 @@ describe("MobileTabBar", () => {
     expect(screen.getByText("外部サイト")).toBeInTheDocument();
   });
 
+  it("pageTypeがhomeでアクティブかつ自動更新有効な場合カウントダウンが表示される", () => {
+    render(
+      <MobileTabBar
+        {...defaultProps}
+        columns={[col1]}
+        activeColumnId="col-1"
+      />,
+    );
+    expect(
+      screen.getByText(`${baseSettings.autoReloadInterval}s`),
+    ).toBeInTheDocument();
+  });
+
+  it("pageTypeがexternalの場合アクティブかつ自動更新有効でもカウントダウンが表示されない", () => {
+    const externalCol: Column = { ...col1, pageType: "external" };
+    render(
+      <MobileTabBar
+        {...defaultProps}
+        columns={[externalCol]}
+        activeColumnId="col-1"
+      />,
+    );
+    expect(
+      screen.queryByText(`${baseSettings.autoReloadInterval}s`),
+    ).not.toBeInTheDocument();
+  });
+
   it("homeTabName がある場合はそれを表示する", () => {
     const colWithTabName: Column = { ...col1, homeTabName: "フォロー中" };
     render(<MobileTabBar {...defaultProps} columns={[colWithTabName]} />);
