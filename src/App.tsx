@@ -444,7 +444,8 @@ const App: React.FC = () => {
           if (isMobile) return null;
           const account = accounts.find((a) => a.id === column.accountId);
           const bounds = columnBounds[column.id];
-          if (!account || !bounds) return null;
+          if (!bounds) return null;
+          if (column.pageType !== "external" && !account) return null;
           return (
             <div
               key={column.id}

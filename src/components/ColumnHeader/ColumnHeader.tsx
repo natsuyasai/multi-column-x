@@ -9,7 +9,7 @@ import styles from "./ColumnHeader.module.scss";
 
 interface ColumnHeaderProps {
   column: Column;
-  account: Account;
+  account: Account | undefined;
   onReload: (columnId: string) => void;
   onReloadPage: (columnId: string) => void;
   onScrollTop: (columnId: string) => void;
@@ -31,7 +31,10 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
   onClearUnread,
 }) => {
   const label =
-    column.label ?? `${account.label} - ${getPageTypeLabel(column)}`;
+    column.label ??
+    (account
+      ? `${account.label} - ${getPageTypeLabel(column)}`
+      : getPageTypeLabel(column));
   const { remaining, reset } = useAutoReload({
     columnId: column.id,
     enabled: column.settings.autoReloadEnabled,
@@ -41,8 +44,14 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
   const showCountdown = column.settings.showCountdown && remaining !== null;
 
   return (
-    <div className={styles.header} style={{ borderTopColor: account.color }}>
-      <span className={styles.dot} style={{ backgroundColor: account.color }} />
+    <div
+      className={styles.header}
+      style={{ borderTopColor: account?.color ?? "#888" }}
+    >
+      <span
+        className={styles.dot}
+        style={{ backgroundColor: account?.color ?? "#888" }}
+      />
       <span className={styles.label}>{label}</span>
       {unreadCount > 0 && (
         <button
