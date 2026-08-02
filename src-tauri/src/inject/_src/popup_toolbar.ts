@@ -251,6 +251,22 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
   downloadStatus.style.cssText =
     "margin-left: 8px; white-space: nowrap; color: #f4212e;";
 
+  /**
+   * ダウンロードボタンの表示/非表示を、動画プレイヤーがDOM上に存在するかどうかで切り替える。
+   * ポップアップで開かれるページは動画詳細ページとは限らないため、動画が無いページでは
+   * ボタンを隠す。MutationObserver から初期化時・DOM変化のたびに呼ばれる想定。
+   */
+  function updateDownloadButtonVisibility(): void {
+    // observer は明示的に disconnect しないため（下記コメント参照）、テストでは
+    // vi.resetModules() のたびに前のテストの observer が残存し、jsdom 環境が
+    // 破棄された後にコールバックが発火して document が undefined になりうる。
+    // 実ブラウザではポップアップが閉じられるとJS実行コンテキストごと破棄されるため
+    // 到達しないが、テストのノイズ防止のためガードする。
+    if (typeof document === "undefined") return;
+    const hasVideo = extractVideoVariantsFromPlayer() !== null;
+    downloadButton.style.display = hasVideo ? "" : "none";
+  }
+
   const DOWNLOAD_FEEDBACK_CLEAR_DELAY_MS = 3000;
 
   /** downloadStatus を一定時間後に空にする（メッセージ自体は呼び出し側で設定済みの前提）。 */
@@ -286,6 +302,15 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
   function inject() {
     const doInject = () => {
       document.body.appendChild(toolbar);
+      updateDownloadButtonVisibility();
+
+      // ポップアップで開かれるページは動画詳細ページとは限らないため、動画プレイヤーの
+      // マウント/アンマウントを継続監視してボタンの表示状態を追従させる。ポップアップウィンドウが
+      // 閉じられればJS実行コンテキストごと破棄されるため、明示的な disconnect() は不要。
+      const videoObserver = new MutationObserver(() => {
+        updateDownloadButtonVisibility();
+      });
+      videoObserver.observe(document.body, { childList: true, subtree: true });
     };
 
     if (document.body) {
