@@ -303,6 +303,83 @@ describe("inject/popup_toolbar の動画ダウンロードボタン", () => {
   });
 });
 
+describe("inject/popup_toolbar の動画ダウンロードボタンの表示切替", () => {
+  beforeEach(() => {
+    tauriInvokeMock.mockClear();
+    window.__TAURI__ = { core: { invoke: tauriInvokeMock } };
+    window.__mcxAccounts = accounts;
+    window.__mcxCurrentAccountId = "acc1";
+    window.__mcxTargetHref = "";
+    window.__mcxEscCloseEnabled = false;
+    delete window.__mcxPopupBridge;
+    document
+      .querySelectorAll('[data-testid="videoComponent"]')
+      .forEach((el) => el.remove());
+  });
+
+  function getDownloadButton(): HTMLButtonElement {
+    const button = document.querySelector<HTMLButtonElement>(
+      "#tv-popup-download-button",
+    );
+    if (!button) throw new Error("download button not found");
+    return button;
+  }
+
+  /** MutationObserver のコールバック（マイクロタスク）実行を待つ。 */
+  async function flushMutationObserver(): Promise<void> {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  }
+
+  it("動画コンポーネントが存在しない状態でツールバーを注入すると初期状態でダウンロードボタンが非表示になる", async () => {
+    await importToolbar();
+
+    expect(getDownloadButton().style.display).toBe("none");
+  });
+
+  it("動画コンポーネントが存在する状態でツールバーを注入すると初期状態でダウンロードボタンが表示される", async () => {
+    const videoComponent = document.createElement("div");
+    videoComponent.dataset.testid = "videoComponent";
+    document.body.appendChild(videoComponent);
+    attachFiber(videoComponent, PLAYER_PROPS);
+
+    await importToolbar();
+
+    expect(getDownloadButton().style.display).not.toBe("none");
+  });
+
+  it("初期表示時は非表示だったが、後から動画コンポーネントをDOMに動的追加するとボタンが表示に切り替わる", async () => {
+    await importToolbar();
+    expect(getDownloadButton().style.display).toBe("none");
+
+    const videoComponent = document.createElement("div");
+    videoComponent.dataset.testid = "videoComponent";
+    document.body.appendChild(videoComponent);
+    attachFiber(videoComponent, PLAYER_PROPS);
+
+    await flushMutationObserver();
+
+    expect(getDownloadButton().style.display).not.toBe("none");
+  });
+
+  it("表示されていた動画コンポーネント要素をDOMから削除するとボタンが非表示に戻る", async () => {
+    const videoComponent = document.createElement("div");
+    videoComponent.dataset.testid = "videoComponent";
+    document.body.appendChild(videoComponent);
+    attachFiber(videoComponent, PLAYER_PROPS);
+
+    await importToolbar();
+    expect(getDownloadButton().style.display).not.toBe("none");
+
+    videoComponent.remove();
+
+    await flushMutationObserver();
+
+    expect(getDownloadButton().style.display).toBe("none");
+  });
+});
+
 describe("formatVideoDownloadProgressText", () => {
   it("downloadingかつtotalありの場合パーセンテージを表示する", () => {
     expect(
