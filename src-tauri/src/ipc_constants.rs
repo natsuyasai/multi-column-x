@@ -28,6 +28,8 @@ pub mod events {
     /// 動画ダウンロード進捗通知（desktop: Rust emit_to → TS listen）
     /// payload { fileIndex, fileCount, current, total, phase }。
     pub const VIDEO_DOWNLOAD_PROGRESS: &str = "video-download-progress";
+    /// APIレート制限残量通知（inject script invoke → TS listen）{ label, bucketKey, limit, remaining, reset }
+    pub const WEBVIEW_API_RATE_LIMIT: &str = "webview-api-rate-limit";
 }
 
 /// WebView / ウィンドウラベルのプレフィックス

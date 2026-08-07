@@ -91,6 +91,39 @@ pub async fn report_new_posts_count(
     .map_err(|e| e.to_string())
 }
 
+/// report_api_rate_limit が emit するペイロードを組み立てる（テスト用に純粋関数として切り出し）。
+fn build_api_rate_limit_payload(
+    label: &str,
+    bucket_key: &str,
+    limit: u32,
+    remaining: u32,
+    reset: u64,
+) -> serde_json::Value {
+    serde_json::json!({
+        "label": label,
+        "bucketKey": bucket_key,
+        "limit": limit,
+        "remaining": remaining,
+        "reset": reset
+    })
+}
+
+#[tauri::command]
+pub async fn report_api_rate_limit(
+    app: AppHandle,
+    label: String,
+    bucket_key: String,
+    limit: u32,
+    remaining: u32,
+    reset: u64,
+) -> Result<(), String> {
+    app.emit(
+        events::WEBVIEW_API_RATE_LIMIT,
+        build_api_rate_limit_payload(&label, &bucket_key, limit, remaining, reset),
+    )
+    .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub async fn report_keyboard_shortcut(app: AppHandle, key: String) -> Result<(), String> {
     app.emit(events::WEBVIEW_KEYBOARD_SHORTCUT, key)
@@ -118,5 +151,16 @@ mod tests {
         let result = parse_url("not a url");
         assert!(result.is_err());
         assert!(!result.unwrap_err().is_empty());
+    }
+
+    #[test]
+    fn api_rate_limitのペイロードが期待した形になる() {
+        let payload =
+            build_api_rate_limit_payload("home-timeline", "user_tweets", 150, 42, 1_700_000_000);
+        assert_eq!(payload["label"], "home-timeline");
+        assert_eq!(payload["bucketKey"], "user_tweets");
+        assert_eq!(payload["limit"], 150);
+        assert_eq!(payload["remaining"], 42);
+        assert_eq!(payload["reset"], 1_700_000_000);
     }
 }
