@@ -88,6 +88,14 @@ export interface GlobalSettings {
   ngWords: string[];
 }
 
+export interface ApiRateLimitBucket {
+  bucketKey: string;
+  limit: number;
+  remaining: number;
+  reset: number;
+  updatedAt: number;
+}
+
 export interface ColumnPreset {
   id: string;
   name: string;

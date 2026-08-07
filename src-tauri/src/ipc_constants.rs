@@ -90,6 +90,7 @@ mod tests {
             ("COLUMN_WEBVIEW_FOCUSED", events::COLUMN_WEBVIEW_FOCUSED),
             ("ACCOUNT_REAUTH_COMPLETE", events::ACCOUNT_REAUTH_COMPLETE),
             ("VIDEO_DOWNLOAD_PROGRESS", events::VIDEO_DOWNLOAD_PROGRESS),
+            ("WEBVIEW_API_RATE_LIMIT", events::WEBVIEW_API_RATE_LIMIT),
         ];
         assert_eq!(
             expected.as_object().unwrap().len(),

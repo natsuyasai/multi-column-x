@@ -27,6 +27,7 @@ import { useDialogState } from "./hooks/useDialogState";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useTheme } from "./hooks/useTheme";
 import {
+  useApiRateLimitReports,
   useColumnCrashRecovery,
   useColumnFocusClearsUnread,
   useNewPostsNotification,
@@ -63,6 +64,7 @@ const App: React.FC = () => {
     unreadCounts,
     setUnreadCount,
     clearUnreadCount,
+    setApiRateLimit,
   } = useAppStore();
   const {
     columns,
@@ -188,6 +190,7 @@ const App: React.FC = () => {
   // WebView 内の横ホイール → スクロールバー追従、新着カウント → バッジ・デスクトップ通知
   useWebviewScrollRelay(scrollbarRef);
   useNewPostsNotification(setUnreadCount);
+  useApiRateLimitReports(setApiRateLimit);
   useColumnCrashRecovery(recreateColumnWebview);
   useColumnFocusClearsUnread(clearUnreadCount);
 

@@ -4,6 +4,7 @@ import { IPC_COMMANDS } from "../constants/ipc";
 import { logError } from "../lib/log";
 import type {
   Account,
+  ApiRateLimitBucket,
   Column,
   ColumnPreset,
   GlobalSettings,
@@ -45,6 +46,8 @@ interface AppStore {
   unreadCounts: Record<string, number>;
   setUnreadCount: (columnId: string, count: number) => void;
   clearUnreadCount: (columnId: string) => void;
+  apiRateLimits: Record<string, Record<string, ApiRateLimitBucket>>; // accountId -> bucketKey -> bucket
+  setApiRateLimit: (accountId: string, bucket: ApiRateLimitBucket) => void;
   loadSettings: () => Promise<void>;
   saveSettings: () => Promise<void>;
   addAccount: (account: Account) => void;
@@ -84,6 +87,17 @@ export const useAppStore = create<AppStore>((set, get) => ({
   clearUnreadCount: (columnId) =>
     set((state) => ({
       unreadCounts: { ...state.unreadCounts, [columnId]: 0 },
+    })),
+  apiRateLimits: {},
+  setApiRateLimit: (accountId, bucket) =>
+    set((state) => ({
+      apiRateLimits: {
+        ...state.apiRateLimits,
+        [accountId]: {
+          ...state.apiRateLimits[accountId],
+          [bucket.bucketKey]: bucket,
+        },
+      },
     })),
 
   loadSettings: async () => {
