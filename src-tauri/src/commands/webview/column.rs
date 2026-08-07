@@ -21,6 +21,13 @@ use tauri::{AppHandle, Manager};
 #[cfg(desktop)]
 use tauri::{LogicalPosition, LogicalSize, WebviewUrl};
 
+// Linux (WebKitGTK) は native HLS 非対応 + デフォルト UA が Safari 判定されるため、
+// X が hls.js 経由の MSE 再生でなく native <video> で m3u8 を渡してしまい動画再生に失敗する。
+// Chrome UA を名乗らせることで hls.js 経由の MSE 再生に切り替えさせる（実機検証済み）。
+// 動画再生が失敗し始めたら、最新の Chrome の User-Agent 文字列に更新すること。
+#[cfg(target_os = "linux")]
+const LINUX_COLUMN_USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36";
+
 fn webview_label(column_id: &str) -> String {
     format!("{}{}", labels::COLUMN_PREFIX, column_id)
 }
@@ -185,6 +192,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
                 .inner_size(args.width.max(1.0), args.height.max(1.0))
                 .parent(&window)
                 .map_err(|e| e.to_string())?
+                .user_agent(LINUX_COLUMN_USER_AGENT)
                 .build()
                 .map_err(|e| e.to_string())?;
 
@@ -546,6 +554,13 @@ mod tests {
     #[test]
     fn resolve_url_unknown_falls_back_to_home() {
         assert_eq!(resolve_url(&column("unknown")), "https://x.com/home");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_column_user_agentはchromeトークンを含みsafariバージョントークンを含まない() {
+        assert!(LINUX_COLUMN_USER_AGENT.contains("Chrome/"));
+        assert!(!LINUX_COLUMN_USER_AGENT.contains("Version/"));
     }
 
     #[test]
