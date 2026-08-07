@@ -169,6 +169,27 @@ describe("ApiRateLimitIndicator", () => {
     expect(trigger.className).toMatch(/critical/i);
   });
 
+  it("カラム関連でないapiがcritical状態でも、トリガーボタンは深刻表示にならない", () => {
+    const rateLimitsWithNonColumnCritical: Record<
+      string,
+      Record<string, ApiRateLimitBucket>
+    > = {
+      "acc-1": {
+        CreateTweet: bucket("CreateTweet", 1, 100), // critical (1%) だが非カラム関連
+      },
+    };
+    render(
+      <ApiRateLimitIndicator
+        accounts={accounts}
+        apiRateLimits={rateLimitsWithNonColumnCritical}
+      />,
+    );
+    const trigger = screen.getByRole("button", { name: "APIレート制限" });
+
+    expect(trigger.className).not.toMatch(/critical/i);
+    expect(trigger.className).not.toMatch(/warning/i);
+  });
+
   it("トリガークリックで開いたときonOpenChangeがtrueで呼ばれる", () => {
     const onOpenChange = vi.fn();
     render(

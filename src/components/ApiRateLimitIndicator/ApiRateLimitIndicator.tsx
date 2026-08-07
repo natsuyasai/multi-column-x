@@ -55,6 +55,7 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
     let worst: Severity = "normal";
     for (const buckets of Object.values(apiRateLimits)) {
       for (const bucket of Object.values(buckets)) {
+        if (!isColumnRelatedApiBucket(bucket.bucketKey)) continue;
         const severity = getRateLimitSeverity(bucket.remaining, bucket.limit);
         if (SEVERITY_ORDER[severity] > SEVERITY_ORDER[worst]) {
           worst = severity;
