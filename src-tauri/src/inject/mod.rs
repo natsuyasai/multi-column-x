@@ -14,6 +14,7 @@ pub struct InitScriptParams<'a> {
     pub blur_image_enabled: bool,
     pub blur_image_amount: &'a str,
     pub hide_ad_enabled: bool,
+    pub api_rate_limit_monitor_enabled: bool,
     pub image_popup_enabled: bool,
     pub video_popup_enabled: bool,
     pub custom_css: &'a str,
@@ -99,7 +100,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         serde_json::to_string(params.global_ng_words).unwrap_or_else(|_| "[]".to_string());
     let effective_show_custom_menu = params.hide_header_enabled && params.show_custom_menu;
     let config = format!(
-        "window.{} = {{ hideHeaderEnabled: {}, hideTweetInputEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?}, blurImageEnabled: {}, blurImageAmount: {:?}, hideAdEnabled: {}, imagePopupEnabled: {}, videoPopupEnabled: {}, ngWords: {}, globalNgWords: {} }};",
+        "window.{} = {{ hideHeaderEnabled: {}, hideTweetInputEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?}, blurImageEnabled: {}, blurImageAmount: {:?}, hideAdEnabled: {}, apiRateLimitMonitorEnabled: {}, imagePopupEnabled: {}, videoPopupEnabled: {}, ngWords: {}, globalNgWords: {} }};",
         globals::MULTI_COLUMN_X_CONFIG,
         params.hide_header_enabled,
         params.hide_tweet_input_enabled,
@@ -110,6 +111,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         params.blur_image_enabled,
         params.blur_image_amount,
         params.hide_ad_enabled,
+        params.api_rate_limit_monitor_enabled,
         params.image_popup_enabled,
         params.video_popup_enabled,
         ng_words_json,
@@ -203,6 +205,7 @@ mod tests {
             blur_image_enabled: false,
             blur_image_amount: "10px",
             hide_ad_enabled: false,
+            api_rate_limit_monitor_enabled: true,
             image_popup_enabled: true,
             video_popup_enabled: true,
             custom_css: "",

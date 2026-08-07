@@ -77,6 +77,7 @@ export interface GlobalSettings {
   blurImageEnabled: boolean;
   blurImageAmount: string;
   hideAdEnabled: boolean;
+  apiRateLimitMonitorEnabled: boolean;
   columnScale: ColumnScale;
   useXAppForCompose: boolean;
   mobileSwipeAreaEnabled: boolean;
@@ -178,6 +179,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   hideAdEnabled: true,
+  apiRateLimitMonitorEnabled: true,
   columnScale: "default",
   useXAppForCompose: false,
   mobileSwipeAreaEnabled: true,

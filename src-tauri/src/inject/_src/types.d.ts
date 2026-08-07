@@ -31,6 +31,7 @@ declare global {
     blurImageEnabled: boolean;
     blurImageAmount: string;
     hideAdEnabled: boolean;
+    apiRateLimitMonitorEnabled?: boolean;
     imagePopupEnabled?: boolean;
     videoPopupEnabled?: boolean;
     ngWords?: string[];

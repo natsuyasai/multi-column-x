@@ -76,6 +76,7 @@ describe("useAppStore", () => {
         blurImageEnabled: false,
         blurImageAmount: "10px",
         hideAdEnabled: false,
+        apiRateLimitMonitorEnabled: true,
         columnScale: "default",
         useXAppForCompose: false,
         mobileSwipeAreaEnabled: true,

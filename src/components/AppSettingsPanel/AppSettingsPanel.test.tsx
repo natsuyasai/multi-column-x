@@ -38,6 +38,7 @@ const baseGlobalSettings: GlobalSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   hideAdEnabled: true,
+  apiRateLimitMonitorEnabled: true,
   columnScale: "default",
   useXAppForCompose: false,
   mobileSwipeAreaEnabled: true,

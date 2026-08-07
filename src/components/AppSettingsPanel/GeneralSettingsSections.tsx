@@ -72,6 +72,18 @@ export const GeneralSettingsSections: React.FC<
       </label>
     </section>
 
+    <section className={styles.section}>
+      <h3 className={styles.sectionTitle}>API残量モニター</h3>
+      <label className={styles.checkLabel}>
+        <input
+          type="checkbox"
+          checked={draft.apiRateLimitMonitorEnabled}
+          onChange={(e) => set("apiRateLimitMonitorEnabled", e.target.checked)}
+        />
+        API残量モニターを有効にする
+      </label>
+    </section>
+
     {isMobile && (
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>ツイート（Android）</h3>

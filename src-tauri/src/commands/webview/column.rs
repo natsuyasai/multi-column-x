@@ -3,8 +3,8 @@
 use super::parse_url;
 use crate::commands::settings::ColumnData;
 use crate::commands::settings_store::{
-    load_global_ng_words, load_hide_ad_enabled, load_image_popup_enabled,
-    load_video_auto_play_stop_enabled, load_video_popup_enabled,
+    load_api_rate_limit_monitor_enabled, load_global_ng_words, load_hide_ad_enabled,
+    load_image_popup_enabled, load_video_auto_play_stop_enabled, load_video_popup_enabled,
 };
 use crate::inject::{build_init_script, InitScriptParams};
 #[cfg(any(target_os = "linux", windows))]
@@ -91,6 +91,7 @@ fn effective_hide_tweet_input_enabled(column: &ColumnData) -> bool {
 fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: bool) -> String {
     let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(app);
     let hide_ad_enabled = load_hide_ad_enabled(app);
+    let api_rate_limit_monitor_enabled = load_api_rate_limit_monitor_enabled(app);
     let image_popup_enabled = load_image_popup_enabled(app);
     let video_popup_enabled = load_video_popup_enabled(app);
     let global_ng_words = load_global_ng_words(app);
@@ -106,6 +107,7 @@ fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: boo
         blur_image_enabled: column.settings.blur_image_enabled,
         blur_image_amount: &column.settings.blur_image_amount,
         hide_ad_enabled,
+        api_rate_limit_monitor_enabled,
         image_popup_enabled,
         video_popup_enabled,
         custom_css: &column.settings.custom_css,

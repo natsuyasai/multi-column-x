@@ -94,6 +94,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       blurImageEnabled: draft.blurImageEnabled,
       blurImageAmount: draft.blurImageAmount,
       hideAdEnabled: draft.hideAdEnabled,
+      apiRateLimitMonitorEnabled: draft.apiRateLimitMonitorEnabled,
       columnScale: draft.columnScale,
       useXAppForCompose: draft.useXAppForCompose,
       mobileSwipeAreaEnabled: draft.mobileSwipeAreaEnabled,
