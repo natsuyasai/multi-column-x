@@ -64,6 +64,8 @@ const defaultProps = {
   onComposeTweet: vi.fn(),
   onTabAction: vi.fn(),
   onDoubleTapColumn: vi.fn(),
+  apiRateLimitMonitorEnabled: true,
+  apiRateLimits: {},
 };
 
 describe("MobileTabBar", () => {
@@ -218,6 +220,30 @@ describe("MobileTabBar", () => {
     await userEvent.click(screen.getByTitle("メニュー表示の切り替え"));
     await userEvent.click(screen.getByRole("button", { name: "カラムを追加" }));
     expect(onAddColumn).toHaveBeenCalled();
+  });
+
+  it("apiRateLimitMonitorEnabledがtrueのとき展開後にAPIレート制限インジケータが表示される", async () => {
+    render(
+      <MobileTabBar
+        {...defaultProps}
+        columns={[]}
+        apiRateLimitMonitorEnabled={true}
+      />,
+    );
+    await userEvent.click(screen.getByTitle("メニュー表示の切り替え"));
+    expect(screen.getByLabelText("APIレート制限")).toBeInTheDocument();
+  });
+
+  it("apiRateLimitMonitorEnabledがfalseのとき展開後もAPIレート制限インジケータが表示されない", async () => {
+    render(
+      <MobileTabBar
+        {...defaultProps}
+        columns={[]}
+        apiRateLimitMonitorEnabled={false}
+      />,
+    );
+    await userEvent.click(screen.getByTitle("メニュー表示の切り替え"));
+    expect(screen.queryByLabelText("APIレート制限")).not.toBeInTheDocument();
   });
 
   describe("アクションボタンの SVG アイコン", () => {

@@ -5,7 +5,13 @@ import PersonIcon from "../../assets/icons/person.svg?react";
 import PlusIcon from "../../assets/icons/plus.svg?react";
 import SettingsIcon from "../../assets/icons/settings.svg?react";
 import { useAutoReload } from "../../hooks/useAutoReload";
-import type { Column, Account, PageType } from "../../types";
+import type {
+  Column,
+  Account,
+  ApiRateLimitBucket,
+  PageType,
+} from "../../types";
+import { ApiRateLimitIndicator } from "../ApiRateLimitIndicator/ApiRateLimitIndicator";
 import styles from "./MobileTabBar.module.scss";
 
 function getExternalTabLabel(customUrl: string | undefined): string {
@@ -163,6 +169,8 @@ interface Props {
   onComposeTweet: () => void;
   onTabAction: (columnId: string) => void;
   onDoubleTapColumn: (columnId: string) => void;
+  apiRateLimitMonitorEnabled: boolean;
+  apiRateLimits: Record<string, Record<string, ApiRateLimitBucket>>;
 }
 
 export const MobileTabBar: React.FC<Props> = ({
@@ -178,6 +186,8 @@ export const MobileTabBar: React.FC<Props> = ({
   onComposeTweet,
   onTabAction,
   onDoubleTapColumn,
+  apiRateLimitMonitorEnabled,
+  apiRateLimits,
 }) => {
   const sorted = [...columns].sort((a, b) => a.order - b.order);
   const [expanded, setExpanded] = useState(false);
@@ -267,6 +277,12 @@ export const MobileTabBar: React.FC<Props> = ({
           >
             <PlusIcon width={18} height={18} data-testid="icon-plus" />
           </button>
+          {apiRateLimitMonitorEnabled && (
+            <ApiRateLimitIndicator
+              accounts={accounts}
+              apiRateLimits={apiRateLimits}
+            />
+          )}
         </div>
       )}
     </div>

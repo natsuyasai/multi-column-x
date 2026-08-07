@@ -65,6 +65,7 @@ const App: React.FC = () => {
     setUnreadCount,
     clearUnreadCount,
     setApiRateLimit,
+    apiRateLimits,
   } = useAppStore();
   const {
     columns,
@@ -416,6 +417,8 @@ const App: React.FC = () => {
           onOpenLinkPopup={handleOpenLinkPopup}
           onJumpToColumn={handleJumpToColumn}
           onClose={handleRemoveColumn}
+          apiRateLimitMonitorEnabled={globalSettings.apiRateLimitMonitorEnabled}
+          apiRateLimits={apiRateLimits}
         />
       )}
       {isMobile && (
@@ -432,6 +435,8 @@ const App: React.FC = () => {
           onTabAction={handleTabAction}
           onDoubleTapColumn={handleDoubleTapColumn}
           swipeState={swipeState}
+          apiRateLimitMonitorEnabled={globalSettings.apiRateLimitMonitorEnabled}
+          apiRateLimits={apiRateLimits}
         />
       )}
       {isMobile && globalSettings.mobileSwipeAreaEnabled && (

@@ -65,6 +65,8 @@ const defaultProps = {
   onOpenLinkPopup: vi.fn(),
   onJumpToColumn: vi.fn(),
   onClose: vi.fn(),
+  apiRateLimitMonitorEnabled: true,
+  apiRateLimits: {},
 };
 
 describe("TopBar", () => {
@@ -145,6 +147,16 @@ describe("TopBar", () => {
     const labeled: Column = { ...col1, label: "マイホーム" };
     render(<TopBar {...defaultProps} columns={[labeled]} />);
     expect(screen.getByTitle("マイホーム (Ctrl+1)")).toBeInTheDocument();
+  });
+
+  it("apiRateLimitMonitorEnabledがtrueのときAPIレート制限インジケータが表示される", () => {
+    render(<TopBar {...defaultProps} apiRateLimitMonitorEnabled={true} />);
+    expect(screen.getByLabelText("APIレート制限")).toBeInTheDocument();
+  });
+
+  it("apiRateLimitMonitorEnabledがfalseのときAPIレート制限インジケータが表示されない", () => {
+    render(<TopBar {...defaultProps} apiRateLimitMonitorEnabled={false} />);
+    expect(screen.queryByLabelText("APIレート制限")).not.toBeInTheDocument();
   });
 
   it("expanded=true のとき各カラムにカラムを閉じるボタンが表示される", () => {

@@ -91,6 +91,8 @@ const meta: Meta<typeof MobileTabBar> = {
     onComposeTweet: fn(),
     onTabAction: fn(),
     onDoubleTapColumn: fn(),
+    apiRateLimitMonitorEnabled: true,
+    apiRateLimits: {},
   },
 };
 
