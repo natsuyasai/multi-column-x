@@ -197,6 +197,43 @@ describe("ApiRateLimitIndicator", () => {
     expect(onOpenChange).toHaveBeenLastCalledWith(false);
   });
 
+  it("辞書に説明がある場合はポップオーバーに説明文が表示される", () => {
+    render(
+      <ApiRateLimitIndicator
+        accounts={accounts}
+        apiRateLimits={normalRateLimits}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "APIレート制限" }));
+
+    expect(
+      screen.getByText(
+        "フォロー中ユーザーのツイートをアルゴリズム順で並べたタイムラインを取得するAPI。",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("辞書に説明が無いbucketKeyの場合は説明文の要素が表示されない", () => {
+    const rateLimitsWithoutDescription: Record<
+      string,
+      Record<string, ApiRateLimitBucket>
+    > = {
+      "acc-1": {
+        UnknownOperationXYZ: bucket("UnknownOperationXYZ", 100, 100),
+      },
+    };
+    render(
+      <ApiRateLimitIndicator
+        accounts={accounts}
+        apiRateLimits={rateLimitsWithoutDescription}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "APIレート制限" }));
+
+    const row = screen.getByText("UnknownOperationXYZ").closest("li");
+    expect(row?.querySelector("p")).not.toBeInTheDocument();
+  });
+
   it("Escキーで閉じたときonOpenChangeがfalseで呼ばれる", () => {
     const onOpenChange = vi.fn();
     render(

@@ -1,5 +1,8 @@
 import React, { useMemo, useState } from "react";
-import { getApiRateLimitLabel } from "@/constants/apiRateLimitLabels";
+import {
+  getApiRateLimitDescription,
+  getApiRateLimitLabel,
+} from "@/constants/apiRateLimitLabels";
 import { useEscapeKey } from "@/hooks/useEscapeKey";
 import { getRateLimitSeverity } from "@/lib/apiRateLimit";
 import type { Account, ApiRateLimitBucket } from "@/types";
@@ -118,18 +121,28 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
                         severity === "warning" && styles.warning,
                         severity === "critical" && styles.critical,
                       );
+                      const description = getApiRateLimitDescription(
+                        bucket.bucketKey,
+                      );
 
                       return (
                         <li key={bucket.bucketKey} className={rowClassName}>
-                          <span className={styles.bucketLabel}>
-                            {getApiRateLimitLabel(bucket.bucketKey)}
-                          </span>
-                          <span className={styles.bucketRemaining}>
-                            {bucket.remaining}/{bucket.limit}
-                          </span>
-                          <span className={styles.bucketReset}>
-                            {formatResetLabel(bucket.reset)}
-                          </span>
+                          <div className={styles.bucketMain}>
+                            <span className={styles.bucketLabel}>
+                              {getApiRateLimitLabel(bucket.bucketKey)}
+                            </span>
+                            <span className={styles.bucketRemaining}>
+                              {bucket.remaining}/{bucket.limit}
+                            </span>
+                            <span className={styles.bucketReset}>
+                              {formatResetLabel(bucket.reset)}
+                            </span>
+                          </div>
+                          {description && (
+                            <p className={styles.bucketDescription}>
+                              {description}
+                            </p>
+                          )}
                         </li>
                       );
                     })}
