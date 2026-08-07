@@ -11,6 +11,7 @@ import { IPC_EVENTS, WEBVIEW_LABELS } from "../constants/ipc";
 import { logError } from "../lib/log";
 import { useAppStore } from "../store/useAppStore";
 import { getColumnLabel } from "../types";
+import type { ApiRateLimitBucket } from "../types";
 
 /** WebView 内の横ホイールを受け取ってスクロールバーを動かす */
 export function useWebviewScrollRelay(
@@ -183,4 +184,36 @@ export function useNewPostsNotification(
       unlisten.then((fn) => fn());
     };
   }, [setUnreadCount]);
+}
+
+/** inject script からのAPIレート制限ヘッダ通知を受け、当該カラムのaccountIdに紐づけてstoreへ反映する */
+export function useApiRateLimitReports(
+  setApiRateLimit: (accountId: string, bucket: ApiRateLimitBucket) => void,
+) {
+  useEffect(() => {
+    const unlisten = listen<{
+      label: string;
+      bucketKey: string;
+      limit: number;
+      remaining: number;
+      reset: number;
+    }>(IPC_EVENTS.WEBVIEW_API_RATE_LIMIT, (e) => {
+      const { label, bucketKey, limit, remaining, reset } = e.payload;
+      const columnId = label.replace(WEBVIEW_LABELS.COLUMN_PREFIX, "");
+
+      const col = useAppStore.getState().columns.find((c) => c.id === columnId);
+      if (!col) return;
+
+      setApiRateLimit(col.accountId, {
+        bucketKey,
+        limit,
+        remaining,
+        reset,
+        updatedAt: Date.now(),
+      });
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [setApiRateLimit]);
 }

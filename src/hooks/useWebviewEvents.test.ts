@@ -6,6 +6,7 @@ import { DEFAULT_COLUMN_SETTINGS, getColumnLabel } from "../types";
 import type { Column } from "../types";
 import {
   __resetNotificationPermissionCacheForTests,
+  useApiRateLimitReports,
   useColumnCrashRecovery,
   useColumnFocusClearsUnread,
   useNewPostsNotification,
@@ -524,5 +525,63 @@ describe("useNewPostsNotification", () => {
         body: expect.stringContaining("通知"),
       }),
     );
+  });
+});
+
+describe("useApiRateLimitReports", () => {
+  beforeEach(() => {
+    capturedCallbacks.clear();
+    mockUnlisten.mockReset();
+    vi.useFakeTimers();
+    useAppStore.setState({
+      columns: [makeColumn({ id: "col-1", accountId: "acc-1" })],
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function emitRateLimit(
+    label: string,
+    bucketKey: string,
+    limit: number,
+    remaining: number,
+    reset: number,
+  ) {
+    capturedCallbacks.get(IPC_EVENTS.WEBVIEW_API_RATE_LIMIT)?.({
+      payload: { label, bucketKey, limit, remaining, reset },
+    });
+  }
+
+  it("イベント受信時に対応するカラムのaccountIdでsetApiRateLimitが呼ばれる", async () => {
+    const setApiRateLimit = vi.fn();
+    vi.setSystemTime(1700000000000);
+    renderHook(() => useApiRateLimitReports(setApiRateLimit));
+    await act(async () => {
+      emitRateLimit("column-col-1", "home_timeline", 500, 100, 1700000000);
+    });
+    expect(setApiRateLimit).toHaveBeenCalledWith("acc-1", {
+      bucketKey: "home_timeline",
+      limit: 500,
+      remaining: 100,
+      reset: 1700000000,
+      updatedAt: 1700000000000,
+    });
+  });
+
+  it("存在しないcolumnIdの場合は何もしない", async () => {
+    const setApiRateLimit = vi.fn();
+    renderHook(() => useApiRateLimitReports(setApiRateLimit));
+    await act(async () => {
+      emitRateLimit(
+        "column-non-existent",
+        "home_timeline",
+        500,
+        100,
+        1700000000,
+      );
+    });
+    expect(setApiRateLimit).not.toHaveBeenCalled();
   });
 });

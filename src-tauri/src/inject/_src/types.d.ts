@@ -31,6 +31,7 @@ declare global {
     blurImageEnabled: boolean;
     blurImageAmount: string;
     hideAdEnabled: boolean;
+    apiRateLimitMonitorEnabled?: boolean;
     imagePopupEnabled?: boolean;
     videoPopupEnabled?: boolean;
     ngWords?: string[];
@@ -99,6 +100,7 @@ declare global {
     __mcxVideoDownloadBridge?: McxVideoDownloadBridge;
     __mobileTopInset?: number;
     __mobileBottomInset?: number;
+    __xhrRateLimitPatched?: boolean;
   }
 }
 

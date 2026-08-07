@@ -90,6 +90,9 @@ const meta: Meta<typeof TopBar> = {
     onComposeTweet: fn(),
     onOpenLinkPopup: fn(),
     onJumpToColumn: fn(),
+    apiRateLimitMonitorEnabled: true,
+    apiRateLimits: {},
+    onApiRateLimitPopoverOpenChange: fn(),
   },
 };
 

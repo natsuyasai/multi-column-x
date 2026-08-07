@@ -43,6 +43,9 @@ export const IPC_COMMANDS = {
   // 未読カウント
   REPORT_NEW_POSTS_COUNT: "report_new_posts_count",
 
+  // APIレート制限
+  REPORT_API_RATE_LIMIT: "report_api_rate_limit",
+
   // キーボードショートカット
   REPORT_KEYBOARD_SHORTCUT: "report_keyboard_shortcut",
 
@@ -70,6 +73,8 @@ export const IPC_EVENTS = {
   ACCOUNT_REAUTH_COMPLETE: "account-reauth-complete",
   /** 動画ダウンロード進捗（desktop: Rust emit_to → TS listen）payload { fileIndex, fileCount, current, total, phase } */
   VIDEO_DOWNLOAD_PROGRESS: "video-download-progress",
+  /** APIレート制限残量通知（inject script invoke → TS listen）{ label, bucketKey, limit, remaining, reset } */
+  WEBVIEW_API_RATE_LIMIT: "webview-api-rate-limit",
 } as const;
 
 /** WebView / ウィンドウラベルのプレフィックスと生成ヘルパー */

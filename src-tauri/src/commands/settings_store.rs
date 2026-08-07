@@ -68,6 +68,14 @@ pub(crate) fn load_hide_ad_enabled(app: &AppHandle) -> bool {
     bool_flag(&load_global_settings(app), "hideAdEnabled", false)
 }
 
+pub(crate) fn load_api_rate_limit_monitor_enabled(app: &AppHandle) -> bool {
+    bool_flag(
+        &load_global_settings(app),
+        "apiRateLimitMonitorEnabled",
+        true,
+    )
+}
+
 pub(crate) fn load_popup_esc_close_enabled(app: &AppHandle) -> bool {
     bool_flag(&load_global_settings(app), "popupEscCloseEnabled", true)
 }

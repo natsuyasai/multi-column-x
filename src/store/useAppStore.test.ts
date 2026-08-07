@@ -76,6 +76,7 @@ describe("useAppStore", () => {
         blurImageEnabled: false,
         blurImageAmount: "10px",
         hideAdEnabled: false,
+        apiRateLimitMonitorEnabled: true,
         columnScale: "default",
         useXAppForCompose: false,
         mobileSwipeAreaEnabled: true,
@@ -216,6 +217,118 @@ describe("useAppStore", () => {
   it("unreadCounts の初期値は空オブジェクト", () => {
     const { result } = renderHook(() => useAppStore());
     expect(result.current.unreadCounts).toEqual({});
+  });
+
+  it("apiRateLimitsの初期値は空オブジェクト", () => {
+    const { result } = renderHook(() => useAppStore());
+    expect(result.current.apiRateLimits).toEqual({});
+  });
+
+  it("setApiRateLimitを呼ぶと指定したアカウントのバケット情報が更新される", () => {
+    const { result } = renderHook(() => useAppStore());
+    act(() => {
+      result.current.setApiRateLimit("acc-1", {
+        bucketKey: "home_timeline",
+        limit: 500,
+        remaining: 100,
+        reset: 1700000000,
+        updatedAt: 1700000000000,
+      });
+    });
+    expect(result.current.apiRateLimits["acc-1"]["home_timeline"]).toEqual({
+      bucketKey: "home_timeline",
+      limit: 500,
+      remaining: 100,
+      reset: 1700000000,
+      updatedAt: 1700000000000,
+    });
+  });
+
+  it("同一アカウントの別バケットを追加しても既存バケットは保持される", () => {
+    const { result } = renderHook(() => useAppStore());
+    act(() => {
+      result.current.setApiRateLimit("acc-1", {
+        bucketKey: "home_timeline",
+        limit: 500,
+        remaining: 100,
+        reset: 1700000000,
+        updatedAt: 1700000000000,
+      });
+      result.current.setApiRateLimit("acc-1", {
+        bucketKey: "user_tweets",
+        limit: 300,
+        remaining: 50,
+        reset: 1700000100,
+        updatedAt: 1700000100000,
+      });
+    });
+    expect(result.current.apiRateLimits["acc-1"]["home_timeline"]).toEqual({
+      bucketKey: "home_timeline",
+      limit: 500,
+      remaining: 100,
+      reset: 1700000000,
+      updatedAt: 1700000000000,
+    });
+    expect(result.current.apiRateLimits["acc-1"]["user_tweets"]).toEqual({
+      bucketKey: "user_tweets",
+      limit: 300,
+      remaining: 50,
+      reset: 1700000100,
+      updatedAt: 1700000100000,
+    });
+  });
+
+  it("同一バケットに再度setApiRateLimitを呼ぶと値が上書きされる", () => {
+    const { result } = renderHook(() => useAppStore());
+    act(() => {
+      result.current.setApiRateLimit("acc-1", {
+        bucketKey: "home_timeline",
+        limit: 500,
+        remaining: 100,
+        reset: 1700000000,
+        updatedAt: 1700000000000,
+      });
+      result.current.setApiRateLimit("acc-1", {
+        bucketKey: "home_timeline",
+        limit: 500,
+        remaining: 80,
+        reset: 1700000050,
+        updatedAt: 1700000050000,
+      });
+    });
+    expect(result.current.apiRateLimits["acc-1"]["home_timeline"]).toEqual({
+      bucketKey: "home_timeline",
+      limit: 500,
+      remaining: 80,
+      reset: 1700000050,
+      updatedAt: 1700000050000,
+    });
+  });
+
+  it("別アカウントのバケットは互いに独立して保持される", () => {
+    const { result } = renderHook(() => useAppStore());
+    act(() => {
+      result.current.setApiRateLimit("acc-1", {
+        bucketKey: "home_timeline",
+        limit: 500,
+        remaining: 100,
+        reset: 1700000000,
+        updatedAt: 1700000000000,
+      });
+      result.current.setApiRateLimit("acc-2", {
+        bucketKey: "home_timeline",
+        limit: 500,
+        remaining: 10,
+        reset: 1700000000,
+        updatedAt: 1700000000000,
+      });
+    });
+    expect(
+      result.current.apiRateLimits["acc-1"]["home_timeline"].remaining,
+    ).toBe(100);
+    expect(
+      result.current.apiRateLimits["acc-2"]["home_timeline"].remaining,
+    ).toBe(10);
   });
 
   it("savePreset で現在のカラムをプリセットとして保存できる", () => {

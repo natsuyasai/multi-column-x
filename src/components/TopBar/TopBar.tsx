@@ -10,7 +10,13 @@ import PersonIcon from "../../assets/icons/person.svg?react";
 import PlusIcon from "../../assets/icons/plus.svg?react";
 import SearchIcon from "../../assets/icons/search.svg?react";
 import SettingsIcon from "../../assets/icons/settings.svg?react";
-import type { Account, Column, PageType } from "../../types";
+import type {
+  Account,
+  ApiRateLimitBucket,
+  Column,
+  PageType,
+} from "../../types";
+import { ApiRateLimitIndicator } from "../ApiRateLimitIndicator/ApiRateLimitIndicator";
 import styles from "./TopBar.module.scss";
 
 interface TopBarProps {
@@ -25,6 +31,9 @@ interface TopBarProps {
   onOpenLinkPopup: () => void;
   onJumpToColumn: (columnId: string) => void;
   onClose: (columnId: string) => void;
+  apiRateLimitMonitorEnabled: boolean;
+  apiRateLimits: Record<string, Record<string, ApiRateLimitBucket>>;
+  onApiRateLimitPopoverOpenChange: (isOpen: boolean) => void;
 }
 
 function getColumnIcon(pageType: PageType): React.ReactElement {
@@ -94,6 +103,9 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenLinkPopup,
   onJumpToColumn,
   onClose,
+  apiRateLimitMonitorEnabled,
+  apiRateLimits,
+  onApiRateLimitPopoverOpenChange,
 }) => {
   const sorted = [...columns].sort((a, b) => a.order - b.order);
 
@@ -166,6 +178,13 @@ export const TopBar: React.FC<TopBarProps> = ({
             />
             {expanded && <span className={styles.label}>設定</span>}
           </button>
+          {apiRateLimitMonitorEnabled && (
+            <ApiRateLimitIndicator
+              accounts={accounts}
+              apiRateLimits={apiRateLimits}
+              onOpenChange={onApiRateLimitPopoverOpenChange}
+            />
+          )}
         </div>
 
         {!expanded && (

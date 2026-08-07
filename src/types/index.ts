@@ -77,6 +77,7 @@ export interface GlobalSettings {
   blurImageEnabled: boolean;
   blurImageAmount: string;
   hideAdEnabled: boolean;
+  apiRateLimitMonitorEnabled: boolean;
   columnScale: ColumnScale;
   useXAppForCompose: boolean;
   mobileSwipeAreaEnabled: boolean;
@@ -85,6 +86,14 @@ export interface GlobalSettings {
   mobileTwoColumnEnabled: boolean;
   presets: ColumnPreset[];
   ngWords: string[];
+}
+
+export interface ApiRateLimitBucket {
+  bucketKey: string;
+  limit: number;
+  remaining: number;
+  reset: number;
+  updatedAt: number;
 }
 
 export interface ColumnPreset {
@@ -178,6 +187,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   hideAdEnabled: true,
+  apiRateLimitMonitorEnabled: true,
   columnScale: "default",
   useXAppForCompose: false,
   mobileSwipeAreaEnabled: true,
