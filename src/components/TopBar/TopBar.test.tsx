@@ -67,6 +67,7 @@ const defaultProps = {
   onClose: vi.fn(),
   apiRateLimitMonitorEnabled: true,
   apiRateLimits: {},
+  onApiRateLimitPopoverOpenChange: vi.fn(),
 };
 
 describe("TopBar", () => {
@@ -157,6 +158,18 @@ describe("TopBar", () => {
   it("apiRateLimitMonitorEnabledがfalseのときAPIレート制限インジケータが表示されない", () => {
     render(<TopBar {...defaultProps} apiRateLimitMonitorEnabled={false} />);
     expect(screen.queryByLabelText("APIレート制限")).not.toBeInTheDocument();
+  });
+
+  it("APIレート制限インジケータの開閉状態が変化するとonApiRateLimitPopoverOpenChangeが呼ばれる", async () => {
+    const onApiRateLimitPopoverOpenChange = vi.fn();
+    render(
+      <TopBar
+        {...defaultProps}
+        onApiRateLimitPopoverOpenChange={onApiRateLimitPopoverOpenChange}
+      />,
+    );
+    await userEvent.click(screen.getByLabelText("APIレート制限"));
+    expect(onApiRateLimitPopoverOpenChange).toHaveBeenCalledWith(true);
   });
 
   it("expanded=true のとき各カラムにカラムを閉じるボタンが表示される", () => {

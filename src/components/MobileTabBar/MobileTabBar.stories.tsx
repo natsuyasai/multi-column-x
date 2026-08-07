@@ -93,6 +93,7 @@ const meta: Meta<typeof MobileTabBar> = {
     onDoubleTapColumn: fn(),
     apiRateLimitMonitorEnabled: true,
     apiRateLimits: {},
+    onApiRateLimitPopoverOpenChange: fn(),
   },
 };
 

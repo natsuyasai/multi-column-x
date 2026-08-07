@@ -33,6 +33,7 @@ interface TopBarProps {
   onClose: (columnId: string) => void;
   apiRateLimitMonitorEnabled: boolean;
   apiRateLimits: Record<string, Record<string, ApiRateLimitBucket>>;
+  onApiRateLimitPopoverOpenChange: (isOpen: boolean) => void;
 }
 
 function getColumnIcon(pageType: PageType): React.ReactElement {
@@ -104,6 +105,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onClose,
   apiRateLimitMonitorEnabled,
   apiRateLimits,
+  onApiRateLimitPopoverOpenChange,
 }) => {
   const sorted = [...columns].sort((a, b) => a.order - b.order);
 
@@ -180,6 +182,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             <ApiRateLimitIndicator
               accounts={accounts}
               apiRateLimits={apiRateLimits}
+              onOpenChange={onApiRateLimitPopoverOpenChange}
             />
           )}
         </div>

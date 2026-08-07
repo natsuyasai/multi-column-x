@@ -124,6 +124,8 @@ const App: React.FC = () => {
   const updater = useAppUpdater(isMobile, columnsRestored);
   const whatsNew = useWhatsNew(columnsRestored);
   const [appVersion, setAppVersion] = useState("");
+  // APIレート制限ポップオーバーの開閉状態（カラムWebView退避判定の anyDialogOpen に含めるため）
+  const [apiRateLimitPopoverOpen, setApiRateLimitPopoverOpen] = useState(false);
 
   const topBarHeight = getTopBarHeight(topBarExpanded);
 
@@ -224,7 +226,8 @@ const App: React.FC = () => {
     !!whatsNew.notes ||
     !!pendingAccountName ||
     !!pendingRemoval ||
-    !!reauthNotice;
+    !!reauthNotice ||
+    apiRateLimitPopoverOpen;
   useEffect(() => {
     setDialogOpen(anyDialogOpen);
     if (anyDialogOpen) {
@@ -419,6 +422,7 @@ const App: React.FC = () => {
           onClose={handleRemoveColumn}
           apiRateLimitMonitorEnabled={globalSettings.apiRateLimitMonitorEnabled}
           apiRateLimits={apiRateLimits}
+          onApiRateLimitPopoverOpenChange={setApiRateLimitPopoverOpen}
         />
       )}
       {isMobile && (
@@ -437,6 +441,7 @@ const App: React.FC = () => {
           swipeState={swipeState}
           apiRateLimitMonitorEnabled={globalSettings.apiRateLimitMonitorEnabled}
           apiRateLimits={apiRateLimits}
+          onApiRateLimitPopoverOpenChange={setApiRateLimitPopoverOpen}
         />
       )}
       {isMobile && globalSettings.mobileSwipeAreaEnabled && (

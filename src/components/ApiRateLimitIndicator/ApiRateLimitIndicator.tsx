@@ -8,6 +8,7 @@ import styles from "./ApiRateLimitIndicator.module.scss";
 interface ApiRateLimitIndicatorProps {
   accounts: Account[];
   apiRateLimits: Record<string, Record<string, ApiRateLimitBucket>>;
+  onOpenChange?: (isOpen: boolean) => void;
 }
 
 type Severity = "normal" | "warning" | "critical";
@@ -37,10 +38,14 @@ function joinClassNames(...names: (string | false | undefined)[]): string {
 export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
   accounts,
   apiRateLimits,
+  onOpenChange,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
-  useEscapeKey(() => setIsOpen(false));
+  useEscapeKey(() => {
+    setIsOpen(false);
+    onOpenChange?.(false);
+  });
 
   const overallSeverity = useMemo<Severity>(() => {
     let worst: Severity = "normal";
@@ -66,7 +71,13 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
       <button
         type="button"
         className={triggerClassName}
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={() =>
+          setIsOpen((prev) => {
+            const next = !prev;
+            onOpenChange?.(next);
+            return next;
+          })
+        }
         aria-label="APIレート制限"
         aria-expanded={isOpen}
         title="APIレート制限"

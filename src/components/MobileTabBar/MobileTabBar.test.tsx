@@ -66,6 +66,7 @@ const defaultProps = {
   onDoubleTapColumn: vi.fn(),
   apiRateLimitMonitorEnabled: true,
   apiRateLimits: {},
+  onApiRateLimitPopoverOpenChange: vi.fn(),
 };
 
 describe("MobileTabBar", () => {
@@ -244,6 +245,20 @@ describe("MobileTabBar", () => {
     );
     await userEvent.click(screen.getByTitle("メニュー表示の切り替え"));
     expect(screen.queryByLabelText("APIレート制限")).not.toBeInTheDocument();
+  });
+
+  it("APIレート制限インジケータの開閉状態が変化するとonApiRateLimitPopoverOpenChangeが呼ばれる", async () => {
+    const onApiRateLimitPopoverOpenChange = vi.fn();
+    render(
+      <MobileTabBar
+        {...defaultProps}
+        columns={[]}
+        onApiRateLimitPopoverOpenChange={onApiRateLimitPopoverOpenChange}
+      />,
+    );
+    await userEvent.click(screen.getByTitle("メニュー表示の切り替え"));
+    await userEvent.click(screen.getByLabelText("APIレート制限"));
+    expect(onApiRateLimitPopoverOpenChange).toHaveBeenCalledWith(true);
   });
 
   describe("アクションボタンの SVG アイコン", () => {

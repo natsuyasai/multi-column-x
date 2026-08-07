@@ -171,6 +171,7 @@ interface Props {
   onDoubleTapColumn: (columnId: string) => void;
   apiRateLimitMonitorEnabled: boolean;
   apiRateLimits: Record<string, Record<string, ApiRateLimitBucket>>;
+  onApiRateLimitPopoverOpenChange: (isOpen: boolean) => void;
 }
 
 export const MobileTabBar: React.FC<Props> = ({
@@ -188,6 +189,7 @@ export const MobileTabBar: React.FC<Props> = ({
   onDoubleTapColumn,
   apiRateLimitMonitorEnabled,
   apiRateLimits,
+  onApiRateLimitPopoverOpenChange,
 }) => {
   const sorted = [...columns].sort((a, b) => a.order - b.order);
   const [expanded, setExpanded] = useState(false);
@@ -281,6 +283,7 @@ export const MobileTabBar: React.FC<Props> = ({
             <ApiRateLimitIndicator
               accounts={accounts}
               apiRateLimits={apiRateLimits}
+              onOpenChange={onApiRateLimitPopoverOpenChange}
             />
           )}
         </div>

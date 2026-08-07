@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Account, ApiRateLimitBucket } from "@/types";
 import { ApiRateLimitIndicator } from "./ApiRateLimitIndicator";
 
@@ -166,5 +166,51 @@ describe("ApiRateLimitIndicator", () => {
     );
     const trigger = screen.getByRole("button", { name: "APIレート制限" });
     expect(trigger.className).toMatch(/critical/i);
+  });
+
+  it("トリガークリックで開いたときonOpenChangeがtrueで呼ばれる", () => {
+    const onOpenChange = vi.fn();
+    render(
+      <ApiRateLimitIndicator
+        accounts={accounts}
+        apiRateLimits={normalRateLimits}
+        onOpenChange={onOpenChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "APIレート制限" }));
+    expect(onOpenChange).toHaveBeenCalledWith(true);
+  });
+
+  it("再クリックで閉じたときonOpenChangeがfalseで呼ばれる", () => {
+    const onOpenChange = vi.fn();
+    render(
+      <ApiRateLimitIndicator
+        accounts={accounts}
+        apiRateLimits={normalRateLimits}
+        onOpenChange={onOpenChange}
+      />,
+    );
+    const trigger = screen.getByRole("button", { name: "APIレート制限" });
+    fireEvent.click(trigger);
+    expect(onOpenChange).toHaveBeenLastCalledWith(true);
+    fireEvent.click(trigger);
+    expect(onOpenChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("Escキーで閉じたときonOpenChangeがfalseで呼ばれる", () => {
+    const onOpenChange = vi.fn();
+    render(
+      <ApiRateLimitIndicator
+        accounts={accounts}
+        apiRateLimits={normalRateLimits}
+        onOpenChange={onOpenChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "APIレート制限" }));
+    expect(onOpenChange).toHaveBeenLastCalledWith(true);
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(onOpenChange).toHaveBeenLastCalledWith(false);
   });
 });

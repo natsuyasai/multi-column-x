@@ -92,6 +92,7 @@ const meta: Meta<typeof TopBar> = {
     onJumpToColumn: fn(),
     apiRateLimitMonitorEnabled: true,
     apiRateLimits: {},
+    onApiRateLimitPopoverOpenChange: fn(),
   },
 };
 
