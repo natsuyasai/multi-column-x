@@ -18,6 +18,7 @@ export default tseslint.config(
       "node_modules",
       "**/*.config.{js,ts}",
       "src-tauri/src/inject/**",
+      ".storybook/**",
     ],
   },
   {
