@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import * as apiRateLimitLabels from "@/constants/apiRateLimitLabels";
 import type { Account, ApiRateLimitBucket } from "@/types";
 import { ApiRateLimitIndicator } from "./ApiRateLimitIndicator";
 
@@ -57,8 +58,8 @@ const mixedSeverityRateLimits: Record<
     HomeTimeline: bucket("HomeTimeline", 900, 900),
   },
   "acc-2": {
-    UserTweets: bucket("UserTweets", 10, 100), // warning (10%)
-    CreateTweet: bucket("CreateTweet", 2, 100), // critical (2%)
+    SearchTimeline: bucket("SearchTimeline", 10, 100), // warning (10%)
+    NotificationsTimeline: bucket("NotificationsTimeline", 2, 100), // critical (2%)
   },
   // acc-3 はデータなし
 };
@@ -214,12 +215,18 @@ describe("ApiRateLimitIndicator", () => {
   });
 
   it("辞書に説明が無いbucketKeyの場合は説明文の要素が表示されない", () => {
+    // カラム関連のbucketKeyはすべて辞書に説明文が定義済みのため、
+    // 「説明文が無い」ケースを再現するにはgetApiRateLimitDescriptionをスタブする。
+    const getDescriptionSpy = vi
+      .spyOn(apiRateLimitLabels, "getApiRateLimitDescription")
+      .mockReturnValue(undefined);
+
     const rateLimitsWithoutDescription: Record<
       string,
       Record<string, ApiRateLimitBucket>
     > = {
       "acc-1": {
-        UnknownOperationXYZ: bucket("UnknownOperationXYZ", 100, 100),
+        HomeTimeline: bucket("HomeTimeline", 100, 100),
       },
     };
     render(
@@ -230,8 +237,10 @@ describe("ApiRateLimitIndicator", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "APIレート制限" }));
 
-    const row = screen.getByText("UnknownOperationXYZ").closest("li");
+    const row = screen.getByText("ホームタイムライン").closest("li");
     expect(row?.querySelector("p")).not.toBeInTheDocument();
+
+    getDescriptionSpy.mockRestore();
   });
 
   it("Escキーで閉じたときonOpenChangeがfalseで呼ばれる", () => {
@@ -249,5 +258,53 @@ describe("ApiRateLimitIndicator", () => {
     fireEvent.keyDown(document, { key: "Escape" });
 
     expect(onOpenChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("カラム関連でないAPIのbucketはポップオーバーに表示されない", () => {
+    const rateLimitsWithNonColumnBucket: Record<
+      string,
+      Record<string, ApiRateLimitBucket>
+    > = {
+      "acc-1": {
+        UserTweets: bucket("UserTweets", 100, 100),
+      },
+    };
+    render(
+      <ApiRateLimitIndicator
+        accounts={accounts}
+        apiRateLimits={rateLimitsWithNonColumnBucket}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "APIレート制限" }));
+
+    expect(screen.getByText("アカウントA")).toBeInTheDocument();
+    expect(
+      screen.queryByText("ユーザーのツイート取得"),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByText("データなし").length).toBe(accounts.length);
+  });
+
+  it("カラム関連のAPIと非関連のAPIが混在する場合、関連するAPIのみ表示される", () => {
+    const rateLimitsMixed: Record<
+      string,
+      Record<string, ApiRateLimitBucket>
+    > = {
+      "acc-1": {
+        HomeTimeline: bucket("HomeTimeline", 900, 900),
+        UserTweets: bucket("UserTweets", 100, 100),
+      },
+    };
+    render(
+      <ApiRateLimitIndicator
+        accounts={accounts}
+        apiRateLimits={rateLimitsMixed}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "APIレート制限" }));
+
+    expect(screen.getByText("ホームタイムライン")).toBeInTheDocument();
+    expect(
+      screen.queryByText("ユーザーのツイート取得"),
+    ).not.toBeInTheDocument();
   });
 });

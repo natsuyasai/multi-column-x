@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import {
   getApiRateLimitDescription,
   getApiRateLimitLabel,
+  isColumnRelatedApiBucket,
 } from "@/constants/apiRateLimitLabels";
 import { useEscapeKey } from "@/hooks/useEscapeKey";
 import { getRateLimitSeverity } from "@/lib/apiRateLimit";
@@ -96,7 +97,11 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
           {accounts.length === 0 && <p className={styles.empty}>データなし</p>}
           {accounts.map((account) => {
             const buckets = apiRateLimits[account.id];
-            const bucketList = buckets ? Object.values(buckets) : [];
+            const bucketList = buckets
+              ? Object.values(buckets).filter((bucket) =>
+                  isColumnRelatedApiBucket(bucket.bucketKey),
+                )
+              : [];
 
             return (
               <div key={account.id} className={styles.accountSection}>

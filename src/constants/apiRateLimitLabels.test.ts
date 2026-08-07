@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   getApiRateLimitDescription,
   getApiRateLimitLabel,
+  isColumnRelatedApiBucket,
 } from "./apiRateLimitLabels";
 
 describe("getApiRateLimitLabel", () => {
@@ -25,5 +26,24 @@ describe("getApiRateLimitDescription", () => {
 
   it("辞書に存在しないbucketKeyを渡すとundefinedを返す", () => {
     expect(getApiRateLimitDescription("UnknownOperationXYZ")).toBeUndefined();
+  });
+});
+
+describe("isColumnRelatedApiBucket", () => {
+  it.each([
+    "HomeTimeline",
+    "HomeLatestTimeline",
+    "SearchTimeline",
+    "NotificationsTimeline",
+  ])("カラム関連のbucketKey(%s)を渡すとtrueを返す", (bucketKey) => {
+    expect(isColumnRelatedApiBucket(bucketKey)).toBe(true);
+  });
+
+  it("カラム非関連のbucketKeyを渡すとfalseを返す", () => {
+    expect(isColumnRelatedApiBucket("UserTweets")).toBe(false);
+  });
+
+  it("辞書に存在しない未知のbucketKeyを渡すとfalseを返す", () => {
+    expect(isColumnRelatedApiBucket("UnknownOperationXYZ")).toBe(false);
   });
 });

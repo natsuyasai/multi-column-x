@@ -97,3 +97,21 @@ export function getApiRateLimitDescription(
 ): string | undefined {
   return API_RATE_LIMIT_LABELS[bucketKey]?.description;
 }
+
+// カラムとして追加できる項目（PageType）が実際に使用するoperationName。
+// home→HomeTimeline/HomeLatestTimeline、notifications→NotificationsTimeline、
+// search→SearchTimeline。list/custom/external/composeに対応する既知のoperationNameは無い。
+const COLUMN_RELATED_BUCKET_KEYS: ReadonlySet<string> = new Set([
+  "HomeTimeline",
+  "HomeLatestTimeline",
+  "SearchTimeline",
+  "NotificationsTimeline",
+]);
+
+/**
+ * bucketKeyがカラム追加可能な項目（PageType）に対応するAPIかどうかを判定する。
+ * 辞書に無い未知のbucketKeyもfalseになる。
+ */
+export function isColumnRelatedApiBucket(bucketKey: string): boolean {
+  return COLUMN_RELATED_BUCKET_KEYS.has(bucketKey);
+}
