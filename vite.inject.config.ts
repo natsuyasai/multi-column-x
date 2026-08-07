@@ -28,6 +28,7 @@ const plainEntries = [
   "notification_header_hide",
   "compose_only",
   "video_long_press_menu",
+  "api_rate_limit_monitor",
 ];
 
 // React を含む header_customizer は IIFE + inlineDynamicImports で個別ビルド

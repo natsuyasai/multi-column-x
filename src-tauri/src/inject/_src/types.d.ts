@@ -100,6 +100,7 @@ declare global {
     __mcxVideoDownloadBridge?: McxVideoDownloadBridge;
     __mobileTopInset?: number;
     __mobileBottomInset?: number;
+    __xhrRateLimitPatched?: boolean;
   }
 }
 

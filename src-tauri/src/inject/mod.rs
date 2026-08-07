@@ -92,6 +92,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     } else {
         ""
     };
+    let api_rate_limit_monitor = include_str!("api_rate_limit_monitor.js");
 
     let visible_links_json =
         serde_json::to_string(params.visible_links).unwrap_or_else(|_| "[]".to_string());
@@ -131,7 +132,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     };
 
     let mut script = format!(
-        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
+        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
         config,
         tab_selector,
         header_part,
@@ -151,7 +152,8 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         mobile_area_hide,
         notification_header_hide,
         compose_only,
-        video_long_press_menu
+        video_long_press_menu,
+        api_rate_limit_monitor
     );
 
     if !params.custom_css.is_empty() {
