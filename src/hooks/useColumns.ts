@@ -180,12 +180,18 @@ export function useColumns() {
                   getTopBarHeight(useAppStore.getState().topBarExpanded) +
                   HEADER_HEIGHT,
                 width: col.width,
-                height: 1,
+                // height を極小値（1px 等）に圧縮すると、退避先が画面外(x=-9999)でも
+                // X.com 側の仮想リストが復元後に再描画されなくなる副作用があるため、
+                // 直近の実際の高さを維持したまま退避する。
+                height:
+                  columnBounds[col.id]?.height ??
+                  containerRef.current?.clientHeight ??
+                  600,
               },
         ).catch(() => {}),
       ),
     );
-  }, []);
+  }, [columnBounds]);
 
   // カラム削除
   const handleRemoveColumn = useCallback(
