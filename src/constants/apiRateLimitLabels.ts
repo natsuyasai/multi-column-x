@@ -100,12 +100,14 @@ export function getApiRateLimitDescription(
 
 // カラムとして追加できる項目（PageType）が実際に使用するoperationName。
 // home→HomeTimeline/HomeLatestTimeline、notifications→NotificationsTimeline、
-// search→SearchTimeline。list/custom/external/composeに対応する既知のoperationNameは無い。
+// search→SearchTimeline、compose（投稿カラム）→CreateTweet。
+// list/custom/externalに対応する既知のoperationNameは無い。
 const COLUMN_RELATED_BUCKET_KEYS: ReadonlySet<string> = new Set([
   "HomeTimeline",
   "HomeLatestTimeline",
   "SearchTimeline",
   "NotificationsTimeline",
+  "CreateTweet",
 ]);
 
 /**

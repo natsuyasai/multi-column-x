@@ -175,7 +175,7 @@ describe("ApiRateLimitIndicator", () => {
       Record<string, ApiRateLimitBucket>
     > = {
       "acc-1": {
-        CreateTweet: bucket("CreateTweet", 1, 100), // critical (1%) だが非カラム関連
+        DeleteTweet: bucket("DeleteTweet", 1, 100), // critical (1%) だが非カラム関連
       },
     };
     render(
@@ -327,5 +327,25 @@ describe("ApiRateLimitIndicator", () => {
     expect(
       screen.queryByText("ユーザーのツイート取得"),
     ).not.toBeInTheDocument();
+  });
+
+  it("CreateTweet（投稿）のリミットもポップオーバーに表示される", () => {
+    const rateLimitsWithCreateTweet: Record<
+      string,
+      Record<string, ApiRateLimitBucket>
+    > = {
+      "acc-1": {
+        CreateTweet: bucket("CreateTweet", 50, 100),
+      },
+    };
+    render(
+      <ApiRateLimitIndicator
+        accounts={accounts}
+        apiRateLimits={rateLimitsWithCreateTweet}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "APIレート制限" }));
+
+    expect(screen.getByText("ツイート投稿")).toBeInTheDocument();
   });
 });

@@ -35,6 +35,7 @@ describe("isColumnRelatedApiBucket", () => {
     "HomeLatestTimeline",
     "SearchTimeline",
     "NotificationsTimeline",
+    "CreateTweet",
   ])("カラム関連のbucketKey(%s)を渡すとtrueを返す", (bucketKey) => {
     expect(isColumnRelatedApiBucket(bucketKey)).toBe(true);
   });
