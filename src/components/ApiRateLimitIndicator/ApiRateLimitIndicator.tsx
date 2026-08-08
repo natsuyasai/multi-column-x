@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import {
   getApiRateLimitDescription,
   getApiRateLimitLabel,
+  getColumnRelatedBucketKeys,
   isColumnRelatedApiBucket,
 } from "@/constants/apiRateLimitLabels";
 import { useEscapeKey } from "@/hooks/useEscapeKey";
@@ -14,6 +15,10 @@ interface ApiRateLimitIndicatorProps {
   apiRateLimits: Record<string, Record<string, ApiRateLimitBucket>>;
   onOpenChange?: (isOpen: boolean) => void;
 }
+
+type BucketListItem =
+  | { bucketKey: string; observed: true; bucket: ApiRateLimitBucket }
+  | { bucketKey: string; observed: false };
 
 type Severity = "normal" | "warning" | "critical";
 
@@ -97,12 +102,14 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
         >
           {accounts.length === 0 && <p className={styles.empty}>データなし</p>}
           {accounts.map((account) => {
-            const buckets = apiRateLimits[account.id];
-            const bucketList = buckets
-              ? Object.values(buckets).filter((bucket) =>
-                  isColumnRelatedApiBucket(bucket.bucketKey),
-                )
-              : [];
+            const observedBuckets = apiRateLimits[account.id] ?? {};
+            const bucketList: BucketListItem[] =
+              getColumnRelatedBucketKeys().map((bucketKey) => {
+                const observed = observedBuckets[bucketKey];
+                return observed
+                  ? { bucketKey, observed: true as const, bucket: observed }
+                  : { bucketKey, observed: false as const };
+              });
 
             return (
               <div key={account.id} className={styles.accountSection}>
@@ -113,47 +120,69 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
                   />
                   <span className={styles.accountLabel}>{account.label}</span>
                 </div>
-                {bucketList.length === 0 ? (
-                  <p className={styles.empty}>データなし</p>
-                ) : (
-                  <ul className={styles.bucketList}>
-                    {bucketList.map((bucket) => {
-                      const severity = getRateLimitSeverity(
-                        bucket.remaining,
-                        bucket.limit,
-                      );
-                      const rowClassName = joinClassNames(
-                        styles.bucketRow,
-                        severity === "warning" && styles.warning,
-                        severity === "critical" && styles.critical,
-                      );
+                <ul className={styles.bucketList}>
+                  {bucketList.map((item) => {
+                    if (!item.observed) {
                       const description = getApiRateLimitDescription(
-                        bucket.bucketKey,
+                        item.bucketKey,
                       );
+                      const unobservedNote =
+                        "（まだ使用されていないため未計測）";
 
                       return (
-                        <li key={bucket.bucketKey} className={rowClassName}>
+                        <li key={item.bucketKey} className={styles.bucketRow}>
                           <div className={styles.bucketMain}>
                             <span className={styles.bucketLabel}>
-                              {getApiRateLimitLabel(bucket.bucketKey)}
+                              {getApiRateLimitLabel(item.bucketKey)}
                             </span>
-                            <span className={styles.bucketRemaining}>
-                              {bucket.remaining}/{bucket.limit}
-                            </span>
-                            <span className={styles.bucketReset}>
-                              {formatResetLabel(bucket.reset)}
-                            </span>
+                            <span className={styles.bucketRemaining}>-/-</span>
+                            <span className={styles.bucketReset}>-</span>
                           </div>
-                          {description && (
-                            <p className={styles.bucketDescription}>
-                              {description}
-                            </p>
-                          )}
+                          <p className={styles.bucketDescription}>
+                            {description
+                              ? `${description}${unobservedNote}`
+                              : unobservedNote}
+                          </p>
                         </li>
                       );
-                    })}
-                  </ul>
-                )}
+                    }
+
+                    const { bucket } = item;
+                    const severity = getRateLimitSeverity(
+                      bucket.remaining,
+                      bucket.limit,
+                    );
+                    const rowClassName = joinClassNames(
+                      styles.bucketRow,
+                      severity === "warning" && styles.warning,
+                      severity === "critical" && styles.critical,
+                    );
+                    const description = getApiRateLimitDescription(
+                      bucket.bucketKey,
+                    );
+
+                    return (
+                      <li key={bucket.bucketKey} className={rowClassName}>
+                        <div className={styles.bucketMain}>
+                          <span className={styles.bucketLabel}>
+                            {getApiRateLimitLabel(bucket.bucketKey)}
+                          </span>
+                          <span className={styles.bucketRemaining}>
+                            {bucket.remaining}/{bucket.limit}
+                          </span>
+                          <span className={styles.bucketReset}>
+                            {formatResetLabel(bucket.reset)}
+                          </span>
+                        </div>
+                        {description && (
+                          <p className={styles.bucketDescription}>
+                            {description}
+                          </p>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
             );
           })}

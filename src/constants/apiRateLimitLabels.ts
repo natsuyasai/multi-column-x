@@ -117,3 +117,10 @@ const COLUMN_RELATED_BUCKET_KEYS: ReadonlySet<string> = new Set([
 export function isColumnRelatedApiBucket(bucketKey: string): boolean {
   return COLUMN_RELATED_BUCKET_KEYS.has(bucketKey);
 }
+
+/**
+ * カラム追加可能な項目に対応するbucketKeyを定義順（表示順）で返す。
+ */
+export function getColumnRelatedBucketKeys(): string[] {
+  return Array.from(COLUMN_RELATED_BUCKET_KEYS);
+}

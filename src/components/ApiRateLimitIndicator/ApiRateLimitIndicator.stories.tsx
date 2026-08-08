@@ -113,7 +113,7 @@ export const Default: Story = {
     await userEvent.click(trigger);
 
     await expect(canvas.getByText("アカウント1")).toBeInTheDocument();
-    await expect(canvas.getByText("検索")).toBeInTheDocument();
+    await expect(canvas.getByText("480/500")).toBeInTheDocument();
     await expect(canvas.getByText("900/900")).toBeInTheDocument();
   },
 };
@@ -153,7 +153,7 @@ export const CriticalState: Story = {
 };
 
 export const Empty: Story = {
-  name: "データが空",
+  name: "未計測プレースホルダー（データが空）",
   args: {
     apiRateLimits: emptyRateLimits,
   },
@@ -163,8 +163,8 @@ export const Empty: Story = {
 
     await userEvent.click(trigger);
 
-    const emptyLabels = canvas.getAllByText("データなし");
-    await expect(emptyLabels.length).toBe(accounts.length);
+    const unobservedLabels = canvas.getAllByText("-/-");
+    await expect(unobservedLabels.length).toBe(accounts.length * 5);
   },
 };
 

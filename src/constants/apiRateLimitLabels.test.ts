@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   getApiRateLimitDescription,
   getApiRateLimitLabel,
+  getColumnRelatedBucketKeys,
   isColumnRelatedApiBucket,
 } from "./apiRateLimitLabels";
 
@@ -46,5 +47,17 @@ describe("isColumnRelatedApiBucket", () => {
 
   it("辞書に存在しない未知のbucketKeyを渡すとfalseを返す", () => {
     expect(isColumnRelatedApiBucket("UnknownOperationXYZ")).toBe(false);
+  });
+});
+
+describe("getColumnRelatedBucketKeys", () => {
+  it("getColumnRelatedBucketKeysはカラム関連のbucketKeyを定義順で返す", () => {
+    expect(getColumnRelatedBucketKeys()).toEqual([
+      "HomeTimeline",
+      "HomeLatestTimeline",
+      "SearchTimeline",
+      "NotificationsTimeline",
+      "CreateTweet",
+    ]);
   });
 });
