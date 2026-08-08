@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   getApiRateLimitDescription,
   getApiRateLimitLabel,
@@ -6,6 +6,7 @@ import {
   isColumnRelatedApiBucket,
 } from "@/constants/apiRateLimitLabels";
 import { useEscapeKey } from "@/hooks/useEscapeKey";
+import { useOutsideClick } from "@/hooks/useOutsideClick";
 import { getRateLimitSeverity } from "@/lib/apiRateLimit";
 import type { Account, ApiRateLimitBucket } from "@/types";
 import styles from "./ApiRateLimitIndicator.module.scss";
@@ -50,11 +51,15 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
   onOpenChange,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  useEscapeKey(() => {
+  const close = () => {
     setIsOpen(false);
     onOpenChange?.(false);
-  });
+  };
+
+  useEscapeKey(close);
+  useOutsideClick(containerRef, close, isOpen);
 
   const overallSeverity = useMemo<Severity>(() => {
     let worst: Severity = "normal";
@@ -77,7 +82,7 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
   );
 
   return (
-    <div className={styles.container}>
+    <div className={styles.container} ref={containerRef}>
       <button
         type="button"
         className={triggerClassName}

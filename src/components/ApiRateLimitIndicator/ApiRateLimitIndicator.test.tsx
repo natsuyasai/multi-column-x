@@ -120,6 +120,53 @@ describe("ApiRateLimitIndicator", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
+  it("ポップオーバー外をクリックすると閉じる", () => {
+    render(
+      <ApiRateLimitIndicator
+        accounts={accounts}
+        apiRateLimits={normalRateLimits}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "APIレート制限" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    fireEvent.mouseDown(document.body);
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("ポップオーバー外クリックで閉じたときonOpenChangeがfalseで呼ばれる", () => {
+    const onOpenChange = vi.fn();
+    render(
+      <ApiRateLimitIndicator
+        accounts={accounts}
+        apiRateLimits={normalRateLimits}
+        onOpenChange={onOpenChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "APIレート制限" }));
+    expect(onOpenChange).toHaveBeenLastCalledWith(true);
+
+    fireEvent.mouseDown(document.body);
+
+    expect(onOpenChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("ポップオーバー内をクリックしても閉じない", () => {
+    render(
+      <ApiRateLimitIndicator
+        accounts={accounts}
+        apiRateLimits={normalRateLimits}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "APIレート制限" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    fireEvent.mouseDown(screen.getByText("アカウントA"));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
   it("データが無いアカウントはカラム関連項目が未計測プレースホルダーとして表示される", () => {
     render(
       <ApiRateLimitIndicator
