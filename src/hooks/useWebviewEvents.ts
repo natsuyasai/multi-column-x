@@ -186,7 +186,11 @@ export function useNewPostsNotification(
   }, [setUnreadCount]);
 }
 
-/** inject script からのAPIレート制限ヘッダ通知を受け、当該カラムのaccountIdに紐づけてstoreへ反映する */
+/**
+ * inject script からのAPIレート制限ヘッダ通知を受け、Rust側（WebviewRegistry / ComposeSession）が
+ * 解決したaccountIdに紐づけてstoreへ反映する。
+ * カラムWebViewだけでなく常駐コンポーズWebView経由の投稿もaccountIdを取りこぼさない。
+ */
 export function useApiRateLimitReports(
   setApiRateLimit: (accountId: string, bucket: ApiRateLimitBucket) => void,
 ) {
@@ -197,14 +201,12 @@ export function useApiRateLimitReports(
       limit: number;
       remaining: number;
       reset: number;
+      accountId: string | null;
     }>(IPC_EVENTS.WEBVIEW_API_RATE_LIMIT, (e) => {
-      const { label, bucketKey, limit, remaining, reset } = e.payload;
-      const columnId = label.replace(WEBVIEW_LABELS.COLUMN_PREFIX, "");
+      const { bucketKey, limit, remaining, reset, accountId } = e.payload;
+      if (!accountId) return;
 
-      const col = useAppStore.getState().columns.find((c) => c.id === columnId);
-      if (!col) return;
-
-      setApiRateLimit(col.accountId, {
+      setApiRateLimit(accountId, {
         bucketKey,
         limit,
         remaining,

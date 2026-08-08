@@ -59,3 +59,19 @@ X内部APIのレスポンスヘッダ、以下3種を見る:
 ## 未知operationNameへの対応方針
 
 未知のbucketKeyが来た場合、`getApiRateLimitLabel` はbucketKeyをそのままフォールバック表示する設計（`getApiRateLimitDescription` は `undefined` を返し、`ApiRateLimitIndicator` 側は説明文の要素自体を出さない）。X側の内部API仕様変更に強くするため、辞書の完全網羅は目指さない方針（`src/constants/apiRateLimitLabels.ts` 冒頭コメント参照）。新しいoperationNameを実測したら随時追加すればよい、必須作業ではない。
+
+## accountId解決、Rust側に一元化した話
+
+昔、フロント（`src/hooks/useWebviewEvents.ts` の `useApiRateLimitReports`）が `label.replace(COLUMN_PREFIX, "")` でcolumnId取り出し、`useAppStore` の `columns` からカラム探して `accountId` 引く方式やってた。カラムWebView（`column-`）はこれで動く。だが常駐コンポーズウィンドウ（`compose-`）はカラムではないので `columns.find` 失敗、`col` が `undefined` になって握りつぶされる。つまり常駐コンポーズから投稿した `CreateTweet` のレート制限、記録されずに消えてた。バグである。
+
+直した。今はRust側（`src-tauri/src/commands/webview/mod.rs` の `report_api_rate_limit` コマンド）がlabelからaccountId自分で解決する。手順:
+
+1. まず `AppState.registry`（`WebviewRegistry`。カラム・ポップアップ系のlabel→account_id台帳）を見る
+2. 見つからなければ `AppState.compose`（常駐コンポーズの `ComposeSession { label, account_id }`）を見る
+3. どちらにも無ければ `None`
+
+この解決ロジックは `resolve_account_id` という純粋関数（テストしやすい形）に切り出してある。2つのMutex（`registry` と `compose`）は同時にロックせず、順にロック・解放する作り。デッドロック怖くない設計。
+
+emitする `webview-api-rate-limit` イベントのpayloadに `accountId`（解決できなければ `null`）が乗るようになった。フロント側はもう `columns.find` しない。payloadの `accountId` そのまま使うだけ。`accountId` が `null` なら何もしない（記録スキップ）。
+
+これでカラムWebView経由でも常駐コンポーズWebView経由でも、レート制限データちゃんと記録される。もう取りこぼさない。
