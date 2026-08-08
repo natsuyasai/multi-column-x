@@ -173,6 +173,105 @@ describe("SettingsPanel NGワード", () => {
   });
 });
 
+describe("SettingsPanel ホワイトリスト", () => {
+  const whitelistPlaceholder =
+    "1行に1ワードで入力（/正規表現/flags 形式も指定可、ホワイトリスト）";
+
+  it("ホワイトリストセクションが表示される", () => {
+    render(<SettingsPanel {...defaultProps} />);
+    expect(screen.getByText("ホワイトリスト")).toBeInTheDocument();
+  });
+
+  it("チェックボックスが表示され初期状態はwhitelistEnabledの値を反映する(false)", () => {
+    render(<SettingsPanel {...defaultProps} />);
+    expect(
+      screen.getByRole("checkbox", { name: "ホワイトリストを有効にする" }),
+    ).not.toBeChecked();
+  });
+
+  it("チェックボックスが表示され初期状態はwhitelistEnabledの値を反映する(true)", () => {
+    const col = {
+      ...mockColumn,
+      settings: { ...baseSettings, whitelistEnabled: true },
+    };
+    render(<SettingsPanel {...defaultProps} column={col} />);
+    expect(
+      screen.getByRole("checkbox", { name: "ホワイトリストを有効にする" }),
+    ).toBeChecked();
+  });
+
+  it("チェックボックスがOFFのときワード入力欄がdisabledになっている", () => {
+    render(<SettingsPanel {...defaultProps} />);
+    expect(screen.getByPlaceholderText(whitelistPlaceholder)).toBeDisabled();
+  });
+
+  it("チェックボックスをONにするとワード入力欄が編集可能になる", async () => {
+    render(<SettingsPanel {...defaultProps} />);
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: "ホワイトリストを有効にする" }),
+    );
+    expect(
+      screen.getByPlaceholderText(whitelistPlaceholder),
+    ).not.toBeDisabled();
+  });
+
+  it("既存のwhitelistWordsが入力エリアに改行区切りで表示される", () => {
+    const col = {
+      ...mockColumn,
+      settings: {
+        ...baseSettings,
+        whitelistEnabled: true,
+        whitelistWords: ["推し", "限定"],
+      },
+    };
+    render(<SettingsPanel {...defaultProps} column={col} />);
+    const textarea = screen.getByPlaceholderText(
+      whitelistPlaceholder,
+    ) as HTMLTextAreaElement;
+    expect(textarea.value).toBe("推し\n限定");
+  });
+
+  it("適用するとwhitelistWordsが配列としてonApplyに渡される（空行は無視）", async () => {
+    const onApply = vi.fn();
+    const col = {
+      ...mockColumn,
+      settings: { ...baseSettings, whitelistEnabled: true },
+    };
+    render(<SettingsPanel {...defaultProps} column={col} onApply={onApply} />);
+    const textarea = screen.getByPlaceholderText(whitelistPlaceholder);
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, "推し{Enter}{Enter}限定");
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.objectContaining({ whitelistWords: ["推し", "限定"] }),
+      350,
+    );
+  });
+
+  it("不正な正規表現形式のワードを入力して適用すると、エラーメッセージが表示されonApplyが呼ばれない", async () => {
+    const onApply = vi.fn();
+    const col = {
+      ...mockColumn,
+      settings: { ...baseSettings, whitelistEnabled: true },
+    };
+    render(<SettingsPanel {...defaultProps} column={col} onApply={onApply} />);
+    const textarea = screen.getByPlaceholderText(whitelistPlaceholder);
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, "/[[/");
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(screen.getByText("正規表現が不正です: /[/")).toBeInTheDocument();
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
+  it("ホワイトリストの書き方ヘルプポップオーバーが表示される", () => {
+    render(<SettingsPanel {...defaultProps} />);
+    expect(
+      screen.getByRole("button", { name: "ホワイトリストの書き方" }),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("SettingsPanel 表示設定", () => {
   it("ヘッダーを非表示にするチェックボックスが表示される", () => {
     render(<SettingsPanel {...defaultProps} />);
@@ -294,6 +393,11 @@ describe("SettingsPanel pageTypeがexternalの場合", () => {
     expect(screen.queryByText("NGワード")).not.toBeInTheDocument();
   });
 
+  it("pageTypeがexternalの場合ホワイトリストセクションが表示されない", () => {
+    render(<SettingsPanel {...defaultProps} column={externalColumn} />);
+    expect(screen.queryByText("ホワイトリスト")).not.toBeInTheDocument();
+  });
+
   it("pageTypeがexternalの場合カスタムcssセクションは表示される", () => {
     render(<SettingsPanel {...defaultProps} column={externalColumn} />);
     expect(screen.getByText("カスタム CSS")).toBeInTheDocument();
@@ -313,6 +417,7 @@ describe("SettingsPanel pageTypeがexternalの場合", () => {
     expect(screen.getByText("画像ブラー")).toBeInTheDocument();
     expect(screen.getByText("通知")).toBeInTheDocument();
     expect(screen.getByText("NGワード")).toBeInTheDocument();
+    expect(screen.getByText("ホワイトリスト")).toBeInTheDocument();
     expect(screen.getByText("カスタム CSS")).toBeInTheDocument();
   });
 });

@@ -124,6 +124,31 @@ export const ExternalColumn: Story = {
   },
 };
 
+export const WhitelistEnabled: Story = {
+  name: "ホワイトリスト有効",
+  args: {
+    column: {
+      ...column,
+      settings: {
+        ...columnSettings,
+        whitelistEnabled: true,
+        whitelistWords: ["推し", "限定"],
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole("checkbox", { name: "ホワイトリストを有効にする" }),
+    ).toBeChecked();
+    const textarea = canvas.getByPlaceholderText(
+      "1行に1ワードで入力（/正規表現/flags 形式も指定可、ホワイトリスト）",
+    ) as HTMLTextAreaElement;
+    await expect(textarea).not.toBeDisabled();
+    await expect(textarea.value).toBe("推し\n限定");
+  },
+};
+
 export const LightTheme: Story = {
   name: "ライトテーマ",
   decorators: [
