@@ -20,6 +20,8 @@ const columnSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   ngWords: [],
+  whitelistEnabled: false,
+  whitelistWords: [],
 };
 
 const globalSettings: GlobalSettings = {

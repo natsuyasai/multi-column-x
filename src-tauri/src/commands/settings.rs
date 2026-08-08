@@ -59,6 +59,12 @@ pub struct ColumnSettings {
     #[serde(rename = "ngWords")]
     #[serde(default)]
     pub ng_words: Vec<String>,
+    #[serde(rename = "whitelistEnabled")]
+    #[serde(default)]
+    pub whitelist_enabled: bool,
+    #[serde(rename = "whitelistWords")]
+    #[serde(default)]
+    pub whitelist_words: Vec<String>,
     #[serde(rename = "desktopNotifyEnabled")]
     #[serde(default)]
     pub desktop_notify_enabled: bool,

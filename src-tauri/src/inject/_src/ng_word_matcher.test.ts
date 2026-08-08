@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { matchesNgWord } from "./ng_word_matcher";
+import { matchesNgWord, shouldHideTweetText } from "./ng_word_matcher";
 
 describe("inject/ng_word_matcher", () => {
   it("通常の文字列は大小文字を無視して部分一致する", () => {
@@ -35,5 +35,64 @@ describe("inject/ng_word_matcher", () => {
     expect(() => matchesNgWord("text with /[/ in it", "/[/")).not.toThrow();
     expect(matchesNgWord("text with /[/ in it", "/[/")).toBe(true);
     expect(matchesNgWord("no match here", "/[/")).toBe(false);
+  });
+});
+
+describe("inject/ng_word_matcher shouldHideTweetText", () => {
+  it("NGワード・ホワイトリストどちらも指定なしなら非表示にしない", () => {
+    expect(shouldHideTweetText("normal tweet", [], false, [])).toBe(false);
+  });
+
+  it("NGワードに一致すればホワイトリスト無効でも非表示にする", () => {
+    expect(shouldHideTweetText("this is spam", ["spam"], false, [])).toBe(true);
+  });
+
+  it("NGワードに一致すればホワイトリスト有効でも非表示にする", () => {
+    expect(shouldHideTweetText("this is spam", ["spam"], true, ["spam"])).toBe(
+      true,
+    );
+  });
+
+  it("ホワイトリスト有効・ワード指定あり・一致するテキストはNGワード一致がなければ非表示にしない", () => {
+    expect(shouldHideTweetText("hello world", [], true, ["hello"])).toBe(false);
+  });
+
+  it("ホワイトリスト有効・ワード指定あり・一致しないテキストは非表示にする", () => {
+    expect(shouldHideTweetText("goodbye world", [], true, ["hello"])).toBe(
+      true,
+    );
+  });
+
+  it("ホワイトリスト有効だがwhitelistWordsが空配列ならNGワード一致がなければ非表示にしない", () => {
+    expect(shouldHideTweetText("hello world", [], true, [])).toBe(false);
+  });
+
+  it("whitelistEnabledがfalseの場合はwhitelistWordsに何が入っていても無視される", () => {
+    expect(shouldHideTweetText("goodbye world", [], false, ["hello"])).toBe(
+      false,
+    );
+  });
+
+  it("NGワードに一致しホワイトリストにも一致する場合はNG優先で非表示にする", () => {
+    expect(
+      shouldHideTweetText("hello spam world", ["spam"], true, ["hello"]),
+    ).toBe(true);
+  });
+
+  it("正規表現形式のNGワードでも非表示判定が動作する", () => {
+    expect(
+      shouldHideTweetText("this contains an ad", ["/spam|ad/"], false, []),
+    ).toBe(true);
+  });
+
+  it("正規表現形式のホワイトリストワードでも判定が動作する", () => {
+    expect(
+      shouldHideTweetText("これは広告ツイートです", [], true, ["/広告|宣伝/"]),
+    ).toBe(false);
+    expect(
+      shouldHideTweetText("これは普通のツイートです", [], true, [
+        "/広告|宣伝/",
+      ]),
+    ).toBe(true);
   });
 });

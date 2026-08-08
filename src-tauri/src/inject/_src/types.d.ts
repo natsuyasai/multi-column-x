@@ -36,6 +36,8 @@ declare global {
     videoPopupEnabled?: boolean;
     ngWords?: string[];
     globalNgWords?: string[];
+    whitelistEnabled?: boolean;
+    whitelistWords?: string[];
   }
 
   interface TauriCore {

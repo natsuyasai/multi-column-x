@@ -73,5 +73,12 @@ export async function applyColumnSettingsScripts(
     columnId,
     WEBVIEW_SCRIPTS.applyNgWords(settings.ngWords, globalNgWords),
   );
+  await evalInColumn(
+    columnId,
+    WEBVIEW_SCRIPTS.applyWhitelist(
+      settings.whitelistEnabled,
+      settings.whitelistWords,
+    ),
+  );
   await evalInColumn(columnId, WEBVIEW_SCRIPTS.TRIGGER_RELOAD);
 }
