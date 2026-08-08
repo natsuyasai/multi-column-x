@@ -189,6 +189,23 @@ export const LightTheme: Story = {
   },
 };
 
+export const MobileOverlay: Story = {
+  name: "モバイル表示（オーバーレイで中央固定）",
+  args: {
+    apiRateLimits: warningRateLimits,
+    isMobile: true,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByRole("button", { name: "APIレート制限" });
+
+    await userEvent.click(trigger);
+
+    await expect(canvas.getByRole("dialog")).toBeInTheDocument();
+    await expect(canvas.getByText("アカウント1")).toBeInTheDocument();
+  },
+};
+
 export const DarkTheme: Story = {
   name: "ダークテーマ",
   args: {
