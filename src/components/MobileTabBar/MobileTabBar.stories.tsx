@@ -20,6 +20,8 @@ const settings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   ngWords: [],
+  whitelistEnabled: false,
+  whitelistWords: [],
 };
 
 const account: Account = {
@@ -91,6 +93,9 @@ const meta: Meta<typeof MobileTabBar> = {
     onComposeTweet: fn(),
     onTabAction: fn(),
     onDoubleTapColumn: fn(),
+    apiRateLimitMonitorEnabled: true,
+    apiRateLimits: {},
+    onApiRateLimitPopoverOpenChange: fn(),
   },
 };
 

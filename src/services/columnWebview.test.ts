@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { WEBVIEW_SCRIPTS } from "../constants/ipc";
 import { DEFAULT_COLUMN_SETTINGS } from "../types";
 import type { Column } from "../types";
 import {
@@ -74,13 +75,35 @@ describe("columnWebview service", () => {
     });
   });
 
-  it("applyColumnSettingsScriptsは4つのスクリプトを順に適用する", async () => {
+  it("applyColumnSettingsScriptsは5つのスクリプトを順に適用する", async () => {
     await applyColumnSettingsScripts("col-1", DEFAULT_COLUMN_SETTINGS, ["ng"]);
-    expect(invoke).toHaveBeenCalledTimes(4);
+    expect(invoke).toHaveBeenCalledTimes(5);
     const labels = vi
       .mocked(invoke)
       .mock.calls.map((c) => (c[1] as { label: string }).label);
     expect(labels.every((l) => l === "column-col-1")).toBe(true);
+    const scripts = vi
+      .mocked(invoke)
+      .mock.calls.map((c) => (c[1] as { script: string }).script);
+    expect(scripts[0]).toBe(
+      WEBVIEW_SCRIPTS.applyAreaVisibility(
+        DEFAULT_COLUMN_SETTINGS.hideHeaderEnabled,
+        DEFAULT_COLUMN_SETTINGS.hideTweetInputEnabled,
+      ),
+    );
+    expect(scripts[1]).toBe(
+      WEBVIEW_SCRIPTS.applyCustomCSS(DEFAULT_COLUMN_SETTINGS.customCSS),
+    );
+    expect(scripts[2]).toBe(
+      WEBVIEW_SCRIPTS.applyNgWords(DEFAULT_COLUMN_SETTINGS.ngWords, ["ng"]),
+    );
+    expect(scripts[3]).toBe(
+      WEBVIEW_SCRIPTS.applyWhitelist(
+        DEFAULT_COLUMN_SETTINGS.whitelistEnabled,
+        DEFAULT_COLUMN_SETTINGS.whitelistWords,
+      ),
+    );
+    expect(scripts[4]).toBe(WEBVIEW_SCRIPTS.TRIGGER_RELOAD);
   });
 
   it("evalInColumn経由の失敗はapplyColumnSettingsScriptsを中断しない", async () => {
@@ -89,7 +112,7 @@ describe("columnWebview service", () => {
       .spyOn(console, "error")
       .mockImplementation(() => {});
     await applyColumnSettingsScripts("col-1", DEFAULT_COLUMN_SETTINGS, []);
-    expect(invoke).toHaveBeenCalledTimes(4);
+    expect(invoke).toHaveBeenCalledTimes(5);
     consoleError.mockRestore();
   });
 });

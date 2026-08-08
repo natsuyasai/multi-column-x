@@ -27,6 +27,7 @@ import { useDialogState } from "./hooks/useDialogState";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useTheme } from "./hooks/useTheme";
 import {
+  useApiRateLimitReports,
   useColumnCrashRecovery,
   useColumnFocusClearsUnread,
   useNewPostsNotification,
@@ -63,6 +64,8 @@ const App: React.FC = () => {
     unreadCounts,
     setUnreadCount,
     clearUnreadCount,
+    setApiRateLimit,
+    apiRateLimits,
   } = useAppStore();
   const {
     columns,
@@ -121,6 +124,8 @@ const App: React.FC = () => {
   const updater = useAppUpdater(isMobile, columnsRestored);
   const whatsNew = useWhatsNew(columnsRestored);
   const [appVersion, setAppVersion] = useState("");
+  // APIレート制限ポップオーバーの開閉状態（カラムWebView退避判定の anyDialogOpen に含めるため）
+  const [apiRateLimitPopoverOpen, setApiRateLimitPopoverOpen] = useState(false);
 
   const topBarHeight = getTopBarHeight(topBarExpanded);
 
@@ -188,6 +193,7 @@ const App: React.FC = () => {
   // WebView 内の横ホイール → スクロールバー追従、新着カウント → バッジ・デスクトップ通知
   useWebviewScrollRelay(scrollbarRef);
   useNewPostsNotification(setUnreadCount);
+  useApiRateLimitReports(setApiRateLimit);
   useColumnCrashRecovery(recreateColumnWebview);
   useColumnFocusClearsUnread(clearUnreadCount);
 
@@ -220,7 +226,8 @@ const App: React.FC = () => {
     !!whatsNew.notes ||
     !!pendingAccountName ||
     !!pendingRemoval ||
-    !!reauthNotice;
+    !!reauthNotice ||
+    apiRateLimitPopoverOpen;
   useEffect(() => {
     setDialogOpen(anyDialogOpen);
     if (anyDialogOpen) {
@@ -413,6 +420,9 @@ const App: React.FC = () => {
           onOpenLinkPopup={handleOpenLinkPopup}
           onJumpToColumn={handleJumpToColumn}
           onClose={handleRemoveColumn}
+          apiRateLimitMonitorEnabled={globalSettings.apiRateLimitMonitorEnabled}
+          apiRateLimits={apiRateLimits}
+          onApiRateLimitPopoverOpenChange={setApiRateLimitPopoverOpen}
         />
       )}
       {isMobile && (
@@ -429,6 +439,9 @@ const App: React.FC = () => {
           onTabAction={handleTabAction}
           onDoubleTapColumn={handleDoubleTapColumn}
           swipeState={swipeState}
+          apiRateLimitMonitorEnabled={globalSettings.apiRateLimitMonitorEnabled}
+          apiRateLimits={apiRateLimits}
+          onApiRateLimitPopoverOpenChange={setApiRateLimitPopoverOpen}
         />
       )}
       {isMobile && globalSettings.mobileSwipeAreaEnabled && (

@@ -14,12 +14,15 @@ pub struct InitScriptParams<'a> {
     pub blur_image_enabled: bool,
     pub blur_image_amount: &'a str,
     pub hide_ad_enabled: bool,
+    pub api_rate_limit_monitor_enabled: bool,
     pub image_popup_enabled: bool,
     pub video_popup_enabled: bool,
     pub custom_css: &'a str,
     pub visible_links: &'a [String],
     pub ng_words: &'a [String],
     pub global_ng_words: &'a [String],
+    pub whitelist_enabled: bool,
+    pub whitelist_words: &'a [String],
     pub compose_only_enabled: bool,
     pub minimal_injection: bool,
 }
@@ -91,15 +94,18 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     } else {
         ""
     };
+    let api_rate_limit_monitor = include_str!("api_rate_limit_monitor.js");
 
     let visible_links_json =
         serde_json::to_string(params.visible_links).unwrap_or_else(|_| "[]".to_string());
     let ng_words_json = serde_json::to_string(params.ng_words).unwrap_or_else(|_| "[]".to_string());
     let global_ng_words_json =
         serde_json::to_string(params.global_ng_words).unwrap_or_else(|_| "[]".to_string());
+    let whitelist_words_json =
+        serde_json::to_string(params.whitelist_words).unwrap_or_else(|_| "[]".to_string());
     let effective_show_custom_menu = params.hide_header_enabled && params.show_custom_menu;
     let config = format!(
-        "window.{} = {{ hideHeaderEnabled: {}, hideTweetInputEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?}, blurImageEnabled: {}, blurImageAmount: {:?}, hideAdEnabled: {}, imagePopupEnabled: {}, videoPopupEnabled: {}, ngWords: {}, globalNgWords: {} }};",
+        "window.{} = {{ hideHeaderEnabled: {}, hideTweetInputEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?}, blurImageEnabled: {}, blurImageAmount: {:?}, hideAdEnabled: {}, apiRateLimitMonitorEnabled: {}, imagePopupEnabled: {}, videoPopupEnabled: {}, ngWords: {}, globalNgWords: {}, whitelistEnabled: {}, whitelistWords: {} }};",
         globals::MULTI_COLUMN_X_CONFIG,
         params.hide_header_enabled,
         params.hide_tweet_input_enabled,
@@ -110,10 +116,13 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         params.blur_image_enabled,
         params.blur_image_amount,
         params.hide_ad_enabled,
+        params.api_rate_limit_monitor_enabled,
         params.image_popup_enabled,
         params.video_popup_enabled,
         ng_words_json,
-        global_ng_words_json
+        global_ng_words_json,
+        params.whitelist_enabled,
+        whitelist_words_json
     );
 
     let header_part = if params.hide_header_enabled || params.hide_tweet_input_enabled {
@@ -129,7 +138,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     };
 
     let mut script = format!(
-        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
+        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
         config,
         tab_selector,
         header_part,
@@ -149,7 +158,8 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         mobile_area_hide,
         notification_header_hide,
         compose_only,
-        video_long_press_menu
+        video_long_press_menu,
+        api_rate_limit_monitor
     );
 
     if !params.custom_css.is_empty() {
@@ -203,12 +213,15 @@ mod tests {
             blur_image_enabled: false,
             blur_image_amount: "10px",
             hide_ad_enabled: false,
+            api_rate_limit_monitor_enabled: true,
             image_popup_enabled: true,
             video_popup_enabled: true,
             custom_css: "",
             visible_links: &[],
             ng_words: &[],
             global_ng_words: &[],
+            whitelist_enabled: false,
+            whitelist_words: &[],
             compose_only_enabled: false,
             minimal_injection: false,
         }
@@ -244,6 +257,36 @@ mod tests {
     fn build_init_script_config_global_ng_words_empty_by_default() {
         let script = build_init_script(&default_params());
         assert!(script.contains("globalNgWords: []"));
+    }
+
+    #[test]
+    fn build_init_script_config_whitelist_enabledがtrueのとき有効値になる() {
+        let mut params = default_params();
+        params.whitelist_enabled = true;
+        let script = build_init_script(&params);
+        assert!(script.contains("whitelistEnabled: true"));
+    }
+
+    #[test]
+    fn build_init_script_config_whitelist_enabledはデフォルトでfalseになる() {
+        let script = build_init_script(&default_params());
+        assert!(script.contains("whitelistEnabled: false"));
+    }
+
+    #[test]
+    fn build_init_script_config_contains_whitelist_words() {
+        let words = vec!["keep".to_string(), "保持".to_string()];
+        let mut params = default_params();
+        params.whitelist_words = &words;
+        let script = build_init_script(&params);
+        assert!(script.contains("whitelistWords"));
+        assert!(script.contains(r#"["keep","保持"]"#));
+    }
+
+    #[test]
+    fn build_init_script_config_whitelist_wordsはデフォルトで空配列になる() {
+        let script = build_init_script(&default_params());
+        assert!(script.contains("whitelistWords: []"));
     }
 
     #[test]

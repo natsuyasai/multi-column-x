@@ -29,6 +29,7 @@ export interface SettingsDraft {
   blurImageEnabled: boolean;
   blurImageAmount: string;
   hideAdEnabled: boolean;
+  apiRateLimitMonitorEnabled: boolean;
   columnScale: ColumnScale;
   useXAppForCompose: boolean;
   mobileSwipeAreaEnabled: boolean;
@@ -68,6 +69,7 @@ export function createSettingsDraft(settings: GlobalSettings): SettingsDraft {
     blurImageEnabled: settings.blurImageEnabled,
     blurImageAmount: settings.blurImageAmount,
     hideAdEnabled: settings.hideAdEnabled,
+    apiRateLimitMonitorEnabled: settings.apiRateLimitMonitorEnabled ?? true,
     columnScale: settings.columnScale ?? "default",
     useXAppForCompose: settings.useXAppForCompose ?? false,
     mobileSwipeAreaEnabled: settings.mobileSwipeAreaEnabled,

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { validateNgWordLines } from "../../lib/ngWordPattern";
 import { useAppStore } from "../../store/useAppStore";
 import type {
   GlobalSettings,
@@ -27,7 +28,10 @@ interface AppSettingsPanelProps {
   onApply: (patch: Partial<GlobalSettings>) => void;
   onApplyLayout: (columns: Column[]) => void;
   onApplyColumnDefaults: (
-    patch: Omit<ColumnSettings, "visibleLinks" | "ngWords">,
+    patch: Omit<
+      ColumnSettings,
+      "visibleLinks" | "ngWords" | "whitelistEnabled" | "whitelistWords"
+    >,
   ) => void;
   onReloadAllWebviews: () => void;
   appVersion: string;
@@ -61,6 +65,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   const [draft, setDraft] = useState<SettingsDraft>(() =>
     createSettingsDraft(settings),
   );
+  const [ngWordsError, setNgWordsError] = useState<string | null>(null);
 
   const set = <K extends keyof SettingsDraft>(
     key: K,
@@ -75,6 +80,12 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       .split("\n")
       .map((w) => w.trim())
       .filter((w) => w.length > 0);
+    const ngWordsValidationError = validateNgWordLines(ngWords);
+    if (ngWordsValidationError) {
+      setNgWordsError(ngWordsValidationError);
+      return;
+    }
+    setNgWordsError(null);
     onApply({
       theme: draft.theme,
       defaultAutoReloadEnabled: draft.defaultAutoReloadEnabled,
@@ -94,6 +105,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       blurImageEnabled: draft.blurImageEnabled,
       blurImageAmount: draft.blurImageAmount,
       hideAdEnabled: draft.hideAdEnabled,
+      apiRateLimitMonitorEnabled: draft.apiRateLimitMonitorEnabled,
       columnScale: draft.columnScale,
       useXAppForCompose: draft.useXAppForCompose,
       mobileSwipeAreaEnabled: draft.mobileSwipeAreaEnabled,
@@ -177,6 +189,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 draft={draft}
                 set={set}
                 isMobile={isMobile}
+                ngWordsError={ngWordsError}
               />
 
               <AppInfoSections

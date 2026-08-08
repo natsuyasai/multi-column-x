@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { validateNgWordLines } from "../../lib/ngWordPattern";
 import type { Column, ColumnSettings } from "../../types";
+import { HelpPopover } from "../HelpPopover/HelpPopover";
 import styles from "./SettingsPanel.module.scss";
 
 interface SettingsPanelProps {
@@ -29,6 +31,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [ngWordsText, setNgWordsText] = useState<string>(
     (column.settings.ngWords ?? []).join("\n"),
   );
+  const [ngWordsError, setNgWordsError] = useState<string | null>(null);
+  const [whitelistWordsText, setWhitelistWordsText] = useState<string>(
+    (column.settings.whitelistWords ?? []).join("\n"),
+  );
+  const [whitelistError, setWhitelistError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +43,25 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       .split("\n")
       .map((w) => w.trim())
       .filter((w) => w.length > 0);
-    onApply(column.id, { ...settings, ngWords }, width);
+    const error = validateNgWordLines(ngWords);
+    if (error) {
+      setNgWordsError(error);
+      return;
+    }
+    setNgWordsError(null);
+
+    const whitelistWords = whitelistWordsText
+      .split("\n")
+      .map((w) => w.trim())
+      .filter((w) => w.length > 0);
+    const whitelistLinesError = validateNgWordLines(whitelistWords);
+    if (whitelistLinesError) {
+      setWhitelistError(whitelistLinesError);
+      return;
+    }
+    setWhitelistError(null);
+
+    onApply(column.id, { ...settings, ngWords, whitelistWords }, width);
   };
 
   return (
@@ -279,14 +304,69 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
           {!isExternal && (
             <section className={styles.section}>
-              <h3 className={styles.sectionTitle}>NGワード</h3>
+              <h3 className={styles.sectionTitle}>
+                NGワード
+                <HelpPopover label="NGワードの書き方">
+                  <p>1行に1ワードを入力してください。</p>
+                  <p>
+                    <code>/pattern/flags</code>{" "}
+                    の形式で入力すると正規表現として扱われます（大文字・小文字は区別しません）。
+                  </p>
+                  <p>例: {"/spam|広告/"}</p>
+                </HelpPopover>
+              </h3>
               <textarea
                 className={styles.cssTextarea}
                 value={ngWordsText}
                 onChange={(e) => setNgWordsText(e.target.value)}
-                placeholder="1行に1ワードで入力"
+                placeholder="1行に1ワードで入力（/正規表現/flags 形式も指定可）"
                 spellCheck={false}
               />
+              {ngWordsError && (
+                <p className={styles.errorText}>{ngWordsError}</p>
+              )}
+            </section>
+          )}
+
+          {!isExternal && (
+            <section className={styles.section}>
+              <h3 className={styles.sectionTitle}>
+                ホワイトリスト
+                <HelpPopover label="ホワイトリストの書き方">
+                  <p>
+                    指定したワードを含むツイートのみを表示します（NGワードとは逆の効果です）。
+                  </p>
+                  <p>1行に1ワードを入力してください。</p>
+                  <p>
+                    <code>/pattern/flags</code>{" "}
+                    の形式で入力すると正規表現として扱われます（大文字・小文字は区別しません）。
+                  </p>
+                </HelpPopover>
+              </h3>
+              <label className={styles.checkLabel}>
+                <input
+                  type="checkbox"
+                  checked={settings.whitelistEnabled}
+                  onChange={(e) =>
+                    setSettings((s) => ({
+                      ...s,
+                      whitelistEnabled: e.target.checked,
+                    }))
+                  }
+                />
+                ホワイトリストを有効にする
+              </label>
+              <textarea
+                className={styles.cssTextarea}
+                value={whitelistWordsText}
+                onChange={(e) => setWhitelistWordsText(e.target.value)}
+                placeholder="1行に1ワードで入力（/正規表現/flags 形式も指定可、ホワイトリスト）"
+                spellCheck={false}
+                disabled={!settings.whitelistEnabled}
+              />
+              {whitelistError && (
+                <p className={styles.errorText}>{whitelistError}</p>
+              )}
             </section>
           )}
 

@@ -3,8 +3,8 @@
 use super::parse_url;
 use crate::commands::settings::ColumnData;
 use crate::commands::settings_store::{
-    load_global_ng_words, load_hide_ad_enabled, load_image_popup_enabled,
-    load_video_auto_play_stop_enabled, load_video_popup_enabled,
+    load_api_rate_limit_monitor_enabled, load_global_ng_words, load_hide_ad_enabled,
+    load_image_popup_enabled, load_video_auto_play_stop_enabled, load_video_popup_enabled,
 };
 use crate::inject::{build_init_script, InitScriptParams};
 #[cfg(any(target_os = "linux", windows))]
@@ -20,6 +20,13 @@ use tauri::WebviewBuilder;
 use tauri::{AppHandle, Manager};
 #[cfg(desktop)]
 use tauri::{LogicalPosition, LogicalSize, WebviewUrl};
+
+// Linux (WebKitGTK) は native HLS 非対応 + デフォルト UA が Safari 判定されるため、
+// X が hls.js 経由の MSE 再生でなく native <video> で m3u8 を渡してしまい動画再生に失敗する。
+// Chrome UA を名乗らせることで hls.js 経由の MSE 再生に切り替えさせる（実機検証済み）。
+// 動画再生が失敗し始めたら、最新の Chrome の User-Agent 文字列に更新すること。
+#[cfg(target_os = "linux")]
+const LINUX_COLUMN_USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36";
 
 fn webview_label(column_id: &str) -> String {
     format!("{}{}", labels::COLUMN_PREFIX, column_id)
@@ -84,6 +91,7 @@ fn effective_hide_tweet_input_enabled(column: &ColumnData) -> bool {
 fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: bool) -> String {
     let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(app);
     let hide_ad_enabled = load_hide_ad_enabled(app);
+    let api_rate_limit_monitor_enabled = load_api_rate_limit_monitor_enabled(app);
     let image_popup_enabled = load_image_popup_enabled(app);
     let video_popup_enabled = load_video_popup_enabled(app);
     let global_ng_words = load_global_ng_words(app);
@@ -99,12 +107,15 @@ fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: boo
         blur_image_enabled: column.settings.blur_image_enabled,
         blur_image_amount: &column.settings.blur_image_amount,
         hide_ad_enabled,
+        api_rate_limit_monitor_enabled,
         image_popup_enabled,
         video_popup_enabled,
         custom_css: &column.settings.custom_css,
         visible_links: &column.settings.visible_links,
         ng_words: &column.settings.ng_words,
         global_ng_words: &global_ng_words,
+        whitelist_enabled: column.settings.whitelist_enabled,
+        whitelist_words: &column.settings.whitelist_words,
         // 投稿カラム（/home 表示）ではインライン投稿フォーム以外を隠す。
         compose_only_enabled: column.page_type == "compose",
         minimal_injection: column.page_type == "external",
@@ -185,6 +196,7 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
                 .inner_size(args.width.max(1.0), args.height.max(1.0))
                 .parent(&window)
                 .map_err(|e| e.to_string())?
+                .user_agent(LINUX_COLUMN_USER_AGENT)
                 .build()
                 .map_err(|e| e.to_string())?;
 
@@ -546,6 +558,13 @@ mod tests {
     #[test]
     fn resolve_url_unknown_falls_back_to_home() {
         assert_eq!(resolve_url(&column("unknown")), "https://x.com/home");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_column_user_agentはchromeトークンを含みsafariバージョントークンを含まない() {
+        assert!(LINUX_COLUMN_USER_AGENT.contains("Chrome/"));
+        assert!(!LINUX_COLUMN_USER_AGENT.contains("Version/"));
     }
 
     #[test]

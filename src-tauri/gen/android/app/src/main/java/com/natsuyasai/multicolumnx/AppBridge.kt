@@ -52,4 +52,14 @@ object AppBridge {
    */
   @JvmStatic
   external fun onVideoDownloadRequest(payloadJson: String)
+
+  /**
+   * column WebView 内の api_rate_limit_monitor.ts から、APIレート制限情報が
+   * 届いたときに ApiRateLimitBridge から呼ぶ。
+   */
+  @JvmStatic
+  external fun onApiRateLimitReport(
+    label: String,
+    payloadJson: String,
+  )
 }

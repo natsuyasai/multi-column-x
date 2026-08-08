@@ -32,6 +32,8 @@ export interface ColumnSettings {
   blurImageEnabled: boolean;
   blurImageAmount: string;
   ngWords: string[];
+  whitelistEnabled: boolean;
+  whitelistWords: string[];
   desktopNotifyEnabled?: boolean;
 }
 
@@ -77,6 +79,7 @@ export interface GlobalSettings {
   blurImageEnabled: boolean;
   blurImageAmount: string;
   hideAdEnabled: boolean;
+  apiRateLimitMonitorEnabled: boolean;
   columnScale: ColumnScale;
   useXAppForCompose: boolean;
   mobileSwipeAreaEnabled: boolean;
@@ -85,6 +88,14 @@ export interface GlobalSettings {
   mobileTwoColumnEnabled: boolean;
   presets: ColumnPreset[];
   ngWords: string[];
+}
+
+export interface ApiRateLimitBucket {
+  bucketKey: string;
+  limit: number;
+  remaining: number;
+  reset: number;
+  updatedAt: number;
 }
 
 export interface ColumnPreset {
@@ -125,6 +136,8 @@ export interface AppSettings {
  * | smallImageWidth         | small_image_width           | "50%"       |
  * | blurImageEnabled        | blur_image_enabled          | false       |
  * | blurImageAmount         | blur_image_amount           | "10px"      |
+ * | whitelistEnabled        | whitelist_enabled           | false       |
+ * | whitelistWords          | whitelist_words             | []          |
  * | desktopNotifyEnabled    | desktop_notify_enabled      | false       |
  */
 export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
@@ -142,6 +155,8 @@ export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   ngWords: [],
+  whitelistEnabled: false,
+  whitelistWords: [],
   desktopNotifyEnabled: false,
 };
 
@@ -178,6 +193,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   hideAdEnabled: true,
+  apiRateLimitMonitorEnabled: true,
   columnScale: "default",
   useXAppForCompose: false,
   mobileSwipeAreaEnabled: true,

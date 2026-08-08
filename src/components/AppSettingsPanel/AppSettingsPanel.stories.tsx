@@ -20,6 +20,8 @@ const columnSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   ngWords: [],
+  whitelistEnabled: false,
+  whitelistWords: [],
 };
 
 const globalSettings: GlobalSettings = {
@@ -44,6 +46,7 @@ const globalSettings: GlobalSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   hideAdEnabled: true,
+  apiRateLimitMonitorEnabled: true,
   columnScale: "default",
   useXAppForCompose: false,
   mobileSwipeAreaEnabled: true,

@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import type { Column, Account } from "../../types";
+import apiRateLimitIndicatorStyles from "../ApiRateLimitIndicator/ApiRateLimitIndicator.module.scss";
 import { MobileTabBar } from "./MobileTabBar";
 
 const baseSettings = {
@@ -19,6 +20,8 @@ const baseSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   ngWords: [],
+  whitelistEnabled: false,
+  whitelistWords: [],
 };
 
 const acc1: Account = {
@@ -64,6 +67,9 @@ const defaultProps = {
   onComposeTweet: vi.fn(),
   onTabAction: vi.fn(),
   onDoubleTapColumn: vi.fn(),
+  apiRateLimitMonitorEnabled: true,
+  apiRateLimits: {},
+  onApiRateLimitPopoverOpenChange: vi.fn(),
 };
 
 describe("MobileTabBar", () => {
@@ -218,6 +224,66 @@ describe("MobileTabBar", () => {
     await userEvent.click(screen.getByTitle("メニュー表示の切り替え"));
     await userEvent.click(screen.getByRole("button", { name: "カラムを追加" }));
     expect(onAddColumn).toHaveBeenCalled();
+  });
+
+  it("apiRateLimitMonitorEnabledがtrueのとき展開後にAPIレート制限インジケータが表示される", async () => {
+    render(
+      <MobileTabBar
+        {...defaultProps}
+        columns={[]}
+        apiRateLimitMonitorEnabled={true}
+      />,
+    );
+    await userEvent.click(screen.getByTitle("メニュー表示の切り替え"));
+    expect(screen.getByLabelText("APIレート制限")).toBeInTheDocument();
+  });
+
+  it("apiRateLimitMonitorEnabledがfalseのとき展開後もAPIレート制限インジケータが表示されない", async () => {
+    render(
+      <MobileTabBar
+        {...defaultProps}
+        columns={[]}
+        apiRateLimitMonitorEnabled={false}
+      />,
+    );
+    await userEvent.click(screen.getByTitle("メニュー表示の切り替え"));
+    expect(screen.queryByLabelText("APIレート制限")).not.toBeInTheDocument();
+  });
+
+  it("APIレート制限インジケータの開閉状態が変化するとonApiRateLimitPopoverOpenChangeが呼ばれる", async () => {
+    const onApiRateLimitPopoverOpenChange = vi.fn();
+    render(
+      <MobileTabBar
+        {...defaultProps}
+        columns={[]}
+        onApiRateLimitPopoverOpenChange={onApiRateLimitPopoverOpenChange}
+      />,
+    );
+    await userEvent.click(screen.getByTitle("メニュー表示の切り替え"));
+    await userEvent.click(screen.getByLabelText("APIレート制限"));
+    expect(onApiRateLimitPopoverOpenChange).toHaveBeenCalledWith(true);
+  });
+
+  it("APIレート制限インジケータがモバイル表示（isMobile）で開かれる", async () => {
+    render(
+      <MobileTabBar
+        {...defaultProps}
+        columns={[]}
+        apiRateLimitMonitorEnabled={true}
+      />,
+    );
+    await userEvent.click(screen.getByTitle("メニュー表示の切り替え"));
+    await userEvent.click(screen.getByLabelText("APIレート制限"));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    // isMobileがtrueとしてApiRateLimitIndicatorへ伝搬していれば
+    // オーバーレイ要素が描画され、クリックで閉じるはず
+    const overlay = document.querySelector(
+      `.${apiRateLimitIndicatorStyles.overlay}`,
+    );
+    expect(overlay).not.toBeNull();
+    await userEvent.click(overlay as Element);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   describe("アクションボタンの SVG アイコン", () => {

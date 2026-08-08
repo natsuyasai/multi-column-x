@@ -19,6 +19,8 @@ const baseSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   ngWords: [],
+  whitelistEnabled: false,
+  whitelistWords: [],
 };
 
 const acc1: Account = {
@@ -65,6 +67,9 @@ const defaultProps = {
   onOpenLinkPopup: vi.fn(),
   onJumpToColumn: vi.fn(),
   onClose: vi.fn(),
+  apiRateLimitMonitorEnabled: true,
+  apiRateLimits: {},
+  onApiRateLimitPopoverOpenChange: vi.fn(),
 };
 
 describe("TopBar", () => {
@@ -145,6 +150,28 @@ describe("TopBar", () => {
     const labeled: Column = { ...col1, label: "マイホーム" };
     render(<TopBar {...defaultProps} columns={[labeled]} />);
     expect(screen.getByTitle("マイホーム (Ctrl+1)")).toBeInTheDocument();
+  });
+
+  it("apiRateLimitMonitorEnabledがtrueのときAPIレート制限インジケータが表示される", () => {
+    render(<TopBar {...defaultProps} apiRateLimitMonitorEnabled={true} />);
+    expect(screen.getByLabelText("APIレート制限")).toBeInTheDocument();
+  });
+
+  it("apiRateLimitMonitorEnabledがfalseのときAPIレート制限インジケータが表示されない", () => {
+    render(<TopBar {...defaultProps} apiRateLimitMonitorEnabled={false} />);
+    expect(screen.queryByLabelText("APIレート制限")).not.toBeInTheDocument();
+  });
+
+  it("APIレート制限インジケータの開閉状態が変化するとonApiRateLimitPopoverOpenChangeが呼ばれる", async () => {
+    const onApiRateLimitPopoverOpenChange = vi.fn();
+    render(
+      <TopBar
+        {...defaultProps}
+        onApiRateLimitPopoverOpenChange={onApiRateLimitPopoverOpenChange}
+      />,
+    );
+    await userEvent.click(screen.getByLabelText("APIレート制限"));
+    expect(onApiRateLimitPopoverOpenChange).toHaveBeenCalledWith(true);
   });
 
   it("expanded=true のとき各カラムにカラムを閉じるボタンが表示される", () => {

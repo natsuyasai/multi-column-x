@@ -59,6 +59,12 @@ pub struct ColumnSettings {
     #[serde(rename = "ngWords")]
     #[serde(default)]
     pub ng_words: Vec<String>,
+    #[serde(rename = "whitelistEnabled")]
+    #[serde(default)]
+    pub whitelist_enabled: bool,
+    #[serde(rename = "whitelistWords")]
+    #[serde(default)]
+    pub whitelist_words: Vec<String>,
     #[serde(rename = "desktopNotifyEnabled")]
     #[serde(default)]
     pub desktop_notify_enabled: bool,
@@ -128,6 +134,7 @@ impl Default for GlobalSettingsData {
             blur_image_enabled: false,
             blur_image_amount: "10px".to_string(),
             hide_ad_enabled: true,
+            api_rate_limit_monitor_enabled: true,
             column_scale: default_column_scale(),
             use_x_app_for_compose: false,
             mobile_swipe_area_enabled: true,
@@ -251,6 +258,9 @@ pub struct GlobalSettingsData {
     #[serde(rename = "hideAdEnabled")]
     #[serde(default)]
     pub hide_ad_enabled: bool,
+    #[serde(rename = "apiRateLimitMonitorEnabled")]
+    #[serde(default = "default_true")]
+    pub api_rate_limit_monitor_enabled: bool,
     #[serde(rename = "columnScale")]
     #[serde(default = "default_column_scale")]
     pub column_scale: String,

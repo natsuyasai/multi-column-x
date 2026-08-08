@@ -28,6 +28,8 @@ pub mod events {
     /// 動画ダウンロード進捗通知（desktop: Rust emit_to → TS listen）
     /// payload { fileIndex, fileCount, current, total, phase }。
     pub const VIDEO_DOWNLOAD_PROGRESS: &str = "video-download-progress";
+    /// APIレート制限残量通知（inject script invoke → TS listen）{ label, bucketKey, limit, remaining, reset }
+    pub const WEBVIEW_API_RATE_LIMIT: &str = "webview-api-rate-limit";
 }
 
 /// WebView / ウィンドウラベルのプレフィックス
@@ -88,6 +90,7 @@ mod tests {
             ("COLUMN_WEBVIEW_FOCUSED", events::COLUMN_WEBVIEW_FOCUSED),
             ("ACCOUNT_REAUTH_COMPLETE", events::ACCOUNT_REAUTH_COMPLETE),
             ("VIDEO_DOWNLOAD_PROGRESS", events::VIDEO_DOWNLOAD_PROGRESS),
+            ("WEBVIEW_API_RATE_LIMIT", events::WEBVIEW_API_RATE_LIMIT),
         ];
         assert_eq!(
             expected.as_object().unwrap().len(),

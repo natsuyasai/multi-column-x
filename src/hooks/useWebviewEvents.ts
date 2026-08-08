@@ -11,6 +11,7 @@ import { IPC_EVENTS, WEBVIEW_LABELS } from "../constants/ipc";
 import { logError } from "../lib/log";
 import { useAppStore } from "../store/useAppStore";
 import { getColumnLabel } from "../types";
+import type { ApiRateLimitBucket } from "../types";
 
 /** WebView 内の横ホイールを受け取ってスクロールバーを動かす */
 export function useWebviewScrollRelay(
@@ -183,4 +184,38 @@ export function useNewPostsNotification(
       unlisten.then((fn) => fn());
     };
   }, [setUnreadCount]);
+}
+
+/**
+ * inject script からのAPIレート制限ヘッダ通知を受け、Rust側（WebviewRegistry / ComposeSession）が
+ * 解決したaccountIdに紐づけてstoreへ反映する。
+ * カラムWebViewだけでなく常駐コンポーズWebView経由の投稿もaccountIdを取りこぼさない。
+ */
+export function useApiRateLimitReports(
+  setApiRateLimit: (accountId: string, bucket: ApiRateLimitBucket) => void,
+) {
+  useEffect(() => {
+    const unlisten = listen<{
+      label: string;
+      bucketKey: string;
+      limit: number;
+      remaining: number;
+      reset: number;
+      accountId: string | null;
+    }>(IPC_EVENTS.WEBVIEW_API_RATE_LIMIT, (e) => {
+      const { bucketKey, limit, remaining, reset, accountId } = e.payload;
+      if (!accountId) return;
+
+      setApiRateLimit(accountId, {
+        bucketKey,
+        limit,
+        remaining,
+        reset,
+        updatedAt: Date.now(),
+      });
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [setApiRateLimit]);
 }
