@@ -255,6 +255,40 @@ pub fn create_column_webview(
     })
 }
 
+/// AppBridge.onApiRateLimitReport(label, payloadJson) から呼ばれるJNIエントリポイント。
+/// column WebView 内の api_rate_limit_monitor.ts が window.__mcxApiRateLimitBridge 経由で
+/// レート制限情報を送ってくる（Android のネイティブ WebView には Tauri IPC が無いため）。
+///
+/// I/Oを伴わない軽量な処理（Mutexロック+emit）のため、onInsets と同様に同期的に処理する。
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onApiRateLimitReport<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    label: jni::objects::JString<'local>,
+    payload_json: jni::objects::JString<'local>,
+) {
+    fn to_string(env: &mut JNIEnv, s: &jni::objects::JString) -> Option<String> {
+        env.get_string(s).ok().map(|v| v.into())
+    }
+    let (Some(label), Some(payload_json)) = (
+        to_string(&mut env, &label),
+        to_string(&mut env, &payload_json),
+    ) else {
+        return;
+    };
+    let app = TAURI_APP.lock().expect("TAURI_APP mutex poisoned").clone();
+    let Some(app) = app else {
+        eprintln!("[AppBridge.onApiRateLimitReport] app handle not initialized");
+        return;
+    };
+    if let Err(e) =
+        crate::commands::webview::report_api_rate_limit_from_android(&app, &label, &payload_json)
+    {
+        eprintln!("[AppBridge.onApiRateLimitReport] {e}");
+    }
+}
+
 /// MainActivity.removeColumnWebView を呼び出してカラム WebView を削除する。
 pub fn remove_column_webview(id: &str) -> Result<(), String> {
     call_activity_method(|env, activity| {
