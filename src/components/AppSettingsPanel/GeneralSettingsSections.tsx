@@ -1,4 +1,5 @@
 import React from "react";
+import { HelpPopover } from "../HelpPopover/HelpPopover";
 import styles from "./AppSettingsPanel.module.scss";
 import {
   clampSwipeAreaHeight,
@@ -10,6 +11,7 @@ interface GeneralSettingsSectionsProps {
   draft: SettingsDraft;
   set: SetSettingsDraft;
   isMobile: boolean;
+  ngWordsError?: string | null;
 }
 
 /**
@@ -18,7 +20,7 @@ interface GeneralSettingsSectionsProps {
  */
 export const GeneralSettingsSections: React.FC<
   GeneralSettingsSectionsProps
-> = ({ draft, set, isMobile }) => (
+> = ({ draft, set, isMobile, ngWordsError }) => (
   <>
     <section className={styles.section}>
       <h3 className={styles.sectionTitle}>ポップアップウィンドウ</h3>
@@ -139,14 +141,25 @@ export const GeneralSettingsSections: React.FC<
     )}
 
     <section className={styles.section}>
-      <h3 className={styles.sectionTitle}>グローバルNGワード</h3>
+      <h3 className={styles.sectionTitle}>
+        グローバルNGワード
+        <HelpPopover label="NGワードの書き方">
+          <p>1行に1ワードを入力してください。</p>
+          <p>
+            <code>/pattern/flags</code>{" "}
+            の形式で入力すると正規表現として扱われます（大文字・小文字は区別しません）。
+          </p>
+          <p>例: {"/spam|広告/"}</p>
+        </HelpPopover>
+      </h3>
       <textarea
         className={styles.cssTextarea}
         value={draft.globalNgWordsText}
         onChange={(e) => set("globalNgWordsText", e.target.value)}
-        placeholder="1行に1ワードで入力（全カラムに適用）"
+        placeholder="1行に1ワードで入力（全カラムに適用・/正規表現/flags 形式も指定可）"
         spellCheck={false}
       />
+      {ngWordsError && <p className={styles.errorText}>{ngWordsError}</p>}
       <p className={styles.hint}>
         全カラムのタイムラインに適用されます。各カラムのNGワードと合わせて使用されます。
       </p>

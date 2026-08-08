@@ -75,6 +75,9 @@
   color: var(--mcx-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .checkLabel {
@@ -179,6 +182,11 @@
   font-size: 11px;
   color: var(--mcx-text-muted);
   margin: 0;
+}
+
+.errorText {
+  color: var(--mcx-danger);
+  font-size: 12px;
 }
 
 .cssTextarea {
