@@ -438,6 +438,14 @@ class MainActivity : TauriActivity() {
             },
             VIDEO_DOWNLOAD_BRIDGE_JS_NAME,
           )
+          // ネイティブ WebView には Tauri IPC が無いため、APIレート制限監視の
+          // 報告を Rust へ届けるブリッジを公開する（loadUrl 前に設定が必要）。
+          wv.addJavascriptInterface(
+            ApiRateLimitBridge(id) { label, payloadJson ->
+              AppBridge.onApiRateLimitReport(label, payloadJson)
+            },
+            API_RATE_LIMIT_BRIDGE_JS_NAME,
+          )
         }
 
       val density = resources.displayMetrics.density
@@ -708,6 +716,9 @@ class MainActivity : TauriActivity() {
 
     // video_long_press_menu.ts が参照する window.__mcxVideoDownloadBridge と一致させること。
     private const val VIDEO_DOWNLOAD_BRIDGE_JS_NAME = "__mcxVideoDownloadBridge"
+
+    // api_rate_limit_monitor.ts が参照する window.__mcxApiRateLimitBridge と一致させること。
+    private const val API_RATE_LIMIT_BRIDGE_JS_NAME = "__mcxApiRateLimitBridge"
 
     // 常駐コンポーズ WebView のラベルプレフィックス。Rust 側 labels::COMPOSE_PREFIX と一致させること。
     private const val COMPOSE_LABEL_PREFIX = "compose-"

@@ -80,6 +80,11 @@ declare global {
     downloadVideo: (payloadJson: string) => void;
   }
 
+  // Android で MainActivity が addJavascriptInterface で公開するAPIレート制限報告ブリッジ
+  interface McxApiRateLimitBridge {
+    report: (payloadJson: string) => void;
+  }
+
   interface TvAccountInfo {
     id: string;
     label: string;
@@ -98,6 +103,7 @@ declare global {
     __mcxEscCloseEnabled?: boolean;
     __mcxPopupBridge?: McxPopupBridge;
     __mcxVideoDownloadBridge?: McxVideoDownloadBridge;
+    __mcxApiRateLimitBridge?: McxApiRateLimitBridge;
     __mobileTopInset?: number;
     __mobileBottomInset?: number;
     __xhrRateLimitPatched?: boolean;

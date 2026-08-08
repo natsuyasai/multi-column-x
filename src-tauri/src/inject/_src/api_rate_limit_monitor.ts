@@ -104,29 +104,38 @@ interface McxXhr extends XMLHttpRequest {
     );
   }
 
-  function tauriInvoke(cmd: string, args: Record<string, unknown>): void {
-    const invoke =
-      window.__TAURI_INTERNALS__?.invoke ??
-      window.__TAURI__?.core?.invoke ??
-      window.__TAURI__?.invoke;
-    if (!invoke) return;
-    invoke(cmd, args).catch(() => {});
-  }
-
   function reportRateLimit(url: string, headersRaw: string): void {
     const bucketKey = extractBucketKey(url, location.href);
     if (!bucketKey) return;
     const parsed = parseRateLimitHeaders(headersRaw);
     if (!parsed) return;
-    const label = getWebviewLabel();
-    if (!label) return;
-    tauriInvoke("report_api_rate_limit", {
-      label,
-      bucketKey,
-      limit: parsed.limit,
-      remaining: parsed.remaining,
-      reset: parsed.reset,
-    });
+
+    const invoke =
+      window.__TAURI_INTERNALS__?.invoke ??
+      window.__TAURI__?.core?.invoke ??
+      window.__TAURI__?.invoke;
+    if (invoke) {
+      const label = getWebviewLabel();
+      if (!label) return;
+      invoke("report_api_rate_limit", {
+        label,
+        bucketKey,
+        limit: parsed.limit,
+        remaining: parsed.remaining,
+        reset: parsed.reset,
+      }).catch(() => {});
+      return;
+    }
+
+    // Android: ネイティブ WebView には Tauri IPC が無いため専用ブリッジを使う
+    window.__mcxApiRateLimitBridge?.report(
+      JSON.stringify({
+        bucketKey,
+        limit: parsed.limit,
+        remaining: parsed.remaining,
+        reset: parsed.reset,
+      }),
+    );
   }
 
   if (!window.__xhrRateLimitPatched) {

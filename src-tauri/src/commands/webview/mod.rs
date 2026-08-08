@@ -128,6 +128,37 @@ fn build_api_rate_limit_payload(
     })
 }
 
+/// label から account_id を解決した上で WEBVIEW_API_RATE_LIMIT を emit する共通ロジック。
+/// デスクトップの Tauri コマンド（report_api_rate_limit）と、Android JNI ブリッジ経由の
+/// report_api_rate_limit_from_android の両方から呼ばれる。
+fn emit_api_rate_limit_resolving_account(
+    app: &AppHandle,
+    label: &str,
+    bucket_key: &str,
+    limit: u32,
+    remaining: u32,
+    reset: u64,
+) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let account_id = {
+        let registry = state.registry.lock().expect("registry mutex poisoned");
+        let compose = state.compose.lock().expect("compose mutex poisoned");
+        resolve_account_id(&registry, compose.as_ref(), label)
+    };
+    app.emit(
+        events::WEBVIEW_API_RATE_LIMIT,
+        build_api_rate_limit_payload(
+            label,
+            bucket_key,
+            limit,
+            remaining,
+            reset,
+            account_id.as_deref(),
+        ),
+    )
+    .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub async fn report_api_rate_limit(
     app: AppHandle,
@@ -137,25 +168,50 @@ pub async fn report_api_rate_limit(
     remaining: u32,
     reset: u64,
 ) -> Result<(), String> {
-    let state = app.state::<AppState>();
-    let account_id = {
-        let registry = state.registry.lock().expect("registry mutex poisoned");
-        let compose = state.compose.lock().expect("compose mutex poisoned");
-        resolve_account_id(&registry, compose.as_ref(), &label)
-    };
+    emit_api_rate_limit_resolving_account(&app, &label, &bucket_key, limit, remaining, reset)
+}
 
-    app.emit(
-        events::WEBVIEW_API_RATE_LIMIT,
-        build_api_rate_limit_payload(
-            &label,
-            &bucket_key,
-            limit,
-            remaining,
-            reset,
-            account_id.as_deref(),
-        ),
+/// Android の column WebView（ネイティブ WebView・Tauri IPC非対応）から
+/// window.__mcxApiRateLimitBridge 経由で届いた JSON payload を表す構造体。
+///
+/// 呼び出し元（android_bridge.rs）は Android ターゲットでのみコンパイルされるため、
+/// デスクトップ向けビルドでは本番コードから到達不能になり dead_code になる
+/// （テストからは呼ばれるため参照自体は残す必要があり、cfg では消せない）。
+#[derive(Debug, serde::Deserialize)]
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+struct AndroidApiRateLimitPayload {
+    #[serde(rename = "bucketKey")]
+    bucket_key: String,
+    limit: u32,
+    remaining: u32,
+    reset: u64,
+}
+
+/// Android ブリッジから届く JSON payload をパースする（テスト用に純粋関数として切り出し）。
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+fn parse_android_api_rate_limit_payload(
+    payload_json: &str,
+) -> Result<AndroidApiRateLimitPayload, String> {
+    serde_json::from_str(payload_json).map_err(|e| e.to_string())
+}
+
+/// Android の column WebView（ネイティブ WebView・Tauri IPC非対応）から
+/// window.__mcxApiRateLimitBridge 経由で届いた JSON payload をパースして emit する。
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+pub fn report_api_rate_limit_from_android(
+    app: &AppHandle,
+    label: &str,
+    payload_json: &str,
+) -> Result<(), String> {
+    let payload = parse_android_api_rate_limit_payload(payload_json)?;
+    emit_api_rate_limit_resolving_account(
+        app,
+        label,
+        &payload.bucket_key,
+        payload.limit,
+        payload.remaining,
+        payload.reset,
     )
-    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -269,5 +325,29 @@ mod tests {
         };
         let result = resolve_account_id(&registry, Some(&compose), "compose-2");
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn android用ペイロードのjsonパースは正しい形式なら各フィールドを取り出せる() {
+        let json = r#"{"bucketKey":"user_tweets","limit":150,"remaining":42,"reset":1700000000}"#;
+        let payload = parse_android_api_rate_limit_payload(json).expect("パースに成功するはず");
+        assert_eq!(payload.bucket_key, "user_tweets");
+        assert_eq!(payload.limit, 150);
+        assert_eq!(payload.remaining, 42);
+        assert_eq!(payload.reset, 1_700_000_000);
+    }
+
+    #[test]
+    fn android用ペイロードのjsonパースは不正なjsonの場合エラーになる() {
+        let result = parse_android_api_rate_limit_payload("not a json");
+        assert!(result.is_err());
+        assert!(!result.unwrap_err().is_empty());
+    }
+
+    #[test]
+    fn android用ペイロードのjsonパースは必須フィールドが欠けている場合エラーになる() {
+        let json = r#"{"bucketKey":"user_tweets","limit":150}"#;
+        let result = parse_android_api_rate_limit_payload(json);
+        assert!(result.is_err());
     }
 }
