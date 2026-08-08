@@ -1,20 +1,22 @@
+import { matchesNgWord } from "./ng_word_matcher";
+
 (function () {
   const TWEET_SELECTOR = 'article[role="article"]';
   const TIMELINE_SELECTOR = 'main[role="main"]';
 
   // WebView 起動後に設定が変わった場合も反映されるよう毎回動的に参照する
+  // 大小文字の無視は matchesNgWord 側で行うため、ここでは lowerCase 化しない
+  // (正規表現パターンの大文字が失われてしまうため)
   function getWords(): string[] {
     const config = window.__multiColumnXConfig;
-    return [...(config?.ngWords ?? []), ...(config?.globalNgWords ?? [])].map(
-      (w) => w.toLowerCase(),
-    );
+    return [...(config?.ngWords ?? []), ...(config?.globalNgWords ?? [])];
   }
 
   function containsNgWord(el: HTMLElement): boolean {
     const words = getWords();
     if (words.length === 0) return false;
-    const text = el.textContent?.toLowerCase() ?? "";
-    return words.some((w) => text.includes(w));
+    const text = el.textContent ?? "";
+    return words.some((w) => matchesNgWord(text, w));
   }
 
   function hideTweet(el: HTMLElement): void {

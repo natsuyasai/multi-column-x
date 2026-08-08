@@ -93,4 +93,31 @@ describe("inject/ng_word", () => {
 
     expect(document.body.contains(cell)).toBe(false);
   });
+
+  it("正規表現形式のNGワードにマッチするツイートが非表示になる", () => {
+    setConfig(["/spam|広告/"]);
+    const hit = addTweet("this is spam content");
+
+    recheck();
+
+    expect(hit.style.display).toBe("none");
+  });
+
+  it("正規表現形式のNGワードにマッチしないツイートは非表示にならない", () => {
+    setConfig(["/spam|広告/"]);
+    const miss = addTweet("normal tweet");
+
+    recheck();
+
+    expect(miss.style.display).not.toBe("none");
+  });
+
+  it("グローバルNGワードでも正規表現形式が動作する", () => {
+    setConfig([], ["/広告|宣伝/"]);
+    const hit = addTweet("これは宣伝ツイートです");
+
+    recheck();
+
+    expect(hit.style.display).toBe("none");
+  });
 });
