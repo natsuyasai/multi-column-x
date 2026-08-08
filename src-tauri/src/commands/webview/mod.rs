@@ -94,8 +94,8 @@ pub async fn report_new_posts_count(
 
 /// labelからaccount_idを解決する。まずWebviewRegistry（カラム・ポップアップ系）を見て、
 /// 見つからなければ常駐コンポーズ（ComposeSession）を見る。
-/// registryとcomposeのMutexは同時にロックしない（呼び出し元で順次ロック/解放する）ため、
-/// この関数自体は参照を受け取るだけでロックには関与しない。
+/// 呼び出し元でregistry→composeの順にMutexをロックしてから渡す設計。
+/// この関数自体は参照を受け取るだけでロックの取得・解放には関与しない。
 fn resolve_account_id(
     registry: &WebviewRegistry,
     compose: Option<&ComposeSession>,
@@ -140,15 +140,9 @@ pub async fn report_api_rate_limit(
     let state = app.state::<AppState>();
     let account_id = {
         let registry = state.registry.lock().expect("registry mutex poisoned");
-        resolve_account_id(&registry, None, &label)
-    };
-    let account_id = account_id.or_else(|| {
         let compose = state.compose.lock().expect("compose mutex poisoned");
-        compose
-            .as_ref()
-            .filter(|session| session.label == label)
-            .map(|session| session.account_id.clone())
-    });
+        resolve_account_id(&registry, compose.as_ref(), &label)
+    };
 
     app.emit(
         events::WEBVIEW_API_RATE_LIMIT,
