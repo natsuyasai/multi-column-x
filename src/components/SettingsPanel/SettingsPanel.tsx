@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { validateNgWordLines } from "../../lib/ngWordPattern";
 import type { Column, ColumnSettings } from "../../types";
+import { HelpPopover } from "../HelpPopover/HelpPopover";
 import styles from "./SettingsPanel.module.scss";
 
 interface SettingsPanelProps {
@@ -29,6 +31,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [ngWordsText, setNgWordsText] = useState<string>(
     (column.settings.ngWords ?? []).join("\n"),
   );
+  const [ngWordsError, setNgWordsError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +39,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       .split("\n")
       .map((w) => w.trim())
       .filter((w) => w.length > 0);
+    const error = validateNgWordLines(ngWords);
+    if (error) {
+      setNgWordsError(error);
+      return;
+    }
+    setNgWordsError(null);
     onApply(column.id, { ...settings, ngWords }, width);
   };
 
@@ -279,14 +288,27 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
           {!isExternal && (
             <section className={styles.section}>
-              <h3 className={styles.sectionTitle}>NGワード</h3>
+              <h3 className={styles.sectionTitle}>
+                NGワード
+                <HelpPopover label="NGワードの書き方">
+                  <p>1行に1ワードを入力してください。</p>
+                  <p>
+                    <code>/pattern/flags</code>{" "}
+                    の形式で入力すると正規表現として扱われます（大文字・小文字は区別しません）。
+                  </p>
+                  <p>例: {"/spam|広告/"}</p>
+                </HelpPopover>
+              </h3>
               <textarea
                 className={styles.cssTextarea}
                 value={ngWordsText}
                 onChange={(e) => setNgWordsText(e.target.value)}
-                placeholder="1行に1ワードで入力"
+                placeholder="1行に1ワードで入力（/正規表現/flags 形式も指定可）"
                 spellCheck={false}
               />
+              {ngWordsError && (
+                <p className={styles.errorText}>{ngWordsError}</p>
+              )}
             </section>
           )}
 

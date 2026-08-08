@@ -80,7 +80,9 @@ export const Default: Story = {
       canvas.getByRole("checkbox", { name: "新着をデスクトップ通知する" }),
     );
     // NGワードを入力して適用すると配列として onApply に渡される
-    const textarea = canvas.getByPlaceholderText("1行に1ワードで入力");
+    const textarea = canvas.getByPlaceholderText(
+      "1行に1ワードで入力（/正規表現/flags 形式も指定可）",
+    );
     await userEvent.clear(textarea);
     await userEvent.type(textarea, "spam{Enter}bot");
     await userEvent.click(canvas.getByRole("button", { name: "適用" }));
