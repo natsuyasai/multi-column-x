@@ -533,9 +533,6 @@ describe("useApiRateLimitReports", () => {
     capturedCallbacks.clear();
     mockUnlisten.mockReset();
     vi.useFakeTimers();
-    useAppStore.setState({
-      columns: [makeColumn({ id: "col-1", accountId: "acc-1" })],
-    });
   });
 
   afterEach(() => {
@@ -548,18 +545,26 @@ describe("useApiRateLimitReports", () => {
     limit: number,
     remaining: number,
     reset: number,
+    accountId: string | null,
   ) {
     capturedCallbacks.get(IPC_EVENTS.WEBVIEW_API_RATE_LIMIT)?.({
-      payload: { label, bucketKey, limit, remaining, reset },
+      payload: { label, bucketKey, limit, remaining, reset, accountId },
     });
   }
 
-  it("イベント受信時に対応するカラムのaccountIdでsetApiRateLimitが呼ばれる", async () => {
+  it("payloadのaccountIdでsetApiRateLimitが呼ばれる", async () => {
     const setApiRateLimit = vi.fn();
     vi.setSystemTime(1700000000000);
     renderHook(() => useApiRateLimitReports(setApiRateLimit));
     await act(async () => {
-      emitRateLimit("column-col-1", "home_timeline", 500, 100, 1700000000);
+      emitRateLimit(
+        "column-col-1",
+        "home_timeline",
+        500,
+        100,
+        1700000000,
+        "acc-1",
+      );
     });
     expect(setApiRateLimit).toHaveBeenCalledWith("acc-1", {
       bucketKey: "home_timeline",
@@ -570,7 +575,30 @@ describe("useApiRateLimitReports", () => {
     });
   });
 
-  it("存在しないcolumnIdの場合は何もしない", async () => {
+  it("常駐コンポーズ由来のlabelでもpayloadのaccountIdでsetApiRateLimitが呼ばれる", async () => {
+    const setApiRateLimit = vi.fn();
+    vi.setSystemTime(1700000000000);
+    renderHook(() => useApiRateLimitReports(setApiRateLimit));
+    await act(async () => {
+      emitRateLimit(
+        "compose-xxxx",
+        "create_tweet",
+        150,
+        50,
+        1700000000,
+        "acc-2",
+      );
+    });
+    expect(setApiRateLimit).toHaveBeenCalledWith("acc-2", {
+      bucketKey: "create_tweet",
+      limit: 150,
+      remaining: 50,
+      reset: 1700000000,
+      updatedAt: 1700000000000,
+    });
+  });
+
+  it("payloadのaccountIdがnullの場合はsetApiRateLimitが呼ばれない", async () => {
     const setApiRateLimit = vi.fn();
     renderHook(() => useApiRateLimitReports(setApiRateLimit));
     await act(async () => {
@@ -580,6 +608,7 @@ describe("useApiRateLimitReports", () => {
         500,
         100,
         1700000000,
+        null,
       );
     });
     expect(setApiRateLimit).not.toHaveBeenCalled();

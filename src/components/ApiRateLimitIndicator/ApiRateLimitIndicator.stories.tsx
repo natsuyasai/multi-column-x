@@ -41,7 +41,7 @@ const accounts: Account[] = [
 const normalRateLimits: Record<string, Record<string, ApiRateLimitBucket>> = {
   "acc-1": {
     HomeTimeline: bucket("HomeTimeline", 900, 900),
-    UserTweets: bucket("UserTweets", 480, 500),
+    SearchTimeline: bucket("SearchTimeline", 480, 500),
   },
   "acc-2": {
     HomeTimeline: bucket("HomeTimeline", 850, 900),
@@ -51,7 +51,7 @@ const normalRateLimits: Record<string, Record<string, ApiRateLimitBucket>> = {
 const warningRateLimits: Record<string, Record<string, ApiRateLimitBucket>> = {
   "acc-1": {
     HomeTimeline: bucket("HomeTimeline", 900, 900),
-    UserTweets: bucket("UserTweets", 15, 100), // 15% -> warning
+    SearchTimeline: bucket("SearchTimeline", 15, 100), // 15% -> warning
   },
   "acc-2": {
     HomeTimeline: bucket("HomeTimeline", 850, 900),
@@ -61,10 +61,10 @@ const warningRateLimits: Record<string, Record<string, ApiRateLimitBucket>> = {
 const criticalRateLimits: Record<string, Record<string, ApiRateLimitBucket>> = {
   "acc-1": {
     HomeTimeline: bucket("HomeTimeline", 900, 900),
-    CreateTweet: bucket("CreateTweet", 2, 100), // 2% -> critical
+    NotificationsTimeline: bucket("NotificationsTimeline", 2, 100), // 2% -> critical
   },
   "acc-2": {
-    UserTweets: bucket("UserTweets", 15, 100), // 15% -> warning
+    SearchTimeline: bucket("SearchTimeline", 15, 100), // 15% -> warning
   },
 };
 
@@ -113,9 +113,7 @@ export const Default: Story = {
     await userEvent.click(trigger);
 
     await expect(canvas.getByText("アカウント1")).toBeInTheDocument();
-    await expect(
-      canvas.getByText("ユーザーのツイート取得"),
-    ).toBeInTheDocument();
+    await expect(canvas.getByText("480/500")).toBeInTheDocument();
     await expect(canvas.getByText("900/900")).toBeInTheDocument();
   },
 };
@@ -155,7 +153,7 @@ export const CriticalState: Story = {
 };
 
 export const Empty: Story = {
-  name: "データが空",
+  name: "未計測プレースホルダー（データが空）",
   args: {
     apiRateLimits: emptyRateLimits,
   },
@@ -165,8 +163,8 @@ export const Empty: Story = {
 
     await userEvent.click(trigger);
 
-    const emptyLabels = canvas.getAllByText("データなし");
-    await expect(emptyLabels.length).toBe(accounts.length);
+    const unobservedLabels = canvas.getAllByText("-/-");
+    await expect(unobservedLabels.length).toBe(accounts.length * 5);
   },
 };
 

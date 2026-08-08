@@ -95,12 +95,27 @@
 
 .bucketRow {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
   padding: 4px 6px;
   border-radius: 4px;
   font-size: 11px;
   color: var(--mcx-text-tertiary);
+}
+
+.bucketMain {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bucketDescription {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--mcx-text-muted);
+  white-space: normal;
 }
 
 .bucketLabel {

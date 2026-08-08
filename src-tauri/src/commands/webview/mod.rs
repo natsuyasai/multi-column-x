@@ -10,6 +10,7 @@ pub use compose::*;
 pub use popup::*;
 
 use crate::ipc_constants::events;
+use crate::state::{AppState, ComposeSession, WebviewRegistry};
 use tauri::{AppHandle, Emitter, Manager};
 
 // Android はポップアップ/カラムとも URL 文字列を JNI 経由でそのまま渡すため、
@@ -91,6 +92,23 @@ pub async fn report_new_posts_count(
     .map_err(|e| e.to_string())
 }
 
+/// labelからaccount_idを解決する。まずWebviewRegistry（カラム・ポップアップ系）を見て、
+/// 見つからなければ常駐コンポーズ（ComposeSession）を見る。
+/// 呼び出し元でregistry→composeの順にMutexをロックしてから渡す設計。
+/// この関数自体は参照を受け取るだけでロックの取得・解放には関与しない。
+fn resolve_account_id(
+    registry: &WebviewRegistry,
+    compose: Option<&ComposeSession>,
+    label: &str,
+) -> Option<String> {
+    if let Some(account_id) = registry.get_account_id(label) {
+        return Some(account_id.to_string());
+    }
+    compose
+        .filter(|session| session.label == label)
+        .map(|session| session.account_id.clone())
+}
+
 /// report_api_rate_limit が emit するペイロードを組み立てる（テスト用に純粋関数として切り出し）。
 fn build_api_rate_limit_payload(
     label: &str,
@@ -98,13 +116,15 @@ fn build_api_rate_limit_payload(
     limit: u32,
     remaining: u32,
     reset: u64,
+    account_id: Option<&str>,
 ) -> serde_json::Value {
     serde_json::json!({
         "label": label,
         "bucketKey": bucket_key,
         "limit": limit,
         "remaining": remaining,
-        "reset": reset
+        "reset": reset,
+        "accountId": account_id
     })
 }
 
@@ -117,9 +137,23 @@ pub async fn report_api_rate_limit(
     remaining: u32,
     reset: u64,
 ) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let account_id = {
+        let registry = state.registry.lock().expect("registry mutex poisoned");
+        let compose = state.compose.lock().expect("compose mutex poisoned");
+        resolve_account_id(&registry, compose.as_ref(), &label)
+    };
+
     app.emit(
         events::WEBVIEW_API_RATE_LIMIT,
-        build_api_rate_limit_payload(&label, &bucket_key, limit, remaining, reset),
+        build_api_rate_limit_payload(
+            &label,
+            &bucket_key,
+            limit,
+            remaining,
+            reset,
+            account_id.as_deref(),
+        ),
     )
     .map_err(|e| e.to_string())
 }
@@ -138,6 +172,7 @@ pub async fn open_in_browser(url: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn httpsのurlをパースできる() {
@@ -155,12 +190,84 @@ mod tests {
 
     #[test]
     fn api_rate_limitのペイロードが期待した形になる() {
-        let payload =
-            build_api_rate_limit_payload("home-timeline", "user_tweets", 150, 42, 1_700_000_000);
+        let payload = build_api_rate_limit_payload(
+            "home-timeline",
+            "user_tweets",
+            150,
+            42,
+            1_700_000_000,
+            Some("account-1"),
+        );
         assert_eq!(payload["label"], "home-timeline");
         assert_eq!(payload["bucketKey"], "user_tweets");
         assert_eq!(payload["limit"], 150);
         assert_eq!(payload["remaining"], 42);
         assert_eq!(payload["reset"], 1_700_000_000);
+        assert_eq!(payload["accountId"], "account-1");
+    }
+
+    #[test]
+    fn api_rate_limitのペイロードはaccount_idがnoneの場合accountidがnullになる() {
+        let payload = build_api_rate_limit_payload(
+            "home-timeline",
+            "user_tweets",
+            150,
+            42,
+            1_700_000_000,
+            None,
+        );
+        assert!(payload["accountId"].is_null());
+    }
+
+    fn new_registry_for_resolve_test() -> WebviewRegistry {
+        WebviewRegistry {
+            entries: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn resolve_account_idはregistryに登録済みのlabelに対してaccount_idを返す() {
+        let mut registry = new_registry_for_resolve_test();
+        registry.register(
+            "column-1".to_string(),
+            "col-1".to_string(),
+            "account-1".to_string(),
+            "/data/dir".to_string(),
+        );
+        let result = resolve_account_id(&registry, None, "column-1");
+        assert_eq!(result, Some("account-1".to_string()));
+    }
+
+    #[test]
+    fn resolve_account_idはregistryに無くcompose_sessionのlabelと一致する場合account_idを返す() {
+        let registry = new_registry_for_resolve_test();
+        let compose = ComposeSession {
+            label: "compose-1".to_string(),
+            account_id: "account-2".to_string(),
+        };
+        let result = resolve_account_id(&registry, Some(&compose), "compose-1");
+        assert_eq!(result, Some("account-2".to_string()));
+    }
+
+    #[test]
+    fn resolve_account_idはregistryにもcomposeにも無いlabelはnoneを返す() {
+        let registry = new_registry_for_resolve_test();
+        let compose = ComposeSession {
+            label: "compose-1".to_string(),
+            account_id: "account-2".to_string(),
+        };
+        let result = resolve_account_id(&registry, Some(&compose), "unknown-label");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn resolve_account_idはcompose_sessionはあるがlabelが不一致の場合noneを返す() {
+        let registry = new_registry_for_resolve_test();
+        let compose = ComposeSession {
+            label: "compose-1".to_string(),
+            account_id: "account-2".to_string(),
+        };
+        let result = resolve_account_id(&registry, Some(&compose), "compose-2");
+        assert_eq!(result, None);
     }
 }
