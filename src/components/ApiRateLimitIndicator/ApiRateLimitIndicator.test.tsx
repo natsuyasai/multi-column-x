@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import * as apiRateLimitLabels from "@/constants/apiRateLimitLabels";
 import type { Account, ApiRateLimitBucket } from "@/types";
 import { ApiRateLimitIndicator } from "./ApiRateLimitIndicator";
+import styles from "./ApiRateLimitIndicator.module.scss";
 
 const NOW_SEC = Math.floor(Date.now() / 1000);
 
@@ -434,5 +435,71 @@ describe("ApiRateLimitIndicator", () => {
     for (const row of unobservedRows) {
       expect(row?.className).not.toMatch(/warning|critical/i);
     }
+  });
+
+  describe("モバイル表示（isMobile）", () => {
+    it("isMobile指定時、ポップオーバーを開くとオーバーレイ要素が表示される", () => {
+      const { container } = render(
+        <ApiRateLimitIndicator
+          accounts={accounts}
+          apiRateLimits={normalRateLimits}
+          isMobile
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "APIレート制限" }));
+
+      expect(container.querySelector(`.${styles.overlay}`)).toBeInTheDocument();
+    });
+
+    it("isMobile指定時、オーバーレイをクリックすると閉じ、onOpenChangeがfalseで呼ばれる", () => {
+      const onOpenChange = vi.fn();
+      const { container } = render(
+        <ApiRateLimitIndicator
+          accounts={accounts}
+          apiRateLimits={normalRateLimits}
+          isMobile
+          onOpenChange={onOpenChange}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "APIレート制限" }));
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+      const overlay = container.querySelector(`.${styles.overlay}`);
+      expect(overlay).not.toBeNull();
+      fireEvent.click(overlay as Element);
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(onOpenChange).toHaveBeenLastCalledWith(false);
+    });
+
+    it("isMobile未指定（デフォルト）時はオーバーレイ要素が存在しない", () => {
+      const { container } = render(
+        <ApiRateLimitIndicator
+          accounts={accounts}
+          apiRateLimits={normalRateLimits}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "APIレート制限" }));
+
+      expect(
+        container.querySelector(`.${styles.overlay}`),
+      ).not.toBeInTheDocument();
+    });
+
+    it("isMobile指定時、ポップオーバー内部をクリックしても閉じない", () => {
+      render(
+        <ApiRateLimitIndicator
+          accounts={accounts}
+          apiRateLimits={normalRateLimits}
+          isMobile
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "APIレート制限" }));
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByText("アカウントA"));
+
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    });
   });
 });

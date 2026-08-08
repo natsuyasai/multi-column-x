@@ -15,6 +15,7 @@ interface ApiRateLimitIndicatorProps {
   accounts: Account[];
   apiRateLimits: Record<string, Record<string, ApiRateLimitBucket>>;
   onOpenChange?: (isOpen: boolean) => void;
+  isMobile?: boolean;
 }
 
 type BucketListItem =
@@ -49,6 +50,7 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
   accounts,
   apiRateLimits,
   onOpenChange,
+  isMobile = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -81,6 +83,95 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
     overallSeverity === "warning" && styles.triggerWarning,
   );
 
+  const popoverContent = (
+    <>
+      {accounts.length === 0 && <p className={styles.empty}>データなし</p>}
+      {accounts.map((account) => {
+        const observedBuckets = apiRateLimits[account.id] ?? {};
+        const bucketList: BucketListItem[] = getColumnRelatedBucketKeys().map(
+          (bucketKey) => {
+            const observed = observedBuckets[bucketKey];
+            return observed
+              ? { bucketKey, observed: true as const, bucket: observed }
+              : { bucketKey, observed: false as const };
+          },
+        );
+
+        return (
+          <div key={account.id} className={styles.accountSection}>
+            <div className={styles.accountHeader}>
+              <span
+                className={styles.dot}
+                style={{ backgroundColor: account.color }}
+              />
+              <span className={styles.accountLabel}>{account.label}</span>
+            </div>
+            <ul className={styles.bucketList}>
+              {bucketList.map((item) => {
+                if (!item.observed) {
+                  const description = getApiRateLimitDescription(
+                    item.bucketKey,
+                  );
+                  const unobservedNote = "（まだ使用されていないため未計測）";
+
+                  return (
+                    <li key={item.bucketKey} className={styles.bucketRow}>
+                      <div className={styles.bucketMain}>
+                        <span className={styles.bucketLabel}>
+                          {getApiRateLimitLabel(item.bucketKey)}
+                        </span>
+                        <span className={styles.bucketRemaining}>-/-</span>
+                        <span className={styles.bucketReset}>-</span>
+                      </div>
+                      <p className={styles.bucketDescription}>
+                        {description
+                          ? `${description}${unobservedNote}`
+                          : unobservedNote}
+                      </p>
+                    </li>
+                  );
+                }
+
+                const { bucket } = item;
+                const severity = getRateLimitSeverity(
+                  bucket.remaining,
+                  bucket.limit,
+                );
+                const rowClassName = joinClassNames(
+                  styles.bucketRow,
+                  severity === "warning" && styles.warning,
+                  severity === "critical" && styles.critical,
+                );
+                const description = getApiRateLimitDescription(
+                  bucket.bucketKey,
+                );
+
+                return (
+                  <li key={bucket.bucketKey} className={rowClassName}>
+                    <div className={styles.bucketMain}>
+                      <span className={styles.bucketLabel}>
+                        {getApiRateLimitLabel(bucket.bucketKey)}
+                      </span>
+                      <span className={styles.bucketRemaining}>
+                        {bucket.remaining}/{bucket.limit}
+                      </span>
+                      <span className={styles.bucketReset}>
+                        {formatResetLabel(bucket.reset)}
+                      </span>
+                    </div>
+                    {description && (
+                      <p className={styles.bucketDescription}>{description}</p>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      })}
+    </>
+  );
+
   return (
     <div className={styles.container} ref={containerRef}>
       <button
@@ -99,98 +190,30 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
       >
         API
       </button>
-      {isOpen && (
+      {isOpen && isMobile && (
+        <div
+          className={styles.overlay}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) close();
+          }}
+          role="presentation"
+        >
+          <div
+            className={joinClassNames(styles.popover, styles.popoverMobile)}
+            role="dialog"
+            aria-label="APIレート制限一覧"
+          >
+            {popoverContent}
+          </div>
+        </div>
+      )}
+      {isOpen && !isMobile && (
         <div
           className={styles.popover}
           role="dialog"
           aria-label="APIレート制限一覧"
         >
-          {accounts.length === 0 && <p className={styles.empty}>データなし</p>}
-          {accounts.map((account) => {
-            const observedBuckets = apiRateLimits[account.id] ?? {};
-            const bucketList: BucketListItem[] =
-              getColumnRelatedBucketKeys().map((bucketKey) => {
-                const observed = observedBuckets[bucketKey];
-                return observed
-                  ? { bucketKey, observed: true as const, bucket: observed }
-                  : { bucketKey, observed: false as const };
-              });
-
-            return (
-              <div key={account.id} className={styles.accountSection}>
-                <div className={styles.accountHeader}>
-                  <span
-                    className={styles.dot}
-                    style={{ backgroundColor: account.color }}
-                  />
-                  <span className={styles.accountLabel}>{account.label}</span>
-                </div>
-                <ul className={styles.bucketList}>
-                  {bucketList.map((item) => {
-                    if (!item.observed) {
-                      const description = getApiRateLimitDescription(
-                        item.bucketKey,
-                      );
-                      const unobservedNote =
-                        "（まだ使用されていないため未計測）";
-
-                      return (
-                        <li key={item.bucketKey} className={styles.bucketRow}>
-                          <div className={styles.bucketMain}>
-                            <span className={styles.bucketLabel}>
-                              {getApiRateLimitLabel(item.bucketKey)}
-                            </span>
-                            <span className={styles.bucketRemaining}>-/-</span>
-                            <span className={styles.bucketReset}>-</span>
-                          </div>
-                          <p className={styles.bucketDescription}>
-                            {description
-                              ? `${description}${unobservedNote}`
-                              : unobservedNote}
-                          </p>
-                        </li>
-                      );
-                    }
-
-                    const { bucket } = item;
-                    const severity = getRateLimitSeverity(
-                      bucket.remaining,
-                      bucket.limit,
-                    );
-                    const rowClassName = joinClassNames(
-                      styles.bucketRow,
-                      severity === "warning" && styles.warning,
-                      severity === "critical" && styles.critical,
-                    );
-                    const description = getApiRateLimitDescription(
-                      bucket.bucketKey,
-                    );
-
-                    return (
-                      <li key={bucket.bucketKey} className={rowClassName}>
-                        <div className={styles.bucketMain}>
-                          <span className={styles.bucketLabel}>
-                            {getApiRateLimitLabel(bucket.bucketKey)}
-                          </span>
-                          <span className={styles.bucketRemaining}>
-                            {bucket.remaining}/{bucket.limit}
-                          </span>
-                          <span className={styles.bucketReset}>
-                            {formatResetLabel(bucket.reset)}
-                          </span>
-                        </div>
-                        {description && (
-                          <p className={styles.bucketDescription}>
-                            {description}
-                          </p>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            );
-          })}
+          {popoverContent}
         </div>
       )}
     </div>

@@ -284,6 +284,7 @@ export const MobileTabBar: React.FC<Props> = ({
               accounts={accounts}
               apiRateLimits={apiRateLimits}
               onOpenChange={onApiRateLimitPopoverOpenChange}
+              isMobile
             />
           )}
         </div>

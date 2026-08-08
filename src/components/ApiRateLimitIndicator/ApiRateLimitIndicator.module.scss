@@ -49,6 +49,22 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--mcx-overlay);
+  z-index: 1000;
+}
+
+.popoverMobile {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: calc(100vw - 32px);
+  max-width: 440px;
+}
+
 .accountSection {
   display: flex;
   flex-direction: column;

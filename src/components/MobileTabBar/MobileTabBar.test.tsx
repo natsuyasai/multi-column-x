@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import type { Column, Account } from "../../types";
+import apiRateLimitIndicatorStyles from "../ApiRateLimitIndicator/ApiRateLimitIndicator.module.scss";
 import { MobileTabBar } from "./MobileTabBar";
 
 const baseSettings = {
@@ -259,6 +260,28 @@ describe("MobileTabBar", () => {
     await userEvent.click(screen.getByTitle("メニュー表示の切り替え"));
     await userEvent.click(screen.getByLabelText("APIレート制限"));
     expect(onApiRateLimitPopoverOpenChange).toHaveBeenCalledWith(true);
+  });
+
+  it("APIレート制限インジケータがモバイル表示（isMobile）で開かれる", async () => {
+    render(
+      <MobileTabBar
+        {...defaultProps}
+        columns={[]}
+        apiRateLimitMonitorEnabled={true}
+      />,
+    );
+    await userEvent.click(screen.getByTitle("メニュー表示の切り替え"));
+    await userEvent.click(screen.getByLabelText("APIレート制限"));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    // isMobileがtrueとしてApiRateLimitIndicatorへ伝搬していれば
+    // オーバーレイ要素が描画され、クリックで閉じるはず
+    const overlay = document.querySelector(
+      `.${apiRateLimitIndicatorStyles.overlay}`,
+    );
+    expect(overlay).not.toBeNull();
+    await userEvent.click(overlay as Element);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   describe("アクションボタンの SVG アイコン", () => {
