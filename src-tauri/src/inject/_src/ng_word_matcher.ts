@@ -22,3 +22,27 @@ export function matchesNgWord(text: string, rawWord: string): boolean {
   }
   return text.toLowerCase().includes(rawWord.toLowerCase());
 }
+
+/**
+ * ツイート本文を非表示にすべきか判定する。
+ * NGワードのいずれかに一致すれば非表示。
+ * ホワイトリストが有効（whitelistEnabled かつ whitelistWordsが空でない）な場合は、
+ * いずれにも一致しなければ非表示にする。
+ */
+export function shouldHideTweetText(
+  text: string,
+  ngWords: string[],
+  whitelistEnabled: boolean,
+  whitelistWords: string[],
+): boolean {
+  if (ngWords.some((word) => matchesNgWord(text, word))) {
+    return true;
+  }
+
+  const whitelistActive = whitelistEnabled && whitelistWords.length > 0;
+  if (whitelistActive) {
+    return !whitelistWords.some((word) => matchesNgWord(text, word));
+  }
+
+  return false;
+}
