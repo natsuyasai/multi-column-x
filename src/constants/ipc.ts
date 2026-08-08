@@ -132,6 +132,12 @@ export const WEBVIEW_SCRIPTS = {
     const global = JSON.stringify(globalNgWords);
     return `if(window.__multiColumnXConfig){window.__multiColumnXConfig.ngWords=${ng};window.__multiColumnXConfig.globalNgWords=${global};}window.__multiColumnX&&window.__multiColumnX.recheckNgWords&&window.__multiColumnX.recheckNgWords();`;
   },
+
+  /** ホワイトリストを動的に更新し、表示中のツイートにも即時適用する */
+  applyWhitelist: (whitelistEnabled: boolean, whitelistWords: string[]) => {
+    const words = JSON.stringify(whitelistWords);
+    return `if(window.__multiColumnXConfig){window.__multiColumnXConfig.whitelistEnabled=${whitelistEnabled};window.__multiColumnXConfig.whitelistWords=${words};}window.__multiColumnX&&window.__multiColumnX.recheckNgWords&&window.__multiColumnX.recheckNgWords();`;
+  },
 } as const;
 
 /** WebView を画面外へ退避させる座標 */

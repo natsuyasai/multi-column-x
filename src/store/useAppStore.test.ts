@@ -44,6 +44,8 @@ const mockColumn: Column = {
     blurImageEnabled: false,
     blurImageAmount: "10px",
     ngWords: [],
+    whitelistEnabled: false,
+    whitelistWords: [],
   },
 };
 

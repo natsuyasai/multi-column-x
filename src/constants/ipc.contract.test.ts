@@ -43,6 +43,20 @@ describe("TS/Rust IPC定数の契約", () => {
     );
   });
 
+  it("WEBVIEW_SCRIPTS.applyWhitelistはホワイトリスト有効かつ単語ありの場合に設定値を反映する", () => {
+    const script = WEBVIEW_SCRIPTS.applyWhitelist(true, ["keep"]);
+    expect(script).toContain("whitelistEnabled=true");
+    expect(script).toContain(`whitelistWords=${JSON.stringify(["keep"])}`);
+    expect(script).toContain("recheckNgWords");
+  });
+
+  it("WEBVIEW_SCRIPTS.applyWhitelistはホワイトリスト無効かつ単語なしの場合に設定値を反映する", () => {
+    const script = WEBVIEW_SCRIPTS.applyWhitelist(false, []);
+    expect(script).toContain("whitelistEnabled=false");
+    expect(script).toContain(`whitelistWords=${JSON.stringify([])}`);
+    expect(script).toContain("recheckNgWords");
+  });
+
   it("inject側INJECT_COMMANDSはIPC_COMMANDS（fixture）の部分集合である", () => {
     for (const cmd of Object.values(INJECT_COMMANDS)) {
       expect(fixture.commands).toContain(cmd);

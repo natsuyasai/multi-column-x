@@ -82,6 +82,8 @@ describe("useColumns mobile", () => {
             blurImageEnabled: false,
             blurImageAmount: "10px",
             ngWords: [],
+            whitelistEnabled: false,
+            whitelistWords: [],
           },
         },
         {
@@ -109,6 +111,8 @@ describe("useColumns mobile", () => {
             blurImageEnabled: false,
             blurImageAmount: "10px",
             ngWords: [],
+            whitelistEnabled: false,
+            whitelistWords: [],
           },
         },
         {
@@ -136,6 +140,8 @@ describe("useColumns mobile", () => {
             blurImageEnabled: false,
             blurImageAmount: "10px",
             ngWords: [],
+            whitelistEnabled: false,
+            whitelistWords: [],
           },
         },
       ],
