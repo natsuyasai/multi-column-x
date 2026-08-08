@@ -114,6 +114,8 @@ fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: boo
         visible_links: &column.settings.visible_links,
         ng_words: &column.settings.ng_words,
         global_ng_words: &global_ng_words,
+        whitelist_enabled: column.settings.whitelist_enabled,
+        whitelist_words: &column.settings.whitelist_words,
         // 投稿カラム（/home 表示）ではインライン投稿フォーム以外を隠す。
         compose_only_enabled: column.page_type == "compose",
         minimal_injection: column.page_type == "external",
