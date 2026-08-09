@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo } from "react";
 import {
   buildGroups,
   moveGroup,
+  normalizeOrder,
   type ColumnGroup,
 } from "../../lib/columnOrder";
 import { getPageTypeLabel, type Account, type Column } from "../../types";
@@ -35,8 +36,13 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
   isMobile = false,
 }) => {
   const [draft, setDraft] = useState<Column[]>(() =>
-    columns.map((c) => ({ ...c })),
+    normalizeOrder(columns.map((c) => ({ ...c }))),
   );
+
+  // draft 変更は必ずここを通す（order の再正規化漏れを防ぐ）
+  const updateDraft = useCallback((updater: (prev: Column[]) => Column[]) => {
+    setDraft((prev) => normalizeOrder(updater(prev)));
+  }, []);
 
   const groups = useMemo(() => buildGroups(draft), [draft]);
 
@@ -80,6 +86,8 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
     : null;
 
   const handleCellClick = useCallback((row: number, col: number) => {
+    // ここは読み取り専用（prevをそのまま返す）なので updateDraft を通さない。
+    // 通すと毎回新しい配列が生成され無駄な再レンダリングになる
     setDraft((prev) => {
       const colAtCell =
         prev.find(
@@ -103,7 +111,7 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
   const handleAssign = useCallback(
     (columnId: string) => {
       if (!pendingCell) return;
-      setDraft((prev) =>
+      updateDraft((prev) =>
         prev.map((c) =>
           c.id === columnId
             ? { ...c, gridRow: pendingCell.row, gridCol: pendingCell.col }
@@ -112,17 +120,20 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
       );
       setPendingCell(null);
     },
-    [pendingCell],
+    [pendingCell, updateDraft],
   );
 
-  const handleRemove = useCallback((columnId: string) => {
-    setDraft((prev) =>
-      prev.map((c) =>
-        c.id === columnId ? { ...c, gridRow: 0, gridCol: 0 } : c,
-      ),
-    );
-    setSelectedCellKey(null);
-  }, []);
+  const handleRemove = useCallback(
+    (columnId: string) => {
+      updateDraft((prev) =>
+        prev.map((c) =>
+          c.id === columnId ? { ...c, gridRow: 0, gridCol: 0 } : c,
+        ),
+      );
+      setSelectedCellKey(null);
+    },
+    [updateDraft],
+  );
 
   const handleHeightChange = useCallback(
     (
@@ -131,7 +142,7 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
       value?: number,
       unit?: "px" | "%",
     ) => {
-      setDraft((prev) =>
+      updateDraft((prev) =>
         prev.map((c) =>
           c.id === columnId
             ? { ...c, heightMode: mode, heightValue: value, heightUnit: unit }
@@ -139,7 +150,7 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
         ),
       );
     },
-    [],
+    [updateDraft],
   );
 
   const getLabel = (col: Column) => getColumnLabel(col, accounts);
@@ -160,7 +171,7 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
               onChange={(e) => {
                 const newCols = Math.max(1, Number(e.target.value));
                 setCols(newCols);
-                setDraft((prev) =>
+                updateDraft((prev) =>
                   prev.map((c) =>
                     c.gridCol > newCols ? { ...c, gridRow: 0, gridCol: 0 } : c,
                   ),
