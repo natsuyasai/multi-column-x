@@ -1,4 +1,9 @@
 import React, { useState, useCallback, useMemo } from "react";
+import {
+  buildGroups,
+  moveGroup,
+  type ColumnGroup,
+} from "../../lib/columnOrder";
 import { getPageTypeLabel, type Account, type Column } from "../../types";
 import styles from "./ColumnLayoutTab.module.scss";
 
@@ -15,51 +20,11 @@ interface CellKey {
   col: number;
 }
 
-interface ColumnGroup {
-  gridCol: number;
-  columns: Column[];
-}
-
 function getColumnLabel(col: Column, accounts: Account[]): string {
   const account = accounts.find((a) => a.id === col.accountId);
   return (
     col.label ?? `${account?.label ?? col.accountId} - ${getPageTypeLabel(col)}`
   );
-}
-
-function buildGroups(columns: Column[]): ColumnGroup[] {
-  const byCol = new Map<number, Column[]>();
-  for (const col of columns) {
-    if (col.gridCol >= 1 && col.gridRow >= 1) {
-      if (!byCol.has(col.gridCol)) byCol.set(col.gridCol, []);
-      byCol.get(col.gridCol)!.push(col);
-    }
-  }
-  return [...byCol.entries()]
-    .sort(([a], [b]) => a - b)
-    .map(([gridCol, cols]) => ({
-      gridCol,
-      columns: [...cols].sort((a, b) => a.gridRow - b.gridRow),
-    }));
-}
-
-function normalizeOrder(columns: Column[]): Column[] {
-  const assigned = columns.filter((c) => c.gridCol >= 1 && c.gridRow >= 1);
-  const unassigned = columns.filter((c) => !(c.gridCol >= 1 && c.gridRow >= 1));
-
-  const sortedAssigned = [...assigned].sort((a, b) =>
-    a.gridCol !== b.gridCol ? a.gridCol - b.gridCol : a.gridRow - b.gridRow,
-  );
-
-  const orderMap = new Map<string, number>();
-  sortedAssigned.forEach((col, i) => orderMap.set(col.id, i));
-
-  const sortedUnassigned = [...unassigned].sort((a, b) => a.order - b.order);
-  sortedUnassigned.forEach((col, i) =>
-    orderMap.set(col.id, sortedAssigned.length + i),
-  );
-
-  return columns.map((c) => ({ ...c, order: orderMap.get(c.id) ?? c.order }));
 }
 
 export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
@@ -76,45 +41,11 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
   const groups = useMemo(() => buildGroups(draft), [draft]);
 
   const handleMoveGroupUp = useCallback((groupIdx: number) => {
-    setDraft((prev) => {
-      const gs = buildGroups(prev);
-      if (groupIdx <= 0 || groupIdx >= gs.length) return prev;
-
-      const groupAbove = gs[groupIdx - 1];
-      const groupCurrent = gs[groupIdx];
-      const aboveGridCol = groupAbove.gridCol;
-      const currentGridCol = groupCurrent.gridCol;
-      const aboveIds = new Set(groupAbove.columns.map((c) => c.id));
-      const currentIds = new Set(groupCurrent.columns.map((c) => c.id));
-
-      const updated = prev.map((c) => {
-        if (aboveIds.has(c.id)) return { ...c, gridCol: currentGridCol };
-        if (currentIds.has(c.id)) return { ...c, gridCol: aboveGridCol };
-        return c;
-      });
-      return normalizeOrder(updated);
-    });
+    setDraft((prev) => moveGroup(prev, groupIdx, groupIdx - 1));
   }, []);
 
   const handleMoveGroupDown = useCallback((groupIdx: number) => {
-    setDraft((prev) => {
-      const gs = buildGroups(prev);
-      if (groupIdx < 0 || groupIdx >= gs.length - 1) return prev;
-
-      const groupCurrent = gs[groupIdx];
-      const groupBelow = gs[groupIdx + 1];
-      const currentGridCol = groupCurrent.gridCol;
-      const belowGridCol = groupBelow.gridCol;
-      const currentIds = new Set(groupCurrent.columns.map((c) => c.id));
-      const belowIds = new Set(groupBelow.columns.map((c) => c.id));
-
-      const updated = prev.map((c) => {
-        if (currentIds.has(c.id)) return { ...c, gridCol: belowGridCol };
-        if (belowIds.has(c.id)) return { ...c, gridCol: currentGridCol };
-        return c;
-      });
-      return normalizeOrder(updated);
-    });
+    setDraft((prev) => moveGroup(prev, groupIdx, groupIdx + 1));
   }, []);
 
   const [cols, setCols] = useState(() =>
