@@ -107,3 +107,75 @@ class FileChooserCallbackHolderTest {
     assertEquals(true, newCalled)
   }
 }
+
+class PickChooserUrisTest {
+  @Test
+  fun `clipItemCountが0ならparsedをそのまま返す`() {
+    val parsed = arrayOf<String?>("parsed1", "parsed2")
+    val result = pickChooserUris(clipItemCount = 0, clipItemAt = { null }, parsed = parsed)
+    assertEquals(parsed.toList(), result?.toList())
+  }
+
+  @Test
+  fun `clipItemCountが0でparsedがnullならnullを返す`() {
+    val result = pickChooserUris<String>(clipItemCount = 0, clipItemAt = { null }, parsed = null)
+    assertNull(result)
+  }
+
+  @Test
+  fun `clipItemCountが1でclipItemAtがuriを返す場合はその1件を返しparsedは使わない`() {
+    val result =
+      pickChooserUris(
+        clipItemCount = 1,
+        clipItemAt = { "clip0" },
+        parsed = arrayOf("unused"),
+      )
+    assertEquals(listOf("clip0"), result?.toList())
+  }
+
+  @Test
+  fun `clipItemCountが3なら3件すべてを入力順で返す`() {
+    val result =
+      pickChooserUris(
+        clipItemCount = 3,
+        clipItemAt = { i -> "clip$i" },
+        parsed = null,
+      )
+    assertEquals(listOf("clip0", "clip1", "clip2"), result?.toList())
+  }
+
+  @Test
+  fun `clipItemAtがnullを返す要素は結果から除外される`() {
+    val result =
+      pickChooserUris(
+        clipItemCount = 2,
+        clipItemAt = { i -> if (i == 0) "clip0" else null },
+        parsed = arrayOf("unused"),
+      )
+    assertEquals(listOf("clip0"), result?.toList())
+  }
+
+  @Test
+  fun `clipItemCountが正でも取得できた要素が0件ならparsedにフォールバックする`() {
+    val parsed = arrayOf<String?>("parsed1")
+    val result =
+      pickChooserUris(
+        clipItemCount = 2,
+        clipItemAt = { null },
+        parsed = parsed,
+      )
+    assertEquals(parsed.toList(), result?.toList())
+  }
+
+  @Test
+  fun `clipItemCountが負値でも例外を投げずparsedを返す`() {
+    val parsed = arrayOf<String?>("parsed1")
+    val result =
+      pickChooserUris(
+        clipItemCount = -1,
+        clipItemAt = { "shouldNotBeCalled" },
+        parsed = parsed,
+      )
+    assertEquals(parsed.toList(), result?.toList())
+  }
+}

@@ -1,5 +1,6 @@
 package com.natsuyasai.multicolumnx
 
+import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
@@ -92,8 +93,29 @@ class MainActivity : TauriActivity() {
   private val fileChooserLauncher: ActivityResultLauncher<Intent> =
     registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
       val callback = fileChooserCallbacks.consume() ?: return@registerForActivityResult
-      // parseResult は単一選択・複数選択（clipData）の両方を扱い、キャンセル時は null を返す。
-      callback(WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data))
+      // キャンセル等で RESULT_OK 以外の場合は null で解決する。
+      // ここで解決しないと WebView 側が待ち続け、以降のファイル選択が無反応になる。
+      if (result.resultCode != Activity.RESULT_OK) {
+        Log.d(TAG, "fileChooserLauncher: resultCode=${result.resultCode} (not OK) -> resolve with null")
+        callback(null)
+        return@registerForActivityResult
+      }
+      // FileChooserParams.parseResult は intent.getData() しか見ないため、Google フォトなど
+      // 選択結果を clipData にだけ入れて返すプロバイダの選択（単一選択でも）を取りこぼす。
+      // そのため clipData があればそちらを優先し、無い場合のみ parseResult にフォールバックする。
+      val clipData = result.data?.clipData
+      val uris =
+        pickChooserUris(
+          clipItemCount = clipData?.itemCount ?: 0,
+          clipItemAt = { i -> clipData?.getItemAt(i)?.uri },
+          parsed = WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data),
+        )
+      Log.d(
+        TAG,
+        "fileChooserLauncher: resultCode=${result.resultCode} " +
+          "clipItemCount=${clipData?.itemCount ?: 0} resolvedUriCount=${uris?.size ?: 0}",
+      )
+      callback(uris)
     }
 
   override fun onCreate(savedInstanceState: Bundle?) {
