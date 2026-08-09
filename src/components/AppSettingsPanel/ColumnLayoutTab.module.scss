@@ -331,42 +331,106 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 0; // 区切り線を見せるため gap は 0
 }
 
 .orderItem {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
-  padding: 4px 6px;
-  border-radius: 4px;
+  padding: 8px 6px;
   background: var(--mcx-surface);
+  position: relative;
+
+  // 項目間の区切り線（ラベルは付けない）
+  & + & {
+    border-top: 1px solid var(--mcx-border-subtle);
+  }
+}
+
+.orderItemMobile {
+  padding: 12px 6px;
+  gap: 10px;
+}
+
+.orderItemDragging {
+  opacity: 0.7;
+  background: var(--mcx-surface-hover);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 25%);
+  border-radius: 4px;
+  z-index: 1;
+}
+
+.dragHandle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--mcx-text-muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: grab;
+  // dnd-kit の PointerSensor がタッチで動くために必須
+  touch-action: none;
+
+  &:hover {
+    color: var(--mcx-text-tertiary);
+    border-color: var(--mcx-border);
+    background: var(--mcx-surface-muted);
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.dragHandleMobile {
+  min-width: 40px;
+  min-height: 40px;
+  font-size: 18px;
 }
 
 .orderItemName {
   font-size: 12px;
   color: var(--mcx-text-secondary);
   flex: 1;
+  // flex 子要素は min-width: auto が既定で、これが無いと内容幅より縮まず溢れる
+  min-width: 0;
+  line-height: 1.35;
+  // 2行まで表示し、超えた分は … で省略する
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  // 区切りの無い長い文字列（URL など）でも折り返せるようにする
+  overflow-wrap: anywhere;
 }
 
 .orderBtns {
   display: flex;
-  gap: 2px;
+  gap: 6px; // 誤タップ防止
   flex-shrink: 0;
 }
 
 .orderBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
   background: none;
   border: 1px solid var(--mcx-border);
-  border-radius: 3px;
+  border-radius: 4px;
   color: var(--mcx-text-muted);
   cursor: pointer;
-  font-size: 10px;
-  padding: 2px 6px;
+  font-size: 12px;
+  padding: 0 8px;
   line-height: 1;
 
   &:hover:not(:disabled) {
@@ -380,6 +444,12 @@
     border-color: var(--mcx-border-subtle);
     cursor: default;
   }
+}
+
+.orderBtnMobile {
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 14px;
 }
 
 .actions {
