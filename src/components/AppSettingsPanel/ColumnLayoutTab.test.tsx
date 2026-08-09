@@ -485,4 +485,28 @@ describe("ColumnLayoutTab カラム順序", () => {
     expect(c2.gridCol).toBe(0);
     expect(c2.order).toBeGreaterThan(c1.order);
   });
+
+  it("各表示順序項目にドラッグハンドルが表示される", () => {
+    render(
+      <ColumnLayoutTab
+        columns={mockColumns}
+        accounts={mockAccounts}
+        onApply={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.getAllByLabelText("ドラッグして並び替え")).toHaveLength(2);
+  });
+
+  it("縦積みグループでもドラッグハンドルはグループごとに1つ表示される", () => {
+    render(
+      <ColumnLayoutTab
+        columns={mockColumnsWithStack}
+        accounts={mockAccounts}
+        onApply={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.getAllByLabelText("ドラッグして並び替え")).toHaveLength(2);
+  });
 });

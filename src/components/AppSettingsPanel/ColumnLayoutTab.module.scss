@@ -344,6 +344,35 @@
   background: var(--mcx-surface);
 }
 
+// Step 4 で本格改修する暫定スタイル
+.orderItemMobile {
+}
+
+.orderItemDragging {
+  opacity: 0.7;
+  z-index: 1;
+}
+
+.dragHandle {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--mcx-text-muted);
+  cursor: grab;
+  // dnd-kit の PointerSensor がタッチで動くために必須
+  touch-action: none;
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.dragHandleMobile {
+  min-width: 40px;
+  min-height: 40px;
+}
+
 .orderItemName {
   font-size: 12px;
   color: var(--mcx-text-secondary);
@@ -380,6 +409,10 @@
     border-color: var(--mcx-border-subtle);
     cursor: default;
   }
+}
+
+// Step 4 で本格改修する暫定スタイル
+.orderBtnMobile {
 }
 
 .actions {

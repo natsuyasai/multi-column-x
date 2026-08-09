@@ -1,3 +1,23 @@
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  restrictToParentElement,
+  restrictToVerticalAxis,
+} from "@dnd-kit/modifiers";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import React, { useState, useCallback, useMemo } from "react";
 import {
   buildGroups,
@@ -28,6 +48,82 @@ function getColumnLabel(col: Column, accounts: Account[]): string {
   );
 }
 
+interface SortableOrderItemProps {
+  id: string;
+  label: string;
+  isFirst: boolean;
+  isLast: boolean;
+  isMobile: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+}
+
+const SortableOrderItem: React.FC<SortableOrderItemProps> = ({
+  id,
+  label,
+  isFirst,
+  isLast,
+  isMobile,
+  onMoveUp,
+  onMoveDown,
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  const btnClass = `${styles.orderBtn}${isMobile ? ` ${styles.orderBtnMobile}` : ""}`;
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className={`${styles.orderItem}${isMobile ? ` ${styles.orderItemMobile}` : ""}${isDragging ? ` ${styles.orderItemDragging}` : ""}`}
+    >
+      <button
+        type="button"
+        className={`${styles.dragHandle}${isMobile ? ` ${styles.dragHandleMobile}` : ""}`}
+        aria-label="ドラッグして並び替え"
+        title="ドラッグして並び替え"
+        {...attributes}
+        {...listeners}
+      >
+        ≡
+      </button>
+      <span className={styles.orderItemName}>{label}</span>
+      <div className={styles.orderBtns}>
+        <button
+          type="button"
+          className={btnClass}
+          aria-label="上へ"
+          disabled={isFirst}
+          onClick={onMoveUp}
+        >
+          ▲
+        </button>
+        <button
+          type="button"
+          className={btnClass}
+          aria-label="下へ"
+          disabled={isLast}
+          onClick={onMoveDown}
+        >
+          ▼
+        </button>
+      </div>
+    </li>
+  );
+};
+
 export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
   columns,
   accounts,
@@ -52,6 +148,26 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
 
   const handleMoveGroupDown = useCallback((groupIdx: number) => {
     setDraft((prev) => moveGroup(prev, groupIdx, groupIdx + 1));
+  }, []);
+
+  const sensors = useSensors(
+    // 8px 動かすまでドラッグ開始しない → ▲▼ボタンのクリックと競合しない
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setDraft((prev) => {
+      const gs = buildGroups(prev);
+      const from = gs.findIndex((g) => g.columns[0].id === active.id);
+      const to = gs.findIndex((g) => g.columns[0].id === over.id);
+      if (from < 0 || to < 0) return prev;
+      return moveGroup(prev, from, to);
+    });
   }, []);
 
   const [cols, setCols] = useState(() =>
@@ -382,33 +498,32 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
 
       <div className={styles.orderSection}>
         <div className={styles.orderLabel}>表示順序</div>
-        <ul className={styles.orderList} data-testid="order-list">
-          {groups.map((group, idx) => (
-            <li key={group.gridCol} className={styles.orderItem}>
-              <span className={styles.orderItemName}>
-                {getGroupLabel(group)}
-              </span>
-              <div className={styles.orderBtns}>
-                <button
-                  className={styles.orderBtn}
-                  aria-label="上へ"
-                  disabled={idx === 0}
-                  onClick={() => handleMoveGroupUp(idx)}
-                >
-                  ▲
-                </button>
-                <button
-                  className={styles.orderBtn}
-                  aria-label="下へ"
-                  disabled={idx === groups.length - 1}
-                  onClick={() => handleMoveGroupDown(idx)}
-                >
-                  ▼
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={groups.map((g) => g.columns[0].id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <ul className={styles.orderList} data-testid="order-list">
+              {groups.map((group, idx) => (
+                <SortableOrderItem
+                  key={group.columns[0].id}
+                  id={group.columns[0].id}
+                  label={getGroupLabel(group)}
+                  isFirst={idx === 0}
+                  isLast={idx === groups.length - 1}
+                  isMobile={isMobile}
+                  onMoveUp={() => handleMoveGroupUp(idx)}
+                  onMoveDown={() => handleMoveGroupDown(idx)}
+                />
+              ))}
+            </ul>
+          </SortableContext>
+        </DndContext>
       </div>
 
       <div className={styles.actions}>
