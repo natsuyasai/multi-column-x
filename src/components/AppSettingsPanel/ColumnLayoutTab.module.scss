@@ -399,9 +399,17 @@
   font-size: 12px;
   color: var(--mcx-text-secondary);
   flex: 1;
+  // flex 子要素は min-width: auto が既定で、これが無いと内容幅より縮まず溢れる
+  min-width: 0;
+  line-height: 1.35;
+  // 2行まで表示し、超えた分は … で省略する
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  // 区切りの無い長い文字列（URL など）でも折り返せるようにする
+  overflow-wrap: anywhere;
 }
 
 .orderBtns {
