@@ -1,5 +1,6 @@
 package com.natsuyasai.multicolumnx
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -9,6 +10,8 @@ import android.provider.Settings
 import android.util.Log
 import android.view.View
 import android.webkit.CookieManager
+import android.webkit.MimeTypeMap
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -78,6 +81,19 @@ class MainActivity : TauriActivity() {
       } finally {
         request.onDone()
       }
+    }
+
+  // <input type="file"> のファイル選択結果を受け取るまでコールバックを保持する。
+  // UI スレッドからのみアクセスする。
+  private val fileChooserCallbacks = FileChooserCallbackHolder<Array<Uri?>?>()
+
+  // <input type="file"> のファイル選択ダイアログ（SAF）。
+  // registerForActivityResult は Activity 生成完了前に呼ぶ必要があるためプロパティ初期化子で登録する。
+  private val fileChooserLauncher: ActivityResultLauncher<Intent> =
+    registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+      val callback = fileChooserCallbacks.consume() ?: return@registerForActivityResult
+      // parseResult は単一選択・複数選択（clipData）の両方を扱い、キャンセル時は null を返す。
+      callback(WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data))
     }
 
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -697,6 +713,43 @@ class MainActivity : TauriActivity() {
       transport.webView = helper
       resultMsg.sendToTarget()
       return true
+    }
+
+    // <input type="file"> のファイル選択。ネイティブ WebView の WebChromeClient は
+    // これを実装しないと何も起こらない（デフォルト実装は false を返すだけ）ため、
+    // SAF のファイル選択 Intent を起動して結果を filePathCallback へ返す。
+    // カメラ撮影（capture 属性）は対象外で、常にファイル選択にフォールバックする。
+    override fun onShowFileChooser(
+      webView: WebView,
+      filePathCallback: ValueCallback<Array<Uri?>?>,
+      fileChooserParams: FileChooserParams,
+    ): Boolean {
+      val intent = fileChooserParams.createIntent()
+      if (fileChooserParams.mode == FileChooserParams.MODE_OPEN_MULTIPLE) {
+        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+      }
+      // createIntent() は acceptTypes の先頭1件しか type に反映しないため、
+      // 複数指定時は EXTRA_MIME_TYPES で全 MIME を渡す（画像と動画の同時選択に必要）。
+      val mimeTypes =
+        normalizeAcceptTypes(fileChooserParams.acceptTypes) {
+          MimeTypeMap.getSingleton().getMimeTypeFromExtension(it)
+        }
+      if (mimeTypes.size > 1) {
+        intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes)
+      }
+      if (intent.type.isNullOrEmpty() || intent.type?.startsWith(".") == true) {
+        intent.type = mimeTypes.firstOrNull() ?: "*/*"
+      }
+      fileChooserCallbacks.set { uris -> filePathCallback.onReceiveValue(uris) }
+      return try {
+        fileChooserLauncher.launch(intent)
+        true
+      } catch (e: ActivityNotFoundException) {
+        // 選択アプリが無い端末。null を返さないと以降ファイル選択が無反応になる。
+        Log.w(TAG, "onShowFileChooser: no activity to handle ${intent.type}: ${e.message}")
+        fileChooserCallbacks.consume()?.invoke(null)
+        false
+      }
     }
   }
 
