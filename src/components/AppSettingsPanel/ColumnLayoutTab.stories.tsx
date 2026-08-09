@@ -126,3 +126,103 @@ export const DarkTheme: Story = {
     ),
   ],
 };
+
+// gridCol=1 に2カラム（縦積み）、gridCol=2 に1カラム
+const stackedColumns: Column[] = [
+  {
+    id: "col-1",
+    accountId: "acc-1",
+    pageType: "home",
+    width: 350,
+    order: 0,
+    gridRow: 1,
+    gridCol: 1,
+    heightMode: "auto",
+    settings: columnSettings,
+  },
+  {
+    id: "col-2",
+    accountId: "acc-1",
+    pageType: "notifications",
+    width: 350,
+    order: 1,
+    gridRow: 2,
+    gridCol: 1,
+    heightMode: "auto",
+    settings: columnSettings,
+  },
+  {
+    id: "col-3",
+    accountId: "acc-1",
+    pageType: "search",
+    width: 350,
+    order: 2,
+    gridRow: 1,
+    gridCol: 2,
+    heightMode: "auto",
+    settings: columnSettings,
+  },
+];
+
+export const StackedColumns: Story = {
+  name: "縦積みレイアウト",
+  args: {
+    columns: stackedColumns,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const orderList = canvas.getByTestId("order-list");
+    const items = within(orderList).getAllByRole("listitem");
+    // 列グループ単位なので、縦積み2カラム+単独1カラムで2件になる
+    await expect(items).toHaveLength(2);
+
+    const upButtons = within(orderList).getAllByLabelText("上へ");
+    const downButtons = within(orderList).getAllByLabelText("下へ");
+    await expect(upButtons[0]).toBeDisabled();
+    await expect(downButtons[downButtons.length - 1]).toBeDisabled();
+
+    const handles = within(orderList).getAllByLabelText("ドラッグして並び替え");
+    await expect(handles).toHaveLength(2);
+  },
+};
+
+export const Mobile: Story = {
+  name: "モバイル",
+  args: {
+    isMobile: true,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const grid = canvas.getByTestId("grid-preview");
+    await expect(grid).not.toBeVisible();
+
+    await expect(canvas.getByText("表示順序")).toBeVisible();
+
+    const orderList = canvas.getByTestId("order-list");
+    const handles = within(orderList).getAllByLabelText("ドラッグして並び替え");
+    await expect(handles.length).toBeGreaterThan(0);
+  },
+};
+
+export const ReorderByButton: Story = {
+  name: "ボタンで並び替え",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const orderList = canvas.getByTestId("order-list");
+
+    const getItemTexts = () =>
+      within(orderList)
+        .getAllByRole("listitem")
+        .map((item) => item.textContent ?? "");
+
+    const before = getItemTexts();
+    await expect(before[0]).toContain("ホーム");
+
+    const downButtons = within(orderList).getAllByLabelText("下へ");
+    await userEvent.click(downButtons[0]);
+
+    const after = getItemTexts();
+    await expect(after[0]).toContain("通知");
+    await expect(after[1]).toContain("ホーム");
+  },
+};
