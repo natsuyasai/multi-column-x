@@ -1,7 +1,10 @@
 // src-tauri/src/inject/_src/video_long_press_menu.ts
-// Android専用: column WebView上で動画要素を長押し（contextmenuイベント）した際に
-// 独自メニューを表示し、動画ダウンロード要求を Android ブリッジ（window.__mcxVideoDownloadBridge）
-// へ委譲する。メニュー描画パターンは context_menu.ts を踏襲する。
+// column WebView上で動画要素を長押し、またはPCでは右クリック（いずれも contextmenu イベント）
+// した際に独自メニューを表示する。desktop/mobile 共通で注入される。
+// 「動画をダウンロード」は Android 専用（動画ダウンロード要求を Android ブリッジ
+// window.__mcxVideoDownloadBridge へ委譲。ブリッジが無い desktop では実質何もしない）。
+// 「動画をポップアップで表示」は videoPopupEnabled 設定に従い desktop/mobile 共通で有効。
+// メニュー描画パターンは context_menu.ts を踏襲する。
 
 // 動画情報（variants）の抽出は popup_toolbar.ts と同じ React Fiber 解析パターン。
 // inject スクリプトはビルドエントリ間で ES module の import ができない構造のため
