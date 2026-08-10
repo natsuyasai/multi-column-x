@@ -48,6 +48,7 @@ export function useColumns() {
     swipeState,
     setActiveColumn,
     navigateColumn,
+    setSwipeProgress,
     restoreMobileColumns,
   } = useMobileColumns(dialogOpenRef);
 
@@ -384,6 +385,7 @@ export function useColumns() {
     swipeState,
     setActiveColumn,
     navigateColumn,
+    setSwipeProgress,
     setDialogOpen,
     recreateAllWebviews,
     recreateColumnWebview,

@@ -304,4 +304,45 @@ describe("useMobileColumns", () => {
 
     expect(result.current.swipeState).toBeNull();
   });
+
+  it("setSwipeProgressにleftを渡すとswipeStateがdirection:left, phase:progressになる", () => {
+    const { result } = renderMobileColumns();
+
+    act(() => {
+      result.current.setSwipeProgress("left");
+    });
+
+    expect(result.current.swipeState).toEqual({
+      direction: "left",
+      phase: "progress",
+    });
+  });
+
+  it("setSwipeProgressにrightを渡すとswipeStateがdirection:right, phase:progressになる", () => {
+    const { result } = renderMobileColumns();
+
+    act(() => {
+      result.current.setSwipeProgress("right");
+    });
+
+    expect(result.current.swipeState).toEqual({
+      direction: "right",
+      phase: "progress",
+    });
+  });
+
+  it("setSwipeProgressにnullを渡すとprogress中のswipeStateが解除される", () => {
+    const { result } = renderMobileColumns();
+
+    act(() => {
+      result.current.setSwipeProgress("left");
+    });
+    expect(result.current.swipeState).not.toBeNull();
+
+    act(() => {
+      result.current.setSwipeProgress(null);
+    });
+
+    expect(result.current.swipeState).toBeNull();
+  });
 });

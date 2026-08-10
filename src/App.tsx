@@ -83,6 +83,7 @@ const App: React.FC = () => {
     swipeState,
     setActiveColumn,
     navigateColumn,
+    setSwipeProgress,
     setDialogOpen,
     recreateAllWebviews,
     recreateColumnWebview,
@@ -449,6 +450,7 @@ const App: React.FC = () => {
           height={resolveSwipeAreaHeight(globalSettings)}
           swipeState={swipeState}
           onSwipeNavigate={navigateColumn}
+          onSwipeProgress={setSwipeProgress}
         />
       )}
 

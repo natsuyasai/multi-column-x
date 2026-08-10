@@ -173,12 +173,22 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
     [activeColumnId, setActiveColumn, dialogOpenRef],
   );
 
+  // スワイプ中の指の移動量に応じた進捗表示（phase: "progress"）を反映する
+  const setSwipeProgress = useCallback((direction: "left" | "right" | null) => {
+    if (direction === null) {
+      setSwipeState(null);
+      return;
+    }
+    setSwipeState({ direction, phase: "progress" });
+  }, []);
+
   return {
     activeColumnId,
     setActiveColumnIdState,
     swipeState,
     setActiveColumn,
     navigateColumn,
+    setSwipeProgress,
     restoreMobileColumns,
   };
 }

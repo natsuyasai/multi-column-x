@@ -10,6 +10,7 @@ interface Props {
     phase: "progress" | "switching";
   } | null;
   onSwipeNavigate?: (direction: "left" | "right") => void;
+  onSwipeProgress?: (direction: "left" | "right" | null) => void;
 }
 
 export const MobileSwipeBar: React.FC<Props> = ({
