@@ -110,6 +110,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       useXAppForCompose: draft.useXAppForCompose,
       mobileSwipeAreaEnabled: draft.mobileSwipeAreaEnabled,
       mobileSwipeAreaHeight: clampSwipeAreaHeight(draft.mobileSwipeAreaHeight),
+      mobileSwipeAreaOpacity: draft.mobileSwipeAreaOpacity,
       mobileTwoColumnEnabled: draft.mobileTwoColumnEnabled,
       ngWords,
     });
