@@ -31,13 +31,8 @@ pub mod events {
     /// APIレート制限残量通知（inject script invoke → TS listen）{ label, bucketKey, limit, remaining, reset }
     pub const WEBVIEW_API_RATE_LIMIT: &str = "webview-api-rate-limit";
     /// モバイルスワイプバーの遷移確定通知（Android JNI → TS listen）payload は "left" | "right"。
-    /// NOTE: TS 側配線（IPC_EVENTS）はまだ無いため、下記 tests::events_match_contract_fixture の
-    /// actual リストと contracts/ipc-constants.json への追加はあえて未了。TS 配線ステップで
-    /// IPC_EVENTS 追加とこの2箇所への追加を同一コミットで行うこと（片方だけ追加すると
-    /// events_match_contract_fixture または TS 側 ipc.contract.test.ts が壊れる）。
     pub const MOBILE_SWIPE_NAVIGATE: &str = "mobile-swipe-navigate";
     /// モバイルスワイプバーのスワイプ中進捗通知（Android JNI → TS listen）payload は "left" | "right" | ""。
-    /// NOTE: MOBILE_SWIPE_NAVIGATE と同じ理由で contracts/ipc-constants.json への追加は未了。
     pub const MOBILE_SWIPE_PROGRESS: &str = "mobile-swipe-progress";
 }
 
@@ -100,6 +95,8 @@ mod tests {
             ("ACCOUNT_REAUTH_COMPLETE", events::ACCOUNT_REAUTH_COMPLETE),
             ("VIDEO_DOWNLOAD_PROGRESS", events::VIDEO_DOWNLOAD_PROGRESS),
             ("WEBVIEW_API_RATE_LIMIT", events::WEBVIEW_API_RATE_LIMIT),
+            ("MOBILE_SWIPE_NAVIGATE", events::MOBILE_SWIPE_NAVIGATE),
+            ("MOBILE_SWIPE_PROGRESS", events::MOBILE_SWIPE_PROGRESS),
         ];
         assert_eq!(
             expected.as_object().unwrap().len(),

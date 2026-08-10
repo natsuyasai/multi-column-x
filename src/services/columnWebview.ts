@@ -41,6 +41,36 @@ export async function setColumnCookies(accountId: string): Promise<void> {
   await invoke(IPC_COMMANDS.SET_COLUMN_COOKIES, { accountId });
 }
 
+/**
+ * モバイルスワイプバー（ネイティブオーバーレイ）の表示状態を更新する（Android のみ実体動作）。
+ * y/height はカラム WebView と同じ絶対座標系（mobileColumnLayout と同じ計算式）で渡す。
+ */
+export async function updateMobileSwipeBar(
+  visible: boolean,
+  y: number,
+  height: number,
+  opacity: number,
+  darkTheme: boolean,
+): Promise<void> {
+  await invoke(IPC_COMMANDS.UPDATE_MOBILE_SWIPE_BAR, {
+    visible,
+    y,
+    height,
+    opacity,
+    darkTheme,
+  });
+}
+
+/**
+ * モバイルスワイプバーの遷移確定フラッシュ演出をトリガーする（Android のみ実体動作）。
+ * カラム遷移が実際に確定したとき（navigateColumn 側）にのみ呼ぶこと。
+ */
+export async function flashMobileSwipeBar(
+  direction: "left" | "right",
+): Promise<void> {
+  await invoke(IPC_COMMANDS.FLASH_MOBILE_SWIPE_BAR, { direction });
+}
+
 /** カラム WebView 内でスクリプトを評価する（失敗は握りつぶす） */
 export async function evalInColumn(
   columnId: string,

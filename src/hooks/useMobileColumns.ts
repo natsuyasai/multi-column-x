@@ -1,11 +1,13 @@
 // src/hooks/useMobileColumns.ts
 // モバイル（Android）のアクティブカラム管理・スワイプナビゲーション・起動時復元
-import { useCallback, useState } from "react";
-import { STORAGE_KEYS } from "../constants/ipc";
+import { listen } from "@tauri-apps/api/event";
+import { useCallback, useEffect, useState } from "react";
+import { IPC_EVENTS, STORAGE_KEYS } from "../constants/ipc";
 import { mobileColumnLayout, resolveSwipeAreaHeight } from "../lib/gridLayout";
 import { logError } from "../lib/log";
 import {
   createColumnWebview,
+  flashMobileSwipeBar,
   resizeColumnWebview,
   setColumnCookies,
 } from "../services/columnWebview";
@@ -25,6 +27,7 @@ export function resolveTwoColumnEnabled(): boolean {
 }
 
 export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
+  const isMobile = useAppStore((s) => s.isMobile);
   const [activeColumnId, setActiveColumnIdState] = useState<string | null>(
     null,
   );
@@ -168,9 +171,17 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
       if (targetIdx < 0 || targetIdx >= sorted.length) return;
       setSwipeState({ direction, phase: "switching" });
       setTimeout(() => setSwipeState(null), 400);
+      // 遷移確定時のみネイティブオーバーレイへフラッシュ演出を明示的に push する
+      // （Kotlin 側で自前判定しない。早期return時に光る退行を避けるため。
+      // desktop では isMobile ガードで呼ばない）。
+      if (isMobile) {
+        flashMobileSwipeBar(direction).catch(
+          logError("navigateColumn:flashMobileSwipeBar"),
+        );
+      }
       setActiveColumn(sorted[targetIdx].id);
     },
-    [activeColumnId, setActiveColumn, dialogOpenRef],
+    [activeColumnId, setActiveColumn, dialogOpenRef, isMobile],
   );
 
   // スワイプ中の指の移動量に応じた進捗表示（phase: "progress"）を反映する
@@ -181,6 +192,33 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
     }
     setSwipeState({ direction, phase: "progress" });
   }, []);
+
+  // ネイティブオーバーレイ（Android スワイプバー）からのジェスチャー通知を受信する。
+  // desktop では Rust 側がこれらのイベントを emit しないため、isMobile のときのみ購読する。
+  // mobile-swipe-progress の payload は "left" | "right" | ""（"" = 進捗なし）。
+  useEffect(() => {
+    if (!isMobile) return;
+    const unlistenNavigate = listen<string>(
+      IPC_EVENTS.MOBILE_SWIPE_NAVIGATE,
+      (e) => {
+        const direction = e.payload;
+        if (direction === "left" || direction === "right") {
+          navigateColumn(direction);
+        }
+      },
+    );
+    const unlistenProgress = listen<string>(
+      IPC_EVENTS.MOBILE_SWIPE_PROGRESS,
+      (e) => {
+        const payload = e.payload;
+        setSwipeProgress(payload === "" ? null : (payload as "left" | "right"));
+      },
+    );
+    return () => {
+      unlistenNavigate.then((fn) => fn());
+      unlistenProgress.then((fn) => fn());
+    };
+  }, [isMobile, navigateColumn, setSwipeProgress]);
 
   return {
     activeColumnId,

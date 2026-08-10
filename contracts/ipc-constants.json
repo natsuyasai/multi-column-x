@@ -24,7 +24,9 @@
     "report_new_posts_count",
     "report_keyboard_shortcut",
     "download_video",
-    "report_api_rate_limit"
+    "report_api_rate_limit",
+    "update_mobile_swipe_bar",
+    "flash_mobile_swipe_bar"
   ],
   "events": {
     "ACCOUNT_LOGIN_COMPLETE": "account-login-complete",
@@ -36,7 +38,9 @@
     "COLUMN_WEBVIEW_FOCUSED": "column-webview-focused",
     "ACCOUNT_REAUTH_COMPLETE": "account-reauth-complete",
     "VIDEO_DOWNLOAD_PROGRESS": "video-download-progress",
-    "WEBVIEW_API_RATE_LIMIT": "webview-api-rate-limit"
+    "WEBVIEW_API_RATE_LIMIT": "webview-api-rate-limit",
+    "MOBILE_SWIPE_NAVIGATE": "mobile-swipe-navigate",
+    "MOBILE_SWIPE_PROGRESS": "mobile-swipe-progress"
   },
   "labels": {
     "MAIN": "main",

@@ -198,4 +198,60 @@ describe("App (mobile)", () => {
     render(<App />);
     expect(screen.queryByText(/スワイプで切替/)).toBeNull();
   });
+
+  it("カラム復元完了後にupdate_mobile_swipe_barがvisible:trueで呼ばれる", async () => {
+    render(<App />);
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "update_mobile_swipe_bar",
+        expect.objectContaining({
+          visible: true,
+          height: 28,
+          opacity: 50,
+          darkTheme: true, // DEFAULT_GLOBAL_SETTINGS.theme === "dark"
+        }),
+      );
+    });
+  });
+
+  it("mobileSwipeAreaOpacityが0のときupdate_mobile_swipe_barはvisible:falseで呼ばれる（透明タッチ吸収事故防止）", async () => {
+    useAppStore.setState({
+      accounts: [account],
+      columns: [column],
+      isMobile: true,
+      isLoaded: true,
+      globalSettings: {
+        ...DEFAULT_GLOBAL_SETTINGS,
+        mobileSwipeAreaOpacity: 0,
+      },
+    });
+    render(<App />);
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "update_mobile_swipe_bar",
+        expect.objectContaining({ visible: false, opacity: 0 }),
+      );
+    });
+  });
+
+  it("ダイアログ表示中はupdate_mobile_swipe_barがvisible:falseで呼ばれる", async () => {
+    render(<App />);
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "update_mobile_swipe_bar",
+        expect.objectContaining({ visible: true }),
+      );
+    });
+    mockInvoke.mockClear();
+
+    fireEvent.click(screen.getByTitle("メニュー表示の切り替え"));
+    fireEvent.click(screen.getByTitle("アカウント管理"));
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "update_mobile_swipe_bar",
+        expect.objectContaining({ visible: false }),
+      );
+    });
+  });
 });
