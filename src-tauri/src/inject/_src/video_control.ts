@@ -5,7 +5,7 @@ export function isMediaViewerPath(pathname: string): boolean {
   return /\/mediaviewer\/?$/.test(pathname);
 }
 
-const VIDEO_PLAYER_SELECTOR = '[data-testid="videoComponent"]';
+const VIDEO_CONTROL_PLAYER_SELECTOR = '[data-testid="videoComponent"]';
 
 (function () {
   // ユーザーが動画コンテナを明示的にクリックして再生操作を行った動画は、以降
@@ -36,7 +36,7 @@ const VIDEO_PLAYER_SELECTOR = '[data-testid="videoComponent"]';
     if (!(target instanceof Element)) {
       return null;
     }
-    const container = target.closest(VIDEO_PLAYER_SELECTOR);
+    const container = target.closest(VIDEO_CONTROL_PLAYER_SELECTOR);
     if (!container) {
       return null;
     }
