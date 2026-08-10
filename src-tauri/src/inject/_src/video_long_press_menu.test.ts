@@ -81,6 +81,7 @@ const PLAYER_PROPS = {
 function createVideoComponent(): HTMLDivElement {
   const el = document.createElement("div");
   el.dataset.testid = "videoComponent";
+  el.appendChild(document.createElement("video"));
   document.body.appendChild(el);
   return el;
 }
@@ -435,5 +436,42 @@ describe("inject/video_long_press_menu のポップアップメニュー項目",
 
     expect(downloadVideoMock).toHaveBeenCalledTimes(1);
     expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("ポップアップ表示項目クリックで対象のvideo要素がpauseされる", async () => {
+    await importLongPressMenu();
+    const article = buildArticle("/carol/status/555");
+    addTweetPhoto(article);
+    const videoEl = addTweetPhotoWithVideo(article);
+    const videoTag = videoEl.querySelector("video");
+    if (!videoTag) throw new Error("video tag not found");
+    const pauseSpy = vi
+      .spyOn(HTMLVideoElement.prototype, "pause")
+      .mockImplementation(() => {});
+    dispatchContextMenu(videoEl);
+
+    clickSecondMenuItem();
+
+    expect(pauseSpy).toHaveBeenCalledTimes(1);
+    pauseSpy.mockRestore();
+  });
+
+  it("video要素が存在しない場合でもエラーにならずポップアップ表示できる", async () => {
+    await importLongPressMenu();
+    const article = buildArticle("/carol/status/555");
+    addTweetPhoto(article);
+    const photo = document.createElement("div");
+    photo.dataset.testid = "tweetPhoto";
+    article.appendChild(photo);
+    const videoEl = document.createElement("div");
+    videoEl.dataset.testid = "videoComponent";
+    photo.appendChild(videoEl);
+    dispatchContextMenu(videoEl);
+
+    expect(() => clickSecondMenuItem()).not.toThrow();
+    expect(invokeMock).toHaveBeenCalledWith("open_popup_window", {
+      webviewLabelCaller: WEBVIEW_LABEL,
+      url: "https://x.com/carol/status/555/video/2",
+    });
   });
 });

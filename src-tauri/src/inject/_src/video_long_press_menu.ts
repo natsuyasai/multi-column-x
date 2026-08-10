@@ -238,6 +238,7 @@ export function extractLongPressQuotedTweetId(
   }
 
   function requestVideoPopup(videoEl: Element): void {
+    videoEl.querySelector("video")?.pause();
     const quoted = findLongPressQuotedTweetContainer(videoEl);
     if (quoted) {
       const quotedId = extractLongPressQuotedTweetId(quoted);
