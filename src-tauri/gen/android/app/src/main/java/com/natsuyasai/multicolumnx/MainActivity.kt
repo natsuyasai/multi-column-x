@@ -50,6 +50,10 @@ class MainActivity : TauriActivity() {
   // 戻るボタン時の canGoBack 判定に使う。UI スレッドからのみアクセスする。
   private var activeColumnWebViewId: String? = null
 
+  // スワイプバーのネイティブオーバーレイ。初回 setSwipeBarOverlay 呼び出し時に生成する。
+  // UI スレッドからのみアクセスする。
+  private var swipeBarOverlay: SwipeBarOverlayView? = null
+
   // saveDownloadedVideo で起動した SAF 保存ダイアログの結果を受け取るまでの間、
   // コピー元の一時ファイルパスと後処理（一時ファイル削除など）を保持する。
   // UI スレッドからのみアクセスする。
@@ -356,7 +360,11 @@ class MainActivity : TauriActivity() {
           FrameLayout.LayoutParams.MATCH_PARENT,
         )
       contentRoot.addView(webView, params)
+      // restoreOverlayOrder() は popupWebViews を走査して bringToFront するため、
+      // この popup 自身をリストに積んでから呼ぶ必要がある（先に呼ぶとこの popup が対象から漏れ、
+      // overlay の方が手前に来てしまい「popup > overlay」の不変条件が崩れる）。
       popupWebViews.addLast(Pair(id, webView))
+      restoreOverlayOrder()
       loadUrlForAccount(webView, url, accountId, profileApplied)
     }
   }
@@ -494,6 +502,7 @@ class MainActivity : TauriActivity() {
         )
 
       contentRoot.addView(webView, params)
+      restoreOverlayOrder()
       columnWebViews[id] = webView
 
       loadUrlForAccount(webView, url, accountId, profileApplied)
@@ -547,6 +556,66 @@ class MainActivity : TauriActivity() {
         wv.visibility = View.GONE
       }
     }
+  }
+
+  // スワイプバーのネイティブオーバーレイを更新する。yDp はカラム WebView と同じ座標系
+  // （mobileColumnLayout と同じ計算元）の絶対座標。Gravity.BOTTOM 等の相対配置は使わない
+  // （IME表示・回転でカラムとズレるため。詳細は plan.md「設計上の重要な決定 (A)」参照）。
+  // opacity<=0 のときは呼び出し側（Rust/React）が visible=false を渡し、View.GONE にして
+  // タッチも完全にカラム側へ通す想定（透明でもタッチを吸収する View.alpha の事故防止）。
+  fun setSwipeBarOverlay(
+    visible: Boolean,
+    yDp: Int,
+    heightDp: Int,
+    opacityPercent: Int,
+    darkTheme: Boolean,
+  ) {
+    runOnUiThread {
+      val density = resources.displayMetrics.density
+      val overlay =
+        swipeBarOverlay ?: SwipeBarOverlayView(this) { direction ->
+          AppBridge.onSwipeNavigate(direction)
+        }.also { view ->
+          view.onProgress = { direction -> AppBridge.onSwipeProgress(direction ?: "") }
+          contentRoot.addView(
+            view,
+            FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, (heightDp * density).toInt()),
+          )
+          swipeBarOverlay = view
+        }
+
+      (overlay.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
+        params.height = (heightDp * density).toInt()
+        params.topMargin = (yDp * density).toInt()
+        overlay.layoutParams = params
+      }
+      overlay.alpha = opacityPercent / 100f
+      overlay.setDarkTheme(darkTheme)
+      overlay.visibility = if (visible) View.VISIBLE else View.GONE
+      overlay.requestLayout()
+
+      restoreOverlayOrder()
+    }
+  }
+
+  // スワイプによるカラム遷移が実際に確定したときの視覚フラッシュ演出をトリガーする。
+  // React 側の navigateColumn が実際に遷移を決定したときのみ呼ばれる想定（自前で判定しない。
+  // 詳細は plan.md「設計上の重要な決定 (B)」参照）。
+  fun setSwipeBarFlash(direction: String) {
+    runOnUiThread {
+      swipeBarOverlay?.flashSwitching(direction)
+    }
+  }
+
+  // View の重なり順（Z順）の不変条件「popup > overlay(スワイプバー) > column > main」を
+  // ここに集約する。bringToFront() は呼ぶたびにその View を最前面に動かすため、
+  // 最後に呼んだものが最終的に最前面になる（popup 群を最後に呼ぶことで overlay より手前にする）。
+  // createColumnWebView / createPopupWebView の両方（contentRoot.addView 直後）から呼ぶことで、
+  // recreateAllWebviews 等で新しい View が追加された場合も不変条件を保つ。
+  private fun restoreOverlayOrder() {
+    swipeBarOverlay?.bringToFront()
+    popupWebViews.forEach { it.second.bringToFront() }
+    persistentComposeWebView?.second?.bringToFront()
   }
 
   // カラム WebView で JavaScript を評価する。
