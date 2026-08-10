@@ -67,3 +67,27 @@ export const DarkTheme: Story = {
     ),
   ],
 };
+
+export const SwipeProgressLeft: Story = {
+  name: "左スワイプ中（進行フィードバック）",
+  args: {
+    swipeState: { direction: "left", phase: "progress" },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const rightHint = canvas.getByText("›");
+    await expect(rightHint.parentElement?.className).toContain("progressLeft");
+  },
+};
+
+export const SwipeProgressRight: Story = {
+  name: "右スワイプ中（進行フィードバック）",
+  args: {
+    swipeState: { direction: "right", phase: "progress" },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const leftHint = canvas.getByText("‹");
+    await expect(leftHint.parentElement?.className).toContain("progressRight");
+  },
+};

@@ -24,6 +24,7 @@
   -webkit-touch-callout: none;
   touch-action: none;
   z-index: 100;
+  transition: background-color 0.1s ease-out;
 }
 
 .switching {
@@ -37,4 +38,10 @@
 .hint {
   font-weight: bold;
   opacity: 0.7;
+}
+
+.progressLeft .hint:last-child,
+.progressRight .hint:first-child {
+  opacity: 1;
+  color: var(--mcx-accent);
 }

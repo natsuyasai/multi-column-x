@@ -97,4 +97,110 @@ describe("MobileSwipeBar", () => {
       });
     }).not.toThrow();
   });
+
+  it("横移動がしきい値を超え縦移動より優勢な touchmove で onSwipeProgress が left で呼ばれる", () => {
+    const onSwipeProgress = vi.fn();
+    const { container } = render(
+      <MobileSwipeBar height={28} onSwipeProgress={onSwipeProgress} />,
+    );
+    const bar = container.firstChild as HTMLElement;
+    fireEvent.touchStart(bar, { touches: [{ clientX: 200, clientY: 10 }] });
+    fireEvent.touchMove(bar, { touches: [{ clientX: 180, clientY: 12 }] });
+    expect(onSwipeProgress).toHaveBeenCalledWith("left");
+  });
+
+  it("横移動がしきい値を超え縦移動より優勢な touchmove で onSwipeProgress が right で呼ばれる", () => {
+    const onSwipeProgress = vi.fn();
+    const { container } = render(
+      <MobileSwipeBar height={28} onSwipeProgress={onSwipeProgress} />,
+    );
+    const bar = container.firstChild as HTMLElement;
+    fireEvent.touchStart(bar, { touches: [{ clientX: 100, clientY: 10 }] });
+    fireEvent.touchMove(bar, { touches: [{ clientX: 120, clientY: 12 }] });
+    expect(onSwipeProgress).toHaveBeenCalledWith("right");
+  });
+
+  it("touchmove で縦移動が優勢な場合は onSwipeProgress が呼ばれない", () => {
+    const onSwipeProgress = vi.fn();
+    const { container } = render(
+      <MobileSwipeBar height={28} onSwipeProgress={onSwipeProgress} />,
+    );
+    const bar = container.firstChild as HTMLElement;
+    fireEvent.touchStart(bar, { touches: [{ clientX: 100, clientY: 10 }] });
+    fireEvent.touchMove(bar, { touches: [{ clientX: 115, clientY: 60 }] });
+    expect(onSwipeProgress).not.toHaveBeenCalled();
+  });
+
+  it("touchmove の移動量がしきい値未満の場合は onSwipeProgress が呼ばれない", () => {
+    const onSwipeProgress = vi.fn();
+    const { container } = render(
+      <MobileSwipeBar height={28} onSwipeProgress={onSwipeProgress} />,
+    );
+    const bar = container.firstChild as HTMLElement;
+    fireEvent.touchStart(bar, { touches: [{ clientX: 100, clientY: 10 }] });
+    fireEvent.touchMove(bar, { touches: [{ clientX: 105, clientY: 10 }] });
+    expect(onSwipeProgress).not.toHaveBeenCalled();
+  });
+
+  it("一度 progress 通知した後、しきい値未満に戻る touchmove では onSwipeProgress が null で呼ばれる", () => {
+    const onSwipeProgress = vi.fn();
+    const { container } = render(
+      <MobileSwipeBar height={28} onSwipeProgress={onSwipeProgress} />,
+    );
+    const bar = container.firstChild as HTMLElement;
+    fireEvent.touchStart(bar, { touches: [{ clientX: 200, clientY: 10 }] });
+    fireEvent.touchMove(bar, { touches: [{ clientX: 180, clientY: 12 }] });
+    expect(onSwipeProgress).toHaveBeenCalledWith("left");
+    onSwipeProgress.mockClear();
+    fireEvent.touchMove(bar, { touches: [{ clientX: 195, clientY: 12 }] });
+    expect(onSwipeProgress).toHaveBeenCalledWith(null);
+  });
+
+  it("同じ方向の touchmove が連続しても onSwipeProgress は再度呼ばれない", () => {
+    const onSwipeProgress = vi.fn();
+    const { container } = render(
+      <MobileSwipeBar height={28} onSwipeProgress={onSwipeProgress} />,
+    );
+    const bar = container.firstChild as HTMLElement;
+    fireEvent.touchStart(bar, { touches: [{ clientX: 200, clientY: 10 }] });
+    fireEvent.touchMove(bar, { touches: [{ clientX: 180, clientY: 12 }] });
+    expect(onSwipeProgress).toHaveBeenCalledTimes(1);
+    onSwipeProgress.mockClear();
+    fireEvent.touchMove(bar, { touches: [{ clientX: 160, clientY: 12 }] });
+    expect(onSwipeProgress).not.toHaveBeenCalled();
+  });
+
+  it("touchcancel で onSwipeProgress が null で呼ばれる", () => {
+    const onSwipeProgress = vi.fn();
+    const { container } = render(
+      <MobileSwipeBar height={28} onSwipeProgress={onSwipeProgress} />,
+    );
+    const bar = container.firstChild as HTMLElement;
+    fireEvent.touchStart(bar, { touches: [{ clientX: 200, clientY: 10 }] });
+    fireEvent.touchMove(bar, { touches: [{ clientX: 180, clientY: 12 }] });
+    onSwipeProgress.mockClear();
+    fireEvent.touchCancel(bar);
+    expect(onSwipeProgress).toHaveBeenCalledWith(null);
+  });
+
+  it("progress 通知が無い状態での touchcancel では onSwipeProgress が呼ばれない", () => {
+    const onSwipeProgress = vi.fn();
+    const { container } = render(
+      <MobileSwipeBar height={28} onSwipeProgress={onSwipeProgress} />,
+    );
+    const bar = container.firstChild as HTMLElement;
+    fireEvent.touchStart(bar, { touches: [{ clientX: 200, clientY: 10 }] });
+    fireEvent.touchCancel(bar);
+    expect(onSwipeProgress).not.toHaveBeenCalled();
+  });
+
+  it("onSwipeProgress 未指定でも touchmove でエラーにならない", () => {
+    const { container } = render(<MobileSwipeBar height={28} />);
+    const bar = container.firstChild as HTMLElement;
+    expect(() => {
+      fireEvent.touchStart(bar, { touches: [{ clientX: 200, clientY: 10 }] });
+      fireEvent.touchMove(bar, { touches: [{ clientX: 180, clientY: 12 }] });
+      fireEvent.touchCancel(bar);
+    }).not.toThrow();
+  });
 });
