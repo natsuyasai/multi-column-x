@@ -106,7 +106,96 @@ function extractLongPressVideoIdFromPlayer(
   return (props.videoId as Record<string, unknown>).id as string;
 }
 
+// --- 動画ポップアップ表示用の純粋関数（image_popup.ts のロジックを複製） ---
+
+/** href をそのまま絶対URLとして使うか、x.com を補って絶対URL化する。 */
+export function resolveLongPressAbsolute(href: string): string {
+  return href.startsWith("http") ? href : "https://x.com" + href;
+}
+
+/**
+ * status パーマリンク（/<user>/status/<id>、末尾に余分なセグメントが付く場合あり）から
+ * /<user>/status/<id>/video/<index> の絶対 URL を組み立てる。
+ */
+export function buildLongPressVideoUrl(
+  statusPermalinkHref: string,
+  index: number,
+): string {
+  const match = statusPermalinkHref.match(/^(.*\/status\/\d+)/);
+  const base = match ? match[1] : statusPermalinkHref;
+  return resolveLongPressAbsolute(`${base}/video/${index}`);
+}
+
+/** status id から /i/status/<id>/video/<index> の絶対 URL を組み立てる。 */
+export function buildLongPressIStatusVideoUrl(
+  statusId: string,
+  index: number,
+): string {
+  return resolveLongPressAbsolute(`/i/status/${statusId}/video/${index}`);
+}
+
+/** article 内の timestamp リンク（time 子要素を持つ status リンク）の href を返す。 */
+export function findLongPressStatusPermalink(article: Element): string | null {
+  const links = article.querySelectorAll<HTMLAnchorElement>(
+    'a[href*="/status/"]',
+  );
+  for (const link of Array.from(links)) {
+    if (link.querySelector("time")) {
+      return link.getAttribute("href");
+    }
+  }
+  return null;
+}
+
+/**
+ * el を内包する tweetPhoto の、root（既定は article）配下 tweetPhoto 群における
+ * 1-based インデックスを返す。取得不可時は 1。引用ツイートではコンテナを root に渡す。
+ */
+export function findLongPressMediaIndex(
+  el: Element,
+  root?: Element | null,
+): number {
+  const photo = el.closest('div[data-testid="tweetPhoto"]');
+  const container = root ?? el.closest("article");
+  if (!photo || !container) return 1;
+  const photos = Array.from(
+    container.querySelectorAll('div[data-testid="tweetPhoto"]'),
+  );
+  const index = photos.indexOf(photo);
+  return index >= 0 ? index + 1 : 1;
+}
+
+/**
+ * el が引用ツイートコンテナ（div[role="link"][tabindex="0"]）の内側にあれば
+ * そのコンテナを返す。通常ツイートの動画では null。
+ */
+export function findLongPressQuotedTweetContainer(el: Element): Element | null {
+  return el.closest('div[role="link"][tabindex="0"]');
+}
+
+/**
+ * 引用ツイートコンテナから React Fiber を遡り、最寄りの tweet.id_str を返す。
+ * 引用RT は DOM 上に引用ツイートの status リンクが無いため、これが唯一の取得手段。
+ * 取得できなければ null（呼び出し側はポップアップを開かずフォールバックする）。
+ */
+export function extractLongPressQuotedTweetId(
+  container: Element,
+): string | null {
+  const props = findLongPressAncestorProps(container, (p) => {
+    const tweet = p.tweet;
+    return (
+      isLongPressRecord(tweet) &&
+      typeof tweet.id_str === "string" &&
+      /^\d+$/.test(tweet.id_str)
+    );
+  });
+  if (!props) return null;
+  return (props.tweet as Record<string, unknown>).id_str as string;
+}
+
 (function () {
+  const OPEN_POPUP_WINDOW = "open_popup_window";
+
   let menu: HTMLDivElement | null = null;
 
   function removeMenu(): void {
@@ -122,6 +211,48 @@ function extractLongPressVideoIdFromPlayer(
     const suggestedFileName = extractLongPressVideoIdFromPlayer(videoEl) ?? "";
     window.__mcxVideoDownloadBridge?.downloadVideo(
       JSON.stringify({ variants, suggestedFileName }),
+    );
+  }
+
+  function isLongPressVideoPopupEnabled(): boolean {
+    return window.__multiColumnXConfig?.videoPopupEnabled !== false;
+  }
+
+  function tauriInvoke(cmd: string, args: Record<string, unknown>): void {
+    const invoke = window.__TAURI__?.core?.invoke ?? window.__TAURI__?.invoke;
+    if (invoke) {
+      invoke(cmd, args);
+    }
+  }
+
+  function openLongPressPopup(url: string): void {
+    const label =
+      window.__TAURI_INTERNALS__?.metadata?.currentWebview?.label ?? "unknown";
+    tauriInvoke(OPEN_POPUP_WINDOW, {
+      webviewLabelCaller: label,
+      url,
+    });
+  }
+
+  function requestVideoPopup(videoEl: Element): void {
+    const quoted = findLongPressQuotedTweetContainer(videoEl);
+    if (quoted) {
+      const quotedId = extractLongPressQuotedTweetId(quoted);
+      if (!quotedId) return;
+      openLongPressPopup(
+        buildLongPressIStatusVideoUrl(
+          quotedId,
+          findLongPressMediaIndex(videoEl, quoted),
+        ),
+      );
+      return;
+    }
+    const article = videoEl.closest("article");
+    if (!article) return;
+    const permalink = findLongPressStatusPermalink(article);
+    if (!permalink) return;
+    openLongPressPopup(
+      buildLongPressVideoUrl(permalink, findLongPressMediaIndex(videoEl)),
     );
   }
 
@@ -167,6 +298,30 @@ function extractLongPressVideoIdFromPlayer(
     });
 
     el.appendChild(item);
+
+    if (isLongPressVideoPopupEnabled()) {
+      const popupItem = document.createElement("div");
+      popupItem.textContent = "動画をポップアップで表示";
+      popupItem.style.cssText = [
+        "padding: 8px 16px",
+        "cursor: pointer",
+        "white-space: nowrap",
+      ].join(";");
+      popupItem.addEventListener("mouseenter", () => {
+        popupItem.style.background = "#1d9bf0";
+      });
+      popupItem.addEventListener("mouseleave", () => {
+        popupItem.style.background = "";
+      });
+      popupItem.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        removeMenu();
+        requestVideoPopup(videoEl);
+      });
+      el.appendChild(popupItem);
+    }
+
     document.documentElement.appendChild(el);
     menu = el;
 

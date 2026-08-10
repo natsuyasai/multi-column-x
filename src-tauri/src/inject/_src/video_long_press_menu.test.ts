@@ -1,13 +1,58 @@
 // video_long_press_menu.ts は IIFE のため、import 時に contextmenu リスナーが
 // document へ登録される。vi.resetModules で再 import してテストする。
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+  findLongPressStatusPermalink,
+  findLongPressQuotedTweetContainer,
+  extractLongPressQuotedTweetId,
+  findLongPressMediaIndex,
+  buildLongPressVideoUrl,
+  buildLongPressIStatusVideoUrl,
+} from "./video_long_press_menu";
 
 const downloadVideoMock = vi.fn();
+const invokeMock = vi.fn((_cmd: string, _args?: Record<string, unknown>) =>
+  Promise.resolve<unknown>(undefined),
+);
+
+const WEBVIEW_LABEL = "col-1";
 
 async function importLongPressMenu(): Promise<void> {
   vi.resetModules();
   document.getElementById("tv-video-long-press-menu")?.remove();
   await import("./video_long_press_menu");
+}
+
+function setConfig(config: Partial<MultiColumnXConfig>): void {
+  window.__multiColumnXConfig = config as MultiColumnXConfig;
+}
+
+/** time 子要素を持つ status リンクを内包する article を生成する。 */
+function buildArticle(statusHref: string): HTMLElement {
+  const article = document.createElement("article");
+  const timeLink = document.createElement("a");
+  timeLink.setAttribute("href", statusHref);
+  timeLink.appendChild(document.createElement("time"));
+  article.appendChild(timeLink);
+  document.body.appendChild(article);
+  return article;
+}
+
+/** article/container に tweetPhoto を追加し、動画要素を内包させる。 */
+function addTweetPhotoWithVideo(container: HTMLElement): HTMLDivElement {
+  const photo = document.createElement("div");
+  photo.dataset.testid = "tweetPhoto";
+  const videoEl = createVideoComponent();
+  photo.appendChild(videoEl);
+  container.appendChild(photo);
+  return videoEl;
+}
+
+function addTweetPhoto(container: HTMLElement): HTMLDivElement {
+  const photo = document.createElement("div");
+  photo.dataset.testid = "tweetPhoto";
+  container.appendChild(photo);
+  return photo;
 }
 
 /** 要素に疑似 React fiber（__reactFiber$test）を直接セットする。 */
@@ -178,5 +223,217 @@ describe("inject/video_long_press_menu の長押しメニュー", () => {
     dispatchContextMenu(other);
 
     expect(getMenu()).toBeNull();
+  });
+});
+
+describe("inject/video_long_press_menu の純粋関数（ポップアップ用）", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  describe("findLongPressStatusPermalink", () => {
+    it("time子要素を持つstatusリンクのhrefを返す", () => {
+      const article = buildArticle("/alice/status/123");
+      expect(findLongPressStatusPermalink(article)).toBe("/alice/status/123");
+    });
+
+    it("timeを持たないstatusリンクしかなければnullを返す", () => {
+      const article = document.createElement("article");
+      const link = document.createElement("a");
+      link.setAttribute("href", "/alice/status/123");
+      article.appendChild(link);
+      expect(findLongPressStatusPermalink(article)).toBeNull();
+    });
+  });
+
+  describe("findLongPressQuotedTweetContainer", () => {
+    it("引用RTコンテナがあれば返す", () => {
+      const container = document.createElement("div");
+      container.setAttribute("role", "link");
+      container.setAttribute("tabindex", "0");
+      const child = document.createElement("div");
+      container.appendChild(child);
+      document.body.appendChild(container);
+
+      expect(findLongPressQuotedTweetContainer(child)).toBe(container);
+    });
+
+    it("通常ツイートならnullを返す", () => {
+      const el = document.createElement("div");
+      document.body.appendChild(el);
+
+      expect(findLongPressQuotedTweetContainer(el)).toBeNull();
+    });
+  });
+
+  describe("extractLongPressQuotedTweetId", () => {
+    it("React Fiberからtweet.id_strを取得できる", () => {
+      const container = document.createElement("div");
+      attachFiber(container, {
+        tweet: { id_str: "2069216779545751868" },
+      });
+
+      expect(extractLongPressQuotedTweetId(container)).toBe(
+        "2069216779545751868",
+      );
+    });
+
+    it("取得できない場合はnullを返す", () => {
+      const container = document.createElement("div");
+
+      expect(extractLongPressQuotedTweetId(container)).toBeNull();
+    });
+  });
+
+  describe("findLongPressMediaIndex", () => {
+    it("複数tweetPhoto中の正しいインデックスを返す", () => {
+      const article = buildArticle("/alice/status/123");
+      addTweetPhoto(article);
+      const videoEl = addTweetPhotoWithVideo(article);
+
+      expect(findLongPressMediaIndex(videoEl)).toBe(2);
+    });
+
+    it("見つからない場合は1を返す", () => {
+      const orphan = document.createElement("div");
+      document.body.appendChild(orphan);
+
+      expect(findLongPressMediaIndex(orphan)).toBe(1);
+    });
+  });
+
+  describe("buildLongPressVideoUrl", () => {
+    it("相対permalinkから/video/<index>の絶対URLを組み立てる", () => {
+      expect(buildLongPressVideoUrl("/alice/status/123", 1)).toBe(
+        "https://x.com/alice/status/123/video/1",
+      );
+    });
+
+    it("末尾に余分なセグメントがあってもstatus idまでを使う", () => {
+      expect(buildLongPressVideoUrl("/alice/status/123/photo/1", 2)).toBe(
+        "https://x.com/alice/status/123/video/2",
+      );
+    });
+  });
+
+  describe("buildLongPressIStatusVideoUrl", () => {
+    it("status idから/i/status/<id>/video/<index>の絶対URLを組み立てる", () => {
+      expect(buildLongPressIStatusVideoUrl("2069216779545751868", 1)).toBe(
+        "https://x.com/i/status/2069216779545751868/video/1",
+      );
+    });
+  });
+});
+
+describe("inject/video_long_press_menu のポップアップメニュー項目", () => {
+  function clickSecondMenuItem(): void {
+    const menu = getMenu();
+    if (!menu) throw new Error("menu not found");
+    const item = menu.children[1];
+    if (!item) throw new Error("popup menu item not found");
+    item.dispatchEvent(
+      new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
+    );
+  }
+
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    getMenu()?.remove();
+    invokeMock.mockClear();
+    window.__TAURI__ = { core: { invoke: invokeMock } };
+    window.__TAURI_INTERNALS__ = {
+      metadata: { currentWebview: { label: WEBVIEW_LABEL } },
+    };
+    window.__mcxVideoDownloadBridge = { downloadVideo: downloadVideoMock };
+    setConfig({ videoPopupEnabled: true });
+  });
+
+  afterEach(() => {
+    delete window.__TAURI_INTERNALS__;
+    delete window.__mcxVideoDownloadBridge;
+    delete window.__multiColumnXConfig;
+    getMenu()?.remove();
+  });
+
+  it("通常動画ではarticleのpermalinkから/video/<idx>のopen_popup_windowを呼ぶ", async () => {
+    await importLongPressMenu();
+    const article = buildArticle("/carol/status/555");
+    addTweetPhoto(article);
+    const videoEl = addTweetPhotoWithVideo(article);
+    dispatchContextMenu(videoEl);
+
+    clickSecondMenuItem();
+
+    expect(invokeMock).toHaveBeenCalledWith("open_popup_window", {
+      webviewLabelCaller: WEBVIEW_LABEL,
+      url: "https://x.com/carol/status/555/video/2",
+    });
+  });
+
+  it("引用RT内の動画はfiberのtweet.id_strから/i/status/<id>/video/1を開く", async () => {
+    await importLongPressMenu();
+    const article = buildArticle("/sankims/status/2070347996856996068");
+    const quoted = document.createElement("div");
+    quoted.setAttribute("role", "link");
+    quoted.setAttribute("tabindex", "0");
+    attachFiber(quoted, { tweet: { id_str: "2069216779545751868" } });
+    article.appendChild(quoted);
+    const videoEl = addTweetPhotoWithVideo(quoted);
+    dispatchContextMenu(videoEl);
+
+    clickSecondMenuItem();
+
+    expect(invokeMock).toHaveBeenCalledWith("open_popup_window", {
+      webviewLabelCaller: WEBVIEW_LABEL,
+      url: "https://x.com/i/status/2069216779545751868/video/1",
+    });
+  });
+
+  it("videoPopupEnabled=falseの場合はメニュー項目が追加されない", async () => {
+    setConfig({ videoPopupEnabled: false });
+    await importLongPressMenu();
+    const article = buildArticle("/carol/status/555");
+    const videoEl = addTweetPhotoWithVideo(article);
+    dispatchContextMenu(videoEl);
+
+    expect(getMenu()?.children.length).toBe(1);
+  });
+
+  it("videoPopupEnabledがundefinedのときは既定で有効扱いとなりメニュー項目が追加される", async () => {
+    setConfig({});
+    await importLongPressMenu();
+    const article = buildArticle("/carol/status/555");
+    const videoEl = addTweetPhotoWithVideo(article);
+    dispatchContextMenu(videoEl);
+
+    expect(getMenu()?.children.length).toBe(2);
+  });
+
+  it("permalinkが見つからない場合はinvokeを呼ばない", async () => {
+    await importLongPressMenu();
+    const orphanArticle = document.createElement("article");
+    document.body.appendChild(orphanArticle);
+    const videoEl = addTweetPhotoWithVideo(orphanArticle);
+    dispatchContextMenu(videoEl);
+
+    clickSecondMenuItem();
+
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("ダウンロード項目クリックは引き続きdownloadVideoを呼ぶ（既存機能への影響なし）", async () => {
+    await importLongPressMenu();
+    const videoEl = createVideoComponent();
+    attachFiber(videoEl, PLAYER_PROPS);
+    dispatchContextMenu(videoEl);
+
+    const menu = getMenu();
+    if (!menu) throw new Error("menu not found");
+    menu.children[0]?.dispatchEvent(
+      new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
+    );
+
+    expect(downloadVideoMock).toHaveBeenCalledTimes(1);
+    expect(invokeMock).not.toHaveBeenCalled();
   });
 });
