@@ -198,6 +198,8 @@ pub fn run() {
             commands::webview::set_column_cookies,
             commands::webview::is_webview_profile_supported,
             commands::webview::open_in_browser,
+            commands::webview::update_mobile_swipe_bar,
+            commands::webview::flash_mobile_swipe_bar,
             commands::account::open_add_account_window,
             commands::account::reauth_account_window,
             commands::account::delete_account_data,

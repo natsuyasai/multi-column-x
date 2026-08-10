@@ -225,6 +225,43 @@ pub async fn open_in_browser(url: String) -> Result<(), String> {
     tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())
 }
 
+/// モバイルスワイプバーのネイティブオーバーレイ状態（表示/位置/高さ/透過度/テーマ）を更新する。
+/// Android 以外は no-op（デスクトップはネイティブオーバーレイを持たない）。
+/// darkTheme は JS 側 camelCase キーに合わせるため non_snake_case を許容する（全ターゲット共通）。
+/// 引数は Android 以外では未参照になるため、非 Android ビルドでのみ unused_variables を許容する
+/// （Android ビルドでは実際に使われるため、そちらでは lint を有効なまま保つ）。
+#[tauri::command]
+#[allow(non_snake_case)]
+#[cfg_attr(not(target_os = "android"), allow(unused_variables))]
+pub async fn update_mobile_swipe_bar(
+    visible: bool,
+    y: i32,
+    height: i32,
+    opacity: i32,
+    darkTheme: bool,
+) -> Result<(), String> {
+    #[cfg(target_os = "android")]
+    {
+        crate::android_bridge::set_swipe_bar_overlay(visible, y, height, opacity, darkTheme)?;
+    }
+    Ok(())
+}
+
+/// スワイプによるカラム遷移が確定したときの視覚フラッシュ演出をトリガーする。
+/// React 側の navigateColumn が実際に遷移を決定したときのみ呼ばれる想定
+/// （Kotlin 側で自前判定しない。理由は plan.md の「設計上の重要な決定 (B)」参照）。
+/// Android 以外は no-op。direction は非 Android ビルドでのみ未参照になるため、そのビルドでのみ
+/// unused_variables を許容する。
+#[tauri::command]
+#[cfg_attr(not(target_os = "android"), allow(unused_variables))]
+pub async fn flash_mobile_swipe_bar(direction: String) -> Result<(), String> {
+    #[cfg(target_os = "android")]
+    {
+        crate::android_bridge::set_swipe_bar_flash(&direction)?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

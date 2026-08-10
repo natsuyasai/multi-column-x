@@ -456,6 +456,106 @@ pub fn reshow_popup_webview(id: &str, url: &str) -> Result<bool, String> {
     result
 }
 
+// ── モバイルスワイプバー ネイティブオーバーレイ ──────────────────────────
+
+/// MainActivity.setSwipeBarOverlay を呼び出してスワイプバーのネイティブオーバーレイを更新する。
+/// y_dp はカラム WebView と同じ座標系（mobileColumnLayout と同じ計算元）の絶対座標。
+/// Gravity.BOTTOM 等の相対配置は使わない（IME表示・回転でカラムとズレるため）。
+pub fn set_swipe_bar_overlay(
+    visible: bool,
+    y_dp: i32,
+    height_dp: i32,
+    opacity_percent: i32,
+    dark_theme: bool,
+) -> Result<(), String> {
+    call_activity_method(|env, activity| {
+        env.call_method(
+            activity,
+            "setSwipeBarOverlay",
+            "(ZIIIZ)V",
+            &[
+                JValue::Bool(visible as u8),
+                JValue::Int(y_dp),
+                JValue::Int(height_dp),
+                JValue::Int(opacity_percent),
+                JValue::Bool(dark_theme as u8),
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
+/// MainActivity.setSwipeBarFlash を呼び出し、スワイプによるカラム遷移が実際に確定したときの
+/// 視覚フラッシュ演出をトリガーする。React側の navigateColumn が実際に遷移を決定したときのみ
+/// 呼ばれる想定（Kotlin側でジェスチャー完了時に自前判定してはいけない。理由は plan.md 参照）。
+pub fn set_swipe_bar_flash(direction: &str) -> Result<(), String> {
+    call_activity_method(|env, activity| {
+        let j_direction = env.new_string(direction).map_err(|e| e.to_string())?;
+        env.call_method(
+            activity,
+            "setSwipeBarFlash",
+            "(Ljava/lang/String;)V",
+            &[JValue::Object(&*j_direction)],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
+/// AppBridge.onSwipeNavigate(direction) から呼ばれる JNI エントリポイント。
+/// スワイプジェスチャーでカラム遷移が要求されたことを React 側へ伝える。
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onSwipeNavigate<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    direction: jni::objects::JString<'local>,
+) {
+    use tauri::Emitter;
+    let direction: String = match env.get_string(&direction) {
+        Ok(s) => s.into(),
+        Err(e) => {
+            eprintln!("[AppBridge.onSwipeNavigate] get_string: {e}");
+            return;
+        }
+    };
+    let guard = TAURI_APP.lock().expect("TAURI_APP mutex poisoned");
+    if let Some(app) = guard.as_ref() {
+        let _ = app.emit(
+            crate::ipc_constants::events::MOBILE_SWIPE_NAVIGATE,
+            direction,
+        );
+    }
+}
+
+/// AppBridge.onSwipeProgress(direction) から呼ばれる JNI エントリポイント。
+/// スワイプジェスチャー中の指の移動方向を React 側へ伝える。
+/// 空文字列は「進捗なし（指を離した/方向未確定）」を表す。JS側で "" → null に変換する。
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onSwipeProgress<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    direction: jni::objects::JString<'local>,
+) {
+    use tauri::Emitter;
+    let direction: String = match env.get_string(&direction) {
+        Ok(s) => s.into(),
+        Err(e) => {
+            eprintln!("[AppBridge.onSwipeProgress] get_string: {e}");
+            return;
+        }
+    };
+    let guard = TAURI_APP.lock().expect("TAURI_APP mutex poisoned");
+    if let Some(app) = guard.as_ref() {
+        let _ = app.emit(
+            crate::ipc_constants::events::MOBILE_SWIPE_PROGRESS,
+            direction,
+        );
+    }
+}
+
 /// MainActivity.setAccountCookies を呼び出して CookieManager を指定アカウントに切り替える。
 /// showColumnWebView とは独立しているため、WebView の表示状態に影響しない。
 pub fn set_account_cookies(account_id: &str) -> Result<(), String> {
