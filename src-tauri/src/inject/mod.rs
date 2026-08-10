@@ -89,7 +89,11 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     } else {
         ""
     };
-    let video_long_press_menu = include_str!("video_long_press_menu.js");
+    let video_long_press_menu = if params.is_mobile {
+        include_str!("video_long_press_menu.js")
+    } else {
+        ""
+    };
     let api_rate_limit_monitor = include_str!("api_rate_limit_monitor.js");
 
     let visible_links_json =
@@ -444,9 +448,9 @@ mod tests {
     }
 
     #[test]
-    fn is_mobileがfalseのときも動画長押しメニュースクリプトが含まれる() {
+    fn is_mobileがfalseのとき動画長押しメニュースクリプトが含まれない() {
         let script = build_init_script(&default_params()); // is_mobile: false
-        assert!(script.contains("tv-video-long-press-menu"));
+        assert!(!script.contains("tv-video-long-press-menu"));
     }
 
     #[test]
