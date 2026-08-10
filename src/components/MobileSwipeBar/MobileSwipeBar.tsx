@@ -6,6 +6,8 @@ const PROGRESS_MIN_PX = 10;
 
 interface Props {
   height: number;
+  /** 透過度（0-100、%単位）。style.opacity へは 0-1 に変換して反映する */
+  opacity: number;
   swipeState?: {
     direction: "left" | "right";
     phase: "progress" | "switching";
@@ -16,6 +18,7 @@ interface Props {
 
 export const MobileSwipeBar: React.FC<Props> = ({
   height,
+  opacity,
   swipeState,
   onSwipeNavigate,
   onSwipeProgress,
@@ -89,7 +92,7 @@ export const MobileSwipeBar: React.FC<Props> = ({
   return (
     <div
       className={className}
-      style={{ height }}
+      style={{ height, opacity: opacity / 100 }}
       onTouchStart={handleStart}
       onTouchMove={handleMove}
       onTouchEnd={handleEnd}

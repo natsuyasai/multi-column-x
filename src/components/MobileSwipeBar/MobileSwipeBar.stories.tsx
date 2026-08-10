@@ -30,6 +30,7 @@ const meta: Meta<typeof MobileSwipeBar> = {
   parameters: { layout: "fullscreen" },
   args: {
     height: 28,
+    opacity: 50,
     swipeState: null,
     onSwipeNavigate: fn(),
   },
@@ -89,5 +90,18 @@ export const SwipeProgressRight: Story = {
     const canvas = within(canvasElement);
     const leftHint = canvas.getByText("‹");
     await expect(leftHint.parentElement?.className).toContain("progressRight");
+  },
+};
+
+export const OpacityLow: Story = {
+  name: "透過度低（20%）",
+  args: {
+    opacity: 20,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const grip = canvas.getByText("⠿ スワイプで切替 ⠿");
+    const bar = grip.parentElement as HTMLElement;
+    await expect(bar.style.opacity).toBe("0.2");
   },
 };
