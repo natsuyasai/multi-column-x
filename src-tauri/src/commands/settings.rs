@@ -94,6 +94,9 @@ fn default_column_scale() -> String {
 fn default_mobile_swipe_area_height() -> u32 {
     28
 }
+fn default_mobile_swipe_area_opacity() -> u8 {
+    50
+}
 
 impl Default for WindowBounds {
     fn default() -> Self {
@@ -139,6 +142,7 @@ impl Default for GlobalSettingsData {
             use_x_app_for_compose: false,
             mobile_swipe_area_enabled: true,
             mobile_swipe_area_height: 28,
+            mobile_swipe_area_opacity: 50,
             mobile_two_column_enabled: true,
             presets: vec![],
             ng_words: vec![],
@@ -273,6 +277,9 @@ pub struct GlobalSettingsData {
     #[serde(rename = "mobileSwipeAreaHeight")]
     #[serde(default = "default_mobile_swipe_area_height")]
     pub mobile_swipe_area_height: u32,
+    #[serde(rename = "mobileSwipeAreaOpacity")]
+    #[serde(default = "default_mobile_swipe_area_opacity")]
+    pub mobile_swipe_area_opacity: u8,
     #[serde(rename = "mobileTwoColumnEnabled")]
     #[serde(default = "default_true")]
     pub mobile_two_column_enabled: bool,
@@ -431,6 +438,7 @@ mod tests {
         let gs = GlobalSettingsData::default();
         assert!(gs.mobile_swipe_area_enabled);
         assert_eq!(gs.mobile_swipe_area_height, 28);
+        assert_eq!(gs.mobile_swipe_area_opacity, 50);
     }
 
     #[test]
