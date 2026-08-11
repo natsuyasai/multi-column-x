@@ -40,7 +40,8 @@
     "VIDEO_DOWNLOAD_PROGRESS": "video-download-progress",
     "WEBVIEW_API_RATE_LIMIT": "webview-api-rate-limit",
     "MOBILE_SWIPE_NAVIGATE": "mobile-swipe-navigate",
-    "MOBILE_SWIPE_PROGRESS": "mobile-swipe-progress"
+    "MOBILE_SWIPE_PROGRESS": "mobile-swipe-progress",
+    "MOBILE_SWIPE_DOUBLE_TAP": "mobile-swipe-double-tap"
   },
   "labels": {
     "MAIN": "main",

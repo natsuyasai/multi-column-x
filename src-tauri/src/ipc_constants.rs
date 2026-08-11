@@ -34,6 +34,8 @@ pub mod events {
     pub const MOBILE_SWIPE_NAVIGATE: &str = "mobile-swipe-navigate";
     /// モバイルスワイプバーのスワイプ中進捗通知（Android JNI → TS listen）payload は "left" | "right" | ""。
     pub const MOBILE_SWIPE_PROGRESS: &str = "mobile-swipe-progress";
+    /// モバイルスワイプバーのダブルタップ確定通知（Android JNI → TS listen）payloadなし。
+    pub const MOBILE_SWIPE_DOUBLE_TAP: &str = "mobile-swipe-double-tap";
 }
 
 /// WebView / ウィンドウラベルのプレフィックス
@@ -97,6 +99,7 @@ mod tests {
             ("WEBVIEW_API_RATE_LIMIT", events::WEBVIEW_API_RATE_LIMIT),
             ("MOBILE_SWIPE_NAVIGATE", events::MOBILE_SWIPE_NAVIGATE),
             ("MOBILE_SWIPE_PROGRESS", events::MOBILE_SWIPE_PROGRESS),
+            ("MOBILE_SWIPE_DOUBLE_TAP", events::MOBILE_SWIPE_DOUBLE_TAP),
         ];
         assert_eq!(
             expected.as_object().unwrap().len(),

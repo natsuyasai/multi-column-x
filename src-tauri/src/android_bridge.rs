@@ -556,6 +556,22 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onSwipeProgr
     }
 }
 
+/// AppBridge.onSwipeDoubleTap() から呼ばれる JNI エントリポイント。
+/// スワイプ領域でダブルタップが確定したことを React 側へ伝える。
+/// React 側はアクティブカラムを先頭スクロール+リロードする（タブのダブルタップと同じ動作）。
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onSwipeDoubleTap<'local>(
+    _env: JNIEnv<'local>,
+    _class: JClass<'local>,
+) {
+    use tauri::Emitter;
+    let guard = TAURI_APP.lock().expect("TAURI_APP mutex poisoned");
+    if let Some(app) = guard.as_ref() {
+        let _ = app.emit(crate::ipc_constants::events::MOBILE_SWIPE_DOUBLE_TAP, ());
+    }
+}
+
 /// MainActivity.setAccountCookies を呼び出して CookieManager を指定アカウントに切り替える。
 /// showColumnWebView とは独立しているため、WebView の表示状態に影響しない。
 pub fn set_account_cookies(account_id: &str) -> Result<(), String> {
