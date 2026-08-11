@@ -195,7 +195,6 @@ describe("mobileColumnLayout", () => {
       twoColumnEnabled: true,
       viewportWidth: 800,
       viewportHeight: 1000,
-      swipeAreaHeight: 0,
     });
     expect(result["c1"].x).toBe(OFFSCREEN.MOBILE_X);
     expect(result["c2"].x).toBe(OFFSCREEN.MOBILE_X);
@@ -210,7 +209,6 @@ describe("mobileColumnLayout", () => {
       twoColumnEnabled: true,
       viewportWidth: 800,
       viewportHeight: 1000,
-      swipeAreaHeight: 0,
     });
     expect(result["c1"].x).toBe(OFFSCREEN.MOBILE_X);
     expect(result["c2"].x).toBe(OFFSCREEN.MOBILE_X);
@@ -225,13 +223,12 @@ describe("mobileColumnLayout", () => {
       twoColumnEnabled: false,
       viewportWidth: 800,
       viewportHeight: 1000,
-      swipeAreaHeight: 20,
     });
     expect(result["c2"]).toEqual({
       x: 0,
       y: 0,
       width: 800,
-      height: 1000 - (56 + 20),
+      height: 1000 - 56,
     });
     expect(result["c1"].x).toBe(OFFSCREEN.MOBILE_X);
     expect(result["c3"].x).toBe(OFFSCREEN.MOBILE_X);
@@ -245,7 +242,6 @@ describe("mobileColumnLayout", () => {
       twoColumnEnabled: true,
       viewportWidth: 599,
       viewportHeight: 1000,
-      swipeAreaHeight: 0,
     });
     expect(result["c2"]).toEqual({
       x: 0,
@@ -265,7 +261,6 @@ describe("mobileColumnLayout", () => {
       twoColumnEnabled: true,
       viewportWidth: 800,
       viewportHeight: 1000,
-      swipeAreaHeight: 0,
     });
     expect(result["c1"]).toEqual({
       x: 0,
@@ -283,7 +278,6 @@ describe("mobileColumnLayout", () => {
       twoColumnEnabled: true,
       viewportWidth: 800,
       viewportHeight: 1000,
-      swipeAreaHeight: 0,
     });
     expect(result["c1"]).toEqual({ x: 0, y: 0, width: 400, height: 944 });
     expect(result["c2"]).toEqual({ x: 400, y: 0, width: 400, height: 944 });
@@ -298,7 +292,6 @@ describe("mobileColumnLayout", () => {
       twoColumnEnabled: true,
       viewportWidth: 800,
       viewportHeight: 1000,
-      swipeAreaHeight: 0,
     });
     expect(result["c1"].width + result["c2"].width).toBe(800);
   });
@@ -311,7 +304,6 @@ describe("mobileColumnLayout", () => {
       twoColumnEnabled: true,
       viewportWidth: 800,
       viewportHeight: 1000,
-      swipeAreaHeight: 0,
     });
     expect(result["c1"].x).toBe(OFFSCREEN.MOBILE_X);
     expect(result["c2"]).toEqual({ x: 0, y: 0, width: 400, height: 944 });
@@ -326,7 +318,6 @@ describe("mobileColumnLayout", () => {
       twoColumnEnabled: true,
       viewportWidth: 600,
       viewportHeight: 1000,
-      swipeAreaHeight: 0,
     });
     expect(result["c1"].width).toBe(300);
     expect(result["c2"].width).toBe(300);
@@ -341,7 +332,6 @@ describe("mobileColumnLayout", () => {
       twoColumnEnabled: true,
       viewportWidth: 601,
       viewportHeight: 1000,
-      swipeAreaHeight: 0,
     });
     expect(result["c1"].width).toBe(300);
     expect(result["c2"].width).toBe(301);
@@ -349,19 +339,18 @@ describe("mobileColumnLayout", () => {
   });
 
   // 仕様 #8
-  it("表示カラムのyは常に0、heightはタブバーとスワイプ帯を引いた値になる", () => {
+  it("表示カラムのyは常に0、heightはタブバーを引いた値になる", () => {
     const result = mobileColumnLayout({
       columns: cols3,
       activeColumnId: "c1",
       twoColumnEnabled: true,
       viewportWidth: 800,
       viewportHeight: 1000,
-      swipeAreaHeight: 30,
     });
     expect(result["c1"].y).toBe(0);
     expect(result["c2"].y).toBe(0);
-    expect(result["c1"].height).toBe(1000 - (56 + 30));
-    expect(result["c2"].height).toBe(1000 - (56 + 30));
+    expect(result["c1"].height).toBe(1000 - 56);
+    expect(result["c2"].height).toBe(1000 - 56);
   });
 
   // 仕様 #9
@@ -378,7 +367,6 @@ describe("mobileColumnLayout", () => {
       twoColumnEnabled: true,
       viewportWidth: 800,
       viewportHeight: 1000,
-      swipeAreaHeight: 0,
     });
     expect(result["c1"].x).toBe(OFFSCREEN.MOBILE_X);
     expect(result["c2"].x).toBe(0);
@@ -398,7 +386,6 @@ describe("mobileColumnLayout", () => {
       twoColumnEnabled: true,
       viewportWidth: 800,
       viewportHeight: 1000,
-      swipeAreaHeight: 0,
     });
     expect(result["c2"]).toEqual({ x: 0, y: 0, width: 400, height: 944 });
     expect(result["c3"]).toEqual({ x: 400, y: 0, width: 400, height: 944 });

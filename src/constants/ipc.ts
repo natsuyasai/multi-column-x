@@ -51,6 +51,10 @@ export const IPC_COMMANDS = {
 
   // 動画ダウンロード
   DOWNLOAD_VIDEO: "download_video",
+
+  // モバイルスワイプバー（ネイティブオーバーレイ）
+  UPDATE_MOBILE_SWIPE_BAR: "update_mobile_swipe_bar",
+  FLASH_MOBILE_SWIPE_BAR: "flash_mobile_swipe_bar",
 } as const;
 
 /** Tauri イベント名 */
@@ -75,6 +79,12 @@ export const IPC_EVENTS = {
   VIDEO_DOWNLOAD_PROGRESS: "video-download-progress",
   /** APIレート制限残量通知（inject script invoke → TS listen）{ label, bucketKey, limit, remaining, reset } */
   WEBVIEW_API_RATE_LIMIT: "webview-api-rate-limit",
+  /** モバイルスワイプバーの遷移確定通知（Android JNI → TS listen）payload は "left" | "right" */
+  MOBILE_SWIPE_NAVIGATE: "mobile-swipe-navigate",
+  /** モバイルスワイプバーのスワイプ中進捗通知（Android JNI → TS listen）payload は "left" | "right" | "" */
+  MOBILE_SWIPE_PROGRESS: "mobile-swipe-progress",
+  /** モバイルスワイプバーのダブルタップ確定通知（Android JNI → TS listen）payloadなし */
+  MOBILE_SWIPE_DOUBLE_TAP: "mobile-swipe-double-tap",
 } as const;
 
 /** WebView / ウィンドウラベルのプレフィックスと生成ヘルパー */

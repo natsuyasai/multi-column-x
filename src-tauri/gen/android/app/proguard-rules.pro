@@ -51,6 +51,8 @@
     public void notifyVideoDownloadStarted();
     public void notifyVideoDownloadProgress(int, int, long, long);
     public void notifyVideoDownloadFinished();
+    public void setSwipeBarOverlay(boolean, int, int, int, boolean);
+    public void setSwipeBarFlash(java.lang.String);
 }
 
 # popup_toolbar.ts が window.__mcxPopupBridge 経由で呼び出す JavascriptInterface メソッド。

@@ -99,7 +99,6 @@ const mobileScenarioArb = ordersArb.chain((orders) => {
     twoColumnEnabled: fc.boolean(),
     viewportWidth: fc.integer({ min: 0, max: 2000 }),
     viewportHeight: fc.integer({ min: 0, max: 2000 }),
-    swipeAreaHeight: fc.integer({ min: 0, max: 100 }),
   });
 });
 
@@ -114,7 +113,6 @@ const mobileExistingActiveScenarioArb = ordersArb
       twoColumnEnabled: fc.boolean(),
       viewportWidth: fc.integer({ min: 0, max: 2000 }),
       viewportHeight: fc.integer({ min: 0, max: 2000 }),
-      swipeAreaHeight: fc.integer({ min: 0, max: 100 }),
     });
   });
 
@@ -132,7 +130,6 @@ const mobileTwoColumnScenarioArb = ordersArb
         max: 2000,
       }),
       viewportHeight: fc.integer({ min: 0, max: 2000 }),
-      swipeAreaHeight: fc.integer({ min: 0, max: 100 }),
     });
   });
 
@@ -207,13 +204,11 @@ describe("mobileColumnLayout プロパティ", () => {
     );
   });
 
-  it("全カラムのheightは同一で、viewportHeight - (MOBILE_TAB_BAR_HEIGHT + swipeAreaHeight)と一致する", () => {
+  it("全カラムのheightは同一で、viewportHeight - MOBILE_TAB_BAR_HEIGHTと一致する", () => {
     fc.assert(
       fc.property(mobileScenarioArb, (input) => {
         const result = mobileColumnLayout(input);
-        const expectedHeight =
-          input.viewportHeight -
-          (MOBILE_TAB_BAR_HEIGHT + input.swipeAreaHeight);
+        const expectedHeight = input.viewportHeight - MOBILE_TAB_BAR_HEIGHT;
         for (const b of Object.values(result)) {
           expect(b.height).toBe(expectedHeight);
         }

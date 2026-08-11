@@ -6,9 +6,11 @@ import type { Column } from "../types";
 import {
   applyColumnSettingsScripts,
   createColumnWebview,
+  flashMobileSwipeBar,
   removeColumnWebview,
   resizeColumnWebview,
   setColumnCookies,
+  updateMobileSwipeBar,
 } from "./columnWebview";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -72,6 +74,39 @@ describe("columnWebview service", () => {
     await setColumnCookies("acc-1");
     expect(invoke).toHaveBeenCalledWith("set_column_cookies", {
       accountId: "acc-1",
+    });
+  });
+
+  it("updateMobileSwipeBarはvisible/y/height/opacity/darkThemeをまとめて送る", async () => {
+    await updateMobileSwipeBar(true, 700, 28, 50, true);
+    expect(invoke).toHaveBeenCalledWith("update_mobile_swipe_bar", {
+      visible: true,
+      y: 700,
+      height: 28,
+      opacity: 50,
+      darkTheme: true,
+    });
+  });
+
+  it("updateMobileSwipeBarはvisible:falseや透過度0もそのまま送る", async () => {
+    await updateMobileSwipeBar(false, 800, 28, 0, false);
+    expect(invoke).toHaveBeenCalledWith("update_mobile_swipe_bar", {
+      visible: false,
+      y: 800,
+      height: 28,
+      opacity: 0,
+      darkTheme: false,
+    });
+  });
+
+  it("flashMobileSwipeBarはdirectionを送る", async () => {
+    await flashMobileSwipeBar("left");
+    expect(invoke).toHaveBeenCalledWith("flash_mobile_swipe_bar", {
+      direction: "left",
+    });
+    await flashMobileSwipeBar("right");
+    expect(invoke).toHaveBeenCalledWith("flash_mobile_swipe_bar", {
+      direction: "right",
     });
   });
 

@@ -136,7 +136,6 @@ interface MobileColumnLayoutInput {
   twoColumnEnabled: boolean;
   viewportWidth: number;
   viewportHeight: number;
-  swipeAreaHeight: number;
 }
 
 /**
@@ -152,10 +151,9 @@ export function mobileColumnLayout(
     twoColumnEnabled,
     viewportWidth,
     viewportHeight,
-    swipeAreaHeight,
   } = input;
 
-  const height = viewportHeight - (MOBILE_TAB_BAR_HEIGHT + swipeAreaHeight);
+  const height = viewportHeight - MOBILE_TAB_BAR_HEIGHT;
   const offscreenBounds = (): ColumnBounds => ({
     x: OFFSCREEN.MOBILE_X,
     y: 0,

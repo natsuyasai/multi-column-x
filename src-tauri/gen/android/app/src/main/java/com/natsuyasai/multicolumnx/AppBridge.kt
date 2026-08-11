@@ -62,4 +62,29 @@ object AppBridge {
     label: String,
     payloadJson: String,
   )
+
+  /**
+   * スワイプバー（SwipeBarOverlayView）でスワイプジェスチャーが確定したときに呼ぶ。
+   * Rust 側はこれを受けて mobile-swipe-navigate イベントを React へ emit する。
+   * React 側の navigateColumn が実際に遷移を決定した場合のみ、遷移確定フラッシュ
+   * （MainActivity.setSwipeBarFlash 経由）が送り返される想定（自前でここから判定しない）。
+   */
+  @JvmStatic
+  external fun onSwipeNavigate(direction: String)
+
+  /**
+   * スワイプバー（SwipeBarOverlayView）でジェスチャー中の指の移動方向が変化したときに呼ぶ。
+   * Rust 側はこれを受けて mobile-swipe-progress イベントを React へ emit する。
+   * 空文字列は「進捗なし（指を離した/方向未確定）」を表す。
+   */
+  @JvmStatic
+  external fun onSwipeProgress(direction: String)
+
+  /**
+   * スワイプバー（SwipeBarOverlayView）でダブルタップが確定したときに呼ぶ。
+   * Rust 側はこれを受けて mobile-swipe-double-tap イベントを React へ emit する。
+   * React 側はアクティブカラムを先頭スクロール+リロードする（タブのダブルタップと同じ動作）。
+   */
+  @JvmStatic
+  external fun onSwipeDoubleTap()
 }
