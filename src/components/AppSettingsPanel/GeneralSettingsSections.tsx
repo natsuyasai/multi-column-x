@@ -129,6 +129,19 @@ export const GeneralSettingsSections: React.FC<
             }
           />
         </label>
+        <label className={styles.fieldLabel}>
+          スワイプ領域の透過度({draft.mobileSwipeAreaOpacity}%)
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={5}
+            value={draft.mobileSwipeAreaOpacity}
+            onChange={(e) =>
+              set("mobileSwipeAreaOpacity", Number(e.target.value))
+            }
+          />
+        </label>
         <label className={styles.checkLabel}>
           <input
             type="checkbox"

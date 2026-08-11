@@ -83,6 +83,7 @@ describe("useAppStore", () => {
         useXAppForCompose: false,
         mobileSwipeAreaEnabled: true,
         mobileSwipeAreaHeight: 28,
+        mobileSwipeAreaOpacity: 50,
         mobileTwoColumnEnabled: true,
         presets: [],
         ngWords: [],

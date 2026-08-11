@@ -84,6 +84,8 @@ export interface GlobalSettings {
   useXAppForCompose: boolean;
   mobileSwipeAreaEnabled: boolean;
   mobileSwipeAreaHeight: number;
+  /** スワイプ切替バーの透過度（0-100、%単位） */
+  mobileSwipeAreaOpacity: number;
   /** 広い画面（>=600px）で2カラム同時表示する（Android のみ・Profile API 対応端末のみ有効） */
   mobileTwoColumnEnabled: boolean;
   presets: ColumnPreset[];
@@ -198,6 +200,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   useXAppForCompose: false,
   mobileSwipeAreaEnabled: true,
   mobileSwipeAreaHeight: 28,
+  mobileSwipeAreaOpacity: 50,
   mobileTwoColumnEnabled: true,
   presets: [],
   ngWords: [],
