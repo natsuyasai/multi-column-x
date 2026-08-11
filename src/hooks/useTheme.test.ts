@@ -1,4 +1,4 @@
-import { renderHook } from "@testing-library/react";
+import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { useTheme } from "./useTheme";
 
@@ -71,5 +71,21 @@ describe("useTheme", () => {
     expect(mm.listenerCount()).toBe(1);
     unmount();
     expect(mm.listenerCount()).toBe(0);
+  });
+
+  it("解決済みテーマを戻り値として返す", () => {
+    installMatchMedia(false);
+    const { result } = renderHook(() => useTheme("dark"));
+    expect(result.current).toBe("dark");
+  });
+
+  it("system選択中にOS配色が変わると戻り値もライブ追従する", () => {
+    const mm = installMatchMedia(true);
+    const { result } = renderHook(() => useTheme("system"));
+    expect(result.current).toBe("dark");
+    act(() => {
+      mm.emit(false);
+    });
+    expect(result.current).toBe("light");
   });
 });
