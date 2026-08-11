@@ -5,26 +5,49 @@ export function isMediaViewerPath(pathname: string): boolean {
   return /\/mediaviewer\/?$/.test(pathname);
 }
 
+const VIDEO_CONTROL_PLAYER_SELECTOR = '[data-testid="videoComponent"]';
+
 (function () {
+  // ユーザーが動画コンテナを明示的にクリックして再生操作を行った動画は、以降
+  // タイムライン仮想リストの再マウントでXが自動 play() を呼んでも止めない。
+  const unlockedVideos = new WeakSet<HTMLVideoElement>();
+
   function blockFirstAutoplay(video: HTMLVideoElement): void {
     // mediaviewer ではブロックしない（処理時点の URL でその都度判定する）
     if (isMediaViewerPath(window.location.pathname)) {
       return;
     }
     video.pause();
-    let blocked = true;
-    setTimeout(() => {
-      blocked = false;
-    }, 2000);
     video.addEventListener(
       "play",
       (e) => {
-        if (blocked) {
-          (e.target as HTMLVideoElement).pause();
+        const target = e.target as HTMLVideoElement;
+        if (!unlockedVideos.has(target)) {
+          target.pause();
         }
       },
       { capture: true },
     );
+  }
+
+  function findVideoInPlayerContainer(
+    target: EventTarget | null,
+  ): HTMLVideoElement | null {
+    if (!(target instanceof Element)) {
+      return null;
+    }
+    const container = target.closest(VIDEO_CONTROL_PLAYER_SELECTOR);
+    if (!container) {
+      return null;
+    }
+    return container.querySelector("video");
+  }
+
+  function unlockOnContainerClick(e: MouseEvent): void {
+    const video = findVideoInPlayerContainer(e.target);
+    if (video) {
+      unlockedVideos.add(video);
+    }
   }
 
   function stopVideosIn(node: Node): void {
@@ -48,6 +71,10 @@ export function isMediaViewerPath(pathname: string): boolean {
         }
       }
     }).observe(document.body, { childList: true, subtree: true });
+
+    document.addEventListener("click", unlockOnContainerClick, {
+      capture: true,
+    });
   }
 
   if (document.body) {

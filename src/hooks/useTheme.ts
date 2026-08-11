@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { resolveTheme } from "../lib/theme";
+import { useEffect, useState } from "react";
+import { resolveTheme, type ResolvedTheme } from "../lib/theme";
 
 const MEDIA_QUERY = "(prefers-color-scheme: dark)";
 
@@ -12,14 +12,20 @@ function getMql(): MediaQueryList | null {
  * globalSettings.theme を解決済みテーマに変換し、
  * document.documentElement の data-theme 属性へ反映する。
  * "system" の間のみ OS 配色変更を購読してライブ追従する。
+ * 戻り値は解決済みテーマ（"dark" | "light"）。呼び出し側が同じ解決値
+ * （例: モバイルスワイプバーのネイティブオーバーレイへの反映）を必要とする場合、
+ * matchMedia 購読ロジックを重複させずにこの戻り値を再利用できる。
  */
-export function useTheme(theme: string): void {
+export function useTheme(theme: string): ResolvedTheme {
+  const [resolved, setResolved] = useState<ResolvedTheme>(() =>
+    resolveTheme(theme, getMql()?.matches ?? false),
+  );
+
   useEffect(() => {
     const apply = (prefersDark: boolean) => {
-      document.documentElement.setAttribute(
-        "data-theme",
-        resolveTheme(theme, prefersDark),
-      );
+      const next = resolveTheme(theme, prefersDark);
+      document.documentElement.setAttribute("data-theme", next);
+      setResolved(next);
     };
 
     const mql = getMql();
@@ -35,4 +41,6 @@ export function useTheme(theme: string): void {
       mql.removeEventListener("change", onChange as (e: Event) => void);
     };
   }, [theme]);
+
+  return resolved;
 }

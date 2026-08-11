@@ -1,7 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { IPC_COMMANDS, OFFSCREEN, STORAGE_KEYS } from "../constants/ipc";
+import {
+  IPC_COMMANDS,
+  IPC_EVENTS,
+  OFFSCREEN,
+  STORAGE_KEYS,
+  WEBVIEW_SCRIPTS,
+} from "../constants/ipc";
 import { resolveColumnDataDirectory } from "../services/externalColumn";
 import { useAppStore } from "../store/useAppStore";
 import type { Account, Column } from "../types";
@@ -10,6 +16,17 @@ import { useMobileColumns } from "./useMobileColumns";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
+}));
+
+type ListenCallback = (event: { payload: string }) => void;
+const capturedCallbacks = new Map<string, ListenCallback>();
+const mockUnlisten = vi.fn();
+
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn((event: string, cb: ListenCallback) => {
+    capturedCallbacks.set(event, cb);
+    return Promise.resolve(mockUnlisten);
+  }),
 }));
 
 // resolveColumnDataDirectory は内部で invoke（IPC）を呼ぶため、実際の挙動を
@@ -77,6 +94,8 @@ function renderMobileColumns(dialogOpen = false) {
 describe("useMobileColumns", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    capturedCallbacks.clear();
+    mockUnlisten.mockReset();
     mockInvoke.mockResolvedValue(undefined);
     mockResolveColumnDataDirectory.mockImplementation(
       async (column, accounts) =>
@@ -303,5 +322,227 @@ describe("useMobileColumns", () => {
     });
 
     expect(result.current.swipeState).toBeNull();
+  });
+
+  it("カラム切替が確定するとflash_mobile_swipe_barがdirection付きで呼ばれる", () => {
+    const { result } = renderMobileColumns();
+    act(() => {
+      result.current.setActiveColumnIdState("col-1");
+    });
+    mockInvoke.mockClear();
+
+    act(() => {
+      result.current.navigateColumn("left");
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith("flash_mobile_swipe_bar", {
+      direction: "left",
+    });
+  });
+
+  it("desktop（isMobile=false）ではnavigateColumnが確定してもflash_mobile_swipe_barを呼ばない", () => {
+    useAppStore.setState({ isMobile: false });
+    const { result } = renderMobileColumns();
+    act(() => {
+      result.current.setActiveColumnIdState("col-1");
+    });
+    mockInvoke.mockClear();
+
+    act(() => {
+      result.current.navigateColumn("left");
+    });
+
+    expect(result.current.swipeState).toEqual({
+      direction: "left",
+      phase: "switching",
+    });
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "flash_mobile_swipe_bar",
+      expect.anything(),
+    );
+  });
+
+  it("端のカラムでnavigateColumnが早期returnするときはflash_mobile_swipe_barを呼ばない", () => {
+    const { result } = renderMobileColumns();
+    act(() => {
+      // col-2 は order 最大（末尾）
+      result.current.setActiveColumnIdState("col-2");
+    });
+    mockInvoke.mockClear();
+
+    act(() => {
+      result.current.navigateColumn("left");
+    });
+
+    expect(mockInvoke).not.toHaveBeenCalled();
+  });
+
+  it("isMobileのときmobile-swipe-navigate/mobile-swipe-progressイベントを購読する", () => {
+    renderMobileColumns();
+    expect(capturedCallbacks.has(IPC_EVENTS.MOBILE_SWIPE_NAVIGATE)).toBe(true);
+    expect(capturedCallbacks.has(IPC_EVENTS.MOBILE_SWIPE_PROGRESS)).toBe(true);
+  });
+
+  it("desktop（isMobile=false）ではmobile-swipe-navigate/mobile-swipe-progressイベントを購読しない", () => {
+    useAppStore.setState({ isMobile: false });
+    renderMobileColumns();
+    expect(capturedCallbacks.has(IPC_EVENTS.MOBILE_SWIPE_NAVIGATE)).toBe(false);
+    expect(capturedCallbacks.has(IPC_EVENTS.MOBILE_SWIPE_PROGRESS)).toBe(false);
+  });
+
+  it("mobile-swipe-navigateイベント受信でnavigateColumnと同じ遷移が実行される", () => {
+    vi.useFakeTimers();
+    const { result } = renderMobileColumns();
+    act(() => {
+      result.current.setActiveColumnIdState("col-1");
+    });
+
+    act(() => {
+      capturedCallbacks.get(IPC_EVENTS.MOBILE_SWIPE_NAVIGATE)?.({
+        payload: "left",
+      });
+    });
+
+    expect(result.current.swipeState).toEqual({
+      direction: "left",
+      phase: "switching",
+    });
+  });
+
+  it("mobile-swipe-progressイベントのpayloadがleft/rightならswipeStateがprogressになる", () => {
+    renderMobileColumns();
+
+    act(() => {
+      capturedCallbacks.get(IPC_EVENTS.MOBILE_SWIPE_PROGRESS)?.({
+        payload: "right",
+      });
+    });
+  });
+
+  it("mobile-swipe-progressイベントのpayloadが空文字列ならswipeStateがnullになる", () => {
+    const { result } = renderMobileColumns();
+
+    act(() => {
+      capturedCallbacks.get(IPC_EVENTS.MOBILE_SWIPE_PROGRESS)?.({
+        payload: "right",
+      });
+    });
+    expect(result.current.swipeState).toEqual({
+      direction: "right",
+      phase: "progress",
+    });
+
+    act(() => {
+      capturedCallbacks.get(IPC_EVENTS.MOBILE_SWIPE_PROGRESS)?.({
+        payload: "",
+      });
+    });
+    expect(result.current.swipeState).toBeNull();
+  });
+
+  it("アンマウント時にイベントリスナをunlistenする", async () => {
+    const { unmount } = renderMobileColumns();
+    // listen() の Promise 解決を待ってからアンマウントする
+    await act(async () => {
+      await Promise.resolve();
+    });
+    unmount();
+    // unlisten 呼び出しは unlistenNavigate/unlistenProgress の then() 経由（マイクロタスク）のため
+    // 1 tick 待ってから検証する
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockUnlisten).toHaveBeenCalled();
+  });
+
+  it("setSwipeProgressにleftを渡すとswipeStateがdirection:left, phase:progressになる", () => {
+    const { result } = renderMobileColumns();
+
+    act(() => {
+      result.current.setSwipeProgress("left");
+    });
+
+    expect(result.current.swipeState).toEqual({
+      direction: "left",
+      phase: "progress",
+    });
+  });
+
+  it("setSwipeProgressにrightを渡すとswipeStateがdirection:right, phase:progressになる", () => {
+    const { result } = renderMobileColumns();
+
+    act(() => {
+      result.current.setSwipeProgress("right");
+    });
+
+    expect(result.current.swipeState).toEqual({
+      direction: "right",
+      phase: "progress",
+    });
+  });
+
+  it("setSwipeProgressにnullを渡すとprogress中のswipeStateが解除される", () => {
+    const { result } = renderMobileColumns();
+
+    act(() => {
+      result.current.setSwipeProgress("left");
+    });
+    expect(result.current.swipeState).not.toBeNull();
+
+    act(() => {
+      result.current.setSwipeProgress(null);
+    });
+
+    expect(result.current.swipeState).toBeNull();
+  });
+
+  it("isMobileのときmobile-swipe-double-tapイベントを購読する", () => {
+    renderMobileColumns();
+    expect(capturedCallbacks.has(IPC_EVENTS.MOBILE_SWIPE_DOUBLE_TAP)).toBe(
+      true,
+    );
+  });
+
+  it("desktop（isMobile=false）ではmobile-swipe-double-tapイベントを購読しない", () => {
+    useAppStore.setState({ isMobile: false });
+    renderMobileColumns();
+    expect(capturedCallbacks.has(IPC_EVENTS.MOBILE_SWIPE_DOUBLE_TAP)).toBe(
+      false,
+    );
+  });
+
+  it("mobile-swipe-double-tapイベント受信時にアクティブカラムをSCROLL_TOP_AND_RELOADする", () => {
+    const { result } = renderMobileColumns();
+    act(() => {
+      result.current.setActiveColumnIdState("col-1");
+    });
+    mockInvoke.mockClear();
+
+    act(() => {
+      capturedCallbacks.get(IPC_EVENTS.MOBILE_SWIPE_DOUBLE_TAP)?.({
+        payload: "",
+      });
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
+      label: "column-col-1",
+      script: WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD,
+    });
+  });
+
+  it("アクティブカラムが無い状態でmobile-swipe-double-tapイベントを受信しても何も呼ばれない", () => {
+    renderMobileColumns();
+    mockInvoke.mockClear();
+
+    act(() => {
+      capturedCallbacks.get(IPC_EVENTS.MOBILE_SWIPE_DOUBLE_TAP)?.({
+        payload: "",
+      });
+    });
+
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      IPC_COMMANDS.EVAL_IN_WEBVIEW,
+      expect.anything(),
+    );
   });
 });

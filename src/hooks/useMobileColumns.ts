@@ -1,11 +1,14 @@
 // src/hooks/useMobileColumns.ts
 // モバイル（Android）のアクティブカラム管理・スワイプナビゲーション・起動時復元
-import { useCallback, useState } from "react";
-import { STORAGE_KEYS } from "../constants/ipc";
-import { mobileColumnLayout, resolveSwipeAreaHeight } from "../lib/gridLayout";
+import { listen } from "@tauri-apps/api/event";
+import { useCallback, useEffect, useState } from "react";
+import { IPC_EVENTS, STORAGE_KEYS, WEBVIEW_SCRIPTS } from "../constants/ipc";
+import { mobileColumnLayout } from "../lib/gridLayout";
 import { logError } from "../lib/log";
 import {
   createColumnWebview,
+  evalInColumn,
+  flashMobileSwipeBar,
   resizeColumnWebview,
   setColumnCookies,
 } from "../services/columnWebview";
@@ -25,6 +28,7 @@ export function resolveTwoColumnEnabled(): boolean {
 }
 
 export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
+  const isMobile = useAppStore((s) => s.isMobile);
   const [activeColumnId, setActiveColumnIdState] = useState<string | null>(
     null,
   );
@@ -36,12 +40,7 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
     try {
       localStorage.setItem(STORAGE_KEYS.ACTIVE_COLUMN_ID, id);
     } catch {}
-    const {
-      columns: currentColumns,
-      isMobile,
-      globalSettings,
-    } = useAppStore.getState();
-    const swipeAreaHeight = resolveSwipeAreaHeight(globalSettings);
+    const { columns: currentColumns, isMobile } = useAppStore.getState();
 
     // モバイル: resize_column_webview より先にアクティブカラムのクッキーを切り替える。
     // CookieManager は共有のため、WebView が表示される前に正しいアカウントを設定する必要がある。
@@ -60,7 +59,6 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
       twoColumnEnabled: resolveTwoColumnEnabled(),
       viewportWidth: window.innerWidth,
       viewportHeight: window.innerHeight,
-      swipeAreaHeight,
     });
     // 非表示（hide）分は並列でよい。表示（show）分は Kotlin 側
     // activeColumnWebViewId（戻るボタン/ダブルタップ対象）が最後の
@@ -101,15 +99,12 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
       const targetColumn =
         (savedId ? sortedByOrder.find((c) => c.id === savedId) : null) ??
         firstColumn;
-      const { globalSettings } = useAppStore.getState();
-      const swipeAreaHeight = resolveSwipeAreaHeight(globalSettings);
       const layout = mobileColumnLayout({
         columns: sortedByOrder,
         activeColumnId: targetColumn?.id ?? null,
         twoColumnEnabled: resolveTwoColumnEnabled(),
         viewportWidth: window.innerWidth,
         viewportHeight: window.innerHeight,
-        swipeAreaHeight,
       });
       // 全カラムを並列作成して loadUrl を一斉に開始する。mobile の
       // create_column_webview は visible = args.x >= 0.0 で可視判定するため、
@@ -168,10 +163,65 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
       if (targetIdx < 0 || targetIdx >= sorted.length) return;
       setSwipeState({ direction, phase: "switching" });
       setTimeout(() => setSwipeState(null), 400);
+      // 遷移確定時のみネイティブオーバーレイへフラッシュ演出を明示的に push する
+      // （Kotlin 側で自前判定しない。早期return時に光る退行を避けるため。
+      // desktop では isMobile ガードで呼ばない）。
+      if (isMobile) {
+        flashMobileSwipeBar(direction).catch(
+          logError("navigateColumn:flashMobileSwipeBar"),
+        );
+      }
       setActiveColumn(sorted[targetIdx].id);
     },
-    [activeColumnId, setActiveColumn, dialogOpenRef],
+    [activeColumnId, setActiveColumn, dialogOpenRef, isMobile],
   );
+
+  // スワイプ中の指の移動量に応じた進捗表示（phase: "progress"）を反映する
+  const setSwipeProgress = useCallback((direction: "left" | "right" | null) => {
+    if (direction === null) {
+      setSwipeState(null);
+      return;
+    }
+    setSwipeState({ direction, phase: "progress" });
+  }, []);
+
+  // スワイプ領域のダブルタップ時: タブのダブルタップ（App.tsx の handleDoubleTapColumn）と同じ動作。
+  // アクティブカラムを先頭スクロール+リロードする。
+  const handleSwipeAreaDoubleTap = useCallback(() => {
+    if (!activeColumnId) return;
+    evalInColumn(activeColumnId, WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD);
+  }, [activeColumnId]);
+
+  // ネイティブオーバーレイ（Android スワイプバー）からのジェスチャー通知を受信する。
+  // desktop では Rust 側がこれらのイベントを emit しないため、isMobile のときのみ購読する。
+  // mobile-swipe-progress の payload は "left" | "right" | ""（"" = 進捗なし）。
+  useEffect(() => {
+    if (!isMobile) return;
+    const unlistenNavigate = listen<string>(
+      IPC_EVENTS.MOBILE_SWIPE_NAVIGATE,
+      (e) => {
+        const direction = e.payload;
+        if (direction === "left" || direction === "right") {
+          navigateColumn(direction);
+        }
+      },
+    );
+    const unlistenProgress = listen<string>(
+      IPC_EVENTS.MOBILE_SWIPE_PROGRESS,
+      (e) => {
+        const payload = e.payload;
+        setSwipeProgress(payload === "" ? null : (payload as "left" | "right"));
+      },
+    );
+    const unlistenDoubleTap = listen(IPC_EVENTS.MOBILE_SWIPE_DOUBLE_TAP, () => {
+      handleSwipeAreaDoubleTap();
+    });
+    return () => {
+      unlistenNavigate.then((fn) => fn());
+      unlistenProgress.then((fn) => fn());
+      unlistenDoubleTap.then((fn) => fn());
+    };
+  }, [isMobile, navigateColumn, setSwipeProgress, handleSwipeAreaDoubleTap]);
 
   return {
     activeColumnId,
@@ -179,6 +229,7 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
     swipeState,
     setActiveColumn,
     navigateColumn,
+    setSwipeProgress,
     restoreMobileColumns,
   };
 }

@@ -2,7 +2,13 @@
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { platform } from "@tauri-apps/plugin-os";
-import React, { useEffect, useCallback, useMemo, useState } from "react";
+import React, {
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import styles from "./App.module.scss";
 import { AccountManager } from "./components/AccountManager/AccountManager";
 import { AccountNameDialog } from "./components/AccountNameDialog/AccountNameDialog";
@@ -11,7 +17,6 @@ import { AppSettingsPanel } from "./components/AppSettingsPanel/AppSettingsPanel
 import { ColumnHeader } from "./components/ColumnHeader/ColumnHeader";
 import { ConfirmDialog } from "./components/ConfirmDialog/ConfirmDialog";
 import { LinkPopupDialog } from "./components/LinkPopupDialog/LinkPopupDialog";
-import { MobileSwipeBar } from "./components/MobileSwipeBar/MobileSwipeBar";
 import { MobileTabBar } from "./components/MobileTabBar/MobileTabBar";
 import { SettingsPanel } from "./components/SettingsPanel/SettingsPanel";
 import { ShortcutHelpDialog } from "./components/ShortcutHelpDialog/ShortcutHelpDialog";
@@ -36,6 +41,7 @@ import {
 import { useWhatsNew } from "./hooks/useWhatsNew";
 import {
   HEADER_HEIGHT,
+  MOBILE_TAB_BAR_HEIGHT,
   getTopBarHeight,
   resolveSwipeAreaHeight,
 } from "./lib/gridLayout";
@@ -43,6 +49,7 @@ import { logError } from "./lib/log";
 import {
   applyColumnSettingsScripts,
   evalInColumn,
+  updateMobileSwipeBar,
 } from "./services/columnWebview";
 import { useAppStore } from "./store/useAppStore";
 import type { ColumnSettings, GlobalSettings } from "./types";
@@ -82,7 +89,6 @@ const App: React.FC = () => {
     activeColumnId,
     swipeState,
     setActiveColumn,
-    navigateColumn,
     setDialogOpen,
     recreateAllWebviews,
     recreateColumnWebview,
@@ -187,8 +193,9 @@ const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [globalSettings.columnScale, isLoaded]);
 
-  // 本体UIのテーマを data-theme 属性へ反映する
-  useTheme(globalSettings.theme);
+  // 本体UIのテーマを data-theme 属性へ反映する。戻り値（解決済みテーマ）は
+  // モバイルスワイプバーのネイティブオーバーレイ同期にも再利用する（matchMedia 購読の重複を避ける）。
+  const resolvedTheme = useTheme(globalSettings.theme);
 
   // WebView 内の横ホイール → スクロールバー追従、新着カウント → バッジ・デスクトップ通知
   useWebviewScrollRelay(scrollbarRef);
@@ -228,6 +235,55 @@ const App: React.FC = () => {
     !!pendingRemoval ||
     !!reauthNotice ||
     apiRateLimitPopoverOpen;
+
+  // モバイルスワイプバー（ネイティブオーバーレイ）の状態を Kotlin 側へ同期する。
+  // visible は「設定で有効」「透過度>0（0のまま表示し続けるとView.alphaが透明でもタッチを
+  // 吸収してしまい、見えないのにタップを奪われる事故になるため非表示にする。詳細は
+  // tmp/plans/2026-08-11-mobile-swipe-bar-native-overlay/plan.md の
+  // 『View.alphaとヒットテストの関係』参照）」「ダイアログが開いていない」の全てを満たす場合のみ true。
+  // y/height は mobileColumnLayout が算出する隙間の絶対座標と同じ計算式を使う（座標の単一ソース化。
+  // Gravity+bottomMargin ではなく絶対 y にするのは、IME表示・回転時のズレを避けるため）。
+  // カラム復元前・非モバイルでは呼ばない。
+  const syncMobileSwipeBar = useCallback(() => {
+    if (!isMobile || !columnsRestored) return;
+    const swipeAreaHeight = resolveSwipeAreaHeight(globalSettings);
+    const visible =
+      globalSettings.mobileSwipeAreaEnabled &&
+      globalSettings.mobileSwipeAreaOpacity > 0 &&
+      !anyDialogOpen;
+    const y = window.innerHeight - MOBILE_TAB_BAR_HEIGHT - swipeAreaHeight;
+    updateMobileSwipeBar(
+      visible,
+      y,
+      swipeAreaHeight,
+      globalSettings.mobileSwipeAreaOpacity,
+      resolvedTheme === "dark",
+    ).catch(logError("syncMobileSwipeBar"));
+  }, [isMobile, columnsRestored, globalSettings, anyDialogOpen, resolvedTheme]);
+
+  // (a) 起動時: カラム復元完了後に初回反映する
+  useEffect(() => {
+    syncMobileSwipeBar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [columnsRestored]);
+
+  // (b) 設定変更時: スワイプ領域の有効/高さ/透過度が変わるたびに反映する
+  useEffect(() => {
+    syncMobileSwipeBar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    globalSettings.mobileSwipeAreaEnabled,
+    globalSettings.mobileSwipeAreaHeight,
+    globalSettings.mobileSwipeAreaOpacity,
+  ]);
+
+  // (c) テーマ変更時: useTheme の戻り値（resolvedTheme）は "system" 選択中の
+  // OS配色変更にもライブ追従するため、この変化を見るだけで反映できる
+  useEffect(() => {
+    syncMobileSwipeBar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolvedTheme]);
+
   useEffect(() => {
     setDialogOpen(anyDialogOpen);
     if (anyDialogOpen) {
@@ -235,9 +291,37 @@ const App: React.FC = () => {
     } else {
       recalculateAllBounds();
     }
+    // (d) ダイアログ開閉時: 開いていれば visible=false になる（syncMobileSwipeBar 内で判定）
+    syncMobileSwipeBar();
     // anyDialogOpen 変化時のみ退避/復元する（他の依存で再実行させない）
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anyDialogOpen]);
+
+  // (e) 画面回転・ウィンドウリサイズ時: syncMobileSwipeBar 内の y は
+  // window.innerHeight から算出するため、リサイズ/回転で再計算しないと
+  // カラムWebView（useDesktopColumns.ts の handleResize 経由で再配置される）と
+  // オーバーレイの位置がズレる。デバウンス時間は useDesktopColumns.ts の
+  // handleResize と揃えて100msにする。
+  // syncMobileSwipeBar は globalSettings/anyDialogOpen/resolvedTheme が変わるたびに
+  // 再生成されるため、ref 経由で最新版を呼ぶことでデバウンス中の再レンダーが
+  // タイマーをリセットしてしまう競合を避ける（useDesktopColumns.ts の
+  // recalculateRef と同じパターン）。
+  const syncMobileSwipeBarRef = useRef(syncMobileSwipeBar);
+  syncMobileSwipeBarRef.current = syncMobileSwipeBar;
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const handleResize = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        syncMobileSwipeBarRef.current();
+      }, 100);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
 
   const handleToggleTopBar = useCallback(() => {
     setTopBarExpanded(!topBarExpanded);
@@ -444,14 +528,6 @@ const App: React.FC = () => {
           onApiRateLimitPopoverOpenChange={setApiRateLimitPopoverOpen}
         />
       )}
-      {isMobile && globalSettings.mobileSwipeAreaEnabled && (
-        <MobileSwipeBar
-          height={resolveSwipeAreaHeight(globalSettings)}
-          swipeState={swipeState}
-          onSwipeNavigate={navigateColumn}
-        />
-      )}
-
       <div className={styles.appContent} ref={containerRef}>
         {columns.map((column) => {
           if (isMobile) return null;

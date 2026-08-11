@@ -8,7 +8,6 @@ import {
   getTopBarHeight,
   calculateGridBounds,
   mobileColumnLayout,
-  resolveSwipeAreaHeight,
 } from "../lib/gridLayout";
 import { logError } from "../lib/log";
 import {
@@ -48,6 +47,7 @@ export function useColumns() {
     swipeState,
     setActiveColumn,
     navigateColumn,
+    setSwipeProgress,
     restoreMobileColumns,
   } = useMobileColumns(dialogOpenRef);
 
@@ -103,9 +103,6 @@ export function useColumns() {
 
       const { isMobile } = useAppStore.getState();
       if (isMobile) {
-        const swipeAreaHeight = resolveSwipeAreaHeight(
-          useAppStore.getState().globalSettings,
-        );
         // 追加カラムは非表示で作成する（activeColumnId: null なので必ず画面外 bounds になる）
         const offscreenLayout = mobileColumnLayout({
           columns: [column],
@@ -113,7 +110,6 @@ export function useColumns() {
           twoColumnEnabled: resolveTwoColumnEnabled(),
           viewportWidth: window.innerWidth,
           viewportHeight: window.innerHeight,
-          swipeAreaHeight,
         });
         await createColumnWebview(
           column,
@@ -153,11 +149,7 @@ export function useColumns() {
 
   // ダイアログ表示時に全カラムWebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
   const hideColumnWebviews = useCallback(async () => {
-    const {
-      columns: currentColumns,
-      isMobile,
-      globalSettings,
-    } = useAppStore.getState();
+    const { columns: currentColumns, isMobile } = useAppStore.getState();
     const mobileLayout = isMobile
       ? mobileColumnLayout({
           columns: currentColumns,
@@ -165,7 +157,6 @@ export function useColumns() {
           twoColumnEnabled: resolveTwoColumnEnabled(),
           viewportWidth: window.innerWidth,
           viewportHeight: window.innerHeight,
-          swipeAreaHeight: resolveSwipeAreaHeight(globalSettings),
         })
       : null;
     await Promise.all(
@@ -196,11 +187,8 @@ export function useColumns() {
   // カラム削除
   const handleRemoveColumn = useCallback(
     async (columnId: string) => {
-      const {
-        isMobile,
-        columns: columnsBeforeRemoval,
-        globalSettings,
-      } = useAppStore.getState();
+      const { isMobile, columns: columnsBeforeRemoval } =
+        useAppStore.getState();
 
       // 削除カラムが現在の表示ペア（アクティブ or その隣）に含まれていたかを、
       // 削除前のカラム構成で判定する。removeColumn 後だと右隣の判定基準が
@@ -216,7 +204,6 @@ export function useColumns() {
           twoColumnEnabled: resolveTwoColumnEnabled(),
           viewportWidth: window.innerWidth,
           viewportHeight: window.innerHeight,
-          swipeAreaHeight: resolveSwipeAreaHeight(globalSettings),
         })[columnId]?.x >= 0;
 
       await removeColumnWebview(columnId).catch(
@@ -274,7 +261,6 @@ export function useColumns() {
         accounts: currentAccounts,
         isMobile,
         topBarExpanded,
-        globalSettings,
       } = useAppStore.getState();
       const column = currentColumns.find((c) => c.id === columnId);
       if (!column) return;
@@ -289,14 +275,12 @@ export function useColumns() {
       );
 
       if (isMobile) {
-        const swipeAreaHeight = resolveSwipeAreaHeight(globalSettings);
         const offscreenLayout = mobileColumnLayout({
           columns: [column],
           activeColumnId: null,
           twoColumnEnabled: resolveTwoColumnEnabled(),
           viewportWidth: window.innerWidth,
           viewportHeight: window.innerHeight,
-          swipeAreaHeight,
         });
         await createColumnWebview(
           column,
@@ -312,7 +296,6 @@ export function useColumns() {
             twoColumnEnabled: resolveTwoColumnEnabled(),
             viewportWidth: window.innerWidth,
             viewportHeight: window.innerHeight,
-            swipeAreaHeight,
           });
           if (displayLayout[columnId].x >= 0) {
             await setActiveColumn(activeColumnId);
@@ -384,6 +367,7 @@ export function useColumns() {
     swipeState,
     setActiveColumn,
     navigateColumn,
+    setSwipeProgress,
     setDialogOpen,
     recreateAllWebviews,
     recreateColumnWebview,

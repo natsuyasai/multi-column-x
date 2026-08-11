@@ -44,6 +44,7 @@ const baseGlobalSettings: GlobalSettings = {
   useXAppForCompose: false,
   mobileSwipeAreaEnabled: true,
   mobileSwipeAreaHeight: 28,
+  mobileSwipeAreaOpacity: 50,
   mobileTwoColumnEnabled: true,
   presets: [],
   ngWords: [],
@@ -301,6 +302,19 @@ describe("AppSettingsPanel スワイプ切替設定", () => {
     fireEvent.change(input, { target: { value: "" } });
     fireEvent.blur(input);
     expect(input.value).toBe("16");
+  });
+
+  it("スワイプ領域の透過度スライダーを操作すると適用時にmobileSwipeAreaOpacityが反映される", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    const slider = screen.getByRole("slider", {
+      name: /スワイプ領域の透過度/,
+    });
+    fireEvent.change(slider, { target: { value: "80" } });
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ mobileSwipeAreaOpacity: 80 }),
+    );
   });
 });
 
