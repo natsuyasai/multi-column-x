@@ -573,9 +573,11 @@ class MainActivity : TauriActivity() {
     runOnUiThread {
       val density = resources.displayMetrics.density
       val overlay =
-        swipeBarOverlay ?: SwipeBarOverlayView(this) { direction ->
-          AppBridge.onSwipeNavigate(direction)
-        }.also { view ->
+        swipeBarOverlay ?: SwipeBarOverlayView(
+          this,
+          onNavigate = { direction -> AppBridge.onSwipeNavigate(direction) },
+          onDoubleTap = { AppBridge.onSwipeDoubleTap() },
+        ).also { view ->
           view.onProgress = { direction -> AppBridge.onSwipeProgress(direction ?: "") }
           contentRoot.addView(
             view,

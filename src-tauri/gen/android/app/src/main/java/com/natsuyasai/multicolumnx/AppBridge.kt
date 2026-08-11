@@ -79,4 +79,12 @@ object AppBridge {
    */
   @JvmStatic
   external fun onSwipeProgress(direction: String)
+
+  /**
+   * スワイプバー（SwipeBarOverlayView）でダブルタップが確定したときに呼ぶ。
+   * Rust 側はこれを受けて mobile-swipe-double-tap イベントを React へ emit する。
+   * React 側はアクティブカラムを先頭スクロール+リロードする（タブのダブルタップと同じ動作）。
+   */
+  @JvmStatic
+  external fun onSwipeDoubleTap()
 }

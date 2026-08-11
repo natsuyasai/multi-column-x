@@ -35,6 +35,7 @@ import android.widget.TextView
 class SwipeBarOverlayView(
   context: Context,
   private val onNavigate: (String) -> Unit,
+  private val onDoubleTap: () -> Unit,
 ) : FrameLayout(context) {
   /** progress方向の変化を外部（AppBridge.onSwipeProgress 経由で Rust/React）へ通知するコールバック。 */
   var onProgress: ((String?) -> Unit)? = null
@@ -47,6 +48,7 @@ class SwipeBarOverlayView(
   private var touchStartX = 0f
   private var touchStartY = 0f
   private var currentProgressDirection: String? = null
+  private var lastTapUpTimeMs = 0L
 
   private var surfaceHoverColor = DARK_SURFACE_HOVER
   private var textTertiaryColor = DARK_TEXT_TERTIARY
@@ -69,12 +71,6 @@ class SwipeBarOverlayView(
       setTypeface(typeface, Typeface.BOLD)
     }
 
-  private val grip =
-    TextView(context).apply {
-      text = "⠿ スワイプで切替 ⠿"
-      textSize = GRIP_TEXT_SIZE_SP
-    }
-
   private val topBorder =
     View(context).apply {
       layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, (1 * density).toInt(), Gravity.TOP)
@@ -89,8 +85,6 @@ class SwipeBarOverlayView(
       }
     content.addView(leftHint)
     (leftHint.layoutParams as LinearLayout.LayoutParams).marginEnd = gapPx
-    content.addView(grip)
-    (grip.layoutParams as LinearLayout.LayoutParams).marginEnd = gapPx
     content.addView(rightHint)
 
     addView(content, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT, Gravity.CENTER))
@@ -118,9 +112,21 @@ class SwipeBarOverlayView(
         if (touchActive) {
           val dx = event.x - touchStartX
           val dy = event.y - touchStartY
-          val direction = SwipeGestureResolver.resolveDirection(dx, dy, minSwipePx)
           resetTouchState()
-          if (direction != null) onNavigate(direction)
+          if (SwipeGestureResolver.isTap(dx, dy, progressMinPx)) {
+            val now = System.currentTimeMillis()
+            if (SwipeGestureResolver.isDoubleTap(now, lastTapUpTimeMs, SwipeGestureResolver.DOUBLE_TAP_MAX_MS)) {
+              // 3回目の素早いタップが誤ってダブルタップ扱いにならないようリセットする
+              // （TabItem.tsx の DOUBLE_TAP_MAX_MS 判定と同じ対策）
+              lastTapUpTimeMs = 0L
+              onDoubleTap()
+            } else {
+              lastTapUpTimeMs = now
+            }
+          } else {
+            val direction = SwipeGestureResolver.resolveDirection(dx, dy, minSwipePx)
+            if (direction != null) onNavigate(direction)
+          }
         }
       }
       MotionEvent.ACTION_CANCEL -> resetTouchState()
@@ -136,7 +142,6 @@ class SwipeBarOverlayView(
 
     setBackgroundColor(surfaceHoverColor)
     topBorder.setBackgroundColor(borderColor)
-    grip.setTextColor(textTertiaryColor)
     applyProgressVisual(currentProgressDirection)
   }
 
@@ -198,7 +203,6 @@ class SwipeBarOverlayView(
     private const val FLASH_DURATION_MS = 400L
     private const val HINT_DEFAULT_ALPHA = 0.7f
     private const val HINT_TEXT_SIZE_SP = 13f
-    private const val GRIP_TEXT_SIZE_SP = 13f
     private const val GRIP_GAP_DP = 10f
 
     // src/index.css の :root[data-theme="dark"] から採取。
