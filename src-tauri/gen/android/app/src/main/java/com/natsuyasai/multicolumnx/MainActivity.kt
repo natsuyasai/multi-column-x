@@ -475,7 +475,7 @@ class MainActivity : TauriActivity() {
         newConfiguredWebView(initScript, accountId, "column $id").also { (wv, _) ->
           wv.webViewClient = ExternalLinkWebViewClient(url)
           wv.webChromeClient = ExternalLinkWebChromeClient()
-          wv.visibility = if (visible) View.VISIBLE else View.GONE
+          wv.visibility = columnWebViewInitialVisibility(visible)
           // ネイティブ WebView には Tauri IPC が無いため、動画長押しメニューの
           // ダウンロード要求を Rust へ届けるブリッジを公開する（loadUrl 前に設定が必要）。
           wv.addJavascriptInterface(
