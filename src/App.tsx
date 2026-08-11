@@ -2,7 +2,13 @@
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { platform } from "@tauri-apps/plugin-os";
-import React, { useEffect, useCallback, useMemo, useState } from "react";
+import React, {
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import styles from "./App.module.scss";
 import { AccountManager } from "./components/AccountManager/AccountManager";
 import { AccountNameDialog } from "./components/AccountNameDialog/AccountNameDialog";
@@ -290,6 +296,32 @@ const App: React.FC = () => {
     // anyDialogOpen 変化時のみ退避/復元する（他の依存で再実行させない）
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anyDialogOpen]);
+
+  // (e) 画面回転・ウィンドウリサイズ時: syncMobileSwipeBar 内の y は
+  // window.innerHeight から算出するため、リサイズ/回転で再計算しないと
+  // カラムWebView（useDesktopColumns.ts の handleResize 経由で再配置される）と
+  // オーバーレイの位置がズレる。デバウンス時間は useDesktopColumns.ts の
+  // handleResize と揃えて100msにする。
+  // syncMobileSwipeBar は globalSettings/anyDialogOpen/resolvedTheme が変わるたびに
+  // 再生成されるため、ref 経由で最新版を呼ぶことでデバウンス中の再レンダーが
+  // タイマーをリセットしてしまう競合を避ける（useDesktopColumns.ts の
+  // recalculateRef と同じパターン）。
+  const syncMobileSwipeBarRef = useRef(syncMobileSwipeBar);
+  syncMobileSwipeBarRef.current = syncMobileSwipeBar;
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const handleResize = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        syncMobileSwipeBarRef.current();
+      }, 100);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
 
   const handleToggleTopBar = useCallback(() => {
     setTopBarExpanded(!topBarExpanded);

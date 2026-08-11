@@ -1,6 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { platform } from "@tauri-apps/plugin-os";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  act,
+} from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import App from "./App";
 import { useAppStore } from "./store/useAppStore";
@@ -202,6 +208,56 @@ describe("App (mobile)", () => {
         expect.objectContaining({ visible: false, opacity: 0 }),
       );
     });
+  });
+
+  it("画面回転・ウィンドウリサイズ時は100msデバウンス後にupdate_mobile_swipe_barのyが再計算される", async () => {
+    // jsdomのデフォルト innerHeight=768 → y = 768 - 56(タブバー) - 28(スワイプ領域) = 684
+    vi.useFakeTimers();
+    try {
+      render(<App />);
+      // columnsRestored への反映はタイマーを介さない Promise チェーンのみのため、
+      // マイクロタスクを進めるために advanceTimersByTimeAsync(0) を挟む
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "update_mobile_swipe_bar",
+        expect.objectContaining({ visible: true, y: 684 }),
+      );
+      mockInvoke.mockClear();
+
+      // 回転/リサイズで innerHeight が変わったことをシミュレートする
+      Object.defineProperty(window, "innerHeight", {
+        configurable: true,
+        value: 400,
+      });
+      act(() => {
+        window.dispatchEvent(new Event("resize"));
+      });
+      act(() => {
+        vi.advanceTimersByTime(50);
+      });
+      // 50ms時点ではまだデバウンス中のため再同期されない
+      expect(
+        mockInvoke.mock.calls.filter((c) => c[0] === "update_mobile_swipe_bar"),
+      ).toHaveLength(0);
+
+      act(() => {
+        vi.advanceTimersByTime(50);
+      });
+      // resizeイベントから100ms経過したので、新しい innerHeight を反映した y で再同期される
+      // y = 400 - 56 - 28 = 316（古い y=684 のまま据え置かれるバグを検知する）
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "update_mobile_swipe_bar",
+        expect.objectContaining({ visible: true, y: 316 }),
+      );
+    } finally {
+      Object.defineProperty(window, "innerHeight", {
+        configurable: true,
+        value: 768,
+      });
+      vi.useRealTimers();
+    }
   });
 
   it("ダイアログ表示中はupdate_mobile_swipe_barがvisible:falseで呼ばれる", async () => {
