@@ -83,6 +83,8 @@ export const IPC_EVENTS = {
   MOBILE_SWIPE_NAVIGATE: "mobile-swipe-navigate",
   /** モバイルスワイプバーのスワイプ中進捗通知（Android JNI → TS listen）payload は "left" | "right" | "" */
   MOBILE_SWIPE_PROGRESS: "mobile-swipe-progress",
+  /** モバイルスワイプバーのダブルタップ確定通知（Android JNI → TS listen）payloadなし */
+  MOBILE_SWIPE_DOUBLE_TAP: "mobile-swipe-double-tap",
 } as const;
 
 /** WebView / ウィンドウラベルのプレフィックスと生成ヘルパー */

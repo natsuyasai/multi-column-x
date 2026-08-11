@@ -6,6 +6,7 @@ import {
   IPC_EVENTS,
   OFFSCREEN,
   STORAGE_KEYS,
+  WEBVIEW_SCRIPTS,
 } from "../constants/ipc";
 import { resolveColumnDataDirectory } from "../services/externalColumn";
 import { useAppStore } from "../store/useAppStore";
@@ -493,5 +494,55 @@ describe("useMobileColumns", () => {
     });
 
     expect(result.current.swipeState).toBeNull();
+  });
+
+  it("isMobileのときmobile-swipe-double-tapイベントを購読する", () => {
+    renderMobileColumns();
+    expect(capturedCallbacks.has(IPC_EVENTS.MOBILE_SWIPE_DOUBLE_TAP)).toBe(
+      true,
+    );
+  });
+
+  it("desktop（isMobile=false）ではmobile-swipe-double-tapイベントを購読しない", () => {
+    useAppStore.setState({ isMobile: false });
+    renderMobileColumns();
+    expect(capturedCallbacks.has(IPC_EVENTS.MOBILE_SWIPE_DOUBLE_TAP)).toBe(
+      false,
+    );
+  });
+
+  it("mobile-swipe-double-tapイベント受信時にアクティブカラムをSCROLL_TOP_AND_RELOADする", () => {
+    const { result } = renderMobileColumns();
+    act(() => {
+      result.current.setActiveColumnIdState("col-1");
+    });
+    mockInvoke.mockClear();
+
+    act(() => {
+      capturedCallbacks.get(IPC_EVENTS.MOBILE_SWIPE_DOUBLE_TAP)?.({
+        payload: "",
+      });
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
+      label: "column-col-1",
+      script: WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD,
+    });
+  });
+
+  it("アクティブカラムが無い状態でmobile-swipe-double-tapイベントを受信しても何も呼ばれない", () => {
+    renderMobileColumns();
+    mockInvoke.mockClear();
+
+    act(() => {
+      capturedCallbacks.get(IPC_EVENTS.MOBILE_SWIPE_DOUBLE_TAP)?.({
+        payload: "",
+      });
+    });
+
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      IPC_COMMANDS.EVAL_IN_WEBVIEW,
+      expect.anything(),
+    );
   });
 });

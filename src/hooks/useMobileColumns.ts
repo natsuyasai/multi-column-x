@@ -2,11 +2,12 @@
 // モバイル（Android）のアクティブカラム管理・スワイプナビゲーション・起動時復元
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useState } from "react";
-import { IPC_EVENTS, STORAGE_KEYS } from "../constants/ipc";
+import { IPC_EVENTS, STORAGE_KEYS, WEBVIEW_SCRIPTS } from "../constants/ipc";
 import { mobileColumnLayout } from "../lib/gridLayout";
 import { logError } from "../lib/log";
 import {
   createColumnWebview,
+  evalInColumn,
   flashMobileSwipeBar,
   resizeColumnWebview,
   setColumnCookies,
@@ -184,6 +185,13 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
     setSwipeState({ direction, phase: "progress" });
   }, []);
 
+  // スワイプ領域のダブルタップ時: タブのダブルタップ（App.tsx の handleDoubleTapColumn）と同じ動作。
+  // アクティブカラムを先頭スクロール+リロードする。
+  const handleSwipeAreaDoubleTap = useCallback(() => {
+    if (!activeColumnId) return;
+    evalInColumn(activeColumnId, WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD);
+  }, [activeColumnId]);
+
   // ネイティブオーバーレイ（Android スワイプバー）からのジェスチャー通知を受信する。
   // desktop では Rust 側がこれらのイベントを emit しないため、isMobile のときのみ購読する。
   // mobile-swipe-progress の payload は "left" | "right" | ""（"" = 進捗なし）。
@@ -205,11 +213,15 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
         setSwipeProgress(payload === "" ? null : (payload as "left" | "right"));
       },
     );
+    const unlistenDoubleTap = listen(IPC_EVENTS.MOBILE_SWIPE_DOUBLE_TAP, () => {
+      handleSwipeAreaDoubleTap();
+    });
     return () => {
       unlistenNavigate.then((fn) => fn());
       unlistenProgress.then((fn) => fn());
+      unlistenDoubleTap.then((fn) => fn());
     };
-  }, [isMobile, navigateColumn, setSwipeProgress]);
+  }, [isMobile, navigateColumn, setSwipeProgress, handleSwipeAreaDoubleTap]);
 
   return {
     activeColumnId,
