@@ -11,7 +11,6 @@ import { AppSettingsPanel } from "./components/AppSettingsPanel/AppSettingsPanel
 import { ColumnHeader } from "./components/ColumnHeader/ColumnHeader";
 import { ConfirmDialog } from "./components/ConfirmDialog/ConfirmDialog";
 import { LinkPopupDialog } from "./components/LinkPopupDialog/LinkPopupDialog";
-import { MobileSwipeBar } from "./components/MobileSwipeBar/MobileSwipeBar";
 import { MobileTabBar } from "./components/MobileTabBar/MobileTabBar";
 import { SettingsPanel } from "./components/SettingsPanel/SettingsPanel";
 import { ShortcutHelpDialog } from "./components/ShortcutHelpDialog/ShortcutHelpDialog";
@@ -84,8 +83,6 @@ const App: React.FC = () => {
     activeColumnId,
     swipeState,
     setActiveColumn,
-    navigateColumn,
-    setSwipeProgress,
     setDialogOpen,
     recreateAllWebviews,
     recreateColumnWebview,
@@ -499,16 +496,6 @@ const App: React.FC = () => {
           onApiRateLimitPopoverOpenChange={setApiRateLimitPopoverOpen}
         />
       )}
-      {isMobile && globalSettings.mobileSwipeAreaEnabled && (
-        <MobileSwipeBar
-          height={resolveSwipeAreaHeight(globalSettings)}
-          opacity={globalSettings.mobileSwipeAreaOpacity}
-          swipeState={swipeState}
-          onSwipeNavigate={navigateColumn}
-          onSwipeProgress={setSwipeProgress}
-        />
-      )}
-
       <div className={styles.appContent} ref={containerRef}>
         {columns.map((column) => {
           if (isMobile) return null;

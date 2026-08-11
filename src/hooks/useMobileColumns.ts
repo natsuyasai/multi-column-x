@@ -3,7 +3,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useState } from "react";
 import { IPC_EVENTS, STORAGE_KEYS } from "../constants/ipc";
-import { mobileColumnLayout, resolveSwipeAreaHeight } from "../lib/gridLayout";
+import { mobileColumnLayout } from "../lib/gridLayout";
 import { logError } from "../lib/log";
 import {
   createColumnWebview,
@@ -39,12 +39,7 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
     try {
       localStorage.setItem(STORAGE_KEYS.ACTIVE_COLUMN_ID, id);
     } catch {}
-    const {
-      columns: currentColumns,
-      isMobile,
-      globalSettings,
-    } = useAppStore.getState();
-    const swipeAreaHeight = resolveSwipeAreaHeight(globalSettings);
+    const { columns: currentColumns, isMobile } = useAppStore.getState();
 
     // モバイル: resize_column_webview より先にアクティブカラムのクッキーを切り替える。
     // CookieManager は共有のため、WebView が表示される前に正しいアカウントを設定する必要がある。
@@ -63,7 +58,6 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
       twoColumnEnabled: resolveTwoColumnEnabled(),
       viewportWidth: window.innerWidth,
       viewportHeight: window.innerHeight,
-      swipeAreaHeight,
     });
     // 非表示（hide）分は並列でよい。表示（show）分は Kotlin 側
     // activeColumnWebViewId（戻るボタン/ダブルタップ対象）が最後の
@@ -104,15 +98,12 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
       const targetColumn =
         (savedId ? sortedByOrder.find((c) => c.id === savedId) : null) ??
         firstColumn;
-      const { globalSettings } = useAppStore.getState();
-      const swipeAreaHeight = resolveSwipeAreaHeight(globalSettings);
       const layout = mobileColumnLayout({
         columns: sortedByOrder,
         activeColumnId: targetColumn?.id ?? null,
         twoColumnEnabled: resolveTwoColumnEnabled(),
         viewportWidth: window.innerWidth,
         viewportHeight: window.innerHeight,
-        swipeAreaHeight,
       });
       // 全カラムを並列作成して loadUrl を一斉に開始する。mobile の
       // create_column_webview は visible = args.x >= 0.0 で可視判定するため、

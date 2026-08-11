@@ -169,36 +169,6 @@ describe("App (mobile)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("mobileSwipeAreaEnabledがtrueのときスワイプ帯が描画される", () => {
-    useAppStore.setState({
-      accounts: [account],
-      columns: [column],
-      isMobile: true,
-      isLoaded: true,
-      globalSettings: {
-        ...DEFAULT_GLOBAL_SETTINGS,
-        mobileSwipeAreaEnabled: true,
-      },
-    });
-    render(<App />);
-    expect(screen.queryByText(/スワイプで切替/)).not.toBeNull();
-  });
-
-  it("mobileSwipeAreaEnabledがfalseのときスワイプ帯が描画されない", () => {
-    useAppStore.setState({
-      accounts: [account],
-      columns: [column],
-      isMobile: true,
-      isLoaded: true,
-      globalSettings: {
-        ...DEFAULT_GLOBAL_SETTINGS,
-        mobileSwipeAreaEnabled: false,
-      },
-    });
-    render(<App />);
-    expect(screen.queryByText(/スワイプで切替/)).toBeNull();
-  });
-
   it("カラム復元完了後にupdate_mobile_swipe_barがvisible:trueで呼ばれる", async () => {
     render(<App />);
     await waitFor(() => {
