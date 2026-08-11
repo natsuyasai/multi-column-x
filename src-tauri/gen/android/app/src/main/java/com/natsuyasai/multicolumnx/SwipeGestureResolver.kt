@@ -28,6 +28,13 @@ object SwipeGestureResolver {
   const val PROGRESS_MIN_DP = 10f
 
   /**
+   * ダブルタップ判定の最大時間間隔（ms）。
+   * React版 `src/components/MobileTabBar/MobileTabBar.tsx` の TabItem が使う `DOUBLE_TAP_MAX_MS = 300`
+   * および ネイティブ側の旧実装 DoubleTapGestureDetector.kt と同じ 300ms 閾値に揃えたもの。
+   */
+  const val DOUBLE_TAP_MAX_MS = 300L
+
+  /**
    * 指の移動量 (dx, dy) としきい値（px）から、スワイプの方向を判定する。
    * しきい値未満、または斜め方向優勢（|dx| <= |dy|）の場合は null（方向なし）を返す。
    */
@@ -38,5 +45,35 @@ object SwipeGestureResolver {
   ): String? {
     if (abs(dx) < thresholdPx || abs(dx) <= abs(dy)) return null
     return if (dx < 0) "left" else "right"
+  }
+
+  /**
+   * 指の移動量 (dx, dy) がタップ操作の範囲内かを判定する。
+   *
+   * スワイプ確定にもスワイプ進捗表示にも至らない小さな移動量を「タップ」とみなす判定。
+   * 呼び出し側は [PROGRESS_MIN_DP] をタップ許容範囲として渡す想定。
+   */
+  fun isTap(
+    dx: Float,
+    dy: Float,
+    tapSlopPx: Float,
+  ): Boolean {
+    return abs(dx) < tapSlopPx && abs(dy) < tapSlopPx
+  }
+
+  /**
+   * 直前のタップ確定時刻からの経過時間がダブルタップ閾値未満かを判定する。
+   *
+   * @param nowMs 現在の時刻（ms）
+   * @param previousTapMs 直前のタップ確定時刻（ms）
+   * @param maxGapMs ダブルタップと判定する最大時間間隔（ms）。通常は [DOUBLE_TAP_MAX_MS]
+   * @return 経過時間が閾値未満なら true、そうでなければ false
+   */
+  fun isDoubleTap(
+    nowMs: Long,
+    previousTapMs: Long,
+    maxGapMs: Long,
+  ): Boolean {
+    return (nowMs - previousTapMs) < maxGapMs
   }
 }
