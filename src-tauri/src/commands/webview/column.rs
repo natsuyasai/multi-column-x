@@ -344,10 +344,75 @@ fn column_webview_labels(registry: &crate::state::WebviewRegistry) -> Vec<String
 #[cfg(desktop)]
 #[tauri::command]
 pub async fn clear_cache(app: AppHandle) -> Result<(), String> {
-    let state = app.state::<AppState>();
-    let registry = state.registry.lock().expect("registry mutex poisoned");
-    let _labels = column_webview_labels(&registry);
-    // TODO: 各ラベルに対するプラットフォーム別キャッシュクリア処理は後続ステップで実装する
+    // ロックスコープを明確に分離して早期解放
+    let column_labels = {
+        let state = app.state::<AppState>();
+        let registry = state.registry.lock().expect("registry mutex poisoned");
+        column_webview_labels(&registry)
+    };
+
+    #[cfg(windows)]
+    {
+        use windows_core::Interface;
+
+        for label in column_labels {
+            if let Some(webview) = app.get_webview(&label) {
+                let _ = webview.with_webview(move |platform_webview| {
+                    let controller = platform_webview.controller();
+
+                    // ICoreWebView2 を取得
+                    let core_webview2 = unsafe { controller.CoreWebView2() }
+                        .map_err(|e| log::warn!("Failed to get CoreWebView2 for {}: {:?}", label, e))
+                        .ok();
+
+                    if let Some(core_webview2) = core_webview2 {
+                        // ICoreWebView2_13 にキャスト（Profile() メソッド取得用）
+                        let webview13 = core_webview2
+                            .cast::<webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2_13>()
+                            .map_err(|e| log::warn!("Failed to cast to ICoreWebView2_13 for {}: {:?}", label, e))
+                            .ok();
+
+                        if let Some(webview13) = webview13 {
+                            // ICoreWebView2Profile を取得
+                            let profile = unsafe { webview13.Profile() }
+                                .map_err(|e| log::warn!("Failed to get Profile for {}: {:?}", label, e))
+                                .ok();
+
+                            if let Some(profile) = profile {
+                                // ICoreWebView2Profile2 にキャスト（ClearBrowsingData メソッド取得用）
+                                let profile2 = profile
+                                    .cast::<webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Profile2>()
+                                    .map_err(|e| log::warn!("Failed to cast to ICoreWebView2Profile2 for {}: {:?}", label, e))
+                                    .ok();
+
+                                if let Some(profile2) = profile2 {
+                                    // Cookie は削除しない（ログイン情報を保持）。
+                                    let kinds = webview2_com::Microsoft::Web::WebView2::Win32::COREWEBVIEW2_BROWSING_DATA_KINDS_DISK_CACHE
+                                        | webview2_com::Microsoft::Web::WebView2::Win32::COREWEBVIEW2_BROWSING_DATA_KINDS_CACHE_STORAGE;
+
+                                    let handler = webview2_com::ClearBrowsingDataCompletedHandler::create(
+                                        Box::new(|_hresult| Ok(()))
+                                    );
+
+                                    unsafe {
+                                        let _ = profile2.ClearBrowsingData(kinds, &handler)
+                                            .map_err(|e| log::warn!("Failed to clear browsing data for {}: {:?}", label, e));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = column_labels;
+        // TODO: macOS/Linux は後続ステップで実装する
+    }
+
     Ok(())
 }
 
@@ -631,6 +696,45 @@ mod tests {
     #[test]
     fn is_safe_column_idは空文字を拒否する() {
         assert!(!is_safe_column_id(""));
+    }
+
+    #[cfg(all(test, windows))]
+    mod windows_cache_tests {
+        use webview2_com::Microsoft::Web::WebView2::Win32::{
+            COREWEBVIEW2_BROWSING_DATA_KINDS_CACHE_STORAGE,
+            COREWEBVIEW2_BROWSING_DATA_KINDS_COOKIES, COREWEBVIEW2_BROWSING_DATA_KINDS_DISK_CACHE,
+        };
+
+        #[test]
+        fn キャッシュクリア対象kindsにcookieが含まれない() {
+            // Cookie は削除しない（ログイン情報を保持）。
+            let kinds = COREWEBVIEW2_BROWSING_DATA_KINDS_DISK_CACHE
+                | COREWEBVIEW2_BROWSING_DATA_KINDS_CACHE_STORAGE;
+
+            // COOKIES が含まれていないことをアサート
+            assert_eq!(
+                kinds.0 & COREWEBVIEW2_BROWSING_DATA_KINDS_COOKIES.0,
+                0,
+                "COOKIES must not be included in cache clearing"
+            );
+
+            // DISK_CACHE と CACHE_STORAGE は含まれていることをアサート
+            assert_ne!(kinds.0, 0, "Must include DISK_CACHE and/or CACHE_STORAGE");
+
+            // DISK_CACHE が含まれていることをアサート
+            assert_ne!(
+                kinds.0 & COREWEBVIEW2_BROWSING_DATA_KINDS_DISK_CACHE.0,
+                0,
+                "DISK_CACHE must be included"
+            );
+
+            // CACHE_STORAGE が含まれていることをアサート
+            assert_ne!(
+                kinds.0 & COREWEBVIEW2_BROWSING_DATA_KINDS_CACHE_STORAGE.0,
+                0,
+                "CACHE_STORAGE must be included"
+            );
+        }
     }
 
     #[cfg(target_os = "linux")]

@@ -51,8 +51,10 @@ gtk = { version = "=0.18.2" }
 
 # Windows: カラム WebView がフォーカスを得たことを検知するため、tauri-runtime-wry
 # と同一バージョンの webview2-com を直接参照する（型を一致させるためバージョンをピン留め）。
+# windows-core は Interface trait の cast() メソッド使用のため明示的に依存。
 [target.'cfg(windows)'.dependencies]
 webview2-com = "=0.38.2"
+windows-core = "0.61"
 
 # 自動更新はデスクトップのみ。Android は APK 自己更新を別実装する。
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
