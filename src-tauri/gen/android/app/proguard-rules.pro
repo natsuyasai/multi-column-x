@@ -79,3 +79,7 @@
     public void clearAllBrowsingData();
     public java.lang.String getCookies(java.lang.String);
 }
+
+# 端末引き継ぎ用バックアップエージェント（OSがリフレクションでクラス名指定して呼び出すため必須）
+-keep class com.natsuyasai.multicolumnx.MultiColumnXBackupAgent { *; }
+-keep class com.natsuyasai.multicolumnx.BackupFileSelector { *; }

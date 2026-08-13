@@ -6,6 +6,7 @@ Android 対応（アカウント追加、モバイルタブバー、APK 自己�
 
 - `src-tauri/gen/android/` 配下（app モジュール全体） — 単体テスト実行方法
 - `src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/MainActivity.kt` / `src-tauri/gen/android/app/proguard-rules.pro` — ProGuard keep ルール同期
+- `src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/BackupFileSelector.kt` / `MultiColumnXBackupAgent.kt` — 端末引き継ぎ（Auto Backup）対応
 
 ## Android の単体テスト実行
 
@@ -73,6 +74,57 @@ app モジュールの variant は universal フレーバー付きのため、`.
 
 - `reqwest`（`rustls-tls` feature）が依存する `ring` crate は Android ターゲットのビルド時にネイティブ C コードのコンパイルが必要で、`ANDROID_NDK_HOME`（または `NDK_HOME`）環境変数と NDK の `clang` が見つからないとビルドに失敗する。**`cargo check`（デフォルトのdesktopターゲット）だけでは検出できず**、`cargo check --target aarch64-linux-android` や実際の `npm run tauri:android:build[:debug]` を通さないと問題が判明しない。ローカル開発機でこの手のネイティブ依存クレートを新規追加した場合は、Androidターゲットでのビルドも一度は試すこと（Android SDK/NDK が `AppData/Local/Android/Sdk` 等にインストール済みでも、シェルの環境変数 `ANDROID_HOME` / `ANDROID_NDK_HOME` が未設定だと同じエラーになる点に注意）。
 - `#[tauri::command]` に `#[cfg(desktop)]` を付けたコマンドを `generate_handler!` マクロへ登録する際は、マクロの引数リストの中でもそのコマンドの直前に同じ `#[cfg(desktop)]` を付ける必要がある。付け忘れると、Android ビルド時に「そのコマンドが `mobile` cfg では存在しない」ため `generate_handler!` がマクロ展開に失敗し `cannot find __tauri_command_name_<cmd>` のようなコンパイルエラーになる。**これも `cargo check`（desktopターゲット）では検出されず、Android向けビルドで初めて顕在化する**。新規コマンドを `#[cfg(desktop)]` 限定で追加したら、`generate_handler!` 側にも同じ `#[cfg]` を付け忘れていないか確認すること。
+
+## 端末引き継ぎ（Auto Backup / 端末間転送）
+
+- Android 標準の Auto Backup for Apps（`allowBackup` + `bmgr` 経由の転送）に乗せてログインセッション（WebView Cookie 等）を含む完全引き継ぎを実現している。デフォルト（`allowBackup=true`、除外ルール無し）のままだと `app_webview`（WebView Profile API のプロファイルストレージ）が実機で数百 MB 規模に肥大化し、Auto Backup の 25MB クォータを超過して **バックアップ自体が丸ごと失敗する**（`bmgr backupnow` が `Size quota exceeded` を返す）。肥大化の99%以上は WebView の Service Worker CacheStorage / Shared Dictionary cache（x.com のオフラインキャッシュで、破棄しても再生成されるだけで実害なし）。
+- `data_extraction_rules.xml` / `backup_rules.xml` の `path` 属性は**ワイルドカード・正規表現非対応**（Android 公式ドキュメント明記）。WebView のプロファイルディレクトリ名は `Default` / `Profile 1` / `Profile 2` ... とアカウント数に応じて動的に増減するため、XML の固定パス列挙では将来のアカウント追加に対応できない。そのため XML 宣言的ルールではなく、カスタム `BackupAgent`（`MultiColumnXBackupAgent`）を実装し、`onFullBackup(FullBackupDataOutput)` 内で `BackupFileSelector` がディレクトリ名の完全一致（`Service Worker` / `Shared Dictionary` を深さ不問で除外等）により対象ファイルを再帰選定し `fullBackupFile()` で個別登録する方式にした。**`super.onFullBackup()` は呼ばないこと**（呼ぶと XML ルールベースの規定動作＝全ファイル対象に戻ってしまい、除外ロジックが無意味になる）。
+- `MultiColumnXBackupAgent` は `android.app.backup.BackupAgent` を継承しフレームワーク依存のため JVM 単体テスト対象外。ロジックの本体は `BackupFileSelector`（`java.io.File` のみ依存の純粋関数）側に切り出してあり、そちらでユニットテストしている。
+- **`android:backupAgent` でカスタムエージェントを指定するだけでは `onFullBackup()` は呼ばれない。`android:fullBackupOnly="true"` を明示しない限り、常に鍵バリューAPI（`onBackup()`）にフォールバックする**（Android公式仕様。デフォルト値は `false`）。この属性を付け忘れると、`bmgr backupnow` は `Success` を返し続ける（鍵バリューAPI側が空実装で正常終了するだけ）ため、**「Successが返る」ことは実装が機能している証拠にならない**。実際に本プロジェクトでも一度この状態でコミットしてしまい、後続の検証で発覚した（後述）。
+
+### 実機/エミュレータでの検証手順（ローカルトランスポート）
+
+Google の実クラウドバックアップ・実機間 D2D 転送を使わずに、同一検証を再現する手順。
+
+```bash
+# バックアップ有効化・ローカルトランスポート選択
+adb shell bmgr enable true
+adb shell bmgr transport com.android.localtransport/.LocalTransport
+
+# 重要: トランスポートに残っている過去のバックアップセットを必ず消してから検証すること。
+# wipeを省略すると、backupnowが実質何もしなくても（K/Vへのフォールバック等で）
+# 古いバックアップセットがrestoreで復元され、あたかも成功したかのように見える
+# 誤検証（false positive）が発生する。
+adb shell bmgr wipe com.android.localtransport/.LocalTransport com.natsuyasai.multicolumnx
+
+# 復元検証用に主要ファイルのmd5を事前記録しておく（settings.jsonは空アプリでも
+# 同一ハッシュになりうる＝復元有無を判別できないため、Cookies DBの方を主たる証拠とする）
+adb shell "run-as com.natsuyasai.multicolumnx sh -c 'find /data/data/com.natsuyasai.multicolumnx/app_webview -name Cookies -exec md5sum {} \;'"
+
+# バックアップ実行。Successであることに加え、adb logcatで
+# 「Package <pkg> with progress: X/Y」が出力されることを必ず確認する
+# （出ていなければonFullBackup()経由でデータ転送されていない疑いが強い。後述）
+adb logcat -c
+adb shell bmgr backupnow com.natsuyasai.multicolumnx
+adb logcat -d | grep -i "with progress"
+
+# 全データ消去→復元
+adb shell bmgr list sets   # トークン確認（例: "1 : Local disk image"）
+adb shell pm clear com.natsuyasai.multicolumnx
+adb shell bmgr restore 1 com.natsuyasai.multicolumnx   # <トークン> <パッケージ名>の順。単に"restore <package>"はサポート外
+
+# md5再取得してCookies DBが事前記録と一致すること、アプリを起動してクラッシュしないことを確認
+adb shell am start -n com.natsuyasai.multicolumnx/.MainActivity
+```
+
+- **「除外ロジックが実際に機能しているか」を判別できる検証をすること。** `bmgr backupnow` が `Success` を返すだけでは、鍵バリューAPI（空実装）が正常終了しただけの可能性を否定できない（前述の `fullBackupOnly` 漏れのケース）。判別には以下が有効:
+  - `bmgr backupnow` / `bmgr fullbackup` 実行中のログに `Package <pkg> with progress: X/Y` が出力されることを確認する（`adb logcat` を都度 `-c` でクリアしてから実行）。これが出ていれば `onFullBackup()` 経由でデータが実際に転送されている証拠になる。出ない場合は鍵バリューAPIにフォールバックしている疑いが強い。
+  - 除外対象ディレクトリ配下（例 `app_webview/<Profile>/Service Worker/`）に `dd if=/dev/zero of=... bs=1M count=100` 等で25MBクォータを明確に超えるダミーファイルを作り、`bmgr backupnow` が `Size quota exceeded` にならず `Success` すること、かつ復元後（**`pm clear` → `bmgr restore` 直後、`am start` で起動する前**）に `run-as <pkg> sh -c 'find .../app_webview -iname "Service Worker"'` が空を返すことを確認する。**アプリを起動する前に確認すること**（起動するとWebViewが再初期化し、ディレクトリが自然に再生成されて判別できなくなる）。
+  - リリースビルド（`run-as` が使えない debuggable=false）では上記のファイル直接確認ができないため、`bmgr backupnow` の `progress` ログ出力の有無と、復元後にアプリがクラッシュせず起動できることの2点で代替確認する。
+- **落とし穴（実際に踏んだ不具合）**: `android:backupAgent` でカスタムエージェントを指定しただけで `android:fullBackupOnly="true"` を付け忘れると、`onFullBackup()` が一切呼ばれず鍵バリューAPI（本実装では空実装）にフォールバックする。この状態でも `bmgr backupnow` は `Success` を返し、`pm clear` → `bmgr restore` 後に**新規インストールと見分けがつかない空の状態**になる（設定・アカウント一切なし、カラム0件で画面が真っ黒になる）。**初回の検証ではこの不具合を見逃しかけた**: `bmgr wipe` をせずに検証したため、ローカルトランスポート側に「以前実際にService Workerを手動退避した状態で取得済みだった、正しい中身のバックアップセット」が残っており、`backupnow`（実際には鍵バリューAPIの空処理で何も転送していない）の後に `restore` すると、その**古いバックアップセットがそのまま復元されて**md5が一致しているように見えてしまった（`Default/Shared Dictionary` だけが復元後に残っていたのも、その古いセットに含まれていた残骸）。**`bmgr backupnow` の `Success` や `md5一致`だけを根拠に「実装が機能している」と判断しないこと。検証の前には必ず `bmgr wipe` で古いバックアップセットを消し、`progress` ログ確認とダミーファイル検証を併用すること。**
+- `pm clear` 直後のアプリは OS 上「force-stopped 状態」として扱われ、その状態のまま `bmgr backupnow` を叩くと `Backup is not allowed` で失敗する。**バックアップ対象アプリは事前に一度フォアグラウンド起動しておく必要がある**（`adb shell am start` 等）。同様に、**署名の異なるビルド（デバッグ版⇔リリース版）を入れ替えてインストールすると、インストール時の自動リストアが signature mismatch で失敗し、アプリが force-stopped 状態のままになる**。ビルド種別を切り替えて検証する場合は、インストール直後に必ず `am start` で一度フォアグラウンド起動すること。
+- `adb shell run-as <pkg> sh -c '...'` は、複数コマンドを一度に文字列連結して渡す場合、シェル呼び出しの引数分割でクォートが失われ空白を含むパス（`Service Worker` 等）が壊れることがある。**コマンド全体を1つのダブルクォート文字列として `adb shell` に渡す**（`adb shell "run-as pkg sh -c '...'"`）と正しく解釈される。
+- **既知の制約（今回の検証では自動確認不可）**: 実際の Google アカウントクラウドバックアップおよび実機間 D2D（Quick Switch / ケーブル移行）が `BackupAgent.onFullBackup()` を同一経路で通るかは、ローカルトランスポートでの検証だけでは完全には裏付けられていない（Android バージョンにより挙動差の可能性が残る）。`fullBackupOnly` 修正後の検証は100MBダミーファイル・空マーカーファイルによる合成データのみで行っており、**実際にログイン済みの複数アカウントを持つ状態でのバックアップ→復元ラウンドトリップは未実施**（メカニズム自体は `Cookies` DBも除外対象外の通常ファイルとして同じ経路で扱われるため理論上は問題ないはずだが、実データでの確認ではない）。リリース前に実機2台での端末移行フローを手動確認する際、この実データラウンドトリップ確認も併せて実施すること。
 
 ## デバッグビルドでは検出できない不具合
 
