@@ -501,7 +501,12 @@ pub async fn clear_cache(app: AppHandle) -> Result<(), String> {
     let state = app.state::<AppState>();
     let registry = state.registry.lock().expect("registry mutex poisoned");
     let _labels = column_webview_labels(&registry);
-    // TODO: Android側の実処理は後続ステップで実装する
+
+    #[cfg(target_os = "android")]
+    {
+        crate::android_bridge::clear_all_column_webview_cache()?;
+    }
+
     Ok(())
 }
 

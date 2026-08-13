@@ -520,6 +520,13 @@ class MainActivity : TauriActivity() {
     }
   }
 
+  // 全カラム WebView のキャッシュのみを削除する（Cookie は CookieManager が別管理のため触れない）。
+  fun clearAllColumnWebViewCache() {
+    runOnUiThread {
+      columnWebViews.values.forEach { it.clearCache(true) }
+    }
+  }
+
   // カラム WebView を表示し、位置・サイズを更新する（xDp/yDp は CSS px = dp）。
   // onResume() で JS タイマーを再開してから表示する。
   fun showColumnWebView(

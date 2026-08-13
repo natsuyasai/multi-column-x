@@ -36,6 +36,7 @@
     public void launchReauthAccount(java.lang.String, java.lang.String);
     public void createColumnWebView(java.lang.String, java.lang.String, int, int, java.lang.String, boolean, java.lang.String);
     public void removeColumnWebView(java.lang.String);
+    public void clearAllColumnWebViewCache();
     public void showColumnWebView(java.lang.String, int, int, int, int);
     public void hideColumnWebView(java.lang.String);
     public void evalInColumnWebView(java.lang.String, java.lang.String);
