@@ -116,7 +116,6 @@ const meta: Meta<typeof AppSettingsPanel> = {
     onApplyLayout: fn(),
     onApplyColumnDefaults: fn(),
     onReloadAllWebviews: fn(),
-    onClearCache: fn(),
     onCheckUpdate: fn(),
     onClose: fn(),
   },

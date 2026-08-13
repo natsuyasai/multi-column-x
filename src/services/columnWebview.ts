@@ -36,11 +36,6 @@ export async function removeColumnWebview(columnId: string): Promise<void> {
   await invoke(IPC_COMMANDS.REMOVE_COLUMN_WEBVIEW, { columnId });
 }
 
-/** 全カラムのキャッシュのみを削除する（ログイン情報は保持される） */
-export async function clearCache(): Promise<void> {
-  await invoke(IPC_COMMANDS.CLEAR_CACHE);
-}
-
 /** アクティブカラムのアカウントに Cookie を切り替える（Android のみ実体動作） */
 export async function setColumnCookies(accountId: string): Promise<void> {
   await invoke(IPC_COMMANDS.SET_COLUMN_COOKIES, { accountId });
