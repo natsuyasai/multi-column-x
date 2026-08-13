@@ -407,10 +407,48 @@ pub async fn clear_cache(app: AppHandle) -> Result<(), String> {
         }
     }
 
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    {
+        for label in column_labels.clone() {
+            if let Some(webview) = app.get_webview(&label) {
+                let _ = webview.with_webview(move |platform_webview| {
+                    unsafe {
+                        use objc2_foundation::{NSDate, NSSet};
+                        use objc2_web_kit::{WKWebView, WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache};
+                        use block2::RcBlock;
+
+                        let inner_ptr = platform_webview.inner();
+                        let wk_webview: &WKWebView = &*(inner_ptr.cast::<WKWebView>());
+
+                        // WKWebViewConfiguration を取得（Retained<T> を直接束縛）
+                        let config = wk_webview.configuration();
+
+                        // WKWebsiteDataStore を取得（Retained<T> を直接束縛）
+                        let store = config.websiteDataStore();
+
+                        // キャッシュ型集合を構築（Cookie は除外）
+                        // WKWebsiteDataTypeDiskCache と WKWebsiteDataTypeMemoryCache を削除対象にする。
+                        // WKWebsiteDataTypeCookies は絶対に含めない（ログイン情報保持要件）。
+                        let cache_types = NSSet::from_slice(&[WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache]);
+
+                        // 全期間を削除対象にする（1970年0時点を基準日とすることで、それ以降全てを対象にする）
+                        let all_time = NSDate::dateWithTimeIntervalSince1970(0.0);
+
+                        // 非同期実行完了ハンドラ（結果待機不要、空クロージャ）
+                        let handler = RcBlock::new(|| {});
+
+                        // キャッシュ削除を実行（戻り値 () で成功）
+                        store.removeDataOfTypes_modifiedSince_completionHandler(&cache_types, &all_time, &handler);
+                    }
+                });
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
     {
         let _ = column_labels;
-        // TODO: macOS/Linux は後続ステップで実装する
+        // Linux は後続ステップで実装する
     }
 
     Ok(())
