@@ -91,19 +91,29 @@ Google の実クラウドバックアップ・実機間 D2D 転送を使わず�
 adb shell bmgr enable true
 adb shell bmgr transport com.android.localtransport/.LocalTransport
 
-# 復元検証用に主要ファイルのmd5を事前記録しておく
-adb shell "run-as com.natsuyasai.multicolumnx sh -c 'md5sum /data/data/com.natsuyasai.multicolumnx/settings.json'"
+# 重要: トランスポートに残っている過去のバックアップセットを必ず消してから検証すること。
+# wipeを省略すると、backupnowが実質何もしなくても（K/Vへのフォールバック等で）
+# 古いバックアップセットがrestoreで復元され、あたかも成功したかのように見える
+# 誤検証（false positive）が発生する。
+adb shell bmgr wipe com.android.localtransport/.LocalTransport com.natsuyasai.multicolumnx
+
+# 復元検証用に主要ファイルのmd5を事前記録しておく（settings.jsonは空アプリでも
+# 同一ハッシュになりうる＝復元有無を判別できないため、Cookies DBの方を主たる証拠とする）
 adb shell "run-as com.natsuyasai.multicolumnx sh -c 'find /data/data/com.natsuyasai.multicolumnx/app_webview -name Cookies -exec md5sum {} \;'"
 
-# バックアップ実行（Success、Size quota exceededが出ないことを確認）
+# バックアップ実行。Successであることに加え、adb logcatで
+# 「Package <pkg> with progress: X/Y」が出力されることを必ず確認する
+# （出ていなければonFullBackup()経由でデータ転送されていない疑いが強い。後述）
+adb logcat -c
 adb shell bmgr backupnow com.natsuyasai.multicolumnx
+adb logcat -d | grep -i "with progress"
 
 # 全データ消去→復元
 adb shell bmgr list sets   # トークン確認（例: "1 : Local disk image"）
 adb shell pm clear com.natsuyasai.multicolumnx
 adb shell bmgr restore 1 com.natsuyasai.multicolumnx   # <トークン> <パッケージ名>の順。単に"restore <package>"はサポート外
 
-# md5再取得して事前記録と一致すること、アプリを起動してクラッシュしないことを確認
+# md5再取得してCookies DBが事前記録と一致すること、アプリを起動してクラッシュしないことを確認
 adb shell am start -n com.natsuyasai.multicolumnx/.MainActivity
 ```
 
@@ -111,10 +121,10 @@ adb shell am start -n com.natsuyasai.multicolumnx/.MainActivity
   - `bmgr backupnow` / `bmgr fullbackup` 実行中のログに `Package <pkg> with progress: X/Y` が出力されることを確認する（`adb logcat` を都度 `-c` でクリアしてから実行）。これが出ていれば `onFullBackup()` 経由でデータが実際に転送されている証拠になる。出ない場合は鍵バリューAPIにフォールバックしている疑いが強い。
   - 除外対象ディレクトリ配下（例 `app_webview/<Profile>/Service Worker/`）に `dd if=/dev/zero of=... bs=1M count=100` 等で25MBクォータを明確に超えるダミーファイルを作り、`bmgr backupnow` が `Size quota exceeded` にならず `Success` すること、かつ復元後（**`pm clear` → `bmgr restore` 直後、`am start` で起動する前**）に `run-as <pkg> sh -c 'find .../app_webview -iname "Service Worker"'` が空を返すことを確認する。**アプリを起動する前に確認すること**（起動するとWebViewが再初期化し、ディレクトリが自然に再生成されて判別できなくなる）。
   - リリースビルド（`run-as` が使えない debuggable=false）では上記のファイル直接確認ができないため、`bmgr backupnow` の `progress` ログ出力の有無と、復元後にアプリがクラッシュせず起動できることの2点で代替確認する。
-- **落とし穴（実際に踏んだ不具合）**: `android:backupAgent` でカスタムエージェントを指定しただけで `android:fullBackupOnly="true"` を付け忘れると、`onFullBackup()` が一切呼ばれず鍵バリューAPI（本実装では空実装）にフォールバックする。この状態でも `bmgr backupnow` は `Success` を返し、`pm clear` → `bmgr restore` 後に**新規インストールと見分けがつかない空の状態**になる（設定・アカウント一切なし、カラム0件で画面が真っ黒になる）。エミュレータのスナップショットに以前の実データが残っていたため、初回の検証では「md5一致」を確認できてしまい、この不具合を見逃しかけた（実際には過去のバックアップデータやその他のキャッシュ由来の見かけ上の一致で、フルバックアップ経路自体は機能していなかった）。**`bmgr backupnow` の `Success` や `md5一致`だけを根拠に「実装が機能している」と判断しないこと。** 上記の `progress` ログ確認とダミーファイル検証を必ず併用する。
+- **落とし穴（実際に踏んだ不具合）**: `android:backupAgent` でカスタムエージェントを指定しただけで `android:fullBackupOnly="true"` を付け忘れると、`onFullBackup()` が一切呼ばれず鍵バリューAPI（本実装では空実装）にフォールバックする。この状態でも `bmgr backupnow` は `Success` を返し、`pm clear` → `bmgr restore` 後に**新規インストールと見分けがつかない空の状態**になる（設定・アカウント一切なし、カラム0件で画面が真っ黒になる）。**初回の検証ではこの不具合を見逃しかけた**: `bmgr wipe` をせずに検証したため、ローカルトランスポート側に「以前実際にService Workerを手動退避した状態で取得済みだった、正しい中身のバックアップセット」が残っており、`backupnow`（実際には鍵バリューAPIの空処理で何も転送していない）の後に `restore` すると、その**古いバックアップセットがそのまま復元されて**md5が一致しているように見えてしまった（`Default/Shared Dictionary` だけが復元後に残っていたのも、その古いセットに含まれていた残骸）。**`bmgr backupnow` の `Success` や `md5一致`だけを根拠に「実装が機能している」と判断しないこと。検証の前には必ず `bmgr wipe` で古いバックアップセットを消し、`progress` ログ確認とダミーファイル検証を併用すること。**
 - `pm clear` 直後のアプリは OS 上「force-stopped 状態」として扱われ、その状態のまま `bmgr backupnow` を叩くと `Backup is not allowed` で失敗する。**バックアップ対象アプリは事前に一度フォアグラウンド起動しておく必要がある**（`adb shell am start` 等）。同様に、**署名の異なるビルド（デバッグ版⇔リリース版）を入れ替えてインストールすると、インストール時の自動リストアが signature mismatch で失敗し、アプリが force-stopped 状態のままになる**。ビルド種別を切り替えて検証する場合は、インストール直後に必ず `am start` で一度フォアグラウンド起動すること。
 - `adb shell run-as <pkg> sh -c '...'` は、複数コマンドを一度に文字列連結して渡す場合、シェル呼び出しの引数分割でクォートが失われ空白を含むパス（`Service Worker` 等）が壊れることがある。**コマンド全体を1つのダブルクォート文字列として `adb shell` に渡す**（`adb shell "run-as pkg sh -c '...'"`）と正しく解釈される。
-- **既知の制約（今回の検証では自動確認不可）**: 実際の Google アカウントクラウドバックアップおよび実機間 D2D（Quick Switch / ケーブル移行）が `BackupAgent.onFullBackup()` を同一経路で通るかは、ローカルトランスポートでの検証だけでは完全には裏付けられていない（Android バージョンにより挙動差の可能性が残る）。リリース前に実機2台での端末移行フローを手動確認することを推奨する。
+- **既知の制約（今回の検証では自動確認不可）**: 実際の Google アカウントクラウドバックアップおよび実機間 D2D（Quick Switch / ケーブル移行）が `BackupAgent.onFullBackup()` を同一経路で通るかは、ローカルトランスポートでの検証だけでは完全には裏付けられていない（Android バージョンにより挙動差の可能性が残る）。`fullBackupOnly` 修正後の検証は100MBダミーファイル・空マーカーファイルによる合成データのみで行っており、**実際にログイン済みの複数アカウントを持つ状態でのバックアップ→復元ラウンドトリップは未実施**（メカニズム自体は `Cookies` DBも除外対象外の通常ファイルとして同じ経路で扱われるため理論上は問題ないはずだが、実データでの確認ではない）。リリース前に実機2台での端末移行フローを手動確認する際、この実データラウンドトリップ確認も併せて実施すること。
 
 ## デバッグビルドでは検出できない不具合
 
