@@ -101,6 +101,7 @@ const defaultProps = {
   onApplyLayout: vi.fn(),
   onApplyColumnDefaults: vi.fn(),
   onReloadAllWebviews: vi.fn(),
+  onClearCache: vi.fn(),
   appVersion: "0.1.1",
   updateChecking: false,
   updateManualResult: "idle" as const,

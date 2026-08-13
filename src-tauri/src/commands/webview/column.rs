@@ -331,6 +331,176 @@ pub async fn remove_column_webview(app: AppHandle, column_id: String) -> Result<
     Ok(())
 }
 
+/// registry から column- プレフィックスを持つラベルのみを列挙する純粋関数。
+fn column_webview_labels(registry: &crate::state::WebviewRegistry) -> Vec<String> {
+    registry
+        .entries
+        .keys()
+        .filter(|l| l.starts_with(labels::COLUMN_PREFIX))
+        .cloned()
+        .collect()
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn clear_cache(app: AppHandle) -> Result<(), String> {
+    // ロックスコープを明確に分離して早期解放
+    let column_labels = {
+        let state = app.state::<AppState>();
+        let registry = state.registry.lock().expect("registry mutex poisoned");
+        column_webview_labels(&registry)
+    };
+
+    #[cfg(windows)]
+    {
+        use windows_core::Interface;
+
+        for label in column_labels {
+            if let Some(webview) = app.get_webview(&label) {
+                let _ = webview.with_webview(move |platform_webview| {
+                    let controller = platform_webview.controller();
+
+                    // ICoreWebView2 を取得
+                    let core_webview2 = unsafe { controller.CoreWebView2() }
+                        .map_err(|e| log::warn!("Failed to get CoreWebView2 for {}: {:?}", label, e))
+                        .ok();
+
+                    if let Some(core_webview2) = core_webview2 {
+                        // ICoreWebView2_13 にキャスト（Profile() メソッド取得用）
+                        let webview13 = core_webview2
+                            .cast::<webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2_13>()
+                            .map_err(|e| log::warn!("Failed to cast to ICoreWebView2_13 for {}: {:?}", label, e))
+                            .ok();
+
+                        if let Some(webview13) = webview13 {
+                            // ICoreWebView2Profile を取得
+                            let profile = unsafe { webview13.Profile() }
+                                .map_err(|e| log::warn!("Failed to get Profile for {}: {:?}", label, e))
+                                .ok();
+
+                            if let Some(profile) = profile {
+                                // ICoreWebView2Profile2 にキャスト（ClearBrowsingData メソッド取得用）
+                                let profile2 = profile
+                                    .cast::<webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Profile2>()
+                                    .map_err(|e| log::warn!("Failed to cast to ICoreWebView2Profile2 for {}: {:?}", label, e))
+                                    .ok();
+
+                                if let Some(profile2) = profile2 {
+                                    // Cookie は削除しない（ログイン情報を保持）。
+                                    let kinds = webview2_com::Microsoft::Web::WebView2::Win32::COREWEBVIEW2_BROWSING_DATA_KINDS_DISK_CACHE
+                                        | webview2_com::Microsoft::Web::WebView2::Win32::COREWEBVIEW2_BROWSING_DATA_KINDS_CACHE_STORAGE;
+
+                                    let handler = webview2_com::ClearBrowsingDataCompletedHandler::create(
+                                        Box::new(|_hresult| Ok(()))
+                                    );
+
+                                    unsafe {
+                                        let _ = profile2.ClearBrowsingData(kinds, &handler)
+                                            .map_err(|e| log::warn!("Failed to clear browsing data for {}: {:?}", label, e));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        for label in column_labels {
+            if let Some(webview) = app.get_webview(&label) {
+                let _ = webview.with_webview(move |platform_webview| {
+                    unsafe {
+                        use block2::RcBlock;
+                        use objc2_foundation::{NSDate, NSSet};
+                        use objc2_web_kit::{
+                            WKWebView, WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache,
+                        };
+
+                        let inner_ptr = platform_webview.inner();
+                        let wk_webview: &WKWebView = &*(inner_ptr.cast::<WKWebView>());
+
+                        // WKWebViewConfiguration を取得（Retained<T> を直接束縛）
+                        let config = wk_webview.configuration();
+
+                        // WKWebsiteDataStore を取得（Retained<T> を直接束縛）
+                        let store = config.websiteDataStore();
+
+                        // キャッシュ型集合を構築（Cookie は除外）
+                        // WKWebsiteDataTypeDiskCache と WKWebsiteDataTypeMemoryCache を削除対象にする。
+                        // WKWebsiteDataTypeCookies は絶対に含めない（ログイン情報保持要件）。
+                        let cache_types = NSSet::from_slice(&[
+                            WKWebsiteDataTypeDiskCache,
+                            WKWebsiteDataTypeMemoryCache,
+                        ]);
+
+                        // 全期間を削除対象にする（1970年0時点を基準日とすることで、それ以降全てを対象にする）
+                        let all_time = NSDate::dateWithTimeIntervalSince1970(0.0);
+
+                        // 非同期実行完了ハンドラ（結果待機不要、空クロージャ）
+                        let handler = RcBlock::new(|| {});
+
+                        // キャッシュ削除を実行（戻り値 () で成功）
+                        store.removeDataOfTypes_modifiedSince_completionHandler(
+                            &cache_types,
+                            &all_time,
+                            &handler,
+                        );
+                    }
+                });
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        use webkit2gtk::{WebContextExt, WebViewExt};
+
+        for label in column_labels {
+            if let Some(webview_window) = app.get_webview_window(&label) {
+                let _ = webview_window.with_webview(move |platform_webview| {
+                    let webview = platform_webview.inner();
+                    if let Some(context) = webview.context() {
+                        // Cookie（ログインセッション）は削除されない。
+                        // webkit_web_context_clear_cache はキャッシュのみを消去し、
+                        // Cookie は WebKitCookieManager が別途管理する。
+                        context.clear_cache();
+                    }
+                });
+            } else if let Some(webview) = app.get_webview(&label) {
+                let _ = webview.with_webview(move |platform_webview| {
+                    let webview = platform_webview.inner();
+                    if let Some(context) = webview.context() {
+                        // Cookie（ログインセッション）は削除されない。
+                        // webkit_web_context_clear_cache はキャッシュのみを消去し、
+                        // Cookie は WebKitCookieManager が別途管理する。
+                        context.clear_cache();
+                    }
+                });
+            }
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn clear_cache(app: AppHandle) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let registry = state.registry.lock().expect("registry mutex poisoned");
+    let _labels = column_webview_labels(&registry);
+
+    #[cfg(target_os = "android")]
+    {
+        crate::android_bridge::clear_all_column_webview_cache()?;
+    }
+
+    Ok(())
+}
+
 #[derive(serde::Deserialize)]
 pub struct ResizeBounds {
     #[serde(rename = "columnId")]
@@ -603,6 +773,45 @@ mod tests {
         assert!(!is_safe_column_id(""));
     }
 
+    #[cfg(all(test, windows))]
+    mod windows_cache_tests {
+        use webview2_com::Microsoft::Web::WebView2::Win32::{
+            COREWEBVIEW2_BROWSING_DATA_KINDS_CACHE_STORAGE,
+            COREWEBVIEW2_BROWSING_DATA_KINDS_COOKIES, COREWEBVIEW2_BROWSING_DATA_KINDS_DISK_CACHE,
+        };
+
+        #[test]
+        fn キャッシュクリア対象kindsにcookieが含まれない() {
+            // Cookie は削除しない（ログイン情報を保持）。
+            let kinds = COREWEBVIEW2_BROWSING_DATA_KINDS_DISK_CACHE
+                | COREWEBVIEW2_BROWSING_DATA_KINDS_CACHE_STORAGE;
+
+            // COOKIES が含まれていないことをアサート
+            assert_eq!(
+                kinds.0 & COREWEBVIEW2_BROWSING_DATA_KINDS_COOKIES.0,
+                0,
+                "COOKIES must not be included in cache clearing"
+            );
+
+            // DISK_CACHE と CACHE_STORAGE は含まれていることをアサート
+            assert_ne!(kinds.0, 0, "Must include DISK_CACHE and/or CACHE_STORAGE");
+
+            // DISK_CACHE が含まれていることをアサート
+            assert_ne!(
+                kinds.0 & COREWEBVIEW2_BROWSING_DATA_KINDS_DISK_CACHE.0,
+                0,
+                "DISK_CACHE must be included"
+            );
+
+            // CACHE_STORAGE が含まれていることをアサート
+            assert_ne!(
+                kinds.0 & COREWEBVIEW2_BROWSING_DATA_KINDS_CACHE_STORAGE.0,
+                0,
+                "CACHE_STORAGE must be included"
+            );
+        }
+    }
+
     #[cfg(target_os = "linux")]
     #[allow(non_snake_case)]
     mod linux_layout {
@@ -862,6 +1071,130 @@ mod tests {
                     bounds_x, bounds_width, win_logical_width, result, is_out_of_screen
                 );
             }
+        }
+    }
+
+    #[cfg(test)]
+    mod column_webview_labels_tests {
+        use super::*;
+        use std::collections::HashMap;
+
+        fn new_registry() -> crate::state::WebviewRegistry {
+            crate::state::WebviewRegistry {
+                entries: HashMap::new(),
+            }
+        }
+
+        #[test]
+        fn 空のregistryは空配列を返す() {
+            let registry = new_registry();
+            let labels = column_webview_labels(&registry);
+            assert!(labels.is_empty());
+        }
+
+        #[test]
+        fn columnラベルのみが返される() {
+            let mut registry = new_registry();
+            registry.entries.insert(
+                "column-a".to_string(),
+                crate::state::WebviewEntry {
+                    column_id: "a".to_string(),
+                    account_id: "acc1".to_string(),
+                    data_directory: "/data/a".to_string(),
+                },
+            );
+            registry.entries.insert(
+                "popup-b".to_string(),
+                crate::state::WebviewEntry {
+                    column_id: "b".to_string(),
+                    account_id: "acc2".to_string(),
+                    data_directory: "/data/b".to_string(),
+                },
+            );
+            registry.entries.insert(
+                "column-c".to_string(),
+                crate::state::WebviewEntry {
+                    column_id: "c".to_string(),
+                    account_id: "acc3".to_string(),
+                    data_directory: "/data/c".to_string(),
+                },
+            );
+
+            let mut labels = column_webview_labels(&registry);
+            labels.sort();
+            assert_eq!(labels, vec!["column-a".to_string(), "column-c".to_string()]);
+        }
+
+        #[test]
+        fn 複数のcolumnラベルが全て返される() {
+            let mut registry = new_registry();
+            registry.entries.insert(
+                "column-1".to_string(),
+                crate::state::WebviewEntry {
+                    column_id: "1".to_string(),
+                    account_id: "acc1".to_string(),
+                    data_directory: "/data/1".to_string(),
+                },
+            );
+            registry.entries.insert(
+                "column-2".to_string(),
+                crate::state::WebviewEntry {
+                    column_id: "2".to_string(),
+                    account_id: "acc2".to_string(),
+                    data_directory: "/data/2".to_string(),
+                },
+            );
+            registry.entries.insert(
+                "column-3".to_string(),
+                crate::state::WebviewEntry {
+                    column_id: "3".to_string(),
+                    account_id: "acc3".to_string(),
+                    data_directory: "/data/3".to_string(),
+                },
+            );
+
+            let mut labels = column_webview_labels(&registry);
+            labels.sort();
+            assert_eq!(
+                labels,
+                vec![
+                    "column-1".to_string(),
+                    "column-2".to_string(),
+                    "column-3".to_string()
+                ]
+            );
+        }
+
+        #[test]
+        fn composeやadd_accountラベルは除外される() {
+            let mut registry = new_registry();
+            registry.entries.insert(
+                "column-a".to_string(),
+                crate::state::WebviewEntry {
+                    column_id: "a".to_string(),
+                    account_id: "acc1".to_string(),
+                    data_directory: "/data/a".to_string(),
+                },
+            );
+            registry.entries.insert(
+                "compose-1".to_string(),
+                crate::state::WebviewEntry {
+                    column_id: "compose1".to_string(),
+                    account_id: "acc2".to_string(),
+                    data_directory: "/data/compose1".to_string(),
+                },
+            );
+            registry.entries.insert(
+                "add-account-1".to_string(),
+                crate::state::WebviewEntry {
+                    column_id: "add1".to_string(),
+                    account_id: "acc3".to_string(),
+                    data_directory: "/data/add1".to_string(),
+                },
+            );
+
+            let labels = column_webview_labels(&registry);
+            assert_eq!(labels, vec!["column-a".to_string()]);
         }
     }
 }

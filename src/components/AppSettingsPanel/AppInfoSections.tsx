@@ -3,6 +3,7 @@ import styles from "./AppSettingsPanel.module.scss";
 
 interface AppInfoSectionsProps {
   onReloadAllWebviews: () => void;
+  onClearCache: () => void;
   appVersion: string;
   updateChecking: boolean;
   updateManualResult: "idle" | "none" | "error";
@@ -12,6 +13,7 @@ interface AppInfoSectionsProps {
 /** 「WebView」「アプリ情報」セクション（ドラフト非依存） */
 export const AppInfoSections: React.FC<AppInfoSectionsProps> = ({
   onReloadAllWebviews,
+  onClearCache,
   appVersion,
   updateChecking,
   updateManualResult,
@@ -29,6 +31,17 @@ export const AppInfoSections: React.FC<AppInfoSectionsProps> = ({
         onClick={onReloadAllWebviews}
       >
         全WebViewを再生成
+      </button>
+      <p className={styles.hint}>
+        ログイン情報は保持したまま、各カラムの不要なキャッシュ（画像等）のみ削除します。
+      </p>
+      <button
+        type="button"
+        className={styles.applyAllBtn}
+        onClick={onClearCache}
+        aria-label="不要なキャッシュを削除"
+      >
+        キャッシュを削除
       </button>
     </section>
 

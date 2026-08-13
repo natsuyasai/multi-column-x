@@ -304,6 +304,17 @@ pub fn remove_column_webview(id: &str) -> Result<(), String> {
     })
 }
 
+/// MainActivity.clearAllColumnWebViewCache を呼び出して全カラム WebView のキャッシュのみを削除する。
+/// Cookie（ログインセッション）は保持される（WebView.clearCache はキャッシュのみが対象で Cookie は
+/// CookieManager が別管理のため触れない）。
+pub fn clear_all_column_webview_cache() -> Result<(), String> {
+    call_activity_method(|env, activity| {
+        env.call_method(activity, "clearAllColumnWebViewCache", "()V", &[])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
 /// MainActivity.showColumnWebView を呼び出してカラム WebView を表示する。
 /// x_dp / y_dp / width_dp / height_dp は CSS px（= dp）。
 pub fn show_column_webview(

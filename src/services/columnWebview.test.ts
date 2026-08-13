@@ -5,6 +5,7 @@ import { DEFAULT_COLUMN_SETTINGS } from "../types";
 import type { Column } from "../types";
 import {
   applyColumnSettingsScripts,
+  clearCache,
   createColumnWebview,
   flashMobileSwipeBar,
   removeColumnWebview,
@@ -68,6 +69,11 @@ describe("columnWebview service", () => {
     expect(invoke).toHaveBeenCalledWith("remove_column_webview", {
       columnId: "col-1",
     });
+  });
+
+  it("clearCacheはclear_cacheコマンドを引数なしで送る", async () => {
+    await clearCache();
+    expect(invoke).toHaveBeenCalledWith("clear_cache");
   });
 
   it("setColumnCookiesはaccountIdを送る", async () => {

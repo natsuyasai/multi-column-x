@@ -4,6 +4,7 @@
     "save_settings",
     "create_column_webview",
     "remove_column_webview",
+    "clear_cache",
     "resize_column_webview",
     "eval_in_webview",
     "get_external_column_data_directory",
