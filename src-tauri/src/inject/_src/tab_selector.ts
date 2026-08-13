@@ -60,14 +60,14 @@
     // MutationObserver が拾えないケースへの 300ms ポーリングフォールバック
     const polling = setInterval(attempt, 300);
 
-    // 10 秒経過で諦める
+    // 60 秒経過で諦める
     setTimeout(function () {
       if (!done) {
         done = true;
         observer.disconnect();
         clearInterval(polling);
       }
-    }, 10000);
+    }, 60000);
   }
 
   function initializeTab(): void {
