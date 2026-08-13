@@ -39,6 +39,23 @@ function addBlurCandidate(): { photoRoot: HTMLElement; bgDiv: HTMLElement } {
   return { photoRoot, bgDiv };
 }
 
+function addCardWrapperBlurCandidate(): {
+  cardRoot: HTMLElement;
+  bgDiv: HTMLElement;
+} {
+  const cardRoot = document.createElement("div");
+  cardRoot.dataset.testid = "card.wrapper";
+  const wrapper = document.createElement("div");
+  const bgDiv = document.createElement("div");
+  bgDiv.style.backgroundImage = "url(https://example.com/card-image.jpg)";
+  const img = document.createElement("img");
+  wrapper.appendChild(bgDiv);
+  wrapper.appendChild(img);
+  cardRoot.appendChild(wrapper);
+  document.body.appendChild(cardRoot);
+  return { cardRoot, bgDiv };
+}
+
 async function importBlurImage(): Promise<void> {
   vi.resetModules();
   await import("./blur_image");
@@ -88,5 +105,14 @@ describe("inject/blur_image", () => {
     await importBlurImage();
 
     expect(bgDiv.style.filter).toBe("");
+  });
+
+  it("card.wrapperの背景画像にもブラーが適用される", async () => {
+    setConfig({ blurImageEnabled: true, blurImageAmount: "10px" });
+    const { bgDiv } = addCardWrapperBlurCandidate();
+
+    await importBlurImage();
+
+    expect(bgDiv.style.filter).toBe("blur(10px)");
   });
 });

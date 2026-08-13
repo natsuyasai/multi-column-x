@@ -144,7 +144,7 @@
 
   function setBlurImage(): void {
     const images = document.body.querySelectorAll(
-      "div[data-testid='tweetPhoto']",
+      "div[data-testid='tweetPhoto'], div[data-testid='card.wrapper']",
     );
     images.forEach((image) => {
       const target = getBlurTarget(image as HTMLElement);
