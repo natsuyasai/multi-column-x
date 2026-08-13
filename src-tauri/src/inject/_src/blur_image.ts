@@ -26,11 +26,15 @@
   }
 
   function applyBlur(target: HTMLElement): void {
-    target.style.filter = `blur(${BLUR_AMOUNT})`;
+    const value = `blur(${BLUR_AMOUNT})`;
+    if (target.style.filter === value) return;
+    target.style.filter = value;
   }
 
   function removeBlur(target: HTMLElement): void {
-    target.style.filter = "";
+    if (target.style.filter !== "") {
+      target.style.filter = "";
+    }
     const key = getTargetKey(target);
     if (key) unblurredKeys.add(key);
   }

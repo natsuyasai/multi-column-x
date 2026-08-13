@@ -149,4 +149,64 @@ describe("inject/blur_image", () => {
       expect(bgDiv.style.filter).toBe("blur(10px)");
     });
   });
+
+  it("既に同じブラー値が設定されている場合_2度目の処理ではstyle属性が変更されないこと", async () => {
+    setConfig({ blurImageEnabled: true, blurImageAmount: "10px" });
+    const { photoRoot, bgDiv } = addBlurCandidate();
+
+    await importBlurImage();
+
+    // 1度目の適用後、style.filter が "blur(10px)" になっているはず
+    const expectedFilterValue = "blur(10px)";
+    expect(bgDiv.style.filter).toBe(expectedFilterValue);
+
+    // style.filter の setter 呼び出し回数をカウント
+    let setterCallCount = 0;
+    const originalStyle = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      "style",
+    );
+
+    // HTMLElement の style オブジェクトの filter プロパティをスパイ
+    const originalBgDivStyle = bgDiv.style;
+    const styleProxy = new Proxy(originalBgDivStyle, {
+      set: (target, prop, value) => {
+        if (prop === "filter") {
+          setterCallCount++;
+        }
+        (target as any)[prop] = value;
+        return true;
+      },
+    });
+    Object.defineProperty(bgDiv, "style", {
+      get: () => styleProxy,
+      configurable: true,
+    });
+
+    // 2度目のブラー処理を誘発: photoRoot に新しい子要素を追加して
+    // blur_image.ts 内の MutationObserver のコールバック（observeDOMChanges）を発火させる
+    const newChild = document.createElement("div");
+    newChild.dataset.testid = "tweetPhoto";
+    const wrapper = document.createElement("div");
+    const newBgDiv = document.createElement("div");
+    newBgDiv.style.backgroundImage = "url(https://example.com/photo2.jpg)";
+    const img = document.createElement("img");
+    wrapper.appendChild(newBgDiv);
+    wrapper.appendChild(img);
+    newChild.appendChild(wrapper);
+    photoRoot.appendChild(newChild);
+
+    // マイクロタスク待機（MutationObserver のコールバック実行待ち）
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // 実装前（guard なし）: setterCallCount は 2
+    //   - 1度目: importBlurImage() で applyBlur() が呼ばれて filter をセット
+    //   - 2度目: photoRoot.appendChild() で observeDOMChanges がトリガーされて applyBlur() が再度呼ばれて filter をセット
+    // 実装後（guard あり）: setterCallCount は 0
+    //   - 1度目: importBlurImage() で applyBlur() が呼ばれるが、まだ filter が「」なので代入
+    //   - 2度目: photoRoot.appendChild() で setBlurImage() が呼ばれても、applyBlur() が現在値と同じを検知してスキップ
+    // ただし、1回目の初期 import 時点では既に filter が "blur(10px)" になっているため、
+    // スパイを設定するタイミングによって setterCallCount は 0 になる
+    expect(setterCallCount).toBe(0);
+  });
 });
