@@ -48,7 +48,6 @@ import {
 import { logError } from "./lib/log";
 import {
   applyColumnSettingsScripts,
-  clearCache,
   evalInColumn,
   updateMobileSwipeBar,
 } from "./services/columnWebview";
@@ -404,16 +403,6 @@ const App: React.FC = () => {
     [recreateColumnWebview],
   );
 
-  const handleClearCache = useCallback(async () => {
-    await clearCache();
-    const { columns: currentColumns } = useAppStore.getState();
-    await Promise.all(
-      currentColumns.map((c) =>
-        evalInColumn(c.id, WEBVIEW_SCRIPTS.RELOAD_PAGE),
-      ),
-    );
-  }, []);
-
   const handleApplySettings = useCallback(
     async (columnId: string, settings: ColumnSettings, width: number) => {
       handleUpdateColumn(columnId, { settings, width });
@@ -683,7 +672,6 @@ const App: React.FC = () => {
             );
           }}
           onReloadAllWebviews={recreateAllWebviews}
-          onClearCache={handleClearCache}
           appVersion={appVersion}
           updateChecking={updater.checking}
           updateManualResult={updater.manualResult}

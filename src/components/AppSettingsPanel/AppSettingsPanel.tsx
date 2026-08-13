@@ -34,7 +34,6 @@ interface AppSettingsPanelProps {
     >,
   ) => void;
   onReloadAllWebviews: () => void;
-  onClearCache: () => void;
   appVersion: string;
   updateChecking: boolean;
   updateManualResult: "idle" | "none" | "error";
@@ -50,7 +49,6 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   onApplyLayout,
   onApplyColumnDefaults,
   onReloadAllWebviews,
-  onClearCache,
   appVersion,
   updateChecking,
   updateManualResult,
@@ -200,7 +198,6 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                   onReloadAllWebviews();
                   onClose();
                 }}
-                onClearCache={onClearCache}
                 appVersion={appVersion}
                 updateChecking={updateChecking}
                 updateManualResult={updateManualResult}
