@@ -409,7 +409,7 @@ pub async fn clear_cache(app: AppHandle) -> Result<(), String> {
 
     #[cfg(target_os = "macos")]
     {
-        for label in column_labels.clone() {
+        for label in column_labels {
             if let Some(webview) = app.get_webview(&label) {
                 let _ = webview.with_webview(move |platform_webview| {
                     unsafe {
@@ -454,41 +454,32 @@ pub async fn clear_cache(app: AppHandle) -> Result<(), String> {
         }
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "linux")]
     {
-        #[cfg(target_os = "linux")]
-        {
-            use webkit2gtk::{WebContextExt, WebViewExt};
+        use webkit2gtk::{WebContextExt, WebViewExt};
 
-            for label in column_labels {
-                if let Some(webview_window) = app.get_webview_window(&label) {
-                    let _ = webview_window.with_webview(move |platform_webview| {
-                        let webview = platform_webview.inner();
-                        if let Some(context) = webview.context() {
-                            // Cookie（ログインセッション）は削除されない。
-                            // webkit_web_context_clear_cache はキャッシュのみを消去し、
-                            // Cookie は WebKitCookieManager が別途管理する。
-                            context.clear_cache();
-                        }
-                    });
-                } else if let Some(webview) = app.get_webview(&label) {
-                    let _ = webview.with_webview(move |platform_webview| {
-                        let webview = platform_webview.inner();
-                        if let Some(context) = webview.context() {
-                            // Cookie（ログインセッション）は削除されない。
-                            // webkit_web_context_clear_cache はキャッシュのみを消去し、
-                            // Cookie は WebKitCookieManager が別途管理する。
-                            context.clear_cache();
-                        }
-                    });
-                }
+        for label in column_labels {
+            if let Some(webview_window) = app.get_webview_window(&label) {
+                let _ = webview_window.with_webview(move |platform_webview| {
+                    let webview = platform_webview.inner();
+                    if let Some(context) = webview.context() {
+                        // Cookie（ログインセッション）は削除されない。
+                        // webkit_web_context_clear_cache はキャッシュのみを消去し、
+                        // Cookie は WebKitCookieManager が別途管理する。
+                        context.clear_cache();
+                    }
+                });
+            } else if let Some(webview) = app.get_webview(&label) {
+                let _ = webview.with_webview(move |platform_webview| {
+                    let webview = platform_webview.inner();
+                    if let Some(context) = webview.context() {
+                        // Cookie（ログインセッション）は削除されない。
+                        // webkit_web_context_clear_cache はキャッシュのみを消去し、
+                        // Cookie は WebKitCookieManager が別途管理する。
+                        context.clear_cache();
+                    }
+                });
             }
-        }
-
-        #[cfg(not(target_os = "linux"))]
-        {
-            let _ = column_labels;
-            // Windows は上の `#[cfg(windows)]` ブロックで処理済み
         }
     }
 
