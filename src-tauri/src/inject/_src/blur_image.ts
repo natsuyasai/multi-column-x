@@ -175,13 +175,32 @@
   }
 
   function observeDOMChanges(): void {
+    let rafScheduled = false;
+    function scheduleSetBlurImage(): void {
+      if (rafScheduled) return;
+      rafScheduled = true;
+      requestAnimationFrame(() => {
+        rafScheduled = false;
+        setBlurImage();
+      });
+    }
+
     new MutationObserver((mutations) => {
       for (const mutation of mutations) {
-        if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
-          setBlurImage();
+        if (
+          (mutation.type === "childList" && mutation.addedNodes.length > 0) ||
+          mutation.type === "attributes"
+        ) {
+          scheduleSetBlurImage();
+          return;
         }
       }
-    }).observe(document.body, { childList: true, subtree: true });
+    }).observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["style"],
+    });
   }
 
   function setup(): void {

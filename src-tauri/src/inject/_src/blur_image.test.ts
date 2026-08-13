@@ -209,4 +209,43 @@ describe("inject/blur_image", () => {
     // スパイを設定するタイミングによって setterCallCount は 0 になる
     expect(setterCallCount).toBe(0);
   });
+
+  it("背景画像が要素追加後に非同期でセットされた場合もブラーが適用される", async () => {
+    setConfig({ blurImageEnabled: true, blurImageAmount: "10px" });
+    const photoRoot = document.createElement("div");
+    photoRoot.dataset.testid = "tweetPhoto";
+    document.body.appendChild(photoRoot);
+
+    await importBlurImage();
+
+    // requestAnimationFrame の発火を待つ
+    async function flushAnimationFrame(): Promise<void> {
+      return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+    }
+
+    // 第1段階: backgroundImage 未設定の要素を追加（childList mutation が発火）
+    const wrapper = document.createElement("div");
+    const bgDiv = document.createElement("div");
+    // 意図的に backgroundImage を未設定のまま追加
+    const img = document.createElement("img");
+    wrapper.appendChild(bgDiv);
+    wrapper.appendChild(img);
+    photoRoot.appendChild(wrapper);
+
+    // 第1段階の mutation 処理完了を待つ（childList mutation による setBlurImage() 実行完了）
+    await flushAnimationFrame();
+
+    // この時点で backgroundImage がないため、bgDiv にはブラーが適用されていないはず
+    expect(bgDiv.style.filter).toBe("");
+
+    // 第2段階: 既存要素の backgroundImage を非同期でセット（attributes mutation のみが単独で発火）
+    bgDiv.style.backgroundImage = "url(https://example.com/async-image.jpg)";
+
+    // 第2段階の mutation 処理完了を待つ（attributes mutation による setBlurImage() 実行完了）
+    await flushAnimationFrame();
+
+    // attributes mutation により style 属性が変更されたことを検知して
+    // setBlurImage() が実行され、bgDiv にブラーが適用されているはず
+    expect(bgDiv.style.filter).toBe("blur(10px)");
+  });
 });
