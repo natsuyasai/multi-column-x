@@ -80,6 +80,7 @@ app モジュールの variant は universal フレーバー付きのため、`.
 - Android 標準の Auto Backup for Apps（`allowBackup` + `bmgr` 経由の転送）に乗せてログインセッション（WebView Cookie 等）を含む完全引き継ぎを実現している。デフォルト（`allowBackup=true`、除外ルール無し）のままだと `app_webview`（WebView Profile API のプロファイルストレージ）が実機で数百 MB 規模に肥大化し、Auto Backup の 25MB クォータを超過して **バックアップ自体が丸ごと失敗する**（`bmgr backupnow` が `Size quota exceeded` を返す）。肥大化の99%以上は WebView の Service Worker CacheStorage / Shared Dictionary cache（x.com のオフラインキャッシュで、破棄しても再生成されるだけで実害なし）。
 - `data_extraction_rules.xml` / `backup_rules.xml` の `path` 属性は**ワイルドカード・正規表現非対応**（Android 公式ドキュメント明記）。WebView のプロファイルディレクトリ名は `Default` / `Profile 1` / `Profile 2` ... とアカウント数に応じて動的に増減するため、XML の固定パス列挙では将来のアカウント追加に対応できない。そのため XML 宣言的ルールではなく、カスタム `BackupAgent`（`MultiColumnXBackupAgent`）を実装し、`onFullBackup(FullBackupDataOutput)` 内で `BackupFileSelector` がディレクトリ名の完全一致（`Service Worker` / `Shared Dictionary` を深さ不問で除外等）により対象ファイルを再帰選定し `fullBackupFile()` で個別登録する方式にした。**`super.onFullBackup()` は呼ばないこと**（呼ぶと XML ルールベースの規定動作＝全ファイル対象に戻ってしまい、除外ロジックが無意味になる）。
 - `MultiColumnXBackupAgent` は `android.app.backup.BackupAgent` を継承しフレームワーク依存のため JVM 単体テスト対象外。ロジックの本体は `BackupFileSelector`（`java.io.File` のみ依存の純粋関数）側に切り出してあり、そちらでユニットテストしている。
+- **`android:backupAgent` でカスタムエージェントを指定するだけでは `onFullBackup()` は呼ばれない。`android:fullBackupOnly="true"` を明示しない限り、常に鍵バリューAPI（`onBackup()`）にフォールバックする**（Android公式仕様。デフォルト値は `false`）。この属性を付け忘れると、`bmgr backupnow` は `Success` を返し続ける（鍵バリューAPI側が空実装で正常終了するだけ）ため、**「Successが返る」ことは実装が機能している証拠にならない**。実際に本プロジェクトでも一度この状態でコミットしてしまい、後続の検証で発覚した（後述）。
 
 ### 実機/エミュレータでの検証手順（ローカルトランスポート）
 
@@ -106,8 +107,12 @@ adb shell bmgr restore 1 com.natsuyasai.multicolumnx   # <トークン> <パッ�
 adb shell am start -n com.natsuyasai.multicolumnx/.MainActivity
 ```
 
-- 実装直後（2026-08-13）にエミュレータ（Pixel_9、既存3アカウント・複数WebViewプロファイル、アプリデータ実測191MB）で上記手順を実施し、`bmgr backupnow` が `Success`（quota超過なし）、`pm clear` → `bmgr restore` 後に `settings.json` と全プロファイルの `Cookies` DB の md5 が完全一致、アプリ起動後もクラッシュせず**再ログイン不要でタイムラインがそのまま表示される**ことを確認済み。
-- `pm clear` 直後のアプリは OS 上「force-stopped 状態」として扱われ、その状態のまま `bmgr backupnow` を叩くと `Backup is not allowed` で失敗する。**バックアップ対象アプリは事前に一度フォアグラウンド起動しておく必要がある**（`adb shell am start` 等）。
+- **「除外ロジックが実際に機能しているか」を判別できる検証をすること。** `bmgr backupnow` が `Success` を返すだけでは、鍵バリューAPI（空実装）が正常終了しただけの可能性を否定できない（前述の `fullBackupOnly` 漏れのケース）。判別には以下が有効:
+  - `bmgr backupnow` / `bmgr fullbackup` 実行中のログに `Package <pkg> with progress: X/Y` が出力されることを確認する（`adb logcat` を都度 `-c` でクリアしてから実行）。これが出ていれば `onFullBackup()` 経由でデータが実際に転送されている証拠になる。出ない場合は鍵バリューAPIにフォールバックしている疑いが強い。
+  - 除外対象ディレクトリ配下（例 `app_webview/<Profile>/Service Worker/`）に `dd if=/dev/zero of=... bs=1M count=100` 等で25MBクォータを明確に超えるダミーファイルを作り、`bmgr backupnow` が `Size quota exceeded` にならず `Success` すること、かつ復元後（**`pm clear` → `bmgr restore` 直後、`am start` で起動する前**）に `run-as <pkg> sh -c 'find .../app_webview -iname "Service Worker"'` が空を返すことを確認する。**アプリを起動する前に確認すること**（起動するとWebViewが再初期化し、ディレクトリが自然に再生成されて判別できなくなる）。
+  - リリースビルド（`run-as` が使えない debuggable=false）では上記のファイル直接確認ができないため、`bmgr backupnow` の `progress` ログ出力の有無と、復元後にアプリがクラッシュせず起動できることの2点で代替確認する。
+- **落とし穴（実際に踏んだ不具合）**: `android:backupAgent` でカスタムエージェントを指定しただけで `android:fullBackupOnly="true"` を付け忘れると、`onFullBackup()` が一切呼ばれず鍵バリューAPI（本実装では空実装）にフォールバックする。この状態でも `bmgr backupnow` は `Success` を返し、`pm clear` → `bmgr restore` 後に**新規インストールと見分けがつかない空の状態**になる（設定・アカウント一切なし、カラム0件で画面が真っ黒になる）。エミュレータのスナップショットに以前の実データが残っていたため、初回の検証では「md5一致」を確認できてしまい、この不具合を見逃しかけた（実際には過去のバックアップデータやその他のキャッシュ由来の見かけ上の一致で、フルバックアップ経路自体は機能していなかった）。**`bmgr backupnow` の `Success` や `md5一致`だけを根拠に「実装が機能している」と判断しないこと。** 上記の `progress` ログ確認とダミーファイル検証を必ず併用する。
+- `pm clear` 直後のアプリは OS 上「force-stopped 状態」として扱われ、その状態のまま `bmgr backupnow` を叩くと `Backup is not allowed` で失敗する。**バックアップ対象アプリは事前に一度フォアグラウンド起動しておく必要がある**（`adb shell am start` 等）。同様に、**署名の異なるビルド（デバッグ版⇔リリース版）を入れ替えてインストールすると、インストール時の自動リストアが signature mismatch で失敗し、アプリが force-stopped 状態のままになる**。ビルド種別を切り替えて検証する場合は、インストール直後に必ず `am start` で一度フォアグラウンド起動すること。
 - `adb shell run-as <pkg> sh -c '...'` は、複数コマンドを一度に文字列連結して渡す場合、シェル呼び出しの引数分割でクォートが失われ空白を含むパス（`Service Worker` 等）が壊れることがある。**コマンド全体を1つのダブルクォート文字列として `adb shell` に渡す**（`adb shell "run-as pkg sh -c '...'"`）と正しく解釈される。
 - **既知の制約（今回の検証では自動確認不可）**: 実際の Google アカウントクラウドバックアップおよび実機間 D2D（Quick Switch / ケーブル移行）が `BackupAgent.onFullBackup()` を同一経路で通るかは、ローカルトランスポートでの検証だけでは完全には裏付けられていない（Android バージョンにより挙動差の可能性が残る）。リリース前に実機2台での端末移行フローを手動確認することを推奨する。
 
