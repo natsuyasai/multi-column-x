@@ -331,6 +331,36 @@ pub async fn remove_column_webview(app: AppHandle, column_id: String) -> Result<
     Ok(())
 }
 
+/// registry から column- プレフィックスを持つラベルのみを列挙する純粋関数。
+fn column_webview_labels(registry: &crate::state::WebviewRegistry) -> Vec<String> {
+    registry
+        .entries
+        .keys()
+        .filter(|l| l.starts_with(labels::COLUMN_PREFIX))
+        .cloned()
+        .collect()
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn clear_cache(app: AppHandle) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let registry = state.registry.lock().expect("registry mutex poisoned");
+    let _labels = column_webview_labels(&registry);
+    // TODO: 各ラベルに対するプラットフォーム別キャッシュクリア処理は後続ステップで実装する
+    Ok(())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn clear_cache(app: AppHandle) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let registry = state.registry.lock().expect("registry mutex poisoned");
+    let _labels = column_webview_labels(&registry);
+    // TODO: Android側の実処理は後続ステップで実装する
+    Ok(())
+}
+
 #[derive(serde::Deserialize)]
 pub struct ResizeBounds {
     #[serde(rename = "columnId")]
@@ -862,6 +892,130 @@ mod tests {
                     bounds_x, bounds_width, win_logical_width, result, is_out_of_screen
                 );
             }
+        }
+    }
+
+    #[cfg(test)]
+    mod column_webview_labels_tests {
+        use super::*;
+        use std::collections::HashMap;
+
+        fn new_registry() -> crate::state::WebviewRegistry {
+            crate::state::WebviewRegistry {
+                entries: HashMap::new(),
+            }
+        }
+
+        #[test]
+        fn 空のregistryは空配列を返す() {
+            let registry = new_registry();
+            let labels = column_webview_labels(&registry);
+            assert!(labels.is_empty());
+        }
+
+        #[test]
+        fn columnラベルのみが返される() {
+            let mut registry = new_registry();
+            registry.entries.insert(
+                "column-a".to_string(),
+                crate::state::WebviewEntry {
+                    column_id: "a".to_string(),
+                    account_id: "acc1".to_string(),
+                    data_directory: "/data/a".to_string(),
+                },
+            );
+            registry.entries.insert(
+                "popup-b".to_string(),
+                crate::state::WebviewEntry {
+                    column_id: "b".to_string(),
+                    account_id: "acc2".to_string(),
+                    data_directory: "/data/b".to_string(),
+                },
+            );
+            registry.entries.insert(
+                "column-c".to_string(),
+                crate::state::WebviewEntry {
+                    column_id: "c".to_string(),
+                    account_id: "acc3".to_string(),
+                    data_directory: "/data/c".to_string(),
+                },
+            );
+
+            let mut labels = column_webview_labels(&registry);
+            labels.sort();
+            assert_eq!(labels, vec!["column-a".to_string(), "column-c".to_string()]);
+        }
+
+        #[test]
+        fn 複数のcolumnラベルが全て返される() {
+            let mut registry = new_registry();
+            registry.entries.insert(
+                "column-1".to_string(),
+                crate::state::WebviewEntry {
+                    column_id: "1".to_string(),
+                    account_id: "acc1".to_string(),
+                    data_directory: "/data/1".to_string(),
+                },
+            );
+            registry.entries.insert(
+                "column-2".to_string(),
+                crate::state::WebviewEntry {
+                    column_id: "2".to_string(),
+                    account_id: "acc2".to_string(),
+                    data_directory: "/data/2".to_string(),
+                },
+            );
+            registry.entries.insert(
+                "column-3".to_string(),
+                crate::state::WebviewEntry {
+                    column_id: "3".to_string(),
+                    account_id: "acc3".to_string(),
+                    data_directory: "/data/3".to_string(),
+                },
+            );
+
+            let mut labels = column_webview_labels(&registry);
+            labels.sort();
+            assert_eq!(
+                labels,
+                vec![
+                    "column-1".to_string(),
+                    "column-2".to_string(),
+                    "column-3".to_string()
+                ]
+            );
+        }
+
+        #[test]
+        fn composeやadd_accountラベルは除外される() {
+            let mut registry = new_registry();
+            registry.entries.insert(
+                "column-a".to_string(),
+                crate::state::WebviewEntry {
+                    column_id: "a".to_string(),
+                    account_id: "acc1".to_string(),
+                    data_directory: "/data/a".to_string(),
+                },
+            );
+            registry.entries.insert(
+                "compose-1".to_string(),
+                crate::state::WebviewEntry {
+                    column_id: "compose1".to_string(),
+                    account_id: "acc2".to_string(),
+                    data_directory: "/data/compose1".to_string(),
+                },
+            );
+            registry.entries.insert(
+                "add-account-1".to_string(),
+                crate::state::WebviewEntry {
+                    column_id: "add1".to_string(),
+                    account_id: "acc3".to_string(),
+                    data_directory: "/data/add1".to_string(),
+                },
+            );
+
+            let labels = column_webview_labels(&registry);
+            assert_eq!(labels, vec!["column-a".to_string()]);
         }
     }
 }

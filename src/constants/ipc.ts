@@ -12,6 +12,7 @@ export const IPC_COMMANDS = {
   // カラム WebView 管理
   CREATE_COLUMN_WEBVIEW: "create_column_webview",
   REMOVE_COLUMN_WEBVIEW: "remove_column_webview",
+  CLEAR_CACHE: "clear_cache",
   RESIZE_COLUMN_WEBVIEW: "resize_column_webview",
   EVAL_IN_WEBVIEW: "eval_in_webview",
   GET_EXTERNAL_COLUMN_DATA_DIRECTORY: "get_external_column_data_directory",
