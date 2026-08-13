@@ -2,10 +2,10 @@
 // window.__multiColumnXConfig はモジュールのトップレベルで一度だけ読み取られるため、
 // 設定値ごとに vi.resetModules で再 import して検証する。
 //
-// ぼかし対象要素は「tweetPhoto 内の div のうち background-image が url() を持ち、
-// かつ同じ親の中に IMG 要素が兄弟として存在するもの」という特有の DOM 構造依存の
-// 判定（getBlurTarget）で決まる。X の実 DOM 構造そのものではなく、この判定ロジック
-// を満たす最小限の合成 DOM を用意して検証する。
+// ぼかし対象要素は「tweetPhoto / card.wrapper 内の div のうち background-image が
+// url() を持ち、かつ同じ親の中に IMG 要素が兄弟として存在するもの」という特有の
+// DOM 構造依存の判定（getBlurTargets）で決まる。X の実 DOM 構造そのものではなく、
+// この判定ロジックを満たす最小限の合成 DOM を用意して検証する。
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // small_image.ts と同様に DOM 監視用 MutationObserver が import のたびに
@@ -54,6 +54,29 @@ function addCardWrapperBlurCandidate(): {
   cardRoot.appendChild(wrapper);
   document.body.appendChild(cardRoot);
   return { cardRoot, bgDiv };
+}
+
+function addMultipleBlurCandidates(count: number): {
+  photoRoot: HTMLElement;
+  bgDivs: HTMLElement[];
+} {
+  const photoRoot = document.createElement("div");
+  photoRoot.dataset.testid = "tweetPhoto";
+  const bgDivs: HTMLElement[] = [];
+
+  for (let i = 0; i < count; i++) {
+    const wrapper = document.createElement("div");
+    const bgDiv = document.createElement("div");
+    bgDiv.style.backgroundImage = `url(https://example.com/photo${i}.jpg)`;
+    const img = document.createElement("img");
+    wrapper.appendChild(bgDiv);
+    wrapper.appendChild(img);
+    photoRoot.appendChild(wrapper);
+    bgDivs.push(bgDiv);
+  }
+
+  document.body.appendChild(photoRoot);
+  return { photoRoot, bgDivs };
 }
 
 async function importBlurImage(): Promise<void> {
@@ -114,5 +137,16 @@ describe("inject/blur_image", () => {
     await importBlurImage();
 
     expect(bgDiv.style.filter).toBe("blur(10px)");
+  });
+
+  it("1つのルート内に複数の背景画像候補がある場合_全てにブラーが適用される", async () => {
+    setConfig({ blurImageEnabled: true, blurImageAmount: "10px" });
+    const { bgDivs } = addMultipleBlurCandidates(3);
+
+    await importBlurImage();
+
+    bgDivs.forEach((bgDiv) => {
+      expect(bgDiv.style.filter).toBe("blur(10px)");
+    });
   });
 });

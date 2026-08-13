@@ -6,18 +6,19 @@
   const unblurredKeys = new Set<string>();
   const processed = new WeakSet<Element>();
 
-  function getBlurTarget(root: HTMLElement): HTMLElement | null {
+  function getBlurTargets(root: HTMLElement): HTMLElement[] {
     const candidates = root.querySelectorAll<HTMLElement>("div");
+    const targets: HTMLElement[] = [];
     for (const div of Array.from(candidates)) {
       if (!div.style.backgroundImage.includes("url(")) continue;
       const siblings = div.parentElement
         ? Array.from(div.parentElement.children)
         : [];
       if (siblings.some((el) => el !== div && el.tagName === "IMG")) {
-        return div;
+        targets.push(div);
       }
     }
-    return null;
+    return targets;
   }
 
   function getTargetKey(target: HTMLElement): string {
@@ -35,15 +36,23 @@
   }
 
   function toggleBlur(root: HTMLElement): void {
-    const target = getBlurTarget(root);
-    if (!target) return;
-    const key = getTargetKey(target);
-    if (key && unblurredKeys.has(key)) {
-      applyBlur(target);
-      unblurredKeys.delete(key);
-    } else {
-      removeBlur(target);
-    }
+    const targets = getBlurTargets(root);
+    if (targets.length === 0) return;
+
+    // 最初のターゲットの状態を代表として判定し、全ターゲットを同じ状態に揃える
+    const firstTarget = targets[0];
+    const firstKey = getTargetKey(firstTarget);
+    const isUnblurred = firstKey && unblurredKeys.has(firstKey);
+
+    targets.forEach((target) => {
+      const key = getTargetKey(target);
+      if (isUnblurred) {
+        applyBlur(target);
+        if (key) unblurredKeys.delete(key);
+      } else {
+        removeBlur(target);
+      }
+    });
   }
 
   function attachInteraction(root: HTMLElement): void {
@@ -147,15 +156,17 @@
       "div[data-testid='tweetPhoto'], div[data-testid='card.wrapper']",
     );
     images.forEach((image) => {
-      const target = getBlurTarget(image as HTMLElement);
-      if (!target) return;
-      const key = getTargetKey(target);
-      if (key && unblurredKeys.has(key)) return;
+      const targets = getBlurTargets(image as HTMLElement);
+      if (targets.length === 0) return;
       if (!processed.has(image)) {
         processed.add(image);
         attachInteraction(image as HTMLElement);
       }
-      applyBlur(target);
+      targets.forEach((target) => {
+        const key = getTargetKey(target);
+        if (key && unblurredKeys.has(key)) return;
+        applyBlur(target);
+      });
     });
   }
 
