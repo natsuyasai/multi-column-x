@@ -27,6 +27,8 @@ interface MultiColumnXConfig {
   showCustomMenu: boolean;
   /** 表示するナビゲーションリンク（空配列 = すべて表示） */
   visibleLinks: string[];
+  /** モバイル環境かどうか */
+  isMobile: boolean;
 }
 
 /** ポップアップ WebView に inject されるアカウント情報 */

@@ -38,6 +38,7 @@ declare global {
     globalNgWords?: string[];
     whitelistEnabled?: boolean;
     whitelistWords?: string[];
+    isMobile: boolean;
   }
 
   interface TauriCore {
