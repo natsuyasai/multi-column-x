@@ -23,11 +23,13 @@ export function useHeaderCustomizer() {
     useState<boolean>(false);
   const composeButtonRef = useRef<HTMLAnchorElement | null>(null);
 
-  // ヘッダーを非表示にする
+  // ヘッダーを非表示にする（モバイルでは header[role="banner"] がタイムライン全体を
+  // 内包するランドマーク要素になっており、非表示にすると表示が重なるため対象外とする）
   useEffect(() => {
     const hideHeaderEnabled =
       window.__multiColumnXConfig?.hideHeaderEnabled ?? true;
-    if (!hideHeaderEnabled) return;
+    const isMobile = window.__multiColumnXConfig?.isMobile ?? false;
+    if (!hideHeaderEnabled || isMobile) return;
     const existingStyle = document.getElementById(HEADER_HIDE_STYLE_ID);
     if (!existingStyle) {
       const style = document.createElement("style");

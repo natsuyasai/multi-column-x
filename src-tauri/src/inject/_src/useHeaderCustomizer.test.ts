@@ -71,4 +71,39 @@ describe("useHeaderCustomizer", () => {
     expect(document.getElementById(HEADER_HIDE_STYLE_ID)).not.toBeNull();
     expect(document.getElementById(TWEET_INPUT_HIDE_STYLE_ID)).not.toBeNull();
   });
+
+  it("isMobileがtrueのときヘッダー非表示CSSが注入されない", () => {
+    window.__multiColumnXConfig = {
+      hideHeaderEnabled: true,
+      hideTweetInputEnabled: true,
+      isMobile: true,
+    } as Window["__multiColumnXConfig"];
+
+    renderHook(() => useHeaderCustomizer());
+
+    expect(document.getElementById(HEADER_HIDE_STYLE_ID)).toBeNull();
+  });
+
+  it("isMobileがfalseのときヘッダー非表示CSSが注入される", () => {
+    window.__multiColumnXConfig = {
+      hideHeaderEnabled: true,
+      hideTweetInputEnabled: true,
+      isMobile: false,
+    } as Window["__multiColumnXConfig"];
+
+    renderHook(() => useHeaderCustomizer());
+
+    expect(document.getElementById(HEADER_HIDE_STYLE_ID)).not.toBeNull();
+  });
+
+  it("isMobileが未設定のときヘッダー非表示CSSが注入される", () => {
+    window.__multiColumnXConfig = {
+      hideHeaderEnabled: true,
+      hideTweetInputEnabled: true,
+    } as Window["__multiColumnXConfig"];
+
+    renderHook(() => useHeaderCustomizer());
+
+    expect(document.getElementById(HEADER_HIDE_STYLE_ID)).not.toBeNull();
+  });
 });
