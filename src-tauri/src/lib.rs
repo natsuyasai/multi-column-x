@@ -206,6 +206,7 @@ pub fn run() {
             commands::account::close_window,
             commands::webview::open_compose_window,
             commands::update::install_apk_update,
+            commands::media_codec::check_media_codec_support,
             #[cfg(desktop)]
             commands::video_download::download_video,
         ])
