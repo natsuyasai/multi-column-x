@@ -4,6 +4,7 @@ import {
   NAV_VISIBLE_KEY,
   TWEET_INPUT_HIDE_STYLE_ID,
   HEADER_HIDE_STYLE_ID,
+  BOTTOM_BAR_SELECTOR,
   CLOSE_ICON_PATH,
   COMPOSE_ICON_PATH,
   DEFAULT_NAV_LINKS,
@@ -23,21 +24,38 @@ export function useHeaderCustomizer() {
     useState<boolean>(false);
   const composeButtonRef = useRef<HTMLAnchorElement | null>(null);
 
-  // ヘッダーを非表示にする（モバイルでは header[role="banner"] がタイムライン全体を
-  // 内包するランドマーク要素になっており、非表示にすると表示が重なるため対象外とする）
+  // ヘッダーを非表示にする（下部固定ヘッダー表示のレイアウトでは header[role="banner"] が
+  // タイムライン全体を内包するランドマーク要素になっており、非表示にすると表示が重なるため
+  // 対象外とする。下部固定ヘッダー表示か否かは data-testid="BottomBar" 要素の有無で判定する）
   useEffect(() => {
     const hideHeaderEnabled =
       window.__multiColumnXConfig?.hideHeaderEnabled ?? true;
-    const isMobile = window.__multiColumnXConfig?.isMobile ?? false;
-    if (!hideHeaderEnabled || isMobile) return;
-    const existingStyle = document.getElementById(HEADER_HIDE_STYLE_ID);
-    if (!existingStyle) {
-      const style = document.createElement("style");
-      style.id = HEADER_HIDE_STYLE_ID;
-      style.textContent = `header[role="banner"] { display: none !important; }`;
-      document.head.appendChild(style);
-    }
+    if (!hideHeaderEnabled) return;
+
+    const applyHeaderVisibility = () => {
+      const hasBottomBar = document.querySelector(BOTTOM_BAR_SELECTOR) !== null;
+      const existingStyle = document.getElementById(HEADER_HIDE_STYLE_ID);
+      if (hasBottomBar) {
+        existingStyle?.remove();
+        return;
+      }
+      if (!existingStyle) {
+        const style = document.createElement("style");
+        style.id = HEADER_HIDE_STYLE_ID;
+        style.textContent = `header[role="banner"] { display: none !important; }`;
+        document.head.appendChild(style);
+      }
+    };
+
+    applyHeaderVisibility();
+
+    const observer = new MutationObserver(applyHeaderVisibility);
+    observer.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("resize", applyHeaderVisibility);
+
     return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", applyHeaderVisibility);
       document.getElementById(HEADER_HIDE_STYLE_ID)?.remove();
     };
   }, []);

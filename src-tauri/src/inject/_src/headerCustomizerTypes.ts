@@ -9,6 +9,7 @@ export const NAV_VISIBLE_KEY = "multi-column-x-nav-visible";
 export const TWEET_INPUT_HIDE_STYLE_ID =
   "multi-column-x-tweet-input-hide-style";
 export const HEADER_HIDE_STYLE_ID = "multi-column-x-header-hide-style";
+export const BOTTOM_BAR_SELECTOR = '[data-testid="BottomBar"]';
 
 export const CLOSE_ICON_PATH =
   "M10.59 12L4.54 5.96l1.42-1.42L12 10.59l6.04-6.05 1.42 1.42L13.41 12l6.05 6.04-1.42 1.42L12 13.41l-6.04 6.05-1.42-1.42L10.59 12z";
