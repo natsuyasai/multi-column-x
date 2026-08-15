@@ -113,4 +113,41 @@ describe("useMediaCodecCheck", () => {
     rerender({ ready: true });
     expect(mockInvoke).toHaveBeenCalledTimes(1);
   });
+
+  it("downloadH264を呼ぶとdownloading状態になり、成功するとsuccess状態になる", async () => {
+    mockInvoke.mockImplementation((cmd) =>
+      cmd === "download_and_enable_h264"
+        ? Promise.resolve()
+        : Promise.resolve({ h264Available: false, aacAvailable: true }),
+    );
+    const { result } = renderHook(() => useMediaCodecCheck(true));
+    await waitFor(() => expect(result.current.h264DownloadState).toBe("idle"));
+
+    await act(async () => {
+      await result.current.downloadH264();
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith("download_and_enable_h264");
+    expect(result.current.h264DownloadState).toBe("success");
+    expect(result.current.h264DownloadError).toBe(null);
+  });
+
+  it("downloadH264が失敗するとerror状態になりエラーメッセージが設定される", async () => {
+    const errorMsg = "ダウンロードに失敗しました";
+    mockInvoke.mockImplementation((cmd) =>
+      cmd === "download_and_enable_h264"
+        ? Promise.reject(new Error(errorMsg))
+        : Promise.resolve({ h264Available: false, aacAvailable: true }),
+    );
+    const { result } = renderHook(() => useMediaCodecCheck(true));
+    await waitFor(() => expect(result.current.h264DownloadState).toBe("idle"));
+
+    await act(async () => {
+      await result.current.downloadH264();
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith("download_and_enable_h264");
+    expect(result.current.h264DownloadState).toBe("error");
+    expect(result.current.h264DownloadError).toBe(errorMsg);
+  });
 });

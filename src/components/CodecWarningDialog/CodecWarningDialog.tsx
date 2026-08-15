@@ -1,16 +1,25 @@
 import React from "react";
+import type { H264DownloadState } from "@/hooks/useMediaCodecCheck";
 import styles from "./CodecWarningDialog.module.scss";
 
 interface Props {
   missingH264: boolean;
   missingAac: boolean;
   onClose: () => void;
+  h264DownloadState: H264DownloadState;
+  h264DownloadError: string | null;
+  onDownloadH264: () => void;
+  onRelaunch: () => void;
 }
 
 export const CodecWarningDialog: React.FC<Props> = ({
   missingH264,
   missingAac,
   onClose,
+  h264DownloadState,
+  h264DownloadError,
+  onDownloadH264,
+  onRelaunch,
 }) => {
   return (
     <div className={styles.overlay}>
@@ -22,6 +31,43 @@ export const CodecWarningDialog: React.FC<Props> = ({
           {missingH264 && <li>H.264 (動画) のデコーダが見つかりません</li>}
           {missingAac && <li>AAC (音声) のデコーダが見つかりません</li>}
         </ul>
+
+        {missingH264 && (
+          <div className={styles.downloadSection}>
+            {h264DownloadState === "downloading" ? (
+              <p className={styles.downloadingMessage}>ダウンロード中...</p>
+            ) : h264DownloadState === "success" ? (
+              <>
+                <p className={styles.successMessage}>
+                  有効化しました。反映するにはアプリの再起動が必要です。
+                </p>
+                <button
+                  type="button"
+                  className={styles.relaunchBtn}
+                  onClick={onRelaunch}
+                  aria-label="今すぐ再起動"
+                >
+                  今すぐ再起動
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className={styles.downloadBtn}
+                  onClick={onDownloadH264}
+                  aria-label="H.264をダウンロードして有効化"
+                >
+                  H.264をダウンロードして有効化
+                </button>
+                {h264DownloadState === "error" && h264DownloadError && (
+                  <p className={styles.errorMessage}>{h264DownloadError}</p>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
         <p className={styles.description}>
           お使いの環境に必要なコーデックが不足しているため、動画または音声が正しく再生できない場合があります。以下のコマンドを実行して、不足しているパッケージをインストールしてください。
         </p>

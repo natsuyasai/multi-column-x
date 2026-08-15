@@ -32,6 +32,10 @@ const meta: Meta<typeof CodecWarningDialog> = {
     missingH264: true,
     missingAac: true,
     onClose: fn(),
+    h264DownloadState: "idle",
+    h264DownloadError: null,
+    onDownloadH264: fn(),
+    onRelaunch: fn(),
   },
 };
 
@@ -45,9 +49,12 @@ export const Default: Story = {
     await expect(
       canvas.getByText("動画/音声を再生できない可能性があります"),
     ).toBeInTheDocument();
-    // 「閉じる」で onClose が呼ばれる
-    await userEvent.click(canvas.getByRole("button", { name: "閉じる" }));
-    await expect(args.onClose).toHaveBeenCalled();
+    // ダウンロードボタンをクリックして onDownloadH264 が呼ばれることを確認
+    const downloadBtn = canvas.getByRole("button", {
+      name: /H\.264をダウンロードして有効化/,
+    });
+    await userEvent.click(downloadBtn);
+    await expect(args.onDownloadH264).toHaveBeenCalled();
   },
 };
 
@@ -95,4 +102,40 @@ export const DarkTheme: Story = {
       </ThemeRoot>
     ),
   ],
+};
+
+export const Downloading: Story = {
+  name: "ダウンロード中",
+  args: {
+    h264DownloadState: "downloading",
+  },
+};
+
+export const DownloadSuccess: Story = {
+  name: "ダウンロード成功",
+  args: {
+    h264DownloadState: "success",
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByText(
+        /有効化しました。反映するにはアプリの再起動が必要です。/,
+      ),
+    ).toBeInTheDocument();
+    // 「今すぐ再起動」ボタンをクリックして onRelaunch が呼ばれることを確認
+    const relaunchBtn = canvas.getByRole("button", {
+      name: /今すぐ再起動/,
+    });
+    await userEvent.click(relaunchBtn);
+    await expect(args.onRelaunch).toHaveBeenCalled();
+  },
+};
+
+export const DownloadError: Story = {
+  name: "ダウンロードエラー",
+  args: {
+    h264DownloadState: "error",
+    h264DownloadError: "ダウンロードに失敗しました",
+  },
 };

@@ -7,11 +7,18 @@ interface MediaCodecStatus {
   aacAvailable: boolean;
 }
 
+export type H264DownloadState = "idle" | "downloading" | "success" | "error";
+
 export function useMediaCodecCheck(ready: boolean = true) {
   const [checking, setChecking] = useState(false);
   const [missingH264, setMissingH264] = useState(false);
   const [missingAac, setMissingAac] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [h264DownloadState, setH264DownloadState] =
+    useState<H264DownloadState>("idle");
+  const [h264DownloadError, setH264DownloadError] = useState<string | null>(
+    null,
+  );
 
   // ready が false の間はチェックしない（カラム復元前にダイアログが裏へ隠れるのを防ぐ）。
   // 起動後は ref で一度だけに制限する。
@@ -41,6 +48,19 @@ export function useMediaCodecCheck(ready: boolean = true) {
   const openDialog = useCallback(() => setIsDialogOpen(true), []);
   const closeDialog = useCallback(() => setIsDialogOpen(false), []);
 
+  const downloadH264 = useCallback(async () => {
+    setH264DownloadState("downloading");
+    setH264DownloadError(null);
+    try {
+      await invoke("download_and_enable_h264");
+      setH264DownloadState("success");
+    } catch (e) {
+      setH264DownloadState("error");
+      setH264DownloadError(e instanceof Error ? e.message : String(e));
+      logError("useMediaCodecCheck:downloadH264")(e);
+    }
+  }, []);
+
   return {
     checking,
     missingH264,
@@ -49,5 +69,8 @@ export function useMediaCodecCheck(ready: boolean = true) {
     isDialogOpen,
     openDialog,
     closeDialog,
+    h264DownloadState,
+    h264DownloadError,
+    downloadH264,
   };
 }

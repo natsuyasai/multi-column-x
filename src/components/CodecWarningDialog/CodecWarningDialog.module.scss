@@ -82,3 +82,63 @@
   border: 1px solid var(--mcx-border-strong);
   color: inherit;
 }
+
+.downloadSection {
+  margin: 12px 0;
+  padding: 12px;
+  background: var(--mcx-surface-muted);
+  border-radius: 4px;
+}
+
+.downloadBtn {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  background: var(--mcx-accent);
+  color: var(--mcx-accent-text);
+  border: none;
+  font-weight: bold;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  &:hover:not(:disabled) {
+    opacity: 0.9;
+  }
+}
+
+.relaunchBtn {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  background: var(--mcx-accent);
+  color: var(--mcx-accent-text);
+  border: none;
+  font-weight: bold;
+
+  &:hover {
+    opacity: 0.9;
+  }
+}
+
+.downloadingMessage {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--mcx-text);
+}
+
+.successMessage {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  color: var(--mcx-text);
+}
+
+.errorMessage {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  color: var(--mcx-error);
+}

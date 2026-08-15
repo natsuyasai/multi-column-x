@@ -2,6 +2,7 @@
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { platform } from "@tauri-apps/plugin-os";
+import { relaunch } from "@tauri-apps/plugin-process";
 import React, {
   useEffect,
   useCallback,
@@ -730,6 +731,12 @@ const App: React.FC = () => {
           missingH264={codecCheck.missingH264}
           missingAac={codecCheck.missingAac}
           onClose={codecCheck.closeDialog}
+          h264DownloadState={codecCheck.h264DownloadState}
+          h264DownloadError={codecCheck.h264DownloadError}
+          onDownloadH264={codecCheck.downloadH264}
+          onRelaunch={() => {
+            void relaunch();
+          }}
         />
       )}
 
