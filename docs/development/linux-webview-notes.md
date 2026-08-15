@@ -38,6 +38,8 @@ WebKitGTK の WebProcess は横スクロールでの `resize_column_webview` 連
 
 - **deb 版**: 引き続き `bundle.linux.deb.depends` に `gstreamer1.0-plugins-{base,good,bad}` と `gstreamer1.0-libav` を明記しており、パッケージマネージャが依存解決するため利用者が追加作業をする必要はない。
 
+**ローカルでのフルビルド**: `tauri.conf.json` の `bundle.linux.appimage.files` は上記の `libgstfdkaac.so` / `libgstopenh264.so` / `libfdk-aac.so.2` を `src-tauri/gstreamer-plugins/`（`.gitignore` 対象）から読む設定になっている。このディレクトリは CI（`.github/workflows/release.yml`）が `gst-plugins-bad` を自前ビルドして初めて生成されるため、ローカルで `npm run tauri:build` / `npm run tauri:build:debug` を実行して AppImage のフルビルドを試す場合は、事前に `./scripts/build-linux-codec-plugins.sh` を実行して `src-tauri/gstreamer-plugins/` にプラグインを配置しておく必要がある（release.yml の該当ステップと同じロジックをスクリプト化したもの）。未実行のまま `tauri:build` を実行すると `Failed to copy custom files: "gstreamer-plugins/libgstopenh264.so" does not exist` のようなエラーで失敗する。なお `npm run tauri:dev` はこのファイルを参照しないため影響を受けない。
+
 検出・案内の仕組み:
 
 - `src-tauri/src/commands/media_codec.rs` の `check_media_codec_support` Tauri コマンドが、Linux desktop に限り `gst-inspect-1.0 <element名>` をサブプロセス実行し、H.264（`avdec_h264`/`openh264dec`）・AAC（`avdec_aac`/`faad`/`fdkaacdec`）デコーダの有無を判定する。非 Linux または非 desktop（Windows/macOS/mobile）では常に「利用可能」を返すダミー実装になる。
