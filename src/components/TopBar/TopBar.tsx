@@ -34,6 +34,8 @@ interface TopBarProps {
   apiRateLimitMonitorEnabled: boolean;
   apiRateLimits: Record<string, Record<string, ApiRateLimitBucket>>;
   onApiRateLimitPopoverOpenChange: (isOpen: boolean) => void;
+  hasMissingCodec: boolean;
+  onOpenCodecWarning: () => void;
 }
 
 function getColumnIcon(pageType: PageType): React.ReactElement {
@@ -106,6 +108,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   apiRateLimitMonitorEnabled,
   apiRateLimits,
   onApiRateLimitPopoverOpenChange,
+  hasMissingCodec,
+  onOpenCodecWarning,
 }) => {
   const sorted = [...columns].sort((a, b) => a.order - b.order);
 
@@ -184,6 +188,19 @@ export const TopBar: React.FC<TopBarProps> = ({
               apiRateLimits={apiRateLimits}
               onOpenChange={onApiRateLimitPopoverOpenChange}
             />
+          )}
+          {hasMissingCodec && (
+            <button
+              className={`${styles.btn}${expanded ? ` ${styles.btnExpanded}` : ""}`}
+              onClick={onOpenCodecWarning}
+              title="コーデック不足の警告（クリックで詳細を表示）"
+              aria-label="コーデック不足の警告（クリックで詳細を表示）"
+            >
+              <span data-testid="icon-codec-warning" className={styles.icon}>
+                ⚠
+              </span>
+              {expanded && <span className={styles.label}>コーデック警告</span>}
+            </button>
           )}
         </div>
 
