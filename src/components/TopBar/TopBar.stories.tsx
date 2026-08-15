@@ -95,6 +95,8 @@ const meta: Meta<typeof TopBar> = {
     apiRateLimitMonitorEnabled: true,
     apiRateLimits: {},
     onApiRateLimitPopoverOpenChange: fn(),
+    hasMissingCodec: false,
+    onOpenCodecWarning: fn(),
   },
 };
 
@@ -134,4 +136,19 @@ export const DarkTheme: Story = {
       </ThemeRoot>
     ),
   ],
+};
+
+export const CodecWarning: Story = {
+  name: "コーデック警告アイコン表示",
+  args: {
+    hasMissingCodec: true,
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    // コーデック警告ボタンを押すと onOpenCodecWarning が呼ばれる
+    await userEvent.click(
+      canvas.getByLabelText("コーデック不足の警告（クリックで詳細を表示）"),
+    );
+    await expect(args.onOpenCodecWarning).toHaveBeenCalled();
+  },
 };
