@@ -3,6 +3,8 @@ mod android_bridge;
 mod commands;
 mod inject;
 mod ipc_constants;
+#[cfg(all(desktop, target_os = "linux"))]
+mod linux_codec_env;
 mod state;
 mod video;
 
@@ -73,6 +75,9 @@ fn save_window_bounds(window: &tauri::Window) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(all(desktop, target_os = "linux"))]
+    linux_codec_env::ensure_openh264_ld_library_path();
+
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
