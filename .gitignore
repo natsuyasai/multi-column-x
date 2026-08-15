@@ -2,6 +2,7 @@ node_modules/
 dist/
 src-tauri/target/
 src-tauri/proptest-regressions/
+src-tauri/gstreamer-plugins/
 .tauri/
 src-tauri/gen/schemas/
 .superpowers/

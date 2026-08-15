@@ -193,7 +193,24 @@ jobs:
         if: matrix.platform == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libbz2-dev libfdk-aac-dev libopenh264-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-tools meson ninja-build
+      - name: Build Linux codec plugins
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          set -euo pipefail
+          GST_VER=$(gst-inspect-1.0 --version | head -1 | grep -oP '\d+\.\d+\.\d+')
+          git clone --filter=blob:none --no-checkout --depth 1 --branch "${GST_VER}" \
+            https://gitlab.freedesktop.org/gstreamer/gstreamer.git /tmp/gst-src
+          cd /tmp/gst-src
+          git sparse-checkout set --no-cone subprojects/gst-plugins-bad
+          git checkout "${GST_VER}"
+          cd subprojects/gst-plugins-bad
+          meson setup builddir -Dauto_features=disabled -Dfdkaac=enabled -Dopenh264=enabled
+          ninja -C builddir
+          mkdir -p "${GITHUB_WORKSPACE}/src-tauri/gstreamer-plugins"
+          cp builddir/ext/fdkaac/libgstfdkaac.so "${GITHUB_WORKSPACE}/src-tauri/gstreamer-plugins/"
+          cp builddir/ext/openh264/libgstopenh264.so "${GITHUB_WORKSPACE}/src-tauri/gstreamer-plugins/"
+          cp -L /usr/lib/x86_64-linux-gnu/libfdk-aac.so.2 "${GITHUB_WORKSPACE}/src-tauri/gstreamer-plugins/"
       - run: npm ci
       - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
         env:
