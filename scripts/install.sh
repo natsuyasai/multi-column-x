@@ -117,6 +117,57 @@ extract_icon() {
   fi
 }
 
+# --- コーデック案内 ---------------------------------------------------
+
+print_codec_hint() {
+  # /etc/os-release からディストロ系統を判定（存在しない場合は判定不能として扱う）
+  local os_id="" os_id_like=""
+  if [ -f /etc/os-release ]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release 2>/dev/null || true
+    os_id="${ID:-}"
+    os_id_like="${ID_LIKE:-}"
+  fi
+
+  local is_debian=0 is_fedora=0 is_arch=0
+  if [[ "$os_id $os_id_like" =~ (debian|ubuntu) ]]; then
+    is_debian=1
+  fi
+  if [[ "$os_id $os_id_like" =~ (fedora|rhel) ]]; then
+    is_fedora=1
+  fi
+  if [[ "$os_id $os_id_like" =~ (arch) ]]; then
+    is_arch=1
+  fi
+
+  # 判定できなかった場合は全系統を表示する
+  if [ "$is_debian" -eq 0 ] && [ "$is_fedora" -eq 0 ] && [ "$is_arch" -eq 0 ]; then
+    is_debian=1
+    is_fedora=1
+    is_arch=1
+  fi
+
+  echo "注意: AppImage版は特許問題があるコーデック（H.264/AAC）を同梱していません。"
+  echo "      動画が再生できない場合は、以下のいずれかのコマンドでインストールしてください:"
+  echo ""
+
+  if [ "$is_debian" -eq 1 ]; then
+    echo "  Debian/Ubuntu系:"
+    echo "    sudo apt install gstreamer1.0-plugins-bad gstreamer1.0-libav"
+    echo ""
+  fi
+  if [ "$is_fedora" -eq 1 ]; then
+    echo "  Fedora系:"
+    echo "    sudo dnf install gstreamer1-plugins-bad-free gstreamer1-libav"
+    echo ""
+  fi
+  if [ "$is_arch" -eq 1 ]; then
+    echo "  Arch系:"
+    echo "    sudo pacman -S gst-plugins-bad gst-libav"
+    echo ""
+  fi
+}
+
 # --- インストール -----------------------------------------------------
 
 install() {
@@ -196,6 +247,8 @@ EOF
   fi
 
   echo "アプリケーションメニューから MultiColumnX を起動できます。"
+
+  print_codec_hint
 }
 
 # --- エントリポイント -------------------------------------------------
