@@ -1,4 +1,5 @@
 pub mod account;
+pub mod media_codec;
 pub mod settings;
 pub mod settings_store;
 pub mod update;

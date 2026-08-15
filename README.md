@@ -291,3 +291,5 @@ webkit2gtk は wry と同一バージョン（`=2.0.2`, `v2_40`）を `[target.'
 `tauri.conf.json` の `bundle.linux.appimage.bundleMediaFramework` は **`true` を維持すること**。AppImage は `LD_LIBRARY_PATH` を同梱ライブラリに向けて動作するため、GStreamer プラグイン（`appsink`=gst-plugins-base、`autoaudiosink`=gst-plugins-good ほか）を同梱しないと、同梱 WebKit が動画/音声再生時に見つからないメディア要素（NULL）へ `g_signal_connect` して **WebProcess がクラッシュ（reason=Crashed）** する。x.com の home タイムラインは動画を含むため、可視状態のカラムが起動直後からクラッシュ → 上記自動復旧が延々と再生成する無限ループに陥る（システムに GStreamer が入っていても AppImage 内からは参照されないため `npm run tauri:dev` や素のバイナリ実行では再現せず、AppImage 起動でのみ再現する点に注意）。
 
 同種の不足を deb 版でも防ぐため、`bundle.linux.deb.depends` に `gstreamer1.0-plugins-{base,good,bad}` と `gstreamer1.0-libav` を明記している。
+
+なお、H.264/AAC デコーダを提供する `gst-plugins-bad`/`gst-libav` は特許問題を避けるため AppImage への同梱から意図的に除外している（`gst-plugins-base`/`gst-plugins-good` は GStreamer プロジェクトが「特許的にクリーンな要素のみ」と分類しているため同梱を継続）。AppImage 版はコーデックの導入をシステム側インストールに委ねる方針のため、欠如を検出してユーザーに案内する仕組み（`check_media_codec_support` コマンド、起動時チェック、案内ダイアログ、`scripts/install.sh` の案内表示）を用意している。詳細は `docs/development/linux-webview-notes.md`「AppImage の H.264/AAC コーデック欠如検出」を参照。
