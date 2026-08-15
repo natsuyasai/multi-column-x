@@ -4,7 +4,7 @@ import {
   NAV_VISIBLE_KEY,
   TWEET_INPUT_HIDE_STYLE_ID,
   HEADER_HIDE_STYLE_ID,
-  BOTTOM_BAR_SELECTOR,
+  BOTTOM_BAR_NAVIGATION_SELECTOR,
   CLOSE_ICON_PATH,
   COMPOSE_ICON_PATH,
   DEFAULT_NAV_LINKS,
@@ -26,16 +26,19 @@ export function useHeaderCustomizer() {
 
   // ヘッダーを非表示にする（下部固定ヘッダー表示のレイアウトでは header[role="banner"] が
   // タイムライン全体を内包するランドマーク要素になっており、非表示にすると表示が重なるため
-  // 対象外とする。下部固定ヘッダー表示か否かは data-testid="BottomBar" 要素の有無で判定する）
+  // 対象外とする。data-testid="BottomBar" 要素はレイアウトに関わらず常に1つ存在するため、
+  // 下部固定ヘッダー表示時のみ追加される「role="navigation" の nav を含む BottomBar 要素」の
+  // 有無で判定する）
   useEffect(() => {
     const hideHeaderEnabled =
       window.__multiColumnXConfig?.hideHeaderEnabled ?? true;
     if (!hideHeaderEnabled) return;
 
     const applyHeaderVisibility = () => {
-      const hasBottomBar = document.querySelector(BOTTOM_BAR_SELECTOR) !== null;
+      const hasBottomBarNavigation =
+        document.querySelector(BOTTOM_BAR_NAVIGATION_SELECTOR) !== null;
       const existingStyle = document.getElementById(HEADER_HIDE_STYLE_ID);
-      if (hasBottomBar) {
+      if (hasBottomBarNavigation) {
         existingStyle?.remove();
         return;
       }
