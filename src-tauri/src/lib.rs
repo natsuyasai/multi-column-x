@@ -212,6 +212,8 @@ pub fn run() {
             commands::webview::open_compose_window,
             commands::update::install_apk_update,
             commands::media_codec::check_media_codec_support,
+            #[cfg(all(desktop, target_os = "linux"))]
+            commands::openh264_fetch::download_and_enable_h264,
             #[cfg(desktop)]
             commands::video_download::download_video,
         ])
