@@ -101,7 +101,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         serde_json::to_string(params.whitelist_words).unwrap_or_else(|_| "[]".to_string());
     let effective_show_custom_menu = params.hide_header_enabled && params.show_custom_menu;
     let config = format!(
-        "window.{} = {{ hideHeaderEnabled: {}, hideTweetInputEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?}, blurImageEnabled: {}, blurImageAmount: {:?}, hideAdEnabled: {}, apiRateLimitMonitorEnabled: {}, imagePopupEnabled: {}, videoPopupEnabled: {}, ngWords: {}, globalNgWords: {}, whitelistEnabled: {}, whitelistWords: {}, isMobile: {} }};",
+        "window.{} = {{ hideHeaderEnabled: {}, hideTweetInputEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?}, blurImageEnabled: {}, blurImageAmount: {:?}, hideAdEnabled: {}, apiRateLimitMonitorEnabled: {}, imagePopupEnabled: {}, videoPopupEnabled: {}, ngWords: {}, globalNgWords: {}, whitelistEnabled: {}, whitelistWords: {} }};",
         globals::MULTI_COLUMN_X_CONFIG,
         params.hide_header_enabled,
         params.hide_tweet_input_enabled,
@@ -118,8 +118,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         ng_words_json,
         global_ng_words_json,
         params.whitelist_enabled,
-        whitelist_words_json,
-        params.is_mobile
+        whitelist_words_json
     );
 
     let header_part = if params.hide_header_enabled || params.hide_tweet_input_enabled {
@@ -420,20 +419,6 @@ mod tests {
         params.is_mobile = true;
         let script = build_init_script(&params);
         assert!(script.contains("multi-column-x-notification-header-hide"));
-    }
-
-    #[test]
-    fn is_mobileがtrueのときismobile_trueがconfigに含まれる() {
-        let mut params = default_params();
-        params.is_mobile = true;
-        let script = build_init_script(&params);
-        assert!(script.contains("isMobile: true"));
-    }
-
-    #[test]
-    fn is_mobileがfalseのときismobile_falseがconfigに含まれる() {
-        let script = build_init_script(&default_params()); // is_mobile: false
-        assert!(script.contains("isMobile: false"));
     }
 
     #[test]
