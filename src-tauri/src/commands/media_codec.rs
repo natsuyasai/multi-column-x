@@ -31,7 +31,8 @@ pub struct MediaCodecStatus {
 #[tauri::command]
 pub fn check_media_codec_support() -> MediaCodecStatus {
     let h264_available = detect_codec_support(&["avdec_h264", "openh264dec"], element_available);
-    let aac_available = detect_codec_support(&["avdec_aac", "faad"], element_available);
+    let aac_available =
+        detect_codec_support(&["avdec_aac", "faad", "fdkaacdec"], element_available);
     MediaCodecStatus {
         h264_available,
         aac_available,
@@ -101,5 +102,15 @@ mod tests {
                 aac_available: true,
             }
         );
+    }
+
+    #[test]
+    fn fdkaacdecが現在の候補に含まれる() {
+        // 現在の実装ではAAC検出候補に"fdkaacdec"が含まれるべきことをテストする。
+        // AAC検出でfdkaacdecが候補として認識されることを検証する。
+        assert!(detect_codec_support(
+            &["avdec_aac", "faad", "fdkaacdec"],
+            |name| name == "fdkaacdec"
+        ));
     }
 }

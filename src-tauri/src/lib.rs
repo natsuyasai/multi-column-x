@@ -3,6 +3,8 @@ mod android_bridge;
 mod commands;
 mod inject;
 mod ipc_constants;
+#[cfg(all(desktop, target_os = "linux"))]
+mod linux_codec_env;
 mod state;
 mod video;
 
@@ -73,6 +75,9 @@ fn save_window_bounds(window: &tauri::Window) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(all(desktop, target_os = "linux"))]
+    linux_codec_env::ensure_openh264_ld_library_path();
+
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
@@ -207,6 +212,8 @@ pub fn run() {
             commands::webview::open_compose_window,
             commands::update::install_apk_update,
             commands::media_codec::check_media_codec_support,
+            #[cfg(all(desktop, target_os = "linux"))]
+            commands::openh264_fetch::download_and_enable_h264,
             #[cfg(desktop)]
             commands::video_download::download_video,
         ])

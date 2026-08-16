@@ -14,7 +14,6 @@ import { AccountManager } from "./components/AccountManager/AccountManager";
 import { AccountNameDialog } from "./components/AccountNameDialog/AccountNameDialog";
 import { AddColumnDialog } from "./components/AddColumnDialog/AddColumnDialog";
 import { AppSettingsPanel } from "./components/AppSettingsPanel/AppSettingsPanel";
-import { CodecWarningDialog } from "./components/CodecWarningDialog/CodecWarningDialog";
 import { ColumnHeader } from "./components/ColumnHeader/ColumnHeader";
 import { ConfirmDialog } from "./components/ConfirmDialog/ConfirmDialog";
 import { LinkPopupDialog } from "./components/LinkPopupDialog/LinkPopupDialog";
@@ -31,7 +30,6 @@ import { useAppUpdater } from "./hooks/useAppUpdater";
 import { useColumns } from "./hooks/useColumns";
 import { useDialogState } from "./hooks/useDialogState";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
-import { useMediaCodecCheck } from "./hooks/useMediaCodecCheck";
 import { useTheme } from "./hooks/useTheme";
 import {
   useApiRateLimitReports,
@@ -131,7 +129,6 @@ const App: React.FC = () => {
   const [columnsRestored, setColumnsRestored] = useState(false);
   const updater = useAppUpdater(isMobile, columnsRestored);
   const whatsNew = useWhatsNew(columnsRestored);
-  const codecCheck = useMediaCodecCheck(columnsRestored);
   const [appVersion, setAppVersion] = useState("");
   // APIレート制限ポップオーバーの開閉状態（カラムWebView退避判定の anyDialogOpen に含めるため）
   const [apiRateLimitPopoverOpen, setApiRateLimitPopoverOpen] = useState(false);
@@ -237,8 +234,7 @@ const App: React.FC = () => {
     !!pendingAccountName ||
     !!pendingRemoval ||
     !!reauthNotice ||
-    apiRateLimitPopoverOpen ||
-    codecCheck.isDialogOpen;
+    apiRateLimitPopoverOpen;
 
   // モバイルスワイプバー（ネイティブオーバーレイ）の状態を Kotlin 側へ同期する。
   // visible は「設定で有効」「透過度>0（0のまま表示し続けるとView.alphaが透明でもタッチを
@@ -511,8 +507,6 @@ const App: React.FC = () => {
           apiRateLimitMonitorEnabled={globalSettings.apiRateLimitMonitorEnabled}
           apiRateLimits={apiRateLimits}
           onApiRateLimitPopoverOpenChange={setApiRateLimitPopoverOpen}
-          hasMissingCodec={codecCheck.hasMissingCodec}
-          onOpenCodecWarning={codecCheck.openDialog}
         />
       )}
       {isMobile && (
@@ -722,14 +716,6 @@ const App: React.FC = () => {
           progress={updater.progress}
           onInstall={updater.install}
           onLater={updater.dismiss}
-        />
-      )}
-
-      {codecCheck.isDialogOpen && (
-        <CodecWarningDialog
-          missingH264={codecCheck.missingH264}
-          missingAac={codecCheck.missingAac}
-          onClose={codecCheck.closeDialog}
         />
       )}
 
