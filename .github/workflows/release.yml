@@ -14,6 +14,7 @@ jobs:
     outputs:
       release_id: ${{ steps.create.outputs.result }}
       version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.create_tag.outputs.tag }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -30,40 +31,62 @@ jobs:
             echo "tag ($tag) != tauri.conf.json version ($ver)"
             exit 1
           fi
-      - name: Create version tag
-        # workflow_dispatch 手動実行時はタグが存在しないため、ここで作成する。
-        # タグ push トリガー時は既にタグが存在するため不要。
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+      - name: Determine release tag
+        id: create_tag
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         env:
           VERSION: ${{ steps.version.outputs.version }}
         with:
           script: |
-            const tag = `v${process.env.VERSION}`;
-            const ref = `tags/${tag}`;
-            try {
-              await github.rest.git.getRef({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref,
-              });
-              console.log(`tag ${tag} already exists, skipping creation`);
-            } catch (error) {
-              if (error.status !== 404) throw error;
-              await github.rest.git.createRef({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: `refs/${ref}`,
-                sha: context.sha,
-              });
-              console.log(`created tag ${tag} at ${context.sha}`);
+            const version = process.env.VERSION;
+            const base = `v${version}`;
+
+            if (context.ref.startsWith("refs/tags/")) {
+              // タグ push トリガー: トリガーとなったタグをそのまま使う（既に存在するため作成不要）。
+              const tag = context.ref.replace("refs/tags/", "");
+              core.setOutput("tag", tag);
+              return;
             }
+
+            // workflow_dispatch 手動実行: タグが未作成のため、ここで作成する。
+            // 同名タグが既に存在する場合は "-temp-<連番>" を付与して衝突を回避する
+            // （連番は v{version}-temp-* の既存タグも含めて空き番号を探す）。
+            async function tagExists(name) {
+              try {
+                await github.rest.git.getRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `tags/${name}`,
+                });
+                return true;
+              } catch (error) {
+                if (error.status !== 404) throw error;
+                return false;
+              }
+            }
+
+            let tag = base;
+            if (await tagExists(base)) {
+              let n = 1;
+              while (await tagExists(`${base}-temp-${n}`)) {
+                n++;
+              }
+              tag = `${base}-temp-${n}`;
+            }
+
+            await github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: `refs/tags/${tag}`,
+              sha: context.sha,
+            });
+            console.log(`created tag ${tag} at ${context.sha}`);
+            core.setOutput("tag", tag);
       - name: Determine previous tag
         id: prevtag
         run: |
           git fetch --tags --force
-          version="${{ steps.version.outputs.version }}"
-          current="v$version"
+          current="${{ steps.create_tag.outputs.tag }}"
           mapfile -t tags < <(git tag --sort=-version:refname)
           prev=""
           if printf '%s\n' "${tags[@]}" | grep -qx "$current"; then
@@ -85,7 +108,7 @@ jobs:
         env:
           PREV_TAG: ${{ steps.prevtag.outputs.prev }}
           HEAD_REF: ${{ steps.prevtag.outputs.head }}
-          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.create_tag.outputs.tag }}
         with:
           result-encoding: string
           script: |
@@ -97,8 +120,7 @@ jobs:
               ).href,
             );
 
-            const version = process.env.VERSION;
-            const tag = `v${version}`;
+            const tag = process.env.TAG;
             const prev = process.env.PREV_TAG;
             const head = process.env.HEAD_REF;
 
@@ -164,8 +186,8 @@ jobs:
       - name: Upload install.sh to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.version.outputs.version }}
-        run: gh release upload "v${VERSION}" scripts/install.sh --clobber
+          TAG: ${{ steps.create_tag.outputs.tag }}
+        run: gh release upload "$TAG" scripts/install.sh --clobber
 
   desktop:
     needs: create-release
@@ -259,6 +281,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.create-release.outputs.version }}
+          TAG: ${{ needs.create-release.outputs.tag }}
         run: |
           apk=$(find src-tauri/gen/android/app/build/outputs/apk -name "*universal*release*.apk" | head -n1)
           if [ -z "$apk" ]; then
@@ -270,7 +293,7 @@ jobs:
           # アプリ内 APK 自己更新の SHA-256 検証（fail-closed）で参照するサイドカーアセット。
           # 中身は hex 64 桁のみ 1 行（parseSha256Text は先頭トークンを取るためファイル名列があっても可）。
           sha256sum "MultiColumnX_${VERSION}_universal.apk" | cut -d' ' -f1 > "MultiColumnX_${VERSION}_universal.apk.sha256"
-          gh release upload "v${VERSION}" \
+          gh release upload "$TAG" \
             "MultiColumnX_${VERSION}_universal.apk" \
             "MultiColumnX_${VERSION}_universal.apk.sha256" --clobber
       - name: Upload CI artifact
