@@ -49,6 +49,9 @@ export const IPC_COMMANDS = {
   // キーボードショートカット
   REPORT_KEYBOARD_SHORTCUT: "report_keyboard_shortcut",
 
+  // 公式設定配布
+  REPORT_OFFICIAL_SETTINGS: "report_official_settings",
+
   // 動画ダウンロード
   DOWNLOAD_VIDEO: "download_video",
 
@@ -85,6 +88,8 @@ export const IPC_EVENTS = {
   MOBILE_SWIPE_PROGRESS: "mobile-swipe-progress",
   /** モバイルスワイプバーのダブルタップ確定通知（Android JNI → TS listen）payloadなし */
   MOBILE_SWIPE_DOUBLE_TAP: "mobile-swipe-double-tap",
+  /** 公式設定ページのスナップショット取得通知（inject script invoke → TS listen）{ accountId, snapshot } */
+  WEBVIEW_OFFICIAL_SETTINGS_CAPTURED: "webview-official-settings-captured",
 } as const;
 
 /** WebView / ウィンドウラベルのプレフィックスと生成ヘルパー */
@@ -136,6 +141,21 @@ export const WEBVIEW_SCRIPTS = {
     return `(function(){var s=${s};var r=indexedDB.open('localforage');r.onsuccess=function(e){var tx=e.target.result.transaction('keyvaluepairs','readwrite'),st=tx.objectStore('keyvaluepairs'),g=st.get('device:rweb.settings');g.onsuccess=function(e){var d=e.target.result;if(!d){d={local:{scale:s,_lastPersisted:Date.now()}};}else{if(!d.local)d.local={};if(d.local.scale===s)return;d.local.scale=s;d.local._lastPersisted=Date.now();}st.put(d,'device:rweb.settings').onsuccess=function(){location.reload();};};};})();`;
   },
 
+  /**
+   * x.com の localforage (IndexedDB "localforage" / store "keyvaluepairs") の
+   * "device:rweb.settings" エントリのうち、OFFICIAL_SETTINGS_WHITELIST_KEYS に含まれるフィールドのみを
+   * 他アカウントから配布された値でマージし、加えて背景設定を管理する Cookie "night_mode" も反映して
+   * リロードする。device:rweb.settings.local の scale 等ホワイトリスト外のフィールドは
+   * 対象アカウント側の既存値を維持する。
+   * snapshotJson は呼び出し元(useOfficialSettingsBroadcast、別タスクで実装予定)で組み立て済みの
+   * `{ local: Record<string, unknown>, nightMode: string | null }` を JSON.stringify した文字列
+   * （そのままJS式として埋め込む）。
+   */
+  applyOfficialSettingsSnapshot: (snapshotJson: string): string => {
+    const keysJson = JSON.stringify(OFFICIAL_SETTINGS_WHITELIST_KEYS);
+    return `(function(){var incoming=${snapshotJson};var keys=${keysJson};var nightMode=incoming&&Object.prototype.hasOwnProperty.call(incoming,'nightMode')?incoming.nightMode:undefined;if(nightMode===null){document.cookie='night_mode=; path=/; domain=.x.com; max-age=0';}else if(typeof nightMode==='string'){document.cookie='night_mode='+nightMode+'; path=/; domain=.x.com; max-age=34560000';}var incomingLocal=(incoming&&incoming.local)||{};var r=indexedDB.open('localforage');r.onsuccess=function(e){var tx=e.target.result.transaction('keyvaluepairs','readwrite'),st=tx.objectStore('keyvaluepairs'),g=st.get('device:rweb.settings');g.onsuccess=function(e){var existing=e.target.result||{};if(!existing.local)existing.local={};for(var i=0;i<keys.length;i++){var k=keys[i];if(Object.prototype.hasOwnProperty.call(incomingLocal,k)){existing.local[k]=incomingLocal[k];}}existing.local._lastPersisted=Date.now();existing._lastPersisted=Date.now();st.put(existing,'device:rweb.settings').onsuccess=function(){location.reload();};};};})();`;
+  },
+
   /** NGワードを動的に更新し、表示中のツイートにも即時適用する */
   applyNgWords: (ngWords: string[], globalNgWords: string[]) => {
     const ng = JSON.stringify(ngWords);
@@ -167,3 +187,20 @@ export const STORAGE_KEYS = {
   /** 最後に What's New を表示した（=起動した）アプリバージョン */
   LAST_SEEN_VERSION: "mcx_lastSeenVersion",
 } as const;
+
+/**
+ * device:rweb.settings.local のうち、アカウント間で配布して意味のある表示・アクセシビリティ設定のみのキー。
+ * scale は既存の表示サイズ設定(columnScale)が管理するため対象外。
+ * pushNotificationsPermission 等のブラウザ通知許可状態やタイムスタンプ系の内部トラッキング状態は
+ * アカウント/デバイス固有のため対象外(2026-09-04 実データ確認: local には他に nextPushCheckin /
+ * loginPromptLastShown / replyVotingSurveyClicked / undoPreview / isSideNavExpanded が存在する)。
+ */
+export const OFFICIAL_SETTINGS_WHITELIST_KEYS = [
+  "themeColor",
+  "highContrastEnabled",
+  "reducedMotionEnabled",
+  "shouldAutoPlayGif",
+  "shouldAutoTagLocation",
+  "showTweetMediaDetailDrawer",
+  "autoPollNewTweets",
+] as const;
