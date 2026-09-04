@@ -38,6 +38,7 @@ interface AppSettingsPanelProps {
   updateChecking: boolean;
   updateManualResult: "idle" | "none" | "error";
   onCheckUpdate: () => void;
+  onOpenOfficialSettings: () => void;
   onClose: () => void;
 }
 
@@ -53,6 +54,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   updateChecking,
   updateManualResult,
   onCheckUpdate,
+  onOpenOfficialSettings,
   onClose,
 }) => {
   const isMobile = useAppStore((s) => s.isMobile);
@@ -194,6 +196,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
               />
 
               <AppInfoSections
+                onOpenOfficialSettings={onOpenOfficialSettings}
                 onReloadAllWebviews={() => {
                   onReloadAllWebviews();
                   onClose();

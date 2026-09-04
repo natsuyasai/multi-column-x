@@ -105,6 +105,7 @@ const defaultProps = {
   updateChecking: false,
   updateManualResult: "idle" as const,
   onCheckUpdate: vi.fn(),
+  onOpenOfficialSettings: vi.fn(),
   onClose: vi.fn(),
 };
 
@@ -118,6 +119,27 @@ describe("AppSettingsPanel", () => {
     render(<AppSettingsPanel {...defaultProps} onClose={onClose} />);
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+describe("AppSettingsPanel 公式設定セクション", () => {
+  it("「公式設定を開く」ボタンが表示される", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(
+      screen.getByRole("button", { name: "公式設定を開く" }),
+    ).toBeInTheDocument();
+  });
+
+  it("「公式設定を開く」ボタンをクリックするとonOpenOfficialSettingsが呼ばれる", () => {
+    const onOpenOfficialSettings = vi.fn();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        onOpenOfficialSettings={onOpenOfficialSettings}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "公式設定を開く" }));
+    expect(onOpenOfficialSettings).toHaveBeenCalled();
   });
 });
 

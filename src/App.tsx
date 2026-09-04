@@ -36,6 +36,7 @@ import {
   useColumnCrashRecovery,
   useColumnFocusClearsUnread,
   useNewPostsNotification,
+  useOfficialSettingsBroadcast,
   useWebviewScrollRelay,
 } from "./hooks/useWebviewEvents";
 import { useWhatsNew } from "./hooks/useWhatsNew";
@@ -117,6 +118,8 @@ const App: React.FC = () => {
     setSettingsColumnId,
     showLinkPopupDialog,
     setShowLinkPopupDialog,
+    showOfficialSettingsDialog,
+    setShowOfficialSettingsDialog,
     tabActionColumnId,
     setTabActionColumnId,
     showShortcutHelp,
@@ -198,11 +201,12 @@ const App: React.FC = () => {
   const resolvedTheme = useTheme(globalSettings.theme);
 
   // WebView 内の横ホイール → スクロールバー追従、新着カウント → バッジ・デスクトップ通知
-  useWebviewScrollRelay(scrollbarRef);
-  useNewPostsNotification(setUnreadCount);
   useApiRateLimitReports(setApiRateLimit);
   useColumnCrashRecovery(recreateColumnWebview);
   useColumnFocusClearsUnread(clearUnreadCount);
+  useNewPostsNotification(setUnreadCount);
+  useOfficialSettingsBroadcast();
+  useWebviewScrollRelay(scrollbarRef);
 
   const handleOpenLinkPopup = useCallback(() => {
     setShowLinkPopupDialog(true);
@@ -223,6 +227,26 @@ const App: React.FC = () => {
       }).catch(logError("handleSubmitLinkPopup:openLinkPopupWindow"));
     },
     [accounts, setShowLinkPopupDialog],
+  );
+
+  const handleOpenOfficialSettings = useCallback(() => {
+    setShowAppSettings(false);
+    setShowOfficialSettingsDialog(true);
+  }, [setShowAppSettings, setShowOfficialSettingsDialog]);
+
+  const handleSubmitOfficialSettings = useCallback(
+    async (url: string, accountId: string) => {
+      setShowOfficialSettingsDialog(false);
+      const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
+      if (!account) return;
+      await invoke(IPC_COMMANDS.OPEN_LINK_POPUP_WINDOW, {
+        webviewLabelCaller: null,
+        accountId: account.id,
+        dataDirectory: account.dataDirectory,
+        url,
+      }).catch(logError("handleSubmitOfficialSettings:openLinkPopupWindow"));
+    },
+    [accounts, setShowOfficialSettingsDialog],
   );
 
   // ダイアログ表示中は列WebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
@@ -583,6 +607,17 @@ const App: React.FC = () => {
         />
       )}
 
+      {showOfficialSettingsDialog && (
+        <LinkPopupDialog
+          accounts={accounts}
+          defaultAccountId={linkPopupDefaultAccountId}
+          fixedUrl="https://x.com/settings"
+          title="公式設定を開く"
+          onSubmit={handleSubmitOfficialSettings}
+          onClose={() => setShowOfficialSettingsDialog(false)}
+        />
+      )}
+
       {showAddColumn && accounts.length > 0 && (
         <AddColumnDialog
           accounts={accounts}
@@ -676,6 +711,7 @@ const App: React.FC = () => {
           updateChecking={updater.checking}
           updateManualResult={updater.manualResult}
           onCheckUpdate={updater.checkManually}
+          onOpenOfficialSettings={handleOpenOfficialSettings}
           onClose={() => setShowAppSettings(false)}
         />
       )}
