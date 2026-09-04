@@ -8,6 +8,7 @@ const tauriInvokeMock = vi.fn((_cmd: string, _args?: Record<string, unknown>) =>
 );
 
 const switchPopupSessionMock = vi.fn();
+const reportOfficialSettingsMock = vi.fn();
 
 type VideoDownloadProgressPayload = {
   fileIndex: number;
@@ -90,7 +91,10 @@ describe("inject/popup_toolbar のアカウント切替", () => {
   });
 
   it("Androidブリッジがある場合はswitchPopupSessionへ転送しTauri invokeは呼ばない", async () => {
-    window.__mcxPopupBridge = { switchPopupSession: switchPopupSessionMock };
+    window.__mcxPopupBridge = {
+      switchPopupSession: switchPopupSessionMock,
+      reportOfficialSettings: reportOfficialSettingsMock,
+    };
     await importToolbar();
 
     selectAccount("acc2");
@@ -116,7 +120,10 @@ describe("inject/popup_toolbar のアカウント切替", () => {
   });
 
   it("存在しないアカウントIDの場合はどこへも転送しない", async () => {
-    window.__mcxPopupBridge = { switchPopupSession: switchPopupSessionMock };
+    window.__mcxPopupBridge = {
+      switchPopupSession: switchPopupSessionMock,
+      reportOfficialSettings: reportOfficialSettingsMock,
+    };
     await importToolbar();
 
     const select = document.querySelector<HTMLSelectElement>(
@@ -303,6 +310,59 @@ describe("inject/popup_toolbar の動画ダウンロードボタン", () => {
   });
 });
 
+describe("inject/popup_toolbar の各カラムに適用ボタン", () => {
+  beforeEach(() => {
+    tauriInvokeMock.mockClear();
+    switchPopupSessionMock.mockClear();
+    window.__TAURI__ = { core: { invoke: tauriInvokeMock } };
+    window.__mcxAccounts = accounts;
+    window.__mcxCurrentAccountId = "acc1";
+    window.__mcxTargetHref = "";
+    window.__mcxEscCloseEnabled = false;
+    delete window.__mcxPopupBridge;
+  });
+
+  function getApplySettingsButton(): HTMLButtonElement {
+    const button = document.querySelector<HTMLButtonElement>(
+      "#tv-popup-apply-settings-button",
+    );
+    if (!button) throw new Error("apply settings button not found");
+    return button;
+  }
+
+  it("ツールバーに各カラムに適用ボタンが追加される", async () => {
+    await importToolbar();
+
+    const button = getApplySettingsButton();
+    expect(button).not.toBeNull();
+    expect(button.textContent).toBe("各カラムに適用");
+  });
+
+  it("/settings で始まるパスの場合、各カラムに適用ボタンが表示される", async () => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: new URL("https://x.com/settings/display"),
+    });
+
+    await importToolbar();
+
+    const button = getApplySettingsButton();
+    expect(button.style.display).not.toBe("none");
+  });
+
+  it("/settings で始まらないパスの場合、各カラムに適用ボタンが非表示になる", async () => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: new URL("https://x.com/home"),
+    });
+
+    await importToolbar();
+
+    const button = getApplySettingsButton();
+    expect(button.style.display).toBe("none");
+  });
+});
+
 describe("inject/popup_toolbar の動画ダウンロードボタンの表示切替", () => {
   beforeEach(() => {
     tauriInvokeMock.mockClear();
@@ -377,6 +437,43 @@ describe("inject/popup_toolbar の動画ダウンロードボタンの表示切�
     await flushMutationObserver();
 
     expect(getDownloadButton().style.display).toBe("none");
+  });
+});
+
+describe("isOfficialSettingsPagePath", () => {
+  it("/settings で始まるパスは true を返す", async () => {
+    const { isOfficialSettingsPagePath } = await import("./popup_toolbar");
+    expect(isOfficialSettingsPagePath("/settings")).toBe(true);
+    expect(isOfficialSettingsPagePath("/settings/display")).toBe(true);
+    expect(isOfficialSettingsPagePath("/settings/privacy")).toBe(true);
+  });
+
+  it("/settings で始まらないパスは false を返す", async () => {
+    const { isOfficialSettingsPagePath } = await import("./popup_toolbar");
+    expect(isOfficialSettingsPagePath("/home")).toBe(false);
+    expect(isOfficialSettingsPagePath("/explore")).toBe(false);
+    expect(isOfficialSettingsPagePath("/messages")).toBe(false);
+  });
+});
+
+describe("readNightModeCookie", () => {
+  it("Cookie 文字列に night_mode=2 が含まれる場合は '2' を返す", async () => {
+    const { readNightModeCookie } = await import("./popup_toolbar");
+    expect(readNightModeCookie("night_mode=2")).toBe("2");
+    expect(readNightModeCookie("other=1; night_mode=2; another=3")).toBe("2");
+  });
+
+  it("Cookie 文字列に night_mode が含まれない場合は null を返す", async () => {
+    const { readNightModeCookie } = await import("./popup_toolbar");
+    expect(readNightModeCookie("")).toBe(null);
+    expect(readNightModeCookie("other=1; another=3")).toBe(null);
+  });
+
+  it("他の Cookie と混在していても正しく抽出できる", async () => {
+    const { readNightModeCookie } = await import("./popup_toolbar");
+    const cookieString =
+      "auth_token=abc123; night_mode=0; user_id=xyz789; other=test";
+    expect(readNightModeCookie(cookieString)).toBe("0");
   });
 });
 

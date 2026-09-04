@@ -3,8 +3,21 @@
 const SWITCH_POPUP_SESSION = "switch_popup_session";
 const CLOSE_POPUP_WINDOW = "close_popup_window";
 const DOWNLOAD_VIDEO = "download_video";
+const REPORT_OFFICIAL_SETTINGS = "report_official_settings";
 // イベント名定数の一覧は src/constants/ipc.ts の IPC_EVENTS を参照
 const VIDEO_DOWNLOAD_PROGRESS = "video-download-progress";
+
+// src/constants/ipc.ts の OFFICIAL_SETTINGS_WHITELIST_KEYS と同じ値を維持すること。
+// inject スクリプトは ES module import が使えない制約により、独立定義が必要。
+const OFFICIAL_SETTINGS_WHITELIST_KEYS = [
+  "themeColor",
+  "highContrastEnabled",
+  "reducedMotionEnabled",
+  "shouldAutoPlayGif",
+  "shouldAutoTagLocation",
+  "showTweetMediaDetailDrawer",
+  "autoPollNewTweets",
+];
 
 interface VideoDownloadProgressPayload {
   fileIndex: number;
@@ -115,6 +128,17 @@ function extractVideoVariantsFromPlayer(
   return variants.length > 0 ? variants : null;
 }
 
+/** pathname が "/settings" で始まるかどうかを判定する（公式設定ページの検出用）。 */
+export function isOfficialSettingsPagePath(pathname: string): boolean {
+  return pathname.startsWith("/settings");
+}
+
+/** Cookie文字列から "night_mode" の値を読む。存在しなければ null（システム設定を使う状態）を返す。 */
+export function readNightModeCookie(cookieString: string): string | null {
+  const match = cookieString.match(/(?:^|; )night_mode=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 /** VideoPlayerコンポーネントのprops（videoId: { id }）からツイートID相当の文字列を取得する。 */
 function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
   const el = startEl ?? document.querySelector(VIDEO_PLAYER_SELECTOR);
@@ -134,6 +158,9 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
   const currentAccountId: string = window.__mcxCurrentAccountId ?? "";
   const targetHref: string = window.__mcxTargetHref ?? "";
   const escCloseEnabled: boolean = window.__mcxEscCloseEnabled ?? true;
+  const isOfficialSettingsPage = isOfficialSettingsPagePath(
+    window.location.pathname,
+  );
 
   if (document.getElementById("tv-popup-toolbar")) return;
 
@@ -294,10 +321,80 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
     });
   });
 
+  const applySettingsButton = document.createElement("button");
+  applySettingsButton.type = "button";
+  applySettingsButton.id = "tv-popup-apply-settings-button";
+  applySettingsButton.textContent = "各カラムに適用";
+  applySettingsButton.style.cssText = downloadButton.style.cssText;
+  applySettingsButton.style.display = isOfficialSettingsPage ? "" : "none";
+
+  const applySettingsStatus = document.createElement("span");
+  applySettingsStatus.id = "tv-popup-apply-settings-status";
+  applySettingsStatus.style.cssText =
+    "margin-left: 8px; white-space: nowrap; color: #f4212e;";
+
+  /** applySettingsStatus を一定時間後に空にする。 */
+  function clearApplySettingsFeedbackAfterDelay(): void {
+    setTimeout(() => {
+      applySettingsStatus.textContent = "";
+    }, DOWNLOAD_FEEDBACK_CLEAR_DELAY_MS);
+  }
+
+  applySettingsButton.addEventListener("click", function () {
+    const r = indexedDB.open("localforage");
+    r.onsuccess = function (e) {
+      const tx = (e.target as IDBOpenDBRequest).result.transaction(
+        "keyvaluepairs",
+        "readonly",
+      );
+      const g = tx.objectStore("keyvaluepairs").get("device:rweb.settings");
+      g.onsuccess = function () {
+        const value = g.result;
+        if (!value || !value.local) {
+          applySettingsStatus.textContent = "設定が見つかりませんでした";
+          clearApplySettingsFeedbackAfterDelay();
+          return;
+        }
+        // ホワイトリストのフィールドのみ抽出して送信する。
+        const whitelisted: Record<string, unknown> = {};
+        OFFICIAL_SETTINGS_WHITELIST_KEYS.forEach(function (key) {
+          if (Object.prototype.hasOwnProperty.call(value.local, key)) {
+            whitelisted[key] = value.local[key];
+          }
+        });
+        // 背景設定は Cookie "night_mode" 側で管理されているため、合わせて読み取り同梱する。
+        const snapshot = JSON.stringify({
+          local: whitelisted,
+          nightMode: readNightModeCookie(document.cookie),
+        });
+        applySettingsButton.disabled = true;
+        const onDone = function () {
+          applySettingsButton.disabled = false;
+          applySettingsStatus.textContent = "各カラムに適用しました";
+          clearApplySettingsFeedbackAfterDelay();
+        };
+        // Android ブリッジ優先、その次に Tauri IPC。
+        const androidBridge = window.__mcxPopupBridge;
+        if (androidBridge) {
+          androidBridge.reportOfficialSettings(currentAccountId, snapshot);
+          onDone();
+          return;
+        }
+        tauriInvoke(
+          REPORT_OFFICIAL_SETTINGS,
+          { accountId: currentAccountId, snapshot },
+          onDone,
+        );
+      };
+    };
+  });
+
   toolbar.appendChild(label);
   toolbar.appendChild(select);
   toolbar.appendChild(downloadButton);
   toolbar.appendChild(downloadStatus);
+  toolbar.appendChild(applySettingsButton);
+  toolbar.appendChild(applySettingsStatus);
 
   function inject() {
     const doInject = () => {

@@ -75,6 +75,7 @@ declare global {
   // Android で MainActivity が addJavascriptInterface で公開するポップアップ操作ブリッジ
   interface McxPopupBridge {
     switchPopupSession: (accountId: string, url: string) => void;
+    reportOfficialSettings: (accountId: string, snapshot: string) => void;
   }
 
   // Android で MainActivity が addJavascriptInterface で公開する動画DL要求ブリッジ
