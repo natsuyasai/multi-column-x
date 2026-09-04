@@ -64,6 +64,16 @@ object AppBridge {
   )
 
   /**
+   * ポップアップ内の popup_toolbar.ts から、公式設定スナップショットが
+   * 届いたときに PopupSessionBridge から呼ぶ。
+   */
+  @JvmStatic
+  external fun onOfficialSettingsReport(
+    accountId: String,
+    snapshot: String,
+  )
+
+  /**
    * スワイプバー（SwipeBarOverlayView）でスワイプジェスチャーが確定したときに呼ぶ。
    * Rust 側はこれを受けて mobile-swipe-navigate イベントを React へ emit する。
    * React 側の navigateColumn が実際に遷移を決定した場合のみ、遷移確定フラッシュ

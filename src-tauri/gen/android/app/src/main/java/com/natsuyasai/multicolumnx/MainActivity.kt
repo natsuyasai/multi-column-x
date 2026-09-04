@@ -348,9 +348,15 @@ class MainActivity : TauriActivity() {
           // ネイティブ WebView には Tauri IPC が無いため、popup_toolbar の
           // アカウント切替を Rust へ届けるブリッジを公開する（loadUrl 前に設定が必要）。
           wv.addJavascriptInterface(
-            PopupSessionBridge(id) { popupId, selectedAccountId, currentUrl ->
-              AppBridge.onPopupSwitchSession(popupId, selectedAccountId, currentUrl)
-            },
+            PopupSessionBridge(
+              id,
+              { popupId, selectedAccountId, currentUrl ->
+                AppBridge.onPopupSwitchSession(popupId, selectedAccountId, currentUrl)
+              },
+              { accountId, snapshot ->
+                AppBridge.onOfficialSettingsReport(accountId, snapshot)
+              },
+            ),
             POPUP_BRIDGE_JS_NAME,
           )
         }
