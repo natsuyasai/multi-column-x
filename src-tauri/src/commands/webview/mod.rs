@@ -92,6 +92,39 @@ pub async fn report_new_posts_count(
     .map_err(|e| e.to_string())
 }
 
+/// emit するペイロードを組み立てる（テスト用に純粋関数として切り出し）。
+fn build_official_settings_payload(account_id: &str, snapshot: &str) -> serde_json::Value {
+    serde_json::json!({ "accountId": account_id, "snapshot": snapshot })
+}
+
+#[tauri::command]
+pub async fn report_official_settings(
+    app: AppHandle,
+    account_id: String,
+    snapshot: String,
+) -> Result<(), String> {
+    app.emit(
+        events::WEBVIEW_OFFICIAL_SETTINGS_CAPTURED,
+        build_official_settings_payload(&account_id, &snapshot),
+    )
+    .map_err(|e| e.to_string())
+}
+
+/// Android のポップアップ WebView（ネイティブ WebView・Tauri IPC非対応）から
+/// window.__mcxPopupBridge.reportOfficialSettings 経由で届いた通知を emit する。
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+pub fn report_official_settings_from_android(
+    app: &AppHandle,
+    account_id: &str,
+    snapshot: &str,
+) -> Result<(), String> {
+    app.emit(
+        events::WEBVIEW_OFFICIAL_SETTINGS_CAPTURED,
+        build_official_settings_payload(account_id, snapshot),
+    )
+    .map_err(|e| e.to_string())
+}
+
 /// labelからaccount_idを解決する。まずWebviewRegistry（カラム・ポップアップ系）を見て、
 /// 見つからなければ常駐コンポーズ（ComposeSession）を見る。
 /// 呼び出し元でregistry→composeの順にMutexをロックしてから渡す設計。
@@ -386,5 +419,16 @@ mod tests {
         let json = r#"{"bucketKey":"user_tweets","limit":150}"#;
         let result = parse_android_api_rate_limit_payload(json);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn official_settingsのペイロードがaccountidとsnapshotを含むjsonを返す() {
+        let payload = build_official_settings_payload("acc1", "snap-data");
+        assert_eq!(payload["accountId"], "acc1");
+        assert_eq!(payload["snapshot"], "snap-data");
+        assert_eq!(
+            payload,
+            serde_json::json!({"accountId": "acc1", "snapshot": "snap-data"})
+        );
     }
 }

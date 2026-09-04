@@ -197,6 +197,7 @@ pub fn run() {
             commands::webview::eval_in_webview,
             commands::webview::report_webview_scroll,
             commands::webview::report_new_posts_count,
+            commands::webview::report_official_settings,
             commands::webview::report_api_rate_limit,
             commands::webview::report_keyboard_shortcut,
             commands::webview::get_mobile_insets,

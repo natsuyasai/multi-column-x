@@ -36,6 +36,8 @@ pub mod events {
     pub const MOBILE_SWIPE_PROGRESS: &str = "mobile-swipe-progress";
     /// モバイルスワイプバーのダブルタップ確定通知（Android JNI → TS listen）payloadなし。
     pub const MOBILE_SWIPE_DOUBLE_TAP: &str = "mobile-swipe-double-tap";
+    /// 公式設定ページのスナップショット取得通知（inject script invoke → TS listen）{ accountId, snapshot }
+    pub const WEBVIEW_OFFICIAL_SETTINGS_CAPTURED: &str = "webview-official-settings-captured";
 }
 
 /// WebView / ウィンドウラベルのプレフィックス
@@ -100,6 +102,10 @@ mod tests {
             ("MOBILE_SWIPE_NAVIGATE", events::MOBILE_SWIPE_NAVIGATE),
             ("MOBILE_SWIPE_PROGRESS", events::MOBILE_SWIPE_PROGRESS),
             ("MOBILE_SWIPE_DOUBLE_TAP", events::MOBILE_SWIPE_DOUBLE_TAP),
+            (
+                "WEBVIEW_OFFICIAL_SETTINGS_CAPTURED",
+                events::WEBVIEW_OFFICIAL_SETTINGS_CAPTURED,
+            ),
         ];
         assert_eq!(
             expected.as_object().unwrap().len(),
