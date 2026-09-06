@@ -348,9 +348,16 @@ class MainActivity : TauriActivity() {
           // ネイティブ WebView には Tauri IPC が無いため、popup_toolbar の
           // アカウント切替を Rust へ届けるブリッジを公開する（loadUrl 前に設定が必要）。
           wv.addJavascriptInterface(
-            PopupSessionBridge(id) { popupId, selectedAccountId, currentUrl ->
-              AppBridge.onPopupSwitchSession(popupId, selectedAccountId, currentUrl)
-            },
+            PopupSessionBridge(
+              id,
+              { popupId, selectedAccountId, currentUrl ->
+                AppBridge.onPopupSwitchSession(popupId, selectedAccountId, currentUrl)
+              },
+              { accountId, snapshot ->
+                AppBridge.onOfficialSettingsReport(accountId, snapshot)
+              },
+              { popupId -> removePopupWebView(popupId) },
+            ),
             POPUP_BRIDGE_JS_NAME,
           )
         }
@@ -379,6 +386,10 @@ class MainActivity : TauriActivity() {
         val wv = popupWebViews.removeAt(idx).second
         contentRoot.removeView(wv)
         wv.destroy()
+        // 通常ポップアップ（常駐コンポーズの退避ではない）の実破棄を Rust 側へ通知する。
+        // 公式設定ポップアップの追跡と一致しない場合は handle_popup_closed 側で無視される
+        // （アカウント切替時は破棄前に追跡ラベルが付け替え済みのため誤検知しない）。
+        AppBridge.onPopupClosed(id)
         return@runOnUiThreadSync
       }
       persistentComposeWebView?.takeIf { it.first == id }?.let { pair ->
@@ -423,6 +434,9 @@ class MainActivity : TauriActivity() {
     val wv = popupWebViews.removeLast().second
     contentRoot.removeView(wv)
     wv.destroy()
+    // 通常ポップアップ（常駐コンポーズの退避ではない）の実破棄を Rust 側へ通知する。
+    // removePopupWebView と同じく handle_popup_closed 側で追跡対象外なら無視される。
+    AppBridge.onPopupClosed(id)
     return true
   }
 

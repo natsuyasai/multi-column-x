@@ -1,6 +1,6 @@
 [package]
 name = "multicolumnx"
-version = "0.5.4"
+version = "0.6.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -48,6 +48,9 @@ jni = { version = "0.21", default-features = false }
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = { version = "=2.0.2", features = ["v2_40"] }
 gtk = { version = "=0.18.2" }
+# AppImage向け Cisco OpenH264 ランタイムダウンロード機能（SHA256検証・bzip2展開）で使用
+sha2 = "0.10"
+bzip2 = "0.4"
 
 # Windows: カラム WebView がフォーカスを得たことを検知するため、tauri-runtime-wry
 # と同一バージョンの webview2-com を直接参照する（型を一致させるためバージョンをピン留め）。

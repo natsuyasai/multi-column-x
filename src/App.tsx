@@ -14,7 +14,6 @@ import { AccountManager } from "./components/AccountManager/AccountManager";
 import { AccountNameDialog } from "./components/AccountNameDialog/AccountNameDialog";
 import { AddColumnDialog } from "./components/AddColumnDialog/AddColumnDialog";
 import { AppSettingsPanel } from "./components/AppSettingsPanel/AppSettingsPanel";
-import { CodecWarningDialog } from "./components/CodecWarningDialog/CodecWarningDialog";
 import { ColumnHeader } from "./components/ColumnHeader/ColumnHeader";
 import { ConfirmDialog } from "./components/ConfirmDialog/ConfirmDialog";
 import { LinkPopupDialog } from "./components/LinkPopupDialog/LinkPopupDialog";
@@ -31,13 +30,14 @@ import { useAppUpdater } from "./hooks/useAppUpdater";
 import { useColumns } from "./hooks/useColumns";
 import { useDialogState } from "./hooks/useDialogState";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
-import { useMediaCodecCheck } from "./hooks/useMediaCodecCheck";
-import { useTheme } from "./hooks/useTheme";
+import { getMql, useTheme } from "./hooks/useTheme";
 import {
   useApiRateLimitReports,
   useColumnCrashRecovery,
   useColumnFocusClearsUnread,
   useNewPostsNotification,
+  useOfficialSettingsBroadcast,
+  useOfficialSettingsPopupReload,
   useWebviewScrollRelay,
 } from "./hooks/useWebviewEvents";
 import { useWhatsNew } from "./hooks/useWhatsNew";
@@ -48,6 +48,7 @@ import {
   resolveSwipeAreaHeight,
 } from "./lib/gridLayout";
 import { logError } from "./lib/log";
+import { resolveTheme } from "./lib/theme";
 import {
   applyColumnSettingsScripts,
   evalInColumn,
@@ -119,6 +120,8 @@ const App: React.FC = () => {
     setSettingsColumnId,
     showLinkPopupDialog,
     setShowLinkPopupDialog,
+    showOfficialSettingsDialog,
+    setShowOfficialSettingsDialog,
     tabActionColumnId,
     setTabActionColumnId,
     showShortcutHelp,
@@ -131,7 +134,6 @@ const App: React.FC = () => {
   const [columnsRestored, setColumnsRestored] = useState(false);
   const updater = useAppUpdater(isMobile, columnsRestored);
   const whatsNew = useWhatsNew(columnsRestored);
-  const codecCheck = useMediaCodecCheck(columnsRestored);
   const [appVersion, setAppVersion] = useState("");
   // APIレート制限ポップオーバーの開閉状態（カラムWebView退避判定の anyDialogOpen に含めるため）
   const [apiRateLimitPopoverOpen, setApiRateLimitPopoverOpen] = useState(false);
@@ -201,11 +203,13 @@ const App: React.FC = () => {
   const resolvedTheme = useTheme(globalSettings.theme);
 
   // WebView 内の横ホイール → スクロールバー追従、新着カウント → バッジ・デスクトップ通知
-  useWebviewScrollRelay(scrollbarRef);
-  useNewPostsNotification(setUnreadCount);
   useApiRateLimitReports(setApiRateLimit);
   useColumnCrashRecovery(recreateColumnWebview);
   useColumnFocusClearsUnread(clearUnreadCount);
+  useNewPostsNotification(setUnreadCount);
+  useOfficialSettingsBroadcast();
+  useOfficialSettingsPopupReload(recreateAllWebviews);
+  useWebviewScrollRelay(scrollbarRef);
 
   const handleOpenLinkPopup = useCallback(() => {
     setShowLinkPopupDialog(true);
@@ -228,6 +232,26 @@ const App: React.FC = () => {
     [accounts, setShowLinkPopupDialog],
   );
 
+  const handleOpenOfficialSettings = useCallback(() => {
+    setShowAppSettings(false);
+    setShowOfficialSettingsDialog(true);
+  }, [setShowAppSettings, setShowOfficialSettingsDialog]);
+
+  const handleSubmitOfficialSettings = useCallback(
+    async (url: string, accountId: string) => {
+      setShowOfficialSettingsDialog(false);
+      const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
+      if (!account) return;
+      await invoke(IPC_COMMANDS.OPEN_LINK_POPUP_WINDOW, {
+        webviewLabelCaller: null,
+        accountId: account.id,
+        dataDirectory: account.dataDirectory,
+        url,
+      }).catch(logError("handleSubmitOfficialSettings:openLinkPopupWindow"));
+    },
+    [accounts, setShowOfficialSettingsDialog],
+  );
+
   // ダイアログ表示中は列WebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
   // 更新ポップアップ・アカウント名入力ダイアログも同様に退避対象に含める。
   const anyDialogOpen =
@@ -237,8 +261,7 @@ const App: React.FC = () => {
     !!pendingAccountName ||
     !!pendingRemoval ||
     !!reauthNotice ||
-    apiRateLimitPopoverOpen ||
-    codecCheck.isDialogOpen;
+    apiRateLimitPopoverOpen;
 
   // モバイルスワイプバー（ネイティブオーバーレイ）の状態を Kotlin 側へ同期する。
   // visible は「設定で有効」「透過度>0（0のまま表示し続けるとView.alphaが透明でもタッチを
@@ -433,6 +456,15 @@ const App: React.FC = () => {
           );
         });
       }
+      if (patch.theme !== undefined) {
+        const prefersDark = getMql()?.matches ?? false;
+        const nightMode =
+          resolveTheme(patch.theme, prefersDark) === "dark" ? "2" : "0";
+        const { columns: currentColumns } = useAppStore.getState();
+        currentColumns.forEach((col) => {
+          evalInColumn(col.id, WEBVIEW_SCRIPTS.applyNightModeCookie(nightMode));
+        });
+      }
     },
     [updateGlobalSettings],
   );
@@ -511,8 +543,6 @@ const App: React.FC = () => {
           apiRateLimitMonitorEnabled={globalSettings.apiRateLimitMonitorEnabled}
           apiRateLimits={apiRateLimits}
           onApiRateLimitPopoverOpenChange={setApiRateLimitPopoverOpen}
-          hasMissingCodec={codecCheck.hasMissingCodec}
-          onOpenCodecWarning={codecCheck.openDialog}
         />
       )}
       {isMobile && (
@@ -586,6 +616,17 @@ const App: React.FC = () => {
           defaultAccountId={linkPopupDefaultAccountId}
           onSubmit={handleSubmitLinkPopup}
           onClose={() => setShowLinkPopupDialog(false)}
+        />
+      )}
+
+      {showOfficialSettingsDialog && (
+        <LinkPopupDialog
+          accounts={accounts}
+          defaultAccountId={linkPopupDefaultAccountId}
+          fixedUrl="https://x.com/settings"
+          title="公式設定を開く"
+          onSubmit={handleSubmitOfficialSettings}
+          onClose={() => setShowOfficialSettingsDialog(false)}
         />
       )}
 
@@ -682,6 +723,7 @@ const App: React.FC = () => {
           updateChecking={updater.checking}
           updateManualResult={updater.manualResult}
           onCheckUpdate={updater.checkManually}
+          onOpenOfficialSettings={handleOpenOfficialSettings}
           onClose={() => setShowAppSettings(false)}
         />
       )}
@@ -722,14 +764,6 @@ const App: React.FC = () => {
           progress={updater.progress}
           onInstall={updater.install}
           onLater={updater.dismiss}
-        />
-      )}
-
-      {codecCheck.isDialogOpen && (
-        <CodecWarningDialog
-          missingH264={codecCheck.missingH264}
-          missingAac={codecCheck.missingAac}
-          onClose={codecCheck.closeDialog}
         />
       )}
 

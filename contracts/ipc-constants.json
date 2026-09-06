@@ -25,6 +25,7 @@
     "report_keyboard_shortcut",
     "download_video",
     "report_api_rate_limit",
+    "report_official_settings",
     "update_mobile_swipe_bar",
     "flash_mobile_swipe_bar"
   ],
@@ -41,7 +42,9 @@
     "WEBVIEW_API_RATE_LIMIT": "webview-api-rate-limit",
     "MOBILE_SWIPE_NAVIGATE": "mobile-swipe-navigate",
     "MOBILE_SWIPE_PROGRESS": "mobile-swipe-progress",
-    "MOBILE_SWIPE_DOUBLE_TAP": "mobile-swipe-double-tap"
+    "MOBILE_SWIPE_DOUBLE_TAP": "mobile-swipe-double-tap",
+    "WEBVIEW_OFFICIAL_SETTINGS_CAPTURED": "webview-official-settings-captured",
+    "OFFICIAL_SETTINGS_POPUP_CLOSED": "official-settings-popup-closed"
   },
   "labels": {
     "MAIN": "main",

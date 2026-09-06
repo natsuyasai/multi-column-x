@@ -78,4 +78,17 @@ describe("useDialogState", () => {
     });
     expect(result.current.dialogOpen).toBe(false);
   });
+
+  it("showOfficialSettingsDialog の初期値が false であること", () => {
+    const { result } = renderHook(() => useDialogState());
+    expect(result.current.showOfficialSettingsDialog).toBe(false);
+  });
+
+  it("showOfficialSettingsDialog を true にすると dialogOpen が true になること", () => {
+    const { result } = renderHook(() => useDialogState());
+    act(() => {
+      result.current.setShowOfficialSettingsDialog(true);
+    });
+    expect(result.current.dialogOpen).toBe(true);
+  });
 });

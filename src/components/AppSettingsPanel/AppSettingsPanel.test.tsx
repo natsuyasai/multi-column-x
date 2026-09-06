@@ -105,6 +105,7 @@ const defaultProps = {
   updateChecking: false,
   updateManualResult: "idle" as const,
   onCheckUpdate: vi.fn(),
+  onOpenOfficialSettings: vi.fn(),
   onClose: vi.fn(),
 };
 
@@ -118,6 +119,27 @@ describe("AppSettingsPanel", () => {
     render(<AppSettingsPanel {...defaultProps} onClose={onClose} />);
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+describe("AppSettingsPanel 公式設定セクション", () => {
+  it("「公式設定を開く」ボタンが表示される", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(
+      screen.getByRole("button", { name: "公式設定を開く" }),
+    ).toBeInTheDocument();
+  });
+
+  it("「公式設定を開く」ボタンをクリックするとonOpenOfficialSettingsが呼ばれる", () => {
+    const onOpenOfficialSettings = vi.fn();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        onOpenOfficialSettings={onOpenOfficialSettings}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "公式設定を開く" }));
+    expect(onOpenOfficialSettings).toHaveBeenCalled();
   });
 });
 
@@ -565,6 +587,7 @@ describe("AppSettingsPanel テーマ選択", () => {
   it("テーマでライトを選び適用するとonApplyにtheme:lightが渡る", () => {
     const onApply = vi.fn();
     render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    fireEvent.click(screen.getByRole("checkbox", { name: "テーマを変更する" }));
     fireEvent.click(screen.getByRole("button", { name: "ライト" }));
     fireEvent.click(screen.getByRole("button", { name: "適用" }));
     expect(onApply).toHaveBeenCalledWith(
@@ -577,5 +600,70 @@ describe("AppSettingsPanel テーマ選択", () => {
     render(<AppSettingsPanel {...defaultProps} settings={settings} />);
     const btn = screen.getByRole("button", { name: "システム" });
     expect(btn.className).toContain("scaleBtnActive");
+  });
+});
+
+describe("AppSettingsPanel 表示サイズ・テーマの変更チェックボックス", () => {
+  it("チェックボックスがいずれもOFFのまま適用すると、patchにcolumnScale/themeキーが含まれない", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledTimes(1);
+    const patch = onApply.mock.calls[0][0] as Record<string, unknown>;
+    expect(patch).not.toHaveProperty("columnScale");
+    expect(patch).not.toHaveProperty("theme");
+  });
+
+  it("表示サイズのチェックボックスをONにして値を変更し適用すると、patchにcolumnScaleが含まれ、themeは含まれない", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "表示サイズを変更する" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "大" }));
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    const patch = onApply.mock.calls[0][0] as Record<string, unknown>;
+    expect(patch).toHaveProperty("columnScale", "large");
+    expect(patch).not.toHaveProperty("theme");
+  });
+
+  it("テーマのチェックボックスをONにして値を変更し適用すると、patchにthemeが含まれ、columnScaleは含まれない", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    fireEvent.click(screen.getByRole("checkbox", { name: "テーマを変更する" }));
+    fireEvent.click(screen.getByRole("button", { name: "ライト" }));
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    const patch = onApply.mock.calls[0][0] as Record<string, unknown>;
+    expect(patch).toHaveProperty("theme", "light");
+    expect(patch).not.toHaveProperty("columnScale");
+  });
+
+  it("表示サイズ・テーマのボタンはチェックボックスがOFFの間は操作できない", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(screen.getByRole("button", { name: "大" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "ライト" })).toBeDisabled();
+  });
+
+  it("パネルを開き直す（再マウント）と、チェックボックスは常にOFF状態で表示される", () => {
+    const { unmount } = render(<AppSettingsPanel {...defaultProps} />);
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "表示サイズを変更する" }),
+    );
+    fireEvent.click(screen.getByRole("checkbox", { name: "テーマを変更する" }));
+    expect(
+      screen.getByRole("checkbox", { name: "表示サイズを変更する" }),
+    ).toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: "テーマを変更する" }),
+    ).toBeChecked();
+    unmount();
+
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(
+      screen.getByRole("checkbox", { name: "表示サイズを変更する" }),
+    ).not.toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: "テーマを変更する" }),
+    ).not.toBeChecked();
   });
 });

@@ -70,8 +70,6 @@ const defaultProps = {
   apiRateLimitMonitorEnabled: true,
   apiRateLimits: {},
   onApiRateLimitPopoverOpenChange: vi.fn(),
-  hasMissingCodec: false,
-  onOpenCodecWarning: vi.fn(),
 };
 
 describe("TopBar", () => {
@@ -174,35 +172,6 @@ describe("TopBar", () => {
     );
     await userEvent.click(screen.getByLabelText("APIレート制限"));
     expect(onApiRateLimitPopoverOpenChange).toHaveBeenCalledWith(true);
-  });
-
-  it("hasMissingCodecがfalseの場合、警告アイコンボタンが表示されない", () => {
-    render(<TopBar {...defaultProps} hasMissingCodec={false} />);
-    expect(
-      screen.queryByLabelText("コーデック不足の警告（クリックで詳細を表示）"),
-    ).not.toBeInTheDocument();
-  });
-
-  it("hasMissingCodecがtrueの場合、警告アイコンボタンが表示される", () => {
-    render(<TopBar {...defaultProps} hasMissingCodec={true} />);
-    expect(
-      screen.getByLabelText("コーデック不足の警告（クリックで詳細を表示）"),
-    ).toBeInTheDocument();
-  });
-
-  it("警告アイコンボタンをクリックするとonOpenCodecWarningが呼ばれる", async () => {
-    const onOpenCodecWarning = vi.fn();
-    render(
-      <TopBar
-        {...defaultProps}
-        hasMissingCodec={true}
-        onOpenCodecWarning={onOpenCodecWarning}
-      />,
-    );
-    await userEvent.click(
-      screen.getByLabelText("コーデック不足の警告（クリックで詳細を表示）"),
-    );
-    expect(onOpenCodecWarning).toHaveBeenCalled();
   });
 
   it("expanded=true のとき各カラムにカラムを閉じるボタンが表示される", () => {

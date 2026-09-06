@@ -7,6 +7,10 @@ interface LinkPopupDialogProps {
   defaultAccountId: string;
   onSubmit: (url: string, accountId: string) => void;
   onClose: () => void;
+  /** 指定時はURL入力欄を隠し、常にこのURLで送信する（公式設定を開く用途など） */
+  fixedUrl?: string;
+  /** ダイアログタイトル（省略時は既存の "URLをポップアップウィンドウで開く"） */
+  title?: string;
 }
 
 export const LinkPopupDialog: React.FC<LinkPopupDialogProps> = ({
@@ -14,8 +18,10 @@ export const LinkPopupDialog: React.FC<LinkPopupDialogProps> = ({
   defaultAccountId,
   onSubmit,
   onClose,
+  fixedUrl,
+  title,
 }) => {
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(fixedUrl ?? "");
   const [accountId, setAccountId] = useState(defaultAccountId);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -24,7 +30,7 @@ export const LinkPopupDialog: React.FC<LinkPopupDialogProps> = ({
   }, []);
 
   const handleSubmit = () => {
-    onSubmit(url, accountId);
+    onSubmit(fixedUrl ?? url, accountId);
     setUrl("");
   };
 
@@ -36,18 +42,20 @@ export const LinkPopupDialog: React.FC<LinkPopupDialogProps> = ({
   return (
     <div className={styles.overlay}>
       <div className={styles.panel}>
-        <h3>URLをポップアップウィンドウで開く</h3>
-        <input
-          ref={inputRef}
-          type="text"
-          placeholder="https://x.com/..."
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleSubmit();
-            if (e.key === "Escape") handleCancel();
-          }}
-        />
+        <h3>{title ?? "URLをポップアップウィンドウで開く"}</h3>
+        {!fixedUrl && (
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder="https://x.com/..."
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSubmit();
+              if (e.key === "Escape") handleCancel();
+            }}
+          />
+        )}
         {accounts.length > 1 && (
           <select
             value={accountId}

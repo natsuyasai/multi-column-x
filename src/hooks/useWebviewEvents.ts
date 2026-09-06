@@ -6,9 +6,15 @@ import {
   requestPermission,
   sendNotification,
 } from "@tauri-apps/plugin-notification";
-import { useEffect } from "react";
-import { IPC_EVENTS, WEBVIEW_LABELS } from "../constants/ipc";
+import { useEffect, useRef } from "react";
+import {
+  IPC_EVENTS,
+  OFFICIAL_SETTINGS_WHITELIST_KEYS,
+  WEBVIEW_LABELS,
+  WEBVIEW_SCRIPTS,
+} from "../constants/ipc";
 import { logError } from "../lib/log";
+import { evalInColumn } from "../services/columnWebview";
 import { useAppStore } from "../store/useAppStore";
 import { getColumnLabel } from "../types";
 import type { ApiRateLimitBucket } from "../types";
@@ -218,4 +224,125 @@ export function useApiRateLimitReports(
       unlisten.then((fn) => fn());
     };
   }, [setApiRateLimit]);
+}
+
+/**
+ * ポップアップ内「各カラムに適用」ボタンから届いた公式設定スナップショットを受け、
+ * 配布元以外の各アカウントの代表カラム（compose/externalを除く先頭カラム。無ければ任意の1つ）
+ * へ書き込み、リロードして反映する。配布元アカウント自身のカラムは、ポップアップと同じ
+ * dataDirectory（＝同じIndexedDB）を共有しており書き込み済みのため、書き込みはせず
+ * リロードのみ実行して表示を最新化する。
+ *
+ * snapshot は x.com 側スクリプトが report_official_settings 経由で送ってくる文字列であり、
+ * report_official_settings 自体は require_main_caller を持たない（ポップアップから呼ぶため）。
+ * そのため任意の文字列が届き得る前提で、ここで JSON.parse による検証を行い、さらに
+ * OFFICIAL_SETTINGS_WHITELIST_KEYS で再フィルタしたオブジェクトを再 JSON.stringify した
+ * 安全な文字列のみを eval_in_webview に渡す（popup_toolbar.ts 側の絞り込みを信用せず、
+ * 受信側でも同じホワイトリストを適用する多層防御）。nightMode は Cookie "night_mode" へ
+ * 直接埋め込まれるため、型チェックではなく既知の値("0"/"1"/"2"/null)のみを許可する
+ * allowlist で検証する（Cookie属性インジェクション対策）。
+ */
+export function useOfficialSettingsBroadcast() {
+  useEffect(() => {
+    const unlisten = listen<{ accountId: string; snapshot: string }>(
+      IPC_EVENTS.WEBVIEW_OFFICIAL_SETTINGS_CAPTURED,
+      (e) => {
+        const { accountId: sourceAccountId, snapshot } = e.payload;
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(snapshot);
+        } catch {
+          return; // 不正なペイロードは配布しない
+        }
+        if (typeof parsed !== "object" || parsed === null) return;
+        const parsedObj = parsed as Record<string, unknown>;
+        const incomingLocal =
+          typeof parsedObj.local === "object" && parsedObj.local !== null
+            ? (parsedObj.local as Record<string, unknown>)
+            : {};
+        const whitelistedLocal: Record<string, unknown> = {};
+        for (const key of OFFICIAL_SETTINGS_WHITELIST_KEYS) {
+          if (Object.prototype.hasOwnProperty.call(incomingLocal, key)) {
+            whitelistedLocal[key] = incomingLocal[key];
+          }
+        }
+        // nightMode は Cookie "night_mode" へ直接埋め込まれるため、型チェックではなく
+        // 既知の値のみを許可する allowlist で検証する（Cookie属性インジェクション対策）。
+        // "0"=デフォルト/"2"=ブラックを実観測、"1"=dim相当は未観測だが値域として許容。
+        const nightMode = (["0", "1", "2", null] as (string | null)[]).includes(
+          parsedObj.nightMode as string | null,
+        )
+          ? (parsedObj.nightMode as string | null)
+          : undefined;
+        const safeSnapshotJson = JSON.stringify({
+          local: whitelistedLocal,
+          nightMode,
+        });
+
+        const { accounts, columns } = useAppStore.getState();
+        accounts.forEach((account) => {
+          const targetColumns = columns.filter(
+            (c) => c.accountId === account.id,
+          );
+          const col =
+            targetColumns.find(
+              (c) => c.pageType !== "compose" && c.pageType !== "external",
+            ) ?? targetColumns[0];
+          if (!col) return;
+
+          if (account.id === sourceAccountId) {
+            // 配布元は同じ dataDirectory を共有しており書き込み済み。表示だけ最新化する。
+            void evalInColumn(col.id, WEBVIEW_SCRIPTS.TRIGGER_RELOAD);
+            return;
+          }
+          void evalInColumn(
+            col.id,
+            WEBVIEW_SCRIPTS.applyOfficialSettingsSnapshot(safeSnapshotJson),
+          );
+        });
+      },
+    );
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
+}
+
+/**
+ * 公式設定ポップアップで「各カラムに適用」を一度でも実行していた場合のみ、そのポップアップが
+ * 実際に閉じられたタイミングで全カラムを再読み込みする。アカウント切替（内部的な閉じ直し）は
+ * Rust側（OFFICIAL_SETTINGS_POPUP_CLOSED の発火条件）で除外済みのため、ここでは
+ * 「適用済みフラグ→閉じたら実行してリセット」のみを扱う。
+ */
+export function useOfficialSettingsPopupReload(
+  recreateAllWebviews: () => void | Promise<void>,
+) {
+  const appliedRef = useRef(false);
+  // recreateAllWebviews（useColumns の useCallback）は columns/settings の変化で
+  // 参照が変わりうる。effect の依存配列に入れると、参照が変わった瞬間に effect が
+  // 再実行され、ローカル状態(applied)が失われてクローズ時のリロードが効かなくなる。
+  // そのため最新の関数は ref 経由で読み、effect自体の依存配列は空にする。
+  const reloadRef = useRef(recreateAllWebviews);
+  reloadRef.current = recreateAllWebviews;
+
+  useEffect(() => {
+    const unlistenCaptured = listen(
+      IPC_EVENTS.WEBVIEW_OFFICIAL_SETTINGS_CAPTURED,
+      () => {
+        appliedRef.current = true;
+      },
+    );
+    const unlistenClosed = listen(
+      IPC_EVENTS.OFFICIAL_SETTINGS_POPUP_CLOSED,
+      () => {
+        if (!appliedRef.current) return;
+        appliedRef.current = false;
+        void reloadRef.current();
+      },
+    );
+    return () => {
+      unlistenCaptured.then((fn) => fn());
+      unlistenClosed.then((fn) => fn());
+    };
+  }, []);
 }

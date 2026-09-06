@@ -151,4 +151,62 @@ describe("LinkPopupDialog", () => {
 
     expect(onClose).toHaveBeenCalled();
   });
+
+  it("fixedUrlを指定した場合URL入力欄が描画されない", () => {
+    render(
+      <LinkPopupDialog
+        accounts={mockAccounts}
+        defaultAccountId="acc-1"
+        onSubmit={vi.fn()}
+        onClose={vi.fn()}
+        fixedUrl="https://x.com/settings"
+      />,
+    );
+    expect(
+      screen.queryByPlaceholderText("https://x.com/..."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("fixedUrlを指定した場合開くボタンをクリックするとfixedUrlの値とアカウントIDでonSubmitが呼ばれる", () => {
+    const onSubmit = vi.fn();
+    render(
+      <LinkPopupDialog
+        accounts={mockAccounts}
+        defaultAccountId="acc-1"
+        onSubmit={onSubmit}
+        onClose={vi.fn()}
+        fixedUrl="https://x.com/settings"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "開く" }));
+
+    expect(onSubmit).toHaveBeenCalledWith("https://x.com/settings", "acc-1");
+  });
+
+  it("titleを指定した場合指定したタイトルが表示される", () => {
+    render(
+      <LinkPopupDialog
+        accounts={mockAccounts}
+        defaultAccountId="acc-1"
+        onSubmit={vi.fn()}
+        onClose={vi.fn()}
+        title="公式設定を開く"
+      />,
+    );
+    expect(screen.getByText("公式設定を開く")).toBeInTheDocument();
+  });
+
+  it("titleを省略した場合デフォルトのタイトルが表示される", () => {
+    render(
+      <LinkPopupDialog
+        accounts={mockAccounts}
+        defaultAccountId="acc-1"
+        onSubmit={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText("URLをポップアップウィンドウで開く"),
+    ).toBeInTheDocument();
+  });
 });

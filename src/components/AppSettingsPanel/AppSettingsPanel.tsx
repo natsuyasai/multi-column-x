@@ -38,6 +38,7 @@ interface AppSettingsPanelProps {
   updateChecking: boolean;
   updateManualResult: "idle" | "none" | "error";
   onCheckUpdate: () => void;
+  onOpenOfficialSettings: () => void;
   onClose: () => void;
 }
 
@@ -53,6 +54,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   updateChecking,
   updateManualResult,
   onCheckUpdate,
+  onOpenOfficialSettings,
   onClose,
 }) => {
   const isMobile = useAppStore((s) => s.isMobile);
@@ -86,8 +88,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       return;
     }
     setNgWordsError(null);
-    onApply({
-      theme: draft.theme,
+    const patch: Partial<GlobalSettings> = {
       defaultAutoReloadEnabled: draft.defaultAutoReloadEnabled,
       defaultAutoReloadInterval: draft.defaultAutoReloadInterval,
       defaultShowCountdown: draft.defaultShowCountdown,
@@ -106,14 +107,20 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       blurImageAmount: draft.blurImageAmount,
       hideAdEnabled: draft.hideAdEnabled,
       apiRateLimitMonitorEnabled: draft.apiRateLimitMonitorEnabled,
-      columnScale: draft.columnScale,
       useXAppForCompose: draft.useXAppForCompose,
       mobileSwipeAreaEnabled: draft.mobileSwipeAreaEnabled,
       mobileSwipeAreaHeight: clampSwipeAreaHeight(draft.mobileSwipeAreaHeight),
       mobileSwipeAreaOpacity: draft.mobileSwipeAreaOpacity,
       mobileTwoColumnEnabled: draft.mobileTwoColumnEnabled,
       ngWords,
-    });
+    };
+    if (draft.columnScaleOverrideEnabled) {
+      patch.columnScale = draft.columnScale;
+    }
+    if (draft.themeOverrideEnabled) {
+      patch.theme = draft.theme;
+    }
+    onApply(patch);
     onClose();
   };
 
@@ -194,6 +201,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
               />
 
               <AppInfoSections
+                onOpenOfficialSettings={onOpenOfficialSettings}
                 onReloadAllWebviews={() => {
                   onReloadAllWebviews();
                   onClose();

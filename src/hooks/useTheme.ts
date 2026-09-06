@@ -3,7 +3,7 @@ import { resolveTheme, type ResolvedTheme } from "../lib/theme";
 
 const MEDIA_QUERY = "(prefers-color-scheme: dark)";
 
-function getMql(): MediaQueryList | null {
+export function getMql(): MediaQueryList | null {
   if (typeof matchMedia !== "function") return null;
   return matchMedia(MEDIA_QUERY);
 }

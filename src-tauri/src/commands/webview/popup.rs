@@ -2,7 +2,7 @@
 #[cfg(not(target_os = "android"))]
 use super::parse_url;
 use crate::commands::settings_store::{load_accounts_json, load_popup_esc_close_enabled};
-use crate::ipc_constants::labels;
+use crate::ipc_constants::{events, labels};
 use crate::state::AppState;
 #[cfg(target_os = "android")]
 use crate::state::ComposeSession;
@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 #[cfg(not(target_os = "android"))]
 use tauri::WebviewUrl;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 #[cfg(desktop)]
 use tauri::{LogicalPosition, LogicalSize};
 
@@ -88,6 +88,90 @@ pub(super) fn build_popup_init(
             esc_close_enabled,
         ),
     }
+}
+
+const OFFICIAL_SETTINGS_URL_PREFIX: &str = "https://x.com/settings";
+
+/// url が公式設定ページ（前方一致）かどうかを判定する純粋関数。
+fn is_official_settings_url(url: &str) -> bool {
+    url.starts_with(OFFICIAL_SETTINGS_URL_PREFIX)
+}
+
+/// アカウント切替（旧ラベルを閉じて新ラベルで開き直す）後、追跡ラベルがどうあるべきかを返す純粋関数。
+/// - 新URLが公式設定ページなら新ラベルを追跡する（旧ラベルを追跡していたかに関わらず）。
+/// - 新URLが公式設定ページでなく、かつ旧ラベルを追跡していたなら追跡を解除する。
+/// - それ以外は現状維持。
+fn next_tracked_label_after_switch(
+    tracked: Option<&str>,
+    old_label: &str,
+    new_label: &str,
+    new_url_is_official_settings: bool,
+) -> Option<String> {
+    if new_url_is_official_settings {
+        Some(new_label.to_string())
+    } else if tracked == Some(old_label) {
+        None
+    } else {
+        tracked.map(|s| s.to_string())
+    }
+}
+
+/// 破棄されたラベルが、現在追跡中の公式設定ポップアップのラベルと一致するかを判定する純粋関数。
+fn is_tracked_popup(tracked: Option<&str>, closed_label: &str) -> bool {
+    tracked == Some(closed_label)
+}
+
+/// ポップアップを開いた/開き直した URL が公式設定ページなら、追跡ラベルにセットする。
+pub fn track_official_settings_popup_if_matches(app: &AppHandle, label: &str, url: &str) {
+    if !is_official_settings_url(url) {
+        return;
+    }
+    let state = app.state::<AppState>();
+    *state
+        .official_settings_popup_label
+        .lock()
+        .expect("official_settings_popup_label mutex poisoned") = Some(label.to_string());
+}
+
+/// アカウント切替時に追跡ラベルを付け替える。旧ウィンドウ/WebViewを実際に破棄する**前**に呼ぶこと
+/// （破棄イベントが飛んできた時点で追跡ラベルが新ラベルに更新済みでないと、切替を「閉じた」と
+/// 誤検知してしまうため）。
+pub fn retarget_official_settings_popup_tracking(
+    app: &AppHandle,
+    old_label: &str,
+    new_label: &str,
+    url: &str,
+) {
+    let state = app.state::<AppState>();
+    let mut guard = state
+        .official_settings_popup_label
+        .lock()
+        .expect("official_settings_popup_label mutex poisoned");
+    let current = guard.as_deref();
+    *guard = next_tracked_label_after_switch(
+        current,
+        old_label,
+        new_label,
+        is_official_settings_url(url),
+    );
+}
+
+/// ポップアップ（ウィンドウ/ネイティブWebView）が実際に破棄されたときに呼ぶ。
+/// 追跡中の公式設定ポップアップと一致する場合のみ追跡を解除し OFFICIAL_SETTINGS_POPUP_CLOSED を emit する。
+/// desktop の WindowEvent::CloseRequested ハンドラ（lib.rs）と Android の
+/// AppBridge.onPopupClosed JNI ハンドラ（android_bridge.rs）の両方から共通で呼ばれる。
+pub fn handle_popup_closed(app: &AppHandle, label: &str) {
+    let state = app.state::<AppState>();
+    let mut guard = state
+        .official_settings_popup_label
+        .lock()
+        .expect("official_settings_popup_label mutex poisoned");
+    if !is_tracked_popup(guard.as_deref(), label) {
+        return;
+    }
+    *guard = None;
+    drop(guard);
+    let _ = app.emit(events::OFFICIAL_SETTINGS_POPUP_CLOSED, ());
 }
 
 #[cfg(desktop)]
@@ -225,6 +309,7 @@ pub async fn open_link_popup_window(
     .data_directory(data_dir);
 
     builder.build().map_err(|e| e.to_string())?;
+    track_official_settings_popup_if_matches(&app, &popup_label, &url);
 
     Ok(())
 }
@@ -254,13 +339,15 @@ pub async fn open_link_popup_window(
 
     #[cfg(target_os = "android")]
     {
-        let _ = (app, dataDirectory);
-        return crate::android_bridge::create_popup_webview(
+        let _ = dataDirectory;
+        crate::android_bridge::create_popup_webview(
             &popup_label,
             &url,
             &popup_init,
             &current_account_id,
-        );
+        )?;
+        track_official_settings_popup_if_matches(&app, &popup_label, &url);
+        Ok(())
     }
 
     #[cfg(not(target_os = "android"))]
@@ -285,6 +372,7 @@ pub async fn open_link_popup_window(
         .data_directory(data_dir)
         .build()
         .map_err(|e| e.to_string())?;
+        track_official_settings_popup_if_matches(&app, &popup_label, &url);
         Ok(())
     }
 }
@@ -306,8 +394,6 @@ pub fn switch_popup_session_android(
     if is_compose_popup_label(popup_label) {
         // compose は常に新規作成ページへ遷移する（渡された url は使わない）。
         const COMPOSE_URL: &str = "https://x.com/compose/post";
-        // 退避中（hide）の旧常駐でも破棄する（Kotlin 側 removePopupWebView の退避分対応）。
-        crate::android_bridge::remove_popup_webview(popup_label)?;
         let PopupInit {
             label: new_label,
             init_script: popup_init,
@@ -318,6 +404,10 @@ pub fn switch_popup_session_android(
             &popup_init,
             account_id,
         )?;
+        // 追跡ラベルの付け替えは、旧ラベルを実際に破棄する（remove_popup_webview）前に行う。
+        retarget_official_settings_popup_tracking(app, popup_label, &new_label, COMPOSE_URL);
+        // 退避中（hide）の旧常駐でも破棄する（Kotlin 側 removePopupWebView の退避分対応）。
+        crate::android_bridge::remove_popup_webview(popup_label)?;
         let state = app.state::<AppState>();
         *state.compose.lock().expect("compose mutex poisoned") = Some(ComposeSession {
             label: new_label,
@@ -326,12 +416,14 @@ pub fn switch_popup_session_android(
         return Ok(());
     }
 
-    crate::android_bridge::remove_popup_webview(popup_label)?;
     let PopupInit {
         label: new_label,
         init_script: popup_init,
     } = build_popup_init(app, labels::POPUP_PREFIX, account_id, "");
-    crate::android_bridge::create_popup_webview(&new_label, url, &popup_init, account_id)
+    crate::android_bridge::create_popup_webview(&new_label, url, &popup_init, account_id)?;
+    // 追跡ラベルの付け替えは、旧ラベルを実際に破棄する（remove_popup_webview）前に行う。
+    retarget_official_settings_popup_tracking(app, popup_label, &new_label, url);
+    crate::android_bridge::remove_popup_webview(popup_label)
 }
 
 #[tauri::command]
@@ -389,6 +481,15 @@ async fn switch_popup_session_window(
         .map(|_| ());
     }
 
+    let PopupInit {
+        label: new_label,
+        init_script: popup_init,
+    } = build_popup_init(&app, labels::POPUP_PREFIX, &accountId, &url);
+
+    // 追跡ラベルの付け替えは、旧ウィンドウを実際に破棄する（close）前に行う
+    // （破棄イベントが飛んできた時点で追跡ラベルが更新済みでないと、切替を「閉じた」と誤検知するため）。
+    retarget_official_settings_popup_tracking(&app, &popupLabel, &new_label, &url);
+
     let (pos, size) = if let Some(window) = app.get_webview_window(&popupLabel) {
         let pos = window.outer_position().ok();
         let size = window.outer_size().ok();
@@ -399,10 +500,6 @@ async fn switch_popup_session_window(
         (None, None)
     };
 
-    let PopupInit {
-        label: new_label,
-        init_script: popup_init,
-    } = build_popup_init(&app, labels::POPUP_PREFIX, &accountId, &url);
     let data_dir = PathBuf::from(&dataDirectory);
 
     let mut builder =
@@ -500,6 +597,61 @@ mod tests {
     #[test]
     fn is_compose_popup_labelはpopup_prefixで始まるlabelでfalseを返す() {
         assert!(!is_compose_popup_label("popup-abc123"));
+    }
+
+    #[test]
+    fn is_official_settings_urlは公式設定urlの前方一致でtrueを返す() {
+        assert!(is_official_settings_url("https://x.com/settings"));
+        assert!(is_official_settings_url("https://x.com/settings/profile"));
+    }
+
+    #[test]
+    fn is_official_settings_urlは公式設定url以外でfalseを返す() {
+        assert!(!is_official_settings_url("https://x.com/home"));
+        assert!(!is_official_settings_url("https://example.com/settings"));
+    }
+
+    #[test]
+    fn next_tracked_label_after_switchは新urlが公式設定なら新ラベルを追跡する() {
+        let result = next_tracked_label_after_switch(None, "popup-old", "popup-new", true);
+        assert_eq!(result, Some("popup-new".to_string()));
+
+        let result_with_other_tracked =
+            next_tracked_label_after_switch(Some("popup-other"), "popup-old", "popup-new", true);
+        assert_eq!(result_with_other_tracked, Some("popup-new".to_string()));
+    }
+
+    #[test]
+    fn next_tracked_label_after_switchは旧ラベル追跡中に新urlが非公式設定なら追跡を解除する() {
+        let result =
+            next_tracked_label_after_switch(Some("popup-old"), "popup-old", "popup-new", false);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn next_tracked_label_after_switchはそれ以外の場合現状維持する() {
+        let result_tracked_other =
+            next_tracked_label_after_switch(Some("popup-other"), "popup-old", "popup-new", false);
+        assert_eq!(result_tracked_other, Some("popup-other".to_string()));
+
+        let result_tracked_none =
+            next_tracked_label_after_switch(None, "popup-old", "popup-new", false);
+        assert_eq!(result_tracked_none, None);
+    }
+
+    #[test]
+    fn is_tracked_popupは追跡中ラベルと一致する場合trueを返す() {
+        assert!(is_tracked_popup(Some("popup-1"), "popup-1"));
+    }
+
+    #[test]
+    fn is_tracked_popupは追跡中ラベルと不一致の場合falseを返す() {
+        assert!(!is_tracked_popup(Some("popup-1"), "popup-2"));
+    }
+
+    #[test]
+    fn is_tracked_popupは追跡中ラベルがnoneの場合falseを返す() {
+        assert!(!is_tracked_popup(None, "popup-1"));
     }
 
     #[test]

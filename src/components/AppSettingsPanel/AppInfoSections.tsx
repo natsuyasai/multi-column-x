@@ -2,6 +2,7 @@ import React from "react";
 import styles from "./AppSettingsPanel.module.scss";
 
 interface AppInfoSectionsProps {
+  onOpenOfficialSettings: () => void;
   onReloadAllWebviews: () => void;
   appVersion: string;
   updateChecking: boolean;
@@ -9,8 +10,9 @@ interface AppInfoSectionsProps {
   onCheckUpdate: () => void;
 }
 
-/** 「WebView」「アプリ情報」セクション（ドラフト非依存） */
+/** 「公式設定」「WebView」「アプリ情報」セクション（ドラフト非依存） */
 export const AppInfoSections: React.FC<AppInfoSectionsProps> = ({
+  onOpenOfficialSettings,
   onReloadAllWebviews,
   appVersion,
   updateChecking,
@@ -18,6 +20,20 @@ export const AppInfoSections: React.FC<AppInfoSectionsProps> = ({
   onCheckUpdate,
 }) => (
   <>
+    <section className={styles.section}>
+      <h3 className={styles.sectionTitle}>公式設定</h3>
+      <p className={styles.hint}>
+        X公式の設定画面をポップアップウィンドウで開きます。開いた画面から他アカウントへ設定を適用できます。
+      </p>
+      <button
+        type="button"
+        className={styles.applyAllBtn}
+        onClick={onOpenOfficialSettings}
+      >
+        公式設定を開く
+      </button>
+    </section>
+
     <section className={styles.section}>
       <h3 className={styles.sectionTitle}>WebView</h3>
       <p className={styles.hint}>

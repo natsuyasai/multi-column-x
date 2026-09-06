@@ -292,4 +292,4 @@ webkit2gtk は wry と同一バージョン（`=2.0.2`, `v2_40`）を `[target.'
 
 同種の不足を deb 版でも防ぐため、`bundle.linux.deb.depends` に `gstreamer1.0-plugins-{base,good,bad}` と `gstreamer1.0-libav` を明記している。
 
-なお、H.264/AAC デコーダを提供する `gst-plugins-bad`/`gst-libav` は特許問題を避けるため AppImage への同梱から意図的に除外している（`gst-plugins-base`/`gst-plugins-good` は GStreamer プロジェクトが「特許的にクリーンな要素のみ」と分類しているため同梱を継続）。AppImage 版はコーデックの導入をシステム側インストールに委ねる方針のため、欠如を検出してユーザーに案内する仕組み（`check_media_codec_support` コマンド、起動時チェック、案内ダイアログ、`scripts/install.sh` の案内表示）を用意している。詳細は `docs/development/linux-webview-notes.md`「AppImage の H.264/AAC コーデック欠如検出」を参照。
+なお、AAC デコーダ（AAC-LC プロファイル限定の `libfdk-aac` + GStreamer `fdkaac` プラグイン）は、AAC-LC のコア特許が失効済みと判断し、CI で `gst-plugins-bad` から `fdkaac` エレメントのみを自前ビルドして AppImage に実際に同梱している。一方 H.264 デコーダ（Cisco OpenH264）は、Cisco の特許ロイヤリティ負担が「Cisco 自身の配布チャネルから直接ダウンロードする」場合にのみ適用されるため AppImage に同梱できず、アプリ内の案内ダイアログからユーザー操作で Cisco 公式サーバーへ直接アクセスしてダウンロードする方式を採っている（Firefox/Chromium と同じ方式）。欠如検出・案内の仕組み（`check_media_codec_support` コマンド、起動時チェック、案内ダイアログのダウンロードボタン、`scripts/install.sh` の案内表示）はフォールバックとして引き続き用意している。詳細は `docs/development/linux-webview-notes.md`「AppImage の H.264/AAC コーデック対応」を参照。

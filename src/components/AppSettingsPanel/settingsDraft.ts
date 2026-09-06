@@ -40,6 +40,10 @@ export interface SettingsDraft {
   mobileTwoColumnEnabled: boolean;
   /** textarea への入力中文字列をそのまま保持するため string で持つ */
   globalNgWordsText: string;
+  /** 「表示サイズ」欄の変更を有効化するチェックボックスの状態（GlobalSettingsには保存しないフォーム専用フラグ） */
+  columnScaleOverrideEnabled: boolean;
+  /** 「テーマ」欄の変更を有効化するチェックボックスの状態（同上） */
+  themeOverrideEnabled: boolean;
 }
 
 /** ドラフトの単一フィールドを更新するヘルパーの型（子セクションへ props で渡す） */
@@ -79,6 +83,8 @@ export function createSettingsDraft(settings: GlobalSettings): SettingsDraft {
     mobileSwipeAreaOpacity: settings.mobileSwipeAreaOpacity ?? 50,
     mobileTwoColumnEnabled: settings.mobileTwoColumnEnabled,
     globalNgWordsText: (settings.ngWords ?? []).join("\n"),
+    columnScaleOverrideEnabled: false,
+    themeOverrideEnabled: false,
   };
 }
 
