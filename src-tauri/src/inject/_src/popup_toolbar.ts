@@ -412,8 +412,8 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
   toolbar.appendChild(downloadButton);
   toolbar.appendChild(downloadStatus);
   toolbar.appendChild(applySettingsButton);
-  toolbar.appendChild(applySettingsStatus);
   toolbar.appendChild(exitButton);
+  toolbar.appendChild(applySettingsStatus);
 
   function inject() {
     const doInject = () => {

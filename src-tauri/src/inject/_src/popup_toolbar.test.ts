@@ -444,6 +444,41 @@ describe("inject/popup_toolbar の終了ボタン", () => {
     });
     expect(closePopupMock).not.toHaveBeenCalled();
   });
+
+  it("公式設定ページの場合、終了ボタンが各カラムに適用のステータス表示よりDOM上で前に配置される", async () => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: new URL("https://x.com/settings/display"),
+    });
+
+    await importToolbar();
+
+    const exitButton = getExitButton();
+    const applySettingsStatus = document.querySelector<HTMLSpanElement>(
+      "#tv-popup-apply-settings-status",
+    );
+    if (!applySettingsStatus) {
+      throw new Error("apply settings status not found");
+    }
+
+    // exitButton を基点に applySettingsStatus が「後方（DOCUMENT_POSITION_FOLLOWING）」に
+    // あることを確認する。可変長メッセージが入る applySettingsStatus より終了ボタンが
+    // 手前に配置されていれば、メッセージ表示による横幅の伸長で終了ボタンが
+    // 画面外へ押し出されることはない。
+    const position = exitButton.compareDocumentPosition(applySettingsStatus);
+    expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+
+    const toolbar = document.getElementById("tv-popup-toolbar");
+    if (!toolbar) throw new Error("toolbar not found");
+    const children = Array.from(toolbar.children);
+    const exitButtonIndex = children.indexOf(exitButton);
+    const applySettingsStatusIndex = children.indexOf(applySettingsStatus);
+    expect(exitButtonIndex).toBeGreaterThanOrEqual(0);
+    expect(applySettingsStatusIndex).toBeGreaterThanOrEqual(0);
+    expect(exitButtonIndex).toBeLessThan(applySettingsStatusIndex);
+  });
 });
 
 describe("inject/popup_toolbar の動画ダウンロードボタンの表示切替", () => {
