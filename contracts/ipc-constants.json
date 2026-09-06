@@ -43,7 +43,8 @@
     "MOBILE_SWIPE_NAVIGATE": "mobile-swipe-navigate",
     "MOBILE_SWIPE_PROGRESS": "mobile-swipe-progress",
     "MOBILE_SWIPE_DOUBLE_TAP": "mobile-swipe-double-tap",
-    "WEBVIEW_OFFICIAL_SETTINGS_CAPTURED": "webview-official-settings-captured"
+    "WEBVIEW_OFFICIAL_SETTINGS_CAPTURED": "webview-official-settings-captured",
+    "OFFICIAL_SETTINGS_POPUP_CLOSED": "official-settings-popup-closed"
   },
   "labels": {
     "MAIN": "main",

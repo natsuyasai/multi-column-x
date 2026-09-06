@@ -90,6 +90,8 @@ export const IPC_EVENTS = {
   MOBILE_SWIPE_DOUBLE_TAP: "mobile-swipe-double-tap",
   /** 公式設定ページのスナップショット取得通知（inject script invoke → TS listen）{ accountId, snapshot } */
   WEBVIEW_OFFICIAL_SETTINGS_CAPTURED: "webview-official-settings-captured",
+  /** 公式設定ポップアップが実際に閉じられた通知（Rust emit → TS listen）。アカウント切替は含まない */
+  OFFICIAL_SETTINGS_POPUP_CLOSED: "official-settings-popup-closed",
 } as const;
 
 /** WebView / ウィンドウラベルのプレフィックスと生成ヘルパー */

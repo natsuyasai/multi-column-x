@@ -38,6 +38,10 @@ pub mod events {
     pub const MOBILE_SWIPE_DOUBLE_TAP: &str = "mobile-swipe-double-tap";
     /// 公式設定ページのスナップショット取得通知（inject script invoke → TS listen）{ accountId, snapshot }
     pub const WEBVIEW_OFFICIAL_SETTINGS_CAPTURED: &str = "webview-official-settings-captured";
+    /// 公式設定ポップアップが実際に閉じられた通知（desktop: WindowEvent::CloseRequested →
+    /// Rust emit → TS listen／Android: MainActivity破棄経路 → JNI → Rust emit → TS listen）。
+    /// アカウント切替による内部的な閉じ直しは含まない（追跡ラベルの付け替えで区別する）。
+    pub const OFFICIAL_SETTINGS_POPUP_CLOSED: &str = "official-settings-popup-closed";
 }
 
 /// WebView / ウィンドウラベルのプレフィックス
@@ -105,6 +109,10 @@ mod tests {
             (
                 "WEBVIEW_OFFICIAL_SETTINGS_CAPTURED",
                 events::WEBVIEW_OFFICIAL_SETTINGS_CAPTURED,
+            ),
+            (
+                "OFFICIAL_SETTINGS_POPUP_CLOSED",
+                events::OFFICIAL_SETTINGS_POPUP_CLOSED,
             ),
         ];
         assert_eq!(
