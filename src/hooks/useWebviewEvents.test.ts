@@ -11,6 +11,7 @@ import {
   useColumnFocusClearsUnread,
   useNewPostsNotification,
   useOfficialSettingsBroadcast,
+  useOfficialSettingsPopupReload,
   useWebviewScrollRelay,
 } from "./useWebviewEvents";
 
@@ -936,5 +937,72 @@ describe("useOfficialSettingsBroadcast", () => {
       const parsed = JSON.parse(jsonMatch[1]);
       expect(parsed.nightMode).toBeUndefined();
     }
+  });
+});
+
+describe("useOfficialSettingsPopupReload", () => {
+  beforeEach(() => {
+    capturedCallbacks.clear();
+    mockUnlisten.mockReset();
+  });
+
+  function emitCaptured() {
+    capturedCallbacks.get(IPC_EVENTS.WEBVIEW_OFFICIAL_SETTINGS_CAPTURED)?.({
+      payload: { accountId: "acc-1", snapshot: "{}" },
+    });
+  }
+
+  function emitClosed() {
+    capturedCallbacks.get(IPC_EVENTS.OFFICIAL_SETTINGS_POPUP_CLOSED)?.({
+      payload: undefined,
+    });
+  }
+
+  it("適用イベントなしで閉じたイベントのみ発火した場合、recreateAllWebviewsが呼ばれない", async () => {
+    const recreateAllWebviews = vi.fn();
+    renderHook(() => useOfficialSettingsPopupReload(recreateAllWebviews));
+    await act(async () => {
+      emitClosed();
+    });
+    expect(recreateAllWebviews).not.toHaveBeenCalled();
+  });
+
+  it("適用イベント→閉じたイベントの順で発火した場合、recreateAllWebviewsが1回呼ばれる", async () => {
+    const recreateAllWebviews = vi.fn();
+    renderHook(() => useOfficialSettingsPopupReload(recreateAllWebviews));
+    await act(async () => {
+      emitCaptured();
+      emitClosed();
+    });
+    expect(recreateAllWebviews).toHaveBeenCalledTimes(1);
+  });
+
+  it("適用→閉じた→(再適用なしで)閉じた、の順で発火した場合、2回目は呼ばれない", async () => {
+    const recreateAllWebviews = vi.fn();
+    renderHook(() => useOfficialSettingsPopupReload(recreateAllWebviews));
+    await act(async () => {
+      emitCaptured();
+      emitClosed();
+      emitClosed();
+    });
+    expect(recreateAllWebviews).toHaveBeenCalledTimes(1);
+  });
+
+  it("適用イベント発火後にrecreateAllWebviewsの参照を差し替えてから閉じたイベントを発火すると、新しい方の関数が呼ばれる", async () => {
+    const oldRecreateAllWebviews = vi.fn();
+    const newRecreateAllWebviews = vi.fn();
+    const { rerender } = renderHook(
+      ({ fn }: { fn: () => void }) => useOfficialSettingsPopupReload(fn),
+      { initialProps: { fn: oldRecreateAllWebviews } },
+    );
+    await act(async () => {
+      emitCaptured();
+    });
+    rerender({ fn: newRecreateAllWebviews });
+    await act(async () => {
+      emitClosed();
+    });
+    expect(oldRecreateAllWebviews).not.toHaveBeenCalled();
+    expect(newRecreateAllWebviews).toHaveBeenCalledTimes(1);
   });
 });

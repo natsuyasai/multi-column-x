@@ -6,7 +6,7 @@ import {
   requestPermission,
   sendNotification,
 } from "@tauri-apps/plugin-notification";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   IPC_EVENTS,
   OFFICIAL_SETTINGS_WHITELIST_KEYS,
@@ -304,6 +304,45 @@ export function useOfficialSettingsBroadcast() {
     );
     return () => {
       unlisten.then((fn) => fn());
+    };
+  }, []);
+}
+
+/**
+ * 公式設定ポップアップで「各カラムに適用」を一度でも実行していた場合のみ、そのポップアップが
+ * 実際に閉じられたタイミングで全カラムを再読み込みする。アカウント切替（内部的な閉じ直し）は
+ * Rust側（OFFICIAL_SETTINGS_POPUP_CLOSED の発火条件）で除外済みのため、ここでは
+ * 「適用済みフラグ→閉じたら実行してリセット」のみを扱う。
+ */
+export function useOfficialSettingsPopupReload(
+  recreateAllWebviews: () => void | Promise<void>,
+) {
+  const appliedRef = useRef(false);
+  // recreateAllWebviews（useColumns の useCallback）は columns/settings の変化で
+  // 参照が変わりうる。effect の依存配列に入れると、参照が変わった瞬間に effect が
+  // 再実行され、ローカル状態(applied)が失われてクローズ時のリロードが効かなくなる。
+  // そのため最新の関数は ref 経由で読み、effect自体の依存配列は空にする。
+  const reloadRef = useRef(recreateAllWebviews);
+  reloadRef.current = recreateAllWebviews;
+
+  useEffect(() => {
+    const unlistenCaptured = listen(
+      IPC_EVENTS.WEBVIEW_OFFICIAL_SETTINGS_CAPTURED,
+      () => {
+        appliedRef.current = true;
+      },
+    );
+    const unlistenClosed = listen(
+      IPC_EVENTS.OFFICIAL_SETTINGS_POPUP_CLOSED,
+      () => {
+        if (!appliedRef.current) return;
+        appliedRef.current = false;
+        void reloadRef.current();
+      },
+    );
+    return () => {
+      unlistenCaptured.then((fn) => fn());
+      unlistenClosed.then((fn) => fn());
     };
   }, []);
 }

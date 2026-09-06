@@ -159,7 +159,7 @@ pub fn retarget_official_settings_popup_tracking(
 /// ポップアップ（ウィンドウ/ネイティブWebView）が実際に破棄されたときに呼ぶ。
 /// 追跡中の公式設定ポップアップと一致する場合のみ追跡を解除し OFFICIAL_SETTINGS_POPUP_CLOSED を emit する。
 /// desktop の WindowEvent::CloseRequested ハンドラ（lib.rs）と Android の
-/// AppBridge.onPopupClosed JNI ハンドラの両方から共通で呼ばれる想定（Android配線は今回対象外）。
+/// AppBridge.onPopupClosed JNI ハンドラ（android_bridge.rs）の両方から共通で呼ばれる。
 pub fn handle_popup_closed(app: &AppHandle, label: &str) {
     let state = app.state::<AppState>();
     let mut guard = state

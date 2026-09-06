@@ -37,6 +37,7 @@ import {
   useColumnFocusClearsUnread,
   useNewPostsNotification,
   useOfficialSettingsBroadcast,
+  useOfficialSettingsPopupReload,
   useWebviewScrollRelay,
 } from "./hooks/useWebviewEvents";
 import { useWhatsNew } from "./hooks/useWhatsNew";
@@ -206,6 +207,7 @@ const App: React.FC = () => {
   useColumnFocusClearsUnread(clearUnreadCount);
   useNewPostsNotification(setUnreadCount);
   useOfficialSettingsBroadcast();
+  useOfficialSettingsPopupReload(recreateAllWebviews);
   useWebviewScrollRelay(scrollbarRef);
 
   const handleOpenLinkPopup = useCallback(() => {
