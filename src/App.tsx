@@ -30,12 +30,14 @@ import { useAppUpdater } from "./hooks/useAppUpdater";
 import { useColumns } from "./hooks/useColumns";
 import { useDialogState } from "./hooks/useDialogState";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
-import { useTheme } from "./hooks/useTheme";
+import { getMql, useTheme } from "./hooks/useTheme";
 import {
   useApiRateLimitReports,
   useColumnCrashRecovery,
   useColumnFocusClearsUnread,
   useNewPostsNotification,
+  useOfficialSettingsBroadcast,
+  useOfficialSettingsPopupReload,
   useWebviewScrollRelay,
 } from "./hooks/useWebviewEvents";
 import { useWhatsNew } from "./hooks/useWhatsNew";
@@ -46,6 +48,7 @@ import {
   resolveSwipeAreaHeight,
 } from "./lib/gridLayout";
 import { logError } from "./lib/log";
+import { resolveTheme } from "./lib/theme";
 import {
   applyColumnSettingsScripts,
   evalInColumn,
@@ -117,6 +120,8 @@ const App: React.FC = () => {
     setSettingsColumnId,
     showLinkPopupDialog,
     setShowLinkPopupDialog,
+    showOfficialSettingsDialog,
+    setShowOfficialSettingsDialog,
     tabActionColumnId,
     setTabActionColumnId,
     showShortcutHelp,
@@ -198,11 +203,13 @@ const App: React.FC = () => {
   const resolvedTheme = useTheme(globalSettings.theme);
 
   // WebView 内の横ホイール → スクロールバー追従、新着カウント → バッジ・デスクトップ通知
-  useWebviewScrollRelay(scrollbarRef);
-  useNewPostsNotification(setUnreadCount);
   useApiRateLimitReports(setApiRateLimit);
   useColumnCrashRecovery(recreateColumnWebview);
   useColumnFocusClearsUnread(clearUnreadCount);
+  useNewPostsNotification(setUnreadCount);
+  useOfficialSettingsBroadcast();
+  useOfficialSettingsPopupReload(recreateAllWebviews);
+  useWebviewScrollRelay(scrollbarRef);
 
   const handleOpenLinkPopup = useCallback(() => {
     setShowLinkPopupDialog(true);
@@ -223,6 +230,26 @@ const App: React.FC = () => {
       }).catch(logError("handleSubmitLinkPopup:openLinkPopupWindow"));
     },
     [accounts, setShowLinkPopupDialog],
+  );
+
+  const handleOpenOfficialSettings = useCallback(() => {
+    setShowAppSettings(false);
+    setShowOfficialSettingsDialog(true);
+  }, [setShowAppSettings, setShowOfficialSettingsDialog]);
+
+  const handleSubmitOfficialSettings = useCallback(
+    async (url: string, accountId: string) => {
+      setShowOfficialSettingsDialog(false);
+      const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
+      if (!account) return;
+      await invoke(IPC_COMMANDS.OPEN_LINK_POPUP_WINDOW, {
+        webviewLabelCaller: null,
+        accountId: account.id,
+        dataDirectory: account.dataDirectory,
+        url,
+      }).catch(logError("handleSubmitOfficialSettings:openLinkPopupWindow"));
+    },
+    [accounts, setShowOfficialSettingsDialog],
   );
 
   // ダイアログ表示中は列WebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
@@ -429,6 +456,15 @@ const App: React.FC = () => {
           );
         });
       }
+      if (patch.theme !== undefined) {
+        const prefersDark = getMql()?.matches ?? false;
+        const nightMode =
+          resolveTheme(patch.theme, prefersDark) === "dark" ? "2" : "0";
+        const { columns: currentColumns } = useAppStore.getState();
+        currentColumns.forEach((col) => {
+          evalInColumn(col.id, WEBVIEW_SCRIPTS.applyNightModeCookie(nightMode));
+        });
+      }
     },
     [updateGlobalSettings],
   );
@@ -583,6 +619,17 @@ const App: React.FC = () => {
         />
       )}
 
+      {showOfficialSettingsDialog && (
+        <LinkPopupDialog
+          accounts={accounts}
+          defaultAccountId={linkPopupDefaultAccountId}
+          fixedUrl="https://x.com/settings"
+          title="公式設定を開く"
+          onSubmit={handleSubmitOfficialSettings}
+          onClose={() => setShowOfficialSettingsDialog(false)}
+        />
+      )}
+
       {showAddColumn && accounts.length > 0 && (
         <AddColumnDialog
           accounts={accounts}
@@ -676,6 +723,7 @@ const App: React.FC = () => {
           updateChecking={updater.checking}
           updateManualResult={updater.manualResult}
           onCheckUpdate={updater.checkManually}
+          onOpenOfficialSettings={handleOpenOfficialSettings}
           onClose={() => setShowAppSettings(false)}
         />
       )}

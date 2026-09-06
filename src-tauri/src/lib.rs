@@ -155,6 +155,17 @@ pub fn run() {
 
                 use crate::ipc_constants::labels;
 
+                // アプリ終了処理に入る前に、公式設定ポップアップの追跡を止める。
+                // 終了時にポップアップが道連れで閉じられても OFFICIAL_SETTINGS_POPUP_CLOSED を
+                // 誤って emit させないため。
+                {
+                    let state = window.app_handle().state::<AppState>();
+                    *state
+                        .official_settings_popup_label
+                        .lock()
+                        .expect("official_settings_popup_label mutex poisoned") = None;
+                }
+
                 // 常駐コンポーズは CloseRequested を prevent_close + hide で握るため、
                 // close() では閉じられず非表示のまま残ってアプリ終了を妨げる。destroy() で明示破棄する。
                 // （全デスクトップ OS 共通）
@@ -178,6 +189,13 @@ pub fn run() {
                         }
                     }
                 }
+            } else if window
+                .label()
+                .starts_with(crate::ipc_constants::labels::POPUP_PREFIX)
+            {
+                // 公式設定ポップアップが実際に閉じられた（アカウント切替による内部的な閉じ直しではない）
+                // ことを検出し、追跡中のラベルと一致すれば OFFICIAL_SETTINGS_POPUP_CLOSED を emit する。
+                crate::commands::webview::handle_popup_closed(window.app_handle(), window.label());
             }
         }
     });
@@ -197,6 +215,7 @@ pub fn run() {
             commands::webview::eval_in_webview,
             commands::webview::report_webview_scroll,
             commands::webview::report_new_posts_count,
+            commands::webview::report_official_settings,
             commands::webview::report_api_rate_limit,
             commands::webview::report_keyboard_shortcut,
             commands::webview::get_mobile_insets,

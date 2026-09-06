@@ -178,6 +178,11 @@
   color: var(--mcx-text-on-accent);
 }
 
+.scaleOverrideCheckbox {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .hint {
   font-size: 11px;
   color: var(--mcx-text-muted);

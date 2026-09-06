@@ -56,6 +56,9 @@ pub fn is_persistent_compose_label(compose: Option<&ComposeSession>, label: &str
 pub struct AppState {
     pub registry: Mutex<WebviewRegistry>,
     pub compose: Mutex<Option<ComposeSession>>,
+    /// 現在追跡中の公式設定ポップアップのラベル（アカウント切替時は新ラベルへ付け替える。
+    /// 実際に破棄された時点でこのラベルと一致すれば OFFICIAL_SETTINGS_POPUP_CLOSED を emit する）。
+    pub official_settings_popup_label: Mutex<Option<String>>,
 }
 
 impl AppState {
@@ -65,6 +68,7 @@ impl AppState {
                 entries: HashMap::new(),
             }),
             compose: Mutex::new(None),
+            official_settings_popup_label: Mutex::new(None),
         }
     }
 }
@@ -205,6 +209,13 @@ mod tests {
         let state = AppState::new();
         let compose = state.compose.lock().unwrap();
         assert!(compose.is_none());
+    }
+
+    #[test]
+    fn app_state_newは公式設定ポップアップ追跡ラベルがnoneである() {
+        let state = AppState::new();
+        let label = state.official_settings_popup_label.lock().unwrap();
+        assert!(label.is_none());
     }
 
     #[test]

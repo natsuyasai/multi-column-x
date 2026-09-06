@@ -10,6 +10,8 @@ import {
   useColumnCrashRecovery,
   useColumnFocusClearsUnread,
   useNewPostsNotification,
+  useOfficialSettingsBroadcast,
+  useOfficialSettingsPopupReload,
   useWebviewScrollRelay,
 } from "./useWebviewEvents";
 
@@ -32,6 +34,11 @@ vi.mock("@tauri-apps/plugin-notification", () => ({
   isPermissionGranted: (...args: []) => isPermissionGrantedMock(...args),
   requestPermission: (...args: []) => requestPermissionMock(...args),
   sendNotification: (...args: [unknown]) => sendNotificationMock(...args),
+}));
+
+const evalInColumnMock = vi.fn();
+vi.mock("../services/columnWebview", () => ({
+  evalInColumn: (...args: [string, string]) => evalInColumnMock(...args),
 }));
 
 function makeColumn(overrides: Partial<Column> & Pick<Column, "id">): Column {
@@ -612,5 +619,390 @@ describe("useApiRateLimitReports", () => {
       );
     });
     expect(setApiRateLimit).not.toHaveBeenCalled();
+  });
+});
+
+describe("useOfficialSettingsBroadcast", () => {
+  beforeEach(() => {
+    capturedCallbacks.clear();
+    mockUnlisten.mockReset();
+    evalInColumnMock.mockReset();
+  });
+
+  it("正常系: 2アカウント(acc-1, acc-2)がそれぞれ1カラムずつ持つ状態で、acc-1からのスナップショット受信時、acc-2の代表カラムに applyOfficialSettingsSnapshot の結果がevalInColumnで実行されること", async () => {
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-1",
+          label: "Account 1",
+          xUserId: "user1",
+          dataDirectory: "/path/1",
+          color: "#1DA1F2",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+        {
+          id: "acc-2",
+          label: "Account 2",
+          xUserId: "user2",
+          dataDirectory: "/path/2",
+          color: "#1DA1F2",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      columns: [
+        makeColumn({ id: "col-1", accountId: "acc-1", pageType: "home" }),
+        makeColumn({ id: "col-2", accountId: "acc-2", pageType: "home" }),
+      ],
+    });
+    renderHook(() => useOfficialSettingsBroadcast());
+    const snapshot = JSON.stringify({
+      local: { themeColor: "blue" },
+      nightMode: "0",
+    });
+    await act(async () => {
+      capturedCallbacks.get(IPC_EVENTS.WEBVIEW_OFFICIAL_SETTINGS_CAPTURED)?.({
+        payload: { accountId: "acc-1", snapshot },
+      });
+    });
+    expect(evalInColumnMock).toHaveBeenCalledTimes(2);
+    // acc-1 (source): TRIGGER_RELOAD
+    expect(evalInColumnMock).toHaveBeenCalledWith(
+      "col-1",
+      expect.stringContaining("triggerReload"),
+    );
+    // acc-2: applyOfficialSettingsSnapshot (contains "incoming" variable which is in that script)
+    expect(evalInColumnMock).toHaveBeenCalledWith(
+      "col-2",
+      expect.stringContaining("incoming"),
+    );
+  });
+
+  it("配布元(sourceAccountId)自身のカラムには applyOfficialSettingsSnapshot ではなく TRIGGER_RELOAD が実行されること", async () => {
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-1",
+          label: "Account 1",
+          xUserId: "user1",
+          dataDirectory: "/path/1",
+          color: "#1DA1F2",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      columns: [
+        makeColumn({ id: "col-1", accountId: "acc-1", pageType: "home" }),
+      ],
+    });
+    renderHook(() => useOfficialSettingsBroadcast());
+    const snapshot = JSON.stringify({
+      local: { themeColor: "blue" },
+      nightMode: "0",
+    });
+    await act(async () => {
+      capturedCallbacks.get(IPC_EVENTS.WEBVIEW_OFFICIAL_SETTINGS_CAPTURED)?.({
+        payload: { accountId: "acc-1", snapshot },
+      });
+    });
+    expect(evalInColumnMock).toHaveBeenCalledTimes(1);
+    expect(evalInColumnMock).toHaveBeenCalledWith(
+      "col-1",
+      expect.stringContaining("triggerReload"),
+    );
+  });
+
+  it("compose/external カラムを除外し、通常のカラムを優先して選ぶこと(あるアカウントが home カラムと compose カラムの両方を持つ場合、home カラムへ配布されること)", async () => {
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-1",
+          label: "Account 1",
+          xUserId: "user1",
+          dataDirectory: "/path/1",
+          color: "#1DA1F2",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+        {
+          id: "acc-2",
+          label: "Account 2",
+          xUserId: "user2",
+          dataDirectory: "/path/2",
+          color: "#1DA1F2",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      columns: [
+        makeColumn({ id: "col-1", accountId: "acc-1", pageType: "home" }),
+        makeColumn({
+          id: "col-2",
+          accountId: "acc-2",
+          pageType: "compose",
+          order: 0,
+        }),
+        makeColumn({
+          id: "col-3",
+          accountId: "acc-2",
+          pageType: "home",
+          order: 1,
+        }),
+      ],
+    });
+    renderHook(() => useOfficialSettingsBroadcast());
+    const snapshot = JSON.stringify({
+      local: { themeColor: "red" },
+      nightMode: "1",
+    });
+    await act(async () => {
+      capturedCallbacks.get(IPC_EVENTS.WEBVIEW_OFFICIAL_SETTINGS_CAPTURED)?.({
+        payload: { accountId: "acc-1", snapshot },
+      });
+    });
+    expect(evalInColumnMock).toHaveBeenCalledTimes(2);
+    // acc-1 (source): TRIGGER_RELOAD
+    expect(evalInColumnMock).toHaveBeenCalledWith(
+      "col-1",
+      expect.stringContaining("triggerReload"),
+    );
+    // acc-2: should prefer home column (col-3) over compose column (col-2)
+    expect(evalInColumnMock).toHaveBeenCalledWith("col-3", expect.any(String));
+  });
+
+  it("compose カラムしか持たないアカウントには、フォールバックでそのカラムへ配布されること", async () => {
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-1",
+          label: "Account 1",
+          xUserId: "user1",
+          dataDirectory: "/path/1",
+          color: "#1DA1F2",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+        {
+          id: "acc-2",
+          label: "Account 2",
+          xUserId: "user2",
+          dataDirectory: "/path/2",
+          color: "#1DA1F2",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      columns: [
+        makeColumn({ id: "col-1", accountId: "acc-1", pageType: "home" }),
+        makeColumn({ id: "col-2", accountId: "acc-2", pageType: "compose" }),
+      ],
+    });
+    renderHook(() => useOfficialSettingsBroadcast());
+    const snapshot = JSON.stringify({
+      local: { themeColor: "green" },
+      nightMode: "2",
+    });
+    await act(async () => {
+      capturedCallbacks.get(IPC_EVENTS.WEBVIEW_OFFICIAL_SETTINGS_CAPTURED)?.({
+        payload: { accountId: "acc-1", snapshot },
+      });
+    });
+    expect(evalInColumnMock).toHaveBeenCalledTimes(2);
+    // acc-1 (source): TRIGGER_RELOAD
+    expect(evalInColumnMock).toHaveBeenCalledWith(
+      "col-1",
+      expect.stringContaining("triggerReload"),
+    );
+    // acc-2: only has compose column, so fallback to that
+    expect(evalInColumnMock).toHaveBeenCalledWith("col-2", expect.any(String));
+  });
+
+  it("不正なJSON文字列を受信した場合、evalInColumn が一切呼ばれないこと(JSON.parse 失敗で処理中断)", async () => {
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-1",
+          label: "Account 1",
+          xUserId: "user1",
+          dataDirectory: "/path/1",
+          color: "#1DA1F2",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+        {
+          id: "acc-2",
+          label: "Account 2",
+          xUserId: "user2",
+          dataDirectory: "/path/2",
+          color: "#1DA1F2",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      columns: [
+        makeColumn({ id: "col-1", accountId: "acc-1", pageType: "home" }),
+        makeColumn({ id: "col-2", accountId: "acc-2", pageType: "home" }),
+      ],
+    });
+    renderHook(() => useOfficialSettingsBroadcast());
+    await act(async () => {
+      capturedCallbacks.get(IPC_EVENTS.WEBVIEW_OFFICIAL_SETTINGS_CAPTURED)?.({
+        payload: { accountId: "acc-1", snapshot: "invalid json {" },
+      });
+    });
+    expect(evalInColumnMock).not.toHaveBeenCalled();
+  });
+
+  it("OFFICIAL_SETTINGS_WHITELIST_KEYS に含まれないキー(例: pushNotificationsPermission)が受信ペイロードに含まれていても、evalInColumn に渡す最終的なJSON文字列にそのキーが含まれないこと", async () => {
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-1",
+          label: "Account 1",
+          xUserId: "user1",
+          dataDirectory: "/path/1",
+          color: "#1DA1F2",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+        {
+          id: "acc-2",
+          label: "Account 2",
+          xUserId: "user2",
+          dataDirectory: "/path/2",
+          color: "#1DA1F2",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      columns: [
+        makeColumn({ id: "col-1", accountId: "acc-1", pageType: "home" }),
+        makeColumn({ id: "col-2", accountId: "acc-2", pageType: "home" }),
+      ],
+    });
+    renderHook(() => useOfficialSettingsBroadcast());
+    const snapshot = JSON.stringify({
+      local: {
+        themeColor: "blue",
+        pushNotificationsPermission: "granted",
+        someOtherKey: "should_be_filtered",
+      },
+      nightMode: "0",
+    });
+    await act(async () => {
+      capturedCallbacks.get(IPC_EVENTS.WEBVIEW_OFFICIAL_SETTINGS_CAPTURED)?.({
+        payload: { accountId: "acc-1", snapshot },
+      });
+    });
+    expect(evalInColumnMock).toHaveBeenCalledTimes(2);
+    // Check the call for acc-2 (non-source account at index 1)
+    const callArg = evalInColumnMock.mock.calls[1][1];
+    expect(callArg).not.toContain("pushNotificationsPermission");
+    expect(callArg).not.toContain("someOtherKey");
+    expect(callArg).toContain("themeColor");
+  });
+
+  it("nightMode が 0/1/2/null 以外の値(例えCookie属性を含む不正な文字列)の場合、evalInColumn に渡す最終的なJSON文字列の nightMode が undefined として扱われること(JSON.stringifyで省略されるか存在しないことを確認する)", async () => {
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-1",
+          label: "Account 1",
+          xUserId: "user1",
+          dataDirectory: "/path/1",
+          color: "#1DA1F2",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+        {
+          id: "acc-2",
+          label: "Account 2",
+          xUserId: "user2",
+          dataDirectory: "/path/2",
+          color: "#1DA1F2",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      columns: [
+        makeColumn({ id: "col-1", accountId: "acc-1", pageType: "home" }),
+        makeColumn({ id: "col-2", accountId: "acc-2", pageType: "home" }),
+      ],
+    });
+    renderHook(() => useOfficialSettingsBroadcast());
+    const snapshot = JSON.stringify({
+      local: { themeColor: "blue" },
+      nightMode: "invalid_value; path=/; domain=.x.com",
+    });
+    await act(async () => {
+      capturedCallbacks.get(IPC_EVENTS.WEBVIEW_OFFICIAL_SETTINGS_CAPTURED)?.({
+        payload: { accountId: "acc-1", snapshot },
+      });
+    });
+    expect(evalInColumnMock).toHaveBeenCalledTimes(2);
+    // Check the call for acc-2 (non-source account at index 1)
+    const callArg = evalInColumnMock.mock.calls[1][1];
+    // nightMode が undefined で stringified されないことを確認
+    // Extract the safeSnapshotJson from the script
+    const jsonMatch = callArg.match(/var incoming=(\{.*?\});/s);
+    if (jsonMatch && jsonMatch[1]) {
+      const parsed = JSON.parse(jsonMatch[1]);
+      expect(parsed.nightMode).toBeUndefined();
+    }
+  });
+});
+
+describe("useOfficialSettingsPopupReload", () => {
+  beforeEach(() => {
+    capturedCallbacks.clear();
+    mockUnlisten.mockReset();
+  });
+
+  function emitCaptured() {
+    capturedCallbacks.get(IPC_EVENTS.WEBVIEW_OFFICIAL_SETTINGS_CAPTURED)?.({
+      payload: { accountId: "acc-1", snapshot: "{}" },
+    });
+  }
+
+  function emitClosed() {
+    capturedCallbacks.get(IPC_EVENTS.OFFICIAL_SETTINGS_POPUP_CLOSED)?.({
+      payload: undefined,
+    });
+  }
+
+  it("適用イベントなしで閉じたイベントのみ発火した場合、recreateAllWebviewsが呼ばれない", async () => {
+    const recreateAllWebviews = vi.fn();
+    renderHook(() => useOfficialSettingsPopupReload(recreateAllWebviews));
+    await act(async () => {
+      emitClosed();
+    });
+    expect(recreateAllWebviews).not.toHaveBeenCalled();
+  });
+
+  it("適用イベント→閉じたイベントの順で発火した場合、recreateAllWebviewsが1回呼ばれる", async () => {
+    const recreateAllWebviews = vi.fn();
+    renderHook(() => useOfficialSettingsPopupReload(recreateAllWebviews));
+    await act(async () => {
+      emitCaptured();
+      emitClosed();
+    });
+    expect(recreateAllWebviews).toHaveBeenCalledTimes(1);
+  });
+
+  it("適用→閉じた→(再適用なしで)閉じた、の順で発火した場合、2回目は呼ばれない", async () => {
+    const recreateAllWebviews = vi.fn();
+    renderHook(() => useOfficialSettingsPopupReload(recreateAllWebviews));
+    await act(async () => {
+      emitCaptured();
+      emitClosed();
+      emitClosed();
+    });
+    expect(recreateAllWebviews).toHaveBeenCalledTimes(1);
+  });
+
+  it("適用イベント発火後にrecreateAllWebviewsの参照を差し替えてから閉じたイベントを発火すると、新しい方の関数が呼ばれる", async () => {
+    const oldRecreateAllWebviews = vi.fn();
+    const newRecreateAllWebviews = vi.fn();
+    const { rerender } = renderHook(
+      ({ fn }: { fn: () => void }) => useOfficialSettingsPopupReload(fn),
+      { initialProps: { fn: oldRecreateAllWebviews } },
+    );
+    await act(async () => {
+      emitCaptured();
+    });
+    rerender({ fn: newRecreateAllWebviews });
+    await act(async () => {
+      emitClosed();
+    });
+    expect(oldRecreateAllWebviews).not.toHaveBeenCalled();
+    expect(newRecreateAllWebviews).toHaveBeenCalledTimes(1);
   });
 });

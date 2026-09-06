@@ -94,3 +94,27 @@ export const DarkTheme: Story = {
     ),
   ],
 };
+
+export const OfficialSettingsUsage: Story = {
+  name: "公式設定を開く",
+  args: {
+    fixedUrl: "https://x.com/settings",
+    title: "公式設定を開く",
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    // URL入力欄が存在しないことを確認
+    expect(
+      canvas.queryByPlaceholderText("https://x.com/..."),
+    ).not.toBeInTheDocument();
+    // タイトルが指定した値で表示されていることを確認
+    await expect(canvas.getByText("公式設定を開く")).toBeInTheDocument();
+    // 「開く」ボタンをクリック
+    await userEvent.click(canvas.getByText("開く"));
+    // fixedUrl と選択アカウント ID を伴って onSubmit が呼ばれることを確認
+    await expect(args.onSubmit).toHaveBeenCalledWith(
+      "https://x.com/settings",
+      "acc-1",
+    );
+  },
+};

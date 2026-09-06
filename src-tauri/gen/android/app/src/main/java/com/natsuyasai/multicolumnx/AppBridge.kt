@@ -64,6 +64,25 @@ object AppBridge {
   )
 
   /**
+   * ポップアップ内の popup_toolbar.ts から、公式設定スナップショットが
+   * 届いたときに PopupSessionBridge から呼ぶ。
+   */
+  @JvmStatic
+  external fun onOfficialSettingsReport(
+    accountId: String,
+    snapshot: String,
+  )
+
+  /**
+   * ポップアップ WebView が実際に破棄されたとき（終了ボタン／戻るボタン経由の非常駐破棄）に
+   * MainActivity の removePopupWebView / closeTopPopupWebView から呼ぶ。
+   * アカウント切替による内部的な閉じ直しでも呼ばれるが、Rust 側の追跡ラベルは
+   * 破棄前に付け替え済みのため、公式設定ポップアップの実クローズのみが検出される。
+   */
+  @JvmStatic
+  external fun onPopupClosed(popupId: String)
+
+  /**
    * スワイプバー（SwipeBarOverlayView）でスワイプジェスチャーが確定したときに呼ぶ。
    * Rust 側はこれを受けて mobile-swipe-navigate イベントを React へ emit する。
    * React 側の navigateColumn が実際に遷移を決定した場合のみ、遷移確定フラッシュ

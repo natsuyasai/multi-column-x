@@ -289,6 +289,72 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onApiRateLim
     }
 }
 
+/// AppBridge.onOfficialSettingsReport(accountId, snapshot) から呼ばれる JNI エントリポイント。
+/// ポップアップ内の popup_toolbar.ts が window.__mcxPopupBridge.reportOfficialSettings 経由で
+/// 公式設定スナップショットを送ってくる（Android のネイティブ WebView には Tauri IPC が無いため）。
+///
+/// I/Oを伴わない軽量な処理（Mutexロック+emit）のため、onInsets と同様に同期的に処理する。
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onOfficialSettingsReport<
+    'local,
+>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    account_id: jni::objects::JString<'local>,
+    snapshot: jni::objects::JString<'local>,
+) {
+    fn to_string(env: &mut JNIEnv, s: &jni::objects::JString) -> Option<String> {
+        env.get_string(s).ok().map(|v| v.into())
+    }
+    let (Some(account_id), Some(snapshot)) = (
+        to_string(&mut env, &account_id),
+        to_string(&mut env, &snapshot),
+    ) else {
+        return;
+    };
+    let app = TAURI_APP.lock().expect("TAURI_APP mutex poisoned").clone();
+    let Some(app) = app else {
+        eprintln!("[AppBridge.onOfficialSettingsReport] app handle not initialized");
+        return;
+    };
+    if let Err(e) = crate::commands::webview::report_official_settings_from_android(
+        &app,
+        &account_id,
+        &snapshot,
+    ) {
+        eprintln!("[AppBridge.onOfficialSettingsReport] {e}");
+    }
+}
+
+/// AppBridge.onPopupClosed(popupId) から呼ばれる JNI エントリポイント。
+/// MainActivity の removePopupWebView / closeTopPopupWebView が非常駐ポップアップ WebView を
+/// 実際に破棄した直後に呼ばれる（終了ボタン／戻るボタン経由）。追跡中の公式設定ポップアップと
+/// 一致する場合のみ OFFICIAL_SETTINGS_POPUP_CLOSED を emit する（handle_popup_closed 側で判定）。
+///
+/// I/Oを伴わない軽量な処理（Mutexロック+emit）のため、onInsets と同様に同期的に処理する。
+/// UI スレッドから呼ばれる想定（既存の onSwipeNavigate 等と同じパターンで安全に emit できる）。
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onPopupClosed<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    popup_id: jni::objects::JString<'local>,
+) {
+    fn to_string(env: &mut JNIEnv, s: &jni::objects::JString) -> Option<String> {
+        env.get_string(s).ok().map(|v| v.into())
+    }
+    let Some(popup_id) = to_string(&mut env, &popup_id) else {
+        return;
+    };
+    let app = TAURI_APP.lock().expect("TAURI_APP mutex poisoned").clone();
+    let Some(app) = app else {
+        eprintln!("[AppBridge.onPopupClosed] app handle not initialized");
+        return;
+    };
+    crate::commands::webview::handle_popup_closed(&app, &popup_id);
+}
+
 /// MainActivity.removeColumnWebView を呼び出してカラム WebView を削除する。
 pub fn remove_column_webview(id: &str) -> Result<(), String> {
     call_activity_method(|env, activity| {

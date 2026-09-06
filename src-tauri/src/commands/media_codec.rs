@@ -1,5 +1,6 @@
 /// 複数の候補エレメント名のうち1つでも `probe` が true を返せば true。
 /// サブプロセス実行（副作用）を関数として注入することでテスト容易にする。
+#[cfg_attr(not(all(desktop, target_os = "linux")), allow(dead_code))]
 pub fn detect_codec_support(candidates: &[&str], probe: impl Fn(&str) -> bool) -> bool {
     candidates.iter().any(|&name| probe(name))
 }

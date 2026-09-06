@@ -117,6 +117,7 @@ const meta: Meta<typeof AppSettingsPanel> = {
     onApplyColumnDefaults: fn(),
     onReloadAllWebviews: fn(),
     onCheckUpdate: fn(),
+    onOpenOfficialSettings: fn(),
     onClose: fn(),
   },
 };
@@ -160,4 +161,46 @@ export const DarkTheme: Story = {
       </ThemeRoot>
     ),
   ],
+};
+
+export const ScaleThemeOverrideDisabled: Story = {
+  name: "表示サイズ・テーマ変更チェックボックスOFF（初期状態）",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scaleCheckbox = canvas.getByRole("checkbox", {
+      name: "表示サイズを変更する",
+    });
+    const themeCheckbox = canvas.getByRole("checkbox", {
+      name: "テーマを変更する",
+    });
+    await expect(scaleCheckbox).not.toBeChecked();
+    await expect(themeCheckbox).not.toBeChecked();
+    await expect(canvas.getByRole("button", { name: "大" })).toBeDisabled();
+    await expect(canvas.getByRole("button", { name: "ライト" })).toBeDisabled();
+  },
+};
+
+export const ScaleThemeOverrideEnabled: Story = {
+  name: "表示サイズ・テーマ変更チェックボックスON",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      canvas.getByRole("checkbox", { name: "表示サイズを変更する" }),
+    );
+    await userEvent.click(
+      canvas.getByRole("checkbox", { name: "テーマを変更する" }),
+    );
+    await expect(canvas.getByRole("button", { name: "大" })).not.toBeDisabled();
+    await expect(
+      canvas.getByRole("button", { name: "ライト" }),
+    ).not.toBeDisabled();
+    await userEvent.click(canvas.getByRole("button", { name: "大" }));
+    await userEvent.click(canvas.getByRole("button", { name: "ライト" }));
+    await expect(canvas.getByRole("button", { name: "大" }).className).toMatch(
+      /scaleBtnActive/,
+    );
+    await expect(
+      canvas.getByRole("button", { name: "ライト" }).className,
+    ).toMatch(/scaleBtnActive/);
+  },
 };

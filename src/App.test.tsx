@@ -7,7 +7,7 @@ import {
   waitFor,
   act,
 } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import App from "./App";
 import { useAppStore } from "./store/useAppStore";
 import type { Column, GlobalSettings } from "./types";
@@ -35,6 +35,30 @@ vi.mock("@tauri-apps/plugin-log", () => ({
 
 const mockInvoke = vi.mocked(invoke);
 const mockPlatform = vi.mocked(platform);
+
+type MatchMediaListener = (e: { matches: boolean }) => void;
+
+function installMatchMedia(matches: boolean) {
+  const listeners = new Set<MatchMediaListener>();
+  const mql = {
+    matches,
+    media: "(prefers-color-scheme: dark)",
+    addEventListener: (_: string, cb: MatchMediaListener) => listeners.add(cb),
+    removeEventListener: (_: string, cb: MatchMediaListener) =>
+      listeners.delete(cb),
+  };
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn(() => mql),
+  );
+  return {
+    emit: (next: boolean) => {
+      mql.matches = next;
+      listeners.forEach((cb) => cb({ matches: next }));
+    },
+    listenerCount: () => listeners.size,
+  };
+}
 
 const account = {
   id: "acc-1",
@@ -279,5 +303,104 @@ describe("App (mobile)", () => {
         expect.objectContaining({ visible: false }),
       );
     });
+  });
+});
+
+describe("App (テーマ適用時のnight_mode Cookie反映)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+    mockPlatform.mockReturnValue("windows");
+    useAppStore.setState({
+      accounts: [account],
+      columns: [column],
+      globalSettings,
+      isLoaded: true,
+      isMobile: false,
+      topBarExpanded: false,
+      unreadCounts: {},
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const openThemeAndApply = (themeLabel: string) => {
+    fireEvent.click(screen.getByTitle("アプリ設定 (Ctrl+,)"));
+    const checkbox = screen
+      .getByText("テーマを変更する")
+      .closest("label")
+      ?.querySelector("input");
+    if (!checkbox) {
+      throw new Error("テーマ変更チェックボックスが見つかりません");
+    }
+    fireEvent.click(checkbox);
+    fireEvent.click(screen.getByText(themeLabel));
+    fireEvent.click(screen.getByText("適用"));
+  };
+
+  const getNightModeCalls = () =>
+    mockInvoke.mock.calls.filter(
+      (c) =>
+        c[0] === "eval_in_webview" &&
+        typeof (c[1] as { script?: unknown })?.script === "string" &&
+        (c[1] as { script: string }).script.includes("night_mode"),
+    );
+
+  it("テーマを「ダーク」にして適用すると、全カラムのnight_modeを2にするスクリプトでevalInColumnが呼ばれる", () => {
+    render(<App />);
+    mockInvoke.mockClear();
+
+    openThemeAndApply("ダーク");
+
+    const calls = getNightModeCalls();
+    expect(calls.length).toBeGreaterThan(0);
+    expect((calls[0][1] as { script: string }).script).toContain('var n="2"');
+  });
+
+  it("テーマを「ライト」にして適用すると、night_modeを0にするスクリプトでevalInColumnが呼ばれる", () => {
+    render(<App />);
+    mockInvoke.mockClear();
+
+    openThemeAndApply("ライト");
+
+    const calls = getNightModeCalls();
+    expect(calls.length).toBeGreaterThan(0);
+    expect((calls[0][1] as { script: string }).script).toContain('var n="0"');
+  });
+
+  it("テーマを「システム」にして適用し、OSがダーク配色の場合はnight_modeが2になる", () => {
+    installMatchMedia(true);
+    render(<App />);
+    mockInvoke.mockClear();
+
+    openThemeAndApply("システム");
+
+    const calls = getNightModeCalls();
+    expect(calls.length).toBeGreaterThan(0);
+    expect((calls[0][1] as { script: string }).script).toContain('var n="2"');
+  });
+
+  it("テーマを「システム」にして適用し、OSがライト配色の場合はnight_modeが0になる", () => {
+    installMatchMedia(false);
+    render(<App />);
+    mockInvoke.mockClear();
+
+    openThemeAndApply("システム");
+
+    const calls = getNightModeCalls();
+    expect(calls.length).toBeGreaterThan(0);
+    expect((calls[0][1] as { script: string }).script).toContain('var n="0"');
+  });
+
+  it("「テーマを変更する」チェックボックスをONにせず他の設定のみ変更して適用した場合、night_mode関連のスクリプトは呼ばれない", () => {
+    render(<App />);
+    mockInvoke.mockClear();
+
+    fireEvent.click(screen.getByTitle("アプリ設定 (Ctrl+,)"));
+    fireEvent.click(screen.getByText("適用"));
+
+    expect(getNightModeCalls()).toHaveLength(0);
   });
 });
