@@ -9,6 +9,7 @@ const tauriInvokeMock = vi.fn((_cmd: string, _args?: Record<string, unknown>) =>
 
 const switchPopupSessionMock = vi.fn();
 const reportOfficialSettingsMock = vi.fn();
+const closePopupMock = vi.fn();
 
 type VideoDownloadProgressPayload = {
   fileIndex: number;
@@ -82,6 +83,7 @@ describe("inject/popup_toolbar のアカウント切替", () => {
   beforeEach(() => {
     tauriInvokeMock.mockClear();
     switchPopupSessionMock.mockClear();
+    closePopupMock.mockClear();
     window.__TAURI__ = { core: { invoke: tauriInvokeMock } };
     window.__mcxAccounts = accounts;
     window.__mcxCurrentAccountId = "acc1";
@@ -94,6 +96,7 @@ describe("inject/popup_toolbar のアカウント切替", () => {
     window.__mcxPopupBridge = {
       switchPopupSession: switchPopupSessionMock,
       reportOfficialSettings: reportOfficialSettingsMock,
+      closePopup: closePopupMock,
     };
     await importToolbar();
 
@@ -123,6 +126,7 @@ describe("inject/popup_toolbar のアカウント切替", () => {
     window.__mcxPopupBridge = {
       switchPopupSession: switchPopupSessionMock,
       reportOfficialSettings: reportOfficialSettingsMock,
+      closePopup: closePopupMock,
     };
     await importToolbar();
 
@@ -360,6 +364,85 @@ describe("inject/popup_toolbar の各カラムに適用ボタン", () => {
 
     const button = getApplySettingsButton();
     expect(button.style.display).toBe("none");
+  });
+});
+
+describe("inject/popup_toolbar の終了ボタン", () => {
+  beforeEach(() => {
+    tauriInvokeMock.mockClear();
+    closePopupMock.mockClear();
+    window.__TAURI__ = { core: { invoke: tauriInvokeMock } };
+    window.__mcxAccounts = accounts;
+    window.__mcxCurrentAccountId = "acc1";
+    window.__mcxTargetHref = "";
+    window.__mcxEscCloseEnabled = false;
+    delete window.__mcxPopupBridge;
+  });
+
+  function getExitButton(): HTMLButtonElement {
+    const button = document.querySelector<HTMLButtonElement>(
+      "#tv-popup-exit-button",
+    );
+    if (!button) throw new Error("exit button not found");
+    return button;
+  }
+
+  it("公式設定ページの場合、終了ボタンが表示される", async () => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: new URL("https://x.com/settings/display"),
+    });
+
+    await importToolbar();
+
+    expect(getExitButton().style.display).toBe("");
+  });
+
+  it("公式設定ページでない場合、終了ボタンが非表示になる", async () => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: new URL("https://x.com/home"),
+    });
+
+    await importToolbar();
+
+    expect(getExitButton().style.display).toBe("none");
+  });
+
+  it("Androidブリッジがある場合、クリックでclosePopupが呼ばれTauri invokeは呼ばない", async () => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: new URL("https://x.com/settings/display"),
+    });
+    window.__mcxPopupBridge = {
+      switchPopupSession: switchPopupSessionMock,
+      reportOfficialSettings: reportOfficialSettingsMock,
+      closePopup: closePopupMock,
+    };
+
+    await importToolbar();
+    getExitButton().click();
+
+    expect(closePopupMock).toHaveBeenCalledTimes(1);
+    expect(tauriInvokeMock).not.toHaveBeenCalledWith(
+      "close_popup_window",
+      expect.anything(),
+    );
+  });
+
+  it("Androidブリッジがない場合、クリックでclose_popup_windowコマンドにフォールバックする", async () => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: new URL("https://x.com/settings/display"),
+    });
+
+    await importToolbar();
+    getExitButton().click();
+
+    expect(tauriInvokeMock).toHaveBeenCalledWith("close_popup_window", {
+      label: "",
+    });
+    expect(closePopupMock).not.toHaveBeenCalled();
   });
 });
 

@@ -389,12 +389,31 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
     };
   });
 
+  const exitButton = document.createElement("button");
+  exitButton.type = "button";
+  exitButton.id = "tv-popup-exit-button";
+  exitButton.textContent = "終了";
+  exitButton.style.cssText = downloadButton.style.cssText;
+  exitButton.style.display = isOfficialSettingsPage ? "" : "none";
+
+  exitButton.addEventListener("click", function () {
+    const androidBridge = window.__mcxPopupBridge;
+    if (androidBridge) {
+      androidBridge.closePopup();
+      return;
+    }
+    tauriInvoke(CLOSE_POPUP_WINDOW, {
+      label: window.__TAURI_INTERNALS__?.metadata?.currentWebview?.label ?? "",
+    });
+  });
+
   toolbar.appendChild(label);
   toolbar.appendChild(select);
   toolbar.appendChild(downloadButton);
   toolbar.appendChild(downloadStatus);
   toolbar.appendChild(applySettingsButton);
   toolbar.appendChild(applySettingsStatus);
+  toolbar.appendChild(exitButton);
 
   function inject() {
     const doInject = () => {

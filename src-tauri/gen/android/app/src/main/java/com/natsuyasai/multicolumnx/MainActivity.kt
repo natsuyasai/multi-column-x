@@ -356,6 +356,7 @@ class MainActivity : TauriActivity() {
               { accountId, snapshot ->
                 AppBridge.onOfficialSettingsReport(accountId, snapshot)
               },
+              { popupId -> removePopupWebView(popupId) },
             ),
             POPUP_BRIDGE_JS_NAME,
           )

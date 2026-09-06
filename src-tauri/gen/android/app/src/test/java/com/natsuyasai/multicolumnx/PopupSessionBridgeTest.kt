@@ -8,12 +8,14 @@ import org.junit.Test
 class PopupSessionBridgeTest {
   private val switchSessionCalls = mutableListOf<Triple<String, String, String>>()
   private val reportOfficialSettingsCalls = mutableListOf<Pair<String, String>>()
+  private val closePopupCalls = mutableListOf<String>()
 
   private val bridge =
     PopupSessionBridge(
       "popup-1",
       { popupId, accountId, url -> switchSessionCalls.add(Triple(popupId, accountId, url)) },
       { accountId, snapshot -> reportOfficialSettingsCalls.add(Pair(accountId, snapshot)) },
+      { popupId -> closePopupCalls.add(popupId) },
     )
 
   @Test
@@ -56,5 +58,12 @@ class PopupSessionBridgeTest {
     bridge.reportOfficialSettings("acc2", "")
 
     assertTrue(reportOfficialSettingsCalls.isEmpty())
+  }
+
+  @Test
+  fun `終了要求はポップアップIDを付けてコールバックへ転送される`() {
+    bridge.closePopup()
+
+    assertEquals(listOf("popup-1"), closePopupCalls)
   }
 }
