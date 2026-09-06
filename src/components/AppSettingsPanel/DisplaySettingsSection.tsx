@@ -17,6 +17,14 @@ export const DisplaySettingsSection: React.FC<DisplaySettingsSectionProps> = ({
     <h3 className={styles.sectionTitle}>表示</h3>
     <div className={styles.scaleRow}>
       <span className={styles.scaleLabel}>表示サイズ</span>
+      <label className={`${styles.checkLabel} ${styles.scaleOverrideCheckbox}`}>
+        <input
+          type="checkbox"
+          checked={draft.columnScaleOverrideEnabled}
+          onChange={(e) => set("columnScaleOverrideEnabled", e.target.checked)}
+        />
+        表示サイズを変更する
+      </label>
       <div className={styles.scaleOptions}>
         {(
           [
@@ -31,6 +39,7 @@ export const DisplaySettingsSection: React.FC<DisplaySettingsSectionProps> = ({
             key={value}
             type="button"
             className={`${styles.scaleBtn} ${draft.columnScale === value ? styles.scaleBtnActive : ""}`}
+            disabled={!draft.columnScaleOverrideEnabled}
             onClick={() => set("columnScale", value)}
           >
             {label}
@@ -40,6 +49,14 @@ export const DisplaySettingsSection: React.FC<DisplaySettingsSectionProps> = ({
     </div>
     <div className={styles.scaleRow}>
       <span className={styles.scaleLabel}>テーマ</span>
+      <label className={`${styles.checkLabel} ${styles.scaleOverrideCheckbox}`}>
+        <input
+          type="checkbox"
+          checked={draft.themeOverrideEnabled}
+          onChange={(e) => set("themeOverrideEnabled", e.target.checked)}
+        />
+        テーマを変更する
+      </label>
       <div className={styles.scaleOptions}>
         {(
           [
@@ -55,6 +72,7 @@ export const DisplaySettingsSection: React.FC<DisplaySettingsSectionProps> = ({
             key={value}
             type="button"
             className={`${styles.scaleBtn} ${draft.theme === value ? styles.scaleBtnActive : ""}`}
+            disabled={!draft.themeOverrideEnabled}
             onClick={() => set("theme", value)}
           >
             {label}
