@@ -30,7 +30,7 @@ import { useAppUpdater } from "./hooks/useAppUpdater";
 import { useColumns } from "./hooks/useColumns";
 import { useDialogState } from "./hooks/useDialogState";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
-import { useTheme } from "./hooks/useTheme";
+import { getMql, useTheme } from "./hooks/useTheme";
 import {
   useApiRateLimitReports,
   useColumnCrashRecovery,
@@ -48,6 +48,7 @@ import {
   resolveSwipeAreaHeight,
 } from "./lib/gridLayout";
 import { logError } from "./lib/log";
+import { resolveTheme } from "./lib/theme";
 import {
   applyColumnSettingsScripts,
   evalInColumn,
@@ -453,6 +454,15 @@ const App: React.FC = () => {
               newGlobalNgWords,
             ),
           );
+        });
+      }
+      if (patch.theme !== undefined) {
+        const prefersDark = getMql()?.matches ?? false;
+        const nightMode =
+          resolveTheme(patch.theme, prefersDark) === "dark" ? "2" : "0";
+        const { columns: currentColumns } = useAppStore.getState();
+        currentColumns.forEach((col) => {
+          evalInColumn(col.id, WEBVIEW_SCRIPTS.applyNightModeCookie(nightMode));
         });
       }
     },

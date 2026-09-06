@@ -89,3 +89,30 @@ describe("WEBVIEW_SCRIPTS.applyOfficialSettingsSnapshot", () => {
     expect(script2).toContain("var incoming=" + snapshotJson2);
   });
 });
+
+describe("WEBVIEW_SCRIPTS.applyNightModeCookie", () => {
+  it("night_modeというCookie名を参照するスクリプトを生成する", () => {
+    const script = WEBVIEW_SCRIPTS.applyNightModeCookie("2");
+    expect(script).toContain("night_mode");
+  });
+
+  it("渡した値がJSON.stringifyされた形でvar n=の後に埋め込まれる", () => {
+    const script = WEBVIEW_SCRIPTS.applyNightModeCookie("2");
+    expect(script).toContain("var n=" + JSON.stringify("2"));
+  });
+
+  it("domain=.x.comを明示している", () => {
+    const script = WEBVIEW_SCRIPTS.applyNightModeCookie("0");
+    expect(script).toContain("domain=.x.com");
+  });
+
+  it("location.reload()の呼び出しが含まれる", () => {
+    const script = WEBVIEW_SCRIPTS.applyNightModeCookie("0");
+    expect(script).toContain("location.reload()");
+  });
+
+  it("既存Cookie値と同じ場合は書き込まずに終了する分岐が含まれる", () => {
+    const script = WEBVIEW_SCRIPTS.applyNightModeCookie("2");
+    expect(script).toContain("current===n)return;");
+  });
+});

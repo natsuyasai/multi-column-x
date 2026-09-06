@@ -158,6 +158,12 @@ export const WEBVIEW_SCRIPTS = {
     return `(function(){var incoming=${snapshotJson};var keys=${keysJson};var nightMode=incoming&&Object.prototype.hasOwnProperty.call(incoming,'nightMode')?incoming.nightMode:undefined;if(nightMode===null){document.cookie='night_mode=; path=/; domain=.x.com; max-age=0';}else if(typeof nightMode==='string'){document.cookie='night_mode='+nightMode+'; path=/; domain=.x.com; max-age=34560000';}var incomingLocal=(incoming&&incoming.local)||{};var r=indexedDB.open('localforage');r.onsuccess=function(e){var tx=e.target.result.transaction('keyvaluepairs','readwrite'),st=tx.objectStore('keyvaluepairs'),g=st.get('device:rweb.settings');g.onsuccess=function(e){var existing=e.target.result||{};if(!existing.local)existing.local={};for(var i=0;i<keys.length;i++){var k=keys[i];if(Object.prototype.hasOwnProperty.call(incomingLocal,k)){existing.local[k]=incomingLocal[k];}}existing.local._lastPersisted=Date.now();existing._lastPersisted=Date.now();st.put(existing,'device:rweb.settings').onsuccess=function(){location.reload();};};};})();`;
   },
 
+  /** night_mode Cookie を書き換え、値が変化した場合のみリロードする */
+  applyNightModeCookie: (nightMode: string): string => {
+    const n = JSON.stringify(nightMode);
+    return `(function(){var n=${n};var m=document.cookie.match(/(?:^|; )night_mode=([^;]*)/);var current=m?m[1]:null;if(current===n)return;document.cookie='night_mode='+n+'; path=/; domain=.x.com; max-age=34560000';location.reload();})();`;
+  },
+
   /** NGワードを動的に更新し、表示中のツイートにも即時適用する */
   applyNgWords: (ngWords: string[], globalNgWords: string[]) => {
     const ng = JSON.stringify(ngWords);
