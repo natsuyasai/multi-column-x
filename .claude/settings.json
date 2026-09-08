@@ -21,16 +21,6 @@
           }
         ]
       }
-    ],
-    "PreCompact": [
-      {
-        "hooks": [
-          {
-            "type": "prompt",
-            "prompt": "現在のセッション状態をまとめた引き継ぎファイルを生成して。.claude/handoff/session-{timestamp}.json に保存して。"
-          }
-        ]
-      }
     ]
   }
 }

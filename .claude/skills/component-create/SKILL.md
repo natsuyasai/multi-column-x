@@ -100,9 +100,7 @@ export const Default: Story = {
 
 ### import順序（ESLint `import-x/order`）
 
-- 外部パッケージ → vitest/storybook → `@/`（internal）→ 相対パスの順、同グループ内はアルファベット昇順
-- グループ間の空行は入れない（`newlines-between: "never"`）
-- `npm run lint:fix` で自動整列できる
+CLAUDE.md「フロントエンドの品質ツール」節のimport順ルールに従う。`npm run lint:fix` で自動整列できる。
 
 ### アクセシビリティ (jsx-a11y)
 
