@@ -102,6 +102,7 @@ X内部APIのレート制限ヘッダをツールバーのポップオーバー�
 ### フロントエンドの品質ツール（ESLint / Storybook / プロパティテスト）
 
 - **ESLint**（flat config: `eslint.config.js`）はフロント `src` の TS/TSX のみを対象にする。`import-x/order` で import 順を統一し、`@/` は internal グループ。`npm run lint` / 自動整列は `npm run lint:fix`。
+  - **import順**: 外部パッケージ → vitest/storybook → `@/`（internal）→ 相対パスの順。同グループ内はアルファベット昇順。グループ間の空行は入れない（`newlines-between: "never"`）。`npm run lint:fix` で自動整列できる。
   - 既存コード由来の a11y 等は段階解消のため **warn**。新規コードでは警告を残さないこと。
 - **import エイリアス**: `@/*` → `src/*`（tsconfig / vite / vitest に設定）。新規コードは `@/` を使う。
 - **Storybook**（`.storybook/`）はコンポーネントと**同じディレクトリ**に `<Name>.stories.tsx` をコロケーション配置する。バレル（`index.ts`）は作らない。play function は `npm run test:story` で chromium ブラウザ実行される。テーマは `document.documentElement` の `data-theme` で切り替える（`MobileTabBar.stories.tsx` 参照）。
