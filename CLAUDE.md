@@ -91,6 +91,14 @@ Linux ではカラムが独立 `WebviewWindow`（親クリップが効かない�
 
 `src-tauri/gen/android/**` を変更する場合の詳細（単体テストコマンド、`MainActivity.kt` とのシグネチャ同期ルール）は `docs/development/android-notes.md` を参照。**`MainActivity.kt` のメソッドシグネチャを変更したら、必ず `proguard-rules.pro` も同時に更新すること**（リリースビルドでしか症状が出ないため注意）。
 
+### API レート制限モニター
+
+X内部APIのレート制限ヘッダをツールバーのポップオーバーに表示する機能。`src/constants/apiRateLimitLabels.ts` / `src/components/ApiRateLimitIndicator/` / `src/lib/apiRateLimit.ts` を変更する場合の詳細（bucketKeyの対応表・severity判定ロジック）は `docs/development/api-rate-limit-operations-notes.md` を参照。
+
+### リリースCI・テーマ切替・再認証
+
+`src/lib/theme.ts` / `src/hooks/useTheme.ts`（テーマ切替）、`src/lib/reauthIdentity.ts` / `src-tauri/src/commands/account.rs`（既存アカウントの再認証・Cookie上書き）、`src/services/updater.ts` / `src/hooks/useAppUpdater.ts` / `src-tauri/src/commands/update.rs`（自動更新・進捗表示）を変更する場合の詳細（設計判断・未確定事項・落とし穴）は `docs/development/release-theme-reauth-notes.md` を参照。**特に `defaultScrollPosRestoreEnabled` はTS側既定値とRust側serde既定値が食い違ったまま未解決なので、この設定に触れる際は現状の実際の挙動を必ず確認すること。**
+
 ### フロントエンドの品質ツール（ESLint / Storybook / プロパティテスト）
 
 - **ESLint**（flat config: `eslint.config.js`）はフロント `src` の TS/TSX のみを対象にする。`import-x/order` で import 順を統一し、`@/` は internal グループ。`npm run lint` / 自動整列は `npm run lint:fix`。

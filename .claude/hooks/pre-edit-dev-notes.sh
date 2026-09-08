@@ -27,6 +27,16 @@ case "$norm" in
   *"/src-tauri/src/lib.rs")                        note="docs/development/compose-popup-sidebar-notes.md" ;;
   *"/src-tauri/gen/android/app/proguard-rules.pro") note="docs/development/android-notes.md" ;;
   *"/MainActivity.kt")                             note="docs/development/android-notes.md" ;;
+  *"/src/constants/apiRateLimitLabels.ts")         note="docs/development/api-rate-limit-operations-notes.md" ;;
+  *"/src/components/ApiRateLimitIndicator/"*)      note="docs/development/api-rate-limit-operations-notes.md" ;;
+  *"/src/lib/apiRateLimit.ts")                     note="docs/development/api-rate-limit-operations-notes.md" ;;
+  *"/src/lib/theme.ts")                            note="docs/development/release-theme-reauth-notes.md" ;;
+  *"/src/hooks/useTheme.ts")                       note="docs/development/release-theme-reauth-notes.md" ;;
+  *"/src/lib/reauthIdentity.ts")                   note="docs/development/release-theme-reauth-notes.md" ;;
+  *"/src-tauri/src/commands/account.rs")           note="docs/development/release-theme-reauth-notes.md" ;;
+  *"/src/services/updater.ts")                     note="docs/development/release-theme-reauth-notes.md" ;;
+  *"/src/hooks/useAppUpdater.ts")                  note="docs/development/release-theme-reauth-notes.md" ;;
+  *"/src-tauri/src/commands/update.rs")            note="docs/development/release-theme-reauth-notes.md" ;;
 esac
 
 [ -z "$note" ] && exit 0
