@@ -11,6 +11,7 @@ develop ブランチのバージョンを上げて main へリリースするま
 
 ## 前提
 
+- **ローカル開発環境（`gh` CLI が使えるシェル環境）専用のスキルである。** Claude Code on the web 等、GitHub操作をMCPツール経由でしか行えず `gh` CLI にアクセスできない環境では実行できない。そのような環境でこのスキルの実行を求められた場合は、着手前に `gh` CLI が使えない旨をユーザーに伝える（GitHub MCPツールでの代替は未整備）。
 - `gh` CLI が認証済みであること
 - `scripts/bump-version.sh` は Git Bash 等 sh が実行できる環境が必要（Bash ツールは Git Bash 上で動くのでそのまま使える）
 - リモートは `origin`、リポジトリは `natsuyasai/multi-column-x`
