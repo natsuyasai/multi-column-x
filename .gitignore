@@ -10,6 +10,8 @@ aidlc-docs/audit.md
 .worktrees/
 .claude/settings.local.json
 .claude/handoff/
+# Claude Code のグローバル自動メモリ（本来 ~/.claude/ 配下に生成されるもの）
+.claude/projects/
 # inject scripts build artifacts
 src-tauri/src/inject/**/*.js
 src-tauri/src/inject/*.svg
