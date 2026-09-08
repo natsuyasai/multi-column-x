@@ -1,6 +1,7 @@
 ---
 description: "品質チェック（format, typecheck, lint, test, story, property, build）をまとめて実行する"
 user-invocable: true
+argument-hint: "（省略可）絞り込みたいチェック対象。省略時は下記手順を上から順にすべて実行する"
 ---
 
 # 品質チェック (check-creation)
@@ -9,7 +10,7 @@ user-invocable: true
 
 ## 実行手順
 
-上から順に実行し、エラー・警告が出たら次へ進む前に修正する。
+`$ARGUMENTS` で対象を絞り込む指示があればその項目のみ実行し、指定がなければ上から順にすべて実行する。エラー・警告が出たら次へ進む前に修正する。
 
 ```bash
 # 1. フォーマット（TS/Rust/Kotlin をまとめて整形）

@@ -94,18 +94,16 @@ npm run storybook
 
 ## Story の import 規約（`import-x/order`）
 
+CLAUDE.md「フロントエンドの品質ツール」節のimport順ルールに従う（外部パッケージ→ `@/`（internal）→ 相対パスの順、グループ間空行なし）。例:
+
 ```tsx
-// 外部パッケージ（型 → 値、アルファベット順）
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
-// @/（internal）
 import { Component } from "@/components/Component/Component";
 import type { SomeType } from "@/types";
 ```
 
-- グループ間の空行は入れない
-- 同グループ内はアルファベット昇順
-- `npm run lint:fix` で自動整列できる
+`npm run lint:fix` で自動整列できる。
 
 ## 参考
 
