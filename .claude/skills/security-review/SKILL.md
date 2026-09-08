@@ -1,6 +1,7 @@
 ---
 description: "Tauri向けセキュリティレビューを実施する（capabilities, CSP, WebView/IPC, inject, パストラバーサル, 依存脆弱性, 署名鍵）"
 user-invocable: true
+argument-hint: "（省略可）重点的にレビューする対象範囲。省略時は下記チェックリスト全項目を確認する"
 allowed-tools: "Read, Glob, Grep, Bash"
 ---
 
@@ -69,7 +70,7 @@ cargo audit --manifest-path src-tauri/Cargo.toml   # 未導入なら: cargo inst
 
 ## 実行手順
 
-1. 上記チェックリストを Grep / Glob / Read / Bash（audit系のみ）で確認する
+1. `$ARGUMENTS` で対象範囲の指定があればその項目を重点的に、指定がなければ上記チェックリスト全項目を Grep / Glob / Read / Bash（audit系のみ）で確認する
 2. 問題は深刻度（Critical / High / Medium / Low）を付けて報告する
 3. 修正案を提示する（**自動修正はしない** — 読み取り専用）
 
