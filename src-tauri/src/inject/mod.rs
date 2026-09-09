@@ -133,13 +133,11 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         String::new()
     };
 
-    let mut script = format!(
-        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
-        config,
+    let script_parts: [&str; 20] = [
         tab_selector,
-        header_part,
-        auto_reload_part,
-        video_control_part,
+        header_part.as_str(),
+        auto_reload_part.as_str(),
+        video_control_part.as_str(),
         small_image,
         blur_image,
         hide_ad,
@@ -155,8 +153,9 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         notification_header_hide,
         compose_only,
         video_long_press_menu,
-        api_rate_limit_monitor
-    );
+        api_rate_limit_monitor,
+    ];
+    let mut script = format!("{}\n{}", config, script_parts.concat());
 
     if !params.custom_css.is_empty() {
         script.push_str(&format!(

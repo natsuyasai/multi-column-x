@@ -7,6 +7,12 @@ use jni::{JNIEnv, JavaVM};
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Mutex;
 
+/// JNI の JString を Rust の String に変換するヘルパー。変換失敗時は None。
+#[cfg(target_os = "android")]
+fn jstring_to_string(env: &mut JNIEnv, s: &jni::objects::JString) -> Option<String> {
+    env.get_string(s).ok().map(|v| v.into())
+}
+
 static MAIN_ACTIVITY: Mutex<Option<(JavaVM, GlobalRef)>> = Mutex::new(None);
 
 /// Tauri AppHandle（back ボタンでポップアップを閉じるイベント emit に使う）。
@@ -69,13 +75,10 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onPopupSwitc
     account_id: jni::objects::JString<'local>,
     url: jni::objects::JString<'local>,
 ) {
-    fn to_string(env: &mut JNIEnv, s: &jni::objects::JString) -> Option<String> {
-        env.get_string(s).ok().map(|v| v.into())
-    }
     let (Some(popup_id), Some(account_id), Some(url)) = (
-        to_string(&mut env, &popup_id),
-        to_string(&mut env, &account_id),
-        to_string(&mut env, &url),
+        jstring_to_string(&mut env, &popup_id),
+        jstring_to_string(&mut env, &account_id),
+        jstring_to_string(&mut env, &url),
     ) else {
         return;
     };
@@ -268,12 +271,9 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onApiRateLim
     label: jni::objects::JString<'local>,
     payload_json: jni::objects::JString<'local>,
 ) {
-    fn to_string(env: &mut JNIEnv, s: &jni::objects::JString) -> Option<String> {
-        env.get_string(s).ok().map(|v| v.into())
-    }
     let (Some(label), Some(payload_json)) = (
-        to_string(&mut env, &label),
-        to_string(&mut env, &payload_json),
+        jstring_to_string(&mut env, &label),
+        jstring_to_string(&mut env, &payload_json),
     ) else {
         return;
     };
@@ -304,12 +304,9 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onOfficialSe
     account_id: jni::objects::JString<'local>,
     snapshot: jni::objects::JString<'local>,
 ) {
-    fn to_string(env: &mut JNIEnv, s: &jni::objects::JString) -> Option<String> {
-        env.get_string(s).ok().map(|v| v.into())
-    }
     let (Some(account_id), Some(snapshot)) = (
-        to_string(&mut env, &account_id),
-        to_string(&mut env, &snapshot),
+        jstring_to_string(&mut env, &account_id),
+        jstring_to_string(&mut env, &snapshot),
     ) else {
         return;
     };
@@ -341,10 +338,7 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onPopupClose
     _class: JClass<'local>,
     popup_id: jni::objects::JString<'local>,
 ) {
-    fn to_string(env: &mut JNIEnv, s: &jni::objects::JString) -> Option<String> {
-        env.get_string(s).ok().map(|v| v.into())
-    }
-    let Some(popup_id) = to_string(&mut env, &popup_id) else {
+    let Some(popup_id) = jstring_to_string(&mut env, &popup_id) else {
         return;
     };
     let app = TAURI_APP.lock().expect("TAURI_APP mutex poisoned").clone();
@@ -775,10 +769,7 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onVideoDownl
     _class: JClass<'local>,
     payload_json: jni::objects::JString<'local>,
 ) {
-    fn to_string(env: &mut JNIEnv, s: &jni::objects::JString) -> Option<String> {
-        env.get_string(s).ok().map(|v| v.into())
-    }
-    let Some(payload_json) = to_string(&mut env, &payload_json) else {
+    let Some(payload_json) = jstring_to_string(&mut env, &payload_json) else {
         return;
     };
     let app = TAURI_APP.lock().expect("TAURI_APP mutex poisoned").clone();

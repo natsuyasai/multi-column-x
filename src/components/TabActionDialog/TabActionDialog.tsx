@@ -1,6 +1,7 @@
-import React, { useEffect } from "react";
+import React from "react";
 import CloseIcon from "../../assets/icons/close.svg?react";
 import SettingsIcon from "../../assets/icons/settings.svg?react";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
 import styles from "./TabActionDialog.module.scss";
 
 interface Props {
@@ -18,13 +19,7 @@ export const TabActionDialog: React.FC<Props> = ({
   onRemove,
   onClose,
 }) => {
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  useEscapeKey(onClose);
 
   return (
     <div

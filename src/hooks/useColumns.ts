@@ -21,18 +21,6 @@ import type { Column } from "../types";
 import { useDesktopColumns } from "./useDesktopColumns";
 import { resolveTwoColumnEnabled, useMobileColumns } from "./useMobileColumns";
 
-// グリッド座標計算は src/lib/gridLayout.ts へ移動した。既存 import 互換のため re-export する。
-export {
-  HEADER_HEIGHT,
-  SCROLLBAR_HEIGHT,
-  MOBILE_TAB_BAR_HEIGHT,
-  TOPBAR_COLLAPSED_HEIGHT,
-  TOPBAR_EXPANDED_HEIGHT,
-  getTopBarHeight,
-  calculateGridBounds,
-} from "../lib/gridLayout";
-export type { ColumnBounds } from "../lib/gridLayout";
-
 export function useColumns() {
   const { columns, accounts, addColumn, removeColumn, updateColumn } =
     useAppStore();

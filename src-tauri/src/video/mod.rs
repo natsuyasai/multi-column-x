@@ -59,9 +59,6 @@ pub fn sanitize_filename(suggested: &str) -> String {
 /// 進捗コールバックの発火頻度を間引く判定（純粋関数）。
 /// 前回発行時刻から `min_interval` 未満しか経過していなければ発行を抑制する。
 /// ただし「初回」（is_first）と「最終」（is_last）は間引かず必ず発行する。
-/// 呼び出し元（desktopのイベント発行・AndroidのJNI通知更新）は後続の実装ステップで配線するため、
-/// 現時点ではこのモジュール内から直接呼ばれない。
-#[allow(dead_code)]
 pub fn should_emit_progress(
     is_first: bool,
     is_last: bool,

@@ -61,7 +61,7 @@ describe("TabActionDialog", () => {
   it("Escape キーで onClose が呼ばれる", () => {
     const onClose = vi.fn();
     render(<TabActionDialog {...defaultProps} onClose={onClose} />);
-    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).toHaveBeenCalled();
   });
 
