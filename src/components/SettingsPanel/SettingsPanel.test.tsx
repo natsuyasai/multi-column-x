@@ -4,8 +4,6 @@ import { describe, expect, it, vi } from "vitest";
 import type { Column } from "../../types";
 import { SettingsPanel } from "./SettingsPanel";
 
-const user = userEvent.setup();
-
 const baseSettings = {
   autoReloadEnabled: false,
   autoReloadInterval: 600,
@@ -490,8 +488,8 @@ describe("SettingsPanel 表示名", () => {
     const onApply = vi.fn();
     render(<SettingsPanel {...defaultProps} onApply={onApply} />);
     const input = screen.getByRole("textbox", { name: "表示名" });
-    await user.clear(input);
-    await user.type(input, "新しい表示名");
+    await userEvent.clear(input);
+    await userEvent.type(input, "新しい表示名");
     await userEvent.click(screen.getByRole("button", { name: "適用" }));
     expect(onApply).toHaveBeenCalledWith(
       "col-1",
@@ -509,7 +507,7 @@ describe("SettingsPanel 表示名", () => {
     };
     render(<SettingsPanel {...defaultProps} column={col} onApply={onApply} />);
     const input = screen.getByRole("textbox", { name: "表示名" });
-    await user.clear(input);
+    await userEvent.clear(input);
     await userEvent.click(screen.getByRole("button", { name: "適用" }));
     expect(onApply).toHaveBeenCalledWith(
       "col-1",
@@ -523,7 +521,7 @@ describe("SettingsPanel 表示名", () => {
     const onApply = vi.fn();
     render(<SettingsPanel {...defaultProps} onApply={onApply} />);
     const input = screen.getByRole("textbox", { name: "表示名" });
-    await user.type(input, "   ");
+    await userEvent.type(input, "   ");
     await userEvent.click(screen.getByRole("button", { name: "適用" }));
     expect(onApply).toHaveBeenCalledWith(
       "col-1",
