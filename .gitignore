@@ -29,3 +29,6 @@ storybook-static
 
 # 一時的な実装プラン等（implementation-planning スキル）
 tmp/
+
+# superpowers スキル生成物（設計・プラン）
+docs/superpowers/
