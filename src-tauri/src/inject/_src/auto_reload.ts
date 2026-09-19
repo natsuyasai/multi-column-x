@@ -40,6 +40,15 @@ export function collectKnownStatusIds(section: Element): Set<string> {
   // observer とは別物であり、互いに干渉しないよう独立した変数で管理する。
   let currentTweetObserver: MutationObserver | null = null;
 
+  // 検索ページの自動更新: 別タブを表示してから元のタブへ戻すまでの待機時間（ms）。
+  // 実 X で 2.5 秒待つと別タブの結果が描画され、戻したときに最新の検索結果が再取得されることを確認済み。
+  const SEARCH_TAB_SWITCH_DELAY_MS = 2500;
+  // 検索ページの自動更新: 元のタブへ戻してから、描画が落ち着くのを待つ時間（ms）。
+  const SEARCH_TAB_RETURN_SETTLE_MS = 3000;
+
+  // 検索ページのタブ切り替え（別タブ→元のタブ）の実行中フラグ。二重実行を防ぐ。
+  let searchTabSwitching = false;
+
   function isScrolling(): boolean {
     return document.scrollingElement
       ? document.scrollingElement.scrollTop > 0
@@ -97,7 +106,24 @@ export function collectKnownStatusIds(section: Element): Set<string> {
     invoke("report_new_posts_count", { label, count }).catch(() => {});
   }
 
-  function waitForNewTweet(): void {
+  /** ids に knownIds に含まれない status ID が 1 つでもあれば true。 */
+  function hasUnknownId(ids: Set<string>, knownIds: Set<string>): boolean {
+    for (const id of ids) {
+      if (!knownIds.has(id)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * 未知の status ID の出現を最大 30 秒監視し、出現したら新着として報告する。
+   * @param initialKnownIds 既知 ID 集合。省略時は呼び出し時点の section からスナップショットする。
+   * @param checkImmediately true のとき、監視を始める前に現在の DOM を既知 ID と比較し、
+   *   未知の ID があれば即報告して監視を張らない。
+   */
+  function waitForNewTweet(
+    initialKnownIds?: Set<string>,
+    checkImmediately = false,
+  ): void {
     const section = document.querySelector("section[aria-labelledby]");
     if (!section) return;
 
@@ -109,7 +135,17 @@ export function collectKnownStatusIds(section: Element): Set<string> {
     // 監視開始時点の status ID 群をスナップショットする。DOM順先頭要素の
     // innerHTML比較では仮想化リストのDOM recycle（スクロール中の要素入れ替え）を
     // 新着と誤検出してしまうため、ツイート固有IDの集合比較に切り替える。
-    const knownIds = collectKnownStatusIds(section);
+    const knownIds = initialKnownIds ?? collectKnownStatusIds(section);
+
+    if (checkImmediately) {
+      // observer 側と同様、スクロール中は仮想リストの入れ替えによる誤検出を
+      // 避けるため、報告も監視もせずこの回の判定を打ち切る。
+      if (isScrolling()) return;
+      if (hasUnknownId(collectKnownStatusIds(section), knownIds)) {
+        reportNewPostsCount(1);
+        return;
+      }
+    }
 
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
@@ -129,15 +165,7 @@ export function collectKnownStatusIds(section: Element): Set<string> {
         return;
       }
 
-      const currentIds = collectKnownStatusIds(section);
-      let hasNewId = false;
-      for (const id of currentIds) {
-        if (!knownIds.has(id)) {
-          hasNewId = true;
-          break;
-        }
-      }
-      if (hasNewId) {
+      if (hasUnknownId(collectKnownStatusIds(section), knownIds)) {
         observer.disconnect();
         cleanUp();
         reportNewPostsCount(1);
@@ -192,11 +220,71 @@ export function collectKnownStatusIds(section: Element): Set<string> {
     }
   }
 
+  function isSearchPage(): boolean {
+    return location.pathname === "/search";
+  }
+
+  function getSearchTabs(): HTMLElement[] {
+    return Array.from(document.querySelectorAll<HTMLElement>("a[role='tab']"));
+  }
+
+  function findSearchTabByHref(href: string): HTMLElement | null {
+    return (
+      getSearchTabs().find((tab) => tab.getAttribute("href") === href) ?? null
+    );
+  }
+
+  /**
+   * 検索ページの更新。選択中のタブへの再クリックや新着ボタンは効かないため、
+   * 別タブへ切り替えてから元のタブへ戻すことでタイムラインを取得し直す。
+   */
+  function triggerSearchRefresh(): void {
+    if (searchTabSwitching) return;
+    const section = document.querySelector("section[aria-labelledby]");
+    const tabs = getSearchTabs();
+    const selected = tabs.find(
+      (tab) => tab.getAttribute("aria-selected") === "true",
+    );
+    const other = tabs.find(
+      (tab) => tab.getAttribute("aria-selected") !== "true",
+    );
+    const originalHref = selected?.getAttribute("href");
+    if (!section || !selected || !other || !originalHref) return;
+
+    // 別タブ表示中の投稿は元タブと ID が異なる。切替前の ID 集合を基準にし、
+    // 元のタブへ戻して描画が落ち着いた後に比較する。
+    const knownIds = collectKnownStatusIds(section);
+    searchTabSwitching = true;
+    other.click();
+
+    setTimeout(function () {
+      const original = isSearchPage()
+        ? findSearchTabByHref(originalHref)
+        : null;
+      if (!original) {
+        searchTabSwitching = false;
+        return;
+      }
+      original.click();
+      setTimeout(function () {
+        searchTabSwitching = false;
+        waitForNewTweet(knownIds, true);
+      }, SEARCH_TAB_RETURN_SETTLE_MS);
+    }, SEARCH_TAB_SWITCH_DELAY_MS);
+  }
+
   function triggerReload(scrollToTop?: boolean): void {
     if (scrollToTop && document.scrollingElement) {
       document.scrollingElement.scrollTop = 0;
     }
     if (isScrolling()) return;
+
+    if (isSearchPage()) {
+      triggerSearchRefresh();
+      // 検索ページでは切替直後に waitForNewTweet() を呼ばない
+      // （別タブ表示中の別 ID を新着と誤検出するため）。
+      return;
+    }
 
     if (isFollowingTabActive()) {
       triggerFollowingRefresh();
