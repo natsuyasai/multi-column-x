@@ -32,7 +32,7 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
 }) => {
   const isExternal = column.pageType === "external";
   const label =
-    column.label ??
+    column.label ||
     (account
       ? `${account.label} - ${getPageTypeLabel(column)}`
       : getPageTypeLabel(column));

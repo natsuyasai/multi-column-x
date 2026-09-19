@@ -431,8 +431,13 @@ const App: React.FC = () => {
   );
 
   const handleApplySettings = useCallback(
-    async (columnId: string, settings: ColumnSettings, width: number) => {
-      handleUpdateColumn(columnId, { settings, width });
+    async (
+      columnId: string,
+      settings: ColumnSettings,
+      width: number,
+      label: string | undefined,
+    ) => {
+      handleUpdateColumn(columnId, { settings, width, label });
       setSettingsColumnId(null);
       const globalNgWords = useAppStore.getState().globalSettings.ngWords ?? [];
       await applyColumnSettingsScripts(columnId, settings, globalNgWords);

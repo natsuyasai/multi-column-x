@@ -206,11 +206,18 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   ngWords: [],
 };
 
+export const COLUMN_LABEL_MAX_LENGTH = 30;
+
 interface GetPageTypeLabelInput {
   pageType: PageType;
   homeTabName?: string;
   searchQuery?: string;
   customUrl?: string;
+}
+
+export function normalizeColumnLabel(input: string): string | undefined {
+  const trimmed = input.trim();
+  return trimmed ? trimmed : undefined;
 }
 
 export function getPageTypeLabel(input: GetPageTypeLabelInput): string {
@@ -238,5 +245,5 @@ export function getPageTypeLabel(input: GetPageTypeLabelInput): string {
 }
 
 export function getColumnLabel(column: Column): string {
-  return column.label ?? getPageTypeLabel(column);
+  return column.label || getPageTypeLabel(column);
 }

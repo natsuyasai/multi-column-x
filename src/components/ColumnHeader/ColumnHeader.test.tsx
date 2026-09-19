@@ -167,6 +167,23 @@ describe("ColumnHeader", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("labelが空文字のときアカウント名とページ種別の既定表示になる", () => {
+    const columnWithEmptyLabel = { ...mockColumn, label: "" };
+    render(<ColumnHeader {...defaultProps} column={columnWithEmptyLabel} />);
+    expect(
+      screen.getByText("テストアカウント - フォロー中"),
+    ).toBeInTheDocument();
+  });
+
+  it("labelが設定されていればそれが表示される", () => {
+    const columnWithLabel = { ...mockColumn, label: "カスタムラベル" };
+    render(<ColumnHeader {...defaultProps} column={columnWithLabel} />);
+    expect(screen.getByText("カスタムラベル")).toBeInTheDocument();
+    expect(
+      screen.queryByText("テストアカウント - フォロー中"),
+    ).not.toBeInTheDocument();
+  });
+
   it("accountがundefinedの場合ドット色がフォールバック値になる", () => {
     const { container } = render(
       <ColumnHeader {...defaultProps} account={undefined} />,

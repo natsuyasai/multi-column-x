@@ -1,13 +1,23 @@
 import React, { useState } from "react";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { validateNgWordLines } from "../../lib/ngWordPattern";
-import type { Column, ColumnSettings } from "../../types";
+import {
+  COLUMN_LABEL_MAX_LENGTH,
+  normalizeColumnLabel,
+  type Column,
+  type ColumnSettings,
+} from "../../types";
 import { HelpPopover } from "../HelpPopover/HelpPopover";
 import styles from "./SettingsPanel.module.scss";
 
 interface SettingsPanelProps {
   column: Column;
-  onApply: (columnId: string, settings: ColumnSettings, width: number) => void;
+  onApply: (
+    columnId: string,
+    settings: ColumnSettings,
+    width: number,
+    label: string | undefined,
+  ) => void;
   onClose: () => void;
   onReload?: (columnId: string) => void;
   isMobile: boolean;
@@ -28,6 +38,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     ...column.settings,
   });
   const [width, setWidth] = useState<number>(column.width);
+  const [labelText, setLabelText] = useState<string>(column.label ?? "");
   const [ngWordsText, setNgWordsText] = useState<string>(
     (column.settings.ngWords ?? []).join("\n"),
   );
@@ -61,7 +72,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
     setWhitelistError(null);
 
-    onApply(column.id, { ...settings, ngWords, whitelistWords }, width);
+    onApply(
+      column.id,
+      { ...settings, ngWords, whitelistWords },
+      width,
+      normalizeColumnLabel(labelText),
+    );
   };
 
   return (
@@ -79,9 +95,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className={styles.form}>
-          {!isMobile && (
-            <section className={styles.section}>
-              <h3 className={styles.sectionTitle}>カラム</h3>
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>カラム</h3>
+            <label className={styles.fieldLabelBlock}>
+              表示名
+              <input
+                type="text"
+                className={styles.labelInput}
+                value={labelText}
+                onChange={(e) => setLabelText(e.target.value)}
+                maxLength={COLUMN_LABEL_MAX_LENGTH}
+                placeholder="未指定の場合は既定の表示名"
+              />
+            </label>
+            {!isMobile && (
               <label className={styles.fieldLabel}>
                 幅（px）
                 <input
@@ -93,8 +120,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   onChange={(e) => setWidth(Number(e.target.value))}
                 />
               </label>
-            </section>
-          )}
+            )}
+          </section>
 
           {!isExternal && (
             <section className={styles.section}>
