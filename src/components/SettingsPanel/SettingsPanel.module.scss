@@ -109,6 +109,14 @@
   color: var(--mcx-text-secondary);
 }
 
+.fieldLabelBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--mcx-text-secondary);
+}
+
 .numberInput {
   background: var(--mcx-surface-sunken);
   border: 1px solid var(--mcx-border);
@@ -141,6 +149,27 @@
   &:focus {
     outline: none;
     border-color: var(--mcx-accent);
+  }
+}
+
+.labelInput {
+  background: var(--mcx-surface-sunken);
+  border: 1px solid var(--mcx-border);
+  border-radius: 4px;
+  color: var(--mcx-text);
+  font-size: 13px;
+  padding: 7px 8px;
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+
+  &:focus {
+    outline: none;
+    border-color: var(--mcx-accent);
+  }
+
+  &::placeholder {
+    color: var(--mcx-text-muted);
   }
 }
 

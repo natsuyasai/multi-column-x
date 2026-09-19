@@ -95,6 +95,33 @@ export const Default: Story = {
         desktopNotifyEnabled: true,
       }),
       350,
+      undefined,
+    );
+  },
+};
+
+export const WithDisplayName: Story = {
+  name: "表示名を設定して適用",
+  args: {
+    column: {
+      ...column,
+      label: "仕事用",
+    },
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const displayNameInput = canvas.getByRole("textbox", {
+      name: "表示名",
+    }) as HTMLInputElement;
+    await expect(displayNameInput.value).toBe("仕事用");
+    await userEvent.clear(displayNameInput);
+    await userEvent.type(displayNameInput, "私用");
+    await userEvent.click(canvas.getByRole("button", { name: "適用" }));
+    await expect(args.onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.anything(),
+      350,
+      "私用",
     );
   },
 };

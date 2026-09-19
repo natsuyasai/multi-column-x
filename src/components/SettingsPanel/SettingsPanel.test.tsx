@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { Column } from "../../types";
 import { SettingsPanel } from "./SettingsPanel";
 
+const user = userEvent.setup();
+
 const baseSettings = {
   autoReloadEnabled: false,
   autoReloadInterval: 600,
@@ -116,6 +118,7 @@ describe("SettingsPanel NGワード", () => {
       "col-1",
       expect.objectContaining({ ngWords: ["spam", "bot"] }),
       350,
+      undefined,
     );
   });
 
@@ -132,6 +135,7 @@ describe("SettingsPanel NGワード", () => {
       "col-1",
       expect.objectContaining({ ngWords: ["spam", "bot"] }),
       350,
+      undefined,
     );
   });
 
@@ -169,6 +173,7 @@ describe("SettingsPanel NGワード", () => {
       "col-1",
       expect.objectContaining({ ngWords: ["spam", "/foo|bar/i"] }),
       350,
+      undefined,
     );
   });
 });
@@ -246,6 +251,7 @@ describe("SettingsPanel ホワイトリスト", () => {
       "col-1",
       expect.objectContaining({ whitelistWords: ["推し", "限定"] }),
       350,
+      undefined,
     );
   });
 
@@ -323,6 +329,7 @@ describe("SettingsPanel 表示設定", () => {
         hideTweetInputEnabled: false,
       }),
       350,
+      undefined,
     );
   });
 
@@ -340,6 +347,7 @@ describe("SettingsPanel 表示設定", () => {
         hideTweetInputEnabled: true,
       }),
       350,
+      undefined,
     );
   });
 
@@ -452,6 +460,108 @@ describe("SettingsPanel 新着デスクトップ通知", () => {
       "col-1",
       expect.objectContaining({ desktopNotifyEnabled: true }),
       350,
+      undefined,
     );
+  });
+});
+
+describe("SettingsPanel 表示名", () => {
+  it("既存のlabelが表示名欄の初期値に入る", () => {
+    const col = {
+      ...mockColumn,
+      label: "仕事用",
+    };
+    render(<SettingsPanel {...defaultProps} column={col} />);
+    const input = screen.getByRole("textbox", {
+      name: "表示名",
+    }) as HTMLInputElement;
+    expect(input.value).toBe("仕事用");
+  });
+
+  it("labelが未設定のとき表示名欄は空", () => {
+    render(<SettingsPanel {...defaultProps} />);
+    const input = screen.getByRole("textbox", {
+      name: "表示名",
+    }) as HTMLInputElement;
+    expect(input.value).toBe("");
+  });
+
+  it("表示名を変更して適用するとonApplyの第4引数が新しい表示名になる", async () => {
+    const onApply = vi.fn();
+    render(<SettingsPanel {...defaultProps} onApply={onApply} />);
+    const input = screen.getByRole("textbox", { name: "表示名" });
+    await user.clear(input);
+    await user.type(input, "新しい表示名");
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.anything(),
+      350,
+      "新しい表示名",
+    );
+  });
+
+  it("表示名を空にして適用すると第4引数がundefinedになる", async () => {
+    const onApply = vi.fn();
+    const col = {
+      ...mockColumn,
+      label: "旧表示名",
+    };
+    render(<SettingsPanel {...defaultProps} column={col} onApply={onApply} />);
+    const input = screen.getByRole("textbox", { name: "表示名" });
+    await user.clear(input);
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.anything(),
+      350,
+      undefined,
+    );
+  });
+
+  it("前後空白のみの表示名は第4引数がundefinedになる", async () => {
+    const onApply = vi.fn();
+    render(<SettingsPanel {...defaultProps} onApply={onApply} />);
+    const input = screen.getByRole("textbox", { name: "表示名" });
+    await user.type(input, "   ");
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.anything(),
+      350,
+      undefined,
+    );
+  });
+
+  it("モバイル（isMobile: true）でも表示名欄が表示され、幅（px）欄は表示されない", () => {
+    render(<SettingsPanel {...defaultProps} isMobile={true} />);
+    expect(screen.getByRole("textbox", { name: "表示名" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("幅（px）")).not.toBeInTheDocument();
+  });
+
+  it("デスクトップでは表示名欄と幅（px）欄の両方が表示される", () => {
+    render(<SettingsPanel {...defaultProps} isMobile={false} />);
+    expect(screen.getByRole("textbox", { name: "表示名" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("spinbutton", { name: "幅（px）" }),
+    ).toBeInTheDocument();
+  });
+
+  it("表示名欄のmaxLengthが30", () => {
+    render(<SettingsPanel {...defaultProps} />);
+    const input = screen.getByRole("textbox", {
+      name: "表示名",
+    }) as HTMLInputElement;
+    expect(input.maxLength).toBe(30);
+  });
+
+  it("externalカラムでも表示名欄が表示される", () => {
+    const externalColumn: Column = {
+      ...mockColumn,
+      pageType: "external",
+      customUrl: "https://example.com",
+    };
+    render(<SettingsPanel {...defaultProps} column={externalColumn} />);
+    expect(screen.getByRole("textbox", { name: "表示名" })).toBeInTheDocument();
   });
 });
