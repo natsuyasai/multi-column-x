@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   getPageTypeLabel,
   getColumnLabel,
+  normalizeColumnLabel,
+  COLUMN_LABEL_MAX_LENGTH,
   DEFAULT_COLUMN_SETTINGS,
   DEFAULT_GLOBAL_SETTINGS,
 } from "./index";
@@ -107,6 +109,51 @@ describe("getColumnLabel", () => {
   it("homeはhomeTabNameを反映する", () => {
     const col = { ...baseColumn, homeTabName: "フォロー中" };
     expect(getColumnLabel(col)).toBe("フォロー中");
+  });
+
+  it("labelが空文字のときページ種別ラベルを返す", () => {
+    const col = {
+      ...baseColumn,
+      label: "",
+      pageType: "notifications" as const,
+    };
+    expect(getColumnLabel(col)).toBe("通知");
+  });
+});
+
+describe("normalizeColumnLabel", () => {
+  it("通常の文字列はそのまま返す", () => {
+    expect(normalizeColumnLabel("マイタブ")).toBe("マイタブ");
+  });
+
+  it("前後の半角空白を除去する", () => {
+    expect(normalizeColumnLabel("  マイタブ  ")).toBe("マイタブ");
+  });
+
+  it("前後の全角空白を除去する", () => {
+    expect(normalizeColumnLabel("　マイタブ　")).toBe("マイタブ");
+  });
+
+  it("内部の空白は保持する", () => {
+    expect(normalizeColumnLabel("マイ タブ")).toBe("マイ タブ");
+  });
+
+  it("空文字はundefinedを返す", () => {
+    expect(normalizeColumnLabel("")).toBeUndefined();
+  });
+
+  it("空白のみはundefinedを返す", () => {
+    expect(normalizeColumnLabel("  ")).toBeUndefined();
+  });
+
+  it("全角空白のみはundefinedを返す", () => {
+    expect(normalizeColumnLabel("　")).toBeUndefined();
+  });
+});
+
+describe("COLUMN_LABEL_MAX_LENGTH", () => {
+  it("値が30である", () => {
+    expect(COLUMN_LABEL_MAX_LENGTH).toBe(30);
   });
 });
 
