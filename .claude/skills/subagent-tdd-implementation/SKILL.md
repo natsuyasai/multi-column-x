@@ -57,6 +57,7 @@ digraph cycle {
 
 - 対象ステップの要求と完了基準
 - **t-wada推奨TDD（Red-Green-Refactor）で進めること** → `tdd` スキル準拠
+- 担当する承認済みGherkinシナリオ（`docs/specs/*.feature` から該当シナリオの全文を貼る。`@unit` / `@integration` のテストを作らせ、テスト名はシナリオ名に対応させる。`@manual` は作らせない。`.feature` への参照はテスト・コメント・コミットに書かせない）
 - 作成するテストの種類（下記「テストの作成」）
 - プロジェクト規約: コロケーション配置、import順（`import-x/order`、`@/` は internal）、新規コードは `@/` エイリアス、テストケース名は日本語、`var` 禁止
 - 該当する場合の制約: desktop/mobile の `#[cfg]` 分岐、serde の `#[serde(rename)]`、inject の `npm run build:inject`、Android の ProGuard keep ルール同期（CLAUDE.md参照）
@@ -66,6 +67,7 @@ digraph cycle {
 サブエージェントの成果を必ずレビューする:
 
 - テストが**先に**書かれ、Red→Greenを経ているか
+- 担当した `@unit` / `@integration` シナリオすべてにテストがあり、テスト名がシナリオ名に対応しているか（`.feature` への参照が混入していないか）
 - テストが振る舞いを正しく表現しているか（実装に追従しただけでないか）
 - 要求・完了基準を満たすか、規約違反がないか
 - 不足・誤りがあれば具体的な指摘を返して再依頼する
@@ -99,6 +101,7 @@ git add -A && git commit -m "<このステップの内容>"
 
 - プランの全作業ステップが実装・レビュー済みで、各ステップがコミットされている
 - 必要なテスト（単体／カタログ／play function／プロパティ）が揃っている
+- 承認済みGherkinの `@unit` / `@integration` シナリオすべてにテストが存在する（漏れをメインがシナリオ一覧と突き合わせて確認）
 - `progress.md` が全ステップ「コミット済み」になっており、計画（`plan.md`）と同一フォルダに残っている
 
 完了したらフェーズ4（`property-based-testing`）の要否を判断する。
