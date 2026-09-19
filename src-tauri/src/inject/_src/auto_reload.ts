@@ -40,11 +40,12 @@ export function collectKnownStatusIds(section: Element): Set<string> {
   // observer とは別物であり、互いに干渉しないよう独立した変数で管理する。
   let currentTweetObserver: MutationObserver | null = null;
 
-  // 検索ページの自動更新: 別タブを表示してから元のタブへ戻すまでの待機時間（ms）。
-  // 実 X で 2.5 秒待つと別タブの結果が描画され、戻したときに最新の検索結果が再取得されることを確認済み。
-  const SEARCH_TAB_SWITCH_DELAY_MS = 2500;
-  // 検索ページの自動更新: 元のタブへ戻してから、描画が落ち着くのを待つ時間（ms）。
-  const SEARCH_TAB_RETURN_SETTLE_MS = 3000;
+  // 検索ページの自動更新: DOM の変化がこの時間止まったら「描画が落ち着いた」とみなす（ms）。
+  const SEARCH_RENDER_QUIET_MS = 800;
+  // 別タブへ切り替えてから、描画の落ち着きを待つ上限時間（ms）。上限で必ず元のタブへ戻す。
+  const SEARCH_TAB_SWITCH_MAX_WAIT_MS = 5000;
+  // 元のタブへ戻してから、描画の落ち着きを待つ上限時間（ms）。上限で必ず判定へ進む。
+  const SEARCH_TAB_RETURN_MAX_WAIT_MS = 5000;
 
   // 検索ページのタブ切り替え（別タブ→元のタブ）の実行中フラグ。二重実行を防ぐ。
   let searchTabSwitching = false;
@@ -235,8 +236,51 @@ export function collectKnownStatusIds(section: Element): Set<string> {
   }
 
   /**
+   * 描画（DOM の子要素の増減）が SEARCH_RENDER_QUIET_MS 止まるまで待つ。
+   * - 最初の変化があるまでは「落ち着いた」とはみなさない（変化前に待ち終わらない）。
+   * - maxWaitMs 経過で必ず打ち切る（変化が無い／変化が続く場合の上限）。
+   * - 待機中・終了時に検索ページでなくなっていたら onDone(false)、それ以外は onDone(true)。
+   * 監視は呼び出した時点から始まるので、変化を起こす操作（タブのクリック）より前に呼ぶこと。
+   */
+  function waitForRenderQuiet(
+    maxWaitMs: number,
+    onDone: (stillOnSearchPage: boolean) => void,
+  ): void {
+    let finished = false;
+    let quietTimer: ReturnType<typeof setTimeout> | null = null;
+    let maxTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const finish = (): void => {
+      if (finished) return;
+      finished = true;
+      observer.disconnect();
+      if (quietTimer !== null) clearTimeout(quietTimer);
+      if (maxTimer !== null) clearTimeout(maxTimer);
+      onDone(isSearchPage());
+    };
+
+    // attributes は監視しない（タブの選択状態の変化を描画と数えないため）。
+    const observer = new MutationObserver(function () {
+      if (finished) return;
+      if (!isSearchPage()) {
+        finish();
+        return;
+      }
+      if (quietTimer !== null) clearTimeout(quietTimer);
+      quietTimer = setTimeout(finish, SEARCH_RENDER_QUIET_MS);
+    });
+
+    observer.observe(document.querySelector("main") ?? document.body, {
+      childList: true,
+      subtree: true,
+    });
+    maxTimer = setTimeout(finish, maxWaitMs);
+  }
+
+  /**
    * 検索ページの更新。選択中のタブへの再クリックや新着ボタンは効かないため、
    * 別タブへ切り替えてから元のタブへ戻すことでタイムラインを取得し直す。
+   * 各段階は描画（DOM の変化）が落ち着くのを待ち、固定時間は上限としてのみ使う。
    */
   function triggerSearchRefresh(): void {
     if (searchTabSwitching) return;
@@ -255,22 +299,27 @@ export function collectKnownStatusIds(section: Element): Set<string> {
     // 元のタブへ戻して描画が落ち着いた後に比較する。
     const knownIds = collectKnownStatusIds(section);
     searchTabSwitching = true;
-    other.click();
 
-    setTimeout(function () {
-      const original = isSearchPage()
-        ? findSearchTabByHref(originalHref)
-        : null;
+    // 1) 別タブへ切り替え。クリックが起こす最初の変化を取りこぼさないよう、
+    //    監視を先に始めてからクリックする。
+    waitForRenderQuiet(SEARCH_TAB_SWITCH_MAX_WAIT_MS, function (onSearchPage) {
+      const original = onSearchPage ? findSearchTabByHref(originalHref) : null;
       if (!original) {
         searchTabSwitching = false;
         return;
       }
+      // 2) 元のタブへ戻す。こちらも監視を先に始めてからクリックする。
+      waitForRenderQuiet(
+        SEARCH_TAB_RETURN_MAX_WAIT_MS,
+        function (stillOnSearchPage) {
+          searchTabSwitching = false;
+          if (!stillOnSearchPage) return;
+          waitForNewTweet(knownIds, true);
+        },
+      );
       original.click();
-      setTimeout(function () {
-        searchTabSwitching = false;
-        waitForNewTweet(knownIds, true);
-      }, SEARCH_TAB_RETURN_SETTLE_MS);
-    }, SEARCH_TAB_SWITCH_DELAY_MS);
+    });
+    other.click();
   }
 
   function triggerReload(scrollToTop?: boolean): void {
