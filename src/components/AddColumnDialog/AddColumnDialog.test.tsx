@@ -114,6 +114,50 @@ describe("AddColumnDialog", () => {
     );
   });
 
+  it("検索を選んで追加すると最新タブ指定つきの検索カラムが作られる", async () => {
+    const onAdd = vi.fn();
+    render(
+      <AddColumnDialog
+        accounts={mockAccounts}
+        globalSettings={mockGlobalSettings}
+        existingColumns={[]}
+        onAdd={onAdd}
+        onCancel={vi.fn()}
+      />,
+    );
+    await userEvent.selectOptions(
+      screen.getByLabelText("ページタイプ"),
+      "検索",
+    );
+    await userEvent.type(screen.getByLabelText("検索クエリ"), "rust");
+    await userEvent.click(screen.getByRole("button", { name: "追加" }));
+    expect(onAdd).toHaveBeenCalledWith(
+      expect.objectContaining<Partial<Column>>({
+        pageType: "search",
+        searchQuery: "rust",
+        searchLiveTab: true,
+      }),
+    );
+  });
+
+  it("検索以外を選んで追加すると最新タブ指定は付かない", async () => {
+    const onAdd = vi.fn();
+    render(
+      <AddColumnDialog
+        accounts={mockAccounts}
+        globalSettings={mockGlobalSettings}
+        existingColumns={[]}
+        onAdd={onAdd}
+        onCancel={vi.fn()}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "追加" }));
+    expect(onAdd).toHaveBeenCalledTimes(1);
+    const added = onAdd.mock.calls[0][0] as Column;
+    expect(added.pageType).toBe("home");
+    expect(added.searchLiveTab).toBeUndefined();
+  });
+
   it("グローバル設定のdefaultHideHeaderEnabledとdefaultHideTweetInputEnabledがそれぞれ独立して新規カラムの設定にコピーされる", async () => {
     const onAdd = vi.fn();
     render(

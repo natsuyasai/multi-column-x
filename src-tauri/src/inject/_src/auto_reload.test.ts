@@ -474,3 +474,390 @@ describe("inject/auto_reload の新着判定（status ID 集合比較方式）",
     expect(invokeMock).not.toHaveBeenCalled();
   });
 });
+
+describe("inject/auto_reload 検索ページの更新", () => {
+  beforeAll(async () => {
+    await import("./auto_reload");
+  });
+
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    invokeMock.mockClear();
+    setScrolling(0);
+    window.__TAURI_INTERNALS__ = {
+      metadata: { currentWebview: { label: "column-1" } },
+    };
+    window.__TAURI__ = { core: { invoke: invokeMock } };
+    history.pushState({}, "", "/search?q=rust&f=live");
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    // 途中のタブ切り替えが次のテストへ持ち越されないよう、保留中のタイマーを流し切る
+    vi.runAllTimers();
+    vi.useRealTimers();
+    history.replaceState({}, "", "/");
+  });
+
+  /** 検索ページのタブ（a[role=tab]）を作る。クリックで選択状態が移る X の挙動を再現する。 */
+  function addSearchTabs(
+    names: string[],
+    selectedIndex: number,
+  ): HTMLAnchorElement[] {
+    const tabs = names.map((name, i) => {
+      const tab = document.createElement("a");
+      tab.setAttribute("role", "tab");
+      tab.setAttribute("href", `/search?q=rust&f=${name}`);
+      tab.setAttribute("aria-selected", String(i === selectedIndex));
+      document.body.appendChild(tab);
+      return tab;
+    });
+    for (const tab of tabs) {
+      tab.addEventListener("click", (event) => {
+        // X の SPA 遷移を再現する（jsdom の実ナビゲーションを起こさない）
+        event.preventDefault();
+        for (const t of tabs)
+          t.setAttribute("aria-selected", String(t === tab));
+      });
+    }
+    return tabs;
+  }
+
+  /** 各タブのクリックを name の配列として記録する。 */
+  function recordClicks(tabs: HTMLAnchorElement[], names: string[]): string[] {
+    const clicks: string[] = [];
+    tabs.forEach((tab, i) => {
+      tab.addEventListener("click", () => clicks.push(names[i]));
+    });
+    return clicks;
+  }
+
+  const TAB_NAMES = ["top", "live", "user", "media", "list"];
+
+  it("「最新」タブの検索カラムで自動更新が動くと検索結果が取得し直される", async () => {
+    const tabs = addSearchTabs(TAB_NAMES, 1);
+    const clicks = recordClicks(tabs, TAB_NAMES);
+    addSection();
+
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(5000);
+
+    expect(clicks).toEqual(["top", "live"]);
+  });
+
+  it("「話題のポスト」タブの検索カラムでも自動更新が動くと元のタブへ戻る", async () => {
+    const tabs = addSearchTabs(TAB_NAMES, 0);
+    const clicks = recordClicks(tabs, TAB_NAMES);
+    addSection();
+
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(5000);
+
+    expect(clicks).toEqual(["live", "top"]);
+  });
+
+  it("自動更新のあと選択中のタブは実行前と同じである", async () => {
+    const tabs = addSearchTabs(TAB_NAMES, 1);
+    addSection();
+
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(5000 + 5000);
+
+    expect(tabs.map((tab) => tab.getAttribute("aria-selected"))).toEqual([
+      "false",
+      "true",
+      "false",
+      "false",
+      "false",
+    ]);
+  });
+
+  it("検索ページにタブが見つからないときは何もせずエラーにもならない", async () => {
+    addSection();
+
+    expect(() => triggerReload()).not.toThrow();
+    await vi.advanceTimersByTimeAsync(5000 + 5000);
+
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("検索ページのタブが選択中の1つしかないときは何もせずエラーにもならない", async () => {
+    const tabs = addSearchTabs(["live"], 0);
+    const clicks = recordClicks(tabs, ["live"]);
+    addSection();
+
+    expect(() => triggerReload()).not.toThrow();
+    await vi.advanceTimersByTimeAsync(5000 + 5000);
+
+    expect(clicks).toEqual([]);
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("ホームのカラムの自動更新は従来どおりの手順で行われる", async () => {
+    history.replaceState({}, "", "/");
+    const searchTabs = addSearchTabs(TAB_NAMES, 1);
+    const searchClicks = recordClicks(searchTabs, TAB_NAMES);
+    const homeTab = addTab(true, false);
+    const homeClickSpy = vi.fn();
+    homeTab.addEventListener("click", homeClickSpy);
+    addSection();
+
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(5000 + 5000);
+
+    expect(homeClickSpy).toHaveBeenCalledTimes(1);
+    expect(searchClicks).toEqual([]);
+  });
+
+  it("検索以外のタブ付きページでも検索ページ専用の切り替えは行われない", async () => {
+    history.replaceState({}, "", "/i/lists/123");
+    const tabs = addSearchTabs(TAB_NAMES, 1);
+    const clicks = recordClicks(tabs, TAB_NAMES);
+    addSection();
+
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(5000 + 5000);
+
+    expect(clicks).toEqual([]);
+  });
+
+  it("ユーザーがスクロールしているときは検索カラムの自動更新を行わない", async () => {
+    setScrolling(100);
+    const tabs = addSearchTabs(TAB_NAMES, 1);
+    const clicks = recordClicks(tabs, TAB_NAMES);
+    addSection();
+
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(5000 + 5000);
+
+    expect(clicks).toEqual([]);
+  });
+
+  it("上端へスクロールする指定つきの自動更新は先頭へ戻してから更新する", async () => {
+    setScrolling(100);
+    const tabs = addSearchTabs(TAB_NAMES, 1);
+    const clicks = recordClicks(tabs, TAB_NAMES);
+    addSection();
+
+    triggerReload(true);
+
+    expect(scrollingElementStub.scrollTop).toBe(0);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(clicks).toEqual(["top", "live"]);
+  });
+
+  it("切り替えの途中でもう一度自動更新が実行されても二重に切り替えない", async () => {
+    const tabs = addSearchTabs(TAB_NAMES, 1);
+    const clicks = recordClicks(tabs, TAB_NAMES);
+    addSection();
+
+    triggerReload();
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(5000);
+
+    expect(clicks).toEqual(["top", "live"]);
+  });
+
+  it("切り替えの途中でカラムのページが検索ページでなくなっても元のタブへ戻そうとしない", async () => {
+    const tabs = addSearchTabs(TAB_NAMES, 1);
+    const clicks = recordClicks(tabs, TAB_NAMES);
+    addSection();
+
+    triggerReload();
+    history.pushState({}, "", "/home");
+
+    await expect(
+      vi.advanceTimersByTimeAsync(5000 + 5000),
+    ).resolves.not.toThrow();
+    expect(clicks).toEqual(["top"]);
+  });
+
+  it("検索結果が取得し直されて未表示のポストが現れると新着として報告される", async () => {
+    addSearchTabs(TAB_NAMES, 1);
+    const section = addSection();
+    addArticleWithStatusId(section, "111");
+
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(5000);
+
+    // 元のタブへ戻したあと、取得し直された結果に未表示のポストが現れる
+    addArticleWithStatusId(section, "222");
+    await vi.advanceTimersByTimeAsync(5000);
+
+    expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
+      label: "column-1",
+      count: 1,
+    });
+  });
+
+  it("検索結果が取得し直されても未表示のポストが現れなければ新着として報告されない", async () => {
+    addSearchTabs(TAB_NAMES, 1);
+    const section = addSection();
+    const original = addArticleWithStatusId(section, "111");
+
+    triggerReload();
+
+    // 別タブ表示中は元のタブと異なるポストが並ぶ
+    original.remove();
+    addArticleWithStatusId(section, "999");
+    await vi.advanceTimersByTimeAsync(5000);
+
+    // 元のタブへ戻すと元と同じ結果に戻る
+    section.innerHTML = "";
+    addArticleWithStatusId(section, "111");
+    await vi.runAllTimersAsync();
+
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("元のタブへ戻した後の待機中にユーザーがスクロールしていたら新着として報告されない", async () => {
+    addSearchTabs(TAB_NAMES, 1);
+    const section = addSection();
+    addArticleWithStatusId(section, "111");
+
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(5000);
+
+    // 元のタブへ戻した後の待機中に未知のポストが現れ、ユーザーがスクロールしている
+    addArticleWithStatusId(section, "222");
+    setScrolling(100);
+    await vi.advanceTimersByTimeAsync(5000);
+
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("別タブの描画が検知できないときは上限時間で元のタブへ戻す", async () => {
+    const tabs = addSearchTabs(TAB_NAMES, 1);
+    const clicks = recordClicks(tabs, TAB_NAMES);
+    addSection();
+
+    triggerReload();
+
+    await vi.advanceTimersByTimeAsync(4999);
+    expect(clicks).toEqual(["top"]);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(clicks).toEqual(["top", "live"]);
+  });
+
+  it("別タブの描画が落ち着いたら上限時間を待たずに元のタブへ戻す", async () => {
+    const tabs = addSearchTabs(TAB_NAMES, 1);
+    const clicks = recordClicks(tabs, TAB_NAMES);
+    const section = addSection();
+
+    triggerReload();
+    // 別タブがクリックされた直後に、別タブの結果が描画される
+    expect(clicks).toEqual(["top"]);
+    addArticleWithStatusId(section, "999");
+
+    await vi.advanceTimersByTimeAsync(799);
+    expect(clicks).toEqual(["top"]);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(clicks).toEqual(["top", "live"]);
+  });
+
+  it("別タブの描画が続いて落ち着かないときも上限時間で元のタブへ戻す", async () => {
+    const tabs = addSearchTabs(TAB_NAMES, 1);
+    const clicks = recordClicks(tabs, TAB_NAMES);
+    const section = addSection();
+
+    triggerReload();
+    // 500ms ごとに描画が続き、800ms の静止には届かない
+    for (let elapsed = 0; elapsed < 4500; elapsed += 500) {
+      section.appendChild(document.createElement("div"));
+      await vi.advanceTimersByTimeAsync(500);
+    }
+    expect(clicks).toEqual(["top"]);
+
+    await vi.advanceTimersByTimeAsync(500);
+    expect(clicks).toEqual(["top", "live"]);
+  });
+
+  it("元のタブへ戻したあと描画が落ち着いてから新着を判定する", async () => {
+    addSearchTabs(TAB_NAMES, 1);
+    const section = addSection();
+    addArticleWithStatusId(section, "111");
+
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(5000);
+
+    // 元のタブへ戻した直後に、取得し直された結果が描画される
+    addArticleWithStatusId(section, "222");
+    await vi.advanceTimersByTimeAsync(799);
+    expect(invokeMock).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
+      label: "column-1",
+      count: 1,
+    });
+  });
+
+  it("元のタブへ戻したあと描画が続いて落ち着かないときは上限時間で判定する", async () => {
+    addSearchTabs(TAB_NAMES, 1);
+    const section = addSection();
+    addArticleWithStatusId(section, "111");
+
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(5000);
+
+    addArticleWithStatusId(section, "222");
+    // 未知の ID を含まない描画が 500ms ごとに続き、静止には届かない
+    for (let elapsed = 0; elapsed < 4500; elapsed += 500) {
+      section.appendChild(document.createElement("div"));
+      await vi.advanceTimersByTimeAsync(500);
+    }
+    expect(invokeMock).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(500);
+    expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
+      label: "column-1",
+      count: 1,
+    });
+  });
+
+  it("描画の落ち着きを待っている間に別タブの投稿が見えていても新着として報告されない", async () => {
+    addSearchTabs(TAB_NAMES, 1);
+    const section = addSection();
+    addArticleWithStatusId(section, "111");
+
+    triggerReload();
+    // 別タブ表示中は元のタブと異なるポストが並ぶ
+    section.innerHTML = "";
+    addArticleWithStatusId(section, "999");
+    await vi.advanceTimersByTimeAsync(800);
+
+    // 元のタブへ戻した直後の待機中（800ms 未満）は別タブの投稿が見えたままでも報告しない
+    await vi.advanceTimersByTimeAsync(700);
+    expect(invokeMock).not.toHaveBeenCalled();
+
+    // 元のタブの結果に戻って落ち着いても報告されない
+    section.innerHTML = "";
+    addArticleWithStatusId(section, "111");
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("描画の落ち着きを待っている間にページが検索ページでなくなったら待機を打ち切る", async () => {
+    const tabs = addSearchTabs(TAB_NAMES, 1);
+    const clicks = recordClicks(tabs, TAB_NAMES);
+    const section = addSection();
+
+    triggerReload();
+    history.pushState({}, "", "/home");
+    section.appendChild(document.createElement("div"));
+
+    await expect(
+      vi.advanceTimersByTimeAsync(5000 + 5000),
+    ).resolves.not.toThrow();
+    expect(clicks).toEqual(["top"]);
+    expect(invokeMock).not.toHaveBeenCalled();
+
+    // 検索ページへ戻ると、再び自動更新が実行できる（切り替え中フラグが戻っている）。
+    // 途中で打ち切ったため選択中のタブは「話題のポスト」のままで、別タブとして「最新」がクリックされる。
+    history.pushState({}, "", "/search?q=rust&f=live");
+    triggerReload();
+    expect(clicks).toEqual(["top", "live"]);
+  });
+});

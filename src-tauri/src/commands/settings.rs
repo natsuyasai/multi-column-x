@@ -163,6 +163,10 @@ pub struct ColumnData {
     pub home_tab_name: Option<String>,
     #[serde(rename = "searchQuery")]
     pub search_query: Option<String>,
+    /// 検索カラムを追加した時点で「最新」タブ指定を記録するフラグ。既存の保存済みカラムには存在しないため false。
+    #[serde(rename = "searchLiveTab")]
+    #[serde(default)]
+    pub search_live_tab: bool,
     #[serde(rename = "listId")]
     pub list_id: Option<String>,
     pub width: f64,

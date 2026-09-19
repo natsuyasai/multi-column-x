@@ -44,6 +44,8 @@ export interface Column {
   customUrl?: string;
   homeTabName?: string;
   searchQuery?: string;
+  /** 検索カラム追加時に true を記録し、「最新」タブで開く。既存の保存済みカラムには存在しない */
+  searchLiveTab?: boolean;
   listId?: string;
   width: number;
   order: number;
