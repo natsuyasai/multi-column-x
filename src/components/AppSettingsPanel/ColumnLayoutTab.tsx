@@ -44,7 +44,7 @@ interface CellKey {
 function getColumnLabel(col: Column, accounts: Account[]): string {
   const account = accounts.find((a) => a.id === col.accountId);
   return (
-    col.label ?? `${account?.label ?? col.accountId} - ${getPageTypeLabel(col)}`
+    col.label || `${account?.label ?? col.accountId} - ${getPageTypeLabel(col)}`
   );
 }
 
