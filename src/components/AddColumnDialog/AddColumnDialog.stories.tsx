@@ -112,3 +112,17 @@ export const DarkTheme: Story = {
     ),
   ],
 };
+
+export const WithDisplayName: Story = {
+  name: "表示名を指定して追加",
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const labelInput = canvas.getByRole("textbox", { name: /表示名（任意）/ });
+    await userEvent.type(labelInput, "仕事用");
+    await expect(labelInput).toHaveValue("仕事用");
+    await userEvent.click(canvas.getByRole("button", { name: "追加" }));
+    await expect(args.onAdd).toHaveBeenCalledWith(
+      expect.objectContaining({ label: "仕事用" }),
+    );
+  },
+};
