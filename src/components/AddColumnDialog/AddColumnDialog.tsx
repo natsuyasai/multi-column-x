@@ -49,6 +49,7 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
       pageType,
       homeTabName: pageType === "home" && homeTabName ? homeTabName : undefined,
       searchQuery: pageType === "search" ? searchQuery : undefined,
+      searchLiveTab: pageType === "search" ? true : undefined,
       listId: pageType === "list" ? listId : undefined,
       customUrl: pageType === "custom" || isExternal ? customUrl : undefined,
       label: normalizeColumnLabel(label),

@@ -25,6 +25,9 @@ fn webview_label(column_id: &str) -> String {
     format!("{}{}", labels::COLUMN_PREFIX, column_id)
 }
 
+/// 追加時に「最新」タブ指定が記録された検索カラムの URL に付ける X の検索 URL パラメータ。
+const SEARCH_LIVE_TAB_PARAM: &str = "f=live";
+
 fn resolve_url(column: &ColumnData) -> String {
     match column.page_type.as_str() {
         "home" => match column.home_tab_name.as_deref().filter(|s| !s.is_empty()) {
@@ -32,10 +35,17 @@ fn resolve_url(column: &ColumnData) -> String {
             None => "https://x.com/home".to_string(),
         },
         "notifications" => "https://x.com/notifications".to_string(),
-        "search" => format!(
-            "https://x.com/search?q={}",
-            urlencoding::encode(column.search_query.as_deref().unwrap_or(""))
-        ),
+        "search" => {
+            let base = format!(
+                "https://x.com/search?q={}",
+                urlencoding::encode(column.search_query.as_deref().unwrap_or(""))
+            );
+            if column.search_live_tab {
+                format!("{base}&{SEARCH_LIVE_TAB_PARAM}")
+            } else {
+                base
+            }
+        }
         "list" => format!(
             "https://x.com/i/lists/{}",
             column.list_id.as_deref().unwrap_or("")
@@ -480,6 +490,7 @@ mod tests {
             custom_url: None,
             home_tab_name: None,
             search_query: None,
+            search_live_tab: false,
             list_id: None,
             width: 400.0,
             order: 0,
@@ -521,6 +532,115 @@ mod tests {
         let mut col = column("search");
         col.search_query = Some("rust lang".into());
         assert_eq!(resolve_url(&col), "https://x.com/search?q=rust%20lang");
+    }
+
+    fn live_search_column(query: Option<&str>) -> ColumnData {
+        let mut col = column("search");
+        col.search_query = query.map(String::from);
+        col.search_live_tab = true;
+        col
+    }
+
+    #[test]
+    fn resolve_url_search最新タブ指定ありは最新タブ指定を含む() {
+        assert_eq!(
+            resolve_url(&live_search_column(Some("rust"))),
+            "https://x.com/search?q=rust&f=live"
+        );
+    }
+
+    #[test]
+    fn resolve_url_search最新タブ指定なしの既存カラムは従来のurlのまま() {
+        let mut col = column("search");
+        col.search_query = Some("東京 天気".into());
+        assert_eq!(
+            resolve_url(&col),
+            "https://x.com/search?q=%E6%9D%B1%E4%BA%AC%20%E5%A4%A9%E6%B0%97"
+        );
+    }
+
+    #[test]
+    fn resolve_url_search最新タブ指定ありはアンパサンドを含むクエリでもf_liveが独立したパラメータになる(
+    ) {
+        let url = resolve_url(&live_search_column(Some("a&f=top")));
+        assert_eq!(url, "https://x.com/search?q=a%26f%3Dtop&f=live");
+        let params: Vec<&str> = url
+            .strip_prefix("https://x.com/search?")
+            .expect("search URL は固定プレフィックスで始まる")
+            .split('&')
+            .collect();
+        assert_eq!(params, vec!["q=a%26f%3Dtop", "f=live"]);
+    }
+
+    #[test]
+    fn resolve_url_search最新タブ指定ありは空白と日本語を含むクエリでも最新タブ指定が末尾に付く() {
+        assert_eq!(
+            resolve_url(&live_search_column(Some("東京 天気"))),
+            "https://x.com/search?q=%E6%9D%B1%E4%BA%AC%20%E5%A4%A9%E6%B0%97&f=live"
+        );
+    }
+
+    #[test]
+    fn resolve_url_search最新タブ指定ありはクエリ未指定でも最新タブ指定を含む() {
+        assert_eq!(
+            resolve_url(&live_search_column(None)),
+            "https://x.com/search?q=&f=live"
+        );
+    }
+
+    #[test]
+    fn resolve_url_検索以外のカラム種別は最新タブ指定が立っていても最新タブ指定を含まない() {
+        for page_type in [
+            "home",
+            "notifications",
+            "list",
+            "custom",
+            "external",
+            "compose",
+            "unknown",
+        ] {
+            let mut col = column(page_type);
+            col.search_live_tab = true;
+            col.custom_url = Some("https://x.com/i/bookmarks".into());
+            col.list_id = Some("123".into());
+            col.home_tab_name = Some("フォロー中".into());
+            assert!(
+                !resolve_url(&col).contains("f=live"),
+                "page_type={page_type} の URL に f=live が含まれている"
+            );
+        }
+    }
+
+    #[test]
+    fn column_data_searchlivetabを持たない保存済みjsonはfalseとして読み込まれる() {
+        let mut json = serde_json::to_value(column("search")).unwrap();
+        json.as_object_mut().unwrap().remove("searchLiveTab");
+        let restored: ColumnData = serde_json::from_value(json).unwrap();
+        assert!(!restored.search_live_tab);
+    }
+
+    #[test]
+    fn column_data_searchlivetabはcamelcaseのjsonキーで読み書きされる() {
+        let json = serde_json::to_value(live_search_column(Some("rust"))).unwrap();
+        assert_eq!(json["searchLiveTab"], serde_json::Value::Bool(true));
+        let restored: ColumnData = serde_json::from_value(json).unwrap();
+        assert!(restored.search_live_tab);
+    }
+
+    #[test]
+    fn resolve_url_search保存して復元した最新タブ指定つきカラムも最新タブで開かれる() {
+        let saved = serde_json::to_string(&live_search_column(Some("rust"))).unwrap();
+        let restored: ColumnData = serde_json::from_str(&saved).unwrap();
+        assert_eq!(resolve_url(&restored), "https://x.com/search?q=rust&f=live");
+    }
+
+    #[test]
+    fn resolve_url_search保存して復元した最新タブ指定なしカラムは従来のurlのまま() {
+        let mut col = column("search");
+        col.search_query = Some("rust".into());
+        let saved = serde_json::to_string(&col).unwrap();
+        let restored: ColumnData = serde_json::from_str(&saved).unwrap();
+        assert_eq!(resolve_url(&restored), "https://x.com/search?q=rust");
     }
 
     #[test]
@@ -730,17 +850,44 @@ mod tests {
         proptest! {
             /// 検索クエリは URL エンコードされて埋め込まれ、デコードすると元の値に戻る（ラウンドトリップ）。
             #[test]
-            fn resolve_url_search_query_roundtrips(query in any::<String>()) {
+            fn resolve_url_search_query_roundtrips(query in any::<String>(), live in any::<bool>()) {
                 let mut col = column("search");
                 col.search_query = Some(query.clone());
+                col.search_live_tab = live;
                 let url = resolve_url(&col);
-                let encoded = url
+                let rest = url
                     .strip_prefix("https://x.com/search?q=")
                     .expect("search URL は固定プレフィックスで始まる");
+                let encoded = if live {
+                    rest.strip_suffix("&f=live").expect("最新タブ指定ありの URL は f=live で終わる")
+                } else {
+                    rest
+                };
                 let decoded = urlencoding::decode(encoded)
                     .expect("エンコード結果は常にデコード可能")
                     .into_owned();
                 prop_assert_eq!(decoded, query);
+            }
+
+            /// どんな検索クエリでも、f=live は最新タブ指定ありのときだけ独立した 2 つ目のパラメータとして付く。
+            #[test]
+            fn resolve_url_search_live_param_only_when_flagged(query in any::<String>(), live in any::<bool>()) {
+                let mut col = column("search");
+                col.search_query = Some(query);
+                col.search_live_tab = live;
+                let url = resolve_url(&col);
+                let params: Vec<&str> = url
+                    .strip_prefix("https://x.com/search?")
+                    .expect("search URL は固定プレフィックスで始まる")
+                    .split('&')
+                    .collect();
+                prop_assert!(params[0].starts_with("q="));
+                if live {
+                    prop_assert_eq!(params.len(), 2);
+                    prop_assert_eq!(params[1], "f=live");
+                } else {
+                    prop_assert_eq!(params.len(), 1);
+                }
             }
 
             /// どの page_type・どんな入力でも、生成 URL は常に https:// スキームになる。

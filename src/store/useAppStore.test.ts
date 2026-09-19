@@ -438,4 +438,23 @@ describe("migrateColumn", () => {
     expect(result.heightMode).toBe("fixed");
     expect(result.heightValue).toBe(400);
   });
+
+  it("最新タブ指定つきの検索カラムは読み込み時も最新タブ指定を保持する", () => {
+    const col: Column = {
+      ...mockColumn,
+      pageType: "search",
+      searchQuery: "rust",
+      searchLiveTab: true,
+    };
+    expect(migrateColumn(col).searchLiveTab).toBe(true);
+  });
+
+  it("最新タブ指定のない既存の検索カラムは読み込み時に最新タブ指定が補われない", () => {
+    const col: Column = {
+      ...mockColumn,
+      pageType: "search",
+      searchQuery: "rust",
+    };
+    expect(migrateColumn(col).searchLiveTab).toBeUndefined();
+  });
 });
