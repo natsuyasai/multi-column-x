@@ -783,6 +783,8 @@ describe("inject/auto_reload の新着判定（見たことのある最新との
       section.appendChild(buildNotificationArticle("2026-09-19T00:45:55Z"));
 
       reloadOnNormalTab();
+      // 通知ページはスクロール往復で更新するため、先頭へ戻したあとに監視が始まる
+      await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
       section.appendChild(buildNotificationArticle("2026-09-19T01:00:00Z"));
       await vi.runAllTimersAsync();
 
@@ -795,6 +797,8 @@ describe("inject/auto_reload の新着判定（見たことのある最新との
       section.appendChild(buildNotificationArticle("2026-09-19T00:45:55Z"));
 
       reloadOnNormalTab();
+      // 通知ページはスクロール往復で更新するため、先頭へ戻したあとに監視が始まる
+      await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
       // status リンクを持たない通知（いいね通知）
       const likeNotification = buildNotificationArticle("2026-09-19T01:00:00Z");
       section.appendChild(likeNotification);
@@ -810,6 +814,8 @@ describe("inject/auto_reload の新着判定（見たことのある最新との
       section.appendChild(buildNotificationArticle("2026-09-19T00:45:55Z"));
 
       reloadOnNormalTab();
+      // 通知ページはスクロール往復で更新するため、先頭へ戻したあとに監視が始まる
+      await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
       section.appendChild(buildNotificationArticle("2026-09-18T23:00:00Z"));
       await vi.runAllTimersAsync();
 
@@ -822,6 +828,8 @@ describe("inject/auto_reload の新着判定（見たことのある最新との
       section.appendChild(buildNotificationArticle("2026-09-19T00:45:55Z"));
 
       reloadOnNormalTab();
+      // 通知ページはスクロール往復で更新するため、先頭へ戻したあとに監視が始まる
+      await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
       section.appendChild(buildNotificationArticle(null));
       section.appendChild(buildNotificationArticle("不正な日時"));
       await expect(vi.runAllTimersAsync()).resolves.not.toThrow();
@@ -831,27 +839,72 @@ describe("inject/auto_reload の新着判定（見たことのある最新との
   });
 });
 
+/** scrollTop への代入（書き込み）を記録できるようにする。afterEach で restoreScrollTopRecorder を呼ぶこと。 */
+function recordScrollTopWrites(): number[] {
+  const writes: number[] = [];
+  let value = scrollingElementStub.scrollTop;
+  Object.defineProperty(scrollingElementStub, "scrollTop", {
+    get: () => value,
+    set: (next: number) => {
+      value = next;
+      writes.push(next);
+    },
+    configurable: true,
+  });
+  return writes;
+}
+
+function restoreScrollTopRecorder(): void {
+  Object.defineProperty(scrollingElementStub, "scrollTop", {
+    value: 0,
+    writable: true,
+    configurable: true,
+  });
+}
+
+/** スクロール往復の待ち時間（ms）。 */
+const ROUNDTRIP_WAIT_MS = 60;
+/** スクロール往復で下へスクロールする最小距離（px）。 */
+const ROUNDTRIP_MIN_DISTANCE_PX = 250;
+
+async function setUpAutoReloadPage(): Promise<void> {
+  // 新着判定の基準（見たことのある最新）と往復中フラグはページ読み込みごとにリセットされるため、
+  // テストごとにモジュールを読み込み直して IIFE を再実行する。
+  vi.resetModules();
+  await import("./auto_reload");
+  document.body.innerHTML = "";
+  invokeMock.mockClear();
+  setScrolling(0);
+  window.__TAURI_INTERNALS__ = {
+    metadata: { currentWebview: { label: "column-1" } },
+  };
+  window.__TAURI__ = { core: { invoke: invokeMock } };
+  vi.useFakeTimers();
+}
+
+function expectReportedNewPostOnce(): void {
+  expect(invokeMock).toHaveBeenCalledTimes(1);
+  expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
+    label: "column-1",
+    count: 1,
+  });
+}
+
 describe("inject/auto_reload 検索ページの更新", () => {
+  let scrollWrites: number[];
+
   beforeEach(async () => {
-    // 新着判定の基準（見たことのある最新）はページ読み込みごとにリセットされるため、
-    // テストごとにモジュールを読み込み直して IIFE を再実行する。
-    vi.resetModules();
-    await import("./auto_reload");
-    document.body.innerHTML = "";
-    invokeMock.mockClear();
-    setScrolling(0);
-    window.__TAURI_INTERNALS__ = {
-      metadata: { currentWebview: { label: "column-1" } },
-    };
-    window.__TAURI__ = { core: { invoke: invokeMock } };
+    await setUpAutoReloadPage();
     history.pushState({}, "", "/search?q=rust&f=live");
-    vi.useFakeTimers();
+    scrollWrites = recordScrollTopWrites();
   });
 
   afterEach(() => {
-    // 途中のタブ切り替えが次のテストへ持ち越されないよう、保留中のタイマーを流し切る
+    // 途中のスクロール往復が次のテストへ持ち越されないよう、保留中のタイマーを流し切る
     vi.runAllTimers();
     vi.useRealTimers();
+    restoreScrollTopRecorder();
+    vi.restoreAllMocks();
     history.replaceState({}, "", "/");
   });
 
@@ -890,34 +943,57 @@ describe("inject/auto_reload 検索ページの更新", () => {
 
   const TAB_NAMES = ["top", "live", "user", "media", "list"];
 
-  it("「最新」タブの検索カラムで自動更新が動くと検索結果が取得し直される", async () => {
-    const tabs = addSearchTabs(TAB_NAMES, 1);
-    const clicks = recordClicks(tabs, TAB_NAMES);
+  it("検索カラムで自動更新が動くと下へスクロールしてから先頭へ戻る", async () => {
+    addSearchTabs(TAB_NAMES, 1);
+    addSection();
+    expect(scrollingElementStub.scrollTop).toBe(0);
+
+    triggerReload();
+    expect(scrollingElementStub.scrollTop).toBeGreaterThanOrEqual(
+      ROUNDTRIP_MIN_DISTANCE_PX,
+    );
+
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+    expect(scrollingElementStub.scrollTop).toBe(0);
+  });
+
+  it("先頭へ戻す前には必ず待ち時間が置かれる", async () => {
+    addSearchTabs(TAB_NAMES, 1);
     addSection();
 
     triggerReload();
-    await vi.advanceTimersByTimeAsync(5000);
+    expect(scrollingElementStub.scrollTop).toBeGreaterThanOrEqual(
+      ROUNDTRIP_MIN_DISTANCE_PX,
+    );
 
-    expect(clicks).toEqual(["top", "live"]);
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS - 1);
+    expect(scrollingElementStub.scrollTop).toBeGreaterThanOrEqual(
+      ROUNDTRIP_MIN_DISTANCE_PX,
+    );
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(scrollingElementStub.scrollTop).toBe(0);
   });
 
-  it("「話題のポスト」タブの検索カラムでも自動更新が動くと元のタブへ戻る", async () => {
+  it("検索ページのどのタブが選択されていても同じスクロール往復で更新される", async () => {
     const tabs = addSearchTabs(TAB_NAMES, 0);
     const clicks = recordClicks(tabs, TAB_NAMES);
     addSection();
 
     triggerReload();
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
 
-    expect(clicks).toEqual(["live", "top"]);
+    expect(clicks).toEqual([]);
+    expect(scrollWrites).toEqual([ROUNDTRIP_MIN_DISTANCE_PX, 0]);
   });
 
-  it("自動更新のあと選択中のタブは実行前と同じである", async () => {
+  it("自動更新のあとも選択中のタブは実行前と同じである", async () => {
     const tabs = addSearchTabs(TAB_NAMES, 1);
     addSection();
+    const urlBefore = location.href;
 
     triggerReload();
-    await vi.advanceTimersByTimeAsync(5000 + 5000);
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS + 5000);
 
     expect(tabs.map((tab) => tab.getAttribute("aria-selected"))).toEqual([
       "false",
@@ -926,251 +1002,256 @@ describe("inject/auto_reload 検索ページの更新", () => {
       "false",
       "false",
     ]);
+    expect(location.href).toBe(urlBefore);
   });
 
-  it("検索ページにタブが見つからないときは何もせずエラーにもならない", async () => {
+  it("自動更新ではタブの切り替えは行われない", async () => {
+    const tabs = addSearchTabs(TAB_NAMES, 1);
+    const clicks = recordClicks(tabs, TAB_NAMES);
+    const clickSpy = vi.spyOn(HTMLElement.prototype, "click");
     addSection();
 
-    expect(() => triggerReload()).not.toThrow();
-    await vi.advanceTimersByTimeAsync(5000 + 5000);
-
-    expect(invokeMock).not.toHaveBeenCalled();
-  });
-
-  it("検索ページのタブが選択中の1つしかないときは何もせずエラーにもならない", async () => {
-    const tabs = addSearchTabs(["live"], 0);
-    const clicks = recordClicks(tabs, ["live"]);
-    addSection();
-
-    expect(() => triggerReload()).not.toThrow();
-    await vi.advanceTimersByTimeAsync(5000 + 5000);
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS + 5000);
 
     expect(clicks).toEqual([]);
-    expect(invokeMock).not.toHaveBeenCalled();
+    expect(clickSpy).not.toHaveBeenCalled();
   });
 
   it("ホームのカラムの自動更新は従来どおりの手順で行われる", async () => {
     history.replaceState({}, "", "/");
-    const searchTabs = addSearchTabs(TAB_NAMES, 1);
-    const searchClicks = recordClicks(searchTabs, TAB_NAMES);
     const homeTab = addTab(true, false);
     const homeClickSpy = vi.fn();
     homeTab.addEventListener("click", homeClickSpy);
     addSection();
 
     triggerReload();
-    await vi.advanceTimersByTimeAsync(5000 + 5000);
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS + 5000);
 
     expect(homeClickSpy).toHaveBeenCalledTimes(1);
-    expect(searchClicks).toEqual([]);
+    expect(scrollWrites).toEqual([]);
   });
 
-  it("検索以外のタブ付きページでも検索ページ専用の切り替えは行われない", async () => {
+  it("通知・検索以外のページでは検索ページ専用のスクロール往復は行われない", async () => {
     history.replaceState({}, "", "/i/lists/123");
     const tabs = addSearchTabs(TAB_NAMES, 1);
     const clicks = recordClicks(tabs, TAB_NAMES);
     addSection();
 
     triggerReload();
-    await vi.advanceTimersByTimeAsync(5000 + 5000);
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS + 5000);
 
     expect(clicks).toEqual([]);
+    expect(scrollWrites).toEqual([]);
   });
 
   it("ユーザーがスクロールしているときは検索カラムの自動更新を行わない", async () => {
     setScrolling(100);
-    const tabs = addSearchTabs(TAB_NAMES, 1);
-    const clicks = recordClicks(tabs, TAB_NAMES);
+    scrollWrites.length = 0;
+    addSearchTabs(TAB_NAMES, 1);
     addSection();
 
     triggerReload();
-    await vi.advanceTimersByTimeAsync(5000 + 5000);
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS + 5000);
 
-    expect(clicks).toEqual([]);
+    expect(scrollWrites).toEqual([]);
+    expect(scrollingElementStub.scrollTop).toBe(100);
   });
 
-  it("上端へスクロールする指定つきの自動更新は先頭へ戻してから更新する", async () => {
+  it("先頭へ戻す指定つきの自動更新はスクロール中でも先頭へ戻してから更新する", async () => {
     setScrolling(100);
-    const tabs = addSearchTabs(TAB_NAMES, 1);
-    const clicks = recordClicks(tabs, TAB_NAMES);
+    scrollWrites.length = 0;
+    addSearchTabs(TAB_NAMES, 1);
     addSection();
 
     triggerReload(true);
 
-    expect(scrollingElementStub.scrollTop).toBe(0);
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(clicks).toEqual(["top", "live"]);
+    expect(scrollWrites).toEqual([0, ROUNDTRIP_MIN_DISTANCE_PX]);
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+    expect(scrollWrites).toEqual([0, ROUNDTRIP_MIN_DISTANCE_PX, 0]);
   });
 
-  it("切り替えの途中でもう一度自動更新が実行されても二重に切り替えない", async () => {
-    const tabs = addSearchTabs(TAB_NAMES, 1);
-    const clicks = recordClicks(tabs, TAB_NAMES);
+  it("往復の途中でもう一度自動更新が実行されても二重に往復しない", async () => {
+    addSearchTabs(TAB_NAMES, 1);
     addSection();
 
     triggerReload();
     triggerReload();
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
 
-    expect(clicks).toEqual(["top", "live"]);
+    expect(scrollWrites).toEqual([ROUNDTRIP_MIN_DISTANCE_PX, 0]);
+    expect(scrollingElementStub.scrollTop).toBe(0);
   });
 
-  it("切り替えの途中でカラムのページが検索ページでなくなっても元のタブへ戻そうとしない", async () => {
-    const tabs = addSearchTabs(TAB_NAMES, 1);
-    const clicks = recordClicks(tabs, TAB_NAMES);
+  it("往復が完了したあとは次の自動更新を再び実行できる", async () => {
+    addSearchTabs(TAB_NAMES, 1);
+    addSection();
+
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+
+    expect(scrollWrites).toEqual([
+      ROUNDTRIP_MIN_DISTANCE_PX,
+      0,
+      ROUNDTRIP_MIN_DISTANCE_PX,
+      0,
+    ]);
+  });
+
+  it("往復の途中でページが検索ページでなくなってもエラーにならず先頭へ戻す操作は行われない", async () => {
+    addSearchTabs(TAB_NAMES, 1);
     addSection();
 
     triggerReload();
     history.pushState({}, "", "/home");
 
     await expect(
-      vi.advanceTimersByTimeAsync(5000 + 5000),
+      vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS + 5000),
     ).resolves.not.toThrow();
-    expect(clicks).toEqual(["top"]);
+    expect(scrollWrites).toEqual([ROUNDTRIP_MIN_DISTANCE_PX]);
+
+    // 検索ページへ戻ると、再び自動更新が実行できる（往復中フラグが戻っている）
+    history.pushState({}, "", "/search?q=rust&f=live");
+    setScrolling(0);
+    scrollWrites.length = 0;
+    triggerReload();
+    expect(scrollWrites).toEqual([ROUNDTRIP_MIN_DISTANCE_PX]);
   });
 
-  it("検索カラムでも見たことのある最新より新しいポストが現れると新着として報告される", async () => {
+  it("スクロール往復のあとに見たことのある最新より新しいポストが現れると新着として報告される", async () => {
     addSearchTabs(TAB_NAMES, 1);
     const section = addSection();
     addArticleWithStatusId(section, "1000");
 
     triggerReload();
-    // 別タブ→元のタブの切り替えが終わって、新着の監視が始まるまで進める
-    await vi.advanceTimersByTimeAsync(5000 + 5000);
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
 
     addArticleWithStatusId(section, "1001");
     await vi.advanceTimersByTimeAsync(0);
 
-    expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
-      label: "column-1",
-      count: 1,
-    });
+    expectReportedNewPostOnce();
   });
 
-  it("検索結果が取得し直されても未表示のポストが現れなければ新着として報告されない", async () => {
+  it("スクロール往復のあとに見たことのある最新より古いポストだけが現れても新着として報告されない", async () => {
     addSearchTabs(TAB_NAMES, 1);
     const section = addSection();
-    const original = addArticleWithStatusId(section, "111");
+    addArticleWithStatusId(section, "1000");
 
     triggerReload();
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
 
-    // 別タブ表示中は元のタブと異なるポストが並ぶ
-    original.remove();
-    addArticleWithStatusId(section, "999");
-    await vi.advanceTimersByTimeAsync(5000);
-
-    // 元のタブへ戻すと元と同じ結果に戻る
-    section.innerHTML = "";
-    addArticleWithStatusId(section, "111");
+    addArticleWithStatusId(section, "900");
     await vi.runAllTimersAsync();
 
     expect(invokeMock).not.toHaveBeenCalled();
   });
+});
 
-  it("元のタブへ戻した後の待機中にユーザーがスクロールしていたら新着として報告されない", async () => {
-    addSearchTabs(TAB_NAMES, 1);
-    const section = addSection();
-    addArticleWithStatusId(section, "111");
+describe("inject/auto_reload 通知ページの更新", () => {
+  let scrollWrites: number[];
 
-    triggerReload();
-    await vi.advanceTimersByTimeAsync(5000);
-
-    // 元のタブへ戻した後の待機中に未知のポストが現れ、ユーザーがスクロールしている
-    addArticleWithStatusId(section, "222");
-    setScrolling(100);
-    await vi.advanceTimersByTimeAsync(5000);
-
-    expect(invokeMock).not.toHaveBeenCalled();
+  beforeEach(async () => {
+    await setUpAutoReloadPage();
+    history.pushState({}, "", "/notifications");
+    scrollWrites = recordScrollTopWrites();
   });
 
-  it("別タブの描画が検知できないときは上限時間で元のタブへ戻す", async () => {
-    const tabs = addSearchTabs(TAB_NAMES, 1);
-    const clicks = recordClicks(tabs, TAB_NAMES);
+  afterEach(() => {
+    vi.runAllTimers();
+    vi.useRealTimers();
+    restoreScrollTopRecorder();
+    vi.restoreAllMocks();
+    history.replaceState({}, "", "/");
+  });
+
+  const NOTIFICATION_PATHS = [
+    ["すべて", "/notifications"],
+    ["メンション", "/notifications/mentions"],
+  ] as const;
+
+  for (const [label, path] of NOTIFICATION_PATHS) {
+    it(`「${label}」の通知ページで自動更新が動くとスクロール往復が行われる`, async () => {
+      history.replaceState({}, "", path);
+      addSection();
+
+      triggerReload();
+      expect(scrollingElementStub.scrollTop).toBeGreaterThanOrEqual(
+        ROUNDTRIP_MIN_DISTANCE_PX,
+      );
+
+      await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+      expect(scrollWrites).toEqual([ROUNDTRIP_MIN_DISTANCE_PX, 0]);
+      expect(scrollingElementStub.scrollTop).toBe(0);
+    });
+  }
+
+  it("通知ページの自動更新ではタブはクリックされない", async () => {
+    const anchorTab = document.createElement("a");
+    anchorTab.setAttribute("role", "tab");
+    anchorTab.setAttribute("aria-selected", "true");
+    document.body.appendChild(anchorTab);
+    const anchorClickSpy = vi.fn((event: Event) => event.preventDefault());
+    anchorTab.addEventListener("click", anchorClickSpy);
+    const divTab = addTab(false, false);
+    const divClickSpy = vi.fn();
+    divTab.addEventListener("click", divClickSpy);
     addSection();
 
     triggerReload();
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS + 5000);
 
-    await vi.advanceTimersByTimeAsync(4999);
-    expect(clicks).toEqual(["top"]);
-
-    await vi.advanceTimersByTimeAsync(1);
-    expect(clicks).toEqual(["top", "live"]);
+    expect(anchorClickSpy).not.toHaveBeenCalled();
+    expect(divClickSpy).not.toHaveBeenCalled();
+    expect(anchorTab.getAttribute("aria-selected")).toBe("true");
+    expect(divTab.getAttribute("aria-selected")).toBe("false");
   });
 
-  it("別タブの描画が落ち着いたら上限時間を待たずに元のタブへ戻す", async () => {
-    const tabs = addSearchTabs(TAB_NAMES, 1);
-    const clicks = recordClicks(tabs, TAB_NAMES);
-    const section = addSection();
+  it("ユーザーがスクロールしているときは通知カラムの自動更新を行わない", async () => {
+    setScrolling(100);
+    scrollWrites.length = 0;
+    addSection();
 
     triggerReload();
-    // 別タブがクリックされた直後に、別タブの結果が描画される
-    expect(clicks).toEqual(["top"]);
-    addArticleWithStatusId(section, "999");
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS + 5000);
 
-    await vi.advanceTimersByTimeAsync(799);
-    expect(clicks).toEqual(["top"]);
-
-    await vi.advanceTimersByTimeAsync(1);
-    expect(clicks).toEqual(["top", "live"]);
+    expect(scrollWrites).toEqual([]);
+    expect(scrollingElementStub.scrollTop).toBe(100);
   });
 
-  it("別タブの描画が続いて落ち着かないときも上限時間で元のタブへ戻す", async () => {
-    const tabs = addSearchTabs(TAB_NAMES, 1);
-    const clicks = recordClicks(tabs, TAB_NAMES);
-    const section = addSection();
+  it("通知ページで往復の途中にもう一度自動更新が実行されても二重に往復しない", async () => {
+    addSection();
 
     triggerReload();
-    // 500ms ごとに描画が続き、800ms の静止には届かない
-    for (let elapsed = 0; elapsed < 4500; elapsed += 500) {
-      section.appendChild(document.createElement("div"));
-      await vi.advanceTimersByTimeAsync(500);
-    }
-    expect(clicks).toEqual(["top"]);
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
 
-    await vi.advanceTimersByTimeAsync(500);
-    expect(clicks).toEqual(["top", "live"]);
+    expect(scrollWrites).toEqual([ROUNDTRIP_MIN_DISTANCE_PX, 0]);
   });
 
-  it("描画の落ち着きを待っている間に別タブの投稿が見えていても新着として報告されない", async () => {
-    addSearchTabs(TAB_NAMES, 1);
-    const section = addSection();
-    addArticleWithStatusId(section, "111");
+  it("通知ページで先頭へ戻す指定つきの自動更新はスクロール中でも先頭へ戻してから更新する", async () => {
+    setScrolling(100);
+    scrollWrites.length = 0;
+    addSection();
 
-    triggerReload();
-    // 別タブ表示中は元のタブと異なるポストが並ぶ
-    section.innerHTML = "";
-    addArticleWithStatusId(section, "999");
-    await vi.advanceTimersByTimeAsync(800);
+    triggerReload(true);
 
-    // 元のタブへ戻した直後の待機中（800ms 未満）は別タブの投稿が見えたままでも報告しない
-    await vi.advanceTimersByTimeAsync(700);
-    expect(invokeMock).not.toHaveBeenCalled();
-
-    // 元のタブの結果に戻って落ち着いても報告されない
-    section.innerHTML = "";
-    addArticleWithStatusId(section, "111");
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(invokeMock).not.toHaveBeenCalled();
+    expect(scrollWrites).toEqual([0, ROUNDTRIP_MIN_DISTANCE_PX]);
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+    expect(scrollWrites).toEqual([0, ROUNDTRIP_MIN_DISTANCE_PX, 0]);
   });
 
-  it("描画の落ち着きを待っている間にページが検索ページでなくなったら待機を打ち切る", async () => {
-    const tabs = addSearchTabs(TAB_NAMES, 1);
-    const clicks = recordClicks(tabs, TAB_NAMES);
+  it("スクロール往復のあとに見たことのある最新より新しい時刻の通知が現れると報告される", async () => {
     const section = addSection();
+    section.appendChild(buildNotificationArticle("2026-09-19T00:45:55Z"));
 
     triggerReload();
-    history.pushState({}, "", "/home");
-    section.appendChild(document.createElement("div"));
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
 
-    await expect(
-      vi.advanceTimersByTimeAsync(5000 + 5000),
-    ).resolves.not.toThrow();
-    expect(clicks).toEqual(["top"]);
-    expect(invokeMock).not.toHaveBeenCalled();
+    section.appendChild(buildNotificationArticle("2026-09-19T01:00:00Z"));
+    await vi.advanceTimersByTimeAsync(0);
 
-    // 検索ページへ戻ると、再び自動更新が実行できる（切り替え中フラグが戻っている）。
-    // 途中で打ち切ったため選択中のタブは「話題のポスト」のままで、別タブとして「最新」がクリックされる。
-    history.pushState({}, "", "/search?q=rust&f=live");
-    triggerReload();
-    expect(clicks).toEqual(["top", "live"]);
+    expectReportedNewPostOnce();
   });
 });

@@ -77,15 +77,15 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
   // observer とは別物であり、互いに干渉しないよう独立した変数で管理する。
   let currentTweetObserver: MutationObserver | null = null;
 
-  // 検索ページの自動更新: DOM の変化がこの時間止まったら「描画が落ち着いた」とみなす（ms）。
-  const SEARCH_RENDER_QUIET_MS = 800;
-  // 別タブへ切り替えてから、描画の落ち着きを待つ上限時間（ms）。上限で必ず元のタブへ戻す。
-  const SEARCH_TAB_SWITCH_MAX_WAIT_MS = 5000;
-  // 元のタブへ戻してから、描画の落ち着きを待つ上限時間（ms）。上限で必ず判定へ進む。
-  const SEARCH_TAB_RETURN_MAX_WAIT_MS = 5000;
+  // 検索・通知ページの更新（スクロール往復）: 下へスクロールする最小距離（px）。
+  // 実測: 120px では取得されず、140px 以上で取得される。余裕を持たせて 250px。
+  const SCROLL_ROUNDTRIP_MIN_DISTANCE_PX = 250;
+  // 下へスクロールしてから先頭へ戻すまでの待ち時間（ms）。
+  // 実測: 同一タスク内・rAF での即戻しは取得されないため setTimeout で待つ。
+  const SCROLL_ROUNDTRIP_WAIT_MS = 60;
 
-  // 検索ページのタブ切り替え（別タブ→元のタブ）の実行中フラグ。二重実行を防ぐ。
-  let searchTabSwitching = false;
+  // スクロール往復の実行中フラグ。二重実行を防ぐ。
+  let scrollRoundtripRunning = false;
 
   function isScrolling(): boolean {
     return document.scrollingElement
@@ -297,100 +297,34 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
     return location.pathname === "/search";
   }
 
-  function getSearchTabs(): HTMLElement[] {
-    return Array.from(document.querySelectorAll<HTMLElement>("a[role='tab']"));
-  }
-
-  function findSearchTabByHref(href: string): HTMLElement | null {
-    return (
-      getSearchTabs().find((tab) => tab.getAttribute("href") === href) ?? null
-    );
+  function isScrollRoundtripPage(): boolean {
+    return isSearchPage() || isNotificationsPage();
   }
 
   /**
-   * 描画（DOM の子要素の増減）が SEARCH_RENDER_QUIET_MS 止まるまで待つ。
-   * - 最初の変化があるまでは「落ち着いた」とはみなさない（変化前に待ち終わらない）。
-   * - maxWaitMs 経過で必ず打ち切る（変化が無い／変化が続く場合の上限）。
-   * - 待機中・終了時に検索ページでなくなっていたら onDone(false)、それ以外は onDone(true)。
-   * 監視は呼び出した時点から始まるので、変化を起こす操作（タブのクリック）より前に呼ぶこと。
+   * 検索・通知ページの更新。選択中のタブへの再クリックや新着ボタンは効かないため、
+   * 下へスクロールしてから先頭へ戻すことで X にタイムラインを取得し直させる。
    */
-  function waitForRenderQuiet(
-    maxWaitMs: number,
-    onDone: (stillOnSearchPage: boolean) => void,
-  ): void {
-    let finished = false;
-    let quietTimer: ReturnType<typeof setTimeout> | null = null;
-    let maxTimer: ReturnType<typeof setTimeout> | null = null;
+  function triggerScrollRoundtrip(): void {
+    if (scrollRoundtripRunning) return;
+    const scrollingElement = document.scrollingElement;
+    if (!scrollingElement) return;
 
-    const finish = (): void => {
-      if (finished) return;
-      finished = true;
-      observer.disconnect();
-      if (quietTimer !== null) clearTimeout(quietTimer);
-      if (maxTimer !== null) clearTimeout(maxTimer);
-      onDone(isSearchPage());
-    };
-
-    // attributes は監視しない（タブの選択状態の変化を描画と数えないため）。
-    const observer = new MutationObserver(function () {
-      if (finished) return;
-      if (!isSearchPage()) {
-        finish();
-        return;
-      }
-      if (quietTimer !== null) clearTimeout(quietTimer);
-      quietTimer = setTimeout(finish, SEARCH_RENDER_QUIET_MS);
-    });
-
-    observer.observe(document.querySelector("main") ?? document.body, {
-      childList: true,
-      subtree: true,
-    });
-    maxTimer = setTimeout(finish, maxWaitMs);
-  }
-
-  /**
-   * 検索ページの更新。選択中のタブへの再クリックや新着ボタンは効かないため、
-   * 別タブへ切り替えてから元のタブへ戻すことでタイムラインを取得し直す。
-   * 各段階は描画（DOM の変化）が落ち着くのを待ち、固定時間は上限としてのみ使う。
-   */
-  function triggerSearchRefresh(): void {
-    if (searchTabSwitching) return;
-    const section = document.querySelector("section[aria-labelledby]");
-    const tabs = getSearchTabs();
-    const selected = tabs.find(
-      (tab) => tab.getAttribute("aria-selected") === "true",
-    );
-    const other = tabs.find(
-      (tab) => tab.getAttribute("aria-selected") !== "true",
-    );
-    const originalHref = selected?.getAttribute("href");
-    if (!section || !selected || !other || !originalHref) return;
-
-    // 別タブ表示中の投稿は元タブと ID が異なる。切替前に見えている最新を基準にする。
+    scrollRoundtripRunning = true;
+    // 往復で取得された結果が基準に混ざらないよう、先に基準を確定する。
     primeNewnessBaseline();
-    searchTabSwitching = true;
-
-    // 1) 別タブへ切り替え。クリックが起こす最初の変化を取りこぼさないよう、
-    //    監視を先に始めてからクリックする。
-    waitForRenderQuiet(SEARCH_TAB_SWITCH_MAX_WAIT_MS, function (onSearchPage) {
-      const original = onSearchPage ? findSearchTabByHref(originalHref) : null;
-      if (!original) {
-        searchTabSwitching = false;
-        return;
-      }
-      // 2) 元のタブへ戻す。こちらも監視を先に始めてからクリックする。
-      waitForRenderQuiet(
-        SEARCH_TAB_RETURN_MAX_WAIT_MS,
-        function (stillOnSearchPage) {
-          searchTabSwitching = false;
-          if (!stillOnSearchPage) return;
-          waitForNewTweet();
-        },
-      );
-      original.click();
-    });
-    other.click();
+    scrollingElement.scrollTop = Math.max(
+      scrollingElement.scrollTop,
+      SCROLL_ROUNDTRIP_MIN_DISTANCE_PX,
+    );
+    setTimeout(function () {
+      // 先頭へ戻す直前に解除する（往復完了後は次の更新を実行できる）。
+      scrollRoundtripRunning = false;
+      if (!isScrollRoundtripPage()) return;
+      scrollingElement.scrollTop = 0;
+      // 先頭へ戻した後に監視を始める（往復中は isScrolling() で打ち切られてしまうため）。
+      waitForNewTweet();
+    }, SCROLL_ROUNDTRIP_WAIT_MS);
   }
 
   function triggerReload(scrollToTop?: boolean): void {
@@ -399,10 +333,9 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
     }
     if (isScrolling()) return;
 
-    if (isSearchPage()) {
-      triggerSearchRefresh();
-      // 検索ページでは切替直後に waitForNewTweet() を呼ばない
-      // （別タブ表示中の別 ID を新着と誤検出するため）。
+    if (isScrollRoundtripPage()) {
+      // 監視の開始は先頭へ戻した後（triggerScrollRoundtrip 内）。
+      triggerScrollRoundtrip();
       return;
     }
 
