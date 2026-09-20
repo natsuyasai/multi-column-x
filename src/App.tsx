@@ -399,8 +399,9 @@ const App: React.FC = () => {
     setShowShortcutHelp(true);
   }, [setShowShortcutHelp]);
 
+  // 手動更新（ヘッダー・設定パネル・r キー）: スクロール位置にかかわらず先頭へ戻して更新する
   const handleReload = useCallback(async (columnId: string) => {
-    await evalInColumn(columnId, WEBVIEW_SCRIPTS.TRIGGER_RELOAD);
+    await evalInColumn(columnId, WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD);
   }, []);
 
   // タブバーのダブルタップ／カラムヘッダーの先頭スクロールボタン共通: 対象カラムを先頭スクロール＋リロードする

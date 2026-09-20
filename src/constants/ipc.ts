@@ -110,14 +110,14 @@ export const WEBVIEW_LABELS = {
  * WebView 内に inject されたオブジェクトが存在しない場合は何もしない。
  */
 export const WEBVIEW_SCRIPTS = {
-  /** ページをリロードする */
+  /** 自動更新用（ユーザーがスクロール中は打ち切る） */
   TRIGGER_RELOAD:
     "window.__multiColumnX && window.__multiColumnX.triggerReload();",
 
   /** ページ全体を再読み込みする（location.reload()） */
   RELOAD_PAGE: "location.reload();",
 
-  /** スクロール位置を先頭に戻してからページをリロードする（ダブルタップ用） */
+  /** 手動更新用（スクロール位置にかかわらず先頭へ戻して更新する。ダブルタップ・先頭スクロールボタン・手動更新・設定適用・公式設定配布で使う） */
   SCROLL_TOP_AND_RELOAD:
     "window.__multiColumnX && window.__multiColumnX.triggerReload(true);",
 

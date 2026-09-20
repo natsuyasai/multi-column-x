@@ -38,6 +38,9 @@ describe("TS/Rust IPC定数の契約", () => {
     expect(WEBVIEW_SCRIPTS.TRIGGER_RELOAD).toContain(
       `window.${fixture.globals.MULTI_COLUMN_X}`,
     );
+    expect(WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD).toContain(
+      `window.${fixture.globals.MULTI_COLUMN_X}`,
+    );
     expect(WEBVIEW_SCRIPTS.applyNgWords([], [])).toContain(
       `window.${fixture.globals.MULTI_COLUMN_X_CONFIG}`,
     );
