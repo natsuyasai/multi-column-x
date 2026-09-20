@@ -866,8 +866,27 @@ function restoreScrollTopRecorder(): void {
 const ROUNDTRIP_WAIT_MS = 60;
 /** スクロール往復で下へスクロールする最小距離（px）。 */
 const ROUNDTRIP_MIN_DISTANCE_PX = 250;
+/** 下限（250px）が効く低いビューポートの高さ（px）。既定で使う。 */
+const LOW_VIEWPORT_HEIGHT_PX = 300;
+
+const originalInnerHeight = window.innerHeight;
+
+/** ビューポート高さ（window.innerHeight）を差し替える。afterEach で restoreViewportHeight を呼ぶこと。 */
+function setViewportHeight(height: number): void {
+  Object.defineProperty(window, "innerHeight", {
+    value: height,
+    configurable: true,
+    writable: true,
+  });
+}
+
+function restoreViewportHeight(): void {
+  setViewportHeight(originalInnerHeight);
+}
 
 async function setUpAutoReloadPage(): Promise<void> {
+  // 下へスクロールする距離はビューポート高さに比例するため、既定では下限が効く高さに固定する。
+  setViewportHeight(LOW_VIEWPORT_HEIGHT_PX);
   // 新着判定の基準（見たことのある最新）と往復中フラグはページ読み込みごとにリセットされるため、
   // テストごとにモジュールを読み込み直して IIFE を再実行する。
   vi.resetModules();
@@ -904,6 +923,7 @@ describe("inject/auto_reload 検索ページの更新", () => {
     vi.runAllTimers();
     vi.useRealTimers();
     restoreScrollTopRecorder();
+    restoreViewportHeight();
     vi.restoreAllMocks();
     history.replaceState({}, "", "/");
   });
@@ -955,6 +975,29 @@ describe("inject/auto_reload 検索ページの更新", () => {
 
     await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
     expect(scrollingElementStub.scrollTop).toBe(0);
+  });
+
+  it("背の高いビューポートでは高さに比例した距離まで下へスクロールしてから先頭へ戻る", async () => {
+    setViewportHeight(1424);
+    addSearchTabs(TAB_NAMES, 1);
+    addSection();
+
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+
+    expect(Math.max(...scrollWrites)).toBeGreaterThanOrEqual(712);
+    expect(scrollWrites[scrollWrites.length - 1]).toBe(0);
+  });
+
+  it("低いビューポートでは最小距離まで下へスクロールする", async () => {
+    setViewportHeight(300);
+    addSearchTabs(TAB_NAMES, 1);
+    addSection();
+
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+
+    expect(scrollWrites).toEqual([250, 0]);
   });
 
   it("先頭へ戻す前には必ず待ち時間が置かれる", async () => {
@@ -1162,8 +1205,30 @@ describe("inject/auto_reload 通知ページの更新", () => {
     vi.runAllTimers();
     vi.useRealTimers();
     restoreScrollTopRecorder();
+    restoreViewportHeight();
     vi.restoreAllMocks();
     history.replaceState({}, "", "/");
+  });
+
+  it("背の高いビューポートでは高さに比例した距離まで下へスクロールしてから先頭へ戻る", async () => {
+    setViewportHeight(1424);
+    addSection();
+
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+
+    expect(Math.max(...scrollWrites)).toBeGreaterThanOrEqual(712);
+    expect(scrollWrites[scrollWrites.length - 1]).toBe(0);
+  });
+
+  it("低いビューポートでは最小距離まで下へスクロールする", async () => {
+    setViewportHeight(300);
+    addSection();
+
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+
+    expect(scrollWrites).toEqual([250, 0]);
   });
 
   const NOTIFICATION_PATHS = [

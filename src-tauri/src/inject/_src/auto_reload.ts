@@ -77,9 +77,13 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
   // observer とは別物であり、互いに干渉しないよう独立した変数で管理する。
   let currentTweetObserver: MutationObserver | null = null;
 
-  // 検索・通知ページの更新（スクロール往復）: 下へスクロールする最小距離（px）。
-  // 実測: 120px では取得されず、140px 以上で取得される。余裕を持たせて 250px。
+  // 検索・通知ページの更新（スクロール往復）: 下へスクロールする距離の決め方。
+  // 必要な距離はビューポート高さの約 21〜24%（実測: 実カラム高さ 1424px で 300px は
+  // 取得なし・350px は取得あり、Chrome 594px で 120px は取得なし・140px は取得あり）。
+  // 固定値では背の高いカラムで届かないため、余裕を持たせてビューポート高さの 50% とし、
+  // 低いビューポート向けの下限を 250px とする。
   const SCROLL_ROUNDTRIP_MIN_DISTANCE_PX = 250;
+  const SCROLL_ROUNDTRIP_VIEWPORT_RATIO = 0.5;
   // 下へスクロールしてから先頭へ戻すまでの待ち時間（ms）。
   // 実測: 同一タスク内・rAF での即戻しは取得されないため setTimeout で待つ。
   const SCROLL_ROUNDTRIP_WAIT_MS = 60;
@@ -301,6 +305,13 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
     return isSearchPage() || isNotificationsPage();
   }
 
+  function getScrollRoundtripDistance(): number {
+    return Math.max(
+      SCROLL_ROUNDTRIP_MIN_DISTANCE_PX,
+      Math.ceil(window.innerHeight * SCROLL_ROUNDTRIP_VIEWPORT_RATIO),
+    );
+  }
+
   /**
    * 検索・通知ページの更新。選択中のタブへの再クリックや新着ボタンは効かないため、
    * 下へスクロールしてから先頭へ戻すことで X にタイムラインを取得し直させる。
@@ -315,7 +326,7 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
     primeNewnessBaseline();
     scrollingElement.scrollTop = Math.max(
       scrollingElement.scrollTop,
-      SCROLL_ROUNDTRIP_MIN_DISTANCE_PX,
+      getScrollRoundtripDistance(),
     );
     setTimeout(function () {
       // 先頭へ戻す直前に解除する（往復完了後は次の更新を実行できる）。
