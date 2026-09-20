@@ -85,6 +85,7 @@ const App: React.FC = () => {
     restoreColumns,
     handleAddColumn,
     handleRemoveColumn,
+    handleMoveColumnGroup,
     handleUpdateColumn,
     recalculateAllBounds,
     hideColumnWebviews,
@@ -546,6 +547,7 @@ const App: React.FC = () => {
           onOpenLinkPopup={handleOpenLinkPopup}
           onJumpToColumn={handleJumpToColumn}
           onClose={handleRemoveColumn}
+          onReorderColumnGroup={handleMoveColumnGroup}
           apiRateLimitMonitorEnabled={globalSettings.apiRateLimitMonitorEnabled}
           apiRateLimits={apiRateLimits}
           onApiRateLimitPopoverOpenChange={setApiRateLimitPopoverOpen}

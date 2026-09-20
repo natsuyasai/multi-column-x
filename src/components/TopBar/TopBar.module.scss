@@ -152,3 +152,55 @@ $transition: 200ms ease;
   gap: 4px;
   flex-shrink: 0;
 }
+
+// 同じ gridCol のカラムをまとめた並び替え単位（1 列 = 1 要素）
+.columnGroup {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  border-radius: 4px;
+}
+
+// ドラッグ中の要素: 半透明 + 影で浮いて見せる
+.columnGroupDragging {
+  opacity: 0.4;
+  background: var(--mcx-surface-hover);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 25%);
+  cursor: grabbing;
+  z-index: 1;
+}
+
+// ドロップ先の位置: 挿入位置を左端のアクセント線で示す
+.columnGroupOver {
+  box-shadow: inset 2px 0 0 var(--mcx-accent);
+}
+
+.dragHandle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 24px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--mcx-text-muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: grab;
+  // dnd-kit の PointerSensor がタッチで動くために必須
+  touch-action: none;
+
+  &:hover {
+    color: var(--mcx-text-tertiary);
+    background: var(--mcx-surface-hover);
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+}
