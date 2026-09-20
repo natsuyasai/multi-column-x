@@ -1,4 +1,5 @@
 import React from "react";
+import { isAutoReloadSupported } from "@/lib/autoReloadTarget";
 import ChevronsUpIcon from "../../assets/icons/chevrons-up.svg?react";
 import CloseIcon from "../../assets/icons/close.svg?react";
 import SettingsIcon from "../../assets/icons/settings.svg?react";
@@ -38,7 +39,7 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
       : getPageTypeLabel(column));
   const { remaining, reset } = useAutoReload({
     columnId: column.id,
-    enabled: column.settings.autoReloadEnabled,
+    enabled: column.settings.autoReloadEnabled && isAutoReloadSupported(column),
     intervalSec: column.settings.autoReloadInterval,
   });
 

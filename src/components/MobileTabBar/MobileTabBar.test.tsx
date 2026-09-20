@@ -187,6 +187,20 @@ describe("MobileTabBar", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("モバイルのタブバーでもリスト詳細カラムは自動更新されない", () => {
+    const listCol: Column = { ...col1, pageType: "list" };
+    render(
+      <MobileTabBar
+        {...defaultProps}
+        columns={[listCol]}
+        activeColumnId="col-1"
+      />,
+    );
+    expect(
+      screen.queryByText(`${baseSettings.autoReloadInterval}s`),
+    ).not.toBeInTheDocument();
+  });
+
   it("homeTabName がある場合はそれを表示する", () => {
     const colWithTabName: Column = { ...col1, homeTabName: "フォロー中" };
     render(<MobileTabBar {...defaultProps} columns={[colWithTabName]} />);
