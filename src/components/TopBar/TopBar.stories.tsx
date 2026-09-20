@@ -194,13 +194,15 @@ export const MultiRowColumnExpanded: Story = {
 // ドラッグ開始の閾値（8px）に満たない移動量
 const UNDER_THRESHOLD_MOVE = 7;
 
+// ドラッグ開始の閾値（8px）を超える最初の一歩の移動量
+const DRAG_FIRST_STEP = 12;
+
 // from を押して水平方向へ動かす（ポインタは離さない）。
-// from / to はグループ内のボタンを渡す。firstStep は最初の一歩の px（8px 未満ならドラッグ開始しない）
+// from / to はグループ内のボタンを渡す
 async function dragOver(
   user: ReturnType<typeof userEvent.setup>,
   from: HTMLElement,
   to: HTMLElement,
-  { firstStep = 12 }: { firstStep?: number } = {},
 ) {
   const fromRect = from.getBoundingClientRect();
   const toRect = to.getBoundingClientRect();
@@ -214,7 +216,7 @@ async function dragOver(
       coords: { clientX: startX, clientY: y },
     },
     // 8px の activationConstraint を超えてからドラッグ開始とみなされる
-    { coords: { clientX: startX + firstStep, clientY: y } },
+    { coords: { clientX: startX + DRAG_FIRST_STEP, clientY: y } },
     { coords: { clientX: endX, clientY: y } },
   ]);
 }
@@ -349,8 +351,13 @@ export const ClickWhenMovedUnderThreshold: Story = {
       },
       { coords: { clientX: startX + UNDER_THRESHOLD_MOVE, clientY: y } },
     ]);
-    await expect(groups[0]).not.toHaveAttribute("data-dragging");
-    await user.pointer({ keys: "[/MouseLeft]" });
+    try {
+      await expect(groups[0]).not.toHaveAttribute("data-dragging");
+    } finally {
+      // 検証が失敗してもポインタを離す。押したままだと dnd-kit のドラッグが残り、
+      // 次のストーリーのクリックが click 抑制リスナーに握りつぶされて連鎖的に失敗する
+      await user.pointer({ keys: "[/MouseLeft]" });
+    }
     await expect(args.onJumpToColumn).toHaveBeenCalledWith("multi-1a");
     await expect(args.onReorderColumnGroup).not.toHaveBeenCalled();
   },

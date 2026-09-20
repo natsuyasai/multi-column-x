@@ -26,6 +26,7 @@ TopBar（desktop のみ）のカラムを、列グループ領域ごとのドラ
 
 - jsdom では実ポインタによる D&D が成立しない（`getBoundingClientRect` が 0 を返す）。`TopBar.test.tsx` は `DndContext` の `onDragEnd` を捕捉して並び替え通知を検証するに留め、**8px のしきい値・click 抑制は Storybook play（chromium）で検証している。**
 - dnd-kit は click 抑制リスナーをドラッグ終了の 50ms 後に外す。このリスナーは全インスタンス共通の関数のため、Story を連続実行すると直前のストーリーのタイマーが今のストーリーのリスナーを外し、ドラッグ直後の `click` が抑制されずにジャンプが発火することがある。各 play 冒頭の `prepareStory` でタイマーが切れるまで待機して回避している。**実操作では起こらないテスト実行特有の事象**で、play を新設するときも冒頭で `prepareStory` を呼ぶこと。
+- ポインタを押したまま play が終わる（途中の検証が throw する、`Dragging` のように意図して押しっぱなしにする）と、アンマウント後も dnd-kit のセンサーが `document` に残り、`click` 抑制リスナー（capture）がそのまま生き続ける。次のストーリーの最初のクリックが握りつぶされて連鎖失敗する（`DRAG_ACTIVATION_DISTANCE` を 5 にすると `ClickWhenMovedUnderThreshold` の失敗に `ClickWithoutMoving` が巻き込まれるのはこれが原因で、単独実行なら通る）。`prepareStory` の待機では防げないため、押したままになり得る play は `try/finally` でポインタを離す（`ClickWhenMovedUnderThreshold` 参照）。本番の閾値 8px では発生しない。
 - CSS Modules のクラス名はハッシュ化されるため、ドラッグ中の判定は `data-dragging` 属性で行う（`aria-pressed` は `attributes` を付けないので出ない）。
 - 元機能（つまみ版）の手動テスト項目 #1（つまみ）と #8（キーボード）は、つまみとキーボード並び替えの廃止により不要になった。
 
