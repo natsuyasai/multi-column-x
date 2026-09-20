@@ -1,23 +1,14 @@
 // auto_reload.ts は IIFE のため、import 時に実行されて window.__multiColumnX に
 // triggerReload が公開される。
-// 新仕様: トリガー時点の section 配下 article の status ID 集合をスナップショットし、
-// 監視期間中に未知の status ID を持つ article が出現したら count=1 固定で報告する
-// （DOM順先頭要素のinnerHTML比較では仮想化リストのDOM recycleを誤検出するため、
-// ツイート固有IDの集合比較方式に変更した）。
+// 新着判定: ページ読み込みから見たことのある最新（status ID の最大値。通知ページは通知時刻の
+// 最大値）を保持し、監視期間中にそれより新しいものが出現したら count=1 固定で報告する
+// （DOM順先頭要素のinnerHTML比較や ID 集合の比較では、仮想化リストの入れ替えや
+// 表示範囲の変化を誤検出するため）。
 // 一定間隔でのリロード実行自体は src/hooks/useAutoReload.ts（呼び出し元）の責務であり、
 // この inject スクリプトは triggerReload() の 1 回分の振る舞いのみを担う。
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeAll,
-  beforeEach,
-  afterEach,
-} from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   extractStatusId,
-  collectKnownStatusIds,
   compareStatusIds,
   maxStatusId,
   collectMaxStatusId,
@@ -152,34 +143,6 @@ describe("inject/auto_reload の純粋関数", () => {
       article.appendChild(likeLink);
 
       expect(extractStatusId(article)).toBeNull();
-    });
-  });
-
-  describe("collectKnownStatusIds", () => {
-    it("複数articleから複数のstatus IDを収集できる", () => {
-      const section = document.createElement("section");
-      section.appendChild(buildArticleWithStatusLink("/username/status/111"));
-      section.appendChild(buildArticleWithStatusLink("/username/status/222"));
-
-      const ids = collectKnownStatusIds(section);
-
-      expect(ids).toEqual(new Set(["111", "222"]));
-    });
-
-    it("articleが無い場合は空のSetを返す", () => {
-      const section = document.createElement("section");
-
-      expect(collectKnownStatusIds(section)).toEqual(new Set());
-    });
-
-    it("同一IDが複数articleに存在する場合は重複排除される", () => {
-      const section = document.createElement("section");
-      section.appendChild(buildArticleWithStatusLink("/username/status/111"));
-      section.appendChild(buildArticleWithStatusLink("/username/status/111"));
-
-      const ids = collectKnownStatusIds(section);
-
-      expect(ids).toEqual(new Set(["111"]));
     });
   });
 
@@ -341,11 +304,11 @@ describe("inject/auto_reload の純粋関数", () => {
 });
 
 describe("inject/auto_reload", () => {
-  beforeAll(async () => {
+  beforeEach(async () => {
+    // 新着判定の基準（見たことのある最新）はページ読み込みごとにリセットされるため、
+    // テストごとにモジュールを読み込み直して IIFE を再実行する。
+    vi.resetModules();
     await import("./auto_reload");
-  });
-
-  beforeEach(() => {
     document.body.innerHTML = "";
     invokeMock.mockClear();
     setScrolling(0);
@@ -580,12 +543,12 @@ describe("inject/auto_reload", () => {
   });
 });
 
-describe("inject/auto_reload の新着判定（status ID 集合比較方式）", () => {
-  beforeAll(async () => {
+describe("inject/auto_reload の新着判定（見たことのある最新との比較）", () => {
+  beforeEach(async () => {
+    // 新着判定の基準（見たことのある最新）はページ読み込みごとにリセットされるため、
+    // テストごとにモジュールを読み込み直して IIFE を再実行する。
+    vi.resetModules();
     await import("./auto_reload");
-  });
-
-  beforeEach(() => {
     document.body.innerHTML = "";
     invokeMock.mockClear();
     setScrolling(0);
@@ -598,6 +561,7 @@ describe("inject/auto_reload の新着判定（status ID 集合比較方式）",
 
   afterEach(() => {
     vi.useRealTimers();
+    history.replaceState({}, "", "/");
   });
 
   it("監視開始後に未知のstatus IDを持つarticleが出現すると新着として報告される", async () => {
@@ -656,14 +620,223 @@ describe("inject/auto_reload の新着判定（status ID 集合比較方式）",
 
     expect(invokeMock).not.toHaveBeenCalled();
   });
+
+  /** 1 回分の triggerReload（通常タブの再選択経路）を実行する。 */
+  function reloadOnNormalTab(): void {
+    triggerReload();
+  }
+
+  function expectReportedOnce(): void {
+    expect(invokeMock).toHaveBeenCalledTimes(1);
+    expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
+      label: "column-1",
+      count: 1,
+    });
+  }
+
+  it("見たことのある最も新しいポストより新しいポストが現れると新着として報告される", async () => {
+    addTab(true, false);
+    const section = addSection();
+    addArticleWithStatusId(section, "1000");
+
+    reloadOnNormalTab();
+    addArticleWithStatusId(section, "1001");
+    await vi.runAllTimersAsync();
+
+    expectReportedOnce();
+  });
+
+  it("見たことのある最も新しいポストより古いポストだけが現れても新着として報告されない", async () => {
+    addTab(true, false);
+    const section = addSection();
+    addArticleWithStatusId(section, "1000");
+
+    reloadOnNormalTab();
+    addArticleWithStatusId(section, "900");
+    await vi.runAllTimersAsync();
+
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("表示が入れ替わっても見たことのある最新より新しいポストがなければ新着として報告されない", async () => {
+    addTab(true, false);
+    const section = addSection();
+    for (const id of ["700", "800", "900", "1000"]) {
+      addArticleWithStatusId(section, id);
+    }
+
+    reloadOnNormalTab();
+    section.innerHTML = "";
+    for (const id of ["500", "600", "700", "950"]) {
+      addArticleWithStatusId(section, id);
+    }
+    await vi.runAllTimersAsync();
+
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("前回までに見たことのある最新の番号は更新をまたいで引き継がれる", async () => {
+    addTab(true, false);
+    const section = addSection();
+    addArticleWithStatusId(section, "1200");
+
+    // 1 回目の更新で 1200 を見たあと、表示が古いポストに入れ替わる
+    reloadOnNormalTab();
+    section.innerHTML = "";
+    addArticleWithStatusId(section, "500");
+    await vi.advanceTimersByTimeAsync(0);
+
+    // 2 回目の更新で 1100 が現れても、1200 を見たことがあるので新着ではない
+    reloadOnNormalTab();
+    addArticleWithStatusId(section, "1100");
+    await vi.runAllTimersAsync();
+
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("前回までに見たことのある最新より新しいポストが次の更新で現れると新着として報告される", async () => {
+    addTab(true, false);
+    const section = addSection();
+    addArticleWithStatusId(section, "1200");
+
+    reloadOnNormalTab();
+    section.innerHTML = "";
+    addArticleWithStatusId(section, "500");
+    await vi.advanceTimersByTimeAsync(0);
+
+    reloadOnNormalTab();
+    addArticleWithStatusId(section, "1201");
+    await vi.runAllTimersAsync();
+
+    expectReportedOnce();
+  });
+
+  it("同じ更新の中で新着は1回だけ報告される", async () => {
+    addTab(true, false);
+    const section = addSection();
+    addArticleWithStatusId(section, "1000");
+
+    reloadOnNormalTab();
+    addArticleWithStatusId(section, "1001");
+    await vi.advanceTimersByTimeAsync(0);
+    addArticleWithStatusId(section, "1002");
+    await vi.runAllTimersAsync();
+
+    expectReportedOnce();
+  });
+
+  it("ユーザーがスクロールしているあいだは新着として報告されない", async () => {
+    addTab(true, false);
+    const section = addSection();
+    addArticleWithStatusId(section, "1000");
+
+    reloadOnNormalTab();
+    setScrolling(100);
+    section.innerHTML = "";
+    addArticleWithStatusId(section, "500");
+    addArticleWithStatusId(section, "1001");
+    await vi.runAllTimersAsync();
+
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("スクロール中に見えたポストも見たことのある最新として次の更新へ引き継がれる", async () => {
+    addTab(true, false);
+    const section = addSection();
+    addArticleWithStatusId(section, "1000");
+
+    reloadOnNormalTab();
+    setScrolling(100);
+    addArticleWithStatusId(section, "1001");
+    await vi.advanceTimersByTimeAsync(0);
+
+    // スクロールが戻ったあとの次の更新で、1001 は既に見たことがあるため新着ではない
+    setScrolling(0);
+    section.innerHTML = "";
+    addArticleWithStatusId(section, "500");
+    reloadOnNormalTab();
+    addArticleWithStatusId(section, "1001");
+    await vi.runAllTimersAsync();
+
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("表示中のポストがないときは新着として報告されない", async () => {
+    addTab(true, false);
+    const section = addSection();
+
+    reloadOnNormalTab();
+    section.appendChild(document.createElement("div"));
+    await vi.runAllTimersAsync();
+
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  describe("通知ページ", () => {
+    beforeEach(() => {
+      history.pushState({}, "", "/notifications");
+    });
+
+    it("見たことのある最新の通知時刻より新しい通知が現れると新着として報告される", async () => {
+      addTab(true, false);
+      const section = addSection();
+      section.appendChild(buildNotificationArticle("2026-09-19T00:45:55Z"));
+
+      reloadOnNormalTab();
+      section.appendChild(buildNotificationArticle("2026-09-19T01:00:00Z"));
+      await vi.runAllTimersAsync();
+
+      expectReportedOnce();
+    });
+
+    it("ポストの識別番号がないいいね通知でも新着として検知される", async () => {
+      addTab(true, false);
+      const section = addSection();
+      section.appendChild(buildNotificationArticle("2026-09-19T00:45:55Z"));
+
+      reloadOnNormalTab();
+      // status リンクを持たない通知（いいね通知）
+      const likeNotification = buildNotificationArticle("2026-09-19T01:00:00Z");
+      section.appendChild(likeNotification);
+      await vi.runAllTimersAsync();
+
+      expect(extractStatusId(likeNotification)).toBeNull();
+      expectReportedOnce();
+    });
+
+    it("見たことのある最新の通知時刻より古い通知だけが現れても新着として報告されない", async () => {
+      addTab(true, false);
+      const section = addSection();
+      section.appendChild(buildNotificationArticle("2026-09-19T00:45:55Z"));
+
+      reloadOnNormalTab();
+      section.appendChild(buildNotificationArticle("2026-09-18T23:00:00Z"));
+      await vi.runAllTimersAsync();
+
+      expect(invokeMock).not.toHaveBeenCalled();
+    });
+
+    it("通知の時刻が読み取れないときは新着として報告されない", async () => {
+      addTab(true, false);
+      const section = addSection();
+      section.appendChild(buildNotificationArticle("2026-09-19T00:45:55Z"));
+
+      reloadOnNormalTab();
+      section.appendChild(buildNotificationArticle(null));
+      section.appendChild(buildNotificationArticle("不正な日時"));
+      await expect(vi.runAllTimersAsync()).resolves.not.toThrow();
+
+      expect(invokeMock).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("inject/auto_reload 検索ページの更新", () => {
-  beforeAll(async () => {
+  beforeEach(async () => {
+    // 新着判定の基準（見たことのある最新）はページ読み込みごとにリセットされるため、
+    // テストごとにモジュールを読み込み直して IIFE を再実行する。
+    vi.resetModules();
     await import("./auto_reload");
-  });
-
-  beforeEach(() => {
     document.body.innerHTML = "";
     invokeMock.mockClear();
     setScrolling(0);
@@ -855,17 +1028,17 @@ describe("inject/auto_reload 検索ページの更新", () => {
     expect(clicks).toEqual(["top"]);
   });
 
-  it("検索結果が取得し直されて未表示のポストが現れると新着として報告される", async () => {
+  it("検索カラムでも見たことのある最新より新しいポストが現れると新着として報告される", async () => {
     addSearchTabs(TAB_NAMES, 1);
     const section = addSection();
-    addArticleWithStatusId(section, "111");
+    addArticleWithStatusId(section, "1000");
 
     triggerReload();
-    await vi.advanceTimersByTimeAsync(5000);
+    // 別タブ→元のタブの切り替えが終わって、新着の監視が始まるまで進める
+    await vi.advanceTimersByTimeAsync(5000 + 5000);
 
-    // 元のタブへ戻したあと、取得し直された結果に未表示のポストが現れる
-    addArticleWithStatusId(section, "222");
-    await vi.advanceTimersByTimeAsync(5000);
+    addArticleWithStatusId(section, "1001");
+    await vi.advanceTimersByTimeAsync(0);
 
     expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
       label: "column-1",
@@ -955,49 +1128,6 @@ describe("inject/auto_reload 検索ページの更新", () => {
 
     await vi.advanceTimersByTimeAsync(500);
     expect(clicks).toEqual(["top", "live"]);
-  });
-
-  it("元のタブへ戻したあと描画が落ち着いてから新着を判定する", async () => {
-    addSearchTabs(TAB_NAMES, 1);
-    const section = addSection();
-    addArticleWithStatusId(section, "111");
-
-    triggerReload();
-    await vi.advanceTimersByTimeAsync(5000);
-
-    // 元のタブへ戻した直後に、取得し直された結果が描画される
-    addArticleWithStatusId(section, "222");
-    await vi.advanceTimersByTimeAsync(799);
-    expect(invokeMock).not.toHaveBeenCalled();
-
-    await vi.advanceTimersByTimeAsync(1);
-    expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
-      label: "column-1",
-      count: 1,
-    });
-  });
-
-  it("元のタブへ戻したあと描画が続いて落ち着かないときは上限時間で判定する", async () => {
-    addSearchTabs(TAB_NAMES, 1);
-    const section = addSection();
-    addArticleWithStatusId(section, "111");
-
-    triggerReload();
-    await vi.advanceTimersByTimeAsync(5000);
-
-    addArticleWithStatusId(section, "222");
-    // 未知の ID を含まない描画が 500ms ごとに続き、静止には届かない
-    for (let elapsed = 0; elapsed < 4500; elapsed += 500) {
-      section.appendChild(document.createElement("div"));
-      await vi.advanceTimersByTimeAsync(500);
-    }
-    expect(invokeMock).not.toHaveBeenCalled();
-
-    await vi.advanceTimersByTimeAsync(500);
-    expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
-      label: "column-1",
-      count: 1,
-    });
   });
 
   it("描画の落ち着きを待っている間に別タブの投稿が見えていても新着として報告されない", async () => {

@@ -21,19 +21,6 @@ export function extractStatusId(article: Element): string | null {
 }
 
 /**
- * section 配下の全 article から status ID を収集する。
- */
-export function collectKnownStatusIds(section: Element): Set<string> {
-  const ids = new Set<string>();
-  const articles = section.querySelectorAll("article");
-  for (const article of Array.from(articles)) {
-    const id = extractStatusId(article);
-    if (id !== null) ids.add(id);
-  }
-  return ids;
-}
-
-/**
  * 数値文字列 2 つの大小を比べる（BigInt は使わない）。a > b: 1, a < b: -1, 等しい: 0。
  * 桁数が長い方が大きく、同じ桁数なら文字列（辞書順）で比較する。
  */
@@ -157,24 +144,68 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
     invoke("report_new_posts_count", { label, count }).catch(() => {});
   }
 
-  /** ids に knownIds に含まれない status ID が 1 つでもあれば true。 */
-  function hasUnknownId(ids: Set<string>, knownIds: Set<string>): boolean {
-    for (const id of ids) {
-      if (!knownIds.has(id)) return true;
-    }
-    return false;
+  /**
+   * 「見たことのある最新」の基準を保持し、新着かどうかを判定する。
+   * 基準はページ読み込み（IIFE 再実行）でリセットされ、更新をまたいで引き継がれる。
+   * 仮想リストの表示入れ替えで古いポストが出入りしても、基準より新しいものが
+   * 現れない限り新着とは扱わない。
+   */
+  interface NewnessTracker {
+    /**
+     * section の最大値を基準へ取り込む（基準 = max(基準, 現在の最大値)）。
+     * 取り込み前の基準より新しいものが section にあったときだけ true を返す。
+     * section に読み取れる値が無ければ何もせず false。
+     */
+    absorb(section: Element): boolean;
+  }
+
+  function createNewnessTracker<T>(
+    readMax: (section: Element) => T | null,
+    compare: (a: T, b: T) => number,
+  ): NewnessTracker {
+    let session: T | null = null;
+    return {
+      absorb(section: Element): boolean {
+        const current = readMax(section);
+        if (current === null) return false;
+        if (session !== null && compare(current, session) <= 0) return false;
+        session = current;
+        return true;
+      },
+    };
+  }
+
+  // 通常ページ: status ID の最大値（Snowflake ID は時系列で単調増加）
+  const statusIdTracker = createNewnessTracker<string>(
+    collectMaxStatusId,
+    compareStatusIds,
+  );
+  // 通知ページ: 通知の時刻（いいね通知等は status リンクを持たないため ID は使えない）
+  const notificationTimeTracker = createNewnessTracker<number>(
+    collectMaxNotificationTimeMs,
+    (a, b) => (a === b ? 0 : a > b ? 1 : -1),
+  );
+
+  function isNotificationsPage(): boolean {
+    return /^\/notifications(\/mentions)?\/?$/.test(location.pathname);
+  }
+
+  function getNewnessTracker(): NewnessTracker {
+    return isNotificationsPage() ? notificationTimeTracker : statusIdTracker;
+  }
+
+  /** 現在表示中のポストを「見たことがある」ものとして基準へ取り込む。 */
+  function primeNewnessBaseline(): void {
+    const section = document.querySelector("section[aria-labelledby]");
+    if (!section) return;
+    getNewnessTracker().absorb(section);
   }
 
   /**
-   * 未知の status ID の出現を最大 30 秒監視し、出現したら新着として報告する。
-   * @param initialKnownIds 既知 ID 集合。省略時は呼び出し時点の section からスナップショットする。
-   * @param checkImmediately true のとき、監視を始める前に現在の DOM を既知 ID と比較し、
-   *   未知の ID があれば即報告して監視を張らない。
+   * 見たことのある最新より新しいポスト（通知ページでは通知）の出現を最大 30 秒監視し、
+   * 出現したら新着として 1 回だけ報告する。
    */
-  function waitForNewTweet(
-    initialKnownIds?: Set<string>,
-    checkImmediately = false,
-  ): void {
+  function waitForNewTweet(): void {
     const section = document.querySelector("section[aria-labelledby]");
     if (!section) return;
 
@@ -183,20 +214,8 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
       currentTweetObserver.disconnect();
     }
 
-    // 監視開始時点の status ID 群をスナップショットする。DOM順先頭要素の
-    // innerHTML比較では仮想化リストのDOM recycle（スクロール中の要素入れ替え）を
-    // 新着と誤検出してしまうため、ツイート固有IDの集合比較に切り替える。
-    const knownIds = initialKnownIds ?? collectKnownStatusIds(section);
-
-    if (checkImmediately) {
-      // observer 側と同様、スクロール中は仮想リストの入れ替えによる誤検出を
-      // 避けるため、報告も監視もせずこの回の判定を打ち切る。
-      if (isScrolling()) return;
-      if (hasUnknownId(collectKnownStatusIds(section), knownIds)) {
-        reportNewPostsCount(1);
-        return;
-      }
-    }
+    const tracker = getNewnessTracker();
+    tracker.absorb(section);
 
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
@@ -208,6 +227,9 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
     };
 
     const observer = new MutationObserver(function () {
+      // 新しく見えたものは、報告するかどうかに関わらず「見たことがある」ものとして取り込む。
+      const foundNewer = tracker.absorb(section);
+
       // 監視期間中（最大30秒）にユーザーがスクロールしていたら、DOM recycle による
       // 誤検出を避けるためその回の判定を打ち切る（新着報告しない）。
       if (isScrolling()) {
@@ -216,7 +238,7 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
         return;
       }
 
-      if (hasUnknownId(collectKnownStatusIds(section), knownIds)) {
+      if (foundNewer) {
         observer.disconnect();
         cleanUp();
         reportNewPostsCount(1);
@@ -345,9 +367,8 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
     const originalHref = selected?.getAttribute("href");
     if (!section || !selected || !other || !originalHref) return;
 
-    // 別タブ表示中の投稿は元タブと ID が異なる。切替前の ID 集合を基準にし、
-    // 元のタブへ戻して描画が落ち着いた後に比較する。
-    const knownIds = collectKnownStatusIds(section);
+    // 別タブ表示中の投稿は元タブと ID が異なる。切替前に見えている最新を基準にする。
+    primeNewnessBaseline();
     searchTabSwitching = true;
 
     // 1) 別タブへ切り替え。クリックが起こす最初の変化を取りこぼさないよう、
@@ -364,7 +385,7 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
         function (stillOnSearchPage) {
           searchTabSwitching = false;
           if (!stillOnSearchPage) return;
-          waitForNewTweet(knownIds, true);
+          waitForNewTweet();
         },
       );
       original.click();
@@ -393,7 +414,7 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
       waitAndClickNewPostsButton();
     }
 
-    // トリガー実行後、status ID 集合のスナップショットを取り、未知IDの出現を監視する
+    // トリガー実行後、見たことのある最新を基準にして、それより新しいポストの出現を監視する
     waitForNewTweet();
   }
 
