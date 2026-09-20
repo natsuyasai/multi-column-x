@@ -1,6 +1,5 @@
 import {
   DndContext,
-  KeyboardSensor,
   PointerSensor,
   closestCenter,
   useSensor,
@@ -14,7 +13,6 @@ import {
 import {
   SortableContext,
   horizontalListSortingStrategy,
-  sortableKeyboardCoordinates,
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -32,6 +30,9 @@ import styles from "./TopBar.module.scss";
 type ColumnListVariant = "collapsed" | "expanded";
 
 const DRAG_MODIFIERS = [restrictToHorizontalAxis, restrictToParentElement];
+
+/** この距離（px）以上ポインタを動かして初めてドラッグを開始する。未満は通常のクリック */
+export const DRAG_ACTIVATION_DISTANCE = 8;
 
 interface ColumnEntryProps {
   column: Column;
@@ -105,15 +106,10 @@ const SortableGroup: React.FC<SortableGroupProps> = ({
   onJumpToColumn,
   onClose,
 }) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-    isOver,
-  } = useSortable({ id: group.columns[0].id });
+  // attributes（role / tabIndex / aria-*）は意図的に使わない。
+  // キーボード並び替えを廃止しており、グループを Tab 停止位置にもボタンの入れ子にもしないため
+  const { listeners, setNodeRef, transform, transition, isDragging, isOver } =
+    useSortable({ id: group.columns[0].id });
 
   const classNames = [styles.columnGroup];
   if (isDragging) classNames.push(styles.columnGroupDragging);
@@ -125,17 +121,9 @@ const SortableGroup: React.FC<SortableGroupProps> = ({
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={classNames.join(" ")}
       data-testid="topbar-column-group"
+      data-dragging={isDragging || undefined}
+      {...listeners}
     >
-      <button
-        type="button"
-        className={styles.dragHandle}
-        aria-label="ドラッグして並び替え"
-        title="ドラッグして並び替え"
-        {...attributes}
-        {...listeners}
-      >
-        ⋮
-      </button>
       {group.columns.map((column) => (
         <ColumnEntry
           key={column.id}
@@ -162,7 +150,7 @@ interface SortableColumnGroupsProps {
 
 /**
  * カラムを gridCol ごとの列グループ（1 列 = 1 要素）として並べ、ドラッグで並び替えられるようにする。
- * グリッド未割当のカラムは並び替え対象外なので、グループの後ろにハンドル無しで表示する。
+ * グリッド未割当のカラムは並び替え対象外なので、グループの後ろにドラッグ不可で表示する。
  */
 export const SortableColumnGroups: React.FC<SortableColumnGroupsProps> = ({
   variant,
@@ -173,10 +161,9 @@ export const SortableColumnGroups: React.FC<SortableColumnGroupsProps> = ({
   onReorderColumnGroup,
 }) => {
   const sensors = useSensors(
-    // 8px 動かすまでドラッグ開始しない → 通常のクリックと競合しない
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
+    // 一定距離動かすまでドラッグ開始しない → 通常のクリックと競合しない
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: DRAG_ACTIVATION_DISTANCE },
     }),
   );
 

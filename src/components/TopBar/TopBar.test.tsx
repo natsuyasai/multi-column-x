@@ -400,16 +400,17 @@ describe("TopBar", () => {
     });
   });
 
-  describe("ドラッグハンドル", () => {
+  describe("グループ領域ドラッグ（つまみ廃止・キーボード非対応）", () => {
+    const stacked: Column = {
+      ...col2,
+      id: "col-3",
+      gridRow: 2,
+      gridCol: 1,
+    };
+
     it.each([false, true])(
-      "ドラッグハンドルが列グループ数だけ表示される（expanded=%s）",
+      "TopBarにドラッグ用のつまみが表示されない（expanded=%s）",
       (expanded) => {
-        const stacked: Column = {
-          ...col2,
-          id: "col-3",
-          gridRow: 2,
-          gridCol: 1,
-        };
         render(
           <TopBar
             {...defaultProps}
@@ -417,20 +418,60 @@ describe("TopBar", () => {
             expanded={expanded}
           />,
         );
-        // gridCol=1 の 2 行と gridCol=2 の 1 行 → 列グループは 2 つ
-        expect(screen.getAllByLabelText("ドラッグして並び替え")).toHaveLength(
-          2,
+        // gridCol=1 の 2 行と gridCol=2 の 1 行 → 列グループは 2 つあるが、つまみはどこにもない
+        expect(screen.getAllByTestId("topbar-column-group")).toHaveLength(2);
+        expect(screen.queryAllByLabelText("ドラッグして並び替え")).toHaveLength(
+          0,
         );
       },
     );
 
-    it("各列グループにドラッグハンドルが1つずつ含まれる", () => {
-      render(<TopBar {...defaultProps} />);
-      for (const group of screen.getAllByTestId("topbar-column-group")) {
-        expect(
-          within(group).getAllByLabelText("ドラッグして並び替え"),
-        ).toHaveLength(1);
+    it("列グループ要素がキーボードの停止位置にならない", async () => {
+      const user = userEvent.setup();
+      render(
+        <TopBar
+          {...defaultProps}
+          columns={[col1, stacked, col2]}
+          expanded={true}
+        />,
+      );
+      const groups = screen.getAllByTestId("topbar-column-group");
+      for (const group of groups) {
+        expect(group).not.toHaveAttribute("tabindex");
+        expect(group).not.toHaveAttribute("role");
       }
+
+      // 全フォーカス可能要素を 1 周以上するだけ Tab を繰り返し、グループ自体にフォーカスが乗らないこと
+      const focused = new Set<Element>();
+      for (let i = 0; i < 40; i++) {
+        await user.tab();
+        if (document.activeElement) focused.add(document.activeElement);
+      }
+      for (const group of groups) {
+        expect(focused.has(group)).toBe(false);
+      }
+      // 一方でグループ内のカラムボタン・閉じるボタンにはフォーカスが止まる
+      const columnButton = within(groups[0]).getAllByTitle(/アカウント1 - /)[0];
+      const closeButton = within(groups[0]).getAllByTitle("カラムを閉じる")[0];
+      expect(focused.has(columnButton)).toBe(true);
+      expect(focused.has(closeButton)).toBe(true);
+    });
+
+    it("SpaceのあとRight矢印を押してもonReorderColumnGroupは呼ばれない", async () => {
+      const user = userEvent.setup();
+      const onReorderColumnGroup = vi.fn();
+      render(
+        <TopBar
+          {...defaultProps}
+          columns={[col1, col2]}
+          onReorderColumnGroup={onReorderColumnGroup}
+        />,
+      );
+      const [firstButton] = screen.getAllByTitle(/アカウント1 - /);
+      firstButton.focus();
+      await user.keyboard(" ");
+      await user.keyboard("{ArrowRight}");
+      expect(onReorderColumnGroup).not.toHaveBeenCalled();
     });
   });
 
@@ -458,21 +499,18 @@ describe("TopBar", () => {
       },
     );
 
-    it("未割当カラムはドラッグハンドルも列グループ要素も持たない", () => {
+    it("未割当カラムは列グループ要素を持たない", () => {
       render(<TopBar {...defaultProps} columns={[col1, col2, unassigned]} />);
       expect(screen.getAllByTestId("topbar-column-group")).toHaveLength(2);
-      expect(screen.getAllByLabelText("ドラッグして並び替え")).toHaveLength(2);
       const unassignedButton = screen.getByTitle(/検索/);
       expect(
         unassignedButton.closest('[data-testid="topbar-column-group"]'),
       ).toBeNull();
     });
 
-    it("未割当カラムだけのときはドラッグハンドルが表示されない", () => {
+    it("未割当カラムだけのときは列グループ要素が表示されない", () => {
       render(<TopBar {...defaultProps} columns={[unassigned]} />);
-      expect(screen.queryAllByLabelText("ドラッグして並び替え")).toHaveLength(
-        0,
-      );
+      expect(screen.queryAllByTestId("topbar-column-group")).toHaveLength(0);
       expect(screen.getByTitle(/検索/)).toBeInTheDocument();
     });
 

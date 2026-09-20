@@ -161,6 +161,9 @@ $transition: 200ms ease;
   gap: 2px;
   flex-shrink: 0;
   border-radius: 4px;
+  // グループ全体がドラッグの取っ手（ボタンは .btn の cursor: pointer を維持）
+  cursor: grab;
+  user-select: none;
 }
 
 // ドラッグ中の要素: 半透明 + 影で浮いて見せる
@@ -172,35 +175,12 @@ $transition: 200ms ease;
   z-index: 1;
 }
 
+// 子ボタンの cursor: pointer を上書きして、ドラッグ中はどこでも grabbing にする
+.columnGroupDragging * {
+  cursor: grabbing;
+}
+
 // ドロップ先の位置: 挿入位置を左端のアクセント線で示す
 .columnGroupOver {
   box-shadow: inset 2px 0 0 var(--mcx-accent);
-}
-
-.dragHandle {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 12px;
-  height: 24px;
-  padding: 0;
-  background: none;
-  border: none;
-  border-radius: 4px;
-  color: var(--mcx-text-muted);
-  font-size: 12px;
-  line-height: 1;
-  cursor: grab;
-  // dnd-kit の PointerSensor がタッチで動くために必須
-  touch-action: none;
-
-  &:hover {
-    color: var(--mcx-text-tertiary);
-    background: var(--mcx-surface-hover);
-  }
-
-  &:active {
-    cursor: grabbing;
-  }
 }
