@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { isAutoReloadSupported } from "@/lib/autoReloadTarget";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { validateNgWordLines } from "../../lib/ngWordPattern";
 import {
@@ -123,7 +124,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             )}
           </section>
 
-          {!isExternal && (
+          {isAutoReloadSupported(column) && (
             <section className={styles.section}>
               <h3 className={styles.sectionTitle}>自動更新</h3>
               <label className={styles.checkLabel}>

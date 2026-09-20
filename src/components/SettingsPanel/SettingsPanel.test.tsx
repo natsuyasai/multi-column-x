@@ -428,6 +428,30 @@ describe("SettingsPanel pageTypeがexternalの場合", () => {
   });
 });
 
+describe("SettingsPanel 自動更新セクションの表示", () => {
+  it("リスト詳細カラムの設定パネルに自動更新の設定が表示されない", () => {
+    const listColumn: Column = { ...mockColumn, pageType: "list" };
+    render(<SettingsPanel {...defaultProps} column={listColumn} />);
+    expect(screen.queryByText("自動更新")).not.toBeInTheDocument();
+    expect(screen.queryByText("自動更新を有効にする")).not.toBeInTheDocument();
+  });
+
+  it("ホームのカラムでは自動更新の設定が従来どおり表示される", () => {
+    render(<SettingsPanel {...defaultProps} column={mockColumn} />);
+    expect(screen.getByText("自動更新")).toBeInTheDocument();
+    expect(screen.getByText("自動更新を有効にする")).toBeInTheDocument();
+  });
+
+  it.each<[string, Column["pageType"]]>([
+    ["検索", "search"],
+    ["通知", "notifications"],
+  ])("%sのカラムでは自動更新の設定が従来どおり表示される", (_, pageType) => {
+    const column: Column = { ...mockColumn, pageType };
+    render(<SettingsPanel {...defaultProps} column={column} />);
+    expect(screen.getByText("自動更新")).toBeInTheDocument();
+  });
+});
+
 describe("SettingsPanel 新着デスクトップ通知", () => {
   it("新着通知トグルが表示される", () => {
     render(<SettingsPanel {...defaultProps} />);

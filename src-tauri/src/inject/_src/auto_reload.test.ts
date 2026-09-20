@@ -1,21 +1,20 @@
 // auto_reload.ts は IIFE のため、import 時に実行されて window.__multiColumnX に
 // triggerReload が公開される。
-// 新仕様: トリガー時点の section 配下 article の status ID 集合をスナップショットし、
-// 監視期間中に未知の status ID を持つ article が出現したら count=1 固定で報告する
-// （DOM順先頭要素のinnerHTML比較では仮想化リストのDOM recycleを誤検出するため、
-// ツイート固有IDの集合比較方式に変更した）。
+// 新着判定: ページ読み込みから見たことのある最新（status ID の最大値。通知ページは通知時刻の
+// 最大値）を保持し、監視期間中にそれより新しいものが出現したら count=1 固定で報告する
+// （DOM順先頭要素のinnerHTML比較や ID 集合の比較では、仮想化リストの入れ替えや
+// 表示範囲の変化を誤検出するため）。
 // 一定間隔でのリロード実行自体は src/hooks/useAutoReload.ts（呼び出し元）の責務であり、
 // この inject スクリプトは triggerReload() の 1 回分の振る舞いのみを担う。
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeAll,
-  beforeEach,
-  afterEach,
-} from "vitest";
-import { extractStatusId, collectKnownStatusIds } from "./auto_reload";
+  extractStatusId,
+  compareStatusIds,
+  maxStatusId,
+  collectMaxStatusId,
+  extractNotificationTimeMs,
+  collectMaxNotificationTimeMs,
+} from "./auto_reload";
 
 const invokeMock = vi.fn((_cmd: string, _args?: Record<string, unknown>) =>
   Promise.resolve<unknown>(undefined),
@@ -101,6 +100,25 @@ function addArticleWithStatusId(
   return article;
 }
 
+/** time[datetime] を持つ要素を生成する。datetime が null のときは属性を付けない。 */
+function buildTimeElement(datetime: string | null): HTMLElement {
+  const time = document.createElement("time");
+  if (datetime !== null) time.setAttribute("datetime", datetime);
+  return time;
+}
+
+/** 通知ページの notification 型 article（status リンク無し・time あり）を生成する。 */
+function buildNotificationArticle(
+  ...datetimes: (string | null)[]
+): HTMLElement {
+  const article = document.createElement("article");
+  article.dataset.testid = "notification";
+  for (const datetime of datetimes) {
+    article.appendChild(buildTimeElement(datetime));
+  }
+  return article;
+}
+
 describe("inject/auto_reload の純粋関数", () => {
   describe("extractStatusId", () => {
     it("time子要素を持つstatusリンクからIDを抽出できる", () => {
@@ -128,41 +146,169 @@ describe("inject/auto_reload の純粋関数", () => {
     });
   });
 
-  describe("collectKnownStatusIds", () => {
-    it("複数articleから複数のstatus IDを収集できる", () => {
+  describe("compareStatusIds", () => {
+    it("桁数の異なる番号でも新旧が正しく比べられる", () => {
+      expect(compareStatusIds("999", "1000")).toBe(-1);
+      expect(compareStatusIds("1000", "999")).toBe(1);
+    });
+
+    it("番号が19桁の実際のポスト番号でも新旧が正しく比べられる", () => {
+      expect(
+        compareStatusIds("1836000000000000000", "1836000000000000001"),
+      ).toBe(-1);
+      expect(
+        compareStatusIds("1836000000000000001", "1836000000000000000"),
+      ).toBe(1);
+    });
+
+    it("同じ値は0を返す", () => {
+      expect(compareStatusIds("12345", "12345")).toBe(0);
+    });
+
+    it("同じ桁数のときは文字列の辞書順で比べる", () => {
+      expect(compareStatusIds("123", "124")).toBe(-1);
+      expect(compareStatusIds("900", "899")).toBe(1);
+    });
+  });
+
+  describe("maxStatusId", () => {
+    it("大きい方の番号を返す", () => {
+      expect(maxStatusId("999", "1000")).toBe("1000");
+      expect(maxStatusId("1000", "999")).toBe("1000");
+    });
+
+    it("片方がnullならもう片方を返す", () => {
+      expect(maxStatusId(null, "123")).toBe("123");
+      expect(maxStatusId("123", null)).toBe("123");
+    });
+
+    it("両方nullならnullを返す", () => {
+      expect(maxStatusId(null, null)).toBeNull();
+    });
+  });
+
+  describe("collectMaxStatusId", () => {
+    it("複数articleのstatus IDのうち最大のものを返す", () => {
       const section = document.createElement("section");
-      section.appendChild(buildArticleWithStatusLink("/username/status/111"));
+      section.appendChild(buildArticleWithStatusLink("/username/status/999"));
+      section.appendChild(buildArticleWithStatusLink("/username/status/1000"));
+      section.appendChild(buildArticleWithStatusLink("/username/status/500"));
+
+      expect(collectMaxStatusId(section)).toBe("1000");
+    });
+
+    it("IDの取れないarticleは無視される", () => {
+      const section = document.createElement("section");
+      section.appendChild(document.createElement("article"));
       section.appendChild(buildArticleWithStatusLink("/username/status/222"));
 
-      const ids = collectKnownStatusIds(section);
-
-      expect(ids).toEqual(new Set(["111", "222"]));
+      expect(collectMaxStatusId(section)).toBe("222");
     });
 
-    it("articleが無い場合は空のSetを返す", () => {
+    it("articleが0件ならnullを返す", () => {
       const section = document.createElement("section");
 
-      expect(collectKnownStatusIds(section)).toEqual(new Set());
+      expect(collectMaxStatusId(section)).toBeNull();
+    });
+  });
+
+  describe("extractNotificationTimeMs", () => {
+    it("通知ページでポストの識別番号がないいいね通知でも時刻が読み取れる", () => {
+      const article = buildNotificationArticle("2026-09-19T00:45:55.510Z");
+
+      expect(extractNotificationTimeMs(article)).toBe(
+        Date.parse("2026-09-19T00:45:55.510Z"),
+      );
     });
 
-    it("同一IDが複数articleに存在する場合は重複排除される", () => {
+    it("statusリンクとtimeを持つtweet型のarticleからも時刻が読み取れる", () => {
+      const article = buildArticleWithStatusLink("/username/status/123");
+      article.dataset.testid = "tweet";
+      article
+        .querySelector("time")
+        ?.setAttribute("datetime", "2026-09-19T01:00:00.000Z");
+
+      expect(extractNotificationTimeMs(article)).toBe(
+        Date.parse("2026-09-19T01:00:00.000Z"),
+      );
+    });
+
+    it("timeが無いときはnullを返し例外にならない", () => {
+      const article = document.createElement("article");
+      article.dataset.testid = "notification";
+
+      expect(extractNotificationTimeMs(article)).toBeNull();
+    });
+
+    it("datetime属性が無い、または不正なときはnullを返し例外にならない", () => {
+      expect(
+        extractNotificationTimeMs(buildNotificationArticle(null)),
+      ).toBeNull();
+      expect(
+        extractNotificationTimeMs(buildNotificationArticle("not-a-date")),
+      ).toBeNull();
+    });
+
+    it("複数のtimeがあれば最大の時刻を返す", () => {
+      const article = buildNotificationArticle(
+        "2026-09-19T00:00:00.000Z",
+        "2026-09-19T02:00:00.000Z",
+        "2026-09-19T01:00:00.000Z",
+      );
+
+      expect(extractNotificationTimeMs(article)).toBe(
+        Date.parse("2026-09-19T02:00:00.000Z"),
+      );
+    });
+
+    it("不正なdatetimeのtimeは無視して有効なtimeの最大を返す", () => {
+      const article = buildNotificationArticle(
+        "invalid",
+        "2026-09-19T01:00:00.000Z",
+      );
+
+      expect(extractNotificationTimeMs(article)).toBe(
+        Date.parse("2026-09-19T01:00:00.000Z"),
+      );
+    });
+  });
+
+  describe("collectMaxNotificationTimeMs", () => {
+    it("複数articleの時刻のうち最大のものを返す", () => {
       const section = document.createElement("section");
-      section.appendChild(buildArticleWithStatusLink("/username/status/111"));
-      section.appendChild(buildArticleWithStatusLink("/username/status/111"));
+      section.appendChild(buildNotificationArticle("2026-09-19T00:00:00.000Z"));
+      section.appendChild(buildNotificationArticle("2026-09-19T03:00:00.000Z"));
+      section.appendChild(buildNotificationArticle("2026-09-19T01:00:00.000Z"));
 
-      const ids = collectKnownStatusIds(section);
+      expect(collectMaxNotificationTimeMs(section)).toBe(
+        Date.parse("2026-09-19T03:00:00.000Z"),
+      );
+    });
 
-      expect(ids).toEqual(new Set(["111"]));
+    it("時刻の読み取れないarticleは無視される", () => {
+      const section = document.createElement("section");
+      section.appendChild(document.createElement("article"));
+      section.appendChild(buildNotificationArticle("2026-09-19T01:00:00.000Z"));
+
+      expect(collectMaxNotificationTimeMs(section)).toBe(
+        Date.parse("2026-09-19T01:00:00.000Z"),
+      );
+    });
+
+    it("articleが0件ならnullを返す", () => {
+      const section = document.createElement("section");
+
+      expect(collectMaxNotificationTimeMs(section)).toBeNull();
     });
   });
 });
 
 describe("inject/auto_reload", () => {
-  beforeAll(async () => {
+  beforeEach(async () => {
+    // 新着判定の基準（見たことのある最新）はページ読み込みごとにリセットされるため、
+    // テストごとにモジュールを読み込み直して IIFE を再実行する。
+    vi.resetModules();
     await import("./auto_reload");
-  });
-
-  beforeEach(() => {
     document.body.innerHTML = "";
     invokeMock.mockClear();
     setScrolling(0);
@@ -397,12 +543,12 @@ describe("inject/auto_reload", () => {
   });
 });
 
-describe("inject/auto_reload の新着判定（status ID 集合比較方式）", () => {
-  beforeAll(async () => {
+describe("inject/auto_reload の新着判定（見たことのある最新との比較）", () => {
+  beforeEach(async () => {
+    // 新着判定の基準（見たことのある最新）はページ読み込みごとにリセットされるため、
+    // テストごとにモジュールを読み込み直して IIFE を再実行する。
+    vi.resetModules();
     await import("./auto_reload");
-  });
-
-  beforeEach(() => {
     document.body.innerHTML = "";
     invokeMock.mockClear();
     setScrolling(0);
@@ -415,6 +561,7 @@ describe("inject/auto_reload の新着判定（status ID 集合比較方式）",
 
   afterEach(() => {
     vi.useRealTimers();
+    history.replaceState({}, "", "/");
   });
 
   it("監視開始後に未知のstatus IDを持つarticleが出現すると新着として報告される", async () => {
@@ -473,29 +620,311 @@ describe("inject/auto_reload の新着判定（status ID 集合比較方式）",
 
     expect(invokeMock).not.toHaveBeenCalled();
   });
-});
 
-describe("inject/auto_reload 検索ページの更新", () => {
-  beforeAll(async () => {
-    await import("./auto_reload");
+  /** 1 回分の triggerReload（通常タブの再選択経路）を実行する。 */
+  function reloadOnNormalTab(): void {
+    triggerReload();
+  }
+
+  function expectReportedOnce(): void {
+    expect(invokeMock).toHaveBeenCalledTimes(1);
+    expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
+      label: "column-1",
+      count: 1,
+    });
+  }
+
+  it("見たことのある最も新しいポストより新しいポストが現れると新着として報告される", async () => {
+    addTab(true, false);
+    const section = addSection();
+    addArticleWithStatusId(section, "1000");
+
+    reloadOnNormalTab();
+    addArticleWithStatusId(section, "1001");
+    await vi.runAllTimersAsync();
+
+    expectReportedOnce();
   });
 
-  beforeEach(() => {
-    document.body.innerHTML = "";
-    invokeMock.mockClear();
+  it("見たことのある最も新しいポストより古いポストだけが現れても新着として報告されない", async () => {
+    addTab(true, false);
+    const section = addSection();
+    addArticleWithStatusId(section, "1000");
+
+    reloadOnNormalTab();
+    addArticleWithStatusId(section, "900");
+    await vi.runAllTimersAsync();
+
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("表示が入れ替わっても見たことのある最新より新しいポストがなければ新着として報告されない", async () => {
+    addTab(true, false);
+    const section = addSection();
+    for (const id of ["700", "800", "900", "1000"]) {
+      addArticleWithStatusId(section, id);
+    }
+
+    reloadOnNormalTab();
+    section.innerHTML = "";
+    for (const id of ["500", "600", "700", "950"]) {
+      addArticleWithStatusId(section, id);
+    }
+    await vi.runAllTimersAsync();
+
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("前回までに見たことのある最新の番号は更新をまたいで引き継がれる", async () => {
+    addTab(true, false);
+    const section = addSection();
+    addArticleWithStatusId(section, "1200");
+
+    // 1 回目の更新で 1200 を見たあと、表示が古いポストに入れ替わる
+    reloadOnNormalTab();
+    section.innerHTML = "";
+    addArticleWithStatusId(section, "500");
+    await vi.advanceTimersByTimeAsync(0);
+
+    // 2 回目の更新で 1100 が現れても、1200 を見たことがあるので新着ではない
+    reloadOnNormalTab();
+    addArticleWithStatusId(section, "1100");
+    await vi.runAllTimersAsync();
+
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("前回までに見たことのある最新より新しいポストが次の更新で現れると新着として報告される", async () => {
+    addTab(true, false);
+    const section = addSection();
+    addArticleWithStatusId(section, "1200");
+
+    reloadOnNormalTab();
+    section.innerHTML = "";
+    addArticleWithStatusId(section, "500");
+    await vi.advanceTimersByTimeAsync(0);
+
+    reloadOnNormalTab();
+    addArticleWithStatusId(section, "1201");
+    await vi.runAllTimersAsync();
+
+    expectReportedOnce();
+  });
+
+  it("同じ更新の中で新着は1回だけ報告される", async () => {
+    addTab(true, false);
+    const section = addSection();
+    addArticleWithStatusId(section, "1000");
+
+    reloadOnNormalTab();
+    addArticleWithStatusId(section, "1001");
+    await vi.advanceTimersByTimeAsync(0);
+    addArticleWithStatusId(section, "1002");
+    await vi.runAllTimersAsync();
+
+    expectReportedOnce();
+  });
+
+  it("ユーザーがスクロールしているあいだは新着として報告されない", async () => {
+    addTab(true, false);
+    const section = addSection();
+    addArticleWithStatusId(section, "1000");
+
+    reloadOnNormalTab();
+    setScrolling(100);
+    section.innerHTML = "";
+    addArticleWithStatusId(section, "500");
+    addArticleWithStatusId(section, "1001");
+    await vi.runAllTimersAsync();
+
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("スクロール中に見えたポストも見たことのある最新として次の更新へ引き継がれる", async () => {
+    addTab(true, false);
+    const section = addSection();
+    addArticleWithStatusId(section, "1000");
+
+    reloadOnNormalTab();
+    setScrolling(100);
+    addArticleWithStatusId(section, "1001");
+    await vi.advanceTimersByTimeAsync(0);
+
+    // スクロールが戻ったあとの次の更新で、1001 は既に見たことがあるため新着ではない
     setScrolling(0);
-    window.__TAURI_INTERNALS__ = {
-      metadata: { currentWebview: { label: "column-1" } },
-    };
-    window.__TAURI__ = { core: { invoke: invokeMock } };
+    section.innerHTML = "";
+    addArticleWithStatusId(section, "500");
+    reloadOnNormalTab();
+    addArticleWithStatusId(section, "1001");
+    await vi.runAllTimersAsync();
+
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("表示中のポストがないときは新着として報告されない", async () => {
+    addTab(true, false);
+    const section = addSection();
+
+    reloadOnNormalTab();
+    section.appendChild(document.createElement("div"));
+    await vi.runAllTimersAsync();
+
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  describe("通知ページ", () => {
+    beforeEach(() => {
+      history.pushState({}, "", "/notifications");
+    });
+
+    it("見たことのある最新の通知時刻より新しい通知が現れると新着として報告される", async () => {
+      addTab(true, false);
+      const section = addSection();
+      section.appendChild(buildNotificationArticle("2026-09-19T00:45:55Z"));
+
+      reloadOnNormalTab();
+      // 通知ページはスクロール往復で更新するため、先頭へ戻したあとに監視が始まる
+      await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+      section.appendChild(buildNotificationArticle("2026-09-19T01:00:00Z"));
+      await vi.runAllTimersAsync();
+
+      expectReportedOnce();
+    });
+
+    it("ポストの識別番号がないいいね通知でも新着として検知される", async () => {
+      addTab(true, false);
+      const section = addSection();
+      section.appendChild(buildNotificationArticle("2026-09-19T00:45:55Z"));
+
+      reloadOnNormalTab();
+      // 通知ページはスクロール往復で更新するため、先頭へ戻したあとに監視が始まる
+      await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+      // status リンクを持たない通知（いいね通知）
+      const likeNotification = buildNotificationArticle("2026-09-19T01:00:00Z");
+      section.appendChild(likeNotification);
+      await vi.runAllTimersAsync();
+
+      expect(extractStatusId(likeNotification)).toBeNull();
+      expectReportedOnce();
+    });
+
+    it("見たことのある最新の通知時刻より古い通知だけが現れても新着として報告されない", async () => {
+      addTab(true, false);
+      const section = addSection();
+      section.appendChild(buildNotificationArticle("2026-09-19T00:45:55Z"));
+
+      reloadOnNormalTab();
+      // 通知ページはスクロール往復で更新するため、先頭へ戻したあとに監視が始まる
+      await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+      section.appendChild(buildNotificationArticle("2026-09-18T23:00:00Z"));
+      await vi.runAllTimersAsync();
+
+      expect(invokeMock).not.toHaveBeenCalled();
+    });
+
+    it("通知の時刻が読み取れないときは新着として報告されない", async () => {
+      addTab(true, false);
+      const section = addSection();
+      section.appendChild(buildNotificationArticle("2026-09-19T00:45:55Z"));
+
+      reloadOnNormalTab();
+      // 通知ページはスクロール往復で更新するため、先頭へ戻したあとに監視が始まる
+      await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+      section.appendChild(buildNotificationArticle(null));
+      section.appendChild(buildNotificationArticle("不正な日時"));
+      await expect(vi.runAllTimersAsync()).resolves.not.toThrow();
+
+      expect(invokeMock).not.toHaveBeenCalled();
+    });
+  });
+});
+
+/** scrollTop への代入（書き込み）を記録できるようにする。afterEach で restoreScrollTopRecorder を呼ぶこと。 */
+function recordScrollTopWrites(): number[] {
+  const writes: number[] = [];
+  let value = scrollingElementStub.scrollTop;
+  Object.defineProperty(scrollingElementStub, "scrollTop", {
+    get: () => value,
+    set: (next: number) => {
+      value = next;
+      writes.push(next);
+    },
+    configurable: true,
+  });
+  return writes;
+}
+
+function restoreScrollTopRecorder(): void {
+  Object.defineProperty(scrollingElementStub, "scrollTop", {
+    value: 0,
+    writable: true,
+    configurable: true,
+  });
+}
+
+/** スクロール往復の待ち時間（ms）。 */
+const ROUNDTRIP_WAIT_MS = 60;
+/** スクロール往復で下へスクロールする最小距離（px）。 */
+const ROUNDTRIP_MIN_DISTANCE_PX = 250;
+/** 下限（250px）が効く低いビューポートの高さ（px）。既定で使う。 */
+const LOW_VIEWPORT_HEIGHT_PX = 300;
+
+const originalInnerHeight = window.innerHeight;
+
+/** ビューポート高さ（window.innerHeight）を差し替える。afterEach で restoreViewportHeight を呼ぶこと。 */
+function setViewportHeight(height: number): void {
+  Object.defineProperty(window, "innerHeight", {
+    value: height,
+    configurable: true,
+    writable: true,
+  });
+}
+
+function restoreViewportHeight(): void {
+  setViewportHeight(originalInnerHeight);
+}
+
+async function setUpAutoReloadPage(): Promise<void> {
+  // 下へスクロールする距離はビューポート高さに比例するため、既定では下限が効く高さに固定する。
+  setViewportHeight(LOW_VIEWPORT_HEIGHT_PX);
+  // 新着判定の基準（見たことのある最新）と往復中フラグはページ読み込みごとにリセットされるため、
+  // テストごとにモジュールを読み込み直して IIFE を再実行する。
+  vi.resetModules();
+  await import("./auto_reload");
+  document.body.innerHTML = "";
+  invokeMock.mockClear();
+  setScrolling(0);
+  window.__TAURI_INTERNALS__ = {
+    metadata: { currentWebview: { label: "column-1" } },
+  };
+  window.__TAURI__ = { core: { invoke: invokeMock } };
+  vi.useFakeTimers();
+}
+
+function expectReportedNewPostOnce(): void {
+  expect(invokeMock).toHaveBeenCalledTimes(1);
+  expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
+    label: "column-1",
+    count: 1,
+  });
+}
+
+describe("inject/auto_reload 検索ページの更新", () => {
+  let scrollWrites: number[];
+
+  beforeEach(async () => {
+    await setUpAutoReloadPage();
     history.pushState({}, "", "/search?q=rust&f=live");
-    vi.useFakeTimers();
+    scrollWrites = recordScrollTopWrites();
   });
 
   afterEach(() => {
-    // 途中のタブ切り替えが次のテストへ持ち越されないよう、保留中のタイマーを流し切る
+    // 途中のスクロール往復が次のテストへ持ち越されないよう、保留中のタイマーを流し切る
     vi.runAllTimers();
     vi.useRealTimers();
+    restoreScrollTopRecorder();
+    restoreViewportHeight();
+    vi.restoreAllMocks();
     history.replaceState({}, "", "/");
   });
 
@@ -534,34 +963,80 @@ describe("inject/auto_reload 検索ページの更新", () => {
 
   const TAB_NAMES = ["top", "live", "user", "media", "list"];
 
-  it("「最新」タブの検索カラムで自動更新が動くと検索結果が取得し直される", async () => {
-    const tabs = addSearchTabs(TAB_NAMES, 1);
-    const clicks = recordClicks(tabs, TAB_NAMES);
+  it("検索カラムで自動更新が動くと下へスクロールしてから先頭へ戻る", async () => {
+    addSearchTabs(TAB_NAMES, 1);
+    addSection();
+    expect(scrollingElementStub.scrollTop).toBe(0);
+
+    triggerReload();
+    expect(scrollingElementStub.scrollTop).toBeGreaterThanOrEqual(
+      ROUNDTRIP_MIN_DISTANCE_PX,
+    );
+
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+    expect(scrollingElementStub.scrollTop).toBe(0);
+  });
+
+  it("背の高いビューポートでは高さに比例した距離まで下へスクロールしてから先頭へ戻る", async () => {
+    setViewportHeight(1424);
+    addSearchTabs(TAB_NAMES, 1);
     addSection();
 
     triggerReload();
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
 
-    expect(clicks).toEqual(["top", "live"]);
+    expect(Math.max(...scrollWrites)).toBeGreaterThanOrEqual(712);
+    expect(scrollWrites[scrollWrites.length - 1]).toBe(0);
   });
 
-  it("「話題のポスト」タブの検索カラムでも自動更新が動くと元のタブへ戻る", async () => {
+  it("低いビューポートでは最小距離まで下へスクロールする", async () => {
+    setViewportHeight(300);
+    addSearchTabs(TAB_NAMES, 1);
+    addSection();
+
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+
+    expect(scrollWrites).toEqual([250, 0]);
+  });
+
+  it("先頭へ戻す前には必ず待ち時間が置かれる", async () => {
+    addSearchTabs(TAB_NAMES, 1);
+    addSection();
+
+    triggerReload();
+    expect(scrollingElementStub.scrollTop).toBeGreaterThanOrEqual(
+      ROUNDTRIP_MIN_DISTANCE_PX,
+    );
+
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS - 1);
+    expect(scrollingElementStub.scrollTop).toBeGreaterThanOrEqual(
+      ROUNDTRIP_MIN_DISTANCE_PX,
+    );
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(scrollingElementStub.scrollTop).toBe(0);
+  });
+
+  it("検索ページのどのタブが選択されていても同じスクロール往復で更新される", async () => {
     const tabs = addSearchTabs(TAB_NAMES, 0);
     const clicks = recordClicks(tabs, TAB_NAMES);
     addSection();
 
     triggerReload();
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
 
-    expect(clicks).toEqual(["live", "top"]);
+    expect(clicks).toEqual([]);
+    expect(scrollWrites).toEqual([ROUNDTRIP_MIN_DISTANCE_PX, 0]);
   });
 
-  it("自動更新のあと選択中のタブは実行前と同じである", async () => {
+  it("自動更新のあとも選択中のタブは実行前と同じである", async () => {
     const tabs = addSearchTabs(TAB_NAMES, 1);
     addSection();
+    const urlBefore = location.href;
 
     triggerReload();
-    await vi.advanceTimersByTimeAsync(5000 + 5000);
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS + 5000);
 
     expect(tabs.map((tab) => tab.getAttribute("aria-selected"))).toEqual([
       "false",
@@ -570,294 +1045,278 @@ describe("inject/auto_reload 検索ページの更新", () => {
       "false",
       "false",
     ]);
+    expect(location.href).toBe(urlBefore);
   });
 
-  it("検索ページにタブが見つからないときは何もせずエラーにもならない", async () => {
+  it("自動更新ではタブの切り替えは行われない", async () => {
+    const tabs = addSearchTabs(TAB_NAMES, 1);
+    const clicks = recordClicks(tabs, TAB_NAMES);
+    const clickSpy = vi.spyOn(HTMLElement.prototype, "click");
     addSection();
 
-    expect(() => triggerReload()).not.toThrow();
-    await vi.advanceTimersByTimeAsync(5000 + 5000);
-
-    expect(invokeMock).not.toHaveBeenCalled();
-  });
-
-  it("検索ページのタブが選択中の1つしかないときは何もせずエラーにもならない", async () => {
-    const tabs = addSearchTabs(["live"], 0);
-    const clicks = recordClicks(tabs, ["live"]);
-    addSection();
-
-    expect(() => triggerReload()).not.toThrow();
-    await vi.advanceTimersByTimeAsync(5000 + 5000);
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS + 5000);
 
     expect(clicks).toEqual([]);
-    expect(invokeMock).not.toHaveBeenCalled();
+    expect(clickSpy).not.toHaveBeenCalled();
   });
 
   it("ホームのカラムの自動更新は従来どおりの手順で行われる", async () => {
     history.replaceState({}, "", "/");
-    const searchTabs = addSearchTabs(TAB_NAMES, 1);
-    const searchClicks = recordClicks(searchTabs, TAB_NAMES);
     const homeTab = addTab(true, false);
     const homeClickSpy = vi.fn();
     homeTab.addEventListener("click", homeClickSpy);
     addSection();
 
     triggerReload();
-    await vi.advanceTimersByTimeAsync(5000 + 5000);
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS + 5000);
 
     expect(homeClickSpy).toHaveBeenCalledTimes(1);
-    expect(searchClicks).toEqual([]);
+    expect(scrollWrites).toEqual([]);
   });
 
-  it("検索以外のタブ付きページでも検索ページ専用の切り替えは行われない", async () => {
+  it("通知・検索以外のページでは検索ページ専用のスクロール往復は行われない", async () => {
     history.replaceState({}, "", "/i/lists/123");
     const tabs = addSearchTabs(TAB_NAMES, 1);
     const clicks = recordClicks(tabs, TAB_NAMES);
     addSection();
 
     triggerReload();
-    await vi.advanceTimersByTimeAsync(5000 + 5000);
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS + 5000);
 
     expect(clicks).toEqual([]);
+    expect(scrollWrites).toEqual([]);
   });
 
   it("ユーザーがスクロールしているときは検索カラムの自動更新を行わない", async () => {
     setScrolling(100);
-    const tabs = addSearchTabs(TAB_NAMES, 1);
-    const clicks = recordClicks(tabs, TAB_NAMES);
+    scrollWrites.length = 0;
+    addSearchTabs(TAB_NAMES, 1);
     addSection();
 
     triggerReload();
-    await vi.advanceTimersByTimeAsync(5000 + 5000);
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS + 5000);
 
-    expect(clicks).toEqual([]);
+    expect(scrollWrites).toEqual([]);
+    expect(scrollingElementStub.scrollTop).toBe(100);
   });
 
-  it("上端へスクロールする指定つきの自動更新は先頭へ戻してから更新する", async () => {
+  it("先頭へ戻す指定つきの自動更新はスクロール中でも先頭へ戻してから更新する", async () => {
     setScrolling(100);
-    const tabs = addSearchTabs(TAB_NAMES, 1);
-    const clicks = recordClicks(tabs, TAB_NAMES);
+    scrollWrites.length = 0;
+    addSearchTabs(TAB_NAMES, 1);
     addSection();
 
     triggerReload(true);
 
-    expect(scrollingElementStub.scrollTop).toBe(0);
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(clicks).toEqual(["top", "live"]);
+    expect(scrollWrites).toEqual([0, ROUNDTRIP_MIN_DISTANCE_PX]);
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+    expect(scrollWrites).toEqual([0, ROUNDTRIP_MIN_DISTANCE_PX, 0]);
   });
 
-  it("切り替えの途中でもう一度自動更新が実行されても二重に切り替えない", async () => {
-    const tabs = addSearchTabs(TAB_NAMES, 1);
-    const clicks = recordClicks(tabs, TAB_NAMES);
+  it("往復の途中でもう一度自動更新が実行されても二重に往復しない", async () => {
+    addSearchTabs(TAB_NAMES, 1);
     addSection();
 
     triggerReload();
     triggerReload();
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
 
-    expect(clicks).toEqual(["top", "live"]);
+    expect(scrollWrites).toEqual([ROUNDTRIP_MIN_DISTANCE_PX, 0]);
+    expect(scrollingElementStub.scrollTop).toBe(0);
   });
 
-  it("切り替えの途中でカラムのページが検索ページでなくなっても元のタブへ戻そうとしない", async () => {
-    const tabs = addSearchTabs(TAB_NAMES, 1);
-    const clicks = recordClicks(tabs, TAB_NAMES);
+  it("往復が完了したあとは次の自動更新を再び実行できる", async () => {
+    addSearchTabs(TAB_NAMES, 1);
+    addSection();
+
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+
+    expect(scrollWrites).toEqual([
+      ROUNDTRIP_MIN_DISTANCE_PX,
+      0,
+      ROUNDTRIP_MIN_DISTANCE_PX,
+      0,
+    ]);
+  });
+
+  it("往復の途中でページが検索ページでなくなってもエラーにならず先頭へ戻す操作は行われない", async () => {
+    addSearchTabs(TAB_NAMES, 1);
     addSection();
 
     triggerReload();
     history.pushState({}, "", "/home");
 
     await expect(
-      vi.advanceTimersByTimeAsync(5000 + 5000),
+      vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS + 5000),
     ).resolves.not.toThrow();
-    expect(clicks).toEqual(["top"]);
+    expect(scrollWrites).toEqual([ROUNDTRIP_MIN_DISTANCE_PX]);
+
+    // 検索ページへ戻ると、再び自動更新が実行できる（往復中フラグが戻っている）
+    history.pushState({}, "", "/search?q=rust&f=live");
+    setScrolling(0);
+    scrollWrites.length = 0;
+    triggerReload();
+    expect(scrollWrites).toEqual([ROUNDTRIP_MIN_DISTANCE_PX]);
   });
 
-  it("検索結果が取得し直されて未表示のポストが現れると新着として報告される", async () => {
+  it("スクロール往復のあとに見たことのある最新より新しいポストが現れると新着として報告される", async () => {
     addSearchTabs(TAB_NAMES, 1);
     const section = addSection();
-    addArticleWithStatusId(section, "111");
+    addArticleWithStatusId(section, "1000");
 
     triggerReload();
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
 
-    // 元のタブへ戻したあと、取得し直された結果に未表示のポストが現れる
-    addArticleWithStatusId(section, "222");
-    await vi.advanceTimersByTimeAsync(5000);
+    addArticleWithStatusId(section, "1001");
+    await vi.advanceTimersByTimeAsync(0);
 
-    expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
-      label: "column-1",
-      count: 1,
-    });
+    expectReportedNewPostOnce();
   });
 
-  it("検索結果が取得し直されても未表示のポストが現れなければ新着として報告されない", async () => {
+  it("スクロール往復のあとに見たことのある最新より古いポストだけが現れても新着として報告されない", async () => {
     addSearchTabs(TAB_NAMES, 1);
     const section = addSection();
-    const original = addArticleWithStatusId(section, "111");
+    addArticleWithStatusId(section, "1000");
 
     triggerReload();
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
 
-    // 別タブ表示中は元のタブと異なるポストが並ぶ
-    original.remove();
-    addArticleWithStatusId(section, "999");
-    await vi.advanceTimersByTimeAsync(5000);
-
-    // 元のタブへ戻すと元と同じ結果に戻る
-    section.innerHTML = "";
-    addArticleWithStatusId(section, "111");
+    addArticleWithStatusId(section, "900");
     await vi.runAllTimersAsync();
 
     expect(invokeMock).not.toHaveBeenCalled();
   });
+});
 
-  it("元のタブへ戻した後の待機中にユーザーがスクロールしていたら新着として報告されない", async () => {
-    addSearchTabs(TAB_NAMES, 1);
-    const section = addSection();
-    addArticleWithStatusId(section, "111");
+describe("inject/auto_reload 通知ページの更新", () => {
+  let scrollWrites: number[];
 
-    triggerReload();
-    await vi.advanceTimersByTimeAsync(5000);
-
-    // 元のタブへ戻した後の待機中に未知のポストが現れ、ユーザーがスクロールしている
-    addArticleWithStatusId(section, "222");
-    setScrolling(100);
-    await vi.advanceTimersByTimeAsync(5000);
-
-    expect(invokeMock).not.toHaveBeenCalled();
+  beforeEach(async () => {
+    await setUpAutoReloadPage();
+    history.pushState({}, "", "/notifications");
+    scrollWrites = recordScrollTopWrites();
   });
 
-  it("別タブの描画が検知できないときは上限時間で元のタブへ戻す", async () => {
-    const tabs = addSearchTabs(TAB_NAMES, 1);
-    const clicks = recordClicks(tabs, TAB_NAMES);
+  afterEach(() => {
+    vi.runAllTimers();
+    vi.useRealTimers();
+    restoreScrollTopRecorder();
+    restoreViewportHeight();
+    vi.restoreAllMocks();
+    history.replaceState({}, "", "/");
+  });
+
+  it("背の高いビューポートでは高さに比例した距離まで下へスクロールしてから先頭へ戻る", async () => {
+    setViewportHeight(1424);
     addSection();
 
     triggerReload();
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
 
-    await vi.advanceTimersByTimeAsync(4999);
-    expect(clicks).toEqual(["top"]);
-
-    await vi.advanceTimersByTimeAsync(1);
-    expect(clicks).toEqual(["top", "live"]);
+    expect(Math.max(...scrollWrites)).toBeGreaterThanOrEqual(712);
+    expect(scrollWrites[scrollWrites.length - 1]).toBe(0);
   });
 
-  it("別タブの描画が落ち着いたら上限時間を待たずに元のタブへ戻す", async () => {
-    const tabs = addSearchTabs(TAB_NAMES, 1);
-    const clicks = recordClicks(tabs, TAB_NAMES);
-    const section = addSection();
+  it("低いビューポートでは最小距離まで下へスクロールする", async () => {
+    setViewportHeight(300);
+    addSection();
 
     triggerReload();
-    // 別タブがクリックされた直後に、別タブの結果が描画される
-    expect(clicks).toEqual(["top"]);
-    addArticleWithStatusId(section, "999");
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
 
-    await vi.advanceTimersByTimeAsync(799);
-    expect(clicks).toEqual(["top"]);
-
-    await vi.advanceTimersByTimeAsync(1);
-    expect(clicks).toEqual(["top", "live"]);
+    expect(scrollWrites).toEqual([250, 0]);
   });
 
-  it("別タブの描画が続いて落ち着かないときも上限時間で元のタブへ戻す", async () => {
-    const tabs = addSearchTabs(TAB_NAMES, 1);
-    const clicks = recordClicks(tabs, TAB_NAMES);
-    const section = addSection();
+  const NOTIFICATION_PATHS = [
+    ["すべて", "/notifications"],
+    ["メンション", "/notifications/mentions"],
+  ] as const;
 
-    triggerReload();
-    // 500ms ごとに描画が続き、800ms の静止には届かない
-    for (let elapsed = 0; elapsed < 4500; elapsed += 500) {
-      section.appendChild(document.createElement("div"));
-      await vi.advanceTimersByTimeAsync(500);
-    }
-    expect(clicks).toEqual(["top"]);
+  for (const [label, path] of NOTIFICATION_PATHS) {
+    it(`「${label}」の通知ページで自動更新が動くとスクロール往復が行われる`, async () => {
+      history.replaceState({}, "", path);
+      addSection();
 
-    await vi.advanceTimersByTimeAsync(500);
-    expect(clicks).toEqual(["top", "live"]);
-  });
+      triggerReload();
+      expect(scrollingElementStub.scrollTop).toBeGreaterThanOrEqual(
+        ROUNDTRIP_MIN_DISTANCE_PX,
+      );
 
-  it("元のタブへ戻したあと描画が落ち着いてから新着を判定する", async () => {
-    addSearchTabs(TAB_NAMES, 1);
-    const section = addSection();
-    addArticleWithStatusId(section, "111");
-
-    triggerReload();
-    await vi.advanceTimersByTimeAsync(5000);
-
-    // 元のタブへ戻した直後に、取得し直された結果が描画される
-    addArticleWithStatusId(section, "222");
-    await vi.advanceTimersByTimeAsync(799);
-    expect(invokeMock).not.toHaveBeenCalled();
-
-    await vi.advanceTimersByTimeAsync(1);
-    expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
-      label: "column-1",
-      count: 1,
+      await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+      expect(scrollWrites).toEqual([ROUNDTRIP_MIN_DISTANCE_PX, 0]);
+      expect(scrollingElementStub.scrollTop).toBe(0);
     });
+  }
+
+  it("通知ページの自動更新ではタブはクリックされない", async () => {
+    const anchorTab = document.createElement("a");
+    anchorTab.setAttribute("role", "tab");
+    anchorTab.setAttribute("aria-selected", "true");
+    document.body.appendChild(anchorTab);
+    const anchorClickSpy = vi.fn((event: Event) => event.preventDefault());
+    anchorTab.addEventListener("click", anchorClickSpy);
+    const divTab = addTab(false, false);
+    const divClickSpy = vi.fn();
+    divTab.addEventListener("click", divClickSpy);
+    addSection();
+
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS + 5000);
+
+    expect(anchorClickSpy).not.toHaveBeenCalled();
+    expect(divClickSpy).not.toHaveBeenCalled();
+    expect(anchorTab.getAttribute("aria-selected")).toBe("true");
+    expect(divTab.getAttribute("aria-selected")).toBe("false");
   });
 
-  it("元のタブへ戻したあと描画が続いて落ち着かないときは上限時間で判定する", async () => {
-    addSearchTabs(TAB_NAMES, 1);
-    const section = addSection();
-    addArticleWithStatusId(section, "111");
+  it("ユーザーがスクロールしているときは通知カラムの自動更新を行わない", async () => {
+    setScrolling(100);
+    scrollWrites.length = 0;
+    addSection();
 
     triggerReload();
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS + 5000);
 
-    addArticleWithStatusId(section, "222");
-    // 未知の ID を含まない描画が 500ms ごとに続き、静止には届かない
-    for (let elapsed = 0; elapsed < 4500; elapsed += 500) {
-      section.appendChild(document.createElement("div"));
-      await vi.advanceTimersByTimeAsync(500);
-    }
-    expect(invokeMock).not.toHaveBeenCalled();
-
-    await vi.advanceTimersByTimeAsync(500);
-    expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
-      label: "column-1",
-      count: 1,
-    });
+    expect(scrollWrites).toEqual([]);
+    expect(scrollingElementStub.scrollTop).toBe(100);
   });
 
-  it("描画の落ち着きを待っている間に別タブの投稿が見えていても新着として報告されない", async () => {
-    addSearchTabs(TAB_NAMES, 1);
-    const section = addSection();
-    addArticleWithStatusId(section, "111");
+  it("通知ページで往復の途中にもう一度自動更新が実行されても二重に往復しない", async () => {
+    addSection();
 
     triggerReload();
-    // 別タブ表示中は元のタブと異なるポストが並ぶ
-    section.innerHTML = "";
-    addArticleWithStatusId(section, "999");
-    await vi.advanceTimersByTimeAsync(800);
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
 
-    // 元のタブへ戻した直後の待機中（800ms 未満）は別タブの投稿が見えたままでも報告しない
-    await vi.advanceTimersByTimeAsync(700);
-    expect(invokeMock).not.toHaveBeenCalled();
-
-    // 元のタブの結果に戻って落ち着いても報告されない
-    section.innerHTML = "";
-    addArticleWithStatusId(section, "111");
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(invokeMock).not.toHaveBeenCalled();
+    expect(scrollWrites).toEqual([ROUNDTRIP_MIN_DISTANCE_PX, 0]);
   });
 
-  it("描画の落ち着きを待っている間にページが検索ページでなくなったら待機を打ち切る", async () => {
-    const tabs = addSearchTabs(TAB_NAMES, 1);
-    const clicks = recordClicks(tabs, TAB_NAMES);
+  it("通知ページで先頭へ戻す指定つきの自動更新はスクロール中でも先頭へ戻してから更新する", async () => {
+    setScrolling(100);
+    scrollWrites.length = 0;
+    addSection();
+
+    triggerReload(true);
+
+    expect(scrollWrites).toEqual([0, ROUNDTRIP_MIN_DISTANCE_PX]);
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+    expect(scrollWrites).toEqual([0, ROUNDTRIP_MIN_DISTANCE_PX, 0]);
+  });
+
+  it("スクロール往復のあとに見たことのある最新より新しい時刻の通知が現れると報告される", async () => {
     const section = addSection();
+    section.appendChild(buildNotificationArticle("2026-09-19T00:45:55Z"));
 
     triggerReload();
-    history.pushState({}, "", "/home");
-    section.appendChild(document.createElement("div"));
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
 
-    await expect(
-      vi.advanceTimersByTimeAsync(5000 + 5000),
-    ).resolves.not.toThrow();
-    expect(clicks).toEqual(["top"]);
-    expect(invokeMock).not.toHaveBeenCalled();
+    section.appendChild(buildNotificationArticle("2026-09-19T01:00:00Z"));
+    await vi.advanceTimersByTimeAsync(0);
 
-    // 検索ページへ戻ると、再び自動更新が実行できる（切り替え中フラグが戻っている）。
-    // 途中で打ち切ったため選択中のタブは「話題のポスト」のままで、別タブとして「最新」がクリックされる。
-    history.pushState({}, "", "/search?q=rust&f=live");
-    triggerReload();
-    expect(clicks).toEqual(["top", "live"]);
+    expectReportedNewPostOnce();
   });
 });

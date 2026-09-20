@@ -1,6 +1,6 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { IPC_EVENTS } from "../constants/ipc";
+import { IPC_EVENTS, WEBVIEW_SCRIPTS } from "../constants/ipc";
 import { useAppStore } from "../store/useAppStore";
 import { DEFAULT_COLUMN_SETTINGS, getColumnLabel } from "../types";
 import type { Column } from "../types";
@@ -665,10 +665,10 @@ describe("useOfficialSettingsBroadcast", () => {
       });
     });
     expect(evalInColumnMock).toHaveBeenCalledTimes(2);
-    // acc-1 (source): TRIGGER_RELOAD
+    // acc-1 (source): SCROLL_TOP_AND_RELOAD
     expect(evalInColumnMock).toHaveBeenCalledWith(
       "col-1",
-      expect.stringContaining("triggerReload"),
+      WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD,
     );
     // acc-2: applyOfficialSettingsSnapshot (contains "incoming" variable which is in that script)
     expect(evalInColumnMock).toHaveBeenCalledWith(
@@ -677,7 +677,7 @@ describe("useOfficialSettingsBroadcast", () => {
     );
   });
 
-  it("配布元(sourceAccountId)自身のカラムには applyOfficialSettingsSnapshot ではなく TRIGGER_RELOAD が実行されること", async () => {
+  it("配布元(sourceAccountId)自身のカラムには applyOfficialSettingsSnapshot ではなく先頭へ戻して更新するスクリプトが実行されること", async () => {
     useAppStore.setState({
       accounts: [
         {
@@ -706,7 +706,7 @@ describe("useOfficialSettingsBroadcast", () => {
     expect(evalInColumnMock).toHaveBeenCalledTimes(1);
     expect(evalInColumnMock).toHaveBeenCalledWith(
       "col-1",
-      expect.stringContaining("triggerReload"),
+      WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD,
     );
   });
 
@@ -757,10 +757,10 @@ describe("useOfficialSettingsBroadcast", () => {
       });
     });
     expect(evalInColumnMock).toHaveBeenCalledTimes(2);
-    // acc-1 (source): TRIGGER_RELOAD
+    // acc-1 (source): SCROLL_TOP_AND_RELOAD
     expect(evalInColumnMock).toHaveBeenCalledWith(
       "col-1",
-      expect.stringContaining("triggerReload"),
+      WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD,
     );
     // acc-2: should prefer home column (col-3) over compose column (col-2)
     expect(evalInColumnMock).toHaveBeenCalledWith("col-3", expect.any(String));
@@ -802,10 +802,10 @@ describe("useOfficialSettingsBroadcast", () => {
       });
     });
     expect(evalInColumnMock).toHaveBeenCalledTimes(2);
-    // acc-1 (source): TRIGGER_RELOAD
+    // acc-1 (source): SCROLL_TOP_AND_RELOAD
     expect(evalInColumnMock).toHaveBeenCalledWith(
       "col-1",
-      expect.stringContaining("triggerReload"),
+      WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD,
     );
     // acc-2: only has compose column, so fallback to that
     expect(evalInColumnMock).toHaveBeenCalledWith("col-2", expect.any(String));

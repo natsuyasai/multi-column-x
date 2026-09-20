@@ -138,7 +138,7 @@ describe("columnWebview service", () => {
         DEFAULT_COLUMN_SETTINGS.whitelistWords,
       ),
     );
-    expect(scripts[4]).toBe(WEBVIEW_SCRIPTS.TRIGGER_RELOAD);
+    expect(scripts[4]).toBe(WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD);
   });
 
   it("evalInColumn経由の失敗はapplyColumnSettingsScriptsを中断しない", async () => {

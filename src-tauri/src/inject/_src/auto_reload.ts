@@ -21,16 +21,53 @@ export function extractStatusId(article: Element): string | null {
 }
 
 /**
- * section 配下の全 article から status ID を収集する。
+ * 数値文字列 2 つの大小を比べる（BigInt は使わない）。a > b: 1, a < b: -1, 等しい: 0。
+ * 桁数が長い方が大きく、同じ桁数なら文字列（辞書順）で比較する。
  */
-export function collectKnownStatusIds(section: Element): Set<string> {
-  const ids = new Set<string>();
-  const articles = section.querySelectorAll("article");
-  for (const article of Array.from(articles)) {
-    const id = extractStatusId(article);
-    if (id !== null) ids.add(id);
+export function compareStatusIds(a: string, b: string): number {
+  if (a.length !== b.length) return a.length > b.length ? 1 : -1;
+  if (a === b) return 0;
+  return a > b ? 1 : -1;
+}
+
+/** 大きい方の status ID を返す。null は無いものとして扱い、両方 null なら null。 */
+export function maxStatusId(a: string | null, b: string | null): string | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return compareStatusIds(a, b) >= 0 ? a : b;
+}
+
+/** section 配下の全 article の status ID の最大値。無ければ null。 */
+export function collectMaxStatusId(section: Element): string | null {
+  let max: string | null = null;
+  for (const article of Array.from(section.querySelectorAll("article"))) {
+    max = maxStatusId(max, extractStatusId(article));
   }
-  return ids;
+  return max;
+}
+
+/**
+ * article 内の全 time[datetime] を Date.parse した ms の最大値。
+ * Date.parse が NaN になる要素は無視し、読み取れなければ null。
+ */
+export function extractNotificationTimeMs(article: Element): number | null {
+  let max: number | null = null;
+  for (const time of Array.from(article.querySelectorAll("time[datetime]"))) {
+    const ms = Date.parse(time.getAttribute("datetime") ?? "");
+    if (Number.isNaN(ms)) continue;
+    if (max === null || ms > max) max = ms;
+  }
+  return max;
+}
+
+/** section 配下の全 article の通知時刻（ms）の最大値。無ければ null。 */
+export function collectMaxNotificationTimeMs(section: Element): number | null {
+  let max: number | null = null;
+  for (const article of Array.from(section.querySelectorAll("article"))) {
+    const ms = extractNotificationTimeMs(article);
+    if (ms !== null && (max === null || ms > max)) max = ms;
+  }
+  return max;
 }
 
 // --- 副作用（import 時に実行される IIFE） ---
@@ -40,15 +77,19 @@ export function collectKnownStatusIds(section: Element): Set<string> {
   // observer とは別物であり、互いに干渉しないよう独立した変数で管理する。
   let currentTweetObserver: MutationObserver | null = null;
 
-  // 検索ページの自動更新: DOM の変化がこの時間止まったら「描画が落ち着いた」とみなす（ms）。
-  const SEARCH_RENDER_QUIET_MS = 800;
-  // 別タブへ切り替えてから、描画の落ち着きを待つ上限時間（ms）。上限で必ず元のタブへ戻す。
-  const SEARCH_TAB_SWITCH_MAX_WAIT_MS = 5000;
-  // 元のタブへ戻してから、描画の落ち着きを待つ上限時間（ms）。上限で必ず判定へ進む。
-  const SEARCH_TAB_RETURN_MAX_WAIT_MS = 5000;
+  // 検索・通知ページの更新（スクロール往復）: 下へスクロールする距離の決め方。
+  // 必要な距離はビューポート高さの約 21〜24%（実測: 実カラム高さ 1424px で 300px は
+  // 取得なし・350px は取得あり、Chrome 594px で 120px は取得なし・140px は取得あり）。
+  // 固定値では背の高いカラムで届かないため、余裕を持たせてビューポート高さの 50% とし、
+  // 低いビューポート向けの下限を 250px とする。
+  const SCROLL_ROUNDTRIP_MIN_DISTANCE_PX = 250;
+  const SCROLL_ROUNDTRIP_VIEWPORT_RATIO = 0.5;
+  // 下へスクロールしてから先頭へ戻すまでの待ち時間（ms）。
+  // 実測: 同一タスク内・rAF での即戻しは取得されないため setTimeout で待つ。
+  const SCROLL_ROUNDTRIP_WAIT_MS = 60;
 
-  // 検索ページのタブ切り替え（別タブ→元のタブ）の実行中フラグ。二重実行を防ぐ。
-  let searchTabSwitching = false;
+  // スクロール往復の実行中フラグ。二重実行を防ぐ。
+  let scrollRoundtripRunning = false;
 
   function isScrolling(): boolean {
     return document.scrollingElement
@@ -107,24 +148,68 @@ export function collectKnownStatusIds(section: Element): Set<string> {
     invoke("report_new_posts_count", { label, count }).catch(() => {});
   }
 
-  /** ids に knownIds に含まれない status ID が 1 つでもあれば true。 */
-  function hasUnknownId(ids: Set<string>, knownIds: Set<string>): boolean {
-    for (const id of ids) {
-      if (!knownIds.has(id)) return true;
-    }
-    return false;
+  /**
+   * 「見たことのある最新」の基準を保持し、新着かどうかを判定する。
+   * 基準はページ読み込み（IIFE 再実行）でリセットされ、更新をまたいで引き継がれる。
+   * 仮想リストの表示入れ替えで古いポストが出入りしても、基準より新しいものが
+   * 現れない限り新着とは扱わない。
+   */
+  interface NewnessTracker {
+    /**
+     * section の最大値を基準へ取り込む（基準 = max(基準, 現在の最大値)）。
+     * 取り込み前の基準より新しいものが section にあったときだけ true を返す。
+     * section に読み取れる値が無ければ何もせず false。
+     */
+    absorb(section: Element): boolean;
+  }
+
+  function createNewnessTracker<T>(
+    readMax: (section: Element) => T | null,
+    compare: (a: T, b: T) => number,
+  ): NewnessTracker {
+    let session: T | null = null;
+    return {
+      absorb(section: Element): boolean {
+        const current = readMax(section);
+        if (current === null) return false;
+        if (session !== null && compare(current, session) <= 0) return false;
+        session = current;
+        return true;
+      },
+    };
+  }
+
+  // 通常ページ: status ID の最大値（Snowflake ID は時系列で単調増加）
+  const statusIdTracker = createNewnessTracker<string>(
+    collectMaxStatusId,
+    compareStatusIds,
+  );
+  // 通知ページ: 通知の時刻（いいね通知等は status リンクを持たないため ID は使えない）
+  const notificationTimeTracker = createNewnessTracker<number>(
+    collectMaxNotificationTimeMs,
+    (a, b) => (a === b ? 0 : a > b ? 1 : -1),
+  );
+
+  function isNotificationsPage(): boolean {
+    return /^\/notifications(\/mentions)?\/?$/.test(location.pathname);
+  }
+
+  function getNewnessTracker(): NewnessTracker {
+    return isNotificationsPage() ? notificationTimeTracker : statusIdTracker;
+  }
+
+  /** 現在表示中のポストを「見たことがある」ものとして基準へ取り込む。 */
+  function primeNewnessBaseline(): void {
+    const section = document.querySelector("section[aria-labelledby]");
+    if (!section) return;
+    getNewnessTracker().absorb(section);
   }
 
   /**
-   * 未知の status ID の出現を最大 30 秒監視し、出現したら新着として報告する。
-   * @param initialKnownIds 既知 ID 集合。省略時は呼び出し時点の section からスナップショットする。
-   * @param checkImmediately true のとき、監視を始める前に現在の DOM を既知 ID と比較し、
-   *   未知の ID があれば即報告して監視を張らない。
+   * 見たことのある最新より新しいポスト（通知ページでは通知）の出現を最大 30 秒監視し、
+   * 出現したら新着として 1 回だけ報告する。
    */
-  function waitForNewTweet(
-    initialKnownIds?: Set<string>,
-    checkImmediately = false,
-  ): void {
+  function waitForNewTweet(): void {
     const section = document.querySelector("section[aria-labelledby]");
     if (!section) return;
 
@@ -133,20 +218,8 @@ export function collectKnownStatusIds(section: Element): Set<string> {
       currentTweetObserver.disconnect();
     }
 
-    // 監視開始時点の status ID 群をスナップショットする。DOM順先頭要素の
-    // innerHTML比較では仮想化リストのDOM recycle（スクロール中の要素入れ替え）を
-    // 新着と誤検出してしまうため、ツイート固有IDの集合比較に切り替える。
-    const knownIds = initialKnownIds ?? collectKnownStatusIds(section);
-
-    if (checkImmediately) {
-      // observer 側と同様、スクロール中は仮想リストの入れ替えによる誤検出を
-      // 避けるため、報告も監視もせずこの回の判定を打ち切る。
-      if (isScrolling()) return;
-      if (hasUnknownId(collectKnownStatusIds(section), knownIds)) {
-        reportNewPostsCount(1);
-        return;
-      }
-    }
+    const tracker = getNewnessTracker();
+    tracker.absorb(section);
 
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
@@ -158,6 +231,9 @@ export function collectKnownStatusIds(section: Element): Set<string> {
     };
 
     const observer = new MutationObserver(function () {
+      // 新しく見えたものは、報告するかどうかに関わらず「見たことがある」ものとして取り込む。
+      const foundNewer = tracker.absorb(section);
+
       // 監視期間中（最大30秒）にユーザーがスクロールしていたら、DOM recycle による
       // 誤検出を避けるためその回の判定を打ち切る（新着報告しない）。
       if (isScrolling()) {
@@ -166,7 +242,7 @@ export function collectKnownStatusIds(section: Element): Set<string> {
         return;
       }
 
-      if (hasUnknownId(collectKnownStatusIds(section), knownIds)) {
+      if (foundNewer) {
         observer.disconnect();
         cleanUp();
         reportNewPostsCount(1);
@@ -225,101 +301,41 @@ export function collectKnownStatusIds(section: Element): Set<string> {
     return location.pathname === "/search";
   }
 
-  function getSearchTabs(): HTMLElement[] {
-    return Array.from(document.querySelectorAll<HTMLElement>("a[role='tab']"));
+  function isScrollRoundtripPage(): boolean {
+    return isSearchPage() || isNotificationsPage();
   }
 
-  function findSearchTabByHref(href: string): HTMLElement | null {
-    return (
-      getSearchTabs().find((tab) => tab.getAttribute("href") === href) ?? null
+  function getScrollRoundtripDistance(): number {
+    return Math.max(
+      SCROLL_ROUNDTRIP_MIN_DISTANCE_PX,
+      Math.ceil(window.innerHeight * SCROLL_ROUNDTRIP_VIEWPORT_RATIO),
     );
   }
 
   /**
-   * 描画（DOM の子要素の増減）が SEARCH_RENDER_QUIET_MS 止まるまで待つ。
-   * - 最初の変化があるまでは「落ち着いた」とはみなさない（変化前に待ち終わらない）。
-   * - maxWaitMs 経過で必ず打ち切る（変化が無い／変化が続く場合の上限）。
-   * - 待機中・終了時に検索ページでなくなっていたら onDone(false)、それ以外は onDone(true)。
-   * 監視は呼び出した時点から始まるので、変化を起こす操作（タブのクリック）より前に呼ぶこと。
+   * 検索・通知ページの更新。選択中のタブへの再クリックや新着ボタンは効かないため、
+   * 下へスクロールしてから先頭へ戻すことで X にタイムラインを取得し直させる。
    */
-  function waitForRenderQuiet(
-    maxWaitMs: number,
-    onDone: (stillOnSearchPage: boolean) => void,
-  ): void {
-    let finished = false;
-    let quietTimer: ReturnType<typeof setTimeout> | null = null;
-    let maxTimer: ReturnType<typeof setTimeout> | null = null;
+  function triggerScrollRoundtrip(): void {
+    if (scrollRoundtripRunning) return;
+    const scrollingElement = document.scrollingElement;
+    if (!scrollingElement) return;
 
-    const finish = (): void => {
-      if (finished) return;
-      finished = true;
-      observer.disconnect();
-      if (quietTimer !== null) clearTimeout(quietTimer);
-      if (maxTimer !== null) clearTimeout(maxTimer);
-      onDone(isSearchPage());
-    };
-
-    // attributes は監視しない（タブの選択状態の変化を描画と数えないため）。
-    const observer = new MutationObserver(function () {
-      if (finished) return;
-      if (!isSearchPage()) {
-        finish();
-        return;
-      }
-      if (quietTimer !== null) clearTimeout(quietTimer);
-      quietTimer = setTimeout(finish, SEARCH_RENDER_QUIET_MS);
-    });
-
-    observer.observe(document.querySelector("main") ?? document.body, {
-      childList: true,
-      subtree: true,
-    });
-    maxTimer = setTimeout(finish, maxWaitMs);
-  }
-
-  /**
-   * 検索ページの更新。選択中のタブへの再クリックや新着ボタンは効かないため、
-   * 別タブへ切り替えてから元のタブへ戻すことでタイムラインを取得し直す。
-   * 各段階は描画（DOM の変化）が落ち着くのを待ち、固定時間は上限としてのみ使う。
-   */
-  function triggerSearchRefresh(): void {
-    if (searchTabSwitching) return;
-    const section = document.querySelector("section[aria-labelledby]");
-    const tabs = getSearchTabs();
-    const selected = tabs.find(
-      (tab) => tab.getAttribute("aria-selected") === "true",
+    scrollRoundtripRunning = true;
+    // 往復で取得された結果が基準に混ざらないよう、先に基準を確定する。
+    primeNewnessBaseline();
+    scrollingElement.scrollTop = Math.max(
+      scrollingElement.scrollTop,
+      getScrollRoundtripDistance(),
     );
-    const other = tabs.find(
-      (tab) => tab.getAttribute("aria-selected") !== "true",
-    );
-    const originalHref = selected?.getAttribute("href");
-    if (!section || !selected || !other || !originalHref) return;
-
-    // 別タブ表示中の投稿は元タブと ID が異なる。切替前の ID 集合を基準にし、
-    // 元のタブへ戻して描画が落ち着いた後に比較する。
-    const knownIds = collectKnownStatusIds(section);
-    searchTabSwitching = true;
-
-    // 1) 別タブへ切り替え。クリックが起こす最初の変化を取りこぼさないよう、
-    //    監視を先に始めてからクリックする。
-    waitForRenderQuiet(SEARCH_TAB_SWITCH_MAX_WAIT_MS, function (onSearchPage) {
-      const original = onSearchPage ? findSearchTabByHref(originalHref) : null;
-      if (!original) {
-        searchTabSwitching = false;
-        return;
-      }
-      // 2) 元のタブへ戻す。こちらも監視を先に始めてからクリックする。
-      waitForRenderQuiet(
-        SEARCH_TAB_RETURN_MAX_WAIT_MS,
-        function (stillOnSearchPage) {
-          searchTabSwitching = false;
-          if (!stillOnSearchPage) return;
-          waitForNewTweet(knownIds, true);
-        },
-      );
-      original.click();
-    });
-    other.click();
+    setTimeout(function () {
+      // 先頭へ戻す直前に解除する（往復完了後は次の更新を実行できる）。
+      scrollRoundtripRunning = false;
+      if (!isScrollRoundtripPage()) return;
+      scrollingElement.scrollTop = 0;
+      // 先頭へ戻した後に監視を始める（往復中は isScrolling() で打ち切られてしまうため）。
+      waitForNewTweet();
+    }, SCROLL_ROUNDTRIP_WAIT_MS);
   }
 
   function triggerReload(scrollToTop?: boolean): void {
@@ -328,10 +344,9 @@ export function collectKnownStatusIds(section: Element): Set<string> {
     }
     if (isScrolling()) return;
 
-    if (isSearchPage()) {
-      triggerSearchRefresh();
-      // 検索ページでは切替直後に waitForNewTweet() を呼ばない
-      // （別タブ表示中の別 ID を新着と誤検出するため）。
+    if (isScrollRoundtripPage()) {
+      // 監視の開始は先頭へ戻した後（triggerScrollRoundtrip 内）。
+      triggerScrollRoundtrip();
       return;
     }
 
@@ -343,7 +358,7 @@ export function collectKnownStatusIds(section: Element): Set<string> {
       waitAndClickNewPostsButton();
     }
 
-    // トリガー実行後、status ID 集合のスナップショットを取り、未知IDの出現を監視する
+    // トリガー実行後、見たことのある最新を基準にして、それより新しいポストの出現を監視する
     waitForNewTweet();
   }
 

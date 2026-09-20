@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { WEBVIEW_SCRIPTS } from "@/constants/ipc";
 import { useAutoReload } from "./useAutoReload";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -52,6 +53,21 @@ describe("useAutoReload", () => {
       script: expect.stringContaining("triggerReload"),
     });
     expect(result.current.remaining).toBe(3); // 再カウント開始
+  });
+
+  it("自動更新の間隔で実行される更新は先頭へ戻す指定を持たない", () => {
+    renderHook(() =>
+      useAutoReload({ columnId: "col-1", enabled: true, intervalSec: 3 }),
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    const script = (mockInvoke.mock.calls[0][1] as { script: string }).script;
+    expect(script).toBe(WEBVIEW_SCRIPTS.TRIGGER_RELOAD);
+    expect(script).toContain("triggerReload");
+    expect(script).not.toContain("triggerReload(true)");
   });
 
   it("resetでカウントがintervalSecに戻る", () => {

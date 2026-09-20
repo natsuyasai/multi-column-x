@@ -292,7 +292,7 @@ export function useOfficialSettingsBroadcast() {
 
           if (account.id === sourceAccountId) {
             // 配布元は同じ dataDirectory を共有しており書き込み済み。表示だけ最新化する。
-            void evalInColumn(col.id, WEBVIEW_SCRIPTS.TRIGGER_RELOAD);
+            void evalInColumn(col.id, WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD);
             return;
           }
           void evalInColumn(

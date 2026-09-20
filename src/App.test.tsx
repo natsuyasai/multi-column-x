@@ -9,6 +9,7 @@ import {
 } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import App from "./App";
+import { WEBVIEW_SCRIPTS } from "./constants/ipc";
 import { useAppStore } from "./store/useAppStore";
 import type { Column, GlobalSettings } from "./types";
 import { DEFAULT_GLOBAL_SETTINGS, DEFAULT_COLUMN_SETTINGS } from "./types";
@@ -402,5 +403,55 @@ describe("App (テーマ適用時のnight_mode Cookie反映)", () => {
     fireEvent.click(screen.getByText("適用"));
 
     expect(getNightModeCalls()).toHaveLength(0);
+  });
+});
+
+describe("App (手動更新のスクロール扱い)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+    mockPlatform.mockReturnValue("windows");
+    useAppStore.setState({
+      accounts: [account],
+      columns: [column],
+      globalSettings,
+      isLoaded: true,
+      isMobile: false,
+      topBarExpanded: false,
+      unreadCounts: {},
+    });
+  });
+
+  const getEvalScripts = () =>
+    mockInvoke.mock.calls
+      .filter((c) => c[0] === "eval_in_webview")
+      .map((c) => (c[1] as { label: string; script: string }).script);
+
+  it("ヘッダーの更新ボタンはスクロール中でも先頭へ戻して更新する", () => {
+    render(<App />);
+    mockInvoke.mockClear();
+
+    fireEvent.click(screen.getByTitle("更新"));
+
+    expect(getEvalScripts()).toEqual([WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD]);
+  });
+
+  it("更新のキー操作はスクロール中でも先頭へ戻して更新する", () => {
+    render(<App />);
+    mockInvoke.mockClear();
+
+    fireEvent.keyDown(window, { key: "r" });
+
+    expect(getEvalScripts()).toEqual([WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD]);
+  });
+
+  it("設定パネルからの更新はスクロール中でも先頭へ戻して更新する", () => {
+    render(<App />);
+    fireEvent.click(screen.getByTitle("設定"));
+    mockInvoke.mockClear();
+
+    fireEvent.click(screen.getByText("再読み込み"));
+
+    expect(getEvalScripts()).toEqual([WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD]);
   });
 });
