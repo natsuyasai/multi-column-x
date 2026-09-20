@@ -33,6 +33,56 @@ export function collectKnownStatusIds(section: Element): Set<string> {
   return ids;
 }
 
+/**
+ * 数値文字列 2 つの大小を比べる（BigInt は使わない）。a > b: 1, a < b: -1, 等しい: 0。
+ * 桁数が長い方が大きく、同じ桁数なら文字列（辞書順）で比較する。
+ */
+export function compareStatusIds(a: string, b: string): number {
+  if (a.length !== b.length) return a.length > b.length ? 1 : -1;
+  if (a === b) return 0;
+  return a > b ? 1 : -1;
+}
+
+/** 大きい方の status ID を返す。null は無いものとして扱い、両方 null なら null。 */
+export function maxStatusId(a: string | null, b: string | null): string | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return compareStatusIds(a, b) >= 0 ? a : b;
+}
+
+/** section 配下の全 article の status ID の最大値。無ければ null。 */
+export function collectMaxStatusId(section: Element): string | null {
+  let max: string | null = null;
+  for (const article of Array.from(section.querySelectorAll("article"))) {
+    max = maxStatusId(max, extractStatusId(article));
+  }
+  return max;
+}
+
+/**
+ * article 内の全 time[datetime] を Date.parse した ms の最大値。
+ * Date.parse が NaN になる要素は無視し、読み取れなければ null。
+ */
+export function extractNotificationTimeMs(article: Element): number | null {
+  let max: number | null = null;
+  for (const time of Array.from(article.querySelectorAll("time[datetime]"))) {
+    const ms = Date.parse(time.getAttribute("datetime") ?? "");
+    if (Number.isNaN(ms)) continue;
+    if (max === null || ms > max) max = ms;
+  }
+  return max;
+}
+
+/** section 配下の全 article の通知時刻（ms）の最大値。無ければ null。 */
+export function collectMaxNotificationTimeMs(section: Element): number | null {
+  let max: number | null = null;
+  for (const article of Array.from(section.querySelectorAll("article"))) {
+    const ms = extractNotificationTimeMs(article);
+    if (ms !== null && (max === null || ms > max)) max = ms;
+  }
+  return max;
+}
+
 // --- 副作用（import 時に実行される IIFE） ---
 
 (function () {

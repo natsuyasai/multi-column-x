@@ -15,7 +15,15 @@ import {
   beforeEach,
   afterEach,
 } from "vitest";
-import { extractStatusId, collectKnownStatusIds } from "./auto_reload";
+import {
+  extractStatusId,
+  collectKnownStatusIds,
+  compareStatusIds,
+  maxStatusId,
+  collectMaxStatusId,
+  extractNotificationTimeMs,
+  collectMaxNotificationTimeMs,
+} from "./auto_reload";
 
 const invokeMock = vi.fn((_cmd: string, _args?: Record<string, unknown>) =>
   Promise.resolve<unknown>(undefined),
@@ -101,6 +109,25 @@ function addArticleWithStatusId(
   return article;
 }
 
+/** time[datetime] を持つ要素を生成する。datetime が null のときは属性を付けない。 */
+function buildTimeElement(datetime: string | null): HTMLElement {
+  const time = document.createElement("time");
+  if (datetime !== null) time.setAttribute("datetime", datetime);
+  return time;
+}
+
+/** 通知ページの notification 型 article（status リンク無し・time あり）を生成する。 */
+function buildNotificationArticle(
+  ...datetimes: (string | null)[]
+): HTMLElement {
+  const article = document.createElement("article");
+  article.dataset.testid = "notification";
+  for (const datetime of datetimes) {
+    article.appendChild(buildTimeElement(datetime));
+  }
+  return article;
+}
+
 describe("inject/auto_reload の純粋関数", () => {
   describe("extractStatusId", () => {
     it("time子要素を持つstatusリンクからIDを抽出できる", () => {
@@ -153,6 +180,162 @@ describe("inject/auto_reload の純粋関数", () => {
       const ids = collectKnownStatusIds(section);
 
       expect(ids).toEqual(new Set(["111"]));
+    });
+  });
+
+  describe("compareStatusIds", () => {
+    it("桁数の異なる番号でも新旧が正しく比べられる", () => {
+      expect(compareStatusIds("999", "1000")).toBe(-1);
+      expect(compareStatusIds("1000", "999")).toBe(1);
+    });
+
+    it("番号が19桁の実際のポスト番号でも新旧が正しく比べられる", () => {
+      expect(
+        compareStatusIds("1836000000000000000", "1836000000000000001"),
+      ).toBe(-1);
+      expect(
+        compareStatusIds("1836000000000000001", "1836000000000000000"),
+      ).toBe(1);
+    });
+
+    it("同じ値は0を返す", () => {
+      expect(compareStatusIds("12345", "12345")).toBe(0);
+    });
+
+    it("同じ桁数のときは文字列の辞書順で比べる", () => {
+      expect(compareStatusIds("123", "124")).toBe(-1);
+      expect(compareStatusIds("900", "899")).toBe(1);
+    });
+  });
+
+  describe("maxStatusId", () => {
+    it("大きい方の番号を返す", () => {
+      expect(maxStatusId("999", "1000")).toBe("1000");
+      expect(maxStatusId("1000", "999")).toBe("1000");
+    });
+
+    it("片方がnullならもう片方を返す", () => {
+      expect(maxStatusId(null, "123")).toBe("123");
+      expect(maxStatusId("123", null)).toBe("123");
+    });
+
+    it("両方nullならnullを返す", () => {
+      expect(maxStatusId(null, null)).toBeNull();
+    });
+  });
+
+  describe("collectMaxStatusId", () => {
+    it("複数articleのstatus IDのうち最大のものを返す", () => {
+      const section = document.createElement("section");
+      section.appendChild(buildArticleWithStatusLink("/username/status/999"));
+      section.appendChild(buildArticleWithStatusLink("/username/status/1000"));
+      section.appendChild(buildArticleWithStatusLink("/username/status/500"));
+
+      expect(collectMaxStatusId(section)).toBe("1000");
+    });
+
+    it("IDの取れないarticleは無視される", () => {
+      const section = document.createElement("section");
+      section.appendChild(document.createElement("article"));
+      section.appendChild(buildArticleWithStatusLink("/username/status/222"));
+
+      expect(collectMaxStatusId(section)).toBe("222");
+    });
+
+    it("articleが0件ならnullを返す", () => {
+      const section = document.createElement("section");
+
+      expect(collectMaxStatusId(section)).toBeNull();
+    });
+  });
+
+  describe("extractNotificationTimeMs", () => {
+    it("通知ページでポストの識別番号がないいいね通知でも時刻が読み取れる", () => {
+      const article = buildNotificationArticle("2026-09-19T00:45:55.510Z");
+
+      expect(extractNotificationTimeMs(article)).toBe(
+        Date.parse("2026-09-19T00:45:55.510Z"),
+      );
+    });
+
+    it("statusリンクとtimeを持つtweet型のarticleからも時刻が読み取れる", () => {
+      const article = buildArticleWithStatusLink("/username/status/123");
+      article.dataset.testid = "tweet";
+      article
+        .querySelector("time")
+        ?.setAttribute("datetime", "2026-09-19T01:00:00.000Z");
+
+      expect(extractNotificationTimeMs(article)).toBe(
+        Date.parse("2026-09-19T01:00:00.000Z"),
+      );
+    });
+
+    it("timeが無いときはnullを返し例外にならない", () => {
+      const article = document.createElement("article");
+      article.dataset.testid = "notification";
+
+      expect(extractNotificationTimeMs(article)).toBeNull();
+    });
+
+    it("datetime属性が無い、または不正なときはnullを返し例外にならない", () => {
+      expect(
+        extractNotificationTimeMs(buildNotificationArticle(null)),
+      ).toBeNull();
+      expect(
+        extractNotificationTimeMs(buildNotificationArticle("not-a-date")),
+      ).toBeNull();
+    });
+
+    it("複数のtimeがあれば最大の時刻を返す", () => {
+      const article = buildNotificationArticle(
+        "2026-09-19T00:00:00.000Z",
+        "2026-09-19T02:00:00.000Z",
+        "2026-09-19T01:00:00.000Z",
+      );
+
+      expect(extractNotificationTimeMs(article)).toBe(
+        Date.parse("2026-09-19T02:00:00.000Z"),
+      );
+    });
+
+    it("不正なdatetimeのtimeは無視して有効なtimeの最大を返す", () => {
+      const article = buildNotificationArticle(
+        "invalid",
+        "2026-09-19T01:00:00.000Z",
+      );
+
+      expect(extractNotificationTimeMs(article)).toBe(
+        Date.parse("2026-09-19T01:00:00.000Z"),
+      );
+    });
+  });
+
+  describe("collectMaxNotificationTimeMs", () => {
+    it("複数articleの時刻のうち最大のものを返す", () => {
+      const section = document.createElement("section");
+      section.appendChild(buildNotificationArticle("2026-09-19T00:00:00.000Z"));
+      section.appendChild(buildNotificationArticle("2026-09-19T03:00:00.000Z"));
+      section.appendChild(buildNotificationArticle("2026-09-19T01:00:00.000Z"));
+
+      expect(collectMaxNotificationTimeMs(section)).toBe(
+        Date.parse("2026-09-19T03:00:00.000Z"),
+      );
+    });
+
+    it("時刻の読み取れないarticleは無視される", () => {
+      const section = document.createElement("section");
+      section.appendChild(document.createElement("article"));
+      section.appendChild(buildNotificationArticle("2026-09-19T01:00:00.000Z"));
+
+      expect(collectMaxNotificationTimeMs(section)).toBe(
+        Date.parse("2026-09-19T01:00:00.000Z"),
+      );
+    });
+
+    it("articleが0件ならnullを返す", () => {
+      const section = document.createElement("section");
+
+      expect(collectMaxNotificationTimeMs(section)).toBeNull();
     });
   });
 });
