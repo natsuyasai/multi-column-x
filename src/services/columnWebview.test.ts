@@ -226,9 +226,12 @@ describe("buildGlobalNgScripts", () => {
       },
       {
         columnId: "c2",
-        script: WEBVIEW_SCRIPTS.applyNgWords(["colng2"], ["gng"], [], [
-          "newuser",
-        ]),
+        script: WEBVIEW_SCRIPTS.applyNgWords(
+          ["colng2"],
+          ["gng"],
+          [],
+          ["newuser"],
+        ),
       },
     ]);
   });
