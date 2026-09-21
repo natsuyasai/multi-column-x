@@ -30,7 +30,11 @@ interface AppSettingsPanelProps {
   onApplyColumnDefaults: (
     patch: Omit<
       ColumnSettings,
-      "visibleLinks" | "ngWords" | "whitelistEnabled" | "whitelistWords"
+      | "visibleLinks"
+      | "ngWords"
+      | "repostHiddenUserIds"
+      | "whitelistEnabled"
+      | "whitelistWords"
     >,
   ) => void;
   onReloadAllWebviews: () => void;

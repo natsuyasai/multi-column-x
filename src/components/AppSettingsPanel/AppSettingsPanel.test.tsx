@@ -48,6 +48,7 @@ const baseGlobalSettings: GlobalSettings = {
   mobileTwoColumnEnabled: true,
   presets: [],
   ngWords: [],
+  repostHiddenUserIds: [],
 };
 
 const baseSettings = {
@@ -65,6 +66,7 @@ const baseSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   ngWords: [],
+  repostHiddenUserIds: [],
   whitelistEnabled: false,
   whitelistWords: [],
 };

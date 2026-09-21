@@ -46,6 +46,7 @@ const mockColumn: Column = {
     blurImageEnabled: false,
     blurImageAmount: "10px",
     ngWords: [],
+    repostHiddenUserIds: [],
     whitelistEnabled: false,
     whitelistWords: [],
   },

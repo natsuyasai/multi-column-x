@@ -46,6 +46,7 @@ const mockGlobalSettings: GlobalSettings = {
   mobileTwoColumnEnabled: true,
   presets: [],
   ngWords: [],
+  repostHiddenUserIds: [],
 };
 
 describe("AddColumnDialog", () => {

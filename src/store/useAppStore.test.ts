@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { Account, Column } from "../types";
+import { DEFAULT_GLOBAL_SETTINGS } from "../types";
 import { useAppStore, migrateColumn } from "./useAppStore";
 
 // Mock invoke from @tauri-apps/api/core
@@ -44,6 +45,7 @@ const mockColumn: Column = {
     blurImageEnabled: false,
     blurImageAmount: "10px",
     ngWords: [],
+    repostHiddenUserIds: [],
     whitelistEnabled: false,
     whitelistWords: [],
   },
@@ -87,6 +89,7 @@ describe("useAppStore", () => {
         mobileTwoColumnEnabled: true,
         presets: [],
         ngWords: [],
+        repostHiddenUserIds: [],
       },
       isLoaded: false,
       isMobile: false,
@@ -394,9 +397,60 @@ describe("useAppStore", () => {
     });
     expect(result.current.globalSettings.presets).toHaveLength(0);
   });
+
+  it("旧バージョンの全体設定はリポスト元ユーザーIDが空として読み込まれる", async () => {
+    const { repostHiddenUserIds: _omitted, ...legacyGlobal } =
+      DEFAULT_GLOBAL_SETTINGS;
+    void _omitted;
+    mockInvoke.mockResolvedValueOnce({
+      accounts: [],
+      columns: [],
+      globalSettings: legacyGlobal,
+    });
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    expect(result.current.globalSettings.repostHiddenUserIds).toEqual([]);
+  });
+
+  it("保存済みの全体設定のリポスト元ユーザーIDは読み込み時にそのまま保持される", async () => {
+    mockInvoke.mockResolvedValueOnce({
+      accounts: [],
+      columns: [],
+      globalSettings: {
+        ...DEFAULT_GLOBAL_SETTINGS,
+        repostHiddenUserIds: ["alice"],
+      },
+    });
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    expect(result.current.globalSettings.repostHiddenUserIds).toEqual([
+      "alice",
+    ]);
+  });
 });
 
 describe("migrateColumn", () => {
+  it("旧バージョンの保存設定はリポスト元ユーザーIDが空として読み込まれる", () => {
+    const { repostHiddenUserIds: _omitted, ...legacySettings } =
+      mockColumn.settings;
+    void _omitted;
+    const legacy = { ...mockColumn, settings: legacySettings };
+    const result = migrateColumn(legacy as unknown as Column);
+    expect(result.settings.repostHiddenUserIds).toEqual([]);
+  });
+
+  it("保存済みのリポスト元ユーザーIDは読み込み時にそのまま保持される", () => {
+    const col: Column = {
+      ...mockColumn,
+      settings: { ...mockColumn.settings, repostHiddenUserIds: ["alice"] },
+    };
+    expect(migrateColumn(col).settings.repostHiddenUserIds).toEqual(["alice"]);
+  });
+
   it("gridフィールドがない既存カラムにデフォルト値を補完する", () => {
     const legacy = {
       id: "col-1",

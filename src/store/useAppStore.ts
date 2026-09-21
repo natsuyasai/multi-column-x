@@ -29,6 +29,11 @@ export function migrateColumn(
     ...col,
     gridRow,
     gridCol,
+    // 旧バージョンの保存データには repostHiddenUserIds が無いため空配列で補う
+    settings: {
+      ...col.settings,
+      repostHiddenUserIds: col.settings.repostHiddenUserIds ?? [],
+    },
   };
 }
 

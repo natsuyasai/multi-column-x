@@ -32,6 +32,8 @@ export interface ColumnSettings {
   blurImageEnabled: boolean;
   blurImageAmount: string;
   ngWords: string[];
+  /** リポストを非表示にするユーザーID（@なし・1件1ID）。旧保存データには無いため読み出し側は `?? []` で扱う */
+  repostHiddenUserIds: string[];
   whitelistEnabled: boolean;
   whitelistWords: string[];
   desktopNotifyEnabled?: boolean;
@@ -92,6 +94,8 @@ export interface GlobalSettings {
   mobileTwoColumnEnabled: boolean;
   presets: ColumnPreset[];
   ngWords: string[];
+  /** リポストを非表示にするユーザーID（全カラム共通） */
+  repostHiddenUserIds: string[];
 }
 
 export interface ApiRateLimitBucket {
@@ -159,6 +163,7 @@ export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   ngWords: [],
+  repostHiddenUserIds: [],
   whitelistEnabled: false,
   whitelistWords: [],
   desktopNotifyEnabled: false,
@@ -206,6 +211,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   mobileTwoColumnEnabled: true,
   presets: [],
   ngWords: [],
+  repostHiddenUserIds: [],
 };
 
 export const COLUMN_LABEL_MAX_LENGTH = 30;
