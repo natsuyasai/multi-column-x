@@ -179,4 +179,46 @@ mod tests {
             );
         }
     }
+
+    /// lib.rs の generate_handler! に登録されたコマンド名を抽出する。
+    /// `#[cfg(...)]` 行は対象外とし、`commands::xxx::yyy,` の末尾識別子 `yyy` のみを集める。
+    fn registered_commands_in_lib_rs() -> Vec<String> {
+        let lib_src = include_str!("lib.rs");
+        let start = lib_src.find("generate_handler![").unwrap() + "generate_handler![".len();
+        let rest = &lib_src[start..];
+        let end = rest.find(']').unwrap();
+        let block = &rest[..end];
+        block
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty() && !line.starts_with("#["))
+            .map(|line| line.trim_end_matches(','))
+            .filter_map(|line| line.rsplit("::").next())
+            .map(|s| s.to_string())
+            .collect()
+    }
+
+    #[test]
+    fn librsに登録されたコマンドはすべて契約fixtureに含まれる() {
+        let expected = fixture()["commands"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_string())
+            .collect::<Vec<_>>();
+        for cmd in registered_commands_in_lib_rs() {
+            assert!(
+                expected.contains(&cmd),
+                "コマンド {cmd} が lib.rs に登録されているが契約fixtureに存在しない"
+            );
+        }
+    }
+
+    #[test]
+    fn 廃止したブラウザ起動コマンドは登録されていない() {
+        assert!(
+            !registered_commands_in_lib_rs().contains(&"open_in_browser".to_string()),
+            "open_in_browser は削除済みのはずだが lib.rs に登録されている"
+        );
+    }
 }
