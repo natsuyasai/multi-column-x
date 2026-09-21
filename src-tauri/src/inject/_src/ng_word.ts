@@ -1,4 +1,5 @@
 import { shouldHideTweetText } from "./ng_word_matcher";
+import { shouldHideByRepostUser } from "./repost_hide_matcher";
 
 (function () {
   const TWEET_SELECTOR = 'article[role="article"]';
@@ -38,9 +39,39 @@ import { shouldHideTweetText } from "./ng_word_matcher";
     el.style.setProperty("display", "none", "important");
   }
 
+  function getRepostHiddenUserIds(): string[] {
+    const config = window.__multiColumnXConfig;
+    return [
+      ...(config?.repostHiddenUserIds ?? []),
+      ...(config?.globalRepostHiddenUserIds ?? []),
+    ];
+  }
+
+  // リポストした人へのリンクは socialContext の親 <a>（実DOM）。子 <a> はフォールバック。
+  // 親側の探索が article の外側の <a> まで遡らないよう el 内に限定する
+  function collectSocialContextHrefs(el: HTMLElement): string[] {
+    const hrefs: string[] = [];
+    el.querySelectorAll('[data-testid="socialContext"]').forEach((ctx) => {
+      const parentAnchor = ctx.closest("a[href]");
+      const anchor =
+        parentAnchor && el.contains(parentAnchor)
+          ? parentAnchor
+          : ctx.querySelector("a[href]");
+      const href = anchor?.getAttribute("href");
+      if (href) hrefs.push(href);
+    });
+    return hrefs;
+  }
+
+  function isRepostedByHiddenUser(el: HTMLElement): boolean {
+    const ids = getRepostHiddenUserIds();
+    if (ids.length === 0) return false; // 設定なし時のオーバーヘッドをゼロにする
+    return shouldHideByRepostUser(collectSocialContextHrefs(el), ids);
+  }
+
   function checkTweet(tweetEl: Element): void {
     const el = tweetEl as HTMLElement;
-    if (containsNgWord(el)) hideTweet(el);
+    if (containsNgWord(el) || isRepostedByHiddenUser(el)) hideTweet(el);
   }
 
   function handleMutations(mutations: MutationRecord[]): void {
