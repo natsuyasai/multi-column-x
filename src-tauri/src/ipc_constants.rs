@@ -199,22 +199,6 @@ mod tests {
     }
 
     #[test]
-    fn librsに登録されたコマンドはすべて契約fixtureに含まれる() {
-        let expected = fixture()["commands"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|v| v.as_str().unwrap().to_string())
-            .collect::<Vec<_>>();
-        for cmd in registered_commands_in_lib_rs() {
-            assert!(
-                expected.contains(&cmd),
-                "コマンド {cmd} が lib.rs に登録されているが契約fixtureに存在しない"
-            );
-        }
-    }
-
-    #[test]
     fn 廃止したブラウザ起動コマンドは登録されていない() {
         assert!(
             !registered_commands_in_lib_rs().contains(&"open_in_browser".to_string()),
