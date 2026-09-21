@@ -165,6 +165,16 @@ struct ReauthCompletePayload {
     new_data_directory: String,
 }
 
+/// 再認証ウィンドウのラベルを作る。アカウントIDの先頭8バイトを識別部分に使う。
+/// 8バイト未満、または8バイト目が文字境界でない場合はエラーを返す（panic = "abort" のためスライスで落とさない）。
+#[cfg(desktop)]
+fn reauth_window_label(account_id: &str) -> Result<String, String> {
+    let head = account_id
+        .get(..8)
+        .ok_or_else(|| "invalid account id".to_string())?;
+    Ok(format!("{}{}", labels::ADD_ACCOUNT_PREFIX, head))
+}
+
 /// 新規 UUID の空ディレクトリで x.com/login を開き、まっさらな新規ログインとして再認証する。
 /// 旧セッション（`data_directory` 引数）は再利用せず、ログイン完了（/home 到達）時に
 /// twid Cookie から数値ユーザーIDを読んで ACCOUNT_REAUTH_COMPLETE イベントを emit する。
@@ -173,14 +183,17 @@ struct ReauthCompletePayload {
 #[cfg(desktop)]
 #[tauri::command]
 pub async fn reauth_account_window(
+    caller: tauri::Webview,
     app: AppHandle,
     account_id: String,
     data_directory: String,
 ) -> Result<String, String> {
+    crate::commands::require_main_caller(&caller)?;
+
     // 旧セッションのディレクトリは新規ログインでは使わない（呼び出し元が引き続き渡すため引数は維持）。
     let _ = &data_directory;
 
-    let window_label = format!("{}{}", labels::ADD_ACCOUNT_PREFIX, &account_id[..8]);
+    let window_label = reauth_window_label(&account_id)?;
 
     let new_account_id = uuid::Uuid::new_v4().to_string();
     let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
@@ -268,11 +281,14 @@ pub async fn reauth_account_window(
 #[cfg(mobile)]
 #[tauri::command]
 pub async fn reauth_account_window(
+    caller: tauri::Webview,
     app: AppHandle,
     account_id: String,
     data_directory: String,
     expected_user_id: Option<String>,
 ) -> Result<String, String> {
+    crate::commands::require_main_caller(&caller)?;
+
     // mobile では Kotlin 側が accountId でプロファイル（WebView Profile）を特定するため未使用。
     let _ = &data_directory;
 
