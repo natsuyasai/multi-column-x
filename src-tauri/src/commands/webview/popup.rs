@@ -525,8 +525,30 @@ async fn switch_popup_session_window(
     Ok(())
 }
 
+/// ポップアップを閉じる操作の対象になれるラベルか（popup- / compose- のみ）。
+fn is_closable_popup_label(label: &str) -> bool {
+    label.starts_with(labels::POPUP_PREFIX) || label.starts_with(labels::COMPOSE_PREFIX)
+}
+
+/// close_popup_window の呼び出し可否。対象は popup-/compose- に限り、呼び出し元は main か対象自身に限る。
+fn authorize_close_popup(caller_label: &str, target_label: &str) -> Result<(), String> {
+    if !is_closable_popup_label(target_label) {
+        return Err("forbidden: target is not a popup".to_string());
+    }
+    if caller_label == labels::MAIN || caller_label == target_label {
+        Ok(())
+    } else {
+        Err("forbidden: caller must be the main window or the popup itself".to_string())
+    }
+}
+
 #[tauri::command]
-pub async fn close_popup_window(app: AppHandle, label: String) -> Result<(), String> {
+pub async fn close_popup_window(
+    caller: tauri::Webview,
+    app: AppHandle,
+    label: String,
+) -> Result<(), String> {
+    authorize_close_popup(caller.label(), &label)?;
     // 常駐コンポーズは破棄せず非表示にして退避する（戻るボタン／Esc キー経路の対応）。
     // それ以外（popup-）は従来どおり破棄する。
     #[cfg(target_os = "android")]
@@ -569,6 +591,95 @@ pub async fn close_popup_window(app: AppHandle, label: String) -> Result<(), Str
         webview.close().map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod authorize_close_popup_tests {
+    use super::*;
+
+    #[test]
+    fn is_closable_popup_labelはpopup_prefixでtrueを返す() {
+        assert!(is_closable_popup_label("popup-abc123"));
+    }
+
+    #[test]
+    fn is_closable_popup_labelはcompose_prefixでtrueを返す() {
+        assert!(is_closable_popup_label("compose-abc123"));
+    }
+
+    #[test]
+    fn is_closable_popup_labelはmainでfalseを返す() {
+        assert!(!is_closable_popup_label(labels::MAIN));
+    }
+
+    #[test]
+    fn is_closable_popup_labelはcolumn_prefixでfalseを返す() {
+        assert!(!is_closable_popup_label("column-abc123"));
+    }
+
+    #[test]
+    fn 閉じる対象がmainのときは拒否する() {
+        assert!(authorize_close_popup(labels::MAIN, labels::MAIN).is_err());
+    }
+
+    #[test]
+    fn 閉じる対象がcolumnのときは拒否する() {
+        assert!(authorize_close_popup(labels::MAIN, "column-abc").is_err());
+    }
+
+    #[test]
+    fn 閉じる対象がadd_accountのときは拒否する() {
+        assert!(authorize_close_popup(labels::MAIN, "add-account-abc").is_err());
+    }
+
+    #[test]
+    fn mainからpopupを閉じるときは許可する() {
+        assert!(authorize_close_popup(labels::MAIN, "popup-abc").is_ok());
+    }
+
+    #[test]
+    fn mainからcomposeを閉じるときは許可する() {
+        assert!(authorize_close_popup(labels::MAIN, "compose-abc").is_ok());
+    }
+
+    #[test]
+    fn popupが自分自身を閉じるときは許可する() {
+        assert!(authorize_close_popup("popup-abc", "popup-abc").is_ok());
+    }
+
+    #[test]
+    fn 別のpopupから閉じるときは拒否する() {
+        assert!(authorize_close_popup("popup-xyz", "popup-abc").is_err());
+    }
+
+    #[test]
+    fn columnからpopupを閉じるときは拒否する() {
+        assert!(authorize_close_popup("column-abc", "popup-xyz").is_err());
+    }
+
+    mod properties {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            /// target が popup-/compose- 以外なら caller が何であっても常に拒否される。
+            #[test]
+            fn targetがpopup_compose以外なら常にerr(
+                caller in "[a-z-]{1,20}",
+                target in "[a-z-]{1,20}",
+            ) {
+                prop_assume!(!target.starts_with(labels::POPUP_PREFIX) && !target.starts_with(labels::COMPOSE_PREFIX));
+                prop_assert!(authorize_close_popup(&caller, &target).is_err());
+            }
+
+            /// caller が main で target が popup- 接頭辞なら常に許可される。
+            #[test]
+            fn callerがmainでtargetがpopup接頭辞なら常にok(id in "[a-z0-9]{1,20}") {
+                let target = format!("{}{}", labels::POPUP_PREFIX, id);
+                prop_assert!(authorize_close_popup(labels::MAIN, &target).is_ok());
+            }
+        }
+    }
 }
 
 #[cfg(all(test, desktop))]
