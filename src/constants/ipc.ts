@@ -164,11 +164,18 @@ export const WEBVIEW_SCRIPTS = {
     return `(function(){var n=${n};var m=document.cookie.match(/(?:^|; )night_mode=([^;]*)/);var current=m?m[1]:null;if(current===n)return;document.cookie='night_mode='+n+'; path=/; domain=.x.com; max-age=34560000';location.reload();})();`;
   },
 
-  /** NGワードを動的に更新し、表示中のツイートにも即時適用する */
-  applyNgWords: (ngWords: string[], globalNgWords: string[]) => {
+  /** NGワード・リポスト非表示ユーザーIDを動的に更新し、表示中のツイートにも即時適用する */
+  applyNgWords: (
+    ngWords: string[],
+    globalNgWords: string[],
+    repostHiddenUserIds: string[],
+    globalRepostHiddenUserIds: string[],
+  ) => {
     const ng = JSON.stringify(ngWords);
     const global = JSON.stringify(globalNgWords);
-    return `if(window.__multiColumnXConfig){window.__multiColumnXConfig.ngWords=${ng};window.__multiColumnXConfig.globalNgWords=${global};}window.__multiColumnX&&window.__multiColumnX.recheckNgWords&&window.__multiColumnX.recheckNgWords();`;
+    const repost = JSON.stringify(repostHiddenUserIds);
+    const globalRepost = JSON.stringify(globalRepostHiddenUserIds);
+    return `if(window.__multiColumnXConfig){window.__multiColumnXConfig.ngWords=${ng};window.__multiColumnXConfig.globalNgWords=${global};window.__multiColumnXConfig.repostHiddenUserIds=${repost};window.__multiColumnXConfig.globalRepostHiddenUserIds=${globalRepost};}window.__multiColumnX&&window.__multiColumnX.recheckNgWords&&window.__multiColumnX.recheckNgWords();`;
   },
 
   /** ホワイトリストを動的に更新し、表示中のツイートにも即時適用する */

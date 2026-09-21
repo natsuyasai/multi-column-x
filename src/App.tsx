@@ -51,6 +51,7 @@ import { logError } from "./lib/log";
 import { resolveTheme } from "./lib/theme";
 import {
   applyColumnSettingsScripts,
+  buildGlobalNgScripts,
   evalInColumn,
   updateMobileSwipeBar,
 } from "./services/columnWebview";
@@ -441,8 +442,13 @@ const App: React.FC = () => {
     ) => {
       handleUpdateColumn(columnId, { settings, width, label });
       setSettingsColumnId(null);
-      const globalNgWords = useAppStore.getState().globalSettings.ngWords ?? [];
-      await applyColumnSettingsScripts(columnId, settings, globalNgWords);
+      const { globalSettings: currentGlobal } = useAppStore.getState();
+      await applyColumnSettingsScripts(
+        columnId,
+        settings,
+        currentGlobal.ngWords ?? [],
+        currentGlobal.repostHiddenUserIds ?? [],
+      );
     },
     [handleUpdateColumn, setSettingsColumnId],
   );
@@ -450,19 +456,13 @@ const App: React.FC = () => {
   const handleApplyGlobalSettings = useCallback(
     (patch: Partial<GlobalSettings>) => {
       updateGlobalSettings(patch);
-      if ("ngWords" in patch) {
-        const newGlobalNgWords = patch.ngWords ?? [];
-        const { columns: currentColumns } = useAppStore.getState();
-        currentColumns.forEach((col) => {
-          evalInColumn(
-            col.id,
-            WEBVIEW_SCRIPTS.applyNgWords(
-              col.settings.ngWords,
-              newGlobalNgWords,
-            ),
-          );
-        });
-      }
+      const { columns: ngColumns, globalSettings: currentGlobal } =
+        useAppStore.getState();
+      buildGlobalNgScripts(patch, currentGlobal, ngColumns).forEach(
+        ({ columnId, script }) => {
+          evalInColumn(columnId, script);
+        },
+      );
       if (patch.theme !== undefined) {
         const prefersDark = getMql()?.matches ?? false;
         const nightMode =
