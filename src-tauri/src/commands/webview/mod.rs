@@ -253,11 +253,6 @@ pub async fn report_keyboard_shortcut(app: AppHandle, key: String) -> Result<(),
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-pub async fn open_in_browser(url: String) -> Result<(), String> {
-    tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())
-}
-
 /// モバイルスワイプバーのネイティブオーバーレイ状態（表示/位置/高さ/透過度/テーマ）を更新する。
 /// Android 以外は no-op（デスクトップはネイティブオーバーレイを持たない）。
 /// darkTheme は JS 側 camelCase キーに合わせるため non_snake_case を許容する（全ターゲット共通）。

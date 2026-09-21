@@ -203,7 +203,6 @@ src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/
 | `report_keyboard_shortcut` | inject から検出したキーボードショートカットを中継                                                           |
 | `get_mobile_insets`        | Android システム UI のインセット（ノッチ等）を取得                                                          |
 | `set_column_cookies`       | カラム WebView に Cookie を設定（Android）                                                                  |
-| `open_in_browser`          | URL をシステムブラウザで開く                                                                                |
 | `open_compose_window`      | ツイート作成ウィンドウを開く                                                                                |
 | `open_add_account_window`  | アカウント追加ウィンドウを開く（ログイン検出付き）                                                          |
 | `delete_account_data`      | アカウントデータディレクトリを削除                                                                          |
