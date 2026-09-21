@@ -8,7 +8,7 @@ import {
 } from "../constants/ipc";
 import type { ColumnBounds } from "../lib/gridLayout";
 import { logError } from "../lib/log";
-import type { Column, ColumnSettings } from "../types";
+import type { Column, ColumnSettings, GlobalSettings } from "../types";
 
 /** カラム WebView を作成する */
 export async function createColumnWebview(
@@ -87,6 +87,7 @@ export async function applyColumnSettingsScripts(
   columnId: string,
   settings: ColumnSettings,
   globalNgWords: string[],
+  globalRepostHiddenUserIds: string[],
 ): Promise<void> {
   await evalInColumn(
     columnId,
@@ -101,7 +102,12 @@ export async function applyColumnSettingsScripts(
   );
   await evalInColumn(
     columnId,
-    WEBVIEW_SCRIPTS.applyNgWords(settings.ngWords, globalNgWords),
+    WEBVIEW_SCRIPTS.applyNgWords(
+      settings.ngWords,
+      globalNgWords,
+      settings.repostHiddenUserIds ?? [],
+      globalRepostHiddenUserIds,
+    ),
   );
   await evalInColumn(
     columnId,
@@ -111,4 +117,32 @@ export async function applyColumnSettingsScripts(
     ),
   );
   await evalInColumn(columnId, WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD);
+}
+
+/**
+ * 全体設定の patch から、全カラムへ送る applyNgWords スクリプト列を組み立てる。
+ * ngWords / repostHiddenUserIds のどちらも含まない patch では空配列を返す。
+ * 片方だけの patch のときは、もう一方を現在の全体設定から補う（空で上書きしない）。
+ */
+export function buildGlobalNgScripts(
+  patch: Partial<GlobalSettings>,
+  currentGlobal: GlobalSettings,
+  columns: Column[],
+): { columnId: string; script: string }[] {
+  if (!("ngWords" in patch) && !("repostHiddenUserIds" in patch)) return [];
+  const globalNgWords =
+    ("ngWords" in patch ? patch.ngWords : currentGlobal.ngWords) ?? [];
+  const globalRepostHiddenUserIds =
+    ("repostHiddenUserIds" in patch
+      ? patch.repostHiddenUserIds
+      : currentGlobal.repostHiddenUserIds) ?? [];
+  return columns.map((col) => ({
+    columnId: col.id,
+    script: WEBVIEW_SCRIPTS.applyNgWords(
+      col.settings.ngWords,
+      globalNgWords,
+      col.settings.repostHiddenUserIds ?? [],
+      globalRepostHiddenUserIds,
+    ),
+  }));
 }

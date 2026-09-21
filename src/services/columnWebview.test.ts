@@ -1,10 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { WEBVIEW_SCRIPTS } from "../constants/ipc";
-import { DEFAULT_COLUMN_SETTINGS } from "../types";
+import { DEFAULT_COLUMN_SETTINGS, DEFAULT_GLOBAL_SETTINGS } from "../types";
 import type { Column } from "../types";
 import {
   applyColumnSettingsScripts,
+  buildGlobalNgScripts,
   createColumnWebview,
   flashMobileSwipeBar,
   removeColumnWebview,
@@ -111,7 +112,12 @@ describe("columnWebview service", () => {
   });
 
   it("applyColumnSettingsScriptsは5つのスクリプトを順に適用する", async () => {
-    await applyColumnSettingsScripts("col-1", DEFAULT_COLUMN_SETTINGS, ["ng"]);
+    await applyColumnSettingsScripts(
+      "col-1",
+      { ...DEFAULT_COLUMN_SETTINGS, repostHiddenUserIds: ["col_user"] },
+      ["ng"],
+      ["global_user"],
+    );
     expect(invoke).toHaveBeenCalledTimes(5);
     const labels = vi
       .mocked(invoke)
@@ -130,7 +136,12 @@ describe("columnWebview service", () => {
       WEBVIEW_SCRIPTS.applyCustomCSS(DEFAULT_COLUMN_SETTINGS.customCSS),
     );
     expect(scripts[2]).toBe(
-      WEBVIEW_SCRIPTS.applyNgWords(DEFAULT_COLUMN_SETTINGS.ngWords, ["ng"]),
+      WEBVIEW_SCRIPTS.applyNgWords(
+        DEFAULT_COLUMN_SETTINGS.ngWords,
+        ["ng"],
+        ["col_user"],
+        ["global_user"],
+      ),
     );
     expect(scripts[3]).toBe(
       WEBVIEW_SCRIPTS.applyWhitelist(
@@ -146,8 +157,130 @@ describe("columnWebview service", () => {
     const consoleError = vi
       .spyOn(console, "error")
       .mockImplementation(() => {});
-    await applyColumnSettingsScripts("col-1", DEFAULT_COLUMN_SETTINGS, []);
+    await applyColumnSettingsScripts("col-1", DEFAULT_COLUMN_SETTINGS, [], []);
     expect(invoke).toHaveBeenCalledTimes(5);
     consoleError.mockRestore();
+  });
+
+  it("applyColumnSettingsScriptsは旧データでカラム個別のIDが無くても空配列として適用する", async () => {
+    const legacy = {
+      ...DEFAULT_COLUMN_SETTINGS,
+    } as Partial<typeof DEFAULT_COLUMN_SETTINGS>;
+    delete legacy.repostHiddenUserIds;
+    await applyColumnSettingsScripts(
+      "col-1",
+      legacy as typeof DEFAULT_COLUMN_SETTINGS,
+      [],
+      ["g"],
+    );
+    const scripts = vi
+      .mocked(invoke)
+      .mock.calls.map((c) => (c[1] as { script: string }).script);
+    expect(scripts[2]).toBe(
+      WEBVIEW_SCRIPTS.applyNgWords(
+        DEFAULT_COLUMN_SETTINGS.ngWords,
+        [],
+        [],
+        ["g"],
+      ),
+    );
+  });
+});
+
+describe("buildGlobalNgScripts", () => {
+  const columns = [
+    {
+      id: "c1",
+      settings: {
+        ...DEFAULT_COLUMN_SETTINGS,
+        ngWords: ["colng1"],
+        repostHiddenUserIds: ["col1"],
+      },
+    },
+    {
+      id: "c2",
+      settings: { ...DEFAULT_COLUMN_SETTINGS, ngWords: ["colng2"] },
+    },
+  ] as Column[];
+  const current = {
+    ...DEFAULT_GLOBAL_SETTINGS,
+    ngWords: ["gng"],
+    repostHiddenUserIds: ["guser"],
+  };
+
+  it("全体のリポスト非表示ユーザーIDの変更が全カラムへ反映される", () => {
+    const result = buildGlobalNgScripts(
+      { repostHiddenUserIds: ["newuser"] },
+      current,
+      columns,
+    );
+    expect(result).toEqual([
+      {
+        columnId: "c1",
+        script: WEBVIEW_SCRIPTS.applyNgWords(
+          ["colng1"],
+          ["gng"],
+          ["col1"],
+          ["newuser"],
+        ),
+      },
+      {
+        columnId: "c2",
+        script: WEBVIEW_SCRIPTS.applyNgWords(
+          ["colng2"],
+          ["gng"],
+          [],
+          ["newuser"],
+        ),
+      },
+    ]);
+  });
+
+  it("全体のngWordsだけのpatchでも全体のリポスト非表示ユーザーIDが空で上書きされない", () => {
+    const result = buildGlobalNgScripts({ ngWords: ["new"] }, current, columns);
+    expect(result[0].script).toBe(
+      WEBVIEW_SCRIPTS.applyNgWords(["colng1"], ["new"], ["col1"], ["guser"]),
+    );
+  });
+
+  it("全体のIDだけのpatchでも全体のngWordsが空で上書きされない", () => {
+    const result = buildGlobalNgScripts(
+      { repostHiddenUserIds: [] },
+      current,
+      columns,
+    );
+    expect(result[0].script).toBe(
+      WEBVIEW_SCRIPTS.applyNgWords(["colng1"], ["gng"], ["col1"], []),
+    );
+  });
+
+  it("ngWordsとIDの両方を含むpatchは両方の新しい値で反映される", () => {
+    const result = buildGlobalNgScripts(
+      { ngWords: ["n"], repostHiddenUserIds: ["u"] },
+      current,
+      columns,
+    );
+    expect(result[1].script).toBe(
+      WEBVIEW_SCRIPTS.applyNgWords(["colng2"], ["n"], [], ["u"]),
+    );
+  });
+
+  it("どちらも含まないpatchでは何も送らない", () => {
+    expect(buildGlobalNgScripts({ theme: "dark" }, current, columns)).toEqual(
+      [],
+    );
+  });
+
+  it("現在の全体設定に値が無い旧データでも空配列として補う", () => {
+    const legacy = { ...current } as Partial<typeof current>;
+    delete legacy.repostHiddenUserIds;
+    const result = buildGlobalNgScripts(
+      { ngWords: ["n"] },
+      legacy as typeof current,
+      columns,
+    );
+    expect(result[0].script).toBe(
+      WEBVIEW_SCRIPTS.applyNgWords(["colng1"], ["n"], ["col1"], []),
+    );
   });
 });

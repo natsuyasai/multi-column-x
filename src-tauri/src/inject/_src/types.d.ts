@@ -36,6 +36,8 @@ declare global {
     videoPopupEnabled?: boolean;
     ngWords?: string[];
     globalNgWords?: string[];
+    repostHiddenUserIds?: string[];
+    globalRepostHiddenUserIds?: string[];
     whitelistEnabled?: boolean;
     whitelistWords?: string[];
   }

@@ -37,6 +37,7 @@
     "mobileSwipeAreaOpacity": 50,
     "mobileTwoColumnEnabled": true,
     "presets": [],
-    "ngWords": []
+    "ngWords": [],
+    "repostHiddenUserIds": []
   }
 }

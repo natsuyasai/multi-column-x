@@ -59,6 +59,9 @@ pub struct ColumnSettings {
     #[serde(rename = "ngWords")]
     #[serde(default)]
     pub ng_words: Vec<String>,
+    #[serde(rename = "repostHiddenUserIds")]
+    #[serde(default)]
+    pub repost_hidden_user_ids: Vec<String>,
     #[serde(rename = "whitelistEnabled")]
     #[serde(default)]
     pub whitelist_enabled: bool,
@@ -146,6 +149,7 @@ impl Default for GlobalSettingsData {
             mobile_two_column_enabled: true,
             presets: vec![],
             ng_words: vec![],
+            repost_hidden_user_ids: vec![],
         }
     }
 }
@@ -292,6 +296,9 @@ pub struct GlobalSettingsData {
     #[serde(rename = "ngWords")]
     #[serde(default)]
     pub ng_words: Vec<String>,
+    #[serde(rename = "repostHiddenUserIds")]
+    #[serde(default)]
+    pub repost_hidden_user_ids: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -500,6 +507,52 @@ mod tests {
         });
         let settings: ColumnSettings = serde_json::from_value(json).unwrap();
         assert!(!settings.desktop_notify_enabled);
+    }
+
+    /// リポスト非表示ユーザーID追加前に保存された旧カラム設定 JSON（repostHiddenUserIds 欠落）を
+    /// デシリアライズしてもエラーにならず、空配列にフォールバックすることを確認する。
+    #[test]
+    fn 旧バージョンのカラム設定はリポスト元ユーザーidが空として読み込まれる() {
+        let json = serde_json::json!({
+            "autoReloadEnabled": true,
+            "autoReloadInterval": 600,
+            "customCSS": "",
+        });
+        let settings: ColumnSettings = serde_json::from_value(json).unwrap();
+        assert!(settings.repost_hidden_user_ids.is_empty());
+    }
+
+    /// 同上の全体設定版。repostHiddenUserIds が欠落した旧 GlobalSettings JSON は空配列になる。
+    #[test]
+    fn 旧バージョンの全体設定はリポスト元ユーザーidが空として読み込まれる() {
+        let json = serde_json::json!({
+            "theme": "dark",
+            "customCSS": "",
+            "windowBounds": { "x": 0.0, "y": 0.0, "width": 1400.0, "height": 900.0 },
+            "defaultAccountId": null,
+        });
+        let settings: GlobalSettingsData = serde_json::from_value(json).unwrap();
+        assert!(settings.repost_hidden_user_ids.is_empty());
+    }
+
+    #[test]
+    fn リポスト元ユーザーidはjsonのキー名reposthiddenuseridsで読み書きできる() {
+        let json = serde_json::json!({
+            "autoReloadEnabled": true,
+            "autoReloadInterval": 600,
+            "customCSS": "",
+            "repostHiddenUserIds": ["alice", "Bob_1"],
+        });
+        let settings: ColumnSettings = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            settings.repost_hidden_user_ids,
+            vec!["alice".to_string(), "Bob_1".to_string()]
+        );
+        let value = serde_json::to_value(&settings).unwrap();
+        assert_eq!(
+            value["repostHiddenUserIds"],
+            serde_json::json!(["alice", "Bob_1"])
+        );
     }
 
     #[test]

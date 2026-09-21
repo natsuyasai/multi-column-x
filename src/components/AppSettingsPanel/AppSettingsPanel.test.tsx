@@ -48,6 +48,7 @@ const baseGlobalSettings: GlobalSettings = {
   mobileTwoColumnEnabled: true,
   presets: [],
   ngWords: [],
+  repostHiddenUserIds: [],
 };
 
 const baseSettings = {
@@ -65,6 +66,7 @@ const baseSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   ngWords: [],
+  repostHiddenUserIds: [],
   whitelistEnabled: false,
   whitelistWords: [],
 };
@@ -245,6 +247,108 @@ describe("AppSettingsPanel グローバルNGワード", () => {
       expect.objectContaining({ ngWords: ["spam", "/foo|bar/i"] }),
     );
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+describe("AppSettingsPanel リポストを非表示にするユーザー", () => {
+  const getTextarea = () =>
+    screen.getByRole("textbox", { name: "リポストを非表示にするユーザー" });
+
+  it("既存のrepostHiddenUserIdsが入力エリアに復元表示される", () => {
+    const settings = {
+      ...baseGlobalSettings,
+      repostHiddenUserIds: ["HAJIME_2001", "abc"],
+    };
+    render(<AppSettingsPanel {...defaultProps} settings={settings} />);
+    expect((getTextarea() as HTMLTextAreaElement).value).toBe(
+      "HAJIME_2001\nabc",
+    );
+  });
+
+  it("旧保存データでrepostHiddenUserIdsが未定義でも空の入力エリアが表示される", () => {
+    const settings = {
+      ...baseGlobalSettings,
+      repostHiddenUserIds: undefined,
+    } as unknown as GlobalSettings;
+    render(<AppSettingsPanel {...defaultProps} settings={settings} />);
+    expect((getTextarea() as HTMLTextAreaElement).value).toBe("");
+  });
+
+  it("説明文が表示される", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(
+      screen.getByText(
+        "1行に1ユーザーID（@以降）。指定ユーザーがリポストした投稿を非表示にします",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("入力は1行1IDで、空行・前後空白・先頭の@・重複は無視して正規化された一覧がonApplyに渡される", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    fireEvent.change(getTextarea(), {
+      target: { value: "  @user_a  \n\nuser_b\nUSER_A\n@user_b" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ repostHiddenUserIds: ["user_a", "user_b"] }),
+    );
+  });
+
+  it("不正なID行があると保存できずエラーが表示される", () => {
+    const onApply = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        onApply={onApply}
+        onClose={onClose}
+      />,
+    );
+    fireEvent.change(getTextarea(), {
+      target: { value: "valid_id\nbad-id!" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(
+      screen.getByText(
+        "`bad-id!` はXのユーザーIDとして正しくありません（英数字とアンダースコアの1〜15文字）",
+      ),
+    ).toBeInTheDocument();
+    expect(onApply).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("不正なID行を修正して再度適用するとエラーが消えてonApplyとonCloseが呼ばれる", () => {
+    const onApply = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        onApply={onApply}
+        onClose={onClose}
+      />,
+    );
+    fireEvent.change(getTextarea(), { target: { value: "bad-id!" } });
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    fireEvent.change(getTextarea(), { target: { value: "good_id" } });
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(
+      screen.queryByText(/ユーザーIDとして正しくありません/),
+    ).not.toBeInTheDocument();
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ repostHiddenUserIds: ["good_id"] }),
+    );
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("16文字以上のIDは不正として保存できない", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    fireEvent.change(getTextarea(), {
+      target: { value: "this_id_is_way_too_long" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).not.toHaveBeenCalled();
   });
 });
 

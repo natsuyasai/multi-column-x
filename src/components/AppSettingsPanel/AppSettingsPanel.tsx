@@ -1,6 +1,10 @@
 import React, { useState } from "react";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { validateNgWordLines } from "../../lib/ngWordPattern";
+import {
+  parseUserIdLines,
+  validateUserIdLine,
+} from "../../lib/repostHiddenUserId";
 import { useAppStore } from "../../store/useAppStore";
 import type {
   GlobalSettings,
@@ -30,7 +34,11 @@ interface AppSettingsPanelProps {
   onApplyColumnDefaults: (
     patch: Omit<
       ColumnSettings,
-      "visibleLinks" | "ngWords" | "whitelistEnabled" | "whitelistWords"
+      | "visibleLinks"
+      | "ngWords"
+      | "repostHiddenUserIds"
+      | "whitelistEnabled"
+      | "whitelistWords"
     >,
   ) => void;
   onReloadAllWebviews: () => void;
@@ -68,6 +76,9 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
     createSettingsDraft(settings),
   );
   const [ngWordsError, setNgWordsError] = useState<string | null>(null);
+  const [repostHiddenUserIdsError, setRepostHiddenUserIdsError] = useState<
+    string | null
+  >(null);
 
   const set = <K extends keyof SettingsDraft>(
     key: K,
@@ -88,6 +99,18 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       return;
     }
     setNgWordsError(null);
+    const repostHiddenUserIds = parseUserIdLines(
+      draft.globalRepostHiddenUserIdsText,
+    );
+    const repostHiddenUserIdsValidationError =
+      repostHiddenUserIds
+        .map((id) => validateUserIdLine(id))
+        .find((error) => error !== null) ?? null;
+    if (repostHiddenUserIdsValidationError) {
+      setRepostHiddenUserIdsError(repostHiddenUserIdsValidationError);
+      return;
+    }
+    setRepostHiddenUserIdsError(null);
     const patch: Partial<GlobalSettings> = {
       defaultAutoReloadEnabled: draft.defaultAutoReloadEnabled,
       defaultAutoReloadInterval: draft.defaultAutoReloadInterval,
@@ -113,6 +136,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       mobileSwipeAreaOpacity: draft.mobileSwipeAreaOpacity,
       mobileTwoColumnEnabled: draft.mobileTwoColumnEnabled,
       ngWords,
+      repostHiddenUserIds,
     };
     if (draft.columnScaleOverrideEnabled) {
       patch.columnScale = draft.columnScale;
@@ -198,6 +222,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 set={set}
                 isMobile={isMobile}
                 ngWordsError={ngWordsError}
+                repostHiddenUserIdsError={repostHiddenUserIdsError}
               />
 
               <AppInfoSections

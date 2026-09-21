@@ -3,6 +3,10 @@ import { isAutoReloadSupported } from "@/lib/autoReloadTarget";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { validateNgWordLines } from "../../lib/ngWordPattern";
 import {
+  parseUserIdLines,
+  validateUserIdLine,
+} from "../../lib/repostHiddenUserId";
+import {
   COLUMN_LABEL_MAX_LENGTH,
   normalizeColumnLabel,
   type Column,
@@ -44,6 +48,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     (column.settings.ngWords ?? []).join("\n"),
   );
   const [ngWordsError, setNgWordsError] = useState<string | null>(null);
+  const [repostHiddenUserIdsText, setRepostHiddenUserIdsText] =
+    useState<string>((column.settings.repostHiddenUserIds ?? []).join("\n"));
+  const [repostHiddenUserIdsError, setRepostHiddenUserIdsError] = useState<
+    string | null
+  >(null);
   const [whitelistWordsText, setWhitelistWordsText] = useState<string>(
     (column.settings.whitelistWords ?? []).join("\n"),
   );
@@ -62,6 +71,17 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
     setNgWordsError(null);
 
+    const repostHiddenUserIds = parseUserIdLines(repostHiddenUserIdsText);
+    const repostHiddenUserIdsValidationError =
+      repostHiddenUserIds
+        .map((id) => validateUserIdLine(id))
+        .find((validationError) => validationError !== null) ?? null;
+    if (repostHiddenUserIdsValidationError) {
+      setRepostHiddenUserIdsError(repostHiddenUserIdsValidationError);
+      return;
+    }
+    setRepostHiddenUserIdsError(null);
+
     const whitelistWords = whitelistWordsText
       .split("\n")
       .map((w) => w.trim())
@@ -75,7 +95,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
     onApply(
       column.id,
-      { ...settings, ngWords, whitelistWords },
+      { ...settings, ngWords, repostHiddenUserIds, whitelistWords },
       width,
       normalizeColumnLabel(labelText),
     );
@@ -353,6 +373,28 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               {ngWordsError && (
                 <p className={styles.errorText}>{ngWordsError}</p>
               )}
+            </section>
+          )}
+
+          {!isExternal && (
+            <section className={styles.section}>
+              <h3 className={styles.sectionTitle}>
+                リポストを非表示にするユーザー
+              </h3>
+              <textarea
+                className={styles.cssTextarea}
+                value={repostHiddenUserIdsText}
+                onChange={(e) => setRepostHiddenUserIdsText(e.target.value)}
+                aria-label="リポストを非表示にするユーザー"
+                placeholder="1行に1ユーザーIDで入力"
+                spellCheck={false}
+              />
+              {repostHiddenUserIdsError && (
+                <p className={styles.errorText}>{repostHiddenUserIdsError}</p>
+              )}
+              <p className={styles.hint}>
+                1行に1ユーザーID（@以降）。指定ユーザーがリポストした投稿を非表示にします
+              </p>
             </section>
           )}
 

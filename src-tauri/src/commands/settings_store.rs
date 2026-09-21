@@ -92,6 +92,10 @@ pub(crate) fn load_global_ng_words(app: &AppHandle) -> Vec<String> {
     string_list(&load_global_settings(app), "ngWords")
 }
 
+pub(crate) fn load_global_repost_hidden_user_ids(app: &AppHandle) -> Vec<String> {
+    string_list(&load_global_settings(app), "repostHiddenUserIds")
+}
+
 #[cfg(target_os = "android")]
 pub(crate) fn load_use_x_app_for_compose(app: &AppHandle) -> bool {
     bool_flag(&load_global_settings(app), "useXAppForCompose", false)
@@ -141,6 +145,23 @@ mod tests {
     fn ngwordsキーが存在しない場合は空配列を返す() {
         let settings = serde_json::json!({});
         assert!(string_list(&settings, "ngWords").is_empty());
+    }
+
+    #[test]
+    fn リポスト元ユーザーidは文字列要素のみ抽出する() {
+        let settings = serde_json::json!({
+            "repostHiddenUserIds": ["alice", 1, "Bob_1", null]
+        });
+        assert_eq!(
+            string_list(&settings, "repostHiddenUserIds"),
+            vec!["alice".to_string(), "Bob_1".to_string()]
+        );
+    }
+
+    #[test]
+    fn 旧バージョンの保存設定はリポスト元ユーザーidが空として読み込まれる() {
+        let settings = serde_json::json!({ "ngWords": ["spam"] });
+        assert!(string_list(&settings, "repostHiddenUserIds").is_empty());
     }
 
     #[test]

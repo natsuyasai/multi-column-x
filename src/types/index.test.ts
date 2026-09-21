@@ -33,6 +33,7 @@ const baseColumn: Column = {
     blurImageEnabled: false,
     blurImageAmount: "10px",
     ngWords: [],
+    repostHiddenUserIds: [],
     whitelistEnabled: false,
     whitelistWords: [],
   },
@@ -161,6 +162,10 @@ describe("DEFAULT_COLUMN_SETTINGS", () => {
   it("ngWordsのデフォルト値は空配列", () => {
     expect(DEFAULT_COLUMN_SETTINGS.ngWords).toEqual([]);
   });
+
+  it("repostHiddenUserIdsのデフォルト値は空配列", () => {
+    expect(DEFAULT_COLUMN_SETTINGS.repostHiddenUserIds).toEqual([]);
+  });
 });
 
 describe("DEFAULT_GLOBAL_SETTINGS", () => {
@@ -170,5 +175,9 @@ describe("DEFAULT_GLOBAL_SETTINGS", () => {
 
   it("ngWordsのデフォルト値は空配列", () => {
     expect(DEFAULT_GLOBAL_SETTINGS.ngWords).toEqual([]);
+  });
+
+  it("repostHiddenUserIdsのデフォルト値は空配列", () => {
+    expect(DEFAULT_GLOBAL_SETTINGS.repostHiddenUserIds).toEqual([]);
   });
 });

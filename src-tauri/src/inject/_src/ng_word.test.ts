@@ -40,6 +40,64 @@ function addTweetInCell(text: string): {
   return { cell, article };
 }
 
+function setRepostConfig(
+  repostHiddenUserIds: string[],
+  globalRepostHiddenUserIds: string[] = [],
+): void {
+  window.__multiColumnXConfig = {
+    ngWords: [],
+    globalNgWords: [],
+    whitelistEnabled: false,
+    whitelistWords: [],
+    repostHiddenUserIds,
+    globalRepostHiddenUserIds,
+  } as MultiColumnXConfig;
+}
+
+// 実DOMと同じ構造: リポストした人への <a> が socialContext の親、元投稿者への <a> は別に存在する
+function addRepostTweet(
+  reposterHref: string,
+  contextLinkPosition: "parent" | "child" | "none" = "parent",
+): HTMLElement {
+  const article = document.createElement("article");
+  article.setAttribute("role", "article");
+  const context = document.createElement("span");
+  context.dataset.testid = "socialContext";
+  context.textContent = "清水朔さんがリポスト";
+  if (contextLinkPosition === "parent") {
+    const link = document.createElement("a");
+    link.setAttribute("href", reposterHref);
+    link.appendChild(context);
+    article.appendChild(link);
+  } else if (contextLinkPosition === "child") {
+    const link = document.createElement("a");
+    link.setAttribute("href", reposterHref);
+    context.appendChild(link);
+    article.appendChild(context);
+  } else {
+    context.textContent = "固定";
+    article.appendChild(context);
+  }
+  const authorLink = document.createElement("a");
+  authorLink.setAttribute("href", "/N_t447");
+  authorLink.textContent = "元投稿者";
+  article.appendChild(authorLink);
+  document.body.appendChild(article);
+  return article;
+}
+
+// socialContext を持たない通常の投稿（投稿者リンクのみ）
+function addOwnTweet(authorHref: string): HTMLElement {
+  const article = document.createElement("article");
+  article.setAttribute("role", "article");
+  const authorLink = document.createElement("a");
+  authorLink.setAttribute("href", authorHref);
+  authorLink.textContent = "投稿者";
+  article.appendChild(authorLink);
+  document.body.appendChild(article);
+  return article;
+}
+
 function recheck(): void {
   window.__multiColumnX.recheckNgWords();
 }
@@ -191,5 +249,129 @@ describe("inject/ng_word", () => {
 
     expect(hit.style.display).not.toBe("none");
     expect(miss.style.display).toBe("none");
+  });
+
+  describe("指定ユーザーのリポスト非表示", () => {
+    it("指定ユーザーがリポストした投稿は非表示になる", () => {
+      setRepostConfig(["HAJIME_2001"]);
+      const hit = addRepostTweet("/HAJIME_2001");
+
+      recheck();
+
+      expect(hit.style.display).toBe("none");
+    });
+
+    it("指定ユーザー自身の投稿は非表示にならない", () => {
+      setRepostConfig(["HAJIME_2001"]);
+      const own = addOwnTweet("/HAJIME_2001");
+
+      recheck();
+
+      expect(own.style.display).not.toBe("none");
+    });
+
+    it("別のユーザーがリポストした投稿は非表示にならない", () => {
+      setRepostConfig(["HAJIME_2001"]);
+      const other = addRepostTweet("/someone_else");
+
+      recheck();
+
+      expect(other.style.display).not.toBe("none");
+    });
+
+    it("大文字小文字と先頭の@の違いは同じIDとして扱う", () => {
+      setRepostConfig(["@hajime_2001"]);
+      const hit = addRepostTweet("/HAJIME_2001");
+
+      recheck();
+
+      expect(hit.style.display).toBe("none");
+    });
+
+    it("IDを前方一致で含むだけの別IDやステータスURLは一致しない", () => {
+      setRepostConfig(["HAJIME_2001"]);
+      const prefix = addRepostTweet("/HAJIME_20012");
+      const status = addRepostTweet("/HAJIME_2001/status/1");
+
+      recheck();
+
+      expect(prefix.style.display).not.toBe("none");
+      expect(status.style.display).not.toBe("none");
+    });
+
+    it("リンクを持たないsocialContext（固定テキストのみ）は非表示にならない", () => {
+      setRepostConfig(["HAJIME_2001"]);
+      const pinned = addRepostTweet("/HAJIME_2001", "none");
+
+      recheck();
+
+      expect(pinned.style.display).not.toBe("none");
+    });
+
+    it("リンクがsocialContextの親でも子でも検出できる", () => {
+      setRepostConfig(["HAJIME_2001"]);
+      const parentLinked = addRepostTweet("/HAJIME_2001", "parent");
+      const childLinked = addRepostTweet("/HAJIME_2001", "child");
+
+      recheck();
+
+      expect(parentLinked.style.display).toBe("none");
+      expect(childLinked.style.display).toBe("none");
+    });
+
+    it("全体設定とカラム個別の両方のIDが有効になる", () => {
+      setRepostConfig(["column_user"], ["global_user"]);
+      const columnHit = addRepostTweet("/column_user");
+      const globalHit = addRepostTweet("/global_user");
+      const miss = addRepostTweet("/nobody");
+
+      recheck();
+
+      expect(columnHit.style.display).toBe("none");
+      expect(globalHit.style.display).toBe("none");
+      expect(miss.style.display).not.toBe("none");
+    });
+
+    it("IDが1件も設定されていなければ何も非表示にならない", () => {
+      setRepostConfig([], []);
+      const tweet = addRepostTweet("/HAJIME_2001");
+
+      recheck();
+
+      expect(tweet.style.display).not.toBe("none");
+    });
+
+    it("リポスト非表示の対象はcellInnerDivごとDOMから削除される", () => {
+      setRepostConfig(["HAJIME_2001"]);
+      const article = addRepostTweet("/HAJIME_2001");
+      const cell = document.createElement("div");
+      cell.dataset.testid = "cellInnerDiv";
+      cell.style.transform = "translateY(100px)";
+      cell.style.position = "absolute";
+      document.body.appendChild(cell);
+      cell.appendChild(article);
+
+      recheck();
+
+      expect(document.body.contains(cell)).toBe(false);
+    });
+
+    it("article の外側にある a 要素は判定対象にしない", () => {
+      setRepostConfig(["HAJIME_2001"]);
+      const outer = document.createElement("a");
+      outer.setAttribute("href", "/HAJIME_2001");
+      document.body.appendChild(outer);
+      const article = document.createElement("article");
+      article.setAttribute("role", "article");
+      const context = document.createElement("span");
+      context.dataset.testid = "socialContext";
+      context.textContent = "固定";
+      article.appendChild(context);
+      outer.appendChild(article);
+
+      recheck();
+
+      expect(article.style.display).not.toBe("none");
+    });
   });
 });
