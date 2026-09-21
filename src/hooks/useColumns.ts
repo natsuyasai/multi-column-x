@@ -2,6 +2,7 @@
 // モバイル/デスクトップ実装（useMobileColumns / useDesktopColumns）を組み合わせるファサード
 import { useCallback, useRef } from "react";
 import { OFFSCREEN } from "../constants/ipc";
+import { moveGroup } from "../lib/columnOrder";
 import {
   HEADER_HEIGHT,
   SCROLLBAR_HEIGHT,
@@ -239,6 +240,19 @@ export function useColumns() {
     ],
   );
 
+  // TopBar の D&D による列グループの並び替え（gridCol の再配分・永続化・WebView 再配置）
+  const handleMoveColumnGroup = useCallback(
+    async (fromIdx: number, toIdx: number) => {
+      const { columns: current, replaceColumns } = useAppStore.getState();
+      const next = moveGroup(current, fromIdx, toIdx);
+      // 同一位置・範囲外は moveGroup が入力をそのまま返す
+      if (next === current) return;
+      replaceColumns(next);
+      await recalculateAllBounds();
+    },
+    [recalculateAllBounds],
+  );
+
   // カラム更新（設定変更）
   const handleUpdateColumn = useCallback(
     (id: string, patch: Partial<Column>) => {
@@ -359,6 +373,7 @@ export function useColumns() {
     restoreColumns,
     handleAddColumn,
     handleRemoveColumn,
+    handleMoveColumnGroup,
     handleUpdateColumn,
     recalculateAllBounds,
     hideColumnWebviews,

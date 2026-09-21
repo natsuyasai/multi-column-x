@@ -23,6 +23,7 @@ import {
   buildGroups,
   moveGroup,
   normalizeOrder,
+  resolveGroupMove,
   type ColumnGroup,
 } from "../../lib/columnOrder";
 import { getPageTypeLabel, type Account, type Column } from "../../types";
@@ -160,13 +161,10 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
+    if (!over) return;
     setDraft((prev) => {
-      const gs = buildGroups(prev);
-      const from = gs.findIndex((g) => g.columns[0].id === active.id);
-      const to = gs.findIndex((g) => g.columns[0].id === over.id);
-      if (from < 0 || to < 0) return prev;
-      return moveGroup(prev, from, to);
+      const move = resolveGroupMove(prev, String(active.id), String(over.id));
+      return move ? moveGroup(prev, move.fromIdx, move.toIdx) : prev;
     });
   }, []);
 

@@ -44,6 +44,23 @@ export function normalizeOrder(columns: Column[]): Column[] {
 }
 
 /**
+ * D&D の active / over の id（各グループ先頭カラムの id）を、moveGroup に渡す
+ * グループ index へ変換する。同一 id・未知の id・先頭以外のカラム id は null。
+ */
+export function resolveGroupMove(
+  columns: Column[],
+  activeId: string,
+  overId: string,
+): { fromIdx: number; toIdx: number } | null {
+  if (activeId === overId) return null;
+  const heads = buildGroups(columns).map((g) => g.columns[0].id);
+  const fromIdx = heads.indexOf(activeId);
+  const toIdx = heads.indexOf(overId);
+  if (fromIdx < 0 || toIdx < 0) return null;
+  return { fromIdx, toIdx };
+}
+
+/**
  * 列グループを fromIdx から toIdx へ移動する。
  * gridCol の値集合（スロット）は保持し、並べ替え後の順序で再配分する
  * （飛び番の空き列を詰めないため）。order も再正規化する。

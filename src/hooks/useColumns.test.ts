@@ -655,3 +655,204 @@ describe("useColumns handleAddColumn", () => {
     ).toBe(false);
   });
 });
+
+describe("useColumns desktop handleMoveColumnGroup", () => {
+  const mockInvoke = vi.mocked(invoke);
+
+  // recalculateAllBounds は containerRef.current の clientHeight を読むため、
+  // jsdom が計測しない値を固定した div を ref に差し込む。
+  function attachContainer(ref: { current: HTMLDivElement | null }) {
+    const div = document.createElement("div");
+    Object.defineProperty(div, "clientHeight", {
+      value: 900,
+      configurable: true,
+    });
+    ref.current = div;
+  }
+
+  function makeColumn(
+    id: string,
+    gridCol: number,
+    gridRow = 1,
+    order = gridCol - 1,
+  ): Column {
+    return {
+      id,
+      accountId: "acc-1",
+      pageType: "home",
+      homeTabName: "フォロー中",
+      width: 350,
+      order,
+      gridRow,
+      gridCol,
+      heightMode: "auto",
+      settings: { ...DEFAULT_COLUMN_SETTINGS },
+    };
+  }
+
+  function setColumns(columns: Column[]) {
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-1",
+          label: "Test",
+          dataDirectory: "/data/acc-1",
+          color: "#1d9bf0",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      columns,
+      globalSettings: { ...DEFAULT_GLOBAL_SETTINGS },
+      isLoaded: true,
+      isMobile: false,
+      topBarExpanded: false,
+    });
+  }
+
+  function callsOf(command: string) {
+    return mockInvoke.mock.calls.filter((call) => call[0] === command);
+  }
+
+  /** columnId ごとに最後の resize_column_webview 呼び出しの bounds を返す。 */
+  function lastResizeBoundsById(): Record<string, { x: number }> {
+    const result: Record<string, { x: number }> = {};
+    for (const call of callsOf("resize_column_webview")) {
+      const bounds = (call[1] as { bounds: { columnId: string; x: number } })
+        .bounds;
+      result[bounds.columnId] = bounds;
+    }
+    return result;
+  }
+
+  function gridColOf(id: string): number | undefined {
+    return useAppStore.getState().columns.find((c) => c.id === id)?.gridCol;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+    setColumns([
+      makeColumn("col-1", 1),
+      makeColumn("col-2", 2),
+      makeColumn("col-3", 3),
+    ]);
+  });
+
+  it("列グループを移動するとstoreのgridColが並び替え後の順序に更新される", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+
+    await act(async () => {
+      await result.current.handleMoveColumnGroup(0, 2);
+    });
+
+    expect(gridColOf("col-2")).toBe(1);
+    expect(gridColOf("col-3")).toBe(2);
+    expect(gridColOf("col-1")).toBe(3);
+  });
+
+  it("列グループを移動するとorderも並び替え後の順序に正規化される", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+
+    await act(async () => {
+      await result.current.handleMoveColumnGroup(0, 2);
+    });
+
+    const orderById = new Map(
+      useAppStore.getState().columns.map((c) => [c.id, c.order]),
+    );
+    expect(orderById.get("col-2")).toBe(0);
+    expect(orderById.get("col-3")).toBe(1);
+    expect(orderById.get("col-1")).toBe(2);
+  });
+
+  it("列グループを移動すると並び替え後のカラム配置が永続化される", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.handleMoveColumnGroup(0, 1);
+    });
+
+    const saves = callsOf("save_settings");
+    expect(saves).toHaveLength(1);
+    const saved = (saves[0][1] as { settings: { columns: Column[] } }).settings
+      .columns;
+    expect(saved.find((c) => c.id === "col-1")?.gridCol).toBe(2);
+    expect(saved.find((c) => c.id === "col-2")?.gridCol).toBe(1);
+  });
+
+  it("列グループを移動するとカラムWebViewが並び替え後のx座標へ再配置される", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.handleMoveColumnGroup(0, 1);
+    });
+
+    const last = lastResizeBoundsById();
+    // 移動前は col-1 が左端だったが、移動後は col-2 が左、col-1 がその右になる
+    expect(last["col-2"].x).toBeLessThan(last["col-1"].x);
+    expect(last["col-1"].x).toBeLessThan(last["col-3"].x);
+  });
+
+  it("縦積みの列を移動しても各カラムのgridRowは変わらず同じ列へ一緒に移動する", async () => {
+    setColumns([
+      makeColumn("col-1a", 1, 1, 0),
+      makeColumn("col-1b", 1, 2, 1),
+      makeColumn("col-2", 2, 1, 2),
+    ]);
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+
+    await act(async () => {
+      await result.current.handleMoveColumnGroup(0, 1);
+    });
+
+    const byId = new Map(useAppStore.getState().columns.map((c) => [c.id, c]));
+    expect(byId.get("col-1a")?.gridCol).toBe(2);
+    expect(byId.get("col-1b")?.gridCol).toBe(2);
+    expect(byId.get("col-2")?.gridCol).toBe(1);
+    expect(byId.get("col-1a")?.gridRow).toBe(1);
+    expect(byId.get("col-1b")?.gridRow).toBe(2);
+    expect(byId.get("col-2")?.gridRow).toBe(1);
+  });
+
+  it("同一位置への移動ではstoreの更新も永続化もWebView再配置も行わない", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    const before = useAppStore.getState().columns;
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.handleMoveColumnGroup(1, 1);
+    });
+
+    expect(useAppStore.getState().columns).toBe(before);
+    expect(callsOf("save_settings")).toHaveLength(0);
+    expect(callsOf("resize_column_webview")).toHaveLength(0);
+  });
+
+  it("範囲外のインデックスでは何も更新されない", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    const before = useAppStore.getState().columns;
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.handleMoveColumnGroup(-1, 1);
+      await result.current.handleMoveColumnGroup(0, 3);
+    });
+
+    expect(useAppStore.getState().columns).toBe(before);
+    expect(callsOf("save_settings")).toHaveLength(0);
+    expect(callsOf("resize_column_webview")).toHaveLength(0);
+  });
+});

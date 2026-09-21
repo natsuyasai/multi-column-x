@@ -1,8 +1,28 @@
-import { render, screen } from "@testing-library/react";
+import type { DragEndEvent } from "@dnd-kit/core";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi } from "vitest";
+import { createElement } from "react";
+import type { ComponentProps } from "react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Column, Account } from "../../types";
 import { TopBar } from "./TopBar";
+
+// jsdom では getBoundingClientRect が全て 0 となり実 D&D の衝突判定が成立しないため、
+// DndContext に渡された onDragEnd を捕捉して、ドロップ結果を直接流し込む。
+const dnd = vi.hoisted(() => ({
+  onDragEnd: undefined as ((event: DragEndEvent) => void) | undefined,
+}));
+
+vi.mock("@dnd-kit/core", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@dnd-kit/core")>();
+  return {
+    ...actual,
+    DndContext: (props: ComponentProps<typeof actual.DndContext>) => {
+      dnd.onDragEnd = props.onDragEnd;
+      return createElement(actual.DndContext, props);
+    },
+  };
+});
 
 const baseSettings = {
   autoReloadEnabled: true,
@@ -67,6 +87,7 @@ const defaultProps = {
   onOpenLinkPopup: vi.fn(),
   onJumpToColumn: vi.fn(),
   onClose: vi.fn(),
+  onReorderColumnGroup: vi.fn(),
   apiRateLimitMonitorEnabled: true,
   apiRateLimits: {},
   onApiRateLimitPopoverOpenChange: vi.fn(),
@@ -264,6 +285,332 @@ describe("TopBar", () => {
       expect(
         screen.getByTitle("アカウント1 - 外部サイト (Ctrl+1)"),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("列単位表示（複数行の列）", () => {
+    // gridCol=1 に 2 行（col-a, col-b）、gridCol=2 に 1 行（col-c）
+    const colA: Column = {
+      ...col1,
+      id: "col-a",
+      pageType: "home",
+      order: 0,
+      gridRow: 1,
+      gridCol: 1,
+    };
+    const colB: Column = {
+      ...col1,
+      id: "col-b",
+      pageType: "notifications",
+      order: 1,
+      gridRow: 2,
+      gridCol: 1,
+    };
+    const colC: Column = {
+      ...col1,
+      id: "col-c",
+      pageType: "search",
+      order: 2,
+      gridRow: 1,
+      gridCol: 2,
+    };
+    const multiRowColumns = [colA, colB, colC];
+
+    it.each([false, true])(
+      "同じ列の複数行カラムが1つの列グループ要素にまとまる（expanded=%s）",
+      (expanded) => {
+        render(
+          <TopBar
+            {...defaultProps}
+            columns={multiRowColumns}
+            expanded={expanded}
+          />,
+        );
+        const groups = screen.getAllByTestId("topbar-column-group");
+        expect(groups).toHaveLength(2);
+        expect(within(groups[0]).getAllByTitle(/アカウント1 - /)).toHaveLength(
+          2,
+        );
+        expect(within(groups[1]).getAllByTitle(/アカウント1 - /)).toHaveLength(
+          1,
+        );
+      },
+    );
+
+    it("列グループ内のカラムはgridRow昇順で並ぶ", () => {
+      // 配列順・order は gridRow と逆にしても、列内は gridRow 昇順で表示される
+      const upper: Column = { ...colA, order: 5, gridRow: 1 };
+      const lower: Column = { ...colB, order: 0, gridRow: 2 };
+      render(<TopBar {...defaultProps} columns={[lower, upper]} />);
+      const [group] = screen.getAllByTestId("topbar-column-group");
+      const titles = within(group)
+        .getAllByTitle(/アカウント1 - /)
+        .map((el) => el.getAttribute("title"));
+      expect(titles[0]).toMatch(/ホーム/);
+      expect(titles[1]).toMatch(/通知/);
+    });
+
+    it("gridColが飛び番でも列グループはgridCol昇順で並ぶ", () => {
+      const left: Column = { ...colA, id: "left", gridCol: 1, order: 1 };
+      const right: Column = { ...colC, id: "right", gridCol: 4, order: 0 };
+      render(<TopBar {...defaultProps} columns={[right, left]} />);
+      const groups = screen.getAllByTestId("topbar-column-group");
+      expect(groups).toHaveLength(2);
+      expect(within(groups[0]).getByTitle(/ホーム/)).toBeInTheDocument();
+      expect(within(groups[1]).getByTitle(/検索/)).toBeInTheDocument();
+    });
+
+    it("複数行の列のカラムタイトルのCtrl+Nはorder順の位置に対応する", () => {
+      // Ctrl+1〜9 のジャンプ先は order 昇順の index なので、タイトルもそれに合わせる
+      render(<TopBar {...defaultProps} columns={multiRowColumns} />);
+      expect(screen.getByTitle(/ホーム \(Ctrl\+1\)/)).toBeInTheDocument();
+      expect(screen.getByTitle(/通知 \(Ctrl\+2\)/)).toBeInTheDocument();
+      expect(screen.getByTitle(/検索: .*\(Ctrl\+3\)/)).toBeInTheDocument();
+    });
+
+    it("expanded=true の複数行の列でもカラムごとに閉じるボタンが動作する", async () => {
+      const onClose = vi.fn();
+      render(
+        <TopBar
+          {...defaultProps}
+          columns={multiRowColumns}
+          expanded={true}
+          onClose={onClose}
+        />,
+      );
+      const [firstGroup] = screen.getAllByTestId("topbar-column-group");
+      const closeButtons = within(firstGroup).getAllByTitle("カラムを閉じる");
+      expect(closeButtons).toHaveLength(2);
+      await userEvent.click(closeButtons[1]);
+      expect(onClose).toHaveBeenCalledWith("col-b");
+    });
+
+    it("複数行の列内のカラムをクリックするとそのカラムで onJumpToColumn が呼ばれる", async () => {
+      const onJump = vi.fn();
+      render(
+        <TopBar
+          {...defaultProps}
+          columns={multiRowColumns}
+          onJumpToColumn={onJump}
+        />,
+      );
+      const [firstGroup] = screen.getAllByTestId("topbar-column-group");
+      await userEvent.click(within(firstGroup).getByTitle(/通知/));
+      expect(onJump).toHaveBeenCalledWith("col-b");
+    });
+  });
+
+  describe("グループ領域ドラッグ（つまみ廃止・キーボード非対応）", () => {
+    const stacked: Column = {
+      ...col2,
+      id: "col-3",
+      gridRow: 2,
+      gridCol: 1,
+    };
+
+    it.each([false, true])(
+      "TopBarにドラッグ用のつまみが表示されない（expanded=%s）",
+      (expanded) => {
+        render(
+          <TopBar
+            {...defaultProps}
+            columns={[col1, stacked, col2]}
+            expanded={expanded}
+          />,
+        );
+        // gridCol=1 の 2 行と gridCol=2 の 1 行 → 列グループは 2 つあるが、つまみはどこにもない
+        expect(screen.getAllByTestId("topbar-column-group")).toHaveLength(2);
+        expect(screen.queryAllByLabelText("ドラッグして並び替え")).toHaveLength(
+          0,
+        );
+      },
+    );
+
+    it("列グループ要素がキーボードの停止位置にならない", async () => {
+      const user = userEvent.setup();
+      render(
+        <TopBar
+          {...defaultProps}
+          columns={[col1, stacked, col2]}
+          expanded={true}
+        />,
+      );
+      const groups = screen.getAllByTestId("topbar-column-group");
+      for (const group of groups) {
+        expect(group).not.toHaveAttribute("tabindex");
+        expect(group).not.toHaveAttribute("role");
+      }
+
+      // 全フォーカス可能要素を 1 周以上するだけ Tab を繰り返し、グループ自体にフォーカスが乗らないこと
+      const focused = new Set<Element>();
+      for (let i = 0; i < 40; i++) {
+        await user.tab();
+        if (document.activeElement) focused.add(document.activeElement);
+      }
+      for (const group of groups) {
+        expect(focused.has(group)).toBe(false);
+      }
+      // 一方でグループ内のカラムボタン・閉じるボタンにはフォーカスが止まる
+      const columnButton = within(groups[0]).getAllByTitle(/アカウント1 - /)[0];
+      const closeButton = within(groups[0]).getAllByTitle("カラムを閉じる")[0];
+      expect(focused.has(columnButton)).toBe(true);
+      expect(focused.has(closeButton)).toBe(true);
+    });
+
+    it("SpaceのあとRight矢印を押してもonReorderColumnGroupは呼ばれない", async () => {
+      const user = userEvent.setup();
+      const onReorderColumnGroup = vi.fn();
+      render(
+        <TopBar
+          {...defaultProps}
+          columns={[col1, col2]}
+          onReorderColumnGroup={onReorderColumnGroup}
+        />,
+      );
+      const [firstButton] = screen.getAllByTitle(/アカウント1 - /);
+      firstButton.focus();
+      await user.keyboard(" ");
+      await user.keyboard("{ArrowRight}");
+      expect(onReorderColumnGroup).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("未割当カラム", () => {
+    const unassigned: Column = {
+      ...col1,
+      id: "col-u",
+      pageType: "search",
+      order: 2,
+      gridRow: 0,
+      gridCol: 0,
+    };
+
+    it.each([false, true])(
+      "未割当カラムも従来どおり表示され続ける（expanded=%s）",
+      (expanded) => {
+        render(
+          <TopBar
+            {...defaultProps}
+            columns={[col1, col2, unassigned]}
+            expanded={expanded}
+          />,
+        );
+        expect(screen.getByTitle(/検索: .*\(Ctrl\+3\)/)).toBeInTheDocument();
+      },
+    );
+
+    it("未割当カラムは列グループ要素を持たない", () => {
+      render(<TopBar {...defaultProps} columns={[col1, col2, unassigned]} />);
+      expect(screen.getAllByTestId("topbar-column-group")).toHaveLength(2);
+      const unassignedButton = screen.getByTitle(/検索/);
+      expect(
+        unassignedButton.closest('[data-testid="topbar-column-group"]'),
+      ).toBeNull();
+    });
+
+    it("未割当カラムだけのときは列グループ要素が表示されない", () => {
+      render(<TopBar {...defaultProps} columns={[unassigned]} />);
+      expect(screen.queryAllByTestId("topbar-column-group")).toHaveLength(0);
+      expect(screen.getByTitle(/検索/)).toBeInTheDocument();
+    });
+
+    it("未割当カラムをクリックすると onJumpToColumn が呼ばれる", async () => {
+      const onJump = vi.fn();
+      render(
+        <TopBar
+          {...defaultProps}
+          columns={[col1, unassigned]}
+          onJumpToColumn={onJump}
+        />,
+      );
+      await userEvent.click(screen.getByTitle(/検索/));
+      expect(onJump).toHaveBeenCalledWith("col-u");
+    });
+  });
+
+  describe("ドロップ時の並び替え通知", () => {
+    beforeEach(() => {
+      dnd.onDragEnd = undefined;
+    });
+
+    function dragEnd(activeId: string, overId: string | null) {
+      const event = {
+        active: { id: activeId },
+        over: overId === null ? null : { id: overId },
+      } as unknown as DragEndEvent;
+      dnd.onDragEnd?.(event);
+    }
+
+    it("別の列グループの上にドロップすると onReorderColumnGroup が移動元と移動先のindexで呼ばれる", () => {
+      const onReorder = vi.fn();
+      render(<TopBar {...defaultProps} onReorderColumnGroup={onReorder} />);
+      expect(dnd.onDragEnd).toBeDefined();
+      dragEnd("col-1", "col-2");
+      expect(onReorder).toHaveBeenCalledTimes(1);
+      expect(onReorder).toHaveBeenCalledWith(0, 1);
+    });
+
+    it("逆方向のドロップでは移動元と移動先のindexが入れ替わって渡る", () => {
+      const onReorder = vi.fn();
+      render(<TopBar {...defaultProps} onReorderColumnGroup={onReorder} />);
+      dragEnd("col-2", "col-1");
+      expect(onReorder).toHaveBeenCalledWith(1, 0);
+    });
+
+    it("expanded=true でもドロップ時に onReorderColumnGroup が呼ばれる", () => {
+      const onReorder = vi.fn();
+      render(
+        <TopBar
+          {...defaultProps}
+          expanded={true}
+          onReorderColumnGroup={onReorder}
+        />,
+      );
+      dragEnd("col-1", "col-2");
+      expect(onReorder).toHaveBeenCalledWith(0, 1);
+    });
+
+    it("ドロップ先がない（over が null）場合は onReorderColumnGroup が呼ばれない", () => {
+      const onReorder = vi.fn();
+      render(<TopBar {...defaultProps} onReorderColumnGroup={onReorder} />);
+      dragEnd("col-1", null);
+      expect(onReorder).not.toHaveBeenCalled();
+    });
+
+    it("同じ列グループの上にドロップした場合は onReorderColumnGroup が呼ばれない", () => {
+      const onReorder = vi.fn();
+      render(<TopBar {...defaultProps} onReorderColumnGroup={onReorder} />);
+      dragEnd("col-1", "col-1");
+      expect(onReorder).not.toHaveBeenCalled();
+    });
+
+    it("存在しないidのドロップでは onReorderColumnGroup が呼ばれない", () => {
+      const onReorder = vi.fn();
+      render(<TopBar {...defaultProps} onReorderColumnGroup={onReorder} />);
+      dragEnd("unknown", "col-2");
+      expect(onReorder).not.toHaveBeenCalled();
+    });
+
+    it("複数行の列は先頭カラムidで解決され列グループ単位のindexで通知される", () => {
+      const top: Column = { ...col1, id: "col-top", gridRow: 1, gridCol: 1 };
+      const bottom: Column = {
+        ...col1,
+        id: "col-bottom",
+        order: 1,
+        gridRow: 2,
+        gridCol: 1,
+      };
+      const right: Column = { ...col2, id: "col-right", order: 2, gridCol: 2 };
+      const onReorder = vi.fn();
+      render(
+        <TopBar
+          {...defaultProps}
+          columns={[top, bottom, right]}
+          onReorderColumnGroup={onReorder}
+        />,
+      );
+      dragEnd("col-top", "col-right");
+      expect(onReorder).toHaveBeenCalledWith(0, 1);
     });
   });
 

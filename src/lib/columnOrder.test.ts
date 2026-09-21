@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { buildGroups, normalizeOrder, moveGroup } from "@/lib/columnOrder";
+import {
+  buildGroups,
+  normalizeOrder,
+  moveGroup,
+  resolveGroupMove,
+} from "@/lib/columnOrder";
 import type { Column } from "@/types";
 
 const baseSettings = {
@@ -215,5 +220,106 @@ describe("moveGroup", () => {
     expect(byId.get("c2")).toBe(1);
     expect(byId.get("c3")).toBe(2);
     expect(byId.get("c1")).toBe(3);
+  });
+});
+
+describe("moveGroup（1列のみ）", () => {
+  it("グループが1つだけでfromIdxとtoIdxがともに0なら元の配列をそのまま返す", () => {
+    const columns: Column[] = [
+      makeColumn({ id: "c1", gridCol: 1, gridRow: 1 }),
+    ];
+    expect(moveGroup(columns, 0, 0)).toBe(columns);
+  });
+});
+
+describe("resolveGroupMove", () => {
+  it("activeIdとoverIdがグループ先頭カラムidならfromIdxとtoIdxが返る", () => {
+    const columns: Column[] = [
+      makeColumn({ id: "c1", gridCol: 1, gridRow: 1 }),
+      makeColumn({ id: "c2", gridCol: 2, gridRow: 1 }),
+      makeColumn({ id: "c3", gridCol: 3, gridRow: 1 }),
+    ];
+    expect(resolveGroupMove(columns, "c1", "c3")).toEqual({
+      fromIdx: 0,
+      toIdx: 2,
+    });
+    expect(resolveGroupMove(columns, "c3", "c2")).toEqual({
+      fromIdx: 2,
+      toIdx: 1,
+    });
+  });
+
+  it("activeIdとoverIdが同じ場合はnullを返す", () => {
+    const columns: Column[] = [
+      makeColumn({ id: "c1", gridCol: 1, gridRow: 1 }),
+      makeColumn({ id: "c2", gridCol: 2, gridRow: 1 }),
+    ];
+    expect(resolveGroupMove(columns, "c1", "c1")).toBeNull();
+  });
+
+  it("存在しないactiveIdの場合はnullを返す", () => {
+    const columns: Column[] = [
+      makeColumn({ id: "c1", gridCol: 1, gridRow: 1 }),
+      makeColumn({ id: "c2", gridCol: 2, gridRow: 1 }),
+    ];
+    expect(resolveGroupMove(columns, "unknown", "c2")).toBeNull();
+  });
+
+  it("存在しないoverIdの場合はnullを返す", () => {
+    const columns: Column[] = [
+      makeColumn({ id: "c1", gridCol: 1, gridRow: 1 }),
+      makeColumn({ id: "c2", gridCol: 2, gridRow: 1 }),
+    ];
+    expect(resolveGroupMove(columns, "c1", "unknown")).toBeNull();
+  });
+
+  it("縦積みグループはgridRowが最小のカラムidで解決される", () => {
+    // 配列上は gridRow=2 のカラムが先でも、グループ先頭は gridRow=1 のカラム
+    const columns: Column[] = [
+      makeColumn({ id: "c1b", gridCol: 1, gridRow: 2 }),
+      makeColumn({ id: "c1a", gridCol: 1, gridRow: 1 }),
+      makeColumn({ id: "c2", gridCol: 2, gridRow: 1 }),
+    ];
+    expect(resolveGroupMove(columns, "c1a", "c2")).toEqual({
+      fromIdx: 0,
+      toIdx: 1,
+    });
+  });
+
+  it("縦積みグループの2行目以降のカラムidはグループ先頭ではないためnullを返す", () => {
+    const columns: Column[] = [
+      makeColumn({ id: "c1a", gridCol: 1, gridRow: 1 }),
+      makeColumn({ id: "c1b", gridCol: 1, gridRow: 2 }),
+      makeColumn({ id: "c2", gridCol: 2, gridRow: 1 }),
+    ];
+    expect(resolveGroupMove(columns, "c1b", "c2")).toBeNull();
+    expect(resolveGroupMove(columns, "c2", "c1b")).toBeNull();
+  });
+
+  it("未割当カラムのidはnullを返す", () => {
+    const columns: Column[] = [
+      makeColumn({ id: "c1", gridCol: 1, gridRow: 1 }),
+      makeColumn({ id: "c2", gridCol: 2, gridRow: 1 }),
+      makeColumn({ id: "u1", gridCol: 0, gridRow: 0 }),
+    ];
+    expect(resolveGroupMove(columns, "u1", "c1")).toBeNull();
+    expect(resolveGroupMove(columns, "c1", "u1")).toBeNull();
+  });
+
+  it("空配列ではnullを返す", () => {
+    expect(resolveGroupMove([], "c1", "c2")).toBeNull();
+  });
+
+  it("解決したfromIdxとtoIdxをmoveGroupへ渡すと列グループが入れ替わる", () => {
+    const columns: Column[] = [
+      makeColumn({ id: "c1", gridCol: 1, gridRow: 1 }),
+      makeColumn({ id: "c2", gridCol: 2, gridRow: 1 }),
+    ];
+    const move = resolveGroupMove(columns, "c1", "c2");
+    expect(move).not.toBeNull();
+    const result = moveGroup(columns, move!.fromIdx, move!.toIdx);
+    const byId = new Map(result.map((c) => [c.id, c.gridCol]));
+    expect(byId.get("c1")).toBe(2);
+    expect(byId.get("c2")).toBe(1);
   });
 });
