@@ -3,8 +3,9 @@
 use super::parse_url;
 use crate::commands::settings::ColumnData;
 use crate::commands::settings_store::{
-    load_api_rate_limit_monitor_enabled, load_global_ng_words, load_hide_ad_enabled,
-    load_image_popup_enabled, load_video_auto_play_stop_enabled, load_video_popup_enabled,
+    load_api_rate_limit_monitor_enabled, load_global_ng_words, load_global_repost_hidden_user_ids,
+    load_hide_ad_enabled, load_image_popup_enabled, load_video_auto_play_stop_enabled,
+    load_video_popup_enabled,
 };
 use crate::inject::{build_init_script, InitScriptParams};
 #[cfg(any(target_os = "linux", windows))]
@@ -98,6 +99,7 @@ fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: boo
     let image_popup_enabled = load_image_popup_enabled(app);
     let video_popup_enabled = load_video_popup_enabled(app);
     let global_ng_words = load_global_ng_words(app);
+    let global_repost_hidden_user_ids = load_global_repost_hidden_user_ids(app);
     build_init_script(&InitScriptParams {
         is_mobile,
         hide_header_enabled: column.settings.hide_header_enabled,
@@ -117,6 +119,8 @@ fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: boo
         visible_links: &column.settings.visible_links,
         ng_words: &column.settings.ng_words,
         global_ng_words: &global_ng_words,
+        repost_hidden_user_ids: &column.settings.repost_hidden_user_ids,
+        global_repost_hidden_user_ids: &global_repost_hidden_user_ids,
         whitelist_enabled: column.settings.whitelist_enabled,
         whitelist_words: &column.settings.whitelist_words,
         // 投稿カラム（/home 表示）ではインライン投稿フォーム以外を隠す。

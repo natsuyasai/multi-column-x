@@ -21,6 +21,8 @@ pub struct InitScriptParams<'a> {
     pub visible_links: &'a [String],
     pub ng_words: &'a [String],
     pub global_ng_words: &'a [String],
+    pub repost_hidden_user_ids: &'a [String],
+    pub global_repost_hidden_user_ids: &'a [String],
     pub whitelist_enabled: bool,
     pub whitelist_words: &'a [String],
     pub compose_only_enabled: bool,
@@ -97,11 +99,16 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     let ng_words_json = serde_json::to_string(params.ng_words).unwrap_or_else(|_| "[]".to_string());
     let global_ng_words_json =
         serde_json::to_string(params.global_ng_words).unwrap_or_else(|_| "[]".to_string());
+    let repost_hidden_user_ids_json =
+        serde_json::to_string(params.repost_hidden_user_ids).unwrap_or_else(|_| "[]".to_string());
+    let global_repost_hidden_user_ids_json =
+        serde_json::to_string(params.global_repost_hidden_user_ids)
+            .unwrap_or_else(|_| "[]".to_string());
     let whitelist_words_json =
         serde_json::to_string(params.whitelist_words).unwrap_or_else(|_| "[]".to_string());
     let effective_show_custom_menu = params.hide_header_enabled && params.show_custom_menu;
     let config = format!(
-        "window.{} = {{ hideHeaderEnabled: {}, hideTweetInputEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?}, blurImageEnabled: {}, blurImageAmount: {:?}, hideAdEnabled: {}, apiRateLimitMonitorEnabled: {}, imagePopupEnabled: {}, videoPopupEnabled: {}, ngWords: {}, globalNgWords: {}, whitelistEnabled: {}, whitelistWords: {} }};",
+        "window.{} = {{ hideHeaderEnabled: {}, hideTweetInputEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?}, blurImageEnabled: {}, blurImageAmount: {:?}, hideAdEnabled: {}, apiRateLimitMonitorEnabled: {}, imagePopupEnabled: {}, videoPopupEnabled: {}, ngWords: {}, globalNgWords: {}, repostHiddenUserIds: {}, globalRepostHiddenUserIds: {}, whitelistEnabled: {}, whitelistWords: {} }};",
         globals::MULTI_COLUMN_X_CONFIG,
         params.hide_header_enabled,
         params.hide_tweet_input_enabled,
@@ -117,6 +124,8 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         params.video_popup_enabled,
         ng_words_json,
         global_ng_words_json,
+        repost_hidden_user_ids_json,
+        global_repost_hidden_user_ids_json,
         params.whitelist_enabled,
         whitelist_words_json
     );
@@ -216,6 +225,8 @@ mod tests {
             visible_links: &[],
             ng_words: &[],
             global_ng_words: &[],
+            repost_hidden_user_ids: &[],
+            global_repost_hidden_user_ids: &[],
             whitelist_enabled: false,
             whitelist_words: &[],
             compose_only_enabled: false,
@@ -253,6 +264,43 @@ mod tests {
     fn build_init_script_config_global_ng_words_empty_by_default() {
         let script = build_init_script(&default_params());
         assert!(script.contains("globalNgWords: []"));
+    }
+
+    #[test]
+    fn 設定したリポスト元ユーザーidがカラム個別として起動時のスクリプトに渡される() {
+        let ids = vec!["alice".to_string(), "Bob_1".to_string()];
+        let mut params = default_params();
+        params.repost_hidden_user_ids = &ids;
+        let script = build_init_script(&params);
+        assert!(script.contains(r#"repostHiddenUserIds: ["alice","Bob_1"]"#));
+    }
+
+    #[test]
+    fn 設定したリポスト元ユーザーidが全体設定として起動時のスクリプトに渡される() {
+        let ids = vec!["global_user".to_string()];
+        let mut params = default_params();
+        params.global_repost_hidden_user_ids = &ids;
+        let script = build_init_script(&params);
+        assert!(script.contains(r#"globalRepostHiddenUserIds: ["global_user"]"#));
+    }
+
+    #[test]
+    fn リポスト元ユーザーidは既定で全体もカラム個別も空配列になる() {
+        let script = build_init_script(&default_params());
+        assert!(script.contains("repostHiddenUserIds: []"));
+        assert!(script.contains("globalRepostHiddenUserIds: []"));
+    }
+
+    #[test]
+    fn 全体とカラム個別のリポスト元ユーザーidは互いに混ざらない() {
+        let column_ids = vec!["col_user".to_string()];
+        let global_ids = vec!["glob_user".to_string()];
+        let mut params = default_params();
+        params.repost_hidden_user_ids = &column_ids;
+        params.global_repost_hidden_user_ids = &global_ids;
+        let script = build_init_script(&params);
+        assert!(script.contains(r#"repostHiddenUserIds: ["col_user"]"#));
+        assert!(script.contains(r#"globalRepostHiddenUserIds: ["glob_user"]"#));
     }
 
     #[test]
