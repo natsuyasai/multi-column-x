@@ -4,7 +4,11 @@ use tauri::{AppHandle, Emitter, Manager, WebviewUrl};
 
 #[cfg(desktop)]
 #[tauri::command]
-pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
+pub async fn open_add_account_window(
+    caller: tauri::Webview,
+    app: AppHandle,
+) -> Result<String, String> {
+    crate::commands::require_main_caller(&caller)?;
     let account_id = uuid::Uuid::new_v4().to_string();
     let window_label = format!("{}{}", labels::ADD_ACCOUNT_PREFIX, &account_id[..8]);
 
@@ -63,7 +67,11 @@ pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
 
 #[cfg(mobile)]
 #[tauri::command]
-pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
+pub async fn open_add_account_window(
+    caller: tauri::Webview,
+    app: AppHandle,
+) -> Result<String, String> {
+    crate::commands::require_main_caller(&caller)?;
     let account_id = uuid::Uuid::new_v4().to_string();
 
     let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;

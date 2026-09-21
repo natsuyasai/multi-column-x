@@ -370,7 +370,11 @@ fn migrate_area_remove_enabled(value: &mut serde_json::Value) {
 }
 
 #[tauri::command]
-pub async fn load_settings(app: AppHandle) -> Result<AppSettingsData, String> {
+pub async fn load_settings(
+    caller: tauri::Webview,
+    app: AppHandle,
+) -> Result<AppSettingsData, String> {
+    crate::commands::require_main_caller(&caller)?;
     let store = app.store("settings.json").map_err(|e| e.to_string())?;
 
     let settings = store
