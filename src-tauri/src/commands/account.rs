@@ -583,6 +583,21 @@ mod tests {
                 );
                 prop_assert_eq!(parse_twid_user_id(&s), None);
             }
+
+            /// 任意の文字列でラベル生成を呼んでもpanicしない（Result型で必ず返る）。
+            #[test]
+            fn 任意の文字列でもラベル生成はpanicしない(s in any::<String>()) {
+                let _ = reauth_window_label(&s);
+            }
+
+            /// 8バイト以上のASCII文字列なら常にOkになり、ラベルの末尾が先頭8文字と一致する。
+            #[test]
+            fn 八バイト以上のascii文字列は常に先頭八文字がラベル末尾になる(s in "[\x00-\x7f]{8,64}") {
+                let result = reauth_window_label(&s);
+                prop_assert!(result.is_ok());
+                let label = result.unwrap();
+                prop_assert_eq!(&label[label.len() - 8..], &s[..8]);
+            }
         }
     }
 }
