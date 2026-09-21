@@ -516,6 +516,24 @@ mod tests {
     }
 
     #[test]
+    fn 八文字以上のasciiのアカウントidは先頭八文字でラベルを作る() {
+        assert_eq!(
+            reauth_window_label("0123456789abcdef"),
+            Ok(format!("{}01234567", labels::ADD_ACCOUNT_PREFIX))
+        );
+    }
+
+    #[test]
+    fn 八バイト未満のアカウントidのときはエラーになる() {
+        assert!(reauth_window_label("abc").is_err());
+    }
+
+    #[test]
+    fn 八バイト目がマルチバイト文字の途中になるアカウントidのときはエラーになる() {
+        assert!(reauth_window_label("あいう").is_err());
+    }
+
+    #[test]
     fn 再認証完了payloadはnewdatadirectoryをキャメルケースで含む() {
         let payload = ReauthCompletePayload {
             account_id: "acc-1".to_string(),
