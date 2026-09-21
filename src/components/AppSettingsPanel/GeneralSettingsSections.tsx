@@ -12,15 +12,16 @@ interface GeneralSettingsSectionsProps {
   set: SetSettingsDraft;
   isMobile: boolean;
   ngWordsError?: string | null;
+  repostHiddenUserIdsError?: string | null;
 }
 
 /**
  * 全体設定セクション群
- * （ポップアップウィンドウ・動画・広告・Android ツイート・スワイプ切替・グローバルNGワード）
+ * （ポップアップウィンドウ・動画・広告・Android ツイート・スワイプ切替・グローバルNGワード・リポストを非表示にするユーザー）
  */
 export const GeneralSettingsSections: React.FC<
   GeneralSettingsSectionsProps
-> = ({ draft, set, isMobile, ngWordsError }) => (
+> = ({ draft, set, isMobile, ngWordsError, repostHiddenUserIdsError }) => (
   <>
     <section className={styles.section}>
       <h3 className={styles.sectionTitle}>ポップアップウィンドウ</h3>
@@ -175,6 +176,24 @@ export const GeneralSettingsSections: React.FC<
       {ngWordsError && <p className={styles.errorText}>{ngWordsError}</p>}
       <p className={styles.hint}>
         全カラムのタイムラインに適用されます。各カラムのNGワードと合わせて使用されます。
+      </p>
+    </section>
+
+    <section className={styles.section}>
+      <h3 className={styles.sectionTitle}>リポストを非表示にするユーザー</h3>
+      <textarea
+        className={styles.cssTextarea}
+        value={draft.globalRepostHiddenUserIdsText}
+        onChange={(e) => set("globalRepostHiddenUserIdsText", e.target.value)}
+        aria-label="リポストを非表示にするユーザー"
+        placeholder="1行に1ユーザーIDで入力（全カラムに適用）"
+        spellCheck={false}
+      />
+      {repostHiddenUserIdsError && (
+        <p className={styles.errorText}>{repostHiddenUserIdsError}</p>
+      )}
+      <p className={styles.hint}>
+        1行に1ユーザーID（@以降）。指定ユーザーがリポストした投稿を非表示にします
       </p>
     </section>
   </>

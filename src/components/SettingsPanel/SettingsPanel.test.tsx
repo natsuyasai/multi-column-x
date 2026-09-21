@@ -177,6 +177,107 @@ describe("SettingsPanel NGワード", () => {
   });
 });
 
+describe("SettingsPanel リポストを非表示にするユーザー", () => {
+  const getTextarea = () =>
+    screen.getByRole("textbox", { name: "リポストを非表示にするユーザー" });
+
+  it("既存のrepostHiddenUserIdsが入力エリアに復元表示される", () => {
+    const col = {
+      ...mockColumn,
+      settings: {
+        ...baseSettings,
+        repostHiddenUserIds: ["HAJIME_2001", "abc"],
+      },
+    };
+    render(<SettingsPanel {...defaultProps} column={col} />);
+    expect((getTextarea() as HTMLTextAreaElement).value).toBe(
+      "HAJIME_2001\nabc",
+    );
+  });
+
+  it("旧プリセット由来でrepostHiddenUserIdsが未定義でも空の入力エリアが表示される", () => {
+    const legacySettings: Record<string, unknown> = { ...baseSettings };
+    delete legacySettings.repostHiddenUserIds;
+    const col = {
+      ...mockColumn,
+      settings: legacySettings as unknown as Column["settings"],
+    };
+    render(<SettingsPanel {...defaultProps} column={col} />);
+    expect((getTextarea() as HTMLTextAreaElement).value).toBe("");
+  });
+
+  it("説明文が表示される", () => {
+    render(<SettingsPanel {...defaultProps} />);
+    expect(
+      screen.getByText(
+        "1行に1ユーザーID（@以降）。指定ユーザーがリポストした投稿を非表示にします",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("入力は1行1IDで、空行・前後空白・先頭の@・重複は無視して正規化された一覧がonApplyに渡される", async () => {
+    const onApply = vi.fn();
+    render(<SettingsPanel {...defaultProps} onApply={onApply} />);
+    const textarea = getTextarea();
+    await userEvent.clear(textarea);
+    await userEvent.type(
+      textarea,
+      "  @user_a  {Enter}{Enter}user_b{Enter}USER_A{Enter}@user_b",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.objectContaining({ repostHiddenUserIds: ["user_a", "user_b"] }),
+      350,
+      undefined,
+    );
+  });
+
+  it("不正なID行があると保存できずエラーが表示される", async () => {
+    const onApply = vi.fn();
+    render(<SettingsPanel {...defaultProps} onApply={onApply} />);
+    const textarea = getTextarea();
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, "valid_id{Enter}bad-id!");
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(
+      screen.getByText(
+        "`bad-id!` はXのユーザーIDとして正しくありません（英数字とアンダースコアの1〜15文字）",
+      ),
+    ).toBeInTheDocument();
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
+  it("不正なID行を修正して再度適用するとエラーが消えてonApplyが呼ばれる", async () => {
+    const onApply = vi.fn();
+    render(<SettingsPanel {...defaultProps} onApply={onApply} />);
+    const textarea = getTextarea();
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, "bad-id!");
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, "good_id");
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(
+      screen.queryByText(/ユーザーIDとして正しくありません/),
+    ).not.toBeInTheDocument();
+    expect(onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.objectContaining({ repostHiddenUserIds: ["good_id"] }),
+      350,
+      undefined,
+    );
+  });
+
+  it("外部URLカラムでは表示されない", () => {
+    const col = { ...mockColumn, pageType: "external" as const };
+    render(<SettingsPanel {...defaultProps} column={col} />);
+    expect(
+      screen.queryByRole("textbox", { name: "リポストを非表示にするユーザー" }),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe("SettingsPanel ホワイトリスト", () => {
   const whitelistPlaceholder =
     "1行に1ワードで入力（/正規表現/flags 形式も指定可、ホワイトリスト）";
