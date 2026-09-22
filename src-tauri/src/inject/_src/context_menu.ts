@@ -74,7 +74,6 @@ const OPEN_LINK_POPUP_WINDOW = "open_link_popup_window";
       tauriInvoke(OPEN_LINK_POPUP_WINDOW, {
         webviewLabelCaller: getCallerLabel(),
         accountId: null,
-        dataDirectory: null,
         url: resolveAbsolute(href),
       });
     });
