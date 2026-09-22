@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useCallback, useRef, useState } from "react";
 import { ACCOUNT_COLORS } from "../constants/accountColors";
 import { IPC_COMMANDS, IPC_EVENTS } from "../constants/ipc";
+import { logError } from "../lib/log";
 import { evaluateReauthIdentity } from "../lib/reauthIdentity";
 import { useAppStore } from "../store/useAppStore";
 import type { Account } from "../types";
@@ -126,10 +127,17 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
     const pending = pendingAccountName;
     setPendingAccountName(null);
     if (pending) {
-      // ログインウィンドウ（既に閉じている場合もあるためエラーは無視）を確実に閉じる
-      invoke(IPC_COMMANDS.CLOSE_WINDOW, { label: pending.windowLabel }).catch(
-        () => {},
-      );
+      // ログインウィンドウ（既に閉じている場合もあるためエラーは無視）を確実に閉じてから、
+      // ログインで作成された未使用の保存先ディレクトリを削除する
+      // （WebView がフォルダを使用中のため、閉じた後に削除する順序を守る）。
+      invoke(IPC_COMMANDS.CLOSE_WINDOW, { label: pending.windowLabel })
+        .catch(() => {})
+        .then(() =>
+          invoke(IPC_COMMANDS.DELETE_ACCOUNT_DATA, {
+            dataDirectory: pending.dataDirectory,
+          }),
+        )
+        .catch(logError("cancelAccountName:deleteAccountData"));
     }
   }, [pendingAccountName]);
 

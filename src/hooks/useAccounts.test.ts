@@ -128,7 +128,7 @@ describe("useAccounts (mobile)", () => {
     expect(result.current.pendingAccountName).toBeNull();
   });
 
-  it("cancelAccountNameを呼ぶとアカウントを追加せずclose_windowが呼ばれる", async () => {
+  it("cancelAccountNameを呼ぶとアカウントを追加せずclose_window後にdelete_account_dataが呼ばれる", async () => {
     mockInvoke.mockImplementation(async (cmd) =>
       cmd === "open_add_account_window" ? addAccountResult : undefined,
     );
@@ -137,14 +137,20 @@ describe("useAccounts (mobile)", () => {
     await act(async () => {
       await result.current.startAddAccount();
     });
-    await act(async () => {
+    act(() => {
       result.current.cancelAccountName();
     });
+    await flushMicrotasks();
 
     expect(useAppStore.getState().accounts).toHaveLength(0);
     expect(result.current.pendingAccountName).toBeNull();
-    expect(mockInvoke).toHaveBeenCalledWith("close_window", {
-      label: "add-account",
+    const calls = mockInvoke.mock.calls.map((c) => c[0]);
+    const closeIdx = calls.indexOf("close_window");
+    const deleteIdx = calls.indexOf("delete_account_data");
+    expect(closeIdx).toBeGreaterThanOrEqual(0);
+    expect(deleteIdx).toBeGreaterThan(closeIdx);
+    expect(mockInvoke).toHaveBeenCalledWith("delete_account_data", {
+      dataDirectory: "/data/acc-new",
     });
   });
 
