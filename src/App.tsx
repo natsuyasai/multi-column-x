@@ -47,6 +47,7 @@ import {
   getTopBarHeight,
   resolveSwipeAreaHeight,
 } from "./lib/gridLayout";
+import { resolveLinkPopupUrl } from "./lib/linkPopupUrl";
 import { logError } from "./lib/log";
 import { resolveTheme } from "./lib/theme";
 import {
@@ -220,8 +221,9 @@ const App: React.FC = () => {
   const handleSubmitLinkPopup = useCallback(
     async (url: string, accountId: string) => {
       setShowLinkPopupDialog(false);
-      if (!url.trim()) return;
-      const resolved = url.startsWith("http") ? url : "https://" + url;
+      const trimmedUrl = url.trim();
+      if (!trimmedUrl) return;
+      const resolved = resolveLinkPopupUrl(trimmedUrl);
       const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
       if (!account) return;
       await invoke(IPC_COMMANDS.OPEN_LINK_POPUP_WINDOW, {
