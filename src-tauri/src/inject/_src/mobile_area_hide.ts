@@ -109,10 +109,11 @@
 
   function setup(): void {
     apply();
-    new MutationObserver(scheduleApply).observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
+    // 共有DOM監視ハブ(dom_observer.ts)経由でDOM変化を検知する。ハブは
+    // document.body を childList+subtree で監視し、MutationRecordの詳細に
+    // 依存しないコールバック（毎回scheduleApply経由でapply()を再実行するだけ）
+    // のため移行対象。詳細は tmp/plans/2026-09-22-inject-observer-consolidation/plan.md 参照。
+    window.__mcxDomObserver?.subscribe(scheduleApply);
   }
 
   if (document.body) {
