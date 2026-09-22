@@ -477,6 +477,116 @@ describe("useAccounts confirmRemoval（カラム削除・削除保留の記録�
   });
 });
 
+describe("useAccounts retryPendingDataDirectoryDeletions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-2",
+          label: "B",
+          dataDirectory: "/data/acc-2",
+          color: "#e0245e",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: [],
+      },
+      isMobile: false,
+    });
+  });
+
+  it("2件中1件成功した場合、成功分は再実行対象から外れ失敗分だけが残り残数が返る", async () => {
+    useAppStore.setState({
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: ["/data/ok", "/data/ng"],
+      },
+    });
+    mockInvoke.mockImplementation(async (cmd, args) => {
+      if (cmd === "delete_account_data") {
+        const dir = (args as { dataDirectory: string }).dataDirectory;
+        if (dir === "/data/ng") throw new Error("locked");
+        return undefined;
+      }
+      return undefined;
+    });
+    const { result } = renderHook(() => useAccounts());
+
+    let retryResult: { remaining: number } = { remaining: -1 };
+    await act(async () => {
+      retryResult = await result.current.retryPendingDataDirectoryDeletions();
+    });
+
+    expect(retryResult).toEqual({ remaining: 1 });
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual(["/data/ng"]);
+  });
+
+  it("全件成功した場合は再実行対象が空になり残数0が返る", async () => {
+    useAppStore.setState({
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: ["/data/ok1", "/data/ok2"],
+      },
+    });
+    mockInvoke.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts());
+
+    let retryResult: { remaining: number } = { remaining: -1 };
+    await act(async () => {
+      retryResult = await result.current.retryPendingDataDirectoryDeletions();
+    });
+
+    expect(retryResult).toEqual({ remaining: 0 });
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual([]);
+  });
+
+  it("再実行対象が現在登録中のアカウントのdataDirectoryと一致する場合は削除せず対象から外す", async () => {
+    useAppStore.setState({
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        // acc-2 (登録中) の dataDirectory と一致するパスが誤って残っているケース
+        pendingDataDirectoryDeletions: ["/data/acc-2"],
+      },
+    });
+    mockInvoke.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts());
+
+    await act(async () => {
+      await result.current.retryPendingDataDirectoryDeletions();
+    });
+
+    expect(mockInvoke).not.toHaveBeenCalledWith("delete_account_data", {
+      dataDirectory: "/data/acc-2",
+    });
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual([]);
+  });
+
+  it("再実行対象が無い場合は何も削除せず残数0が返る", async () => {
+    mockInvoke.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts());
+
+    let retryResult: { remaining: number } = { remaining: -1 };
+    await act(async () => {
+      retryResult = await result.current.retryPendingDataDirectoryDeletions();
+    });
+
+    expect(retryResult).toEqual({ remaining: 0 });
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "delete_account_data",
+      expect.anything(),
+    );
+  });
+});
+
 const OLD_DATA_DIRECTORY = "/data/acc-1";
 const NEW_DATA_DIRECTORY = "/data/accounts/account-new";
 

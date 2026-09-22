@@ -85,6 +85,7 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
     removeAccount,
     removeColumnsByAccount,
     addPendingDataDirectoryDeletion,
+    setPendingDataDirectoryDeletions,
     updateAccount,
     isMobile,
   } = useAppStore();
@@ -437,6 +438,36 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
     removeAccount,
   ]);
 
+  /**
+   * アプリ設定画面から呼ばれる、削除保留中のデータフォルダの再実行。
+   * 各パスへ DELETE_ACCOUNT_DATA を実行し、成功したものを再実行対象から外す。
+   * 安全策として、現在登録中のいずれかのアカウントの dataDirectory と一致するパスは
+   * （誤って生きているアカウントのデータを消さないよう）削除を実行せず、対象からのみ外す。
+   */
+  const retryPendingDataDirectoryDeletions = useCallback(async (): Promise<{
+    remaining: number;
+  }> => {
+    const { globalSettings, accounts: currentAccounts } =
+      useAppStore.getState();
+    const activeDataDirectories = new Set(
+      currentAccounts.map((a) => a.dataDirectory),
+    );
+    const remaining: string[] = [];
+    for (const dir of globalSettings.pendingDataDirectoryDeletions) {
+      if (activeDataDirectories.has(dir)) {
+        continue;
+      }
+      try {
+        await invoke(IPC_COMMANDS.DELETE_ACCOUNT_DATA, { dataDirectory: dir });
+      } catch (e) {
+        logError("retryPendingDataDirectoryDeletions")(e);
+        remaining.push(dir);
+      }
+    }
+    setPendingDataDirectoryDeletions(remaining);
+    return { remaining: remaining.length };
+  }, [setPendingDataDirectoryDeletions]);
+
   const cancelRemoval = useCallback(() => {
     setPendingRemoval(null);
   }, []);
@@ -454,5 +485,6 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
     startReauth,
     reauthNotice,
     dismissReauthNotice,
+    retryPendingDataDirectoryDeletions,
   };
 }
