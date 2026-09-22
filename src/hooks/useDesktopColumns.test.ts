@@ -1,4 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { platform } from "@tauri-apps/plugin-os";
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { IPC_COMMANDS } from "../constants/ipc";
@@ -14,6 +16,12 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn().mockResolvedValue(() => {}),
+}));
+
+// Linux のメインウィンドウ移動監視（onMoved）用。既定では呼び出し元テストに影響しないよう
+// 未設定の vi.fn() を返し、platform() が "linux" のテストでのみ個別に実装を差し替える。
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: vi.fn(),
 }));
 
 // Linux 専用のウィンドウ移動追従 useEffect（platform() !== "linux" で早期 return）を
@@ -35,6 +43,8 @@ vi.mock("../services/externalColumn", () => ({
 
 const mockInvoke = vi.mocked(invoke);
 const mockResolveColumnDataDirectory = vi.mocked(resolveColumnDataDirectory);
+const mockGetCurrentWindow = vi.mocked(getCurrentWindow);
+const mockPlatform = vi.mocked(platform);
 
 /** clientHeight を固定した div を持つ RefObject を作る（jsdom は clientHeight を計測しないため）。 */
 function makeContainerRef(clientHeight: number) {
@@ -304,5 +314,74 @@ describe("useDesktopColumns", () => {
       (createCall?.[1] as { args: { dataDirectory: string } }).args
         .dataDirectory,
     ).toBe("/data/external/col-external");
+  });
+});
+
+describe("useDesktopColumns（Linux: メインウィンドウ移動監視）", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+    mockResolveColumnDataDirectory.mockImplementation(
+      async (column, accounts) =>
+        accounts.find((a) => a.id === column.accountId)?.dataDirectory,
+    );
+    useAppStore.setState({
+      accounts: [account1],
+      columns: [makeColumn({ id: "col-1", gridCol: 1 })],
+      globalSettings: { ...DEFAULT_GLOBAL_SETTINGS },
+      isLoaded: true,
+      isMobile: false,
+      topBarExpanded: false,
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("監視の登録完了前に解除されたときも、登録が完了した時点で監視は解除される", async () => {
+    mockPlatform.mockReturnValueOnce("linux");
+    const unlistenFn = vi.fn();
+    let resolveOnMoved!: (fn: () => void) => void;
+    const onMovedPromise = new Promise<() => void>((resolve) => {
+      resolveOnMoved = resolve;
+    });
+    mockGetCurrentWindow.mockReturnValue({
+      onMoved: vi.fn().mockReturnValue(onMovedPromise),
+    } as unknown as ReturnType<typeof getCurrentWindow>);
+
+    const { unmount } = renderDesktopColumns();
+
+    // 登録（onMoved の Promise）が解決する前にクリーンアップが走る
+    unmount();
+    expect(unlistenFn).not.toHaveBeenCalled();
+
+    // 登録が完了した時点で解除関数が呼ばれること
+    await act(async () => {
+      resolveOnMoved(unlistenFn);
+      await onMovedPromise;
+    });
+
+    expect(unlistenFn).toHaveBeenCalledTimes(1);
+  });
+
+  it("登録完了後に不要になったときは監視が解除される", async () => {
+    mockPlatform.mockReturnValueOnce("linux");
+    const unlistenFn = vi.fn();
+    const onMovedPromise = Promise.resolve(unlistenFn);
+    mockGetCurrentWindow.mockReturnValue({
+      onMoved: vi.fn().mockReturnValue(onMovedPromise),
+    } as unknown as ReturnType<typeof getCurrentWindow>);
+
+    const { unmount } = renderDesktopColumns();
+
+    // 登録完了（onMoved の Promise 解決）を待ってからアンマウントする
+    await act(async () => {
+      await onMovedPromise;
+    });
+
+    unmount();
+
+    expect(unlistenFn).toHaveBeenCalledTimes(1);
   });
 });
