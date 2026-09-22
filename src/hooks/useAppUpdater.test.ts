@@ -230,6 +230,21 @@ describe("useAppUpdater", () => {
     });
   });
 
+  it("見送り（dismiss）したときは前回のエラーが消える", async () => {
+    const install = vi.fn().mockRejectedValue(new Error("boom"));
+    vi.mocked(createUpdater).mockReturnValue({
+      check: vi.fn().mockResolvedValue({ version: "1.2.0" }),
+      install,
+    });
+    const { result } = renderHook(() => useAppUpdater(false));
+    await waitFor(() => expect(result.current.available).not.toBeNull());
+    await act(async () => await result.current.install());
+    expect(result.current.installError).not.toBeNull();
+
+    act(() => result.current.dismiss());
+    expect(result.current.installError).toBeNull();
+  });
+
   it("checkManualで更新が無ければmanualResultがnoneになる", async () => {
     vi.mocked(createUpdater).mockReturnValue({
       check: vi.fn().mockResolvedValue(null),
