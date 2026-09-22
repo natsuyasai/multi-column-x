@@ -19,7 +19,6 @@
     "allow-get-mobile-insets",
     "allow-set-column-cookies",
     "allow-is-webview-profile-supported",
-    "allow-open-in-browser",
     "allow-update-mobile-swipe-bar",
     "allow-flash-mobile-swipe-bar",
     "allow-open-add-account-window",
