@@ -73,6 +73,11 @@ interface AppStore {
   deletePreset: (id: string) => void;
 }
 
+// saveSettings の直列化用チェーン。呼び出しごとにこのチェーンへ連結し、
+// 前の保存が完了(成功/失敗いずれも)してから次の保存を実行することで、
+// 最後に要求された保存が最後に書き込まれることを保証する。
+let saveChain: Promise<void> = Promise.resolve();
+
 export const useAppStore = create<AppStore>((set, get) => ({
   accounts: [],
   columns: [],
@@ -124,11 +129,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
   },
 
-  saveSettings: async () => {
-    const { accounts, columns, globalSettings } = get();
-    await invoke(IPC_COMMANDS.SAVE_SETTINGS, {
-      settings: { accounts, columns, globalSettings },
-    }).catch(logError("saveSettings"));
+  saveSettings: () => {
+    // 前の保存の完了を待ってから実行する。状態は実行時点(get())で読むため、
+    // 連続して呼ばれても最後に書き込まれるのは最新の状態になる。
+    saveChain = saveChain.then(async () => {
+      const { accounts, columns, globalSettings } = get();
+      await invoke(IPC_COMMANDS.SAVE_SETTINGS, {
+        settings: { accounts, columns, globalSettings },
+      }).catch(logError("saveSettings"));
+    });
+    return saveChain;
   },
 
   addAccount: (account) => {
