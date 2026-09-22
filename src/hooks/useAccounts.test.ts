@@ -4,7 +4,23 @@ import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { IPC_EVENTS } from "../constants/ipc";
 import { useAppStore } from "../store/useAppStore";
+import { DEFAULT_COLUMN_SETTINGS } from "../types";
+import type { Column } from "../types";
 import { useAccounts } from "./useAccounts";
+
+function makeColumn(overrides: Partial<Column> & Pick<Column, "id">): Column {
+  return {
+    accountId: "acc-1",
+    pageType: "home",
+    width: 350,
+    order: 0,
+    gridRow: 1,
+    gridCol: 1,
+    heightMode: "auto",
+    settings: DEFAULT_COLUMN_SETTINGS,
+    ...overrides,
+  };
+}
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -303,6 +319,161 @@ describe("useAccounts (mobile)", () => {
     });
     expect(useAppStore.getState().accounts).toHaveLength(0);
     expect(result.current.pendingRemoval).toBeNull();
+  });
+});
+
+const ACCOUNT_DATA_DELETE_FAILED_MESSAGE =
+  "アカウントのデータフォルダを削除できませんでした。アプリ設定の「データフォルダの削除を再実行」から後で削除できます。";
+
+describe("useAccounts confirmRemoval（カラム削除・削除保留の記録）", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function setupAccountsAndColumns() {
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-1",
+          label: "A",
+          dataDirectory: "/data/acc-1",
+          color: "#1d9bf0",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+        {
+          id: "acc-2",
+          label: "B",
+          dataDirectory: "/data/acc-2",
+          color: "#e0245e",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      columns: [
+        makeColumn({ id: "col-a1", accountId: "acc-1" }),
+        makeColumn({ id: "col-a2", accountId: "acc-1" }),
+        makeColumn({ id: "col-b1", accountId: "acc-2" }),
+        makeColumn({
+          id: "col-external",
+          accountId: "col-external",
+          pageType: "external",
+        }),
+      ],
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: [],
+      },
+      isMobile: false,
+    });
+  }
+
+  it("アカウントを削除するとそのアカウントのカラムも削除され、他アカウントと外部カラムは残る", async () => {
+    setupAccountsAndColumns();
+    mockInvoke.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts());
+
+    act(() => {
+      result.current.removeAccount("acc-1");
+    });
+    await act(async () => {
+      await result.current.confirmRemoval();
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith("remove_column_webview", {
+      columnId: "col-a1",
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("remove_column_webview", {
+      columnId: "col-a2",
+    });
+    expect(mockInvoke).not.toHaveBeenCalledWith("remove_column_webview", {
+      columnId: "col-b1",
+    });
+    expect(mockInvoke).not.toHaveBeenCalledWith("remove_column_webview", {
+      columnId: "col-external",
+    });
+
+    expect(useAppStore.getState().columns.map((c) => c.id)).toEqual([
+      "col-b1",
+      "col-external",
+    ]);
+    expect(useAppStore.getState().accounts.map((a) => a.id)).toEqual(["acc-2"]);
+  });
+
+  it("保存先の削除はカラムの表示を破棄した後に行われる", async () => {
+    setupAccountsAndColumns();
+    mockInvoke.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts());
+
+    act(() => {
+      result.current.removeAccount("acc-1");
+    });
+    await act(async () => {
+      await result.current.confirmRemoval();
+    });
+
+    const callsWithOrder = mockInvoke.mock.calls.map((call, i) => ({
+      cmd: call[0],
+      order: mockInvoke.mock.invocationCallOrder[i],
+    }));
+    const removeWebviewOrders = callsWithOrder
+      .filter((c) => c.cmd === "remove_column_webview")
+      .map((c) => c.order);
+    const deleteDataOrder = callsWithOrder.find(
+      (c) => c.cmd === "delete_account_data",
+    )?.order;
+
+    expect(removeWebviewOrders).toHaveLength(2);
+    expect(deleteDataOrder).toBeDefined();
+    for (const order of removeWebviewOrders) {
+      expect(order).toBeLessThan(deleteDataOrder as number);
+    }
+  });
+
+  it("保存先の削除に失敗したときは通知され再実行対象として記録され、アカウントとカラムは削除される", async () => {
+    setupAccountsAndColumns();
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "delete_account_data") {
+        throw new Error("locked");
+      }
+      return undefined;
+    });
+    const { result } = renderHook(() => useAccounts());
+
+    act(() => {
+      result.current.removeAccount("acc-1");
+    });
+    await act(async () => {
+      await result.current.confirmRemoval();
+    });
+
+    expect(useAppStore.getState().accounts.map((a) => a.id)).toEqual(["acc-2"]);
+    expect(useAppStore.getState().columns.map((c) => c.id)).toEqual([
+      "col-b1",
+      "col-external",
+    ]);
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual(["/data/acc-1"]);
+    expect(result.current.reauthNotice).toBe(
+      ACCOUNT_DATA_DELETE_FAILED_MESSAGE,
+    );
+  });
+
+  it("保存先の削除に成功したときは通知されず再実行対象に記録されない", async () => {
+    setupAccountsAndColumns();
+    mockInvoke.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts());
+
+    act(() => {
+      result.current.removeAccount("acc-1");
+    });
+    await act(async () => {
+      await result.current.confirmRemoval();
+    });
+
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual([]);
+    expect(result.current.reauthNotice).toBeNull();
   });
 });
 

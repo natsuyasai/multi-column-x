@@ -4,7 +4,9 @@ import { listen } from "@tauri-apps/api/event";
 import { useCallback, useRef, useState } from "react";
 import { ACCOUNT_COLORS } from "../constants/accountColors";
 import { IPC_COMMANDS, IPC_EVENTS } from "../constants/ipc";
+import { logError } from "../lib/log";
 import { evaluateReauthIdentity } from "../lib/reauthIdentity";
+import { removeColumnWebview } from "../services/columnWebview";
 import { useAppStore } from "../store/useAppStore";
 import type { Account } from "../types";
 
@@ -55,6 +57,8 @@ const REAUTH_MISMATCH_MESSAGE =
   "登録済みと異なるアカウントでログインされたため、セッションを更新しませんでした";
 const REAUTH_SKIP_MESSAGE =
   "初回の再認証のため同一性の照合をスキップし、アカウント識別子を記録しました";
+const ACCOUNT_DATA_DELETE_FAILED_MESSAGE =
+  "アカウントのデータフォルダを削除できませんでした。アプリ設定の「データフォルダの削除を再実行」から後で削除できます。";
 
 // ログイン完了後、アカウント名の入力待ちであることを表す状態。
 // AccountNameDialog はこの値の有無で表示・非表示を切り替える。
@@ -74,8 +78,16 @@ export interface PendingAccountRemoval {
 }
 
 export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
-  const { accounts, addAccount, removeAccount, updateAccount, isMobile } =
-    useAppStore();
+  const {
+    accounts,
+    columns,
+    addAccount,
+    removeAccount,
+    removeColumnsByAccount,
+    addPendingDataDirectoryDeletion,
+    updateAccount,
+    isMobile,
+  } = useAppStore();
   const isAddingRef = useRef(false);
   const isReauthingRef = useRef(false);
   const [pendingAccountName, setPendingAccountName] =
@@ -386,11 +398,41 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
     const pending = pendingRemoval;
     if (!pending) return;
     setPendingRemoval(null);
-    await invoke(IPC_COMMANDS.DELETE_ACCOUNT_DATA, {
-      dataDirectory: pending.dataDirectory,
-    });
+
+    // 1. 対象アカウントのカラムのWebViewをすべて破棄する（保存先削除の前に行う必要がある。
+    //    Windows の WebView2 はカラムWebViewが使用中のフォルダをロックするため）。
+    //    個別の破棄失敗はログのみに留め、後続の削除処理は続行する。
+    const targetColumns = columns.filter((c) => c.accountId === pending.id);
+    for (const column of targetColumns) {
+      try {
+        await removeColumnWebview(column.id);
+      } catch (e) {
+        logError("confirmRemoval:removeColumnWebview")(e);
+      }
+    }
+    // 2. store からもカラムを削除する（状態変更のみ。WebView破棄は上で完了済み）。
+    removeColumnsByAccount(pending.id);
+
+    // 3. 保存先データフォルダを削除する。失敗しても致命的にはせず、
+    //    再実行対象として記録した上でアカウント自体は削除する。
+    try {
+      await invoke(IPC_COMMANDS.DELETE_ACCOUNT_DATA, {
+        dataDirectory: pending.dataDirectory,
+      });
+    } catch (e) {
+      logError("confirmRemoval:deleteAccountData")(e);
+      addPendingDataDirectoryDeletion(pending.dataDirectory);
+      setReauthNotice(ACCOUNT_DATA_DELETE_FAILED_MESSAGE);
+    }
+
     removeAccount(pending.id);
-  }, [pendingRemoval, removeAccount]);
+  }, [
+    pendingRemoval,
+    columns,
+    removeColumnsByAccount,
+    addPendingDataDirectoryDeletion,
+    removeAccount,
+  ]);
 
   const cancelRemoval = useCallback(() => {
     setPendingRemoval(null);
