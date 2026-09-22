@@ -262,12 +262,14 @@ pub async fn report_keyboard_shortcut(app: AppHandle, key: String) -> Result<(),
 #[allow(non_snake_case)]
 #[cfg_attr(not(target_os = "android"), allow(unused_variables))]
 pub async fn update_mobile_swipe_bar(
+    caller: tauri::Webview,
     visible: bool,
     y: i32,
     height: i32,
     opacity: i32,
     darkTheme: bool,
 ) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     #[cfg(target_os = "android")]
     {
         crate::android_bridge::set_swipe_bar_overlay(visible, y, height, opacity, darkTheme)?;
@@ -282,7 +284,11 @@ pub async fn update_mobile_swipe_bar(
 /// unused_variables を許容する。
 #[tauri::command]
 #[cfg_attr(not(target_os = "android"), allow(unused_variables))]
-pub async fn flash_mobile_swipe_bar(direction: String) -> Result<(), String> {
+pub async fn flash_mobile_swipe_bar(
+    caller: tauri::Webview,
+    direction: String,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     #[cfg(target_os = "android")]
     {
         crate::android_bridge::set_swipe_bar_flash(&direction)?;

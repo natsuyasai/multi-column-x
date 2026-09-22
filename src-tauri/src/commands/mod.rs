@@ -45,12 +45,12 @@ mod tests {
     }
 
     #[test]
-    fn add_accountプレフィックスのラベルは拒否する() {
-        assert!(!is_main_label("add-account-abc123"));
+    fn composeプレフィックスのラベルは拒否する() {
+        assert!(!is_main_label("compose-abc123"));
     }
 
     #[test]
-    fn composeプレフィックスのラベルは拒否する() {
-        assert!(!is_main_label("compose-abc123"));
+    fn add_accountプレフィックスのラベルは拒否する() {
+        assert!(!is_main_label("add-account-abc123"));
     }
 }
