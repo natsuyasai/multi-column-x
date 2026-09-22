@@ -1,14 +1,12 @@
 // sidebar_hide.ts は IIFE のため import 時に実行される。
-// apply() は import 時（setup() 内）に即時実行される他、MutationObserver 経由の
-// DOM 変化検知（100ms デバウンス）でも再適用される。公開 API が無いため、
+// apply() は import 時（setup() 内）に即時実行される他、共有DOM監視ハブ
+// (dom_observer.ts、window.__mcxDomObserver)経由のDOM変化検知（rAFで1フレーム
+// にまとめられた後、100msデバウンス）でも再適用される。公開 API が無いため、
 // 各テストは「import した／DOM を変化させた結果の副作用」として検証する。
-//
-// このテストは dom_observer ハブへの移行前の現状挙動を固定する特性テストとして
-// 追加した（移行後もこのテストがグリーンのまま保たれることを確認する）。
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-// mobile_area_hide.test.ts と同様に、MutationObserver が import のたびに新規登録され
-// disconnect されないため、テスト間の汚染を防ぐために追跡・切断する。
+// dom_observer.test.ts と同様に、共有ハブが作るMutationObserverを追跡し、
+// 各テストでフレッシュなハブ（＝1本だけのMutationObserver）を使う。
 const createdObservers = new Set<MutationObserver>();
 const OriginalMutationObserver = globalThis.MutationObserver;
 
@@ -39,10 +37,12 @@ function addPrimary(): HTMLElement {
 
 async function importSidebarHide(): Promise<void> {
   vi.resetModules();
+  delete (window as unknown as { __mcxDomObserver?: unknown }).__mcxDomObserver;
+  await import("./dom_observer");
   await import("./sidebar_hide");
 }
 
-// apply() の再実行は MutationObserver 通知（マイクロタスク）→ 100ms デバウンスを
+// apply() の再実行は 共有ハブの通知（マイクロタスク→rAF）→ 100ms デバウンスを
 // 経るため、実タイマーで十分に待ってから検証する（mobile_area_hide.test.ts と同じ方式）。
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
