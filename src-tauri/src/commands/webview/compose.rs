@@ -298,7 +298,12 @@ mod tests {
             #[test]
             fn ホストがx_com以外なら常にfalse(h in "[a-z0-9-]{1,20}\\.(com|net|org)") {
                 prop_assume!(h != "x.com");
-                let url = parse(&format!("https://{h}/compose/post"));
+                // 生成された文字列は "xn--" で始まる不正な punycode ラベル等、
+                // URL として解析できない場合がある（is_compose_post_url の不具合ではない）。
+                // その場合は URL として成立しているケースのみを検証対象とする。
+                let Ok(url) = format!("https://{h}/compose/post").parse::<tauri::Url>() else {
+                    return Ok(());
+                };
                 prop_assert!(!is_compose_post_url(&url));
             }
         }
