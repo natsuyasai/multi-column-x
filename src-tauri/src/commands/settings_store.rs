@@ -56,44 +56,36 @@ fn accounts_to_json(accounts: &serde_json::Value) -> String {
         .unwrap_or_else(|| "[]".to_string())
 }
 
-pub(crate) fn load_video_auto_play_stop_enabled(app: &AppHandle) -> bool {
-    bool_flag(
-        &load_global_settings(app),
-        "videoAutoPlayStopEnabled",
-        false,
-    )
-}
-
-pub(crate) fn load_hide_ad_enabled(app: &AppHandle) -> bool {
-    bool_flag(&load_global_settings(app), "hideAdEnabled", false)
-}
-
-pub(crate) fn load_api_rate_limit_monitor_enabled(app: &AppHandle) -> bool {
-    bool_flag(
-        &load_global_settings(app),
-        "apiRateLimitMonitorEnabled",
-        true,
-    )
-}
-
 pub(crate) fn load_popup_esc_close_enabled(app: &AppHandle) -> bool {
     bool_flag(&load_global_settings(app), "popupEscCloseEnabled", true)
 }
 
-pub(crate) fn load_image_popup_enabled(app: &AppHandle) -> bool {
-    bool_flag(&load_global_settings(app), "imagePopupEnabled", true)
+/// カラム起動スクリプト構築に必要な全体設定値をまとめた構造体。
+/// `build_column_init_script` が `load_global_settings` を1回だけ呼び出し、
+/// ここから全フラグを取り出すために使う。
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct ColumnScriptSettings {
+    pub(crate) video_auto_play_stop_enabled: bool,
+    pub(crate) hide_ad_enabled: bool,
+    pub(crate) api_rate_limit_monitor_enabled: bool,
+    pub(crate) image_popup_enabled: bool,
+    pub(crate) video_popup_enabled: bool,
+    pub(crate) global_ng_words: Vec<String>,
+    pub(crate) global_repost_hidden_user_ids: Vec<String>,
 }
 
-pub(crate) fn load_video_popup_enabled(app: &AppHandle) -> bool {
-    bool_flag(&load_global_settings(app), "videoPopupEnabled", true)
-}
-
-pub(crate) fn load_global_ng_words(app: &AppHandle) -> Vec<String> {
-    string_list(&load_global_settings(app), "ngWords")
-}
-
-pub(crate) fn load_global_repost_hidden_user_ids(app: &AppHandle) -> Vec<String> {
-    string_list(&load_global_settings(app), "repostHiddenUserIds")
+/// 読み込み済みの `globalSettings` JSON からカラム起動スクリプト用の値をまとめて取り出す。
+/// 既定値（キー欠落時の値）は各値ごとの従来の挙動と同じにする。
+pub(crate) fn column_script_settings_from(global: &serde_json::Value) -> ColumnScriptSettings {
+    ColumnScriptSettings {
+        video_auto_play_stop_enabled: bool_flag(global, "videoAutoPlayStopEnabled", false),
+        hide_ad_enabled: bool_flag(global, "hideAdEnabled", false),
+        api_rate_limit_monitor_enabled: bool_flag(global, "apiRateLimitMonitorEnabled", true),
+        image_popup_enabled: bool_flag(global, "imagePopupEnabled", true),
+        video_popup_enabled: bool_flag(global, "videoPopupEnabled", true),
+        global_ng_words: string_list(global, "ngWords"),
+        global_repost_hidden_user_ids: string_list(global, "repostHiddenUserIds"),
+    }
 }
 
 #[cfg(target_os = "android")]
@@ -162,6 +154,48 @@ mod tests {
     fn 旧バージョンの保存設定はリポスト元ユーザーidが空として読み込まれる() {
         let settings = serde_json::json!({ "ngWords": ["spam"] });
         assert!(string_list(&settings, "repostHiddenUserIds").is_empty());
+    }
+
+    #[test]
+    fn 全体設定から各フラグを一度に取り出す() {
+        let settings = serde_json::json!({
+            "videoAutoPlayStopEnabled": true,
+            "hideAdEnabled": true,
+            "apiRateLimitMonitorEnabled": false,
+            "imagePopupEnabled": false,
+            "videoPopupEnabled": false,
+            "ngWords": ["spam"],
+            "repostHiddenUserIds": ["alice"],
+        });
+        assert_eq!(
+            column_script_settings_from(&settings),
+            ColumnScriptSettings {
+                video_auto_play_stop_enabled: true,
+                hide_ad_enabled: true,
+                api_rate_limit_monitor_enabled: false,
+                image_popup_enabled: false,
+                video_popup_enabled: false,
+                global_ng_words: vec!["spam".to_string()],
+                global_repost_hidden_user_ids: vec!["alice".to_string()],
+            }
+        );
+    }
+
+    #[test]
+    fn キーが無いときは従来と同じ既定値になる() {
+        let settings = serde_json::json!({});
+        assert_eq!(
+            column_script_settings_from(&settings),
+            ColumnScriptSettings {
+                video_auto_play_stop_enabled: false,
+                hide_ad_enabled: false,
+                api_rate_limit_monitor_enabled: true,
+                image_popup_enabled: true,
+                video_popup_enabled: true,
+                global_ng_words: vec![],
+                global_repost_hidden_user_ids: vec![],
+            }
+        );
     }
 
     #[test]
