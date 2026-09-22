@@ -453,7 +453,7 @@ describe("useAccounts confirmRemoval（カラム削除・削除保留の記録�
     expect(
       useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
     ).toEqual(["/data/acc-1"]);
-    expect(result.current.reauthNotice).toBe(
+    expect(result.current.accountNotice).toBe(
       ACCOUNT_DATA_DELETE_FAILED_MESSAGE,
     );
   });
@@ -473,7 +473,7 @@ describe("useAccounts confirmRemoval（カラム削除・削除保留の記録�
     expect(
       useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
     ).toEqual([]);
-    expect(result.current.reauthNotice).toBeNull();
+    expect(result.current.accountNotice).toBeNull();
   });
 });
 
@@ -650,7 +650,7 @@ describe("useAccounts (desktop reauth)", () => {
       dataDirectory: OLD_DATA_DIRECTORY,
     });
     expect(mockReload).toHaveBeenCalledTimes(1);
-    expect(result.current.reauthNotice).toBeNull();
+    expect(result.current.accountNotice).toBeNull();
     expect(mockListen).toHaveBeenCalledWith(
       IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE,
       expect.any(Function),
@@ -725,7 +725,7 @@ describe("useAccounts (desktop reauth)", () => {
       dataDirectory: OLD_DATA_DIRECTORY,
     });
     expect(mockReload).toHaveBeenCalledTimes(1);
-    expect(result.current.reauthNotice).toBe(
+    expect(result.current.accountNotice).toBe(
       "初回の再認証のため同一性の照合をスキップし、アカウント識別子を記録しました",
     );
   });
@@ -764,7 +764,7 @@ describe("useAccounts (desktop reauth)", () => {
     expect(mockInvoke).toHaveBeenCalledWith("delete_account_data", {
       dataDirectory: NEW_DATA_DIRECTORY,
     });
-    expect(result.current.reauthNotice).toBe(
+    expect(result.current.accountNotice).toBe(
       "登録済みと異なるアカウントでログインされたため、セッションを更新しませんでした",
     );
   });
@@ -803,12 +803,12 @@ describe("useAccounts (desktop reauth)", () => {
     expect(mockInvoke).toHaveBeenCalledWith("delete_account_data", {
       dataDirectory: NEW_DATA_DIRECTORY,
     });
-    expect(result.current.reauthNotice).toBe(
+    expect(result.current.accountNotice).toBe(
       "再認証に失敗しました（アカウント識別子を取得できませんでした）",
     );
   });
 
-  it("dismissReauthNoticeを呼ぶとreauthNoticeがnullに戻る", async () => {
+  it("dismissAccountNoticeを呼ぶとaccountNoticeがnullに戻る", async () => {
     useAppStore.setState({
       accounts: [makeReauthAccount("123")],
       isMobile: false,
@@ -830,13 +830,13 @@ describe("useAccounts (desktop reauth)", () => {
       });
       await reauthPromise;
     });
-    expect(result.current.reauthNotice).not.toBeNull();
+    expect(result.current.accountNotice).not.toBeNull();
 
     act(() => {
-      result.current.dismissReauthNotice();
+      result.current.dismissAccountNotice();
     });
 
-    expect(result.current.reauthNotice).toBeNull();
+    expect(result.current.accountNotice).toBeNull();
   });
 
   it("reloadAllWebviewsを渡さずuseAccounts()で呼んでもmatch時にエラーにならない", async () => {
@@ -862,7 +862,7 @@ describe("useAccounts (desktop reauth)", () => {
     });
 
     expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
-    expect(result.current.reauthNotice).toBeNull();
+    expect(result.current.accountNotice).toBeNull();
   });
 
   it("対象外accountIdのイベントは無視される", async () => {
@@ -924,7 +924,7 @@ describe("useAccounts (desktop reauth)", () => {
       dataDirectory: NEW_DATA_DIRECTORY,
     });
     expect(mockReload).not.toHaveBeenCalled();
-    expect(result.current.reauthNotice).toBeNull();
+    expect(result.current.accountNotice).toBeNull();
   });
 });
 
@@ -963,7 +963,7 @@ describe("useAccounts (mobile reauth)", () => {
       expect.anything(),
     );
     expect(mockReload).toHaveBeenCalledTimes(1);
-    expect(result.current.reauthNotice).toBeNull();
+    expect(result.current.accountNotice).toBeNull();
   });
 
   it("初回(skip)の場合、xUserIdが記録されreloadAllWebviewsが呼ばれスキップ通知がセットされるがdataDirectoryは据え置かれる", async () => {
@@ -992,7 +992,7 @@ describe("useAccounts (mobile reauth)", () => {
       expect.anything(),
     );
     expect(mockReload).toHaveBeenCalledTimes(1);
-    expect(result.current.reauthNotice).toBe(
+    expect(result.current.accountNotice).toBe(
       "初回の再認証のため同一性の照合をスキップし、アカウント識別子を記録しました",
     );
   });
@@ -1016,7 +1016,7 @@ describe("useAccounts (mobile reauth)", () => {
 
     expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
     expect(mockReload).not.toHaveBeenCalled();
-    expect(result.current.reauthNotice).toBe(
+    expect(result.current.accountNotice).toBe(
       "登録済みと異なるアカウントでログインされたため、セッションを更新しませんでした",
     );
   });
@@ -1040,7 +1040,7 @@ describe("useAccounts (mobile reauth)", () => {
 
     expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
     expect(mockReload).not.toHaveBeenCalled();
-    expect(result.current.reauthNotice).toBeNull();
+    expect(result.current.accountNotice).toBeNull();
   });
 
   it("xUserIdがnullで返る場合、更新もリロードもされず失敗通知がセットされる", async () => {
@@ -1062,7 +1062,7 @@ describe("useAccounts (mobile reauth)", () => {
 
     expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
     expect(mockReload).not.toHaveBeenCalled();
-    expect(result.current.reauthNotice).toBe(
+    expect(result.current.accountNotice).toBe(
       "再認証に失敗しました（アカウント識別子を取得できませんでした）",
     );
   });

@@ -95,7 +95,7 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
     useState<PendingAccountName | null>(null);
   const [pendingRemoval, setPendingRemoval] =
     useState<PendingAccountRemoval | null>(null);
-  const [reauthNotice, setReauthNotice] = useState<string | null>(null);
+  const [accountNotice, setAccountNotice] = useState<string | null>(null);
 
   const requestAccountName = useCallback(
     (accountId: string, dataDirectory: string, windowLabel: string) => {
@@ -227,8 +227,8 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
     }
   }, [isMobile, pendingAccountName, requestAccountName]);
 
-  const dismissReauthNotice = useCallback(() => {
-    setReauthNotice(null);
+  const dismissAccountNotice = useCallback(() => {
+    setAccountNotice(null);
   }, []);
 
   const startReauth = useCallback(
@@ -254,7 +254,7 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
           const payload = JSON.parse(raw) as ReauthCompletePayload;
           const xUserId = payload.xUserId;
           if (!xUserId) {
-            setReauthNotice(REAUTH_FAILED_MESSAGE);
+            setAccountNotice(REAUTH_FAILED_MESSAGE);
             return;
           }
 
@@ -262,7 +262,7 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
           updateAccount(accountId, { xUserId });
           await reloadAllWebviews?.();
           if (verdict === "skip") {
-            setReauthNotice(REAUTH_SKIP_MESSAGE);
+            setAccountNotice(REAUTH_SKIP_MESSAGE);
           }
           return;
         }
@@ -304,7 +304,7 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
             if (!xUserId) {
               closeReauthWindow();
               deleteDataDirectory(newDataDirectory);
-              setReauthNotice(REAUTH_FAILED_MESSAGE);
+              setAccountNotice(REAUTH_FAILED_MESSAGE);
               resolve();
               return;
             }
@@ -313,7 +313,7 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
             if (verdict === "mismatch") {
               closeReauthWindow();
               deleteDataDirectory(newDataDirectory);
-              setReauthNotice(REAUTH_MISMATCH_MESSAGE);
+              setAccountNotice(REAUTH_MISMATCH_MESSAGE);
               resolve();
               return;
             }
@@ -329,7 +329,7 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
             await reloadAllWebviews?.();
             deleteDataDirectory(oldDataDirectory);
             if (verdict === "skip") {
-              setReauthNotice(REAUTH_SKIP_MESSAGE);
+              setAccountNotice(REAUTH_SKIP_MESSAGE);
             }
             resolve();
           };
@@ -376,7 +376,7 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
         // mobile: Kotlin 側で不一致と判定された場合は Rust が "account-mismatch" で reject する。
         // それ以外（cancelled/timeout、desktop のウィンドウclose）はエラー表示不要。
         if (isMobile && String(e).includes("account-mismatch")) {
-          setReauthNotice(REAUTH_MISMATCH_MESSAGE);
+          setAccountNotice(REAUTH_MISMATCH_MESSAGE);
         }
       } finally {
         isReauthingRef.current = false;
@@ -426,7 +426,7 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
     } catch (e) {
       logError("confirmRemoval:deleteAccountData")(e);
       addPendingDataDirectoryDeletion(pending.dataDirectory);
-      setReauthNotice(ACCOUNT_DATA_DELETE_FAILED_MESSAGE);
+      setAccountNotice(ACCOUNT_DATA_DELETE_FAILED_MESSAGE);
     }
 
     removeAccount(pending.id);
@@ -483,8 +483,8 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
     confirmRemoval,
     cancelRemoval,
     startReauth,
-    reauthNotice,
-    dismissReauthNotice,
+    accountNotice,
+    dismissAccountNotice,
     retryPendingDataDirectoryDeletions,
   };
 }

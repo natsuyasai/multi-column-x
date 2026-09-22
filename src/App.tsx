@@ -108,8 +108,8 @@ const App: React.FC = () => {
     confirmRemoval,
     cancelRemoval,
     startReauth,
-    reauthNotice,
-    dismissReauthNotice,
+    accountNotice,
+    dismissAccountNotice,
     retryPendingDataDirectoryDeletions,
   } = useAccounts(recreateAllWebviews);
   const {
@@ -263,7 +263,7 @@ const App: React.FC = () => {
     !!whatsNew.notes ||
     !!pendingAccountName ||
     !!pendingRemoval ||
-    !!reauthNotice ||
+    !!accountNotice ||
     apiRateLimitPopoverOpen;
 
   // モバイルスワイプバー（ネイティブオーバーレイ）の状態を Kotlin 側へ同期する。
@@ -698,14 +698,14 @@ const App: React.FC = () => {
         />
       )}
 
-      {reauthNotice && (
+      {accountNotice && (
         <ConfirmDialog
           singleButton
           title="再認証"
-          message={reauthNotice}
+          message={accountNotice}
           confirmLabel="OK"
-          onConfirm={dismissReauthNotice}
-          onCancel={dismissReauthNotice}
+          onConfirm={dismissAccountNotice}
+          onCancel={dismissAccountNotice}
         />
       )}
 
