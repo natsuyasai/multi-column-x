@@ -487,12 +487,94 @@ mod tests {
 
     /// TS 側（src/types/defaults.contract.test.ts）と同じ fixture を参照する契約テスト。
     /// デフォルト値を変更したら contracts/default-settings.json を再生成すること。
+    /// fixture にはカラム設定の既定値契約用の `columnSettings` キーも同居しているため、
+    /// AppSettingsData に対応する accounts / columns / globalSettings の3キーのみを比較する。
     #[test]
     fn default_settings_match_contract_fixture() {
         let fixture: serde_json::Value =
             serde_json::from_str(include_str!("../../../contracts/default-settings.json")).unwrap();
+        let expected = serde_json::json!({
+            "accounts": fixture["accounts"],
+            "columns": fixture["columns"],
+            "globalSettings": fixture["globalSettings"],
+        });
         let actual = serde_json::to_value(AppSettingsData::default()).unwrap();
-        assert_eq!(actual, fixture);
+        assert_eq!(actual, expected);
+    }
+
+    /// キーが全く無い空の全体設定 JSON（`{}`）を読み込んだ結果が、
+    /// 新規インストール時の既定値（contracts/default-settings.json の globalSettings）と一致することを確認する。
+    #[test]
+    fn 空の全体設定を読み込むと新規インストール時の既定値と一致する() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../../../contracts/default-settings.json")).unwrap();
+        let settings: GlobalSettingsData = serde_json::from_value(serde_json::json!({})).unwrap();
+        let actual = serde_json::to_value(&settings).unwrap();
+        assert_eq!(actual, fixture["globalSettings"]);
+    }
+
+    /// showSortButtons が欠落した旧全体設定は、新規インストール時と同じ false になる
+    /// （旧 serde 既定値 true から変更）。
+    #[test]
+    fn showsortbuttonsが無い旧全体設定はデフォルトでfalseになる() {
+        let settings: GlobalSettingsData = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert!(!settings.show_sort_buttons);
+    }
+
+    /// defaultScrollPosRestoreEnabled が欠落した旧全体設定は、新規インストール時と同じ false になる
+    /// （旧 serde 既定値 true から変更）。
+    #[test]
+    fn defaultscrollposrestoreenabledが無い旧全体設定はデフォルトでfalseになる() {
+        let settings: GlobalSettingsData = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert!(!settings.default_scroll_pos_restore_enabled);
+    }
+
+    /// videoAutoPlayStopEnabled が欠落した旧全体設定は、新規インストール時と同じ true になる
+    /// （旧 serde 既定値 false から変更）。
+    #[test]
+    fn videoautoplaystopenabledが無い旧全体設定はデフォルトでtrueになる() {
+        let settings: GlobalSettingsData = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert!(settings.video_auto_play_stop_enabled);
+    }
+
+    /// hideAdEnabled が欠落した旧全体設定は、新規インストール時と同じ true になる
+    /// （旧 serde 既定値 false から変更）。
+    #[test]
+    fn hideadenabledが無い旧全体設定はデフォルトでtrueになる() {
+        let settings: GlobalSettingsData = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert!(settings.hide_ad_enabled);
+    }
+
+    /// defaultAccountId 等これまで必須だったフィールドが欠落していても
+    /// エラーにならず既定値（None）になることを確認する。
+    #[test]
+    fn defaultaccountidが無い旧全体設定はデフォルトでnoneになる() {
+        let settings: GlobalSettingsData = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert_eq!(settings.default_account_id, None);
+    }
+
+    /// カラム設定の showCustomMenu が欠落しているとき、新規インストール時と同じ false（無効）になる。
+    #[test]
+    fn カラム設定のカスタムメニューのキーが無いときは無効になる() {
+        let json = serde_json::json!({
+            "autoReloadEnabled": true,
+            "autoReloadInterval": 600,
+            "customCSS": "",
+        });
+        let settings: ColumnSettings = serde_json::from_value(json).unwrap();
+        assert!(!settings.show_custom_menu);
+    }
+
+    /// キーが全く無い空のカラム設定 JSON（`{}`）を読み込んだ結果が、
+    /// 新規インストール時の既定値（contracts/default-settings.json の columnSettings、
+    /// TS の DEFAULT_COLUMN_SETTINGS 相当）と一致することを確認する。
+    #[test]
+    fn 空のカラム設定を読み込むと新規インストール時の既定値と一致する() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../../../contracts/default-settings.json")).unwrap();
+        let settings: ColumnSettings = serde_json::from_value(serde_json::json!({})).unwrap();
+        let actual = serde_json::to_value(&settings).unwrap();
+        assert_eq!(actual, fixture["columnSettings"]);
     }
 
     /// 新フィールド追加前に保存された旧カラム設定 JSON（desktopNotifyEnabled 欠落）を

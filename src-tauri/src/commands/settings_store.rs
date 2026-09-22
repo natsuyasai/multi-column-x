@@ -3,6 +3,8 @@
 use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
 
+use crate::commands::settings::GlobalSettingsData;
+
 pub(crate) fn load_global_settings(app: &AppHandle) -> serde_json::Value {
     app.store("settings.json")
         .ok()
@@ -119,6 +121,25 @@ mod tests {
         let settings = serde_json::json!({});
         assert!(bool_flag(&settings, "videoAutoPlayStopEnabled", true));
         assert!(!bool_flag(&settings, "hideAdEnabled", false));
+    }
+
+    /// globalSettings が丸ごと欠落している（旧バージョンの settings.json 等）とき、
+    /// カラムへ注入する動画の自動再生停止・広告の非表示は、新規インストール時と
+    /// 同じ既定値（GlobalSettingsData::default() 相当）である true になる。
+    #[test]
+    fn キーが無いときカラムへ注入する動画の自動再生停止と広告の非表示は有効になる() {
+        let settings = serde_json::json!({});
+        let default = GlobalSettingsData::default();
+        assert!(bool_flag(
+            &settings,
+            "videoAutoPlayStopEnabled",
+            default.video_auto_play_stop_enabled
+        ));
+        assert!(bool_flag(
+            &settings,
+            "hideAdEnabled",
+            default.hide_ad_enabled
+        ));
     }
 
     #[test]
