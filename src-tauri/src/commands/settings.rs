@@ -15,90 +15,87 @@ pub struct AccountData {
     pub x_user_id: Option<String>,
 }
 
-// ColumnSettings の #[serde(default)] はカラム設定 JSON にフィールドが存在しない場合のフォールバック値。
+// ColumnSettings は構造体レベルの #[serde(default)] により、キーが欠落しているフィールドは
+// すべて impl Default for ColumnSettings（このすぐ下）の値にフォールバックする。
+// フィールドごとの既定値の唯一の定義元は impl Default であり、#[serde(default = "...")] は使わない。
 // TypeScript 側の対応定義: src/types/index.ts の DEFAULT_COLUMN_SETTINGS
 // 値を変更するときは TypeScript 側も必ず合わせること。
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default)]
 pub struct ColumnSettings {
     #[serde(rename = "autoReloadEnabled")]
     pub auto_reload_enabled: bool,
     #[serde(rename = "autoReloadInterval")]
     pub auto_reload_interval: u32,
     #[serde(rename = "showCountdown")]
-    #[serde(default = "default_true")]
     pub show_countdown: bool,
     #[serde(rename = "hideHeaderEnabled")]
-    #[serde(default = "default_true")]
     pub hide_header_enabled: bool,
     #[serde(rename = "hideTweetInputEnabled")]
-    #[serde(default = "default_true")]
     pub hide_tweet_input_enabled: bool,
     #[serde(rename = "showCustomMenu")]
-    #[serde(default = "default_true")]
     pub show_custom_menu: bool,
     #[serde(rename = "customCSS")]
     pub custom_css: String,
     #[serde(rename = "scrollPosRestoreEnabled")]
-    #[serde(default = "default_true")]
     pub scroll_pos_restore_enabled: bool,
     #[serde(rename = "visibleLinks")]
-    #[serde(default)]
     pub visible_links: Vec<String>,
     #[serde(rename = "smallImageEnabled")]
-    #[serde(default)]
     pub small_image_enabled: bool,
     #[serde(rename = "smallImageWidth")]
-    #[serde(default = "default_small_image_width")]
     pub small_image_width: String,
     #[serde(rename = "blurImageEnabled")]
-    #[serde(default)]
     pub blur_image_enabled: bool,
     #[serde(rename = "blurImageAmount")]
-    #[serde(default = "default_blur_image_amount")]
     pub blur_image_amount: String,
     #[serde(rename = "ngWords")]
-    #[serde(default)]
     pub ng_words: Vec<String>,
     #[serde(rename = "repostHiddenUserIds")]
-    #[serde(default)]
     pub repost_hidden_user_ids: Vec<String>,
     #[serde(rename = "whitelistEnabled")]
-    #[serde(default)]
     pub whitelist_enabled: bool,
     #[serde(rename = "whitelistWords")]
-    #[serde(default)]
     pub whitelist_words: Vec<String>,
     #[serde(rename = "desktopNotifyEnabled")]
-    #[serde(default)]
     pub desktop_notify_enabled: bool,
 }
 
-// デシリアライズ時のデフォルト値ヘルパー関数。
-// TypeScript 側の対応定義: src/types/index.ts の DEFAULT_COLUMN_SETTINGS / DEFAULT_GLOBAL_SETTINGS
-// 値を変更するときは TypeScript 側の対応定数も必ず合わせること。
-fn default_true() -> bool {
-    true
+// ColumnSettings のデフォルト値（新規インストール時 / キー欠落時の唯一の定義元）。
+// TypeScript 側の対応定義: src/types/index.ts の DEFAULT_COLUMN_SETTINGS
+// 値を変更するときは TypeScript 側も必ず合わせること（契約テスト: contracts/default-settings.json の columnSettings）。
+impl Default for ColumnSettings {
+    fn default() -> Self {
+        Self {
+            auto_reload_enabled: true,
+            auto_reload_interval: 600,
+            show_countdown: true,
+            hide_header_enabled: true,
+            hide_tweet_input_enabled: true,
+            show_custom_menu: false,
+            custom_css: String::new(),
+            scroll_pos_restore_enabled: true,
+            visible_links: vec![],
+            small_image_enabled: false,
+            small_image_width: "50%".to_string(),
+            blur_image_enabled: false,
+            blur_image_amount: "10px".to_string(),
+            ng_words: vec![],
+            repost_hidden_user_ids: vec![],
+            whitelist_enabled: false,
+            whitelist_words: vec![],
+            desktop_notify_enabled: false,
+        }
+    }
 }
+
+// デシリアライズ時のデフォルト値ヘルパー関数。
+// ColumnData / GlobalSettingsData の一部フィールドで個別に参照する。
 fn default_height_mode() -> String {
     "auto".to_string()
 }
-fn default_auto_reload_interval() -> u32 {
-    600
-}
-fn default_small_image_width() -> String {
-    "50%".to_string()
-}
-fn default_blur_image_amount() -> String {
-    "10px".to_string()
-}
 fn default_column_scale() -> String {
     "default".to_string()
-}
-fn default_mobile_swipe_area_height() -> u32 {
-    28
-}
-fn default_mobile_swipe_area_opacity() -> u8 {
-    50
 }
 
 impl Default for WindowBounds {
@@ -207,7 +204,12 @@ pub struct ColumnPresetData {
     pub columns: Vec<ColumnData>,
 }
 
+// GlobalSettingsData は構造体レベルの #[serde(default)] により、キーが欠落しているフィールドは
+// すべて impl Default for GlobalSettingsData（このすぐ下）の値にフォールバックする。
+// フィールドごとの既定値の唯一の定義元は impl Default であり、#[serde(default = "...")] は使わない。
+// TypeScript 側の対応定義: src/types/index.ts の DEFAULT_GLOBAL_SETTINGS
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default)]
 pub struct GlobalSettingsData {
     pub theme: String,
     #[serde(rename = "customCSS")]
@@ -217,87 +219,59 @@ pub struct GlobalSettingsData {
     #[serde(rename = "defaultAccountId")]
     pub default_account_id: Option<String>,
     #[serde(rename = "defaultAutoReloadEnabled")]
-    #[serde(default = "default_true")]
     pub default_auto_reload_enabled: bool,
     #[serde(rename = "defaultAutoReloadInterval")]
-    #[serde(default = "default_auto_reload_interval")]
     pub default_auto_reload_interval: u32,
     #[serde(rename = "popupEscCloseEnabled")]
-    #[serde(default = "default_true")]
     pub popup_esc_close_enabled: bool,
     #[serde(rename = "videoAutoPlayStopEnabled")]
-    #[serde(default)]
     pub video_auto_play_stop_enabled: bool,
     #[serde(rename = "imagePopupEnabled")]
-    #[serde(default = "default_true")]
     pub image_popup_enabled: bool,
     #[serde(rename = "videoPopupEnabled")]
-    #[serde(default = "default_true")]
     pub video_popup_enabled: bool,
     #[serde(rename = "showSortButtons")]
-    #[serde(default = "default_true")]
     pub show_sort_buttons: bool,
     #[serde(rename = "defaultShowCountdown")]
-    #[serde(default = "default_true")]
     pub default_show_countdown: bool,
     #[serde(rename = "defaultHideHeaderEnabled")]
-    #[serde(default = "default_true")]
     pub default_hide_header_enabled: bool,
     #[serde(rename = "defaultHideTweetInputEnabled")]
-    #[serde(default = "default_true")]
     pub default_hide_tweet_input_enabled: bool,
     #[serde(rename = "defaultShowCustomMenu")]
-    #[serde(default)]
     pub default_show_custom_menu: bool,
     #[serde(rename = "defaultScrollPosRestoreEnabled")]
-    #[serde(default = "default_true")]
     pub default_scroll_pos_restore_enabled: bool,
     #[serde(rename = "defaultColumnCustomCSS")]
-    #[serde(default)]
     pub default_column_custom_css: String,
     #[serde(rename = "smallImageEnabled")]
-    #[serde(default)]
     pub small_image_enabled: bool,
     #[serde(rename = "smallImageWidth")]
-    #[serde(default = "default_small_image_width")]
     pub small_image_width: String,
     #[serde(rename = "blurImageEnabled")]
-    #[serde(default)]
     pub blur_image_enabled: bool,
     #[serde(rename = "blurImageAmount")]
-    #[serde(default = "default_blur_image_amount")]
     pub blur_image_amount: String,
     #[serde(rename = "hideAdEnabled")]
-    #[serde(default)]
     pub hide_ad_enabled: bool,
     #[serde(rename = "apiRateLimitMonitorEnabled")]
-    #[serde(default = "default_true")]
     pub api_rate_limit_monitor_enabled: bool,
     #[serde(rename = "columnScale")]
-    #[serde(default = "default_column_scale")]
     pub column_scale: String,
     #[serde(rename = "useXAppForCompose")]
-    #[serde(default)]
     pub use_x_app_for_compose: bool,
     #[serde(rename = "mobileSwipeAreaEnabled")]
-    #[serde(default = "default_true")]
     pub mobile_swipe_area_enabled: bool,
     #[serde(rename = "mobileSwipeAreaHeight")]
-    #[serde(default = "default_mobile_swipe_area_height")]
     pub mobile_swipe_area_height: u32,
     #[serde(rename = "mobileSwipeAreaOpacity")]
-    #[serde(default = "default_mobile_swipe_area_opacity")]
     pub mobile_swipe_area_opacity: u8,
     #[serde(rename = "mobileTwoColumnEnabled")]
-    #[serde(default = "default_true")]
     pub mobile_two_column_enabled: bool,
-    #[serde(default)]
     pub presets: Vec<ColumnPresetData>,
     #[serde(rename = "ngWords")]
-    #[serde(default)]
     pub ng_words: Vec<String>,
     #[serde(rename = "repostHiddenUserIds")]
-    #[serde(default)]
     pub repost_hidden_user_ids: Vec<String>,
 }
 

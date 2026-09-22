@@ -62,32 +62,48 @@ pub(crate) fn load_video_auto_play_stop_enabled(app: &AppHandle) -> bool {
     bool_flag(
         &load_global_settings(app),
         "videoAutoPlayStopEnabled",
-        false,
+        GlobalSettingsData::default().video_auto_play_stop_enabled,
     )
 }
 
 pub(crate) fn load_hide_ad_enabled(app: &AppHandle) -> bool {
-    bool_flag(&load_global_settings(app), "hideAdEnabled", false)
+    bool_flag(
+        &load_global_settings(app),
+        "hideAdEnabled",
+        GlobalSettingsData::default().hide_ad_enabled,
+    )
 }
 
 pub(crate) fn load_api_rate_limit_monitor_enabled(app: &AppHandle) -> bool {
     bool_flag(
         &load_global_settings(app),
         "apiRateLimitMonitorEnabled",
-        true,
+        GlobalSettingsData::default().api_rate_limit_monitor_enabled,
     )
 }
 
 pub(crate) fn load_popup_esc_close_enabled(app: &AppHandle) -> bool {
-    bool_flag(&load_global_settings(app), "popupEscCloseEnabled", true)
+    bool_flag(
+        &load_global_settings(app),
+        "popupEscCloseEnabled",
+        GlobalSettingsData::default().popup_esc_close_enabled,
+    )
 }
 
 pub(crate) fn load_image_popup_enabled(app: &AppHandle) -> bool {
-    bool_flag(&load_global_settings(app), "imagePopupEnabled", true)
+    bool_flag(
+        &load_global_settings(app),
+        "imagePopupEnabled",
+        GlobalSettingsData::default().image_popup_enabled,
+    )
 }
 
 pub(crate) fn load_video_popup_enabled(app: &AppHandle) -> bool {
-    bool_flag(&load_global_settings(app), "videoPopupEnabled", true)
+    bool_flag(
+        &load_global_settings(app),
+        "videoPopupEnabled",
+        GlobalSettingsData::default().video_popup_enabled,
+    )
 }
 
 pub(crate) fn load_global_ng_words(app: &AppHandle) -> Vec<String> {
@@ -100,7 +116,11 @@ pub(crate) fn load_global_repost_hidden_user_ids(app: &AppHandle) -> Vec<String>
 
 #[cfg(target_os = "android")]
 pub(crate) fn load_use_x_app_for_compose(app: &AppHandle) -> bool {
-    bool_flag(&load_global_settings(app), "useXAppForCompose", false)
+    bool_flag(
+        &load_global_settings(app),
+        "useXAppForCompose",
+        GlobalSettingsData::default().use_x_app_for_compose,
+    )
 }
 
 pub(crate) fn load_accounts_json(app: &AppHandle) -> String {
