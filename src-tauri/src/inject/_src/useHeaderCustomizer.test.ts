@@ -2,16 +2,49 @@
 // スタイル挿入制御を検証する。3つ目の useEffect（リンク抽出）は
 // window.__multiColumnXConfig?.visibleLinks に依存するのみで今回のスコープ外。
 import { renderHook, cleanup, waitFor } from "@testing-library/react";
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-// useHeaderCustomizerはDOM変化検知に共有DOM監視ハブ(window.__mcxDomObserver)を
-// 使うため、side effectとしてハブを初期化するimportが必要（dom_observer.test.ts参照）。
-import "./dom_observer";
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeAll,
+  beforeEach,
+  afterEach,
+  afterAll,
+} from "vitest";
 import {
   BOTTOM_BAR_NAVIGATION_SELECTOR,
   HEADER_HIDE_STYLE_ID,
   TWEET_INPUT_HIDE_STYLE_ID,
 } from "./headerCustomizerTypes";
 import { useHeaderCustomizer } from "./useHeaderCustomizer";
+
+// 共有DOM監視ハブ(dom_observer.ts)は自身の内部MutationObserverを明示的に
+// disconnectしない常駐前提の設計のため、ハブが作るMutationObserverを追跡し、
+// このファイルの全テスト終了後に確実にdisconnectする
+// （dom_observer.test.ts / mobile_area_hide.test.ts と同じ対策）。
+const createdObservers = new Set<MutationObserver>();
+const OriginalMutationObserver = globalThis.MutationObserver;
+
+class TrackingMutationObserver extends OriginalMutationObserver {
+  constructor(callback: MutationCallback) {
+    super(callback);
+    createdObservers.add(this);
+  }
+}
+vi.stubGlobal("MutationObserver", TrackingMutationObserver);
+
+// useHeaderCustomizerはDOM変化検知に共有DOM監視ハブ(window.__mcxDomObserver)を
+// 使うため、side effectとしてハブを初期化するimportが必要（dom_observer.test.ts参照）。
+// 上記のMutationObserverスタブが効いた状態で初期化するため動的importで行う。
+beforeAll(async () => {
+  await import("./dom_observer");
+});
+
+afterAll(() => {
+  createdObservers.forEach((observer) => observer.disconnect());
+  createdObservers.clear();
+});
 
 /**
  * role="navigation" を含む BottomBar 要素（下部固定ヘッダー表示時のnav）を作成して
