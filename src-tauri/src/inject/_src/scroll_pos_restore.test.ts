@@ -89,6 +89,33 @@ describe("inject/scroll_pos_restore", () => {
     }
   });
 
+  it("写真ページからpushStateで遷移した後にブラウザ操作(popstate)で戻ったときもスクロール位置を復元する", async () => {
+    const target = document.createElement("a");
+    target.setAttribute("role", "link");
+    target.setAttribute("href", "/bob/status/999/photo/2");
+    document.body.appendChild(target);
+    const scrollSpy = vi.mocked(target.scrollIntoView);
+    scrollSpy.mockClear();
+
+    // 写真ページへ pushState 遷移 → previousUrl は pushState フックのみで更新される
+    // （interval は動かしていないので、setInterval の周期に依存していないことを保証する）
+    history.pushState({}, "", "/bob/status/999/photo/2");
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(
+      "https://x.com/bob/status/999/photo/2",
+    );
+
+    // history.pushState/replaceState を経由しないブラウザの戻る操作（popstateのみ発火）を再現する
+    history.back();
+
+    await vi.waitFor(
+      () => {
+        expect(scrollSpy).toHaveBeenCalledTimes(1);
+      },
+      { timeout: 3000, interval: 20 },
+    );
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+
   it("復元対象の投稿がタイムライン上に見つからない場合は元のスクロール位置に戻す", () => {
     vi.useFakeTimers();
     const scrollToSpy = vi
