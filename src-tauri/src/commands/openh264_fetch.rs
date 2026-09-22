@@ -3,6 +3,8 @@
 //! Cisco の特許ロイヤリティ負担は「Ciscoの配布チャネルから直接ダウンロードする」
 //! 場合にのみ適用されるため、AppImageには同梱せずこの方式を採る。
 
+use crate::commands::arch_support::validate_arch;
+
 const OPENH264_VERSION: &str = "2.4.1";
 // x86_64 (amd64) 用の実測値。ダウンロードして一致確認済み。
 const OPENH264_SHA256_AMD64: &str =
@@ -85,6 +87,7 @@ pub(crate) fn validate_window_label(window_label: &str) -> Result<(), String> {
 #[tauri::command]
 pub async fn download_and_enable_h264(window: tauri::Window) -> Result<(), String> {
     validate_window_label(window.label())?;
+    validate_arch(std::env::consts::ARCH)?;
 
     let url = build_download_url(OPENH264_VERSION);
     let client = reqwest::Client::builder()
