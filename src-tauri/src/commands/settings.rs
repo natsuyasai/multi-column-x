@@ -150,6 +150,7 @@ impl Default for GlobalSettingsData {
             presets: vec![],
             ng_words: vec![],
             repost_hidden_user_ids: vec![],
+            pending_data_directory_deletions: vec![],
         }
     }
 }
@@ -299,6 +300,11 @@ pub struct GlobalSettingsData {
     #[serde(rename = "repostHiddenUserIds")]
     #[serde(default)]
     pub repost_hidden_user_ids: Vec<String>,
+    /// アカウント削除時にデータフォルダ削除へ失敗した保存先パスの再実行対象一覧。
+    /// アプリ設定画面から手動で再実行できる（詳細: docs/development ではなく本フィールド追加時の plan.md 参照）。
+    #[serde(rename = "pendingDataDirectoryDeletions")]
+    #[serde(default)]
+    pub pending_data_directory_deletions: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -370,7 +376,11 @@ fn migrate_area_remove_enabled(value: &mut serde_json::Value) {
 }
 
 #[tauri::command]
-pub async fn load_settings(app: AppHandle) -> Result<AppSettingsData, String> {
+pub async fn load_settings(
+    caller: tauri::Webview,
+    app: AppHandle,
+) -> Result<AppSettingsData, String> {
+    crate::commands::require_main_caller(&caller)?;
     let store = app.store("settings.json").map_err(|e| e.to_string())?;
 
     let settings = store
@@ -533,6 +543,51 @@ mod tests {
         });
         let settings: GlobalSettingsData = serde_json::from_value(json).unwrap();
         assert!(settings.repost_hidden_user_ids.is_empty());
+    }
+
+    /// アカウント削除時のデータフォルダ削除リトライ機能追加前に保存された旧 GlobalSettings JSON
+    /// （pendingDataDirectoryDeletions 欠落）をデシリアライズしてもエラーにならず、
+    /// 空配列にフォールバックすることを確認する。
+    #[test]
+    fn 旧バージョンの全体設定は削除保留フォルダが空として読み込まれる() {
+        let json = serde_json::json!({
+            "theme": "dark",
+            "customCSS": "",
+            "windowBounds": { "x": 0.0, "y": 0.0, "width": 1400.0, "height": 900.0 },
+            "defaultAccountId": null,
+        });
+        let settings: GlobalSettingsData = serde_json::from_value(json).unwrap();
+        assert!(settings.pending_data_directory_deletions.is_empty());
+    }
+
+    /// 削除保留フォルダは JSON のキー名 pendingDataDirectoryDeletions で読み書きでき、
+    /// 保存→読み込み（アプリ再起動相当）を経ても内容が保持される。
+    #[test]
+    fn 削除保留フォルダはjsonのキー名pendingdatadirectorydeletionsで読み書きできてラウンドトリップする(
+    ) {
+        let json = serde_json::json!({
+            "theme": "dark",
+            "customCSS": "",
+            "windowBounds": { "x": 0.0, "y": 0.0, "width": 1400.0, "height": 900.0 },
+            "defaultAccountId": null,
+            "pendingDataDirectoryDeletions": ["/data/accounts/account-a"],
+        });
+        let settings: GlobalSettingsData = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            settings.pending_data_directory_deletions,
+            vec!["/data/accounts/account-a".to_string()]
+        );
+        let value = serde_json::to_value(&settings).unwrap();
+        assert_eq!(
+            value["pendingDataDirectoryDeletions"],
+            serde_json::json!(["/data/accounts/account-a"])
+        );
+        // 保存→読み込みで保持される（アプリ再起動を想定したラウンドトリップ）
+        let restored: GlobalSettingsData = serde_json::from_value(value).unwrap();
+        assert_eq!(
+            restored.pending_data_directory_deletions,
+            settings.pending_data_directory_deletions
+        );
     }
 
     #[test]

@@ -4,7 +4,11 @@ use tauri::{AppHandle, Emitter, Manager, WebviewUrl};
 
 #[cfg(desktop)]
 #[tauri::command]
-pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
+pub async fn open_add_account_window(
+    caller: tauri::Webview,
+    app: AppHandle,
+) -> Result<String, String> {
+    crate::commands::require_main_caller(&caller)?;
     let account_id = uuid::Uuid::new_v4().to_string();
     let window_label = format!("{}{}", labels::ADD_ACCOUNT_PREFIX, &account_id[..8]);
 
@@ -63,7 +67,11 @@ pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
 
 #[cfg(mobile)]
 #[tauri::command]
-pub async fn open_add_account_window(app: AppHandle) -> Result<String, String> {
+pub async fn open_add_account_window(
+    caller: tauri::Webview,
+    app: AppHandle,
+) -> Result<String, String> {
+    crate::commands::require_main_caller(&caller)?;
     let account_id = uuid::Uuid::new_v4().to_string();
 
     let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
@@ -165,6 +173,16 @@ struct ReauthCompletePayload {
     new_data_directory: String,
 }
 
+/// 再認証ウィンドウのラベルを作る。アカウントIDの先頭8バイトを識別部分に使う。
+/// 8バイト未満、または8バイト目が文字境界でない場合はエラーを返す（panic = "abort" のためスライスで落とさない）。
+#[cfg(desktop)]
+fn reauth_window_label(account_id: &str) -> Result<String, String> {
+    let head = account_id
+        .get(..8)
+        .ok_or_else(|| "invalid account id".to_string())?;
+    Ok(format!("{}{}", labels::ADD_ACCOUNT_PREFIX, head))
+}
+
 /// 新規 UUID の空ディレクトリで x.com/login を開き、まっさらな新規ログインとして再認証する。
 /// 旧セッション（`data_directory` 引数）は再利用せず、ログイン完了（/home 到達）時に
 /// twid Cookie から数値ユーザーIDを読んで ACCOUNT_REAUTH_COMPLETE イベントを emit する。
@@ -173,14 +191,17 @@ struct ReauthCompletePayload {
 #[cfg(desktop)]
 #[tauri::command]
 pub async fn reauth_account_window(
+    caller: tauri::Webview,
     app: AppHandle,
     account_id: String,
     data_directory: String,
 ) -> Result<String, String> {
+    crate::commands::require_main_caller(&caller)?;
+
     // 旧セッションのディレクトリは新規ログインでは使わない（呼び出し元が引き続き渡すため引数は維持）。
     let _ = &data_directory;
 
-    let window_label = format!("{}{}", labels::ADD_ACCOUNT_PREFIX, &account_id[..8]);
+    let window_label = reauth_window_label(&account_id)?;
 
     let new_account_id = uuid::Uuid::new_v4().to_string();
     let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
@@ -268,11 +289,14 @@ pub async fn reauth_account_window(
 #[cfg(mobile)]
 #[tauri::command]
 pub async fn reauth_account_window(
+    caller: tauri::Webview,
     app: AppHandle,
     account_id: String,
     data_directory: String,
     expected_user_id: Option<String>,
 ) -> Result<String, String> {
+    crate::commands::require_main_caller(&caller)?;
+
     // mobile では Kotlin 側が accountId でプロファイル（WebView Profile）を特定するため未使用。
     let _ = &data_directory;
 
@@ -361,6 +385,39 @@ fn is_safe_account_dir(path: &Path, accounts_root: &Path) -> bool {
     path.starts_with(accounts_root) && path != accounts_root
 }
 
+/// データフォルダ削除のリトライ回数・間隔。
+/// Windows の WebView2 はカラム WebView を閉じた直後もブラウザプロセスがフォルダを
+/// 解放するまで短時間ロックを保持することがあるため、即失敗にせず数回リトライする。
+const DELETE_RETRY_MAX_ATTEMPTS: u32 = 5;
+const DELETE_RETRY_INTERVAL: std::time::Duration = std::time::Duration::from_millis(200);
+
+/// 与えられた非同期操作を最大 `attempts` 回試行する。
+/// 1回目で成功すれば即 Ok を返す。全て失敗した場合は最後のエラーを返す。
+/// 試行の間は `interval` だけ待機する（最後の試行後は待機しない）。
+async fn retry_with_delay<F, Fut, T, E>(
+    attempts: u32,
+    interval: std::time::Duration,
+    mut op: F,
+) -> Result<T, E>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<T, E>>,
+{
+    let mut last_err = None;
+    for attempt in 0..attempts.max(1) {
+        match op().await {
+            Ok(value) => return Ok(value),
+            Err(e) => {
+                last_err = Some(e);
+                if attempt + 1 < attempts {
+                    tokio::time::sleep(interval).await;
+                }
+            }
+        }
+    }
+    Err(last_err.expect("attempts.max(1) により最低1回は試行される"))
+}
+
 #[tauri::command]
 pub async fn delete_account_data(
     caller: tauri::Webview,
@@ -377,10 +434,14 @@ pub async fn delete_account_data(
     if !is_safe_account_dir(&path, &accounts_root) {
         return Err("invalid account data directory".to_string());
     }
-    if path.exists() {
-        std::fs::remove_dir_all(&path).map_err(|e| e.to_string())?;
-    }
-    Ok(())
+    retry_with_delay(DELETE_RETRY_MAX_ATTEMPTS, DELETE_RETRY_INTERVAL, || async {
+        if path.exists() {
+            std::fs::remove_dir_all(&path).map_err(|e| e.to_string())
+        } else {
+            Ok(())
+        }
+    })
+    .await
 }
 
 #[tauri::command]
@@ -515,6 +576,84 @@ mod tests {
         assert!(!is_safe_account_dir(root, root));
     }
 
+    #[tokio::test]
+    async fn 削除は二回失敗した後に成功すればokを返す() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        let calls = AtomicU32::new(0);
+        let result: Result<(), String> = retry_with_delay(
+            DELETE_RETRY_MAX_ATTEMPTS,
+            std::time::Duration::from_millis(0),
+            || {
+                let n = calls.fetch_add(1, Ordering::SeqCst);
+                async move {
+                    if n < 2 {
+                        Err("locked".to_string())
+                    } else {
+                        Ok(())
+                    }
+                }
+            },
+        )
+        .await;
+        assert!(result.is_ok());
+        assert_eq!(calls.load(Ordering::SeqCst), 3);
+    }
+
+    #[tokio::test]
+    async fn 全ての試行が失敗すれば最後のエラーを返す() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        let calls = AtomicU32::new(0);
+        let result: Result<(), String> = retry_with_delay(
+            DELETE_RETRY_MAX_ATTEMPTS,
+            std::time::Duration::from_millis(0),
+            || {
+                let n = calls.fetch_add(1, Ordering::SeqCst);
+                async move { Err(format!("locked-{n}")) }
+            },
+        )
+        .await;
+        assert_eq!(
+            result,
+            Err(format!("locked-{}", DELETE_RETRY_MAX_ATTEMPTS - 1))
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), DELETE_RETRY_MAX_ATTEMPTS);
+    }
+
+    #[tokio::test]
+    async fn 削除は初回で成功すれば一回しか試行しない() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        let calls = AtomicU32::new(0);
+        let result: Result<(), String> = retry_with_delay(
+            DELETE_RETRY_MAX_ATTEMPTS,
+            std::time::Duration::from_millis(0),
+            || {
+                calls.fetch_add(1, Ordering::SeqCst);
+                async move { Ok(()) }
+            },
+        )
+        .await;
+        assert!(result.is_ok());
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn 八文字以上のasciiのアカウントidは先頭八文字でラベルを作る() {
+        assert_eq!(
+            reauth_window_label("0123456789abcdef"),
+            Ok(format!("{}01234567", labels::ADD_ACCOUNT_PREFIX))
+        );
+    }
+
+    #[test]
+    fn 八バイト未満のアカウントidのときはエラーになる() {
+        assert!(reauth_window_label("abc").is_err());
+    }
+
+    #[test]
+    fn 八バイト目がマルチバイト文字の途中になるアカウントidのときはエラーになる() {
+        assert!(reauth_window_label("あいう").is_err());
+    }
+
     #[test]
     fn 再認証完了payloadはnewdatadirectoryをキャメルケースで含む() {
         let payload = ReauthCompletePayload {
@@ -548,6 +687,21 @@ mod tests {
                     !s.starts_with("u=") && !s.starts_with("u%3D") && !s.starts_with("u%3d")
                 );
                 prop_assert_eq!(parse_twid_user_id(&s), None);
+            }
+
+            /// 任意の文字列でラベル生成を呼んでもpanicしない（Result型で必ず返る）。
+            #[test]
+            fn 任意の文字列でもラベル生成はpanicしない(s in any::<String>()) {
+                let _ = reauth_window_label(&s);
+            }
+
+            /// 8バイト以上のASCII文字列なら常にOkになり、ラベルの末尾が先頭8文字と一致する。
+            #[test]
+            fn 八バイト以上のascii文字列は常に先頭八文字がラベル末尾になる(s in "[\x00-\x7f]{8,64}") {
+                let result = reauth_window_label(&s);
+                prop_assert!(result.is_ok());
+                let label = result.unwrap();
+                prop_assert_eq!(&label[label.len() - 8..], &s[..8]);
             }
         }
     }

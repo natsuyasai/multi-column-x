@@ -29,12 +29,11 @@ interface MultiColumnXConfig {
   visibleLinks: string[];
 }
 
-/** ポップアップ WebView に inject されるアカウント情報 */
+/** ポップアップ WebView に inject されるアカウント情報（ローカル保存先は含めない） */
 interface TvAccountInfo {
   id: string;
   label: string;
   color: string;
-  dataDirectory: string;
 }
 
 declare global {
