@@ -6,6 +6,9 @@
 ///
 /// OpenH264 バイナリの配布が linux64（x86_64）専用であるため、
 /// それ以外のアーキテクチャでは取得処理そのものを拒否する。
+/// 呼び出し元（`openh264_fetch`）が Linux desktop 限定でコンパイルされるため、
+/// それ以外の環境では未使用（dead_code）警告が出るのを抑止する。
+#[cfg_attr(not(all(desktop, target_os = "linux")), allow(dead_code))]
 pub(crate) fn validate_arch(arch: &str) -> Result<(), String> {
     if arch == "x86_64" {
         Ok(())
