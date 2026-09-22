@@ -14,7 +14,7 @@ pub(crate) fn validate_install_request(
     url: &str,
     expected_sha256: &str,
 ) -> Result<(), String> {
-    if window_label != "main" {
+    if window_label != crate::ipc_constants::labels::MAIN {
         return Err("install_apk_update is only allowed from the main window".into());
     }
     let rest = url
@@ -44,11 +44,11 @@ pub(crate) fn validate_install_request(
 /// （x.com を表示する column/popup WebView に IPC が付与されているため、任意 URL のインストールを防ぐ）。
 #[tauri::command]
 pub async fn install_apk_update(
-    window: tauri::Window,
+    caller: tauri::Webview,
     url: String,
     expected_sha256: String,
 ) -> Result<(), String> {
-    validate_install_request(window.label(), &url, &expected_sha256)?;
+    validate_install_request(caller.label(), &url, &expected_sha256)?;
     #[cfg(target_os = "android")]
     {
         return crate::android_bridge::download_and_install_apk(&url, &expected_sha256);

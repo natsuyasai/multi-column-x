@@ -71,7 +71,7 @@ fn invalidate_gstreamer_registry_cache() {
 /// main ウィンドウ以外からの呼び出しを拒否する（column/popup WebView は x.com を
 /// 表示しておりIPCが付与されているため、任意のダウンロードトリガーを防ぐ）。
 pub(crate) fn validate_window_label(window_label: &str) -> Result<(), String> {
-    if window_label != "main" {
+    if window_label != crate::ipc_constants::labels::MAIN {
         Err("download_and_enable_h264 is only allowed from the main window".into())
     } else {
         Ok(())
@@ -83,8 +83,8 @@ pub(crate) fn validate_window_label(window_label: &str) -> Result<(), String> {
 /// レジストリキャッシュを削除する（次回起動時の再スキャンを強制するため）。
 #[cfg(all(desktop, target_os = "linux"))]
 #[tauri::command]
-pub async fn download_and_enable_h264(window: tauri::Window) -> Result<(), String> {
-    validate_window_label(window.label())?;
+pub async fn download_and_enable_h264(caller: tauri::Webview) -> Result<(), String> {
+    validate_window_label(caller.label())?;
 
     let url = build_download_url(OPENH264_VERSION);
     let client = reqwest::Client::builder()
