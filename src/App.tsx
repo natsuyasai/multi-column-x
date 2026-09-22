@@ -77,6 +77,8 @@ const App: React.FC = () => {
     clearUnreadCount,
     setApiRateLimit,
     apiRateLimits,
+    settingsLoadNotice,
+    dismissSettingsLoadNotice,
   } = useAppStore();
   const {
     columns,
@@ -263,6 +265,7 @@ const App: React.FC = () => {
     !!pendingAccountName ||
     !!pendingRemoval ||
     !!reauthNotice ||
+    !!settingsLoadNotice ||
     apiRateLimitPopoverOpen;
 
   // モバイルスワイプバー（ネイティブオーバーレイ）の状態を Kotlin 側へ同期する。
@@ -705,6 +708,17 @@ const App: React.FC = () => {
           confirmLabel="OK"
           onConfirm={dismissReauthNotice}
           onCancel={dismissReauthNotice}
+        />
+      )}
+
+      {settingsLoadNotice && (
+        <ConfirmDialog
+          singleButton
+          title="設定の読み込みに失敗しました"
+          message={settingsLoadNotice}
+          confirmLabel="OK"
+          onConfirm={dismissSettingsLoadNotice}
+          onCancel={dismissSettingsLoadNotice}
         />
       )}
 
