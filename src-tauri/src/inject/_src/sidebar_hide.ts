@@ -60,13 +60,26 @@
     applyTimer = setTimeout(apply, 100);
   }
 
+  // 共有DOM監視ハブ(dom_observer.ts, window.__mcxDomObserver)経由でDOM変化を購読する。
+  // ハブは document.body を childList+subtree で監視し、MutationRecordの詳細に依存
+  // しないコールバック（毎回scheduleApply経由でapply()を再実行するだけ）を
+  // requestAnimationFrameで1フレームにまとめて配る。ハブが無い環境（単体テストや、
+  // 注入順序が変わった場合等）では、フォールバックとして従来と同じdocument.bodyの
+  // childList+subtree監視をこのファイル単独で行う。
+  function subscribeDomChanges(
+    callback: (mutations: MutationRecord[]) => void,
+  ): () => void {
+    if (window.__mcxDomObserver) {
+      return window.__mcxDomObserver.subscribe(callback);
+    }
+    const observer = new MutationObserver(callback);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }
+
   function setup(): void {
     apply();
-    // 共有DOM監視ハブ(dom_observer.ts)経由でDOM変化を検知する。ハブは
-    // document.body を childList+subtree で監視し、MutationRecordの詳細に
-    // 依存しないコールバック（毎回scheduleApply経由でapply()を再実行するだけ）
-    // のため移行対象。詳細は tmp/plans/2026-09-22-inject-observer-consolidation/plan.md 参照。
-    window.__mcxDomObserver?.subscribe(scheduleApply);
+    subscribeDomChanges(scheduleApply);
   }
 
   if (document.body) {

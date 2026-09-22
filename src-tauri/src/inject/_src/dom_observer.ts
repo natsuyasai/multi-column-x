@@ -2,8 +2,7 @@
 //
 // カラム WebView に注入される多数の inject スクリプトが、それぞれ独自に
 // document.body を { childList: true, subtree: true } で監視する MutationObserver を
-// 持っており、X の DOM 変化のたびに全部が同期的に走っていた（詳細は
-// tmp/plans/2026-09-22-inject-observer-consolidation/plan.md 参照）。
+// 持っており、X の DOM 変化のたびに全部が同期的に走っていた。
 //
 // このファイルは「document.body の childList+subtree 監視だけで済み、コールバックが
 // MutationRecord の詳細に依存しない（毎回 DOM を再スキャンするだけ）」スクリプトのために、
@@ -12,8 +11,14 @@
 // されるため、非表示処理等がちらつかない）。
 //
 // 移行しないスクリプト（attributes監視・document.body以外を監視・addedNodesを個別処理・
-// 自身のobserverをdisconnect/reconnectする等）は、このハブを使わず従来どおり独自の
-// MutationObserver を保持し続ける。分類の詳細は同plan.md / progress.md 参照。
+// 自身のobserverをdisconnect/reconnectする等、MutationRecordの詳細やタイミングに依存する
+// もの）は、このハブを使わず従来どおり独自の MutationObserver を保持し続ける。
+//
+// このハブは build_init_script / build_popup_init_script の両方で他のどのスクリプトより
+// 先に連結されるため、購読側は基本的に window.__mcxDomObserver が存在する前提で書ける。
+// ただし単体テストや将来の注入順序変更でハブが無い場合に備え、購読側は
+// window.__mcxDomObserver が無いときローカルの MutationObserver（同じ
+// document.body の childList+subtree 監視）にフォールバックする実装にすること。
 (function () {
   // 多重注入に備えて冪等にする。既にハブが存在する場合は何もしない。
   if (window.__mcxDomObserver) return;

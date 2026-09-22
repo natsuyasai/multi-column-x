@@ -215,3 +215,33 @@ describe("inject/sidebar_hide のapply", () => {
     });
   });
 });
+
+describe("inject/sidebar_hide の共有ハブ非存在時のフォールバック", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  afterEach(() => {
+    createdObservers.forEach((observer) => observer.disconnect());
+    createdObservers.clear();
+  });
+
+  it("window.__mcxDomObserverが存在しない場合でも、ローカルのMutationObserverでDOM変化に追従する", async () => {
+    const sidebar = addSidebar();
+    addPrimary();
+
+    // 共有ハブ(dom_observer.ts)をimportせずに、ハブ不在の状態を再現する
+    vi.resetModules();
+    delete (window as unknown as { __mcxDomObserver?: unknown })
+      .__mcxDomObserver;
+    await import("./sidebar_hide");
+    expect(sidebar.style.display).toBe("none");
+
+    sidebar.style.display = "";
+    document.body.appendChild(document.createElement("div"));
+
+    await vi.waitFor(() => {
+      expect(sidebar.style.display).toBe("none");
+    });
+  });
+});

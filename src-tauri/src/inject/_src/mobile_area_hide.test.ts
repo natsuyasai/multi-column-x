@@ -301,3 +301,36 @@ describe("inject/mobile_area_hide のapplyLayersHide", () => {
     expect(typeof window.__multiColumnX.applyLayersHide).toBe("function");
   });
 });
+
+describe("inject/mobile_area_hide の共有ハブ非存在時のフォールバック", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  afterEach(() => {
+    createdObservers.forEach((observer) => observer.disconnect());
+    createdObservers.clear();
+  });
+
+  it("window.__mcxDomObserverが存在しない場合でも、ローカルのMutationObserverでDOM変化に追従する", async () => {
+    const header = addHeader();
+    const tablist = addTablist(40);
+
+    // 共有ハブ(dom_observer.ts)をimportせずに、ハブ不在の状態を再現する
+    vi.resetModules();
+    delete (window as unknown as { __mcxDomObserver?: unknown })
+      .__mcxDomObserver;
+    await import("./mobile_area_hide");
+    expect(header.style.height).toBe("40px");
+
+    Object.defineProperty(tablist, "offsetHeight", {
+      value: 60,
+      configurable: true,
+    });
+    document.body.appendChild(document.createElement("div"));
+
+    await vi.waitFor(() => {
+      expect(header.style.height).toBe("60px");
+    });
+  });
+});
