@@ -135,16 +135,13 @@ export function useDesktopColumns({
   // Linux: カラム WebView は独立したウィンドウのため、メインウィンドウ移動時に位置を再計算する
   useEffect(() => {
     if (isMobile || platform() !== "linux") return;
-    let unlisten: (() => void) | undefined;
-    getCurrentWindow()
-      .onMoved(() => {
-        recalculateAllBounds();
-      })
-      .then((fn) => {
-        unlisten = fn;
-      });
+    const unlistenPromise = getCurrentWindow().onMoved(() => {
+      recalculateAllBounds();
+    });
     return () => {
-      unlisten?.();
+      void unlistenPromise
+        .then((fn) => fn())
+        .catch(logError("useDesktopColumns:onMoved"));
     };
   }, [isMobile, recalculateAllBounds]);
 

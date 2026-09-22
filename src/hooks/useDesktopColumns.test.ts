@@ -381,6 +381,10 @@ describe("useDesktopColumns（Linux: メインウィンドウ移動監視）", (
     });
 
     unmount();
+    // cleanup 内の unlistenPromise.then(...) はマイクロタスクなので1tick待つ
+    await act(async () => {
+      await Promise.resolve();
+    });
 
     expect(unlistenFn).toHaveBeenCalledTimes(1);
   });
