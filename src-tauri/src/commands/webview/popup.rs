@@ -9,6 +9,8 @@ use crate::state::AppState;
 #[cfg(target_os = "android")]
 use crate::state::ComposeSession;
 #[cfg(not(target_os = "android"))]
+use crate::state::WebviewRegistry;
+#[cfg(not(target_os = "android"))]
 use std::path::PathBuf;
 #[cfg(not(target_os = "android"))]
 use std::time::Duration;
@@ -90,6 +92,56 @@ pub(super) fn build_popup_init(
             esc_close_enabled,
         ),
     }
+}
+
+/// caller のラベルから registry を引いて (data_dir, account_id) を返す（純粋関数）。
+/// open_popup_window / open_link_popup_window で、送信元 WebView 自身の
+/// セッションだけを解決できるようにする（他カラムを名乗ることを構造的に防ぐ）。
+/// 未登録の caller には空文字列・空パスを返す（既存コマンドの挙動を維持）。
+#[cfg(not(target_os = "android"))]
+pub(super) fn popup_session_for_caller(
+    registry: &WebviewRegistry,
+    caller_label: &str,
+) -> (PathBuf, String) {
+    let data_dir = registry
+        .get_data_directory(caller_label)
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(""));
+    let account_id = registry
+        .get_account_id(caller_label)
+        .unwrap_or("")
+        .to_string();
+    (data_dir, account_id)
+}
+
+/// open_link_popup_window でセッションに使うアカウントの決め方（純粋関数）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum LinkPopupAccountSource<'a> {
+    /// 呼び出し元が指定した accountId をそのまま使う。
+    Explicit(&'a str),
+    /// 送信元ラベル（caller.label()）から registry で解決する。
+    FromCaller(&'a str),
+}
+
+/// main（メインウィンドウ）からの呼び出しで accountId 指定があればそれを使い、
+/// それ以外（カラム等のリモートコンテンツ）からの呼び出しでは指定を無視し送信元ラベルから
+/// 解決する。これにより、カラム側が任意の accountId を騙って他アカウントのセッションで
+/// ポップアップを開くことを構造的に防ぐ。
+pub(super) fn link_popup_account_source<'a>(
+    caller_label: &'a str,
+    account_id: Option<&'a str>,
+) -> LinkPopupAccountSource<'a> {
+    match account_id {
+        Some(aid) if caller_label == labels::MAIN => LinkPopupAccountSource::Explicit(aid),
+        _ => LinkPopupAccountSource::FromCaller(caller_label),
+    }
+}
+
+/// switch_popup_session の呼び出し元ラベルが popup/compose のいずれかであることを検証する
+/// （純粋関数）。caller.label() を直接対象ラベルとして使うことで、他ウィンドウのラベルを
+/// 騙ってセッション切替対象を差し替えることを構造的に防ぐ。
+fn is_switchable_popup_caller_label(label: &str) -> bool {
+    label.starts_with(labels::POPUP_PREFIX) || label.starts_with(labels::COMPOSE_PREFIX)
 }
 
 const OFFICIAL_SETTINGS_URL_PREFIX: &str = "https://x.com/settings";
@@ -179,22 +231,14 @@ pub fn handle_popup_closed(app: &AppHandle, label: &str) {
 #[cfg(desktop)]
 #[tauri::command]
 pub async fn open_popup_window(
+    caller: tauri::Webview,
     app: AppHandle,
-    webview_label_caller: String,
     url: String,
 ) -> Result<(), String> {
     let state = app.state::<AppState>();
     let (data_dir, current_account_id) = {
         let registry = state.registry.lock().expect("registry mutex poisoned");
-        let data_dir = registry
-            .get_data_directory(&webview_label_caller)
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from(""));
-        let account_id = registry
-            .get_account_id(&webview_label_caller)
-            .unwrap_or("")
-            .to_string();
-        (data_dir, account_id)
+        popup_session_for_caller(&registry, caller.label())
     };
 
     let PopupInit {
@@ -218,15 +262,15 @@ pub async fn open_popup_window(
 #[cfg(mobile)]
 #[tauri::command]
 pub async fn open_popup_window(
+    caller: tauri::Webview,
     app: AppHandle,
-    webview_label_caller: String,
     url: String,
 ) -> Result<(), String> {
     let state = app.state::<AppState>();
     let current_account_id = {
         let registry = state.registry.lock().expect("registry mutex poisoned");
         registry
-            .get_account_id(&webview_label_caller)
+            .get_account_id(caller.label())
             .unwrap_or("")
             .to_string()
     };
@@ -252,7 +296,7 @@ pub async fn open_popup_window(
         let data_dir = {
             let registry = state.registry.lock().expect("registry mutex poisoned");
             registry
-                .get_data_directory(&webview_label_caller)
+                .get_data_directory(caller.label())
                 .map(PathBuf::from)
                 .unwrap_or_default()
         };
@@ -272,25 +316,23 @@ pub async fn open_popup_window(
 #[cfg(desktop)]
 #[tauri::command]
 pub async fn open_link_popup_window(
+    caller: tauri::Webview,
     app: AppHandle,
-    webview_label_caller: Option<String>,
     #[allow(non_snake_case)] accountId: Option<String>,
     url: String,
 ) -> Result<(), String> {
-    let (data_dir, current_account_id) = if let Some(aid) = accountId {
-        let dd = resolve_account_data_directory(&app, &aid)?;
-        (PathBuf::from(dd), aid)
-    } else {
-        let label = webview_label_caller.unwrap_or_default();
-        let state = app.state::<AppState>();
-        let registry = state.registry.lock().expect("registry mutex poisoned");
-        let dd = registry
-            .get_data_directory(&label)
-            .map(PathBuf::from)
-            .unwrap_or_default();
-        let aid = registry.get_account_id(&label).unwrap_or("").to_string();
-        (dd, aid)
-    };
+    let (data_dir, current_account_id) =
+        match link_popup_account_source(caller.label(), accountId.as_deref()) {
+            LinkPopupAccountSource::Explicit(aid) => {
+                let dd = resolve_account_data_directory(&app, aid)?;
+                (PathBuf::from(dd), aid.to_string())
+            }
+            LinkPopupAccountSource::FromCaller(label) => {
+                let state = app.state::<AppState>();
+                let registry = state.registry.lock().expect("registry mutex poisoned");
+                popup_session_for_caller(&registry, label)
+            }
+        };
 
     let PopupInit {
         label: popup_label,
@@ -319,18 +361,19 @@ pub async fn open_link_popup_window(
 #[cfg(mobile)]
 #[tauri::command]
 pub async fn open_link_popup_window(
+    caller: tauri::Webview,
     app: AppHandle,
-    webview_label_caller: Option<String>,
     #[allow(non_snake_case)] accountId: Option<String>,
     url: String,
 ) -> Result<(), String> {
-    let current_account_id = if let Some(aid) = &accountId {
-        aid.clone()
-    } else {
-        let label = webview_label_caller.clone().unwrap_or_default();
-        let state = app.state::<AppState>();
-        let registry = state.registry.lock().expect("registry mutex poisoned");
-        registry.get_account_id(&label).unwrap_or("").to_string()
+    let caller_label = caller.label();
+    let current_account_id = match link_popup_account_source(caller_label, accountId.as_deref()) {
+        LinkPopupAccountSource::Explicit(aid) => aid.to_string(),
+        LinkPopupAccountSource::FromCaller(label) => {
+            let state = app.state::<AppState>();
+            let registry = state.registry.lock().expect("registry mutex poisoned");
+            registry.get_account_id(label).unwrap_or("").to_string()
+        }
     };
 
     let PopupInit {
@@ -352,16 +395,15 @@ pub async fn open_link_popup_window(
 
     #[cfg(not(target_os = "android"))]
     {
-        let data_dir = if let Some(aid) = &accountId {
-            PathBuf::from(resolve_account_data_directory(&app, aid)?)
-        } else {
-            let label = webview_label_caller.unwrap_or_default();
-            let state = app.state::<AppState>();
-            let registry = state.registry.lock().expect("registry mutex poisoned");
-            registry
-                .get_data_directory(&label)
-                .map(PathBuf::from)
-                .unwrap_or_default()
+        let data_dir = match link_popup_account_source(caller_label, accountId.as_deref()) {
+            LinkPopupAccountSource::Explicit(aid) => {
+                PathBuf::from(resolve_account_data_directory(&app, aid)?)
+            }
+            LinkPopupAccountSource::FromCaller(label) => {
+                let state = app.state::<AppState>();
+                let registry = state.registry.lock().expect("registry mutex poisoned");
+                popup_session_for_caller(&registry, label).0
+            }
         };
         tauri::WebviewWindowBuilder::new(
             &app,
@@ -428,18 +470,23 @@ pub fn switch_popup_session_android(
 
 #[tauri::command]
 pub async fn switch_popup_session(
+    caller: tauri::Webview,
     app: AppHandle,
-    #[allow(non_snake_case)] popupLabel: String,
     #[allow(non_snake_case)] accountId: String,
     url: String,
 ) -> Result<(), String> {
+    let popup_label = caller.label().to_string();
+    if !is_switchable_popup_caller_label(&popup_label) {
+        return Err("forbidden: caller must be a popup or compose webview".to_string());
+    }
+
     #[cfg(target_os = "android")]
     {
-        return switch_popup_session_android(&app, &popupLabel, &accountId, &url);
+        return switch_popup_session_android(&app, &popup_label, &accountId, &url);
     }
 
     #[cfg(not(target_os = "android"))]
-    switch_popup_session_window(app, popupLabel, accountId, url).await
+    switch_popup_session_window(app, popup_label, accountId, url).await
 }
 
 /// popup ラベルが常駐コンポーズ用ラベル（`COMPOSE_PREFIX`）かどうかを判定する。
@@ -686,6 +733,81 @@ mod authorize_close_popup_tests {
 #[cfg(all(test, desktop))]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
+
+    fn new_registry_for_caller_test() -> WebviewRegistry {
+        WebviewRegistry {
+            entries: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn popup_session_for_callerは送信元カラムのアカウントとデータディレクトリを返す() {
+        let mut registry = new_registry_for_caller_test();
+        registry.register(
+            "column-a".to_string(),
+            "col-a".to_string(),
+            "account-a".to_string(),
+            "/data/a".to_string(),
+        );
+        registry.register(
+            "column-b".to_string(),
+            "col-b".to_string(),
+            "account-b".to_string(),
+            "/data/b".to_string(),
+        );
+        // 送信元(caller.label())が column-a であれば、column-b のセッションを
+        // 名乗ることはできず、常に送信元自身のセッションが解決される。
+        let (data_dir, account_id) = popup_session_for_caller(&registry, "column-a");
+        assert_eq!(account_id, "account-a");
+        assert_eq!(data_dir, PathBuf::from("/data/a"));
+    }
+
+    #[test]
+    fn popup_session_for_callerは未登録の送信元には空文字列を返す() {
+        let registry = new_registry_for_caller_test();
+        let (data_dir, account_id) = popup_session_for_caller(&registry, "column-unknown");
+        assert_eq!(account_id, "");
+        assert_eq!(data_dir, PathBuf::from(""));
+    }
+
+    #[test]
+    fn mainからのリンクポップアップは指定されたアカウントを使う() {
+        let result = link_popup_account_source(labels::MAIN, Some("account-1"));
+        assert_eq!(result, LinkPopupAccountSource::Explicit("account-1"));
+    }
+
+    #[test]
+    fn main以外からのリンクポップアップは指定されたアカウントを無視し送信元から解決する() {
+        let result = link_popup_account_source("column-a", Some("account-spoofed"));
+        assert_eq!(result, LinkPopupAccountSource::FromCaller("column-a"));
+    }
+
+    #[test]
+    fn mainからのリンクポップアップでアカウント指定がなければ送信元から解決する() {
+        let result = link_popup_account_source(labels::MAIN, None);
+        assert_eq!(result, LinkPopupAccountSource::FromCaller(labels::MAIN));
+    }
+
+    #[test]
+    fn is_switchable_popup_caller_labelはpopup接頭辞でtrueを返す() {
+        assert!(is_switchable_popup_caller_label("popup-abc123"));
+    }
+
+    #[test]
+    fn is_switchable_popup_caller_labelはcompose接頭辞でtrueを返す() {
+        assert!(is_switchable_popup_caller_label("compose-abc123"));
+    }
+
+    #[test]
+    fn is_switchable_popup_caller_labelはmainラベルでfalseを返す() {
+        assert!(!is_switchable_popup_caller_label(labels::MAIN));
+    }
+
+    #[test]
+    fn is_switchable_popup_caller_labelはcolumn接頭辞でfalseを返す() {
+        assert!(!is_switchable_popup_caller_label("column-abc123"));
+    }
 
     #[test]
     fn padded_popup_bounds_はメイン位置から50px内側に配置する() {

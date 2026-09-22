@@ -247,10 +247,9 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
       );
       return;
     }
-    const popupLabel =
-      window.__TAURI_INTERNALS__?.metadata?.currentWebview?.label ?? "";
+    // popupLabel は渡さない。実際の送信元 WebView（呼び出し元）は Rust 側が
+    // caller.label() で判定するため、JS が自己申告する必要も権限も無い。
     tauriInvoke(SWITCH_POPUP_SESSION, {
-      popupLabel,
       accountId: selectedAccount.id,
       url: window.location.href,
     });

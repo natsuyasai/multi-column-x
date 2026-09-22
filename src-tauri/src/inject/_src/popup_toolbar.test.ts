@@ -115,7 +115,6 @@ describe("inject/popup_toolbar のアカウント切替", () => {
     selectAccount("acc2");
 
     expect(tauriInvokeMock).toHaveBeenCalledWith("switch_popup_session", {
-      popupLabel: "",
       accountId: "acc2",
       url: window.location.href,
     });
