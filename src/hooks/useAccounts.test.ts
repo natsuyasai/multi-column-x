@@ -376,6 +376,41 @@ describe("useAccounts (desktop reauth)", () => {
     );
   });
 
+  it("再認証完了時の新しい保存先は再認証の開始結果から採用する", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+    });
+    const dataDirectoryFromStartResult = "/data/accounts/from-start-result";
+    const dataDirectoryFromEventPayload = "/data/accounts/from-event-payload";
+    const startResult = JSON.stringify({
+      accountId: "acc-1",
+      windowLabel: "reauth-acc-1",
+      newDataDirectory: dataDirectoryFromStartResult,
+    });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "reauth_account_window" ? startResult : undefined,
+    );
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: "123",
+        newDataDirectory: dataDirectoryFromEventPayload,
+      });
+      await reauthPromise;
+    });
+
+    expect(useAppStore.getState().accounts[0].dataDirectory).toBe(
+      dataDirectoryFromStartResult,
+    );
+  });
+
   it("初回(skip)の場合、xUserIdとdataDirectoryが記録され旧dirが削除されreloadAllWebviewsが呼ばれスキップ通知がセットされる", async () => {
     useAppStore.setState({
       accounts: [makeReauthAccount()],
