@@ -25,9 +25,6 @@ export const IPC_COMMANDS = {
   // コンポーズ
   OPEN_COMPOSE_WINDOW: "open_compose_window",
 
-  // ブラウザ
-  OPEN_IN_BROWSER: "open_in_browser",
-
   // アカウント管理
   OPEN_ADD_ACCOUNT_WINDOW: "open_add_account_window",
   REAUTH_ACCOUNT_WINDOW: "reauth_account_window",

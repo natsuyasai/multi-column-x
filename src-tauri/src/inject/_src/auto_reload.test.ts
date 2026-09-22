@@ -352,7 +352,6 @@ describe("inject/auto_reload", () => {
     await vi.runAllTimersAsync();
 
     expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
-      label: "column-1",
       count: 1,
     });
     expect(clickSpy).toHaveBeenCalledTimes(1);
@@ -391,7 +390,6 @@ describe("inject/auto_reload", () => {
     await vi.runAllTimersAsync();
 
     expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
-      label: "column-1",
       count: 1,
     });
     expect(clickSpy).toHaveBeenCalledTimes(1);
@@ -430,7 +428,6 @@ describe("inject/auto_reload", () => {
     await vi.runAllTimersAsync();
 
     expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
-      label: "column-1",
       count: 1,
     });
   });
@@ -478,7 +475,6 @@ describe("inject/auto_reload", () => {
     await vi.runAllTimersAsync();
 
     expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
-      label: "column-1",
       count: 1,
     });
   });
@@ -515,7 +511,6 @@ describe("inject/auto_reload", () => {
     await vi.runAllTimersAsync();
 
     expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
-      label: "column-1",
       count: 1,
     });
   });
@@ -577,7 +572,6 @@ describe("inject/auto_reload の新着判定（見たことのある最新との
     await vi.runAllTimersAsync();
 
     expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
-      label: "column-1",
       count: 1,
     });
   });
@@ -629,7 +623,6 @@ describe("inject/auto_reload の新着判定（見たことのある最新との
   function expectReportedOnce(): void {
     expect(invokeMock).toHaveBeenCalledTimes(1);
     expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
-      label: "column-1",
       count: 1,
     });
   }
@@ -904,7 +897,6 @@ async function setUpAutoReloadPage(): Promise<void> {
 function expectReportedNewPostOnce(): void {
   expect(invokeMock).toHaveBeenCalledTimes(1);
   expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
-    label: "column-1",
     count: 1,
   });
 }

@@ -145,9 +145,11 @@ fn is_safe_column_id(column_id: &str) -> bool {
 /// パス区切り文字・親ディレクトリ参照を含む値は拒否する。
 #[tauri::command]
 pub async fn get_external_column_data_directory(
+    caller: tauri::Webview,
     app: AppHandle,
     column_id: String,
 ) -> Result<String, String> {
+    crate::commands::require_main_caller(&caller)?;
     if !is_safe_column_id(&column_id) {
         return Err("invalid column id".to_string());
     }
@@ -161,7 +163,12 @@ pub async fn get_external_column_data_directory(
 
 #[cfg(desktop)]
 #[tauri::command]
-pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> Result<(), String> {
+pub async fn create_column_webview(
+    caller: tauri::Webview,
+    app: AppHandle,
+    args: CreateWebviewArgs,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let url = resolve_url(&args.column);
     let label = webview_label(&args.column.id);
     let data_dir = PathBuf::from(&args.data_directory);
@@ -273,7 +280,12 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
 
 #[cfg(mobile)]
 #[tauri::command]
-pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> Result<(), String> {
+pub async fn create_column_webview(
+    caller: tauri::Webview,
+    app: AppHandle,
+    args: CreateWebviewArgs,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let url = resolve_url(&args.column);
     let label = webview_label(&args.column.id);
 
@@ -311,7 +323,12 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
 
 #[cfg(desktop)]
 #[tauri::command]
-pub async fn remove_column_webview(app: AppHandle, column_id: String) -> Result<(), String> {
+pub async fn remove_column_webview(
+    caller: tauri::Webview,
+    app: AppHandle,
+    column_id: String,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let label = webview_label(&column_id);
 
     // On Linux, column WebViews are WebviewWindows; on other platforms they are child Webviews.
@@ -330,7 +347,12 @@ pub async fn remove_column_webview(app: AppHandle, column_id: String) -> Result<
 
 #[cfg(mobile)]
 #[tauri::command]
-pub async fn remove_column_webview(app: AppHandle, column_id: String) -> Result<(), String> {
+pub async fn remove_column_webview(
+    caller: tauri::Webview,
+    app: AppHandle,
+    column_id: String,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let label = webview_label(&column_id);
 
     #[cfg(target_os = "android")]
@@ -357,7 +379,12 @@ pub struct ResizeBounds {
 
 #[cfg(desktop)]
 #[tauri::command]
-pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Result<(), String> {
+pub async fn resize_column_webview(
+    caller: tauri::Webview,
+    app: AppHandle,
+    bounds: ResizeBounds,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let label = webview_label(&bounds.column_id);
 
     // On Linux, column WebViews are undecorated WebviewWindows. Reposition by computing
@@ -415,7 +442,12 @@ pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Resu
 
 #[cfg(mobile)]
 #[tauri::command]
-pub async fn resize_column_webview(_app: AppHandle, bounds: ResizeBounds) -> Result<(), String> {
+pub async fn resize_column_webview(
+    caller: tauri::Webview,
+    _app: AppHandle,
+    bounds: ResizeBounds,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let label = webview_label(&bounds.column_id);
 
     #[cfg(target_os = "android")]
@@ -441,8 +473,10 @@ pub async fn resize_column_webview(_app: AppHandle, bounds: ResizeBounds) -> Res
 /// setActiveColumn から resize_column_webview より先に呼ばれ、正しいアカウントで WebView が動作する。
 #[tauri::command]
 pub async fn set_column_cookies(
+    caller: tauri::Webview,
     #[allow(non_snake_case, unused_variables)] accountId: String,
 ) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     #[cfg(target_os = "android")]
     {
         crate::android_bridge::set_account_cookies(&accountId)?;

@@ -29,10 +29,11 @@ interface ReauthWindowResult {
 }
 
 // desktop 再認証: ACCOUNT_REAUTH_COMPLETE イベントの payload
+// newDataDirectory はリモート(x.com)から偽装されうるイベント経由の値のため使用しない。
+// 保存先は reauth_account_window の戻り値（ReauthWindowResult.newDataDirectory）を採用する。
 interface ReauthEventPayload {
   accountId: string;
   xUserId: string | null;
-  newDataDirectory: string;
 }
 
 function parseReauthWindowResult(raw: string): ReauthWindowResult {
@@ -295,7 +296,7 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
 
         await new Promise<void>((resolve, reject) => {
           let settled = false;
-          let newDataDirectory = initialNewDataDirectory;
+          const newDataDirectory = initialNewDataDirectory;
           let unlistenComplete: (() => void) | null = null;
           let unlistenDestroyed: (() => void) | null = null;
 
@@ -366,7 +367,6 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
             (event) => {
               if (settled || event.payload.accountId !== accountId) return;
               settled = true;
-              newDataDirectory = event.payload.newDataDirectory;
               cleanup();
               void handleComplete(event.payload.xUserId);
             },
