@@ -49,6 +49,7 @@ const baseGlobalSettings: GlobalSettings = {
   presets: [],
   ngWords: [],
   repostHiddenUserIds: [],
+  pendingDataDirectoryDeletions: [],
 };
 
 const baseSettings = {

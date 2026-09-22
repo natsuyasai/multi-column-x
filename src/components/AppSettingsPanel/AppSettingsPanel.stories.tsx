@@ -57,6 +57,7 @@ const globalSettings: GlobalSettings = {
   presets: [],
   ngWords: [],
   repostHiddenUserIds: [],
+  pendingDataDirectoryDeletions: [],
 };
 
 const accounts: Account[] = [

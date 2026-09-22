@@ -47,6 +47,7 @@ const mockGlobalSettings: GlobalSettings = {
   presets: [],
   ngWords: [],
   repostHiddenUserIds: [],
+  pendingDataDirectoryDeletions: [],
 };
 
 describe("AddColumnDialog", () => {

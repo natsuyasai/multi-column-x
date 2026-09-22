@@ -180,6 +180,7 @@ describe("useColumns mobile", () => {
         presets: [],
         ngWords: [],
         repostHiddenUserIds: [],
+        pendingDataDirectoryDeletions: [],
       },
       isLoaded: true,
       isMobile: true,

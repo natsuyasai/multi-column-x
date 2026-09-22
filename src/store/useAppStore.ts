@@ -65,6 +65,9 @@ interface AppStore {
   removeAccount: (id: string) => void;
   addColumn: (column: Column) => void;
   removeColumn: (id: string) => void;
+  removeColumnsByAccount: (accountId: string) => void;
+  addPendingDataDirectoryDeletion: (dir: string) => void;
+  setPendingDataDirectoryDeletions: (dirs: string[]) => void;
   updateColumn: (id: string, patch: Partial<Column>) => void;
   updateGlobalSettings: (patch: Partial<GlobalSettings>) => void;
   replaceColumns: (columns: Column[]) => void;
@@ -157,6 +160,41 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   removeColumn: (id) => {
     set((state) => ({ columns: state.columns.filter((c) => c.id !== id) }));
+    get().saveSettings();
+  },
+
+  removeColumnsByAccount: (accountId) => {
+    set((state) => ({
+      columns: state.columns.filter((c) => c.accountId !== accountId),
+    }));
+    get().saveSettings();
+  },
+
+  addPendingDataDirectoryDeletion: (dir) => {
+    set((state) => {
+      if (state.globalSettings.pendingDataDirectoryDeletions.includes(dir)) {
+        return state;
+      }
+      return {
+        globalSettings: {
+          ...state.globalSettings,
+          pendingDataDirectoryDeletions: [
+            ...state.globalSettings.pendingDataDirectoryDeletions,
+            dir,
+          ],
+        },
+      };
+    });
+    get().saveSettings();
+  },
+
+  setPendingDataDirectoryDeletions: (dirs) => {
+    set((state) => ({
+      globalSettings: {
+        ...state.globalSettings,
+        pendingDataDirectoryDeletions: dirs,
+      },
+    }));
     get().saveSettings();
   },
 
