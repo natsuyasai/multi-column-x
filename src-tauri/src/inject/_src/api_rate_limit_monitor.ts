@@ -96,6 +96,16 @@ interface McxXhr extends XMLHttpRequest {
 
   if (!isMonitorEnabled()) return;
 
+  // Android ネイティブブリッジ（addWebMessageListener で公開される postMessage）へ、
+  // 種類（type）と内容を含む JSON 文字列としてメッセージを送る。
+  // inject スクリプトはビルドエントリ間で import を共有できないため、このファイル内に置く。
+  function postBridgeMessage(
+    bridge: { postMessage: (message: string) => void } | undefined,
+    message: Record<string, unknown>,
+  ): void {
+    bridge?.postMessage(JSON.stringify(message));
+  }
+
   function getWebviewLabel(): string {
     return (
       window.__TAURI_INTERNALS__?.metadata?.currentWebview?.label ??
@@ -128,14 +138,15 @@ interface McxXhr extends XMLHttpRequest {
     }
 
     // Android: ネイティブ WebView には Tauri IPC が無いため専用ブリッジを使う
-    window.__mcxApiRateLimitBridge?.report(
-      JSON.stringify({
+    postBridgeMessage(window.__mcxApiRateLimitBridge, {
+      type: "reportApiRateLimit",
+      payload: JSON.stringify({
         bucketKey,
         limit: parsed.limit,
         remaining: parsed.remaining,
         reset: parsed.reset,
       }),
-    );
+    });
   }
 
   if (!window.__xhrRateLimitPatched) {

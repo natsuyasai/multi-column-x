@@ -208,13 +208,24 @@ export function extractLongPressQuotedTweetId(
     }
   }
 
+  // Android ネイティブブリッジ（addWebMessageListener で公開される postMessage）へ、
+  // 種類（type）と内容を含む JSON 文字列としてメッセージを送る。
+  // inject スクリプトはビルドエントリ間で import を共有できないため、このファイル内に置く。
+  function postBridgeMessage(
+    bridge: { postMessage: (message: string) => void } | undefined,
+    message: Record<string, unknown>,
+  ): void {
+    bridge?.postMessage(JSON.stringify(message));
+  }
+
   function requestVideoDownload(videoEl: Element): void {
     const variants = extractLongPressVideoVariantsFromPlayer(videoEl);
     if (!variants) return;
     const suggestedFileName = extractLongPressVideoIdFromPlayer(videoEl) ?? "";
-    window.__mcxVideoDownloadBridge?.downloadVideo(
-      JSON.stringify({ variants, suggestedFileName }),
-    );
+    postBridgeMessage(window.__mcxVideoDownloadBridge, {
+      type: "downloadVideo",
+      payload: JSON.stringify({ variants, suggestedFileName }),
+    });
   }
 
   function isLongPressVideoPopupEnabled(): boolean {
