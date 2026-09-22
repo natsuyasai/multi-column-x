@@ -1,6 +1,8 @@
 //! メディア／リンクポップアップウィンドウの作成・セッション切替・クローズ。
 #[cfg(not(target_os = "android"))]
 use super::parse_url;
+#[cfg(not(target_os = "android"))]
+use crate::commands::settings_store::resolve_account_data_directory;
 use crate::commands::settings_store::{load_accounts_json, load_popup_esc_close_enabled};
 use crate::ipc_constants::{events, labels};
 use crate::state::AppState;
@@ -273,10 +275,10 @@ pub async fn open_link_popup_window(
     app: AppHandle,
     webview_label_caller: Option<String>,
     #[allow(non_snake_case)] accountId: Option<String>,
-    #[allow(non_snake_case)] dataDirectory: Option<String>,
     url: String,
 ) -> Result<(), String> {
-    let (data_dir, current_account_id) = if let (Some(aid), Some(dd)) = (accountId, dataDirectory) {
+    let (data_dir, current_account_id) = if let Some(aid) = accountId {
+        let dd = resolve_account_data_directory(&app, &aid)?;
         (PathBuf::from(dd), aid)
     } else {
         let label = webview_label_caller.unwrap_or_default();
@@ -320,11 +322,10 @@ pub async fn open_link_popup_window(
     app: AppHandle,
     webview_label_caller: Option<String>,
     #[allow(non_snake_case)] accountId: Option<String>,
-    #[allow(non_snake_case)] dataDirectory: Option<String>,
     url: String,
 ) -> Result<(), String> {
-    let current_account_id = if let Some(aid) = accountId {
-        aid
+    let current_account_id = if let Some(aid) = &accountId {
+        aid.clone()
     } else {
         let label = webview_label_caller.clone().unwrap_or_default();
         let state = app.state::<AppState>();
@@ -339,7 +340,6 @@ pub async fn open_link_popup_window(
 
     #[cfg(target_os = "android")]
     {
-        let _ = dataDirectory;
         crate::android_bridge::create_popup_webview(
             &popup_label,
             &url,
@@ -352,8 +352,8 @@ pub async fn open_link_popup_window(
 
     #[cfg(not(target_os = "android"))]
     {
-        let data_dir = if let Some(dd) = dataDirectory {
-            PathBuf::from(dd)
+        let data_dir = if let Some(aid) = &accountId {
+            PathBuf::from(resolve_account_data_directory(&app, aid)?)
         } else {
             let label = webview_label_caller.unwrap_or_default();
             let state = app.state::<AppState>();
@@ -431,17 +431,15 @@ pub async fn switch_popup_session(
     app: AppHandle,
     #[allow(non_snake_case)] popupLabel: String,
     #[allow(non_snake_case)] accountId: String,
-    #[allow(non_snake_case)] dataDirectory: String,
     url: String,
 ) -> Result<(), String> {
     #[cfg(target_os = "android")]
     {
-        let _ = dataDirectory;
         return switch_popup_session_android(&app, &popupLabel, &accountId, &url);
     }
 
     #[cfg(not(target_os = "android"))]
-    switch_popup_session_window(app, popupLabel, accountId, dataDirectory, url).await
+    switch_popup_session_window(app, popupLabel, accountId, url).await
 }
 
 /// popup ラベルが常駐コンポーズ用ラベル（`COMPOSE_PREFIX`）かどうかを判定する。
@@ -458,9 +456,12 @@ async fn switch_popup_session_window(
     app: AppHandle,
     #[allow(non_snake_case)] popupLabel: String,
     #[allow(non_snake_case)] accountId: String,
-    #[allow(non_snake_case)] dataDirectory: String,
     url: String,
 ) -> Result<(), String> {
+    // 保存先の解決は旧ウィンドウを閉じる（破棄する）前に行う。解決に失敗した場合は
+    // 何も閉じずにエラーを返し、既存のポップアップをそのまま維持する。
+    let data_dir_str = resolve_account_data_directory(&app, &accountId)?;
+
     // compose（COMPOSE_PREFIX）のセッション切替は「常駐の置換」として扱う。
     // popup として再作成すると常駐ラベルが POPUP_PREFIX になり compose 扱いから
     // 外れてしまう（旧バグ）ため、create_compose_window で常駐登録込みに作り直す。
@@ -476,7 +477,7 @@ async fn switch_popup_session_window(
         return super::compose::create_compose_window(
             &app,
             &accountId,
-            PathBuf::from(&dataDirectory),
+            PathBuf::from(&data_dir_str),
         )
         .map(|_| ());
     }
@@ -500,7 +501,7 @@ async fn switch_popup_session_window(
         (None, None)
     };
 
-    let data_dir = PathBuf::from(&dataDirectory);
+    let data_dir = PathBuf::from(&data_dir_str);
 
     let mut builder =
         tauri::WebviewWindowBuilder::new(&app, &new_label, WebviewUrl::External(parse_url(&url)?))
