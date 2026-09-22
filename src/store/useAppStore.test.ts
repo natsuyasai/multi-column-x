@@ -500,6 +500,19 @@ describe("useAppStore", () => {
       ["/data/acc-2"],
     );
   });
+
+  it("updateGlobalSettingsはpendingDataDirectoryDeletionsを含まないpatchで巻き戻さない（設定パネル保存時の回帰確認）", () => {
+    const { result } = renderHook(() => useAppStore());
+    act(() => {
+      result.current.addPendingDataDirectoryDeletion("/data/acc-1");
+      // AppSettingsPanelの「適用」相当。pendingDataDirectoryDeletionsを含まないpatch
+      result.current.updateGlobalSettings({ theme: "light" });
+    });
+    expect(result.current.globalSettings.pendingDataDirectoryDeletions).toEqual(
+      ["/data/acc-1"],
+    );
+    expect(result.current.globalSettings.theme).toBe("light");
+  });
 });
 
 describe("migrateColumn", () => {

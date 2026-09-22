@@ -839,4 +839,19 @@ describe("AppSettingsPanel 削除保留データフォルダの再実行", () =>
       await screen.findByText("1件のデータフォルダを削除できませんでした"),
     ).toBeInTheDocument();
   });
+
+  it("一般タブの「適用」で送られるpatchにpendingDataDirectoryDeletionsは含まれない（保存で巻き戻らないことの回帰確認）", () => {
+    const onApply = vi.fn();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        pendingDataDirectoryDeletionCount={1}
+        onApply={onApply}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledTimes(1);
+    const patch = onApply.mock.calls[0][0] as Record<string, unknown>;
+    expect(patch).not.toHaveProperty("pendingDataDirectoryDeletions");
+  });
 });
