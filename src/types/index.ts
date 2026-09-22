@@ -96,6 +96,8 @@ export interface GlobalSettings {
   ngWords: string[];
   /** リポストを非表示にするユーザーID（全カラム共通） */
   repostHiddenUserIds: string[];
+  /** アカウント削除時にデータフォルダの削除へ失敗し、再実行対象として記録された保存先パス一覧 */
+  pendingDataDirectoryDeletions: string[];
 }
 
 export interface ApiRateLimitBucket {
@@ -212,6 +214,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   presets: [],
   ngWords: [],
   repostHiddenUserIds: [],
+  pendingDataDirectoryDeletions: [],
 };
 
 export const COLUMN_LABEL_MAX_LENGTH = 30;

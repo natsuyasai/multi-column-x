@@ -48,6 +48,8 @@ interface AppSettingsPanelProps {
   onCheckUpdate: () => void;
   onOpenOfficialSettings: () => void;
   onClose: () => void;
+  pendingDataDirectoryDeletionCount: number;
+  onRetryDataDirectoryDeletion: () => Promise<{ remaining: number }>;
 }
 
 export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
@@ -64,6 +66,8 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   onCheckUpdate,
   onOpenOfficialSettings,
   onClose,
+  pendingDataDirectoryDeletionCount,
+  onRetryDataDirectoryDeletion,
 }) => {
   const isMobile = useAppStore((s) => s.isMobile);
   const { savePreset, loadPreset, deletePreset } = useAppStore();
@@ -79,6 +83,30 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   const [repostHiddenUserIdsError, setRepostHiddenUserIdsError] = useState<
     string | null
   >(null);
+
+  const [retryingDataDirectoryDeletion, setRetryingDataDirectoryDeletion] =
+    useState(false);
+  const [
+    dataDirectoryDeletionRetryResult,
+    setDataDirectoryDeletionRetryResult,
+  ] = useState<"idle" | "success" | "remaining">("idle");
+  const [
+    dataDirectoryDeletionRemainingCount,
+    setDataDirectoryDeletionRemainingCount,
+  ] = useState(0);
+
+  const handleRetryDataDirectoryDeletion = async () => {
+    setRetryingDataDirectoryDeletion(true);
+    try {
+      const { remaining } = await onRetryDataDirectoryDeletion();
+      setDataDirectoryDeletionRemainingCount(remaining);
+      setDataDirectoryDeletionRetryResult(
+        remaining === 0 ? "success" : "remaining",
+      );
+    } finally {
+      setRetryingDataDirectoryDeletion(false);
+    }
+  };
 
   const set = <K extends keyof SettingsDraft>(
     key: K,
@@ -235,6 +263,17 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 updateChecking={updateChecking}
                 updateManualResult={updateManualResult}
                 onCheckUpdate={onCheckUpdate}
+                pendingDataDirectoryDeletionCount={
+                  pendingDataDirectoryDeletionCount
+                }
+                retryingDataDirectoryDeletion={retryingDataDirectoryDeletion}
+                dataDirectoryDeletionRetryResult={
+                  dataDirectoryDeletionRetryResult
+                }
+                dataDirectoryDeletionRemainingCount={
+                  dataDirectoryDeletionRemainingCount
+                }
+                onRetryDataDirectoryDeletion={handleRetryDataDirectoryDeletion}
               />
             </form>
           )}

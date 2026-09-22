@@ -57,6 +57,7 @@ const globalSettings: GlobalSettings = {
   presets: [],
   ngWords: [],
   repostHiddenUserIds: [],
+  pendingDataDirectoryDeletions: [],
 };
 
 const accounts: Account[] = [
@@ -121,6 +122,8 @@ const meta: Meta<typeof AppSettingsPanel> = {
     onCheckUpdate: fn(),
     onOpenOfficialSettings: fn(),
     onClose: fn(),
+    pendingDataDirectoryDeletionCount: 0,
+    onRetryDataDirectoryDeletion: fn(async () => ({ remaining: 0 })),
   },
 };
 
@@ -179,6 +182,26 @@ export const WithRepostHiddenUserIds: Story = {
     await expect(args.onApply).toHaveBeenCalledWith(
       expect.objectContaining({ repostHiddenUserIds: ["user_a", "user_b"] }),
     );
+  },
+};
+
+export const PendingDataDirectoryDeletion: Story = {
+  name: "削除保留のデータフォルダがあり再実行できる",
+  args: {
+    pendingDataDirectoryDeletionCount: 1,
+    onRetryDataDirectoryDeletion: fn(async () => ({ remaining: 0 })),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText(/1件/)).toBeInTheDocument();
+    const retryButton = canvas.getByRole("button", {
+      name: "データフォルダの削除を再実行",
+    });
+    await userEvent.click(retryButton);
+    await expect(args.onRetryDataDirectoryDeletion).toHaveBeenCalledTimes(1);
+    await expect(
+      await canvas.findByText("データフォルダを削除しました"),
+    ).toBeInTheDocument();
   },
 };
 

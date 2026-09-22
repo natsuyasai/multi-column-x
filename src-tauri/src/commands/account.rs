@@ -385,6 +385,39 @@ fn is_safe_account_dir(path: &Path, accounts_root: &Path) -> bool {
     path.starts_with(accounts_root) && path != accounts_root
 }
 
+/// データフォルダ削除のリトライ回数・間隔。
+/// Windows の WebView2 はカラム WebView を閉じた直後もブラウザプロセスがフォルダを
+/// 解放するまで短時間ロックを保持することがあるため、即失敗にせず数回リトライする。
+const DELETE_RETRY_MAX_ATTEMPTS: u32 = 5;
+const DELETE_RETRY_INTERVAL: std::time::Duration = std::time::Duration::from_millis(200);
+
+/// 与えられた非同期操作を最大 `attempts` 回試行する。
+/// 1回目で成功すれば即 Ok を返す。全て失敗した場合は最後のエラーを返す。
+/// 試行の間は `interval` だけ待機する（最後の試行後は待機しない）。
+async fn retry_with_delay<F, Fut, T, E>(
+    attempts: u32,
+    interval: std::time::Duration,
+    mut op: F,
+) -> Result<T, E>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<T, E>>,
+{
+    let mut last_err = None;
+    for attempt in 0..attempts.max(1) {
+        match op().await {
+            Ok(value) => return Ok(value),
+            Err(e) => {
+                last_err = Some(e);
+                if attempt + 1 < attempts {
+                    tokio::time::sleep(interval).await;
+                }
+            }
+        }
+    }
+    Err(last_err.expect("attempts.max(1) により最低1回は試行される"))
+}
+
 #[tauri::command]
 pub async fn delete_account_data(
     caller: tauri::Webview,
@@ -401,10 +434,14 @@ pub async fn delete_account_data(
     if !is_safe_account_dir(&path, &accounts_root) {
         return Err("invalid account data directory".to_string());
     }
-    if path.exists() {
-        std::fs::remove_dir_all(&path).map_err(|e| e.to_string())?;
-    }
-    Ok(())
+    retry_with_delay(DELETE_RETRY_MAX_ATTEMPTS, DELETE_RETRY_INTERVAL, || async {
+        if path.exists() {
+            std::fs::remove_dir_all(&path).map_err(|e| e.to_string())
+        } else {
+            Ok(())
+        }
+    })
+    .await
 }
 
 #[tauri::command]
@@ -537,6 +574,66 @@ mod tests {
     fn accountsルート自体は拒否する() {
         let root = Path::new("/data/app/accounts");
         assert!(!is_safe_account_dir(root, root));
+    }
+
+    #[tokio::test]
+    async fn 削除は二回失敗した後に成功すればokを返す() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        let calls = AtomicU32::new(0);
+        let result: Result<(), String> = retry_with_delay(
+            DELETE_RETRY_MAX_ATTEMPTS,
+            std::time::Duration::from_millis(0),
+            || {
+                let n = calls.fetch_add(1, Ordering::SeqCst);
+                async move {
+                    if n < 2 {
+                        Err("locked".to_string())
+                    } else {
+                        Ok(())
+                    }
+                }
+            },
+        )
+        .await;
+        assert!(result.is_ok());
+        assert_eq!(calls.load(Ordering::SeqCst), 3);
+    }
+
+    #[tokio::test]
+    async fn 全ての試行が失敗すれば最後のエラーを返す() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        let calls = AtomicU32::new(0);
+        let result: Result<(), String> = retry_with_delay(
+            DELETE_RETRY_MAX_ATTEMPTS,
+            std::time::Duration::from_millis(0),
+            || {
+                let n = calls.fetch_add(1, Ordering::SeqCst);
+                async move { Err(format!("locked-{n}")) }
+            },
+        )
+        .await;
+        assert_eq!(
+            result,
+            Err(format!("locked-{}", DELETE_RETRY_MAX_ATTEMPTS - 1))
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), DELETE_RETRY_MAX_ATTEMPTS);
+    }
+
+    #[tokio::test]
+    async fn 削除は初回で成功すれば一回しか試行しない() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        let calls = AtomicU32::new(0);
+        let result: Result<(), String> = retry_with_delay(
+            DELETE_RETRY_MAX_ATTEMPTS,
+            std::time::Duration::from_millis(0),
+            || {
+                calls.fetch_add(1, Ordering::SeqCst);
+                async move { Ok(()) }
+            },
+        )
+        .await;
+        assert!(result.is_ok());
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
 
     #[test]
