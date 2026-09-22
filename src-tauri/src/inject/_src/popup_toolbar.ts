@@ -252,7 +252,6 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
     tauriInvoke(SWITCH_POPUP_SESSION, {
       popupLabel,
       accountId: selectedAccount.id,
-      dataDirectory: selectedAccount.dataDirectory,
       url: window.location.href,
     });
   });

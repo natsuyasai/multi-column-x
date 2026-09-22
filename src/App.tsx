@@ -227,7 +227,6 @@ const App: React.FC = () => {
       await invoke(IPC_COMMANDS.OPEN_LINK_POPUP_WINDOW, {
         webviewLabelCaller: null,
         accountId: account.id,
-        dataDirectory: account.dataDirectory,
         url: resolved,
       }).catch(logError("handleSubmitLinkPopup:openLinkPopupWindow"));
     },
@@ -247,7 +246,6 @@ const App: React.FC = () => {
       await invoke(IPC_COMMANDS.OPEN_LINK_POPUP_WINDOW, {
         webviewLabelCaller: null,
         accountId: account.id,
-        dataDirectory: account.dataDirectory,
         url,
       }).catch(logError("handleSubmitOfficialSettings:openLinkPopupWindow"));
     },
