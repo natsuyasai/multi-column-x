@@ -12,14 +12,22 @@ const OPENH264_VERSION: &str = "2.4.1";
 const OPENH264_SHA256_AMD64: &str =
     "ca413853d99d960ebcd5ae5b4c65a85bb2b5598e9042e64700a9f4b737ca3a3f";
 
+/// 接続確立（TCPハンドシェイク）までのタイムアウト。
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+/// 読み取り1回あたりのタイムアウト（無通信状態が続いた場合に発火）。
+const READ_TIMEOUT: Duration = Duration::from_secs(30);
+
 /// 指定したタイムアウトを設定したHTTPクライアントを構築する（純粋関数寄りの組み立て処理）。
 /// `read` は無通信状態の検出用、`connect` はTCP接続確立までの上限。
 pub(crate) fn build_client_with(
     read: Duration,
     connect: Duration,
 ) -> Result<reqwest::Client, String> {
-    let _ = (read, connect);
-    todo!("未実装")
+    reqwest::Client::builder()
+        .read_timeout(read)
+        .connect_timeout(connect)
+        .build()
+        .map_err(|e| e.to_string())
 }
 
 /// Cisco公式配布サーバーのダウンロードURLを組み立てる（純粋関数）。
@@ -85,8 +93,11 @@ fn invalidate_gstreamer_registry_cache() {
 /// reqwest のエラーをユーザー向け文言に変換する（純粋関数）。
 /// タイムアウト由来のエラーには「タイムアウトしました」を含める。
 pub(crate) fn map_reqwest_error(e: reqwest::Error) -> String {
-    let _ = &e;
-    todo!("未実装")
+    if e.is_timeout() {
+        format!("ダウンロードがタイムアウトしました: {e}")
+    } else {
+        e.to_string()
+    }
 }
 
 /// main ウィンドウ以外からの呼び出しを拒否する（column/popup WebView は x.com を
@@ -109,14 +120,12 @@ pub async fn download_and_enable_h264(window: tauri::Window) -> Result<(), Strin
     validate_arch(std::env::consts::ARCH)?;
 
     let url = build_download_url(OPENH264_VERSION);
-    let client = reqwest::Client::builder()
-        .build()
-        .map_err(|e| e.to_string())?;
-    let resp = client.get(&url).send().await.map_err(|e| e.to_string())?;
+    let client = build_client_with(READ_TIMEOUT, CONNECT_TIMEOUT)?;
+    let resp = client.get(&url).send().await.map_err(map_reqwest_error)?;
     if !resp.status().is_success() {
         return Err(format!("download failed: HTTP {}", resp.status()));
     }
-    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+    let bytes = resp.bytes().await.map_err(map_reqwest_error)?;
     verify_sha256(&bytes, OPENH264_SHA256_AMD64)?;
     let decompressed = decompress_bz2(&bytes)?;
 
