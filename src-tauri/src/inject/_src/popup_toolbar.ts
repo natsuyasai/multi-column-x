@@ -415,6 +415,22 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
   toolbar.appendChild(exitButton);
   toolbar.appendChild(applySettingsStatus);
 
+  // 共有DOM監視ハブ(dom_observer.ts, window.__mcxDomObserver)経由でDOM変化を購読する。
+  // ハブは document.body を childList+subtree で監視し、MutationRecordの詳細に依存
+  // しないコールバックをrequestAnimationFrameで1フレームにまとめて配る。ハブが無い
+  // 環境（単体テストや、注入順序が変わった場合等）では、フォールバックとして従来と
+  // 同じdocument.bodyのchildList+subtree監視をこのファイル単独で行う。
+  function subscribeDomChanges(
+    callback: (mutations: MutationRecord[]) => void,
+  ): () => void {
+    if (window.__mcxDomObserver) {
+      return window.__mcxDomObserver.subscribe(callback);
+    }
+    const observer = new MutationObserver(callback);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }
+
   function inject() {
     const doInject = () => {
       document.body.appendChild(toolbar);
@@ -422,11 +438,10 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
 
       // ポップアップで開かれるページは動画詳細ページとは限らないため、動画プレイヤーの
       // マウント/アンマウントを継続監視してボタンの表示状態を追従させる。ポップアップウィンドウが
-      // 閉じられればJS実行コンテキストごと破棄されるため、明示的な disconnect() は不要。
-      const videoObserver = new MutationObserver(() => {
+      // 閉じられればJS実行コンテキストごと破棄されるため、明示的な購読解除は不要。
+      subscribeDomChanges(() => {
         updateDownloadButtonVisibility();
       });
-      videoObserver.observe(document.body, { childList: true, subtree: true });
     };
 
     if (document.body) {
@@ -487,13 +502,12 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
 
   function watchAndClick(): void {
     if (tryClick(document)) return;
-    const observer = new MutationObserver(() => {
+    const unsubscribe = subscribeDomChanges(() => {
       if (tryClick(document)) {
-        observer.disconnect();
+        unsubscribe();
       }
     });
-    observer.observe(document.body, { childList: true, subtree: true });
-    setTimeout(() => observer.disconnect(), 10000);
+    setTimeout(() => unsubscribe(), 10000);
   }
 
   if (document.readyState === "loading") {
