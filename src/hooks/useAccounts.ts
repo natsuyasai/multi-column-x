@@ -322,8 +322,11 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
               xUserId,
               dataDirectory: newDataDirectory,
             });
-            deleteDataDirectory(oldDataDirectory);
+            // 旧保存先を使っているWebViewがまだ生きている可能性があるため、
+            // 新セッションで全WebViewを作り直した後に旧保存先を削除する
+            // （Windows の WebView2 はプロセス生存中フォルダをロックするため）。
             await reloadAllWebviews?.();
+            deleteDataDirectory(oldDataDirectory);
             if (verdict === "skip") {
               setReauthNotice(REAUTH_SKIP_MESSAGE);
             }

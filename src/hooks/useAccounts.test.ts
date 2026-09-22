@@ -547,6 +547,43 @@ describe("useAccounts (desktop reauth)", () => {
     );
   });
 
+  it("一致(match)の場合、旧保存先の削除はreloadAllWebviewsの後に行われる", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+    });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "reauth_account_window" ? reauthWindowResult : undefined,
+    );
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: "123",
+        newDataDirectory: NEW_DATA_DIRECTORY,
+      });
+      await reauthPromise;
+    });
+
+    const deleteOldDirCallIndex = mockInvoke.mock.calls.findIndex(
+      (call) =>
+        call[0] === "delete_account_data" &&
+        (call[1] as { dataDirectory: string }).dataDirectory ===
+          OLD_DATA_DIRECTORY,
+    );
+    const deleteOldDirOrder =
+      mockInvoke.mock.invocationCallOrder[deleteOldDirCallIndex];
+    const reloadOrder = mockReload.mock.invocationCallOrder[0];
+
+    expect(deleteOldDirCallIndex).toBeGreaterThanOrEqual(0);
+    expect(reloadOrder).toBeLessThan(deleteOldDirOrder);
+  });
+
   it("初回(skip)の場合、xUserIdとdataDirectoryが記録され旧dirが削除されreloadAllWebviewsが呼ばれスキップ通知がセットされる", async () => {
     useAppStore.setState({
       accounts: [makeReauthAccount()],
