@@ -792,6 +792,8 @@ describe("AppSettingsPanel プリセット", () => {
     fireEvent.click(screen.getByRole("button", { name: "プリセット" }));
     fireEvent.click(screen.getByRole("button", { name: "読み込む" }));
     expect(onLoadPreset).toHaveBeenCalledWith("preset-1");
+    // ストアの loadPreset を直接呼ばず、onLoadPreset 経由のみで読み込むこと
+    expect(mockStoreState.loadPreset).not.toHaveBeenCalled();
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 });

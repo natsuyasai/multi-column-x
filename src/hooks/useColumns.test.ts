@@ -557,6 +557,8 @@ describe("useColumns desktop loadPresetAndRecreateWebviews", () => {
     );
     expect(createdIds).toContain("col-a");
     expect(createdIds).toContain("col-c");
+    // 読み込み前のカラムのうちプリセット側に存在しない col-b は作り直されない
+    expect(createdIds).not.toContain("col-b");
   });
 
   it("同じIDのカラムがあってもプリセット側の設定で作り直される", async () => {
