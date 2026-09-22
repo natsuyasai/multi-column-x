@@ -2,7 +2,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { OFFSCREEN } from "../constants/ipc";
-import { resolveColumnDataDirectory } from "../services/externalColumn";
+import {
+  deleteExternalColumnData,
+  resolveColumnDataDirectory,
+} from "../services/externalColumn";
 import { useAppStore } from "../store/useAppStore";
 import type { Account, Column } from "../types";
 import { DEFAULT_COLUMN_SETTINGS, DEFAULT_GLOBAL_SETTINGS } from "../types";
@@ -30,11 +33,13 @@ vi.mock("../services/externalColumn", () => ({
     async (column: Column, accounts: Account[]) =>
       accounts.find((a) => a.id === column.accountId)?.dataDirectory,
   ),
+  deleteExternalColumnData: vi.fn(async () => undefined),
 }));
 
 // calculateGridBounds のテストは src/lib/gridLayout.test.ts へ移動した
 
 const mockResolveColumnDataDirectory = vi.mocked(resolveColumnDataDirectory);
+const mockDeleteExternalColumnData = vi.mocked(deleteExternalColumnData);
 
 describe("useColumns mobile", () => {
   const mockInvoke = vi.mocked(invoke);
@@ -657,6 +662,78 @@ describe("useColumns handleAddColumn", () => {
     expect(
       useAppStore.getState().columns.some((c) => c.id === "col-orphan"),
     ).toBe(false);
+  });
+});
+
+describe("useColumns handleRemoveColumn external", () => {
+  const mockInvoke = vi.mocked(invoke);
+
+  function makeColumn(overrides: Partial<Column> & Pick<Column, "id">): Column {
+    return {
+      accountId: "acc-1",
+      pageType: "home",
+      homeTabName: "フォロー中",
+      width: 350,
+      order: 0,
+      gridRow: 1,
+      gridCol: 1,
+      heightMode: "auto",
+      settings: { ...DEFAULT_COLUMN_SETTINGS },
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+    mockDeleteExternalColumnData.mockResolvedValue(undefined);
+    useAppStore.setState({
+      accounts: [],
+      columns: [
+        makeColumn({
+          id: "col-external",
+          pageType: "external",
+          accountId: "col-external",
+        }),
+        makeColumn({ id: "col-home", pageType: "home", accountId: "acc-1" }),
+      ],
+      globalSettings: { ...DEFAULT_GLOBAL_SETTINGS },
+      isLoaded: true,
+      isMobile: false,
+      topBarExpanded: false,
+    });
+  });
+
+  it("externalカラムを削除するとWebView破棄の後に保存先データも削除される", async () => {
+    const { result } = renderHook(() => useColumns());
+
+    await act(async () => {
+      await result.current.handleRemoveColumn("col-external");
+    });
+
+    const removeIdx = mockInvoke.mock.calls.findIndex(
+      (c) =>
+        c[0] === "remove_column_webview" &&
+        (c[1] as { columnId: string }).columnId === "col-external",
+    );
+    expect(removeIdx).toBeGreaterThanOrEqual(0);
+    expect(mockDeleteExternalColumnData).toHaveBeenCalledWith("col-external");
+    // WebView破棄呼び出しの後で保存先削除が呼ばれる（vi.fn の呼び出し順は
+    // invocationCallOrder で全モック共通に比較できる）
+    const removeCallOrder = mockInvoke.mock.invocationCallOrder[removeIdx];
+    const deleteCallOrder =
+      mockDeleteExternalColumnData.mock.invocationCallOrder[0];
+    expect(deleteCallOrder).toBeGreaterThan(removeCallOrder);
+  });
+
+  it("external以外のカラムを削除しても保存先データ削除は呼ばれない", async () => {
+    const { result } = renderHook(() => useColumns());
+
+    await act(async () => {
+      await result.current.handleRemoveColumn("col-home");
+    });
+
+    expect(mockDeleteExternalColumnData).not.toHaveBeenCalled();
   });
 });
 

@@ -28,3 +28,13 @@ export async function resolveColumnDataDirectory(
   }
   return accounts.find((a) => a.id === column.accountId)?.dataDirectory;
 }
+
+/**
+ * external カラム専用のデータディレクトリを削除する。
+ * column_id から Rust 側でパスを組み立てるため、呼び出し側は任意パスを渡さない。
+ */
+export async function deleteExternalColumnData(
+  columnId: string,
+): Promise<void> {
+  await invoke(IPC_COMMANDS.DELETE_EXTERNAL_COLUMN_DATA, { columnId });
+}

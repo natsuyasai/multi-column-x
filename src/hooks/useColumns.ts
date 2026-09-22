@@ -16,7 +16,11 @@ import {
   removeColumnWebview,
   resizeColumnWebview,
 } from "../services/columnWebview";
-import { resolveColumnDataDirectory } from "../services/externalColumn";
+import {
+  deleteExternalColumnData,
+  isExternalColumn,
+  resolveColumnDataDirectory,
+} from "../services/externalColumn";
 import { useAppStore } from "../store/useAppStore";
 import type { Column } from "../types";
 import { useDesktopColumns } from "./useDesktopColumns";
@@ -191,6 +195,8 @@ export function useColumns() {
       const { isMobile, columns: columnsBeforeRemoval } =
         useAppStore.getState();
 
+      const removedColumn = columnsBeforeRemoval.find((c) => c.id === columnId);
+
       // 削除カラムが現在の表示ペア（アクティブ or その隣）に含まれていたかを、
       // 削除前のカラム構成で判定する。removeColumn 後だと右隣の判定基準が
       // ずれるため、必ず removeColumn 呼び出し前に計算する（recreateColumnWebview
@@ -210,6 +216,13 @@ export function useColumns() {
       await removeColumnWebview(columnId).catch(
         logError("handleRemoveColumn:removeColumnWebview"),
       );
+      if (removedColumn && isExternalColumn(removedColumn)) {
+        // external カラム専用の保存先ディレクトリは WebView 破棄後に削除する
+        // （WebView がフォルダを使用中のため）。失敗してもログのみ。
+        await deleteExternalColumnData(columnId).catch(
+          logError("handleRemoveColumn:deleteExternalColumnData"),
+        );
+      }
       removeColumn(columnId);
       const { columns: remainingColumns } = useAppStore.getState();
       if (isMobile) {
