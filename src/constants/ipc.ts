@@ -58,6 +58,13 @@ export const IPC_COMMANDS = {
   // モバイルスワイプバー（ネイティブオーバーレイ）
   UPDATE_MOBILE_SWIPE_BAR: "update_mobile_swipe_bar",
   FLASH_MOBILE_SWIPE_BAR: "flash_mobile_swipe_bar",
+
+  // アプリ自動更新（Android APK）
+  INSTALL_APK_UPDATE: "install_apk_update",
+
+  // メディアコーデック（Linux）
+  CHECK_MEDIA_CODEC_SUPPORT: "check_media_codec_support",
+  DOWNLOAD_AND_ENABLE_H264: "download_and_enable_h264",
 } as const;
 
 /** Tauri イベント名 */

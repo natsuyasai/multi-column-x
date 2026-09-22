@@ -27,7 +27,10 @@
     "report_api_rate_limit",
     "report_official_settings",
     "update_mobile_swipe_bar",
-    "flash_mobile_swipe_bar"
+    "flash_mobile_swipe_bar",
+    "install_apk_update",
+    "check_media_codec_support",
+    "download_and_enable_h264"
   ],
   "events": {
     "ACCOUNT_LOGIN_COMPLETE": "account-login-complete",
