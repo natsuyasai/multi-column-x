@@ -114,6 +114,21 @@ describe("UpdateDialog", () => {
     expect(screen.getByText(/再起動中/)).toBeInTheDocument();
   });
 
+  it("インストールに失敗したときはエラーが表示される", () => {
+    render(
+      <UpdateDialog
+        update={update}
+        installing={false}
+        installError="更新のインストールに失敗しました。時間をおいて再度お試しください。"
+        onInstall={vi.fn()}
+        onLater={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "更新のインストールに失敗しました。時間をおいて再度お試しください。",
+    );
+  });
+
   it("インストール待機フェーズ(awaitingInstall)を表示する", () => {
     render(
       <UpdateDialog

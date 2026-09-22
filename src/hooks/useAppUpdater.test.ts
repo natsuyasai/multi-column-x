@@ -185,6 +185,51 @@ describe("useAppUpdater", () => {
     expect(result.current.installing).toBe(false);
   });
 
+  it("インストールに失敗したときはエラーが設定される", async () => {
+    const install = vi.fn().mockRejectedValue(new Error("boom"));
+    vi.mocked(createUpdater).mockReturnValue({
+      check: vi.fn().mockResolvedValue({ version: "1.2.0" }),
+      install,
+    });
+    const { result } = renderHook(() => useAppUpdater(false));
+    await waitFor(() => expect(result.current.available).not.toBeNull());
+    await act(async () => await result.current.install());
+    expect(result.current.installError).toBe(
+      "更新のインストールに失敗しました。時間をおいて再度お試しください。",
+    );
+  });
+
+  it("再度インストールを開始したときは前回のエラーが消える", async () => {
+    let resolveInstall!: () => void;
+    const install = vi.fn();
+    install.mockRejectedValueOnce(new Error("boom"));
+    install.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveInstall = resolve;
+        }),
+    );
+    vi.mocked(createUpdater).mockReturnValue({
+      check: vi.fn().mockResolvedValue({ version: "1.2.0" }),
+      install,
+    });
+    const { result } = renderHook(() => useAppUpdater(false));
+    await waitFor(() => expect(result.current.available).not.toBeNull());
+    await act(async () => await result.current.install());
+    expect(result.current.installError).not.toBeNull();
+
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.install();
+    });
+    expect(result.current.installError).toBeNull();
+
+    await act(async () => {
+      resolveInstall();
+      await pending;
+    });
+  });
+
   it("checkManualで更新が無ければmanualResultがnoneになる", async () => {
     vi.mocked(createUpdater).mockReturnValue({
       check: vi.fn().mockResolvedValue(null),
