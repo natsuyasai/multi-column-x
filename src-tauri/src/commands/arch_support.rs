@@ -7,7 +7,13 @@
 /// OpenH264 バイナリの配布が linux64（x86_64）専用であるため、
 /// それ以外のアーキテクチャでは取得処理そのものを拒否する。
 pub(crate) fn validate_arch(arch: &str) -> Result<(), String> {
-    todo!("未実装: {arch}")
+    if arch == "x86_64" {
+        Ok(())
+    } else {
+        Err(format!(
+            "この環境（{arch}）には対応していません。H.264 コーデックの自動取得は x86_64 のみ対応です"
+        ))
+    }
 }
 
 #[cfg(test)]
