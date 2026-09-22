@@ -14,16 +14,6 @@ const OPEN_LINK_POPUP_WINDOW = "open_link_popup_window";
     }
   }
 
-  function getCallerLabel(): string {
-    return (
-      (
-        window.__TAURI_INTERNALS__ as {
-          metadata?: { currentWebview?: { label?: string } };
-        }
-      )?.metadata?.currentWebview?.label ?? "unknown"
-    );
-  }
-
   let contextMenu: HTMLDivElement | null = null;
 
   function removeContextMenu(): void {
@@ -71,8 +61,9 @@ const OPEN_LINK_POPUP_WINDOW = "open_link_popup_window";
       e.preventDefault();
       e.stopPropagation();
       removeContextMenu();
+      // webviewLabelCaller は渡さない。実際の送信元 WebView（呼び出し元）は
+      // Rust 側が caller.label() で判定するため、JS が自己申告する必要も権限も無い。
       tauriInvoke(OPEN_LINK_POPUP_WINDOW, {
-        webviewLabelCaller: getCallerLabel(),
         accountId: null,
         url: resolveAbsolute(href),
       });

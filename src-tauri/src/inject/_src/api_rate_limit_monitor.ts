@@ -96,14 +96,6 @@ interface McxXhr extends XMLHttpRequest {
 
   if (!isMonitorEnabled()) return;
 
-  function getWebviewLabel(): string {
-    return (
-      window.__TAURI_INTERNALS__?.metadata?.currentWebview?.label ??
-      window.__TAURI__?.core?.invoke?.name ??
-      ""
-    );
-  }
-
   function reportRateLimit(url: string, headersRaw: string): void {
     const bucketKey = extractBucketKey(url, location.href);
     if (!bucketKey) return;
@@ -115,10 +107,9 @@ interface McxXhr extends XMLHttpRequest {
       window.__TAURI__?.core?.invoke ??
       window.__TAURI__?.invoke;
     if (invoke) {
-      const label = getWebviewLabel();
-      if (!label) return;
+      // label は渡さない。実際の送信元 WebView（呼び出し元）は Rust 側が
+      // caller.label() で判定するため、JS が自己申告する必要も権限も無い。
       invoke("report_api_rate_limit", {
-        label,
         bucketKey,
         limit: parsed.limit,
         remaining: parsed.remaining,

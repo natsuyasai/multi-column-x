@@ -224,8 +224,9 @@ const App: React.FC = () => {
       const resolved = url.startsWith("http") ? url : "https://" + url;
       const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
       if (!account) return;
+      // webviewLabelCaller は渡さない。実際の送信元 WebView（呼び出し元）は
+      // Rust 側が caller.label() で判定するため、JS が自己申告する必要も権限も無い。
       await invoke(IPC_COMMANDS.OPEN_LINK_POPUP_WINDOW, {
-        webviewLabelCaller: null,
         accountId: account.id,
         url: resolved,
       }).catch(logError("handleSubmitLinkPopup:openLinkPopupWindow"));
@@ -243,8 +244,9 @@ const App: React.FC = () => {
       setShowOfficialSettingsDialog(false);
       const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
       if (!account) return;
+      // webviewLabelCaller は渡さない。実際の送信元 WebView（呼び出し元）は
+      // Rust 側が caller.label() で判定するため、JS が自己申告する必要も権限も無い。
       await invoke(IPC_COMMANDS.OPEN_LINK_POPUP_WINDOW, {
-        webviewLabelCaller: null,
         accountId: account.id,
         url,
       }).catch(logError("handleSubmitOfficialSettings:openLinkPopupWindow"));
