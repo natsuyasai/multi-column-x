@@ -1,3 +1,4 @@
+mod acl_contract;
 #[cfg(target_os = "android")]
 mod android_bridge;
 mod commands;
