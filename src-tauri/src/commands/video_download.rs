@@ -188,14 +188,21 @@ pub async fn download_video(
             let path = file_path.into_path().map_err(|e| e.to_string())?;
 
             let client = http::build_client()?;
-            let mut file = std::fs::File::create(&path).map_err(|e| e.to_string())?;
 
             let mut emitter = ProgressEmitter::new(&app, window_label.clone(), 1, 1);
-            let mut on_progress = |current: u64, total: Option<u64>| {
-                let is_last = total.is_some_and(|t| current >= t);
-                emitter.update(current, total, is_last);
-            };
-            let result = http::download_to_writer(&client, &url, &mut file, &mut on_progress).await;
+            let result = video::download_to_file_or_cleanup(&path, |mut file| {
+                let client = &client;
+                let url = &url;
+                let emitter = &mut emitter;
+                async move {
+                    let mut on_progress = |current: u64, total: Option<u64>| {
+                        let is_last = total.is_some_and(|t| current >= t);
+                        emitter.update(current, total, is_last);
+                    };
+                    http::download_to_writer(client, url, &mut file, &mut on_progress).await
+                }
+            })
+            .await;
             match &result {
                 Ok(()) => emitter.finish("completed"),
                 Err(_) => emitter.finish("failed"),
@@ -233,19 +240,26 @@ pub async fn download_video(
                 .blocking_save_file()
             {
                 let path = file_path.into_path().map_err(|e| e.to_string())?;
-                let mut file = std::fs::File::create(&path).map_err(|e| e.to_string())?;
 
                 let mut emitter = ProgressEmitter::new(&app, window_label.clone(), 1, file_count);
-                let mut on_progress = |current: u32, total: u32| {
-                    let is_last = current >= total;
-                    emitter.update(current as u64, Some(total as u64), is_last);
-                };
-                let result = hls::download_track_to_writer(
-                    &client,
-                    &tracks.video_playlist_url,
-                    &mut file,
-                    &mut on_progress,
-                )
+                let result = video::download_to_file_or_cleanup(&path, |mut file| {
+                    let client = &client;
+                    let video_playlist_url = &tracks.video_playlist_url;
+                    let emitter = &mut emitter;
+                    async move {
+                        let mut on_progress = |current: u32, total: u32| {
+                            let is_last = current >= total;
+                            emitter.update(current as u64, Some(total as u64), is_last);
+                        };
+                        hls::download_track_to_writer(
+                            client,
+                            video_playlist_url,
+                            &mut file,
+                            &mut on_progress,
+                        )
+                        .await
+                    }
+                })
                 .await;
                 match &result {
                     Ok(()) => emitter.finish("completed"),
@@ -262,20 +276,27 @@ pub async fn download_video(
                     .blocking_save_file()
                 {
                     let path = file_path.into_path().map_err(|e| e.to_string())?;
-                    let mut file = std::fs::File::create(&path).map_err(|e| e.to_string())?;
 
                     let mut emitter =
                         ProgressEmitter::new(&app, window_label.clone(), 2, file_count);
-                    let mut on_progress = |current: u32, total: u32| {
-                        let is_last = current >= total;
-                        emitter.update(current as u64, Some(total as u64), is_last);
-                    };
-                    let result = hls::download_track_to_writer(
-                        &client,
-                        &audio_url,
-                        &mut file,
-                        &mut on_progress,
-                    )
+                    let result = video::download_to_file_or_cleanup(&path, |mut file| {
+                        let client = &client;
+                        let audio_url = &audio_url;
+                        let emitter = &mut emitter;
+                        async move {
+                            let mut on_progress = |current: u32, total: u32| {
+                                let is_last = current >= total;
+                                emitter.update(current as u64, Some(total as u64), is_last);
+                            };
+                            hls::download_track_to_writer(
+                                client,
+                                audio_url,
+                                &mut file,
+                                &mut on_progress,
+                            )
+                            .await
+                        }
+                    })
                     .await;
                     match &result {
                         Ok(()) => emitter.finish("completed"),
