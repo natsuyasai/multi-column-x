@@ -202,6 +202,13 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
                   loginWindow
                     .once("tauri://destroyed", () => {
                       cleanup();
+                      // ログイン完了前にウィンドウを閉じた（キャンセル）場合、
+                      // 作成済みの保存先ディレクトリを削除する。ログイン完了後は
+                      // cleanup() 済みでこのリスナー自体が発火しないため、
+                      // 確定したアカウントのディレクトリを誤って消すことはない。
+                      invoke(IPC_COMMANDS.DELETE_ACCOUNT_DATA, {
+                        dataDirectory,
+                      }).catch(logError("startAddAccount:deleteAccountData"));
                       reject(new Error("Login window closed"));
                     })
                     .then((fn) => {

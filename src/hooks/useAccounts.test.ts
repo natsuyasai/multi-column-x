@@ -312,6 +312,67 @@ describe("useAccounts (mobile)", () => {
   });
 });
 
+describe("useAccounts (desktop addAccount)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAppStore.setState({ accounts: [], isMobile: false });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("ログイン前にログインウィンドウを閉じると作られた保存先が削除される", async () => {
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "open_add_account_window" ? addAccountResult : undefined,
+    );
+    const { result } = renderHook(() => useAccounts());
+
+    let startPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      startPromise = result.current.startAddAccount();
+      await flushMicrotasks();
+      fireDestroyedEvent("add-account");
+      await startPromise;
+    });
+
+    expect(result.current.pendingAccountName).toBeNull();
+    expect(useAppStore.getState().accounts).toHaveLength(0);
+    expect(mockInvoke).toHaveBeenCalledWith("delete_account_data", {
+      dataDirectory: "/data/acc-new",
+    });
+  });
+
+  it("ログイン完了後は同じログインウィンドウが閉じられても保存先を削除しない", async () => {
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "open_add_account_window" ? addAccountResult : undefined,
+    );
+    const { result } = renderHook(() => useAccounts());
+
+    let startPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      startPromise = result.current.startAddAccount();
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_LOGIN_COMPLETE, undefined);
+      await startPromise;
+    });
+
+    expect(result.current.pendingAccountName).toMatchObject({
+      accountId: "acc-new",
+      dataDirectory: "/data/acc-new",
+      windowLabel: "add-account",
+    });
+    // ログイン完了後は destroyed リスナーを解除済みのため、その後ウィンドウが
+    // 閉じられてもコールバックは登録されていない（二重削除・確定済みディレクトリの
+    // 誤削除防止の固定）。
+    expect(() => fireDestroyedEvent("add-account")).toThrow();
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "delete_account_data",
+      expect.anything(),
+    );
+  });
+});
+
 const OLD_DATA_DIRECTORY = "/data/acc-1";
 const NEW_DATA_DIRECTORY = "/data/accounts/account-new";
 
