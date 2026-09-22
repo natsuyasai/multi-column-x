@@ -3,12 +3,24 @@
 //! Cisco の特許ロイヤリティ負担は「Ciscoの配布チャネルから直接ダウンロードする」
 //! 場合にのみ適用されるため、AppImageには同梱せずこの方式を採る。
 
+use std::time::Duration;
+
 use crate::commands::arch_support::validate_arch;
 
 const OPENH264_VERSION: &str = "2.4.1";
 // x86_64 (amd64) 用の実測値。ダウンロードして一致確認済み。
 const OPENH264_SHA256_AMD64: &str =
     "ca413853d99d960ebcd5ae5b4c65a85bb2b5598e9042e64700a9f4b737ca3a3f";
+
+/// 指定したタイムアウトを設定したHTTPクライアントを構築する（純粋関数寄りの組み立て処理）。
+/// `read` は無通信状態の検出用、`connect` はTCP接続確立までの上限。
+pub(crate) fn build_client_with(
+    read: Duration,
+    connect: Duration,
+) -> Result<reqwest::Client, String> {
+    let _ = (read, connect);
+    todo!("未実装")
+}
 
 /// Cisco公式配布サーバーのダウンロードURLを組み立てる（純粋関数）。
 pub(crate) fn build_download_url(version: &str) -> String {
@@ -68,6 +80,13 @@ fn invalidate_gstreamer_registry_cache() {
             log::warn!("GStreamerレジストリキャッシュの削除に失敗しました: {e}");
         }
     }
+}
+
+/// reqwest のエラーをユーザー向け文言に変換する（純粋関数）。
+/// タイムアウト由来のエラーには「タイムアウトしました」を含める。
+pub(crate) fn map_reqwest_error(e: reqwest::Error) -> String {
+    let _ = &e;
+    todo!("未実装")
 }
 
 /// main ウィンドウ以外からの呼び出しを拒否する（column/popup WebView は x.com を
@@ -209,5 +228,31 @@ mod tests {
     fn validate_window_labelはmain以外なら_errを返す() {
         let result = validate_window_label("column-0");
         assert!(result.is_err());
+    }
+
+    // ===== build_client_with / map_reqwest_error のテスト =====
+
+    #[tokio::test]
+    async fn 応答が無いサーバーへの接続は読み取りタイムアウトでエラーになる() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("リスナーの作成に失敗した");
+        let addr = listener.local_addr().expect("アドレス取得に失敗した");
+
+        tokio::spawn(async move {
+            if let Ok((_socket, _)) = listener.accept().await {
+                // 接続は受け付けるが、応答を返さずソケットを保持し続ける（無応答状態を再現する）。
+                std::future::pending::<()>().await;
+            }
+        });
+
+        let client = build_client_with(Duration::from_millis(200), Duration::from_secs(5))
+            .expect("クライアント構築に失敗した");
+        let result = client.get(format!("http://{addr}/")).send().await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.is_timeout());
+        assert!(map_reqwest_error(err).contains("タイムアウトしました"));
     }
 }
