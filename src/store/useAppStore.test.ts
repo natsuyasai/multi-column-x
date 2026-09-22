@@ -403,9 +403,9 @@ describe("useAppStore", () => {
       DEFAULT_GLOBAL_SETTINGS;
     void _omitted;
     mockInvoke.mockResolvedValueOnce({
-      accounts: [],
-      columns: [],
-      globalSettings: legacyGlobal,
+      settings: { accounts: [], columns: [], globalSettings: legacyGlobal },
+      loadFailed: false,
+      backupPath: null,
     });
     const { result } = renderHook(() => useAppStore());
     await act(async () => {
@@ -416,12 +416,16 @@ describe("useAppStore", () => {
 
   it("保存済みの全体設定のリポスト元ユーザーIDは読み込み時にそのまま保持される", async () => {
     mockInvoke.mockResolvedValueOnce({
-      accounts: [],
-      columns: [],
-      globalSettings: {
-        ...DEFAULT_GLOBAL_SETTINGS,
-        repostHiddenUserIds: ["alice"],
+      settings: {
+        accounts: [],
+        columns: [],
+        globalSettings: {
+          ...DEFAULT_GLOBAL_SETTINGS,
+          repostHiddenUserIds: ["alice"],
+        },
       },
+      loadFailed: false,
+      backupPath: null,
     });
     const { result } = renderHook(() => useAppStore());
     await act(async () => {
@@ -430,6 +434,98 @@ describe("useAppStore", () => {
     expect(result.current.globalSettings.repostHiddenUserIds).toEqual([
       "alice",
     ]);
+  });
+
+  it("設定を正常に解析できたときは退避も通知も行われない", async () => {
+    mockInvoke.mockResolvedValueOnce({
+      settings: {
+        accounts: [],
+        columns: [],
+        globalSettings: DEFAULT_GLOBAL_SETTINGS,
+      },
+      loadFailed: false,
+      backupPath: null,
+    });
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    expect(result.current.settingsLoadNotice).toBeNull();
+  });
+
+  it("設定ファイルが存在しない初回起動では退避も通知も行われない", async () => {
+    mockInvoke.mockResolvedValueOnce({
+      settings: {
+        accounts: [],
+        columns: [],
+        globalSettings: DEFAULT_GLOBAL_SETTINGS,
+      },
+      loadFailed: false,
+      backupPath: null,
+    });
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    expect(result.current.settingsLoadNotice).toBeNull();
+  });
+
+  it("設定を解析できないときは読み込み失敗と退避先が通知される", async () => {
+    mockInvoke.mockResolvedValueOnce({
+      settings: {
+        accounts: [],
+        columns: [],
+        globalSettings: DEFAULT_GLOBAL_SETTINGS,
+      },
+      loadFailed: true,
+      backupPath: "/data/settings.json.20260922-120000.bak",
+    });
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    expect(result.current.settingsLoadNotice).toContain(
+      "/data/settings.json.20260922-120000.bak",
+    );
+  });
+
+  it("設定の退避にも失敗したときはその旨が通知される", async () => {
+    mockInvoke.mockResolvedValueOnce({
+      settings: {
+        accounts: [],
+        columns: [],
+        globalSettings: DEFAULT_GLOBAL_SETTINGS,
+      },
+      loadFailed: true,
+      backupPath: null,
+    });
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    expect(result.current.settingsLoadNotice).toContain("バックアップ");
+    expect(result.current.settingsLoadNotice).not.toContain("次の場所");
+  });
+
+  it("dismissSettingsLoadNoticeを呼ぶと通知が消える", async () => {
+    mockInvoke.mockResolvedValueOnce({
+      settings: {
+        accounts: [],
+        columns: [],
+        globalSettings: DEFAULT_GLOBAL_SETTINGS,
+      },
+      loadFailed: true,
+      backupPath: "/data/settings.json.20260922-120000.bak",
+    });
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    expect(result.current.settingsLoadNotice).not.toBeNull();
+    act(() => {
+      result.current.dismissSettingsLoadNotice();
+    });
+    expect(result.current.settingsLoadNotice).toBeNull();
   });
 });
 

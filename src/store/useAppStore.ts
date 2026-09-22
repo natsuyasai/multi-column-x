@@ -8,9 +8,14 @@ import type {
   Column,
   ColumnPreset,
   GlobalSettings,
-  AppSettings,
+  LoadSettingsResult,
 } from "../types";
 import { DEFAULT_GLOBAL_SETTINGS } from "../types";
+
+const SETTINGS_LOAD_FAILED_WITH_BACKUP_MESSAGE = (backupPath: string) =>
+  `設定ファイルを読み込めなかったため、初期設定で起動しました。元の設定は次の場所にバックアップしました: ${backupPath}`;
+const SETTINGS_LOAD_FAILED_WITHOUT_BACKUP_MESSAGE =
+  "設定ファイルを読み込めなかったため、初期設定で起動しました。元の設定のバックアップにも失敗しました。";
 
 export function migrateColumn(
   col: Partial<Column> &
@@ -42,6 +47,8 @@ interface AppStore {
   columns: Column[];
   globalSettings: GlobalSettings;
   isLoaded: boolean;
+  settingsLoadNotice: string | null;
+  dismissSettingsLoadNotice: () => void;
   topBarExpanded: boolean;
   setTopBarExpanded: (v: boolean) => void;
   isMobile: boolean;
@@ -78,6 +85,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   columns: [],
   globalSettings: DEFAULT_GLOBAL_SETTINGS,
   isLoaded: false,
+  settingsLoadNotice: null,
+  dismissSettingsLoadNotice: () => set({ settingsLoadNotice: null }),
   topBarExpanded: false,
   setTopBarExpanded: (v) => set({ topBarExpanded: v }),
   isMobile: false,
@@ -107,7 +116,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   loadSettings: async () => {
     try {
-      const settings = await invoke<AppSettings>(IPC_COMMANDS.LOAD_SETTINGS);
+      const { settings, loadFailed, backupPath } =
+        await invoke<LoadSettingsResult>(IPC_COMMANDS.LOAD_SETTINGS);
       set({
         accounts: settings.accounts,
         columns: settings.columns
@@ -118,6 +128,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
           ...settings.globalSettings,
         },
         isLoaded: true,
+        settingsLoadNotice: loadFailed
+          ? backupPath
+            ? SETTINGS_LOAD_FAILED_WITH_BACKUP_MESSAGE(backupPath)
+            : SETTINGS_LOAD_FAILED_WITHOUT_BACKUP_MESSAGE
+          : null,
       });
     } catch {
       set({ isLoaded: true });
