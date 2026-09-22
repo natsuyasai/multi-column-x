@@ -770,6 +770,7 @@ const App: React.FC = () => {
           update={updater.available}
           installing={updater.installing}
           progress={updater.progress}
+          installError={updater.installError}
           onInstall={updater.install}
           onLater={updater.dismiss}
         />
