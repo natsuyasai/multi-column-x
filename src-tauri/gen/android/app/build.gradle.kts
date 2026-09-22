@@ -89,6 +89,10 @@ dependencies {
   implementation("com.google.android.material:material:1.12.0")
   implementation("androidx.lifecycle:lifecycle-process:2.10.0")
   testImplementation("junit:junit:4.13.2")
+  // BridgeMessages.kt が org.json.JSONObject を使う。android.jar の org.json はスタブ
+  // （unitTests.isReturnDefaultValues 下でもメソッド本体が空）で JVM 単体テストでは動かないため、
+  // 実装を持つ org.json:json を testImplementation で追加しテストクラスパス上で優先させる。
+  testImplementation("org.json:json:20231013")
   // mockito-kotlin 5.x は JVM 11 ビルドのため、jvmTarget 1.8 と互換の 4.x を使う。
   // mockito-core は Java 21 ランタイム対応のため 5.x へ上書き
   // （5.x は inline mock maker が既定で、MotionEvent 等の final クラスをモックできる）。
