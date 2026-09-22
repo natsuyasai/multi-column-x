@@ -1,4 +1,5 @@
 pub mod account;
+pub mod arch_support;
 pub mod media_codec;
 #[cfg(all(desktop, target_os = "linux"))]
 pub mod openh264_fetch;
