@@ -110,6 +110,7 @@ const App: React.FC = () => {
     startReauth,
     reauthNotice,
     dismissReauthNotice,
+    retryPendingDataDirectoryDeletions,
   } = useAccounts(recreateAllWebviews);
   const {
     showAddColumn,
@@ -733,6 +734,10 @@ const App: React.FC = () => {
           onCheckUpdate={updater.checkManually}
           onOpenOfficialSettings={handleOpenOfficialSettings}
           onClose={() => setShowAppSettings(false)}
+          pendingDataDirectoryDeletionCount={
+            globalSettings.pendingDataDirectoryDeletions.length
+          }
+          onRetryDataDirectoryDeletion={retryPendingDataDirectoryDeletions}
         />
       )}
 

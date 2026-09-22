@@ -110,6 +110,8 @@ const defaultProps = {
   onCheckUpdate: vi.fn(),
   onOpenOfficialSettings: vi.fn(),
   onClose: vi.fn(),
+  pendingDataDirectoryDeletionCount: 0,
+  onRetryDataDirectoryDeletion: vi.fn().mockResolvedValue({ remaining: 0 }),
 };
 
 beforeEach(() => {
@@ -770,5 +772,71 @@ describe("AppSettingsPanel 表示サイズ・テーマの変更チェックボ�
     expect(
       screen.getByRole("checkbox", { name: "テーマを変更する" }),
     ).not.toBeChecked();
+  });
+});
+
+describe("AppSettingsPanel 削除保留データフォルダの再実行", () => {
+  it("再実行対象が無いときは再実行の操作が表示されない", () => {
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        pendingDataDirectoryDeletionCount={0}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: "データフォルダの削除を再実行" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("再実行対象があるときは件数と再実行の操作が表示される", () => {
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        pendingDataDirectoryDeletionCount={1}
+      />,
+    );
+    expect(screen.getByText(/1件/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "データフォルダの削除を再実行" }),
+    ).toBeInTheDocument();
+  });
+
+  it("再実行して全件成功すると成功メッセージが表示される", async () => {
+    const onRetryDataDirectoryDeletion = vi
+      .fn()
+      .mockResolvedValue({ remaining: 0 });
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        pendingDataDirectoryDeletionCount={1}
+        onRetryDataDirectoryDeletion={onRetryDataDirectoryDeletion}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "データフォルダの削除を再実行" }),
+    );
+    expect(onRetryDataDirectoryDeletion).toHaveBeenCalledTimes(1);
+    expect(
+      await screen.findByText("データフォルダを削除しました"),
+    ).toBeInTheDocument();
+  });
+
+  it("再実行して一部失敗すると残数の失敗メッセージが表示される", async () => {
+    const onRetryDataDirectoryDeletion = vi
+      .fn()
+      .mockResolvedValue({ remaining: 1 });
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        pendingDataDirectoryDeletionCount={2}
+        onRetryDataDirectoryDeletion={onRetryDataDirectoryDeletion}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "データフォルダの削除を再実行" }),
+    );
+    expect(
+      await screen.findByText("1件のデータフォルダを削除できませんでした"),
+    ).toBeInTheDocument();
   });
 });
