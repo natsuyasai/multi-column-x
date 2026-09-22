@@ -83,6 +83,18 @@ mod tests {
     }
 
     #[test]
+    fn カラムのwebviewラベルからの呼び出しを拒否する() {
+        let result = validate_install_request("column-abc", VALID_URL, VALID_SHA256);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn ポップアップのwebviewラベルからの呼び出しを拒否する() {
+        let result = validate_install_request("popup-abc", VALID_URL, VALID_SHA256);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn 許可プレフィックス以外のurlを拒否する() {
         let result =
             validate_install_request("main", "https://evil.example.com/x.apk", VALID_SHA256);

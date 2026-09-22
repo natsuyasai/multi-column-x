@@ -207,4 +207,16 @@ mod tests {
         let result = validate_window_label("column-0");
         assert!(result.is_err());
     }
+
+    #[test]
+    fn カラムのwebviewラベルからの呼び出しを拒否する() {
+        let result = validate_window_label("column-abc");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn ポップアップのwebviewラベルからの呼び出しを拒否する() {
+        let result = validate_window_label("popup-abc");
+        assert!(result.is_err());
+    }
 }
