@@ -3,12 +3,15 @@
 // window.__multiColumnXConfig?.visibleLinks に依存するのみで今回のスコープ外。
 import { renderHook, cleanup, waitFor } from "@testing-library/react";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { useHeaderCustomizer } from "./useHeaderCustomizer";
+// useHeaderCustomizerはDOM変化検知に共有DOM監視ハブ(window.__mcxDomObserver)を
+// 使うため、side effectとしてハブを初期化するimportが必要（dom_observer.test.ts参照）。
+import "./dom_observer";
 import {
   BOTTOM_BAR_NAVIGATION_SELECTOR,
   HEADER_HIDE_STYLE_ID,
   TWEET_INPUT_HIDE_STYLE_ID,
 } from "./headerCustomizerTypes";
+import { useHeaderCustomizer } from "./useHeaderCustomizer";
 
 /**
  * role="navigation" を含む BottomBar 要素（下部固定ヘッダー表示時のnav）を作成して
@@ -182,6 +185,42 @@ describe("useHeaderCustomizer", () => {
 
     appendBottomBarWithNavigation();
     window.dispatchEvent(new Event("resize"));
+
+    await waitFor(() => {
+      expect(document.getElementById(HEADER_HIDE_STYLE_ID)).toBeNull();
+    });
+  });
+});
+
+describe("useHeaderCustomizer の共有ハブ非存在時のフォールバック", () => {
+  let originalHub: Window["__mcxDomObserver"];
+
+  beforeEach(() => {
+    document.head.innerHTML = "";
+    document.body.innerHTML = "";
+    window.__multiColumnXConfig = undefined;
+    // 共有ハブ(window.__mcxDomObserver)が無い環境を再現するため、このdescribeの
+    // 間だけ一時的に取り除く（他のdescribeのテストへ影響しないよう復元する）。
+    originalHub = window.__mcxDomObserver;
+    delete window.__mcxDomObserver;
+  });
+
+  afterEach(() => {
+    cleanup();
+    window.__multiColumnXConfig = undefined;
+    window.__mcxDomObserver = originalHub;
+  });
+
+  it("window.__mcxDomObserverが存在しない場合でも、ローカルのMutationObserverでヘッダー非表示CSSが再判定される", async () => {
+    window.__multiColumnXConfig = {
+      hideHeaderEnabled: true,
+      hideTweetInputEnabled: true,
+    } as Window["__multiColumnXConfig"];
+
+    renderHook(() => useHeaderCustomizer());
+    expect(document.getElementById(HEADER_HIDE_STYLE_ID)).not.toBeNull();
+
+    appendBottomBarWithNavigation();
 
     await waitFor(() => {
       expect(document.getElementById(HEADER_HIDE_STYLE_ID)).toBeNull();
