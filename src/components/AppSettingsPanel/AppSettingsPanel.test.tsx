@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { GlobalSettings, Column, Account } from "../../types";
@@ -103,6 +103,7 @@ const defaultProps = {
   onApplyLayout: vi.fn(),
   onApplyColumnDefaults: vi.fn(),
   onReloadAllWebviews: vi.fn(),
+  onLoadPreset: vi.fn().mockResolvedValue(undefined),
   appVersion: "0.1.1",
   updateChecking: false,
   updateManualResult: "idle" as const,
@@ -769,5 +770,28 @@ describe("AppSettingsPanel 表示サイズ・テーマの変更チェックボ�
     expect(
       screen.getByRole("checkbox", { name: "テーマを変更する" }),
     ).not.toBeChecked();
+  });
+});
+
+describe("AppSettingsPanel プリセット", () => {
+  it("プリセットの読み込みでonLoadPresetが呼ばれる", async () => {
+    const onLoadPreset = vi.fn().mockResolvedValue(undefined);
+    const onClose = vi.fn();
+    const settings = {
+      ...baseGlobalSettings,
+      presets: [{ id: "preset-1", name: "プリセット1", columns: [] }],
+    };
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={settings}
+        onLoadPreset={onLoadPreset}
+        onClose={onClose}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "プリセット" }));
+    fireEvent.click(screen.getByRole("button", { name: "読み込む" }));
+    expect(onLoadPreset).toHaveBeenCalledWith("preset-1");
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 });

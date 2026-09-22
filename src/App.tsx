@@ -97,6 +97,7 @@ const App: React.FC = () => {
     setDialogOpen,
     recreateAllWebviews,
     recreateColumnWebview,
+    loadPresetAndRecreateWebviews,
   } = useColumns();
   const {
     startAddAccount,
@@ -727,6 +728,7 @@ const App: React.FC = () => {
             );
           }}
           onReloadAllWebviews={recreateAllWebviews}
+          onLoadPreset={loadPresetAndRecreateWebviews}
           appVersion={appVersion}
           updateChecking={updater.checking}
           updateManualResult={updater.manualResult}
