@@ -15,6 +15,16 @@
     "core:default",
     "core:webview:default",
     "opener:default",
-    "opener:allow-default-urls"
+    "opener:allow-default-urls",
+    "allow-open-popup-window",
+    "allow-open-link-popup-window",
+    "allow-close-popup-window",
+    "allow-switch-popup-session",
+    "allow-report-webview-scroll",
+    "allow-report-new-posts-count",
+    "allow-report-official-settings",
+    "allow-report-api-rate-limit",
+    "allow-report-keyboard-shortcut",
+    "allow-download-video"
   ]
 }
