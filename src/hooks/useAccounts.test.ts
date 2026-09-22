@@ -453,9 +453,30 @@ describe("useAccounts confirmRemoval（カラム削除・削除保留の記録�
     expect(
       useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
     ).toEqual(["/data/acc-1"]);
-    expect(result.current.accountNotice).toBe(
-      ACCOUNT_DATA_DELETE_FAILED_MESSAGE,
-    );
+    expect(result.current.accountNotice).toEqual({
+      title: "アカウントの削除",
+      message: ACCOUNT_DATA_DELETE_FAILED_MESSAGE,
+    });
+  });
+
+  it("データフォルダの削除に失敗したときはアカウントの削除として通知される", async () => {
+    setupAccountsAndColumns();
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "delete_account_data") {
+        throw new Error("locked");
+      }
+      return undefined;
+    });
+    const { result } = renderHook(() => useAccounts());
+
+    act(() => {
+      result.current.removeAccount("acc-1");
+    });
+    await act(async () => {
+      await result.current.confirmRemoval();
+    });
+
+    expect(result.current.accountNotice?.title).toBe("アカウントの削除");
   });
 
   it("保存先の削除に成功したときは通知されず再実行対象に記録されない", async () => {
@@ -725,9 +746,11 @@ describe("useAccounts (desktop reauth)", () => {
       dataDirectory: OLD_DATA_DIRECTORY,
     });
     expect(mockReload).toHaveBeenCalledTimes(1);
-    expect(result.current.accountNotice).toBe(
-      "初回の再認証のため同一性の照合をスキップし、アカウント識別子を記録しました",
-    );
+    expect(result.current.accountNotice).toEqual({
+      title: "再認証",
+      message:
+        "初回の再認証のため同一性の照合をスキップし、アカウント識別子を記録しました",
+    });
   });
 
   it("不一致(mismatch)の場合、xUserIdとdataDirectoryは据え置かれ新dirが削除されreloadAllWebviewsも呼ばれず警告がセットされる", async () => {
@@ -764,9 +787,11 @@ describe("useAccounts (desktop reauth)", () => {
     expect(mockInvoke).toHaveBeenCalledWith("delete_account_data", {
       dataDirectory: NEW_DATA_DIRECTORY,
     });
-    expect(result.current.accountNotice).toBe(
-      "登録済みと異なるアカウントでログインされたため、セッションを更新しませんでした",
-    );
+    expect(result.current.accountNotice).toEqual({
+      title: "再認証",
+      message:
+        "登録済みと異なるアカウントでログインされたため、セッションを更新しませんでした",
+    });
   });
 
   it("識別子取得失敗の場合、更新もリロードもされず新dirが削除され失敗通知がセットされる", async () => {
@@ -803,9 +828,10 @@ describe("useAccounts (desktop reauth)", () => {
     expect(mockInvoke).toHaveBeenCalledWith("delete_account_data", {
       dataDirectory: NEW_DATA_DIRECTORY,
     });
-    expect(result.current.accountNotice).toBe(
-      "再認証に失敗しました（アカウント識別子を取得できませんでした）",
-    );
+    expect(result.current.accountNotice).toEqual({
+      title: "再認証",
+      message: "再認証に失敗しました（アカウント識別子を取得できませんでした）",
+    });
   });
 
   it("dismissAccountNoticeを呼ぶとaccountNoticeがnullに戻る", async () => {
@@ -992,9 +1018,11 @@ describe("useAccounts (mobile reauth)", () => {
       expect.anything(),
     );
     expect(mockReload).toHaveBeenCalledTimes(1);
-    expect(result.current.accountNotice).toBe(
-      "初回の再認証のため同一性の照合をスキップし、アカウント識別子を記録しました",
-    );
+    expect(result.current.accountNotice).toEqual({
+      title: "再認証",
+      message:
+        "初回の再認証のため同一性の照合をスキップし、アカウント識別子を記録しました",
+    });
   });
 
   it("不一致の場合、invokeがaccount-mismatchでrejectされxUserIdは更新されず警告がセットされる", async () => {
@@ -1016,9 +1044,11 @@ describe("useAccounts (mobile reauth)", () => {
 
     expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
     expect(mockReload).not.toHaveBeenCalled();
-    expect(result.current.accountNotice).toBe(
-      "登録済みと異なるアカウントでログインされたため、セッションを更新しませんでした",
-    );
+    expect(result.current.accountNotice).toEqual({
+      title: "再認証",
+      message:
+        "登録済みと異なるアカウントでログインされたため、セッションを更新しませんでした",
+    });
   });
 
   it("キャンセルの場合、invokeがcancelledでrejectされ何も起きない", async () => {
@@ -1062,8 +1092,9 @@ describe("useAccounts (mobile reauth)", () => {
 
     expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
     expect(mockReload).not.toHaveBeenCalled();
-    expect(result.current.accountNotice).toBe(
-      "再認証に失敗しました（アカウント識別子を取得できませんでした）",
-    );
+    expect(result.current.accountNotice).toEqual({
+      title: "再認証",
+      message: "再認証に失敗しました（アカウント識別子を取得できませんでした）",
+    });
   });
 });

@@ -701,8 +701,8 @@ const App: React.FC = () => {
       {accountNotice && (
         <ConfirmDialog
           singleButton
-          title="再認証"
-          message={accountNotice}
+          title={accountNotice.title}
+          message={accountNotice.message}
           confirmLabel="OK"
           onConfirm={dismissAccountNotice}
           onCancel={dismissAccountNotice}
