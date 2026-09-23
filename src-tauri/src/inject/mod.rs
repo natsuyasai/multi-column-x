@@ -34,6 +34,8 @@ pub struct InitScriptParams<'a> {
     pub whitelist_words: &'a [String],
     pub compose_only_enabled: bool,
     pub minimal_injection: bool,
+    pub return_to_last_read_included: bool,
+    pub return_to_last_read_enabled: bool,
 }
 
 // document.body の childList+subtree 監視を共有する単一 MutationObserver ハブ。
@@ -120,7 +122,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         serde_json::to_string(params.whitelist_words).unwrap_or_else(|_| "[]".to_string());
     let effective_show_custom_menu = params.hide_header_enabled && params.show_custom_menu;
     let config = format!(
-        "window.{} = {{ hideHeaderEnabled: {}, hideTweetInputEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {}, blurImageEnabled: {}, blurImageAmount: {}, hideAdEnabled: {}, apiRateLimitMonitorEnabled: {}, imagePopupEnabled: {}, videoPopupEnabled: {}, ngWords: {}, globalNgWords: {}, repostHiddenUserIds: {}, globalRepostHiddenUserIds: {}, whitelistEnabled: {}, whitelistWords: {} }};",
+        "window.{} = {{ hideHeaderEnabled: {}, hideTweetInputEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {}, blurImageEnabled: {}, blurImageAmount: {}, hideAdEnabled: {}, apiRateLimitMonitorEnabled: {}, imagePopupEnabled: {}, videoPopupEnabled: {}, ngWords: {}, globalNgWords: {}, repostHiddenUserIds: {}, globalRepostHiddenUserIds: {}, whitelistEnabled: {}, whitelistWords: {}, returnToLastReadEnabled: {} }};",
         globals::MULTI_COLUMN_X_CONFIG,
         params.hide_header_enabled,
         params.hide_tweet_input_enabled,
@@ -139,7 +141,8 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         repost_hidden_user_ids_json,
         global_repost_hidden_user_ids_json,
         params.whitelist_enabled,
-        whitelist_words_json
+        whitelist_words_json,
+        params.return_to_last_read_enabled
     );
 
     let header_part = if params.hide_header_enabled || params.hide_tweet_input_enabled {
@@ -148,6 +151,11 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         String::new()
     };
     let auto_reload_part = format!("\n{}", auto_reload);
+    let return_to_last_read_part = if params.return_to_last_read_included {
+        format!("\n{}", include_str!("return_to_last_read.js"))
+    } else {
+        String::new()
+    };
     let video_control_part = if params.video_auto_play_stop_enabled {
         format!("\n{}", video_control)
     } else {
@@ -155,12 +163,13 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     };
 
     let mut script = format!(
-        "{}\n{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
+        "{}\n{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
         DOM_OBSERVER_HUB,
         config,
         tab_selector,
         header_part,
         auto_reload_part,
+        return_to_last_read_part,
         video_control_part,
         small_image,
         blur_image,
@@ -245,6 +254,8 @@ mod tests {
             whitelist_words: &[],
             compose_only_enabled: false,
             minimal_injection: false,
+            return_to_last_read_included: false,
+            return_to_last_read_enabled: false,
         }
     }
 
@@ -693,6 +704,59 @@ mod tests {
     fn build_popup_init_scriptに共有domobserverハブが含まれる() {
         let script = build_popup_init_script("[]", "acc1", "", true);
         assert!(script.contains("__mcxDomObserver"));
+    }
+
+    #[test]
+    fn return_to_last_read_includedがtrueのとき前回の境目へ戻るスクリプトが含まれる() {
+        let mut params = default_params();
+        params.return_to_last_read_included = true;
+        let script = build_init_script(&params);
+        assert!(script.contains("mcx-return-to-last-read"));
+    }
+
+    #[test]
+    fn return_to_last_read_includedがfalseのとき前回の境目へ戻るスクリプトが含まれない() {
+        let script = build_init_script(&default_params());
+        assert!(!script.contains("mcx-return-to-last-read"));
+    }
+
+    #[test]
+    fn return_to_last_read_includedがtrueのとき前回の境目へ戻るスクリプトはauto_reloadより後ろに連結される(
+    ) {
+        let mut params = default_params();
+        params.return_to_last_read_included = true;
+        let script = build_init_script(&params);
+        let auto_reload_pos = script
+            .find("window.__multiColumnX.triggerReload = triggerReload;")
+            .expect("auto_reload marker not found");
+        let return_to_last_read_pos = script
+            .find("mcx-return-to-last-read")
+            .expect("return_to_last_read marker not found");
+        assert!(auto_reload_pos < return_to_last_read_pos);
+    }
+
+    #[test]
+    fn build_init_script_configにreturntolastreadenabled_trueが含まれる() {
+        let mut params = default_params();
+        params.return_to_last_read_enabled = true;
+        let script = build_init_script(&params);
+        assert!(script.contains("returnToLastReadEnabled: true"));
+    }
+
+    #[test]
+    fn build_init_script_configにreturntolastreadenabled_falseが含まれる() {
+        let script = build_init_script(&default_params());
+        assert!(script.contains("returnToLastReadEnabled: false"));
+    }
+
+    #[test]
+    fn minimal_injectionがtrueのときreturn_to_last_read_includedがtrueでも前回の境目へ戻るスクリプトは含まれない(
+    ) {
+        let mut params = default_params();
+        params.minimal_injection = true;
+        params.return_to_last_read_included = true;
+        let script = build_init_script(&params);
+        assert!(!script.contains("mcx-return-to-last-read"));
     }
 
     #[test]

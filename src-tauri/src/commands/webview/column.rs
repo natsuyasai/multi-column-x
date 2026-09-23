@@ -85,6 +85,13 @@ fn effective_hide_tweet_input_enabled(column: &ColumnData) -> bool {
     }
 }
 
+/// 「前回の境目へ戻る」ボタンの inject スクリプトを注入するカラム種別かどうかを判定する。
+/// 対象はホームタイムライン（page_type == "home"）のみ。投稿カラム（page_type == "compose"）も
+/// URL としては /home を表示するが、対象外（インライン投稿フォーム専用のため）。
+fn is_return_to_last_read_target(column: &ColumnData) -> bool {
+    column.page_type == "home"
+}
+
 /// カラム WebView に注入する init script を、設定ストアの読み出しを含めて構築する。
 /// desktop / mobile 双方の `create_column_webview` から呼ばれ、挙動差分は `is_mobile` のみ。
 fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: bool) -> String {
@@ -116,6 +123,8 @@ fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: boo
         // 投稿カラム（/home 表示）ではインライン投稿フォーム以外を隠す。
         compose_only_enabled: column.page_type == "compose",
         minimal_injection: column.page_type == "external",
+        return_to_last_read_included: is_return_to_last_read_target(column),
+        return_to_last_read_enabled: column.settings.return_to_last_read_enabled,
     })
 }
 
@@ -754,6 +763,28 @@ mod tests {
         let mut col = column("home");
         col.settings.hide_tweet_input_enabled = false;
         assert!(!effective_hide_tweet_input_enabled(&col));
+    }
+
+    #[test]
+    fn is_return_to_last_read_targetはhomeカラムでtrueになる() {
+        assert!(is_return_to_last_read_target(&column("home")));
+    }
+
+    #[test]
+    fn is_return_to_last_read_targetはhome以外のカラムでfalseになる() {
+        for page_type in [
+            "compose",
+            "notifications",
+            "search",
+            "list",
+            "custom",
+            "external",
+        ] {
+            assert!(
+                !is_return_to_last_read_target(&column(page_type)),
+                "page_type={page_type} はfalseになるはず"
+            );
+        }
     }
 
     #[test]
