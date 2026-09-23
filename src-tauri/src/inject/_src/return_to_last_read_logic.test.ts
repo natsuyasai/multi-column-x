@@ -248,13 +248,41 @@ describe("inject/return_to_last_read_logic", () => {
       expect(result).toEqual({ kind: "run", id: "A" });
     });
 
-    it("広告除外済みの列でも連続と判定できる", () => {
-      const result = scanReturnTarget(
-        ["N1", "N2", "A", "B", "C", "D", "E"],
-        ["A", "B", "C", "D", "E"],
-      );
+    it("基準の投稿の間に広告が挟まっていても続けて並んでいるものとして扱う", () => {
+      // extractArticleStatusId は status リンクの数値部分しか拾わないため、
+      // N1/N2/A〜E/広告に対応する数字文字列のIDを割り当てる。
+      // 広告も実DOMと同様にstatusリンクを持つ article として組み立て、
+      // 広告除外（isAdArticle）が効いていない場合にA-B間の連続が崩れて
+      // 検出結果が変わることを保証する。
+      const [n1, n2, a, b, c, d, e, adId] = [
+        "901",
+        "902",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "999",
+      ];
+      const adArticle = buildArticleWithStatusId(adId);
+      const adMarker = document.createElement("div");
+      adMarker.dataset.testid = "placementTracking";
+      adArticle.appendChild(adMarker);
 
-      expect(result).toEqual({ kind: "run", id: "A" });
+      const section = addSection();
+      addCell(section, buildArticleWithStatusId(n1));
+      addCell(section, buildArticleWithStatusId(n2));
+      addCell(section, buildArticleWithStatusId(a));
+      addCell(section, adArticle);
+      addCell(section, buildArticleWithStatusId(b));
+      addCell(section, buildArticleWithStatusId(c));
+      addCell(section, buildArticleWithStatusId(d));
+      addCell(section, buildArticleWithStatusId(e));
+      const anchorIds = [a, b, c, d, e];
+
+      const result = scanReturnTarget(readTimelineIds(section), anchorIds);
+
+      expect(result).toEqual({ kind: "run", id: a });
     });
 
     it("連続する箇所が無い場合は出現順のsinglesを返す", () => {
@@ -272,7 +300,7 @@ describe("inject/return_to_last_read_logic", () => {
       expect(result).toEqual({ kind: "none", singles: ["B", "A"] });
     });
 
-    it("基準の投稿が新着の中へ分散していても続けて並んでいる箇所を返す", () => {
+    it("基準の投稿の一部が新着の中へ移動していても基準が続けて並んでいる箇所へ戻る", () => {
       const result = scanReturnTarget(
         ["N1", "A", "N2", "N3", "D", "N4", "B", "C", "E"],
         ["A", "B", "C", "D", "E"],
@@ -635,7 +663,7 @@ describe("inject/return_to_last_read_logic", () => {
       expect(deps.getScrollTop()).toBe(500);
     });
 
-    it("探している途中で自分でスクロールすると探索を中断しその位置のままにする", async () => {
+    it("探している途中で自分でスクロールすると探索を中断する", async () => {
       const anchorIds = ["A", "B", "C", "D", "E"];
       const { deps: baseDeps } = createFakeVirtualList(
         [["N1"], ["N2"], ["N3"], ["N4"]],

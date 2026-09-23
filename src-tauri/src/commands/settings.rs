@@ -710,7 +710,7 @@ mod tests {
     /// returnToLastReadEnabled 追加前に保存された旧カラム設定 JSON（キー欠落）を
     /// デシリアライズしてもエラーにならず、デフォルト値 false にフォールバックすることを確認する。
     #[test]
-    fn returntolastreadenabledが無い旧カラム設定はデフォルトでfalseになる() {
+    fn 設定値を持たない保存済みカラムを読み込むと戻るボタン設定はoffになる() {
         let json = serde_json::json!({
             "autoReloadEnabled": true,
             "autoReloadInterval": 600,
