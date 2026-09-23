@@ -174,6 +174,24 @@ describe("App (desktop)", () => {
     render(<App />);
     expect(screen.getByText("外部: example.com")).toBeInTheDocument();
   });
+
+  it("設定読み込み失敗の通知があるとダイアログが表示され、OKを押すと消える", () => {
+    useAppStore.setState({
+      settingsLoadNotice:
+        "設定ファイルを読み込めなかったため、初期設定で起動しました。元の設定は次の場所にバックアップしました: /data/settings.json.20260922-120000.bak",
+    });
+    render(<App />);
+    expect(
+      screen.getByText("設定の読み込みに失敗しました"),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/バックアップしました/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("OK"));
+
+    expect(
+      screen.queryByText("設定の読み込みに失敗しました"),
+    ).not.toBeInTheDocument();
+  });
 });
 
 describe("App (mobile)", () => {

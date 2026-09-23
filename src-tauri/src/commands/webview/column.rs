@@ -8,8 +8,7 @@ use crate::inject::{build_init_script, InitScriptParams};
 use crate::ipc_constants::events;
 use crate::ipc_constants::labels;
 use crate::state::AppState;
-#[cfg(desktop)]
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 #[cfg(any(target_os = "linux", windows))]
 use tauri::Emitter;
 #[cfg(all(desktop, not(target_os = "linux")))]
@@ -129,30 +128,67 @@ fn is_safe_column_id(column_id: &str) -> bool {
         && !column_id.contains("..")
 }
 
+/// external カラム（アカウント非依存の任意URLカラム）専用のデータディレクトリのパスを組み立てる
+/// （存在確認・作成は行わない純粋関数）。column_id は IPC 経由で任意の文字列を受け取るため、
+/// パストラバーサル対策として `is_safe_column_id` を満たさない値は `None` を返す。
+fn external_column_data_dir(app_data: &Path, column_id: &str) -> Option<PathBuf> {
+    if !is_safe_column_id(column_id) {
+        return None;
+    }
+    Some(
+        app_data
+            .join("external_columns")
+            .join(format!("column-{column_id}")),
+    )
+}
+
 /// external カラム（アカウント非依存の任意URLカラム）専用のデータディレクトリを解決する。
 /// カラムIDごとに固有のディレクトリを作成し、WebView のセッション（Cookie等）を
 /// 他のカラム・アカウントと完全に分離する。
-/// column_id は IPC 経由で任意の文字列を受け取るため、パストラバーサル対策として
-/// パス区切り文字・親ディレクトリ参照を含む値は拒否する。
 #[tauri::command]
 pub async fn get_external_column_data_directory(
+    caller: tauri::Webview,
     app: AppHandle,
     column_id: String,
 ) -> Result<String, String> {
+    crate::commands::require_main_caller(&caller)?;
     if !is_safe_column_id(&column_id) {
         return Err("invalid column id".to_string());
     }
     let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let data_dir = app_data
-        .join("external_columns")
-        .join(format!("column-{column_id}"));
+    let data_dir = external_column_data_dir(&app_data, &column_id)
+        .ok_or_else(|| "invalid column id".to_string())?;
     std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
     Ok(data_dir.to_string_lossy().to_string())
 }
 
+/// external カラム専用のデータディレクトリを削除する。column_id から Rust 側でパスを
+/// 組み立てるため、呼び出し元（TS 側）は任意パスを直接指定できない。ディレクトリが
+/// 存在しない場合は何もしない（カラム追加前にキャンセルされた場合など）。
+#[tauri::command]
+pub async fn delete_external_column_data(
+    caller: tauri::Webview,
+    app: AppHandle,
+    column_id: String,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
+    let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let data_dir = external_column_data_dir(&app_data, &column_id)
+        .ok_or_else(|| "invalid column id".to_string())?;
+    if data_dir.exists() {
+        std::fs::remove_dir_all(&data_dir).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[cfg(desktop)]
 #[tauri::command]
-pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> Result<(), String> {
+pub async fn create_column_webview(
+    caller: tauri::Webview,
+    app: AppHandle,
+    args: CreateWebviewArgs,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let url = resolve_url(&args.column);
     let label = webview_label(&args.column.id);
     let data_dir = PathBuf::from(&args.data_directory);
@@ -264,7 +300,12 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
 
 #[cfg(mobile)]
 #[tauri::command]
-pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> Result<(), String> {
+pub async fn create_column_webview(
+    caller: tauri::Webview,
+    app: AppHandle,
+    args: CreateWebviewArgs,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let url = resolve_url(&args.column);
     let label = webview_label(&args.column.id);
 
@@ -302,7 +343,12 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
 
 #[cfg(desktop)]
 #[tauri::command]
-pub async fn remove_column_webview(app: AppHandle, column_id: String) -> Result<(), String> {
+pub async fn remove_column_webview(
+    caller: tauri::Webview,
+    app: AppHandle,
+    column_id: String,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let label = webview_label(&column_id);
 
     // On Linux, column WebViews are WebviewWindows; on other platforms they are child Webviews.
@@ -321,7 +367,12 @@ pub async fn remove_column_webview(app: AppHandle, column_id: String) -> Result<
 
 #[cfg(mobile)]
 #[tauri::command]
-pub async fn remove_column_webview(app: AppHandle, column_id: String) -> Result<(), String> {
+pub async fn remove_column_webview(
+    caller: tauri::Webview,
+    app: AppHandle,
+    column_id: String,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let label = webview_label(&column_id);
 
     #[cfg(target_os = "android")]
@@ -348,7 +399,12 @@ pub struct ResizeBounds {
 
 #[cfg(desktop)]
 #[tauri::command]
-pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Result<(), String> {
+pub async fn resize_column_webview(
+    caller: tauri::Webview,
+    app: AppHandle,
+    bounds: ResizeBounds,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let label = webview_label(&bounds.column_id);
 
     // On Linux, column WebViews are undecorated WebviewWindows. Reposition by computing
@@ -406,7 +462,12 @@ pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Resu
 
 #[cfg(mobile)]
 #[tauri::command]
-pub async fn resize_column_webview(_app: AppHandle, bounds: ResizeBounds) -> Result<(), String> {
+pub async fn resize_column_webview(
+    caller: tauri::Webview,
+    _app: AppHandle,
+    bounds: ResizeBounds,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let label = webview_label(&bounds.column_id);
 
     #[cfg(target_os = "android")]
@@ -432,8 +493,10 @@ pub async fn resize_column_webview(_app: AppHandle, bounds: ResizeBounds) -> Res
 /// setActiveColumn から resize_column_webview より先に呼ばれ、正しいアカウントで WebView が動作する。
 #[tauri::command]
 pub async fn set_column_cookies(
+    caller: tauri::Webview,
     #[allow(non_snake_case, unused_variables)] accountId: String,
 ) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     #[cfg(target_os = "android")]
     {
         crate::android_bridge::set_account_cookies(&accountId)?;
@@ -716,6 +779,33 @@ mod tests {
     #[test]
     fn is_safe_column_idは空文字を拒否する() {
         assert!(!is_safe_column_id(""));
+    }
+
+    #[test]
+    fn external_column_data_dirは有効なidでexternal_columns配下のパスを返す() {
+        let app_data = Path::new("/data/app");
+        assert_eq!(
+            external_column_data_dir(app_data, "abc-123"),
+            Some(PathBuf::from("/data/app/external_columns/column-abc-123"))
+        );
+    }
+
+    #[test]
+    fn external_column_data_dirはスラッシュを含むidでnoneを返す() {
+        let app_data = Path::new("/data/app");
+        assert_eq!(external_column_data_dir(app_data, "abc/def"), None);
+    }
+
+    #[test]
+    fn external_column_data_dirは親ディレクトリ参照を含むidでnoneを返す() {
+        let app_data = Path::new("/data/app");
+        assert_eq!(external_column_data_dir(app_data, "../../etc/passwd"), None);
+    }
+
+    #[test]
+    fn external_column_data_dirは空文字のidでnoneを返す() {
+        let app_data = Path::new("/data/app");
+        assert_eq!(external_column_data_dir(app_data, ""), None);
     }
 
     #[cfg(target_os = "linux")]

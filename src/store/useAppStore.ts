@@ -8,9 +8,14 @@ import type {
   Column,
   ColumnPreset,
   GlobalSettings,
-  AppSettings,
+  LoadSettingsResult,
 } from "../types";
 import { DEFAULT_GLOBAL_SETTINGS } from "../types";
+
+const SETTINGS_LOAD_FAILED_WITH_BACKUP_MESSAGE = (backupPath: string) =>
+  `設定ファイルを読み込めなかったため、初期設定で起動しました。元の設定は次の場所にバックアップしました: ${backupPath}`;
+const SETTINGS_LOAD_FAILED_WITHOUT_BACKUP_MESSAGE =
+  "設定ファイルを読み込めなかったため、初期設定で起動しました。元の設定のバックアップにも失敗しました。";
 
 export function migrateColumn(
   col: Partial<Column> &
@@ -42,6 +47,8 @@ interface AppStore {
   columns: Column[];
   globalSettings: GlobalSettings;
   isLoaded: boolean;
+  settingsLoadNotice: string | null;
+  dismissSettingsLoadNotice: () => void;
   topBarExpanded: boolean;
   setTopBarExpanded: (v: boolean) => void;
   isMobile: boolean;
@@ -65,6 +72,9 @@ interface AppStore {
   removeAccount: (id: string) => void;
   addColumn: (column: Column) => void;
   removeColumn: (id: string) => void;
+  removeColumnsByAccount: (accountId: string) => void;
+  addPendingDataDirectoryDeletion: (dir: string) => void;
+  setPendingDataDirectoryDeletions: (dirs: string[]) => void;
   updateColumn: (id: string, patch: Partial<Column>) => void;
   updateGlobalSettings: (patch: Partial<GlobalSettings>) => void;
   replaceColumns: (columns: Column[]) => void;
@@ -73,11 +83,18 @@ interface AppStore {
   deletePreset: (id: string) => void;
 }
 
+// saveSettings の直列化用チェーン。呼び出しごとにこのチェーンへ連結し、
+// 前の保存が完了(成功/失敗いずれも)してから次の保存を実行することで、
+// 最後に要求された保存が最後に書き込まれることを保証する。
+let saveChain: Promise<void> = Promise.resolve();
+
 export const useAppStore = create<AppStore>((set, get) => ({
   accounts: [],
   columns: [],
   globalSettings: DEFAULT_GLOBAL_SETTINGS,
   isLoaded: false,
+  settingsLoadNotice: null,
+  dismissSettingsLoadNotice: () => set({ settingsLoadNotice: null }),
   topBarExpanded: false,
   setTopBarExpanded: (v) => set({ topBarExpanded: v }),
   isMobile: false,
@@ -107,7 +124,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   loadSettings: async () => {
     try {
-      const settings = await invoke<AppSettings>(IPC_COMMANDS.LOAD_SETTINGS);
+      const { settings, loadFailed, backupPath } =
+        await invoke<LoadSettingsResult>(IPC_COMMANDS.LOAD_SETTINGS);
       set({
         accounts: settings.accounts,
         columns: settings.columns
@@ -118,17 +136,27 @@ export const useAppStore = create<AppStore>((set, get) => ({
           ...settings.globalSettings,
         },
         isLoaded: true,
+        settingsLoadNotice: loadFailed
+          ? backupPath
+            ? SETTINGS_LOAD_FAILED_WITH_BACKUP_MESSAGE(backupPath)
+            : SETTINGS_LOAD_FAILED_WITHOUT_BACKUP_MESSAGE
+          : null,
       });
     } catch {
       set({ isLoaded: true });
     }
   },
 
-  saveSettings: async () => {
-    const { accounts, columns, globalSettings } = get();
-    await invoke(IPC_COMMANDS.SAVE_SETTINGS, {
-      settings: { accounts, columns, globalSettings },
-    }).catch(logError("saveSettings"));
+  saveSettings: () => {
+    // 前の保存の完了を待ってから実行する。状態は実行時点(get())で読むため、
+    // 連続して呼ばれても最後に書き込まれるのは最新の状態になる。
+    saveChain = saveChain.then(async () => {
+      const { accounts, columns, globalSettings } = get();
+      await invoke(IPC_COMMANDS.SAVE_SETTINGS, {
+        settings: { accounts, columns, globalSettings },
+      }).catch(logError("saveSettings"));
+    });
+    return saveChain;
   },
 
   addAccount: (account) => {
@@ -157,6 +185,41 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   removeColumn: (id) => {
     set((state) => ({ columns: state.columns.filter((c) => c.id !== id) }));
+    get().saveSettings();
+  },
+
+  removeColumnsByAccount: (accountId) => {
+    set((state) => ({
+      columns: state.columns.filter((c) => c.accountId !== accountId),
+    }));
+    get().saveSettings();
+  },
+
+  addPendingDataDirectoryDeletion: (dir) => {
+    set((state) => {
+      if (state.globalSettings.pendingDataDirectoryDeletions.includes(dir)) {
+        return state;
+      }
+      return {
+        globalSettings: {
+          ...state.globalSettings,
+          pendingDataDirectoryDeletions: [
+            ...state.globalSettings.pendingDataDirectoryDeletions,
+            dir,
+          ],
+        },
+      };
+    });
+    get().saveSettings();
+  },
+
+  setPendingDataDirectoryDeletions: (dirs) => {
+    set((state) => ({
+      globalSettings: {
+        ...state.globalSettings,
+        pendingDataDirectoryDeletions: dirs,
+      },
+    }));
     get().saveSettings();
   },
 

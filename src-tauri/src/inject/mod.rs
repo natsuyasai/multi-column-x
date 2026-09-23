@@ -36,6 +36,11 @@ pub struct InitScriptParams<'a> {
     pub minimal_injection: bool,
 }
 
+// document.body の childList+subtree 監視を共有する単一 MutationObserver ハブ。
+// 他のどのスクリプトよりも先に連結し、後続スクリプトが window.__mcxDomObserver を
+// 参照できるようにする（詳細は dom_observer.ts のコメント参照）。
+const DOM_OBSERVER_HUB: &str = include_str!("dom_observer.js");
+
 pub fn build_init_script(params: &InitScriptParams) -> String {
     if params.minimal_injection {
         let custom_css_js = include_str!("custom_css.js");
@@ -150,7 +155,8 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     };
 
     let mut script = format!(
-        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
+        "{}\n{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
+        DOM_OBSERVER_HUB,
         config,
         tab_selector,
         header_part,
@@ -194,7 +200,8 @@ pub fn build_popup_init_script(
     let popup_toolbar = include_str!("popup_toolbar.js");
     let popup_video_autoplay = include_str!("popup_video_autoplay.js");
     format!(
-        "window.{}={};window.{}={};window.{}={};window.{}={};\n{}\n{}",
+        "{}\nwindow.{}={};window.{}={};window.{}={};window.{}={};\n{}\n{}",
+        DOM_OBSERVER_HUB,
         globals::MCX_ACCOUNTS,
         accounts_json,
         globals::MCX_CURRENT_ACCOUNT_ID,
@@ -654,5 +661,49 @@ mod tests {
         let script = build_init_script(&params);
         assert!(script.contains("multi-column-x-header-customizer-root"));
         assert!(script.contains("__multiColumnXConfig"));
+    }
+
+    #[test]
+    fn build_init_scriptに共有domobserverハブが含まれる() {
+        let script = build_init_script(&default_params());
+        assert!(script.contains("__mcxDomObserver"));
+    }
+
+    #[test]
+    fn build_init_scriptで共有domobserverハブが他のどのスクリプトよりも先頭に連結される() {
+        let script = build_init_script(&default_params());
+        let hub_pos = script
+            .find("__mcxDomObserver")
+            .expect("dom observer hub marker not found");
+        let config_pos = script
+            .find("__multiColumnXConfig")
+            .expect("config marker not found");
+        assert!(hub_pos < config_pos);
+    }
+
+    #[test]
+    fn minimal_injectionがtrueのとき共有domobserverハブは含まれない() {
+        let mut params = default_params();
+        params.minimal_injection = true;
+        let script = build_init_script(&params);
+        assert!(!script.contains("__mcxDomObserver"));
+    }
+
+    #[test]
+    fn build_popup_init_scriptに共有domobserverハブが含まれる() {
+        let script = build_popup_init_script("[]", "acc1", "", true);
+        assert!(script.contains("__mcxDomObserver"));
+    }
+
+    #[test]
+    fn build_popup_init_scriptで共有domobserverハブがpopup_toolbarよりも先頭に連結される() {
+        let script = build_popup_init_script("[]", "acc1", "", true);
+        let hub_pos = script
+            .find("__mcxDomObserver")
+            .expect("dom observer hub marker not found");
+        let toolbar_pos = script
+            .find("tv-popup-toolbar")
+            .expect("popup toolbar marker not found");
+        assert!(hub_pos < toolbar_pos);
     }
 }

@@ -1,3 +1,4 @@
+mod acl_contract;
 #[cfg(target_os = "android")]
 mod android_bridge;
 mod commands;
@@ -206,6 +207,7 @@ pub fn run() {
             commands::settings::save_settings,
             commands::webview::create_column_webview,
             commands::webview::get_external_column_data_directory,
+            commands::webview::delete_external_column_data,
             commands::webview::remove_column_webview,
             commands::webview::resize_column_webview,
             commands::webview::open_popup_window,
@@ -221,7 +223,6 @@ pub fn run() {
             commands::webview::get_mobile_insets,
             commands::webview::set_column_cookies,
             commands::webview::is_webview_profile_supported,
-            commands::webview::open_in_browser,
             commands::webview::update_mobile_swipe_bar,
             commands::webview::flash_mobile_swipe_bar,
             commands::account::open_add_account_window,
