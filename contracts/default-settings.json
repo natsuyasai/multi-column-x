@@ -38,6 +38,27 @@
     "mobileTwoColumnEnabled": true,
     "presets": [],
     "ngWords": [],
-    "repostHiddenUserIds": []
+    "repostHiddenUserIds": [],
+    "pendingDataDirectoryDeletions": []
+  },
+  "columnSettings": {
+    "autoReloadEnabled": true,
+    "autoReloadInterval": 600,
+    "showCountdown": true,
+    "hideHeaderEnabled": true,
+    "hideTweetInputEnabled": true,
+    "showCustomMenu": false,
+    "scrollPosRestoreEnabled": true,
+    "customCSS": "",
+    "visibleLinks": [],
+    "smallImageEnabled": false,
+    "smallImageWidth": "50%",
+    "blurImageEnabled": false,
+    "blurImageAmount": "10px",
+    "ngWords": [],
+    "repostHiddenUserIds": [],
+    "whitelistEnabled": false,
+    "whitelistWords": [],
+    "desktopNotifyEnabled": false
   }
 }

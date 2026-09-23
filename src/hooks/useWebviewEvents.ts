@@ -17,7 +17,7 @@ import { logError } from "../lib/log";
 import { evalInColumn } from "../services/columnWebview";
 import { useAppStore } from "../store/useAppStore";
 import { getColumnLabel } from "../types";
-import type { ApiRateLimitBucket } from "../types";
+import type { ApiRateLimitBucket, Column } from "../types";
 
 /** WebView 内の横ホイールを受け取ってスクロールバーを動かす */
 export function useWebviewScrollRelay(
@@ -227,11 +227,30 @@ export function useApiRateLimitReports(
 }
 
 /**
+ * 公式設定の配布先カラムを選ぶ。投稿（compose）・外部サイト（external）のカラムは、
+ * x.com の localStorage / Cookie 書き込みやリロードの対象として不適切なため対象外とする。
+ * 該当アカウントに通常のカラムが無ければ undefined（=どのカラムにも配布しない）。
+ */
+export function pickOfficialSettingsTargetColumn(
+  columns: Column[],
+  accountId: string,
+): Column | undefined {
+  return columns.find(
+    (c) =>
+      c.accountId === accountId &&
+      c.pageType !== "compose" &&
+      c.pageType !== "external",
+  );
+}
+
+/**
  * ポップアップ内「各カラムに適用」ボタンから届いた公式設定スナップショットを受け、
- * 配布元以外の各アカウントの代表カラム（compose/externalを除く先頭カラム。無ければ任意の1つ）
- * へ書き込み、リロードして反映する。配布元アカウント自身のカラムは、ポップアップと同じ
- * dataDirectory（＝同じIndexedDB）を共有しており書き込み済みのため、書き込みはせず
- * リロードのみ実行して表示を最新化する。
+ * 配布元以外の各アカウントの代表カラム（pickOfficialSettingsTargetColumn が選んだ、
+ * compose/external を除く通常カラム）へ書き込み、リロードして反映する。対象カラムが
+ * 無いアカウント（投稿・外部サイトのカラムしか持たない）には配布しない。配布元アカウント
+ * 自身のカラムは、ポップアップと同じ dataDirectory（＝同じIndexedDB）を共有しており
+ * 書き込み済みのため、書き込みはせずリロードのみ実行して表示を最新化する（対象カラムが
+ * 無ければ配布元も何もしない）。
  *
  * snapshot は x.com 側スクリプトが report_official_settings 経由で送ってくる文字列であり、
  * report_official_settings 自体は require_main_caller を持たない（ポップアップから呼ぶため）。
@@ -281,13 +300,7 @@ export function useOfficialSettingsBroadcast() {
 
         const { accounts, columns } = useAppStore.getState();
         accounts.forEach((account) => {
-          const targetColumns = columns.filter(
-            (c) => c.accountId === account.id,
-          );
-          const col =
-            targetColumns.find(
-              (c) => c.pageType !== "compose" && c.pageType !== "external",
-            ) ?? targetColumns[0];
+          const col = pickOfficialSettingsTargetColumn(columns, account.id);
           if (!col) return;
 
           if (account.id === sourceAccountId) {

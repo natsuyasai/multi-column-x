@@ -115,11 +115,21 @@ describe("inject/popup_toolbar のアカウント切替", () => {
     selectAccount("acc2");
 
     expect(tauriInvokeMock).toHaveBeenCalledWith("switch_popup_session", {
-      popupLabel: "",
       accountId: "acc2",
-      dataDirectory: "dir2",
       url: window.location.href,
     });
+  });
+
+  it("アカウント切替の要求にローカル保存先を含めない", async () => {
+    await importToolbar();
+
+    selectAccount("acc2");
+
+    const [, args] = tauriInvokeMock.mock.calls[0] as [
+      string,
+      Record<string, unknown>,
+    ];
+    expect(args).not.toHaveProperty("dataDirectory");
   });
 
   it("存在しないアカウントIDの場合はどこへも転送しない", async () => {

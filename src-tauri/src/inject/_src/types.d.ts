@@ -95,7 +95,6 @@ declare global {
     id: string;
     label: string;
     color: string;
-    dataDirectory: string;
   }
 
   interface Window {
