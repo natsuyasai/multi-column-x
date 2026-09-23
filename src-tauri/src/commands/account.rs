@@ -125,6 +125,7 @@ pub async fn open_add_account_window(
         if cancel_sentinel.exists() {
             log::info!("[open_add_account] cancel sentinel found at poll #{i}");
             let _ = std::fs::remove_file(&cancel_sentinel);
+            cleanup_created_data_dir(&data_dir);
             return Err("cancelled".to_string());
         }
 
@@ -134,6 +135,7 @@ pub async fn open_add_account_window(
     }
 
     log::warn!("[open_add_account] timeout");
+    cleanup_created_data_dir(&data_dir);
     Err("timeout".to_string())
 }
 
@@ -375,6 +377,25 @@ pub async fn reauth_account_window(
     Err("timeout".to_string())
 }
 
+/// open_add_account_window（mobile）がキャンセル/タイムアウトで終わった場合に、
+/// 作成済みの保存先ディレクトリを削除する。mobile 固有のコードは Windows でコンパイル
+/// されないため、削除処理自体はこの小さな関数に切り出し desktop でもテストできるようにする。
+/// 失敗はログのみ（呼び出し元は結果を待たない）。
+/// 実際の呼び出し元は mobile 専用コードのみのため、desktop の通常ビルドで
+/// 未使用警告にならないよう test / mobile ビルドでのみコンパイルする。
+#[cfg(any(test, mobile))]
+fn cleanup_created_data_dir(data_dir: &Path) {
+    if !data_dir.exists() {
+        return;
+    }
+    if let Err(e) = std::fs::remove_dir_all(data_dir) {
+        log::warn!(
+            "[open_add_account] failed to remove data_dir {}: {e}",
+            data_dir.display()
+        );
+    }
+}
+
 /// 削除対象パスが accounts ルートの「配下」であることを検証する（ルート自体・外部・.. 参照は拒否）。
 /// canonicalize は存在しないパスで失敗するため、字句的な正規化（components ベース）で判定する。
 fn is_safe_account_dir(path: &Path, accounts_root: &Path) -> bool {
@@ -466,6 +487,27 @@ pub async fn close_window(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cleanup_created_data_dirは存在するディレクトリを削除する() {
+        let dir = std::env::temp_dir().join(format!("mcx-test-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        assert!(dir.exists());
+
+        cleanup_created_data_dir(&dir);
+
+        assert!(!dir.exists());
+    }
+
+    #[test]
+    fn cleanup_created_data_dirは存在しないディレクトリでも失敗しない() {
+        let dir = std::env::temp_dir().join(format!("mcx-test-{}", uuid::Uuid::new_v4()));
+        assert!(!dir.exists());
+
+        cleanup_created_data_dir(&dir);
+
+        assert!(!dir.exists());
+    }
 
     #[test]
     fn urlエンコード済みtwidから数値idを抽出する() {

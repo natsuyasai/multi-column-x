@@ -207,6 +207,7 @@ pub fn run() {
             commands::settings::save_settings,
             commands::webview::create_column_webview,
             commands::webview::get_external_column_data_directory,
+            commands::webview::delete_external_column_data,
             commands::webview::remove_column_webview,
             commands::webview::resize_column_webview,
             commands::webview::open_popup_window,

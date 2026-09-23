@@ -12,6 +12,7 @@
     "allow-save-settings",
     "allow-create-column-webview",
     "allow-get-external-column-data-directory",
+    "allow-delete-external-column-data",
     "allow-remove-column-webview",
     "allow-resize-column-webview",
     "allow-open-link-popup-window",

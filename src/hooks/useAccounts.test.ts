@@ -144,7 +144,7 @@ describe("useAccounts (mobile)", () => {
     expect(result.current.pendingAccountName).toBeNull();
   });
 
-  it("cancelAccountNameを呼ぶとアカウントを追加せずclose_windowが呼ばれる", async () => {
+  it("cancelAccountNameを呼ぶとアカウントを追加せずclose_window後にdelete_account_dataが呼ばれる", async () => {
     mockInvoke.mockImplementation(async (cmd) =>
       cmd === "open_add_account_window" ? addAccountResult : undefined,
     );
@@ -153,14 +153,20 @@ describe("useAccounts (mobile)", () => {
     await act(async () => {
       await result.current.startAddAccount();
     });
-    await act(async () => {
+    act(() => {
       result.current.cancelAccountName();
     });
+    await flushMicrotasks();
 
     expect(useAppStore.getState().accounts).toHaveLength(0);
     expect(result.current.pendingAccountName).toBeNull();
-    expect(mockInvoke).toHaveBeenCalledWith("close_window", {
-      label: "add-account",
+    const calls = mockInvoke.mock.calls.map((c) => c[0]);
+    const closeIdx = calls.indexOf("close_window");
+    const deleteIdx = calls.indexOf("delete_account_data");
+    expect(closeIdx).toBeGreaterThanOrEqual(0);
+    expect(deleteIdx).toBeGreaterThan(closeIdx);
+    expect(mockInvoke).toHaveBeenCalledWith("delete_account_data", {
+      dataDirectory: "/data/acc-new",
     });
   });
 
@@ -319,6 +325,67 @@ describe("useAccounts (mobile)", () => {
     });
     expect(useAppStore.getState().accounts).toHaveLength(0);
     expect(result.current.pendingRemoval).toBeNull();
+  });
+});
+
+describe("useAccounts (desktop addAccount)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAppStore.setState({ accounts: [], isMobile: false });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("ログイン前にログインウィンドウを閉じると作られた保存先が削除される", async () => {
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "open_add_account_window" ? addAccountResult : undefined,
+    );
+    const { result } = renderHook(() => useAccounts());
+
+    let startPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      startPromise = result.current.startAddAccount();
+      await flushMicrotasks();
+      fireDestroyedEvent("add-account");
+      await startPromise;
+    });
+
+    expect(result.current.pendingAccountName).toBeNull();
+    expect(useAppStore.getState().accounts).toHaveLength(0);
+    expect(mockInvoke).toHaveBeenCalledWith("delete_account_data", {
+      dataDirectory: "/data/acc-new",
+    });
+  });
+
+  it("ログイン完了後は同じログインウィンドウが閉じられても保存先を削除しない", async () => {
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "open_add_account_window" ? addAccountResult : undefined,
+    );
+    const { result } = renderHook(() => useAccounts());
+
+    let startPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      startPromise = result.current.startAddAccount();
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_LOGIN_COMPLETE, undefined);
+      await startPromise;
+    });
+
+    expect(result.current.pendingAccountName).toMatchObject({
+      accountId: "acc-new",
+      dataDirectory: "/data/acc-new",
+      windowLabel: "add-account",
+    });
+    // ログイン完了後は destroyed リスナーを解除済みのため、その後ウィンドウが
+    // 閉じられてもコールバックは登録されていない（二重削除・確定済みディレクトリの
+    // 誤削除防止の固定）。
+    expect(() => fireDestroyedEvent("add-account")).toThrow();
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "delete_account_data",
+      expect.anything(),
+    );
   });
 });
 

@@ -9,6 +9,7 @@ fn main() {
             "save_settings",
             "create_column_webview",
             "get_external_column_data_directory",
+            "delete_external_column_data",
             "remove_column_webview",
             "resize_column_webview",
             "open_popup_window",
