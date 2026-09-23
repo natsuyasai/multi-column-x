@@ -46,6 +46,7 @@ declare global {
     whitelistEnabled?: boolean;
     whitelistWords?: string[];
     returnToLastReadEnabled?: boolean;
+    mobileSwipeAreaOffset?: number;
   }
 
   interface TauriCore {

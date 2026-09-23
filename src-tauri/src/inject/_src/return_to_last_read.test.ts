@@ -193,6 +193,7 @@ async function importReturnToLastRead(
   options: {
     enabled?: boolean;
     triggerReload?: ReturnType<typeof vi.fn> | null;
+    mobileSwipeAreaOffset?: number;
   } = {},
 ): Promise<{ triggerReloadMock: ReturnType<typeof vi.fn> | null }> {
   vi.resetModules();
@@ -205,6 +206,7 @@ async function importReturnToLastRead(
   ) as MultiColumnXAPI;
   window.__multiColumnXConfig = {
     returnToLastReadEnabled: options.enabled ?? false,
+    mobileSwipeAreaOffset: options.mobileSwipeAreaOffset,
   } as MultiColumnXConfig;
 
   await import("./return_to_last_read");
@@ -732,6 +734,90 @@ describe("inject/return_to_last_read", () => {
       window.dispatchEvent(new Event("scroll"));
       expect(isButtonVisible()).toBe(false);
     });
+  });
+
+  describe("モバイルスワイプ切替領域との重なり補正", () => {
+    it("戻るボタンの下端位置にスワイプ切替領域分の余白が追加される", async () => {
+      const tablist = addTablist();
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["1", "2", "3", "4", "5"]);
+
+      await importReturnToLastRead({
+        enabled: true,
+        mobileSwipeAreaOffset: 28,
+      });
+      window.__multiColumnX.triggerReload?.();
+
+      setTimeline(section, ["100", "1", "2", "3", "4"]);
+      window.dispatchEvent(new Event("scroll"));
+
+      expect(isButtonVisible()).toBe(true);
+      expect(getContainer()?.style.bottom).toBe("52px");
+    });
+
+    it("mobileSwipeAreaOffset未指定のとき戻るボタンの位置は従来通り(24px)である", async () => {
+      const tablist = addTablist();
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["1", "2", "3", "4", "5"]);
+
+      await importReturnToLastRead({ enabled: true });
+      window.__multiColumnX.triggerReload?.();
+
+      setTimeline(section, ["100", "1", "2", "3", "4"]);
+      window.dispatchEvent(new Event("scroll"));
+
+      expect(isButtonVisible()).toBe(true);
+      expect(getContainer()?.style.bottom).toBe("24px");
+    });
+
+    it("mobileSwipeAreaOffsetが0のとき戻るボタンの位置は従来通り(24px)である", async () => {
+      const tablist = addTablist();
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["1", "2", "3", "4", "5"]);
+
+      await importReturnToLastRead({ enabled: true, mobileSwipeAreaOffset: 0 });
+      window.__multiColumnX.triggerReload?.();
+
+      setTimeline(section, ["100", "1", "2", "3", "4"]);
+      window.dispatchEvent(new Event("scroll"));
+
+      expect(isButtonVisible()).toBe(true);
+      expect(getContainer()?.style.bottom).toBe("24px");
+    });
+
+    it("見つからなかった通知もスワイプ切替領域分の余白が追加される", async () => {
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["11", "12", "13", "14", "15"]);
+
+      await importReturnToLastRead({
+        enabled: true,
+        mobileSwipeAreaOffset: 28,
+      });
+      window.__multiColumnX.triggerReload?.();
+
+      setTimeline(section, ["101", "11", "12", "13", "14"]);
+      window.dispatchEvent(new Event("scroll"));
+      expect(isButtonVisible()).toBe(true);
+
+      setTimeline(section, ["901"]);
+      setClampedScrollingElement(300, 300);
+
+      vi.useFakeTimers();
+      const btn = getButton();
+      btn?.click();
+
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(3300);
+
+      const toast = getToast();
+      expect(toast).not.toBeNull();
+      expect(toast?.style.bottom).toBe("52px");
+    }, 15000);
   });
 
   describe("探索: 見つからない場合", () => {
