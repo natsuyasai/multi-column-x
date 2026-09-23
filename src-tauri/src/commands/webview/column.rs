@@ -2,11 +2,7 @@
 #[cfg(desktop)]
 use super::parse_url;
 use crate::commands::settings::ColumnData;
-use crate::commands::settings_store::{
-    load_api_rate_limit_monitor_enabled, load_global_ng_words, load_global_repost_hidden_user_ids,
-    load_hide_ad_enabled, load_image_popup_enabled, load_video_auto_play_stop_enabled,
-    load_video_popup_enabled,
-};
+use crate::commands::settings_store::{column_script_settings_from, load_global_settings};
 use crate::inject::{build_init_script, InitScriptParams};
 #[cfg(any(target_os = "linux", windows))]
 use crate::ipc_constants::events;
@@ -92,34 +88,29 @@ fn effective_hide_tweet_input_enabled(column: &ColumnData) -> bool {
 /// カラム WebView に注入する init script を、設定ストアの読み出しを含めて構築する。
 /// desktop / mobile 双方の `create_column_webview` から呼ばれ、挙動差分は `is_mobile` のみ。
 fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: bool) -> String {
-    let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(app);
-    let hide_ad_enabled = load_hide_ad_enabled(app);
-    let api_rate_limit_monitor_enabled = load_api_rate_limit_monitor_enabled(app);
-    let image_popup_enabled = load_image_popup_enabled(app);
-    let video_popup_enabled = load_video_popup_enabled(app);
-    let global_ng_words = load_global_ng_words(app);
-    let global_repost_hidden_user_ids = load_global_repost_hidden_user_ids(app);
+    let global_settings = load_global_settings(app);
+    let script_settings = column_script_settings_from(&global_settings);
     build_init_script(&InitScriptParams {
         is_mobile,
         hide_header_enabled: column.settings.hide_header_enabled,
         hide_tweet_input_enabled: effective_hide_tweet_input_enabled(column),
         show_custom_menu: column.settings.show_custom_menu,
         scroll_pos_restore_enabled: column.settings.scroll_pos_restore_enabled,
-        video_auto_play_stop_enabled,
+        video_auto_play_stop_enabled: script_settings.video_auto_play_stop_enabled,
         small_image_enabled: column.settings.small_image_enabled,
         small_image_width: &column.settings.small_image_width,
         blur_image_enabled: column.settings.blur_image_enabled,
         blur_image_amount: &column.settings.blur_image_amount,
-        hide_ad_enabled,
-        api_rate_limit_monitor_enabled,
-        image_popup_enabled,
-        video_popup_enabled,
+        hide_ad_enabled: script_settings.hide_ad_enabled,
+        api_rate_limit_monitor_enabled: script_settings.api_rate_limit_monitor_enabled,
+        image_popup_enabled: script_settings.image_popup_enabled,
+        video_popup_enabled: script_settings.video_popup_enabled,
         custom_css: &column.settings.custom_css,
         visible_links: &column.settings.visible_links,
         ng_words: &column.settings.ng_words,
-        global_ng_words: &global_ng_words,
+        global_ng_words: &script_settings.global_ng_words,
         repost_hidden_user_ids: &column.settings.repost_hidden_user_ids,
-        global_repost_hidden_user_ids: &global_repost_hidden_user_ids,
+        global_repost_hidden_user_ids: &script_settings.global_repost_hidden_user_ids,
         whitelist_enabled: column.settings.whitelist_enabled,
         whitelist_words: &column.settings.whitelist_words,
         // 投稿カラム（/home 表示）ではインライン投稿フォーム以外を隠す。

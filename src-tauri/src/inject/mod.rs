@@ -2,6 +2,13 @@
 
 use crate::ipc_constants::globals;
 
+/// 文字列値を JS の文字列リテラルとして埋め込むための JSON エンコード。
+/// `{:?}`（Rust の Debug 書式）は JS 文字列リテラルとのエスケープ規則の互換性が
+/// 保証されないため使わない。エンコードに失敗した場合は空文字列にフォールバックする。
+fn js_string(value: &str) -> String {
+    serde_json::to_string(value).unwrap_or_else(|_| "\"\"".to_string())
+}
+
 pub struct InitScriptParams<'a> {
     pub is_mobile: bool,
     pub hide_header_enabled: bool,
@@ -40,9 +47,9 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         let mut script = custom_css_js.to_string();
         if !params.custom_css.is_empty() {
             script.push_str(&format!(
-                "\nwindow.{}.applyCustomCSS({:?});",
+                "\nwindow.{}.applyCustomCSS({});",
                 globals::MULTI_COLUMN_X,
-                params.custom_css
+                js_string(params.custom_css)
             ));
         }
         return script;
@@ -113,16 +120,16 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         serde_json::to_string(params.whitelist_words).unwrap_or_else(|_| "[]".to_string());
     let effective_show_custom_menu = params.hide_header_enabled && params.show_custom_menu;
     let config = format!(
-        "window.{} = {{ hideHeaderEnabled: {}, hideTweetInputEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?}, blurImageEnabled: {}, blurImageAmount: {:?}, hideAdEnabled: {}, apiRateLimitMonitorEnabled: {}, imagePopupEnabled: {}, videoPopupEnabled: {}, ngWords: {}, globalNgWords: {}, repostHiddenUserIds: {}, globalRepostHiddenUserIds: {}, whitelistEnabled: {}, whitelistWords: {} }};",
+        "window.{} = {{ hideHeaderEnabled: {}, hideTweetInputEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {}, blurImageEnabled: {}, blurImageAmount: {}, hideAdEnabled: {}, apiRateLimitMonitorEnabled: {}, imagePopupEnabled: {}, videoPopupEnabled: {}, ngWords: {}, globalNgWords: {}, repostHiddenUserIds: {}, globalRepostHiddenUserIds: {}, whitelistEnabled: {}, whitelistWords: {} }};",
         globals::MULTI_COLUMN_X_CONFIG,
         params.hide_header_enabled,
         params.hide_tweet_input_enabled,
         effective_show_custom_menu,
         visible_links_json,
         params.small_image_enabled,
-        params.small_image_width,
+        js_string(params.small_image_width),
         params.blur_image_enabled,
-        params.blur_image_amount,
+        js_string(params.blur_image_amount),
         params.hide_ad_enabled,
         params.api_rate_limit_monitor_enabled,
         params.image_popup_enabled,
@@ -175,9 +182,9 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
 
     if !params.custom_css.is_empty() {
         script.push_str(&format!(
-            "\nwindow.{}.applyCustomCSS({:?});",
+            "\nwindow.{}.applyCustomCSS({});",
             globals::MULTI_COLUMN_X,
-            params.custom_css
+            js_string(params.custom_css)
         ));
     }
 
@@ -193,14 +200,14 @@ pub fn build_popup_init_script(
     let popup_toolbar = include_str!("popup_toolbar.js");
     let popup_video_autoplay = include_str!("popup_video_autoplay.js");
     format!(
-        "{}\nwindow.{}={};window.{}={:?};window.{}={:?};window.{}={};\n{}\n{}",
+        "{}\nwindow.{}={};window.{}={};window.{}={};window.{}={};\n{}\n{}",
         DOM_OBSERVER_HUB,
         globals::MCX_ACCOUNTS,
         accounts_json,
         globals::MCX_CURRENT_ACCOUNT_ID,
-        current_account_id,
+        js_string(current_account_id),
         globals::MCX_TARGET_HREF,
-        target_href,
+        js_string(target_href),
         globals::MCX_ESC_CLOSE_ENABLED,
         esc_close_enabled,
         popup_toolbar,
@@ -413,6 +420,71 @@ mod tests {
     }
 
     #[test]
+    fn small_image_widthとblur_image_amountは通常の値ではダブルクオート文字列として埋め込まれる() {
+        let mut params = default_params();
+        params.small_image_width = "50%";
+        params.blur_image_amount = "10px";
+        let script = build_init_script(&params);
+        assert!(script.contains(r#"smallImageWidth: "50%""#));
+        assert!(script.contains(r#"blurImageAmount: "10px""#));
+    }
+
+    #[test]
+    fn custom_cssは通常の値では変更前と同じダブルクオート文字列として埋め込まれる() {
+        let mut params = default_params();
+        params.custom_css = "body { color: red; }";
+        let script = build_init_script(&params);
+        assert!(script.contains(r#"applyCustomCSS("body { color: red; }");"#));
+    }
+
+    #[test]
+    fn 引用符やバックスラッシュや改行を含む値もjsの文字列として正しく埋め込まれる() {
+        let value = "a\"b\\c\nd";
+        let mut params = default_params();
+        params.custom_css = value;
+        let script = build_init_script(&params);
+
+        // custom_css.js 内の関数定義 `function applyCustomCSS(css) {` と区別するため、
+        // 実際の呼び出し `window.__multiColumnX.applyCustomCSS(...)` に一致するマーカーを使う。
+        let start_marker = format!("window.{}.applyCustomCSS(", globals::MULTI_COLUMN_X);
+        let start = script
+            .rfind(&start_marker)
+            .expect("applyCustomCSS呼び出しが見つかること")
+            + start_marker.len();
+        let end = script[start..]
+            .find(");")
+            .expect("呼び出しの終端が見つかること")
+            + start;
+        let embedded_json = &script[start..end];
+
+        let decoded: String =
+            serde_json::from_str(embedded_json).expect("有効なjson文字列として解釈できること");
+        assert_eq!(decoded, value);
+    }
+
+    #[test]
+    fn build_popup_init_scriptで引用符やバックスラッシュや改行を含む値もjsの文字列として正しく埋め込まれる(
+    ) {
+        let value = "a\"b\\c\nd";
+        let script = build_popup_init_script("[]", value, "https://x.com", true);
+
+        let marker = format!("window.{}=", globals::MCX_CURRENT_ACCOUNT_ID);
+        let start = script
+            .find(&marker)
+            .expect("current_account_idの埋め込みが見つかること")
+            + marker.len();
+        let end = script[start..]
+            .find(";window.")
+            .expect("次のwindow代入が見つかること")
+            + start;
+        let embedded_json = &script[start..end];
+
+        let decoded: String =
+            serde_json::from_str(embedded_json).expect("有効なjson文字列として解釈できること");
+        assert_eq!(decoded, value);
+    }
+
+    #[test]
     fn build_init_script_appends_custom_css_when_provided() {
         let mut params = default_params();
         params.custom_css = ".foo { color: red; }";
@@ -527,6 +599,19 @@ mod tests {
         // popup_video_autoplay.ts 内の一意なマーカーコメント
         assert!(script.contains("mcx-video-autoplay"));
         assert!(script.contains("shouldAutoplay"));
+    }
+
+    #[test]
+    fn build_popup_init_scriptでuuidとhttpsurlは通常の値では変更前と同じダブルクオート文字列として埋め込まれる(
+    ) {
+        let script = build_popup_init_script(
+            "[]",
+            "550e8400-e29b-41d4-a716-446655440000",
+            "https://x.com/user/status/123",
+            true,
+        );
+        assert!(script.contains(r#"__mcxCurrentAccountId="550e8400-e29b-41d4-a716-446655440000""#));
+        assert!(script.contains(r#"__mcxTargetHref="https://x.com/user/status/123""#));
     }
 
     #[test]
