@@ -347,19 +347,38 @@ class MainActivity : TauriActivity() {
           wv.webChromeClient = ExternalLinkWebChromeClient()
           // ネイティブ WebView には Tauri IPC が無いため、popup_toolbar の
           // アカウント切替を Rust へ届けるブリッジを公開する（loadUrl 前に設定が必要）。
-          wv.addJavascriptInterface(
-            PopupSessionBridge(
-              id,
-              { popupId, selectedAccountId, currentUrl ->
-                AppBridge.onPopupSwitchSession(popupId, selectedAccountId, currentUrl)
-              },
-              { accountId, snapshot ->
-                AppBridge.onOfficialSettingsReport(accountId, snapshot)
-              },
-              { popupId -> removePopupWebView(popupId) },
-            ),
-            POPUP_BRIDGE_JS_NAME,
-          )
+          // addJavascriptInterface はオリジン制約が無く任意のオリジンから呼べてしまうため、
+          // オリジンを X 系ドメインに限定できる addWebMessageListener を使う。
+          // 端末が非対応の場合は安全側に倒し、ブリッジ自体を公開しない。
+          if (shouldExposeBridge(WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER))) {
+            val popupBridge =
+              PopupSessionBridge(
+                id,
+                { popupId, selectedAccountId, currentUrl ->
+                  AppBridge.onPopupSwitchSession(popupId, selectedAccountId, currentUrl)
+                },
+                { accountId, snapshot ->
+                  AppBridge.onOfficialSettingsReport(accountId, snapshot)
+                },
+                { popupId -> removePopupWebView(popupId) },
+              )
+            WebViewCompat.addWebMessageListener(
+              wv,
+              POPUP_BRIDGE_JS_NAME,
+              BRIDGE_ALLOWED_ORIGIN_RULES,
+            ) { _, message, sourceOrigin, isMainFrame, _ ->
+              // iframe（メインフレーム以外）からの連携は受け付けない。
+              if (!isMainFrame) return@addWebMessageListener
+              // allowedOriginRules は WebView 内部のフィルタだが、念のためコールバック内でも
+              // 二重チェックする。
+              if (!isAllowedBridgeOrigin(sourceOrigin.toString())) return@addWebMessageListener
+              val data = message.data ?: return@addWebMessageListener
+              val parsed = parseBridgeMessage(data) ?: return@addWebMessageListener
+              popupBridge.handle(parsed)
+            }
+          } else {
+            Log.w(TAG, "WEB_MESSAGE_LISTENER unsupported; popup native bridge disabled ($id)")
+          }
         }
       val params =
         FrameLayout.LayoutParams(
@@ -492,20 +511,46 @@ class MainActivity : TauriActivity() {
           wv.visibility = columnWebViewInitialVisibility(visible)
           // ネイティブ WebView には Tauri IPC が無いため、動画長押しメニューの
           // ダウンロード要求を Rust へ届けるブリッジを公開する（loadUrl 前に設定が必要）。
-          wv.addJavascriptInterface(
-            VideoDownloadRequestBridge { payloadJson ->
-              AppBridge.onVideoDownloadRequest(payloadJson)
-            },
-            VIDEO_DOWNLOAD_BRIDGE_JS_NAME,
-          )
-          // ネイティブ WebView には Tauri IPC が無いため、APIレート制限監視の
-          // 報告を Rust へ届けるブリッジを公開する（loadUrl 前に設定が必要）。
-          wv.addJavascriptInterface(
-            ApiRateLimitBridge(id) { label, payloadJson ->
-              AppBridge.onApiRateLimitReport(label, payloadJson)
-            },
-            API_RATE_LIMIT_BRIDGE_JS_NAME,
-          )
+          // addJavascriptInterface はオリジン制約が無く任意のオリジンから呼べてしまうため、
+          // オリジンを X 系ドメインに限定できる addWebMessageListener を使う。
+          // 端末が非対応の場合は安全側に倒し、ブリッジ自体を公開しない。
+          if (shouldExposeBridge(WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER))) {
+            val videoDownloadBridge =
+              VideoDownloadRequestBridge { payloadJson ->
+                AppBridge.onVideoDownloadRequest(payloadJson)
+              }
+            WebViewCompat.addWebMessageListener(
+              wv,
+              VIDEO_DOWNLOAD_BRIDGE_JS_NAME,
+              BRIDGE_ALLOWED_ORIGIN_RULES,
+            ) { _, message, sourceOrigin, isMainFrame, _ ->
+              if (!isMainFrame) return@addWebMessageListener
+              if (!isAllowedBridgeOrigin(sourceOrigin.toString())) return@addWebMessageListener
+              val data = message.data ?: return@addWebMessageListener
+              val parsed = parseBridgeMessage(data) ?: return@addWebMessageListener
+              videoDownloadBridge.handle(parsed)
+            }
+
+            // ネイティブ WebView には Tauri IPC が無いため、APIレート制限監視の
+            // 報告を Rust へ届けるブリッジを公開する（loadUrl 前に設定が必要）。
+            val apiRateLimitBridge =
+              ApiRateLimitBridge(id) { label, payloadJson ->
+                AppBridge.onApiRateLimitReport(label, payloadJson)
+              }
+            WebViewCompat.addWebMessageListener(
+              wv,
+              API_RATE_LIMIT_BRIDGE_JS_NAME,
+              BRIDGE_ALLOWED_ORIGIN_RULES,
+            ) { _, message, sourceOrigin, isMainFrame, _ ->
+              if (!isMainFrame) return@addWebMessageListener
+              if (!isAllowedBridgeOrigin(sourceOrigin.toString())) return@addWebMessageListener
+              val data = message.data ?: return@addWebMessageListener
+              val parsed = parseBridgeMessage(data) ?: return@addWebMessageListener
+              apiRateLimitBridge.handle(parsed)
+            }
+          } else {
+            Log.w(TAG, "WEB_MESSAGE_LISTENER unsupported; column native bridge disabled ($id)")
+          }
         }
 
       val density = resources.displayMetrics.density

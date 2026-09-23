@@ -22,9 +22,7 @@ const tauriInvokeMock = vi.fn((_cmd: string, _args?: Record<string, unknown>) =>
   Promise.resolve<unknown>(undefined),
 );
 
-const switchPopupSessionMock = vi.fn();
-const reportOfficialSettingsMock = vi.fn();
-const closePopupMock = vi.fn();
+const postMessageMock = vi.fn();
 
 type VideoDownloadProgressPayload = {
   fileIndex: number;
@@ -97,8 +95,7 @@ function clickDownloadButton(): void {
 describe("inject/popup_toolbar のアカウント切替", () => {
   beforeEach(() => {
     tauriInvokeMock.mockClear();
-    switchPopupSessionMock.mockClear();
-    closePopupMock.mockClear();
+    postMessageMock.mockClear();
     window.__TAURI__ = { core: { invoke: tauriInvokeMock } };
     window.__mcxAccounts = accounts;
     window.__mcxCurrentAccountId = "acc1";
@@ -107,19 +104,18 @@ describe("inject/popup_toolbar のアカウント切替", () => {
     delete window.__mcxPopupBridge;
   });
 
-  it("Androidブリッジがある場合はswitchPopupSessionへ転送しTauri invokeは呼ばない", async () => {
-    window.__mcxPopupBridge = {
-      switchPopupSession: switchPopupSessionMock,
-      reportOfficialSettings: reportOfficialSettingsMock,
-      closePopup: closePopupMock,
-    };
+  it("Androidブリッジがある場合は種類と内容を含むメッセージをpostMessageで送りTauri invokeは呼ばない", async () => {
+    window.__mcxPopupBridge = { postMessage: postMessageMock };
     await importToolbar();
 
     selectAccount("acc2");
 
-    expect(switchPopupSessionMock).toHaveBeenCalledWith(
-      "acc2",
-      window.location.href,
+    expect(postMessageMock).toHaveBeenCalledWith(
+      JSON.stringify({
+        type: "switchPopupSession",
+        accountId: "acc2",
+        url: window.location.href,
+      }),
     );
     expect(tauriInvokeMock).not.toHaveBeenCalled();
   });
@@ -148,11 +144,7 @@ describe("inject/popup_toolbar のアカウント切替", () => {
   });
 
   it("存在しないアカウントIDの場合はどこへも転送しない", async () => {
-    window.__mcxPopupBridge = {
-      switchPopupSession: switchPopupSessionMock,
-      reportOfficialSettings: reportOfficialSettingsMock,
-      closePopup: closePopupMock,
-    };
+    window.__mcxPopupBridge = { postMessage: postMessageMock };
     await importToolbar();
 
     const select = document.querySelector<HTMLSelectElement>(
@@ -165,7 +157,7 @@ describe("inject/popup_toolbar のアカウント切替", () => {
 
     selectAccount("ghost");
 
-    expect(switchPopupSessionMock).not.toHaveBeenCalled();
+    expect(postMessageMock).not.toHaveBeenCalled();
     expect(tauriInvokeMock).not.toHaveBeenCalled();
   });
 });
@@ -342,7 +334,7 @@ describe("inject/popup_toolbar の動画ダウンロードボタン", () => {
 describe("inject/popup_toolbar の各カラムに適用ボタン", () => {
   beforeEach(() => {
     tauriInvokeMock.mockClear();
-    switchPopupSessionMock.mockClear();
+    postMessageMock.mockClear();
     window.__TAURI__ = { core: { invoke: tauriInvokeMock } };
     window.__mcxAccounts = accounts;
     window.__mcxCurrentAccountId = "acc1";
@@ -395,7 +387,7 @@ describe("inject/popup_toolbar の各カラムに適用ボタン", () => {
 describe("inject/popup_toolbar の終了ボタン", () => {
   beforeEach(() => {
     tauriInvokeMock.mockClear();
-    closePopupMock.mockClear();
+    postMessageMock.mockClear();
     window.__TAURI__ = { core: { invoke: tauriInvokeMock } };
     window.__mcxAccounts = accounts;
     window.__mcxCurrentAccountId = "acc1";
@@ -434,21 +426,19 @@ describe("inject/popup_toolbar の終了ボタン", () => {
     expect(getExitButton().style.display).toBe("none");
   });
 
-  it("Androidブリッジがある場合、クリックでclosePopupが呼ばれTauri invokeは呼ばない", async () => {
+  it("Androidブリッジがある場合、クリックでclosePopupメッセージをpostMessageで送りTauri invokeは呼ばない", async () => {
     Object.defineProperty(window, "location", {
       configurable: true,
       value: new URL("https://x.com/settings/display"),
     });
-    window.__mcxPopupBridge = {
-      switchPopupSession: switchPopupSessionMock,
-      reportOfficialSettings: reportOfficialSettingsMock,
-      closePopup: closePopupMock,
-    };
+    window.__mcxPopupBridge = { postMessage: postMessageMock };
 
     await importToolbar();
     getExitButton().click();
 
-    expect(closePopupMock).toHaveBeenCalledTimes(1);
+    expect(postMessageMock).toHaveBeenCalledWith(
+      JSON.stringify({ type: "closePopup" }),
+    );
     expect(tauriInvokeMock).not.toHaveBeenCalledWith(
       "close_popup_window",
       expect.anything(),
@@ -467,7 +457,7 @@ describe("inject/popup_toolbar の終了ボタン", () => {
     expect(tauriInvokeMock).toHaveBeenCalledWith("close_popup_window", {
       label: "",
     });
-    expect(closePopupMock).not.toHaveBeenCalled();
+    expect(postMessageMock).not.toHaveBeenCalled();
   });
 
   it("公式設定ページの場合、終了ボタンが各カラムに適用のステータス表示よりDOM上で前に配置される", async () => {

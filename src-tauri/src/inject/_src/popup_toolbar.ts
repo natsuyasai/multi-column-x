@@ -185,6 +185,16 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
     }
   }
 
+  // Android ネイティブブリッジ（addWebMessageListener で公開される postMessage）へ、
+  // 種類（type）と内容を含む JSON 文字列としてメッセージを送る。
+  // inject スクリプトはビルドエントリ間で import を共有できないため、このファイル内に置く。
+  function postBridgeMessage(
+    bridge: { postMessage: (message: string) => void } | undefined,
+    message: Record<string, unknown>,
+  ): void {
+    bridge?.postMessage(JSON.stringify(message));
+  }
+
   const TOOLBAR_HEIGHT = 40;
 
   const toolbar = document.createElement("div");
@@ -241,10 +251,11 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
     // addJavascriptInterface で公開されたブリッジを優先して使う。
     const androidBridge = window.__mcxPopupBridge;
     if (androidBridge) {
-      androidBridge.switchPopupSession(
-        selectedAccount.id,
-        window.location.href,
-      );
+      postBridgeMessage(androidBridge, {
+        type: "switchPopupSession",
+        accountId: selectedAccount.id,
+        url: window.location.href,
+      });
       return;
     }
     // popupLabel は渡さない。実際の送信元 WebView（呼び出し元）は Rust 側が
@@ -374,7 +385,11 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
         // Android ブリッジ優先、その次に Tauri IPC。
         const androidBridge = window.__mcxPopupBridge;
         if (androidBridge) {
-          androidBridge.reportOfficialSettings(currentAccountId, snapshot);
+          postBridgeMessage(androidBridge, {
+            type: "reportOfficialSettings",
+            accountId: currentAccountId,
+            snapshot,
+          });
           onDone();
           return;
         }
@@ -397,7 +412,7 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
   exitButton.addEventListener("click", function () {
     const androidBridge = window.__mcxPopupBridge;
     if (androidBridge) {
-      androidBridge.closePopup();
+      postBridgeMessage(androidBridge, { type: "closePopup" });
       return;
     }
     tauriInvoke(CLOSE_POPUP_WINDOW, {

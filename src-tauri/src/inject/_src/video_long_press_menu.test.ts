@@ -10,7 +10,7 @@ import {
   buildLongPressIStatusVideoUrl,
 } from "./video_long_press_menu";
 
-const downloadVideoMock = vi.fn();
+const postMessageMock = vi.fn();
 const invokeMock = vi.fn((_cmd: string, _args?: Record<string, unknown>) =>
   Promise.resolve<unknown>(undefined),
 );
@@ -116,12 +116,12 @@ function clickMenuItem(): void {
 
 describe("inject/video_long_press_menu の長押しメニュー", () => {
   beforeEach(() => {
-    downloadVideoMock.mockClear();
+    postMessageMock.mockClear();
     document
       .querySelectorAll('[data-testid="videoComponent"]')
       .forEach((el) => el.remove());
     getMenu()?.remove();
-    window.__mcxVideoDownloadBridge = { downloadVideo: downloadVideoMock };
+    window.__mcxVideoDownloadBridge = { postMessage: postMessageMock };
   });
 
   afterEach(() => {
@@ -151,7 +151,7 @@ describe("inject/video_long_press_menu の長押しメニュー", () => {
     expect(event.defaultPrevented).toBe(false);
   });
 
-  it("variantsが取得できる場合、メニュー項目クリックでdownloadVideoが正しいJSON文字列で呼ばれる", async () => {
+  it("variantsが取得できる場合、メニュー項目クリックで種類と内容を含むダウンロードメッセージがpostMessageで送られる", async () => {
     await importLongPressMenu();
     const videoEl = createVideoComponent();
     attachFiber(videoEl, PLAYER_PROPS);
@@ -159,9 +159,11 @@ describe("inject/video_long_press_menu の長押しメニュー", () => {
 
     clickMenuItem();
 
-    expect(downloadVideoMock).toHaveBeenCalledTimes(1);
-    const payloadJson = downloadVideoMock.mock.calls[0]?.[0] as string;
-    expect(JSON.parse(payloadJson)).toEqual({
+    expect(postMessageMock).toHaveBeenCalledTimes(1);
+    const raw = postMessageMock.mock.calls[0]?.[0] as string;
+    const message = JSON.parse(raw) as { type: string; payload: string };
+    expect(message.type).toBe("downloadVideo");
+    expect(JSON.parse(message.payload)).toEqual({
       variants: [
         {
           contentType: "application/x-mpegURL",
@@ -177,7 +179,7 @@ describe("inject/video_long_press_menu の長押しメニュー", () => {
     });
   });
 
-  it("variantsが取得できない場合（動画未再生等）はdownloadVideoを呼ばない", async () => {
+  it("variantsが取得できない場合（動画未再生等）はダウンロードメッセージを送らない", async () => {
     await importLongPressMenu();
     const videoEl = createVideoComponent();
     // fiber を付与しないため variants が取得できない
@@ -185,7 +187,7 @@ describe("inject/video_long_press_menu の長押しメニュー", () => {
     dispatchContextMenu(videoEl);
     clickMenuItem();
 
-    expect(downloadVideoMock).not.toHaveBeenCalled();
+    expect(postMessageMock).not.toHaveBeenCalled();
   });
 
   it("window.__mcxVideoDownloadBridgeが存在しない場合でもエラーにならない", async () => {
@@ -345,7 +347,7 @@ describe("inject/video_long_press_menu のポップアップメニュー項目",
     window.__TAURI_INTERNALS__ = {
       metadata: { currentWebview: { label: WEBVIEW_LABEL } },
     };
-    window.__mcxVideoDownloadBridge = { downloadVideo: downloadVideoMock };
+    window.__mcxVideoDownloadBridge = { postMessage: postMessageMock };
     setConfig({ videoPopupEnabled: true });
   });
 
@@ -420,7 +422,7 @@ describe("inject/video_long_press_menu のポップアップメニュー項目",
     expect(invokeMock).not.toHaveBeenCalled();
   });
 
-  it("ダウンロード項目クリックは引き続きdownloadVideoを呼ぶ（既存機能への影響なし）", async () => {
+  it("ダウンロード項目クリックは引き続きダウンロードメッセージを送る（既存機能への影響なし）", async () => {
     await importLongPressMenu();
     const videoEl = createVideoComponent();
     attachFiber(videoEl, PLAYER_PROPS);
@@ -432,7 +434,7 @@ describe("inject/video_long_press_menu のポップアップメニュー項目",
       new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
     );
 
-    expect(downloadVideoMock).toHaveBeenCalledTimes(1);
+    expect(postMessageMock).toHaveBeenCalledTimes(1);
     expect(invokeMock).not.toHaveBeenCalled();
   });
 

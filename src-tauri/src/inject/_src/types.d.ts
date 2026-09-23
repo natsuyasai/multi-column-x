@@ -74,21 +74,20 @@ declare global {
     invoke?: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
   }
 
-  // Android で MainActivity が addJavascriptInterface で公開するポップアップ操作ブリッジ
+  // Android で MainActivity が addWebMessageListener で公開するネイティブブリッジ共通の形。
+  // JS からは postMessage(JSON.stringify({ type, ... })) の形でメッセージを送る
+  // （オリジンを X 系ドメインに限定するため addJavascriptInterface ではなく
+  // addWebMessageListener を使っている。詳細は BridgeMessages.kt 参照）。
   interface McxPopupBridge {
-    switchPopupSession: (accountId: string, url: string) => void;
-    reportOfficialSettings: (accountId: string, snapshot: string) => void;
-    closePopup: () => void;
+    postMessage: (message: string) => void;
   }
 
-  // Android で MainActivity が addJavascriptInterface で公開する動画DL要求ブリッジ
   interface McxVideoDownloadBridge {
-    downloadVideo: (payloadJson: string) => void;
+    postMessage: (message: string) => void;
   }
 
-  // Android で MainActivity が addJavascriptInterface で公開するAPIレート制限報告ブリッジ
   interface McxApiRateLimitBridge {
-    report: (payloadJson: string) => void;
+    postMessage: (message: string) => void;
   }
 
   interface TvAccountInfo {
