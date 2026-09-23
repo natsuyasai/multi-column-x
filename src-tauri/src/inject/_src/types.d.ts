@@ -97,6 +97,12 @@ declare global {
     color: string;
   }
 
+  // document.body の childList+subtree 監視を共有する単一 MutationObserver ハブ。
+  // dom_observer.ts が公開する。詳細は同ファイルのコメント参照。
+  interface McxDomObserver {
+    subscribe: (callback: (mutations: MutationRecord[]) => void) => () => void;
+  }
+
   interface Window {
     __multiColumnX: MultiColumnXAPI;
     __multiColumnXConfig?: MultiColumnXConfig;
@@ -112,6 +118,7 @@ declare global {
     __mobileTopInset?: number;
     __mobileBottomInset?: number;
     __xhrRateLimitPatched?: boolean;
+    __mcxDomObserver?: McxDomObserver;
   }
 }
 

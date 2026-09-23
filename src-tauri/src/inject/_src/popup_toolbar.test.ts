@@ -3,6 +3,21 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { formatVideoDownloadProgressText } from "./popup_toolbar";
 
+// 共有DOM監視ハブ(dom_observer.ts)は自身の内部MutationObserverを明示的に
+// disconnectしない常駐前提の設計のため、共有ハブ経由のテストではハブが作る
+// MutationObserverを追跡し、テスト後に確実にdisconnectする
+// （dom_observer.test.ts / mobile_area_hide.test.ts と同じ対策）。
+const createdObservers = new Set<MutationObserver>();
+const OriginalMutationObserver = globalThis.MutationObserver;
+
+class TrackingMutationObserver extends OriginalMutationObserver {
+  constructor(callback: MutationCallback) {
+    super(callback);
+    createdObservers.add(this);
+  }
+}
+vi.stubGlobal("MutationObserver", TrackingMutationObserver);
+
 const tauriInvokeMock = vi.fn((_cmd: string, _args?: Record<string, unknown>) =>
   Promise.resolve<unknown>(undefined),
 );
@@ -513,6 +528,10 @@ describe("inject/popup_toolbar の動画ダウンロードボタンの表示切�
     return button;
   }
 
+  // このdescribe内はdom_observer(共有ハブ)をimportしないため、popup_toolbar.ts
+  // 側のsubscribeDomChangesはフォールバック（ローカルのMutationObserver）経路を
+  // 使う。フォールバックはマイクロタスクでコールバックが呼ばれるため、
+  // Promise.resolve()を複数回挟んで待つ。
   /** MutationObserver のコールバック（マイクロタスク）実行を待つ。 */
   async function flushMutationObserver(): Promise<void> {
     await Promise.resolve();
@@ -565,6 +584,61 @@ describe("inject/popup_toolbar の動画ダウンロードボタンの表示切�
     await flushMutationObserver();
 
     expect(getDownloadButton().style.display).toBe("none");
+  });
+});
+
+describe("inject/popup_toolbar の動画ダウンロードボタン表示切替(共有ハブ経由)", () => {
+  beforeEach(async () => {
+    tauriInvokeMock.mockClear();
+    window.__TAURI__ = { core: { invoke: tauriInvokeMock } };
+    window.__mcxAccounts = accounts;
+    window.__mcxCurrentAccountId = "acc1";
+    window.__mcxTargetHref = "";
+    window.__mcxEscCloseEnabled = false;
+    delete window.__mcxPopupBridge;
+    document
+      .querySelectorAll('[data-testid="videoComponent"]')
+      .forEach((el) => el.remove());
+    // popup_toolbar.tsのsubscribeDomChangesが共有ハブ経由になることを確認するため、
+    // window.__mcxDomObserverを事前にセットアップする(build_popup_init_scriptが
+    // 実際にpopup_toolbar.jsより先にdom_observer.jsを連結する経路を模す)。
+    vi.resetModules();
+    delete (window as unknown as { __mcxDomObserver?: unknown })
+      .__mcxDomObserver;
+    await import("./dom_observer");
+  });
+
+  afterEach(() => {
+    createdObservers.forEach((observer) => observer.disconnect());
+    createdObservers.clear();
+  });
+
+  function getDownloadButton(): HTMLButtonElement {
+    const button = document.querySelector<HTMLButtonElement>(
+      "#tv-popup-download-button",
+    );
+    if (!button) throw new Error("download button not found");
+    return button;
+  }
+
+  /** requestAnimationFrame の発火を待つ（共有ハブはrAFで1フレームにまとめて通知する）。 */
+  function waitForAnimationFrame(): Promise<void> {
+    return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+  }
+
+  it("共有ハブ経由でも、動画コンポーネントの動的追加でダウンロードボタンが表示に切り替わる", async () => {
+    document.getElementById("tv-popup-toolbar")?.remove();
+    await import("./popup_toolbar");
+    expect(getDownloadButton().style.display).toBe("none");
+
+    const videoComponent = document.createElement("div");
+    videoComponent.dataset.testid = "videoComponent";
+    document.body.appendChild(videoComponent);
+    attachFiber(videoComponent, PLAYER_PROPS);
+
+    await waitForAnimationFrame();
+
+    expect(getDownloadButton().style.display).not.toBe("none");
   });
 });
 
