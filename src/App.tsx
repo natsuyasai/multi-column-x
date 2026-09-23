@@ -97,6 +97,7 @@ const App: React.FC = () => {
     setDialogOpen,
     recreateAllWebviews,
     recreateColumnWebview,
+    loadPresetAndRecreateWebviews,
   } = useColumns();
   const {
     startAddAccount,
@@ -108,8 +109,9 @@ const App: React.FC = () => {
     confirmRemoval,
     cancelRemoval,
     startReauth,
-    reauthNotice,
-    dismissReauthNotice,
+    accountNotice,
+    dismissAccountNotice,
+    retryPendingDataDirectoryDeletions,
   } = useAccounts(recreateAllWebviews);
   const {
     showAddColumn,
@@ -224,10 +226,10 @@ const App: React.FC = () => {
       const resolved = url.startsWith("http") ? url : "https://" + url;
       const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
       if (!account) return;
+      // webviewLabelCaller は渡さない。実際の送信元 WebView（呼び出し元）は
+      // Rust 側が caller.label() で判定するため、JS が自己申告する必要も権限も無い。
       await invoke(IPC_COMMANDS.OPEN_LINK_POPUP_WINDOW, {
-        webviewLabelCaller: null,
         accountId: account.id,
-        dataDirectory: account.dataDirectory,
         url: resolved,
       }).catch(logError("handleSubmitLinkPopup:openLinkPopupWindow"));
     },
@@ -244,10 +246,10 @@ const App: React.FC = () => {
       setShowOfficialSettingsDialog(false);
       const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
       if (!account) return;
+      // webviewLabelCaller は渡さない。実際の送信元 WebView（呼び出し元）は
+      // Rust 側が caller.label() で判定するため、JS が自己申告する必要も権限も無い。
       await invoke(IPC_COMMANDS.OPEN_LINK_POPUP_WINDOW, {
-        webviewLabelCaller: null,
         accountId: account.id,
-        dataDirectory: account.dataDirectory,
         url,
       }).catch(logError("handleSubmitOfficialSettings:openLinkPopupWindow"));
     },
@@ -262,7 +264,7 @@ const App: React.FC = () => {
     !!whatsNew.notes ||
     !!pendingAccountName ||
     !!pendingRemoval ||
-    !!reauthNotice ||
+    !!accountNotice ||
     apiRateLimitPopoverOpen;
 
   // モバイルスワイプバー（ネイティブオーバーレイ）の状態を Kotlin 側へ同期する。
@@ -697,14 +699,14 @@ const App: React.FC = () => {
         />
       )}
 
-      {reauthNotice && (
+      {accountNotice && (
         <ConfirmDialog
           singleButton
-          title="再認証"
-          message={reauthNotice}
+          title={accountNotice.title}
+          message={accountNotice.message}
           confirmLabel="OK"
-          onConfirm={dismissReauthNotice}
-          onCancel={dismissReauthNotice}
+          onConfirm={dismissAccountNotice}
+          onCancel={dismissAccountNotice}
         />
       )}
 
@@ -727,12 +729,17 @@ const App: React.FC = () => {
             );
           }}
           onReloadAllWebviews={recreateAllWebviews}
+          onLoadPreset={loadPresetAndRecreateWebviews}
           appVersion={appVersion}
           updateChecking={updater.checking}
           updateManualResult={updater.manualResult}
           onCheckUpdate={updater.checkManually}
           onOpenOfficialSettings={handleOpenOfficialSettings}
           onClose={() => setShowAppSettings(false)}
+          pendingDataDirectoryDeletionCount={
+            globalSettings.pendingDataDirectoryDeletions.length
+          }
+          onRetryDataDirectoryDeletion={retryPendingDataDirectoryDeletions}
         />
       )}
 

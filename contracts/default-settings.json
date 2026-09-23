@@ -38,7 +38,8 @@
     "mobileTwoColumnEnabled": true,
     "presets": [],
     "ngWords": [],
-    "repostHiddenUserIds": []
+    "repostHiddenUserIds": [],
+    "pendingDataDirectoryDeletions": []
   },
   "columnSettings": {
     "autoReloadEnabled": true,
