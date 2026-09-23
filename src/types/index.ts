@@ -121,6 +121,18 @@ export interface AppSettings {
 }
 
 /**
+ * load_settings IPC の戻り値。
+ * 保存済み設定の解析に失敗した場合、Rust 側は元データを退避した上で
+ * 既定値の settings を返し、loadFailed / backupPath で失敗を通知する。
+ * Rust 側の対応定義: src-tauri/src/commands/settings.rs の LoadSettingsResult。
+ */
+export interface LoadSettingsResult {
+  settings: AppSettings;
+  loadFailed: boolean;
+  backupPath: string | null;
+}
+
+/**
  * カラム設定のデフォルト値。
  *
  * NOTE: Rust 側にも同等のデフォルト値が定義されている。
