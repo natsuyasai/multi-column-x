@@ -204,6 +204,7 @@ export type ReturnEvent =
   | { type: "tabChanged"; tabName: string | null }
   | { type: "targetSeenByUser" }
   | { type: "returnFinished" }
+  | { type: "dismissed" }
   | { type: "disabled" };
 
 export function reduceReturnState(
@@ -242,6 +243,12 @@ export function reduceReturnState(
     }
 
     case "returnFinished": {
+      if (state.anchorIds === null) return state;
+      if (state.consumed && !state.buttonVisible) return state;
+      return { ...state, consumed: true, buttonVisible: false };
+    }
+
+    case "dismissed": {
       if (state.anchorIds === null) return state;
       if (state.consumed && !state.buttonVisible) return state;
       return { ...state, consumed: true, buttonVisible: false };

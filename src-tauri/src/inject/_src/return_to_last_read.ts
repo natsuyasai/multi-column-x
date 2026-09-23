@@ -21,7 +21,9 @@ import {
 } from "./return_to_last_read_logic";
 
 (function () {
+  const CONTAINER_ID = "mcx-return-to-last-read-container";
   const BUTTON_ID = "mcx-return-to-last-read";
+  const CLOSE_BUTTON_ID = "mcx-return-to-last-read-close";
   const TOAST_ID = "mcx-return-to-last-read-toast";
   const TOAST_DURATION_MS = 3000;
   const NOT_FOUND_MESSAGE = "前回の位置が見つかりませんでした";
@@ -43,7 +45,9 @@ import {
   let searching = false;
   let lastUserInputAt = 0;
   let searchStartedAt = 0;
+  let containerEl: HTMLElement | null = null;
   let buttonEl: HTMLButtonElement | null = null;
+  let closeButtonEl: HTMLButtonElement | null = null;
   let toastEl: HTMLElement | null = null;
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -89,9 +93,17 @@ import {
 
   // --- ボタン / トースト ---
 
-  function buttonStyle(): string {
+  function containerStyle(): string {
     const bottomInset = window.__mobileBottomInset ?? 0;
-    return `position:fixed; left:50%; transform:translateX(-50%); bottom: calc(24px + ${bottomInset}px); z-index:2147483000; background:#1d9bf0; color:#fff; border:none; border-radius:9999px; padding:8px 16px; font:bold 14px/1.2 system-ui, sans-serif; box-shadow:0 2px 8px rgba(0,0,0,.3); cursor:pointer;`;
+    return `position:fixed; left:50%; transform:translateX(-50%); bottom: calc(24px + ${bottomInset}px); z-index:2147483000; display:flex; gap:8px; align-items:center;`;
+  }
+
+  function buttonStyle(): string {
+    return `background:#1d9bf0; color:#fff; border:none; border-radius:9999px; padding:8px 16px; font:bold 14px/1.2 system-ui, sans-serif; box-shadow:0 2px 8px rgba(0,0,0,.3); cursor:pointer;`;
+  }
+
+  function closeButtonStyle(): string {
+    return `width:32px; height:32px; border-radius:9999px; background:rgba(0,0,0,.6); color:#fff; border:none; font:bold 16px/1 system-ui, sans-serif; cursor:pointer;`;
   }
 
   function toastStyle(): string {
@@ -99,8 +111,19 @@ import {
     return `position:fixed; left:50%; transform:translateX(-50%); bottom: calc(24px + ${bottomInset}px); z-index:2147483000; background:rgba(0,0,0,.8); color:#fff; border-radius:9999px; padding:8px 16px; font:bold 14px/1.2 system-ui, sans-serif;`;
   }
 
+  function ensureContainer(): HTMLElement {
+    if (containerEl) return containerEl;
+    const container = document.createElement("div");
+    container.id = CONTAINER_ID;
+    container.style.cssText = containerStyle();
+    document.body.appendChild(container);
+    containerEl = container;
+    return container;
+  }
+
   function ensureButton(): HTMLButtonElement {
     if (buttonEl) return buttonEl;
+    const container = ensureContainer();
     const btn = document.createElement("button");
     btn.type = "button";
     btn.id = BUTTON_ID;
@@ -111,8 +134,26 @@ import {
         console.error("[return_to_last_read]", e);
       });
     });
-    document.body.appendChild(btn);
+    container.appendChild(btn);
     buttonEl = btn;
+    return btn;
+  }
+
+  function ensureCloseButton(): HTMLButtonElement {
+    if (closeButtonEl) return closeButtonEl;
+    const container = ensureContainer();
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = CLOSE_BUTTON_ID;
+    btn.setAttribute("aria-label", "前回の続きへ戻るボタンを閉じる");
+    btn.textContent = "×";
+    btn.style.cssText = closeButtonStyle();
+    btn.addEventListener("click", () => {
+      dispatch({ type: "dismissed" });
+      render();
+    });
+    container.appendChild(btn);
+    closeButtonEl = btn;
     return btn;
   }
 
@@ -145,15 +186,18 @@ import {
     const visible =
       enabled && isHomePath() && (state.buttonVisible || searching);
     if (visible) {
-      const btn = ensureButton();
+      const container = ensureContainer();
       // showToast と同じ理由で、値が変化したときだけ代入する
       // （textContent の無条件代入は MutationObserver との無限ループを引き起こす）。
-      if (btn.style.display !== "") btn.style.display = "";
+      if (container.style.display !== "flex") container.style.display = "flex";
+      const btn = ensureButton();
       const text = searching ? "探しています…" : "↓ 前回の続きへ";
       if (btn.textContent !== text) btn.textContent = text;
       if (btn.disabled !== searching) btn.disabled = searching;
-    } else if (buttonEl && buttonEl.style.display !== "none") {
-      buttonEl.style.display = "none";
+      const closeBtn = ensureCloseButton();
+      if (closeBtn.disabled !== searching) closeBtn.disabled = searching;
+    } else if (containerEl && containerEl.style.display !== "none") {
+      containerEl.style.display = "none";
     }
   }
 
@@ -202,7 +246,9 @@ import {
   }
 
   function isFromButton(target: EventTarget | null): boolean {
-    return !!buttonEl && target instanceof Node && buttonEl.contains(target);
+    return (
+      !!containerEl && target instanceof Node && containerEl.contains(target)
+    );
   }
 
   function handleUserInput(event: Event): void {

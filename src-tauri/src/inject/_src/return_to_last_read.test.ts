@@ -169,11 +169,24 @@ function getButton(): HTMLButtonElement | null {
 
 function isButtonVisible(): boolean {
   const btn = getButton();
-  return !!btn && btn.style.display !== "none";
+  const container = document.getElementById(
+    "mcx-return-to-last-read-container",
+  );
+  return !!btn && !!container && container.style.display !== "none";
 }
 
 function getToast(): HTMLElement | null {
   return document.getElementById("mcx-return-to-last-read-toast");
+}
+
+function getContainer(): HTMLElement | null {
+  return document.getElementById("mcx-return-to-last-read-container");
+}
+
+function getCloseButton(): HTMLButtonElement | null {
+  return document.getElementById(
+    "mcx-return-to-last-read-close",
+  ) as HTMLButtonElement | null;
 }
 
 async function importReturnToLastRead(
@@ -471,6 +484,117 @@ describe("inject/return_to_last_read", () => {
       expect(btn?.textContent).toBe("↓ 前回の続きへ");
       expect(btn?.getAttribute("aria-label")).toBe("前回の続きへ戻る");
     });
+  });
+
+  describe("閉じるボタン", () => {
+    it("戻るボタンが表示されているときはその隣に閉じるボタンが表示される", async () => {
+      const tablist = addTablist();
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["1", "2", "3", "4", "5"]);
+
+      await importReturnToLastRead({ enabled: true });
+      window.__multiColumnX.triggerReload?.();
+
+      setTimeline(section, ["100", "1", "2", "3", "4"]);
+      window.dispatchEvent(new Event("scroll"));
+
+      expect(isButtonVisible()).toBe(true);
+      const container = getContainer();
+      const btn = getButton();
+      const closeBtn = getCloseButton();
+      expect(container).not.toBeNull();
+      expect(closeBtn).not.toBeNull();
+      expect(container?.contains(btn as Node)).toBe(true);
+      expect(container?.contains(closeBtn as Node)).toBe(true);
+      expect(btn?.nextElementSibling).toBe(closeBtn);
+      expect(closeBtn?.style.display).not.toBe("none");
+      expect(closeBtn?.getAttribute("aria-label")).toBe(
+        "前回の続きへ戻るボタンを閉じる",
+      );
+    });
+
+    it("閉じるボタンを押すと戻らずにボタンが消える", async () => {
+      const tablist = addTablist();
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["1", "2", "3", "4", "5"]);
+
+      await importReturnToLastRead({ enabled: true });
+      window.__multiColumnX.triggerReload?.();
+
+      setTimeline(section, ["100", "1", "2", "3", "4"]);
+      window.dispatchEvent(new Event("scroll"));
+      expect(isButtonVisible()).toBe(true);
+
+      setScrollTop(42);
+      const closeBtn = getCloseButton();
+      closeBtn?.click();
+
+      expect(document.scrollingElement?.scrollTop).toBe(42);
+      expect(isButtonVisible()).toBe(false);
+    });
+
+    it("閉じるボタンで閉じた後の更新では新しい基準を記録する", async () => {
+      const tablist = addTablist();
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["1", "2", "3", "4", "5"]);
+
+      await importReturnToLastRead({ enabled: true });
+      window.__multiColumnX.triggerReload?.();
+
+      setTimeline(section, ["100", "1", "2", "3", "4"]);
+      window.dispatchEvent(new Event("scroll"));
+      expect(isButtonVisible()).toBe(true);
+
+      getCloseButton()?.click();
+      expect(isButtonVisible()).toBe(false);
+
+      // 先頭が N1, N2, A, B, C の順になっている状態で更新する
+      setScrollTop(0);
+      setTimeline(section, ["n1", "n2", "1", "2", "3"]);
+      window.dispatchEvent(new Event("scroll"));
+      window.__multiColumnX.triggerReload?.();
+
+      // 新しい基準（N1, N2, A, B, C）と完全一致する並びでは新着扱いされない
+      // （もし基準が更新されておらず旧基準のままなら新着扱いされてしまう）
+      setTimeline(section, ["n1", "n2", "1", "2", "3"]);
+      window.dispatchEvent(new Event("scroll"));
+      expect(isButtonVisible()).toBe(false);
+    });
+
+    it("戻る位置を探している間は閉じるボタンを押せない", async () => {
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["11", "12", "13", "14", "15"]);
+
+      await importReturnToLastRead({ enabled: true });
+      window.__multiColumnX.triggerReload?.();
+
+      setTimeline(section, ["101", "11", "12", "13", "14"]);
+      window.dispatchEvent(new Event("scroll"));
+      expect(isButtonVisible()).toBe(true);
+      expect(getCloseButton()?.disabled).toBe(false);
+
+      // 探索対象がどこにもヒットしないタイムラインへ変え、これ以上スクロールできない
+      // 状態（仮想リスト終端）を模す。探索中は打ち切りまで待たずに disabled を確認する。
+      setTimeline(section, ["901"]);
+      setClampedScrollingElement(300, 300);
+
+      vi.useFakeTimers();
+      const btn = getButton();
+      btn?.click();
+      await vi.advanceTimersByTimeAsync(0);
+
+      // 探索中は閉じるボタンを押せない
+      expect(getCloseButton()?.disabled).toBe(true);
+
+      // クリックしても消化されない（無効化されているため、実際のブラウザでは
+      // クリックイベント自体が発火しないが、ここでは disabled 状態のみ検証する）
+      await vi.advanceTimersByTimeAsync(3300);
+    }, 15000);
   });
 
   describe("/home以外のパス", () => {

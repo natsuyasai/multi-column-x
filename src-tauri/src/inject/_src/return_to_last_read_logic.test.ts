@@ -547,6 +547,48 @@ describe("inject/return_to_last_read_logic", () => {
       expect(next.buttonVisible).toBe(false);
     });
 
+    it("閉じるボタンを押すと消化済みになりボタンが消える", () => {
+      const visible: ReturnState = {
+        anchorIds: ["A", "B", "C", "D", "E"],
+        tabName: "おすすめ",
+        consumed: false,
+        buttonVisible: true,
+      };
+
+      const next = reduceReturnState(visible, { type: "dismissed" });
+
+      expect(next.consumed).toBe(true);
+      expect(next.buttonVisible).toBe(false);
+    });
+
+    it("閉じるボタンで閉じた後の更新では新しい基準を記録する", () => {
+      const withAnchor: ReturnState = {
+        anchorIds: ["A", "B", "C", "D", "E"],
+        tabName: "おすすめ",
+        consumed: false,
+        buttonVisible: true,
+      };
+      const dismissed = reduceReturnState(withAnchor, { type: "dismissed" });
+
+      const next = reduceReturnState(dismissed, {
+        type: "reload",
+        snapshot: ["N1", "N2", "A", "B", "C"],
+        tabName: "おすすめ",
+      });
+
+      expect(next.anchorIds).toEqual(["N1", "N2", "A", "B", "C"]);
+      expect(next.consumed).toBe(false);
+      expect(next.buttonVisible).toBe(false);
+    });
+
+    it("基準が無い状態でのdismissedは何もしない", () => {
+      const next = reduceReturnState(INITIAL_RETURN_STATE, {
+        type: "dismissed",
+      });
+
+      expect(next).toEqual(INITIAL_RETURN_STATE);
+    });
+
     it("disabledイベントで初期状態に戻る", () => {
       const withAnchor: ReturnState = {
         anchorIds: ["A", "B", "C", "D", "E"],
