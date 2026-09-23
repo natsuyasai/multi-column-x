@@ -447,6 +447,171 @@ describe("useColumns desktop recreateAllWebviews", () => {
   });
 });
 
+describe("useColumns desktop loadPresetAndRecreateWebviews", () => {
+  const mockInvoke = vi.mocked(invoke);
+
+  function attachContainer(
+    ref: { current: HTMLDivElement | null },
+    clientHeight = 900,
+  ) {
+    const div = document.createElement("div");
+    Object.defineProperty(div, "clientHeight", {
+      value: clientHeight,
+      configurable: true,
+    });
+    ref.current = div;
+  }
+
+  function makeColumn(
+    id: string,
+    gridCol: number,
+    widthOverride?: number,
+  ): Column {
+    return {
+      id,
+      accountId: "acc-1",
+      pageType: "home",
+      homeTabName: "フォロー中",
+      width: widthOverride ?? 350,
+      order: gridCol - 1,
+      gridRow: 1,
+      gridCol,
+      heightMode: "auto",
+      settings: { ...DEFAULT_COLUMN_SETTINGS },
+    };
+  }
+
+  // 読み込み前: カラム A・B。プリセット: A'（A と同じ id・width 違い）・C
+  const columnA = makeColumn("col-a", 1);
+  const columnB = makeColumn("col-b", 2);
+  const columnAPrime = makeColumn("col-a", 1, 500);
+  const columnC = makeColumn("col-c", 2);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+    mockResolveColumnDataDirectory.mockImplementation(
+      async (column, accounts) =>
+        accounts.find((a) => a.id === column.accountId)?.dataDirectory,
+    );
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-1",
+          label: "Test",
+          dataDirectory: "/data/acc-1",
+          color: "#1d9bf0",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      columns: [columnA, columnB],
+      globalSettings: {
+        ...DEFAULT_GLOBAL_SETTINGS,
+        presets: [
+          {
+            id: "preset-1",
+            name: "プリセット1",
+            columns: [columnAPrime, columnC],
+          },
+        ],
+      },
+      isLoaded: true,
+      isMobile: false,
+      topBarExpanded: false,
+    });
+  });
+
+  /** invoke 呼び出し全体から create/remove の呼び出し順・引数を拾う */
+  function callsOf(command: string) {
+    return mockInvoke.mock.calls.filter((c) => c[0] === command);
+  }
+
+  it("プリセットを読み込むと読み込み前の全カラムの表示が破棄される", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.loadPresetAndRecreateWebviews("preset-1");
+    });
+
+    const removedIds = callsOf("remove_column_webview").map(
+      (c) => (c[1] as { columnId: string }).columnId,
+    );
+    expect(removedIds).toContain("col-a");
+    expect(removedIds).toContain("col-b");
+  });
+
+  it("プリセットを読み込むとプリセットのカラムの表示が作られる", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.loadPresetAndRecreateWebviews("preset-1");
+    });
+
+    const createdIds = callsOf("create_column_webview").map(
+      (c) => (c[1] as { args: { column: Column } }).args.column.id,
+    );
+    expect(createdIds).toContain("col-a");
+    expect(createdIds).toContain("col-c");
+    // 読み込み前のカラムのうちプリセット側に存在しない col-b は作り直されない
+    expect(createdIds).not.toContain("col-b");
+  });
+
+  it("同じIDのカラムがあってもプリセット側の設定で作り直される", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.loadPresetAndRecreateWebviews("preset-1");
+    });
+
+    const removeIdx = mockInvoke.mock.calls.findIndex(
+      (c) =>
+        c[0] === "remove_column_webview" &&
+        (c[1] as { columnId: string }).columnId === "col-a",
+    );
+    const createIdx = mockInvoke.mock.calls.findIndex(
+      (c) =>
+        c[0] === "create_column_webview" &&
+        (c[1] as { args: { column: Column } }).args.column.id === "col-a",
+    );
+    expect(removeIdx).toBeGreaterThanOrEqual(0);
+    expect(createIdx).toBeGreaterThan(removeIdx);
+
+    const createCall = mockInvoke.mock.calls[createIdx] as [
+      string,
+      { args: { column: Column } },
+    ];
+    // A' の設定（width: 500）で作り直されていること
+    expect(createCall[1].args.column.width).toBe(500);
+  });
+
+  it("存在しないプリセットIDのときはカラムの表示を変更しない", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.loadPresetAndRecreateWebviews("not-exist");
+    });
+
+    expect(callsOf("remove_column_webview")).toHaveLength(0);
+    expect(callsOf("create_column_webview")).toHaveLength(0);
+    expect(useAppStore.getState().columns.map((c) => c.id)).toEqual([
+      "col-a",
+      "col-b",
+    ]);
+  });
+});
+
 describe("useColumns desktop hideColumnWebviews", () => {
   const mockInvoke = vi.mocked(invoke);
 
