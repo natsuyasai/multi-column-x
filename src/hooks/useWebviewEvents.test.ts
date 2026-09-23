@@ -6,6 +6,7 @@ import { DEFAULT_COLUMN_SETTINGS, getColumnLabel } from "../types";
 import type { Column } from "../types";
 import {
   __resetNotificationPermissionCacheForTests,
+  pickOfficialSettingsTargetColumn,
   useApiRateLimitReports,
   useColumnCrashRecovery,
   useColumnFocusClearsUnread,
@@ -622,6 +623,26 @@ describe("useApiRateLimitReports", () => {
   });
 });
 
+describe("pickOfficialSettingsTargetColumn", () => {
+  it("投稿カラムや外部サイトのカラムしか無いアカウントには配布しない", () => {
+    const columns: Column[] = [
+      makeColumn({ id: "col-1", accountId: "acc-1", pageType: "compose" }),
+      makeColumn({ id: "col-2", accountId: "acc-1", pageType: "external" }),
+    ];
+    expect(pickOfficialSettingsTargetColumn(columns, "acc-1")).toBeUndefined();
+  });
+
+  it("通常のカラムがあるアカウントにはそのカラムへ配布する", () => {
+    const columns: Column[] = [
+      makeColumn({ id: "col-1", accountId: "acc-1", pageType: "compose" }),
+      makeColumn({ id: "col-2", accountId: "acc-1", pageType: "home" }),
+    ];
+    expect(pickOfficialSettingsTargetColumn(columns, "acc-1")?.id).toBe(
+      "col-2",
+    );
+  });
+});
+
 describe("useOfficialSettingsBroadcast", () => {
   beforeEach(() => {
     capturedCallbacks.clear();
@@ -766,7 +787,7 @@ describe("useOfficialSettingsBroadcast", () => {
     expect(evalInColumnMock).toHaveBeenCalledWith("col-3", expect.any(String));
   });
 
-  it("compose カラムしか持たないアカウントには、フォールバックでそのカラムへ配布されること", async () => {
+  it("投稿カラムしか持たないアカウントには配布されないこと", async () => {
     useAppStore.setState({
       accounts: [
         {
@@ -801,14 +822,84 @@ describe("useOfficialSettingsBroadcast", () => {
         payload: { accountId: "acc-1", snapshot },
       });
     });
-    expect(evalInColumnMock).toHaveBeenCalledTimes(2);
-    // acc-1 (source): SCROLL_TOP_AND_RELOAD
+    // acc-1 (source): SCROLL_TOP_AND_RELOAD のみ。acc-2 は投稿カラムしか無いため配布されない。
+    expect(evalInColumnMock).toHaveBeenCalledTimes(1);
     expect(evalInColumnMock).toHaveBeenCalledWith(
       "col-1",
       WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD,
     );
-    // acc-2: only has compose column, so fallback to that
-    expect(evalInColumnMock).toHaveBeenCalledWith("col-2", expect.any(String));
+  });
+
+  it("外部サイトのカラムしか持たないアカウントには配布されないこと", async () => {
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-1",
+          label: "Account 1",
+          xUserId: "user1",
+          dataDirectory: "/path/1",
+          color: "#1DA1F2",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+        {
+          id: "acc-2",
+          label: "Account 2",
+          xUserId: "user2",
+          dataDirectory: "/path/2",
+          color: "#1DA1F2",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      columns: [
+        makeColumn({ id: "col-1", accountId: "acc-1", pageType: "home" }),
+        makeColumn({ id: "col-2", accountId: "acc-2", pageType: "external" }),
+      ],
+    });
+    renderHook(() => useOfficialSettingsBroadcast());
+    const snapshot = JSON.stringify({
+      local: { themeColor: "green" },
+      nightMode: "2",
+    });
+    await act(async () => {
+      capturedCallbacks.get(IPC_EVENTS.WEBVIEW_OFFICIAL_SETTINGS_CAPTURED)?.({
+        payload: { accountId: "acc-1", snapshot },
+      });
+    });
+    // acc-1 (source): SCROLL_TOP_AND_RELOAD のみ。acc-2 は外部サイトのカラムしか無いため配布されない。
+    expect(evalInColumnMock).toHaveBeenCalledTimes(1);
+    expect(evalInColumnMock).toHaveBeenCalledWith(
+      "col-1",
+      WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD,
+    );
+  });
+
+  it("配布元アカウントが投稿カラムしか持たない場合、再読込も実行されないこと", async () => {
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-1",
+          label: "Account 1",
+          xUserId: "user1",
+          dataDirectory: "/path/1",
+          color: "#1DA1F2",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      columns: [
+        makeColumn({ id: "col-1", accountId: "acc-1", pageType: "compose" }),
+      ],
+    });
+    renderHook(() => useOfficialSettingsBroadcast());
+    const snapshot = JSON.stringify({
+      local: { themeColor: "blue" },
+      nightMode: "0",
+    });
+    await act(async () => {
+      capturedCallbacks.get(IPC_EVENTS.WEBVIEW_OFFICIAL_SETTINGS_CAPTURED)?.({
+        payload: { accountId: "acc-1", snapshot },
+      });
+    });
+    expect(evalInColumnMock).not.toHaveBeenCalled();
   });
 
   it("不正なJSON文字列を受信した場合、evalInColumn が一切呼ばれないこと(JSON.parse 失敗で処理中断)", async () => {

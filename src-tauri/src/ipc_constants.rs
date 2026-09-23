@@ -237,4 +237,14 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn 廃止したブラウザ起動コマンドは登録されていない() {
+        let lib_src = include_str!("lib.rs");
+        let registered = handler_command_names(lib_src);
+        assert!(
+            !registered.contains(&"open_in_browser".to_string()),
+            "open_in_browser は削除済みのはずだが lib.rs に登録されている"
+        );
+    }
 }

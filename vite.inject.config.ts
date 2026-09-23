@@ -8,6 +8,7 @@ const outDir = resolve(import.meta.dirname, "src-tauri/src/inject");
 
 // React を含まない通常エントリ (ES modules)
 const plainEntries = [
+  "dom_observer",
   "image_popup",
   "tab_selector",
   "custom_css",

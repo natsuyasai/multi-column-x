@@ -11,6 +11,9 @@ import {
 
 type ManualResult = "idle" | "none" | "error";
 
+const INSTALL_ERROR_MESSAGE =
+  "更新のインストールに失敗しました。時間をおいて再度お試しください。";
+
 function readDismissed(): string | null {
   try {
     return localStorage.getItem(STORAGE_KEYS.DISMISSED_UPDATE_VERSION);
@@ -26,6 +29,7 @@ export function useAppUpdater(isMobile: boolean, ready: boolean = true) {
   const [installing, setInstalling] = useState(false);
   const [progress, setProgress] = useState<UpdateProgress | null>(null);
   const [manualResult, setManualResult] = useState<ManualResult>("idle");
+  const [installError, setInstallError] = useState<string | null>(null);
 
   // updater インスタンスごとに一度、起動時の自動チェックを行う。見送り済みバージョンは表示しない。
   // isMobile が確定して updater が mobile 実装へ切り替わった際にも確実にチェックするため、
@@ -71,6 +75,7 @@ export function useAppUpdater(isMobile: boolean, ready: boolean = true) {
   const install = useCallback(async () => {
     setInstalling(true);
     setProgress(null);
+    setInstallError(null);
     let lastPhase: string | null = null;
     try {
       await updater.install((p) => {
@@ -86,6 +91,7 @@ export function useAppUpdater(isMobile: boolean, ready: boolean = true) {
       logError("useAppUpdater:install")(e);
       setInstalling(false);
       setProgress(null);
+      setInstallError(INSTALL_ERROR_MESSAGE);
     }
   }, [updater]);
 
@@ -100,6 +106,7 @@ export function useAppUpdater(isMobile: boolean, ready: boolean = true) {
       } catch {}
     }
     setAvailable(null);
+    setInstallError(null);
   }, [available]);
 
   return {
@@ -108,6 +115,7 @@ export function useAppUpdater(isMobile: boolean, ready: boolean = true) {
     installing,
     progress,
     manualResult,
+    installError,
     checkManually,
     install,
     dismiss,

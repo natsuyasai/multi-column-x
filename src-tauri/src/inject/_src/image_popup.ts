@@ -143,12 +143,9 @@ export function extractQuotedTweetId(container: Element): string | null {
   }
 
   function openPopup(url: string): void {
-    const label =
-      window.__TAURI_INTERNALS__?.metadata?.currentWebview?.label ?? "unknown";
-    tauriInvoke(OPEN_POPUP_WINDOW, {
-      webviewLabelCaller: label,
-      url,
-    });
+    // webviewLabelCaller は渡さない。実際の送信元 WebView（呼び出し元）は
+    // Rust 側が caller.label() で判定するため、JS が自己申告する必要も権限も無い。
+    tauriInvoke(OPEN_POPUP_WINDOW, { url });
   }
 
   function handlePlayButton(playButton: Element, e: MouseEvent): boolean {
