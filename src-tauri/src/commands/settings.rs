@@ -15,90 +15,87 @@ pub struct AccountData {
     pub x_user_id: Option<String>,
 }
 
-// ColumnSettings の #[serde(default)] はカラム設定 JSON にフィールドが存在しない場合のフォールバック値。
+// ColumnSettings は構造体レベルの #[serde(default)] により、キーが欠落しているフィールドは
+// すべて impl Default for ColumnSettings（このすぐ下）の値にフォールバックする。
+// フィールドごとの既定値の唯一の定義元は impl Default であり、#[serde(default = "...")] は使わない。
 // TypeScript 側の対応定義: src/types/index.ts の DEFAULT_COLUMN_SETTINGS
 // 値を変更するときは TypeScript 側も必ず合わせること。
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default)]
 pub struct ColumnSettings {
     #[serde(rename = "autoReloadEnabled")]
     pub auto_reload_enabled: bool,
     #[serde(rename = "autoReloadInterval")]
     pub auto_reload_interval: u32,
     #[serde(rename = "showCountdown")]
-    #[serde(default = "default_true")]
     pub show_countdown: bool,
     #[serde(rename = "hideHeaderEnabled")]
-    #[serde(default = "default_true")]
     pub hide_header_enabled: bool,
     #[serde(rename = "hideTweetInputEnabled")]
-    #[serde(default = "default_true")]
     pub hide_tweet_input_enabled: bool,
     #[serde(rename = "showCustomMenu")]
-    #[serde(default = "default_true")]
     pub show_custom_menu: bool,
     #[serde(rename = "customCSS")]
     pub custom_css: String,
     #[serde(rename = "scrollPosRestoreEnabled")]
-    #[serde(default = "default_true")]
     pub scroll_pos_restore_enabled: bool,
     #[serde(rename = "visibleLinks")]
-    #[serde(default)]
     pub visible_links: Vec<String>,
     #[serde(rename = "smallImageEnabled")]
-    #[serde(default)]
     pub small_image_enabled: bool,
     #[serde(rename = "smallImageWidth")]
-    #[serde(default = "default_small_image_width")]
     pub small_image_width: String,
     #[serde(rename = "blurImageEnabled")]
-    #[serde(default)]
     pub blur_image_enabled: bool,
     #[serde(rename = "blurImageAmount")]
-    #[serde(default = "default_blur_image_amount")]
     pub blur_image_amount: String,
     #[serde(rename = "ngWords")]
-    #[serde(default)]
     pub ng_words: Vec<String>,
     #[serde(rename = "repostHiddenUserIds")]
-    #[serde(default)]
     pub repost_hidden_user_ids: Vec<String>,
     #[serde(rename = "whitelistEnabled")]
-    #[serde(default)]
     pub whitelist_enabled: bool,
     #[serde(rename = "whitelistWords")]
-    #[serde(default)]
     pub whitelist_words: Vec<String>,
     #[serde(rename = "desktopNotifyEnabled")]
-    #[serde(default)]
     pub desktop_notify_enabled: bool,
 }
 
-// デシリアライズ時のデフォルト値ヘルパー関数。
-// TypeScript 側の対応定義: src/types/index.ts の DEFAULT_COLUMN_SETTINGS / DEFAULT_GLOBAL_SETTINGS
-// 値を変更するときは TypeScript 側の対応定数も必ず合わせること。
-fn default_true() -> bool {
-    true
+// ColumnSettings のデフォルト値（新規インストール時 / キー欠落時の唯一の定義元）。
+// TypeScript 側の対応定義: src/types/index.ts の DEFAULT_COLUMN_SETTINGS
+// 値を変更するときは TypeScript 側も必ず合わせること（契約テスト: contracts/default-settings.json の columnSettings）。
+impl Default for ColumnSettings {
+    fn default() -> Self {
+        Self {
+            auto_reload_enabled: true,
+            auto_reload_interval: 600,
+            show_countdown: true,
+            hide_header_enabled: true,
+            hide_tweet_input_enabled: true,
+            show_custom_menu: false,
+            custom_css: String::new(),
+            scroll_pos_restore_enabled: true,
+            visible_links: vec![],
+            small_image_enabled: false,
+            small_image_width: "50%".to_string(),
+            blur_image_enabled: false,
+            blur_image_amount: "10px".to_string(),
+            ng_words: vec![],
+            repost_hidden_user_ids: vec![],
+            whitelist_enabled: false,
+            whitelist_words: vec![],
+            desktop_notify_enabled: false,
+        }
+    }
 }
+
+// デシリアライズ時のデフォルト値ヘルパー関数。
+// ColumnData / GlobalSettingsData の一部フィールドで個別に参照する。
 fn default_height_mode() -> String {
     "auto".to_string()
 }
-fn default_auto_reload_interval() -> u32 {
-    600
-}
-fn default_small_image_width() -> String {
-    "50%".to_string()
-}
-fn default_blur_image_amount() -> String {
-    "10px".to_string()
-}
 fn default_column_scale() -> String {
     "default".to_string()
-}
-fn default_mobile_swipe_area_height() -> u32 {
-    28
-}
-fn default_mobile_swipe_area_opacity() -> u8 {
-    50
 }
 
 impl Default for WindowBounds {
@@ -208,7 +205,12 @@ pub struct ColumnPresetData {
     pub columns: Vec<ColumnData>,
 }
 
+// GlobalSettingsData は構造体レベルの #[serde(default)] により、キーが欠落しているフィールドは
+// すべて impl Default for GlobalSettingsData（このすぐ下）の値にフォールバックする。
+// フィールドごとの既定値の唯一の定義元は impl Default であり、#[serde(default = "...")] は使わない。
+// TypeScript 側の対応定義: src/types/index.ts の DEFAULT_GLOBAL_SETTINGS
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default)]
 pub struct GlobalSettingsData {
     pub theme: String,
     #[serde(rename = "customCSS")]
@@ -218,87 +220,59 @@ pub struct GlobalSettingsData {
     #[serde(rename = "defaultAccountId")]
     pub default_account_id: Option<String>,
     #[serde(rename = "defaultAutoReloadEnabled")]
-    #[serde(default = "default_true")]
     pub default_auto_reload_enabled: bool,
     #[serde(rename = "defaultAutoReloadInterval")]
-    #[serde(default = "default_auto_reload_interval")]
     pub default_auto_reload_interval: u32,
     #[serde(rename = "popupEscCloseEnabled")]
-    #[serde(default = "default_true")]
     pub popup_esc_close_enabled: bool,
     #[serde(rename = "videoAutoPlayStopEnabled")]
-    #[serde(default)]
     pub video_auto_play_stop_enabled: bool,
     #[serde(rename = "imagePopupEnabled")]
-    #[serde(default = "default_true")]
     pub image_popup_enabled: bool,
     #[serde(rename = "videoPopupEnabled")]
-    #[serde(default = "default_true")]
     pub video_popup_enabled: bool,
     #[serde(rename = "showSortButtons")]
-    #[serde(default = "default_true")]
     pub show_sort_buttons: bool,
     #[serde(rename = "defaultShowCountdown")]
-    #[serde(default = "default_true")]
     pub default_show_countdown: bool,
     #[serde(rename = "defaultHideHeaderEnabled")]
-    #[serde(default = "default_true")]
     pub default_hide_header_enabled: bool,
     #[serde(rename = "defaultHideTweetInputEnabled")]
-    #[serde(default = "default_true")]
     pub default_hide_tweet_input_enabled: bool,
     #[serde(rename = "defaultShowCustomMenu")]
-    #[serde(default)]
     pub default_show_custom_menu: bool,
     #[serde(rename = "defaultScrollPosRestoreEnabled")]
-    #[serde(default = "default_true")]
     pub default_scroll_pos_restore_enabled: bool,
     #[serde(rename = "defaultColumnCustomCSS")]
-    #[serde(default)]
     pub default_column_custom_css: String,
     #[serde(rename = "smallImageEnabled")]
-    #[serde(default)]
     pub small_image_enabled: bool,
     #[serde(rename = "smallImageWidth")]
-    #[serde(default = "default_small_image_width")]
     pub small_image_width: String,
     #[serde(rename = "blurImageEnabled")]
-    #[serde(default)]
     pub blur_image_enabled: bool,
     #[serde(rename = "blurImageAmount")]
-    #[serde(default = "default_blur_image_amount")]
     pub blur_image_amount: String,
     #[serde(rename = "hideAdEnabled")]
-    #[serde(default)]
     pub hide_ad_enabled: bool,
     #[serde(rename = "apiRateLimitMonitorEnabled")]
-    #[serde(default = "default_true")]
     pub api_rate_limit_monitor_enabled: bool,
     #[serde(rename = "columnScale")]
-    #[serde(default = "default_column_scale")]
     pub column_scale: String,
     #[serde(rename = "useXAppForCompose")]
-    #[serde(default)]
     pub use_x_app_for_compose: bool,
     #[serde(rename = "mobileSwipeAreaEnabled")]
-    #[serde(default = "default_true")]
     pub mobile_swipe_area_enabled: bool,
     #[serde(rename = "mobileSwipeAreaHeight")]
-    #[serde(default = "default_mobile_swipe_area_height")]
     pub mobile_swipe_area_height: u32,
     #[serde(rename = "mobileSwipeAreaOpacity")]
-    #[serde(default = "default_mobile_swipe_area_opacity")]
     pub mobile_swipe_area_opacity: u8,
     #[serde(rename = "mobileTwoColumnEnabled")]
-    #[serde(default = "default_true")]
     pub mobile_two_column_enabled: bool,
-    #[serde(default)]
     pub presets: Vec<ColumnPresetData>,
     #[serde(rename = "ngWords")]
-    #[serde(default)]
     pub ng_words: Vec<String>,
     #[serde(rename = "repostHiddenUserIds")]
-    #[serde(default)]
     pub repost_hidden_user_ids: Vec<String>,
     /// アカウント削除時にデータフォルダ削除へ失敗した保存先パスの再実行対象一覧。
     /// アプリ設定画面から手動で再実行できる（詳細: docs/development ではなく本フィールド追加時の plan.md 参照）。
@@ -620,12 +594,94 @@ mod tests {
 
     /// TS 側（src/types/defaults.contract.test.ts）と同じ fixture を参照する契約テスト。
     /// デフォルト値を変更したら contracts/default-settings.json を再生成すること。
+    /// fixture にはカラム設定の既定値契約用の `columnSettings` キーも同居しているため、
+    /// AppSettingsData に対応する accounts / columns / globalSettings の3キーのみを比較する。
     #[test]
     fn default_settings_match_contract_fixture() {
         let fixture: serde_json::Value =
             serde_json::from_str(include_str!("../../../contracts/default-settings.json")).unwrap();
+        let expected = serde_json::json!({
+            "accounts": fixture["accounts"],
+            "columns": fixture["columns"],
+            "globalSettings": fixture["globalSettings"],
+        });
         let actual = serde_json::to_value(AppSettingsData::default()).unwrap();
-        assert_eq!(actual, fixture);
+        assert_eq!(actual, expected);
+    }
+
+    /// キーが全く無い空の全体設定 JSON（`{}`）を読み込んだ結果が、
+    /// 新規インストール時の既定値（contracts/default-settings.json の globalSettings）と一致することを確認する。
+    #[test]
+    fn 空の全体設定を読み込むと新規インストール時の既定値と一致する() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../../../contracts/default-settings.json")).unwrap();
+        let settings: GlobalSettingsData = serde_json::from_value(serde_json::json!({})).unwrap();
+        let actual = serde_json::to_value(&settings).unwrap();
+        assert_eq!(actual, fixture["globalSettings"]);
+    }
+
+    /// showSortButtons が欠落した旧全体設定は、新規インストール時と同じ false になる
+    /// （旧 serde 既定値 true から変更）。
+    #[test]
+    fn showsortbuttonsが無い旧全体設定はデフォルトでfalseになる() {
+        let settings: GlobalSettingsData = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert!(!settings.show_sort_buttons);
+    }
+
+    /// defaultScrollPosRestoreEnabled が欠落した旧全体設定は、新規インストール時と同じ false になる
+    /// （旧 serde 既定値 true から変更）。
+    #[test]
+    fn defaultscrollposrestoreenabledが無い旧全体設定はデフォルトでfalseになる() {
+        let settings: GlobalSettingsData = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert!(!settings.default_scroll_pos_restore_enabled);
+    }
+
+    /// videoAutoPlayStopEnabled が欠落した旧全体設定は、新規インストール時と同じ true になる
+    /// （旧 serde 既定値 false から変更）。
+    #[test]
+    fn videoautoplaystopenabledが無い旧全体設定はデフォルトでtrueになる() {
+        let settings: GlobalSettingsData = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert!(settings.video_auto_play_stop_enabled);
+    }
+
+    /// hideAdEnabled が欠落した旧全体設定は、新規インストール時と同じ true になる
+    /// （旧 serde 既定値 false から変更）。
+    #[test]
+    fn hideadenabledが無い旧全体設定はデフォルトでtrueになる() {
+        let settings: GlobalSettingsData = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert!(settings.hide_ad_enabled);
+    }
+
+    /// defaultAccountId 等これまで必須だったフィールドが欠落していても
+    /// エラーにならず既定値（None）になることを確認する。
+    #[test]
+    fn defaultaccountidが無い旧全体設定はデフォルトでnoneになる() {
+        let settings: GlobalSettingsData = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert_eq!(settings.default_account_id, None);
+    }
+
+    /// カラム設定の showCustomMenu が欠落しているとき、新規インストール時と同じ false（無効）になる。
+    #[test]
+    fn カラム設定のカスタムメニューのキーが無いときは無効になる() {
+        let json = serde_json::json!({
+            "autoReloadEnabled": true,
+            "autoReloadInterval": 600,
+            "customCSS": "",
+        });
+        let settings: ColumnSettings = serde_json::from_value(json).unwrap();
+        assert!(!settings.show_custom_menu);
+    }
+
+    /// キーが全く無い空のカラム設定 JSON（`{}`）を読み込んだ結果が、
+    /// 新規インストール時の既定値（contracts/default-settings.json の columnSettings、
+    /// TS の DEFAULT_COLUMN_SETTINGS 相当）と一致することを確認する。
+    #[test]
+    fn 空のカラム設定を読み込むと新規インストール時の既定値と一致する() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../../../contracts/default-settings.json")).unwrap();
+        let settings: ColumnSettings = serde_json::from_value(serde_json::json!({})).unwrap();
+        let actual = serde_json::to_value(&settings).unwrap();
+        assert_eq!(actual, fixture["columnSettings"]);
     }
 
     /// 新フィールド追加前に保存された旧カラム設定 JSON（desktopNotifyEnabled 欠落）を
