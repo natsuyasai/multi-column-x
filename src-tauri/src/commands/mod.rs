@@ -43,4 +43,14 @@ mod tests {
     fn popupプレフィックスのラベルは拒否する() {
         assert!(!is_main_label("popup-abc123"));
     }
+
+    #[test]
+    fn composeプレフィックスのラベルは拒否する() {
+        assert!(!is_main_label("compose-abc123"));
+    }
+
+    #[test]
+    fn add_accountプレフィックスのラベルは拒否する() {
+        assert!(!is_main_label("add-account-abc123"));
+    }
 }

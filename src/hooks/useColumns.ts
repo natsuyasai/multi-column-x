@@ -360,13 +360,18 @@ export function useColumns() {
     ],
   );
 
-  const recreateAllWebviews = useCallback(async () => {
-    const { columns: currentColumns, topBarExpanded } = useAppStore.getState();
-    for (const column of currentColumns) {
+  // 指定カラム群の WebView をすべて破棄する（remove_column_webview の失敗は握りつぶす）
+  const removeWebviewsOf = useCallback(async (cols: Column[]) => {
+    for (const column of cols) {
       await removeColumnWebview(column.id).catch(
-        logError("recreateAllWebviews:removeColumnWebview"),
+        logError("removeWebviewsOf:removeColumnWebview"),
       );
     }
+  }, []);
+
+  // store の現在の columns から WebView を作り直す（作成後の退避判定を含む）
+  const rebuildWebviews = useCallback(async () => {
+    const { topBarExpanded } = useAppStore.getState();
     await restoreColumns(getTopBarHeight(topBarExpanded));
     // ダイアログ表示中（再認証や GlobalSettings の全再読込など）に呼ばれた場合、
     // restoreColumns は列 WebView を通常座標に表示してしまう。native WebView は
@@ -377,6 +382,28 @@ export function useColumns() {
       await hideColumnWebviews();
     }
   }, [restoreColumns, hideColumnWebviews]);
+
+  const recreateAllWebviews = useCallback(async () => {
+    const { columns: currentColumns } = useAppStore.getState();
+    await removeWebviewsOf(currentColumns);
+    await rebuildWebviews();
+  }, [removeWebviewsOf, rebuildWebviews]);
+
+  // プリセットを読み込み、差し替え前の全カラムの WebView を破棄したうえで
+  // プリセット側のカラムの WebView を作り直す。同じ id のカラムがあっても
+  // 一度破棄してから作り直すため、プリセット側の設定で確実に再作成される。
+  const loadPresetAndRecreateWebviews = useCallback(
+    async (presetId: string) => {
+      const { columns: before, globalSettings } = useAppStore.getState();
+      if (!(globalSettings.presets ?? []).some((p) => p.id === presetId)) {
+        return;
+      }
+      await removeWebviewsOf(before);
+      useAppStore.getState().loadPreset(presetId);
+      await rebuildWebviews();
+    },
+    [removeWebviewsOf, rebuildWebviews],
+  );
 
   return {
     columns,
@@ -399,5 +426,6 @@ export function useColumns() {
     setDialogOpen,
     recreateAllWebviews,
     recreateColumnWebview,
+    loadPresetAndRecreateWebviews,
   };
 }

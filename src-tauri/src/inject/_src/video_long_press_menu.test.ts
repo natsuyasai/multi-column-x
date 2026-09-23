@@ -366,7 +366,6 @@ describe("inject/video_long_press_menu のポップアップメニュー項目",
     clickSecondMenuItem();
 
     expect(invokeMock).toHaveBeenCalledWith("open_popup_window", {
-      webviewLabelCaller: WEBVIEW_LABEL,
       url: "https://x.com/carol/status/555/video/2",
     });
   });
@@ -385,7 +384,6 @@ describe("inject/video_long_press_menu のポップアップメニュー項目",
     clickSecondMenuItem();
 
     expect(invokeMock).toHaveBeenCalledWith("open_popup_window", {
-      webviewLabelCaller: WEBVIEW_LABEL,
       url: "https://x.com/i/status/2069216779545751868/video/1",
     });
   });
@@ -470,7 +468,6 @@ describe("inject/video_long_press_menu のポップアップメニュー項目",
 
     expect(() => clickSecondMenuItem()).not.toThrow();
     expect(invokeMock).toHaveBeenCalledWith("open_popup_window", {
-      webviewLabelCaller: WEBVIEW_LABEL,
       url: "https://x.com/carol/status/555/video/2",
     });
   });

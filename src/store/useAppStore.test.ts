@@ -90,6 +90,7 @@ describe("useAppStore", () => {
         presets: [],
         ngWords: [],
         repostHiddenUserIds: [],
+        pendingDataDirectoryDeletions: [],
       },
       isLoaded: false,
       isMobile: false,
@@ -177,6 +178,40 @@ describe("useAppStore", () => {
       result.current.removeColumn("col-1");
     });
     expect(result.current.columns).not.toContainEqual(mockColumn);
+  });
+
+  it("指定アカウントのカラムだけを削除できる", () => {
+    const { result } = renderHook(() => useAppStore());
+    const otherAccountColumn: Column = {
+      ...mockColumn,
+      id: "col-2",
+      accountId: "acc-2",
+    };
+    const externalColumn: Column = {
+      ...mockColumn,
+      id: "col-external",
+      accountId: "col-external",
+      pageType: "external",
+    };
+    act(() => {
+      result.current.addColumn(mockColumn);
+      result.current.addColumn(otherAccountColumn);
+      result.current.addColumn(externalColumn);
+      result.current.removeColumnsByAccount("acc-1");
+    });
+    expect(result.current.columns.map((c) => c.id)).toEqual([
+      "col-2",
+      "col-external",
+    ]);
+  });
+
+  it("removeColumnsByAccountで該当カラムが無くても他のカラムはそのまま残る", () => {
+    const { result } = renderHook(() => useAppStore());
+    act(() => {
+      result.current.addColumn(mockColumn);
+      result.current.removeColumnsByAccount("acc-missing");
+    });
+    expect(result.current.columns).toContainEqual(mockColumn);
   });
 
   it("カラム設定を更新できる", () => {
@@ -403,9 +438,9 @@ describe("useAppStore", () => {
       DEFAULT_GLOBAL_SETTINGS;
     void _omitted;
     mockInvoke.mockResolvedValueOnce({
-      accounts: [],
-      columns: [],
-      globalSettings: legacyGlobal,
+      settings: { accounts: [], columns: [], globalSettings: legacyGlobal },
+      loadFailed: false,
+      backupPath: null,
     });
     const { result } = renderHook(() => useAppStore());
     await act(async () => {
@@ -416,12 +451,16 @@ describe("useAppStore", () => {
 
   it("保存済みの全体設定のリポスト元ユーザーIDは読み込み時にそのまま保持される", async () => {
     mockInvoke.mockResolvedValueOnce({
-      accounts: [],
-      columns: [],
-      globalSettings: {
-        ...DEFAULT_GLOBAL_SETTINGS,
-        repostHiddenUserIds: ["alice"],
+      settings: {
+        accounts: [],
+        columns: [],
+        globalSettings: {
+          ...DEFAULT_GLOBAL_SETTINGS,
+          repostHiddenUserIds: ["alice"],
+        },
       },
+      loadFailed: false,
+      backupPath: null,
     });
     const { result } = renderHook(() => useAppStore());
     await act(async () => {
@@ -430,6 +469,145 @@ describe("useAppStore", () => {
     expect(result.current.globalSettings.repostHiddenUserIds).toEqual([
       "alice",
     ]);
+  });
+
+  it("設定を正常に解析できたときは退避も通知も行われない", async () => {
+    mockInvoke.mockResolvedValueOnce({
+      settings: {
+        accounts: [],
+        columns: [],
+        globalSettings: DEFAULT_GLOBAL_SETTINGS,
+      },
+      loadFailed: false,
+      backupPath: null,
+    });
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    expect(result.current.settingsLoadNotice).toBeNull();
+  });
+
+  it("設定ファイルが存在しない初回起動では退避も通知も行われない", async () => {
+    mockInvoke.mockResolvedValueOnce({
+      settings: {
+        accounts: [],
+        columns: [],
+        globalSettings: DEFAULT_GLOBAL_SETTINGS,
+      },
+      loadFailed: false,
+      backupPath: null,
+    });
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    expect(result.current.settingsLoadNotice).toBeNull();
+  });
+
+  it("設定を解析できないときは読み込み失敗と退避先が通知される", async () => {
+    mockInvoke.mockResolvedValueOnce({
+      settings: {
+        accounts: [],
+        columns: [],
+        globalSettings: DEFAULT_GLOBAL_SETTINGS,
+      },
+      loadFailed: true,
+      backupPath: "/data/settings.json.20260922-120000.bak",
+    });
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    expect(result.current.settingsLoadNotice).toContain(
+      "/data/settings.json.20260922-120000.bak",
+    );
+  });
+
+  it("設定の退避にも失敗したときはその旨が通知される", async () => {
+    mockInvoke.mockResolvedValueOnce({
+      settings: {
+        accounts: [],
+        columns: [],
+        globalSettings: DEFAULT_GLOBAL_SETTINGS,
+      },
+      loadFailed: true,
+      backupPath: null,
+    });
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    expect(result.current.settingsLoadNotice).toContain("バックアップ");
+    expect(result.current.settingsLoadNotice).not.toContain("次の場所");
+  });
+
+  it("dismissSettingsLoadNoticeを呼ぶと通知が消える", async () => {
+    mockInvoke.mockResolvedValueOnce({
+      settings: {
+        accounts: [],
+        columns: [],
+        globalSettings: DEFAULT_GLOBAL_SETTINGS,
+      },
+      loadFailed: true,
+      backupPath: "/data/settings.json.20260922-120000.bak",
+    });
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    expect(result.current.settingsLoadNotice).not.toBeNull();
+    act(() => {
+      result.current.dismissSettingsLoadNotice();
+    });
+    expect(result.current.settingsLoadNotice).toBeNull();
+  });
+
+  it("addPendingDataDirectoryDeletionで削除保留フォルダを追加できる", () => {
+    const { result } = renderHook(() => useAppStore());
+    act(() => {
+      result.current.addPendingDataDirectoryDeletion("/data/acc-1");
+    });
+    expect(result.current.globalSettings.pendingDataDirectoryDeletions).toEqual(
+      ["/data/acc-1"],
+    );
+    expect(mockInvoke).toHaveBeenCalledWith("save_settings", expect.anything());
+  });
+
+  it("addPendingDataDirectoryDeletionは同じパスを重複追加しない", () => {
+    const { result } = renderHook(() => useAppStore());
+    act(() => {
+      result.current.addPendingDataDirectoryDeletion("/data/acc-1");
+      result.current.addPendingDataDirectoryDeletion("/data/acc-1");
+    });
+    expect(result.current.globalSettings.pendingDataDirectoryDeletions).toEqual(
+      ["/data/acc-1"],
+    );
+  });
+
+  it("setPendingDataDirectoryDeletionsで削除保留フォルダを置き換えられる", () => {
+    const { result } = renderHook(() => useAppStore());
+    act(() => {
+      result.current.addPendingDataDirectoryDeletion("/data/acc-1");
+      result.current.addPendingDataDirectoryDeletion("/data/acc-2");
+      result.current.setPendingDataDirectoryDeletions(["/data/acc-2"]);
+    });
+    expect(result.current.globalSettings.pendingDataDirectoryDeletions).toEqual(
+      ["/data/acc-2"],
+    );
+  });
+
+  it("updateGlobalSettingsはpendingDataDirectoryDeletionsを含まないpatchで巻き戻さない（設定パネル保存時の回帰確認）", () => {
+    const { result } = renderHook(() => useAppStore());
+    act(() => {
+      result.current.addPendingDataDirectoryDeletion("/data/acc-1");
+      // AppSettingsPanelの「適用」相当。pendingDataDirectoryDeletionsを含まないpatch
+      result.current.updateGlobalSettings({ theme: "light" });
+    });
+    expect(result.current.globalSettings.pendingDataDirectoryDeletions).toEqual(
+      ["/data/acc-1"],
+    );
+    expect(result.current.globalSettings.theme).toBe("light");
   });
 });
 

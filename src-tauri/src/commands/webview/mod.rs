@@ -79,15 +79,21 @@ pub async fn report_webview_scroll(app: AppHandle, delta: f64) -> Result<(), Str
         .map_err(|e| e.to_string())
 }
 
+/// report_new_posts_count が emit するペイロードを組み立てる（テスト用に純粋関数として切り出し）。
+/// label には呼び出し元コマンドが `caller.label()`（実際の送信元 WebView のラベル）を渡すことを保証する。
+fn build_new_posts_count_payload(label: &str, count: u32) -> serde_json::Value {
+    serde_json::json!({ "label": label, "count": count })
+}
+
 #[tauri::command]
 pub async fn report_new_posts_count(
+    caller: tauri::Webview,
     app: AppHandle,
-    label: String,
     count: u32,
 ) -> Result<(), String> {
     app.emit(
         events::WEBVIEW_NEW_POSTS_COUNT,
-        serde_json::json!({ "label": label, "count": count }),
+        build_new_posts_count_payload(caller.label(), count),
     )
     .map_err(|e| e.to_string())
 }
@@ -194,14 +200,21 @@ fn emit_api_rate_limit_resolving_account(
 
 #[tauri::command]
 pub async fn report_api_rate_limit(
+    caller: tauri::Webview,
     app: AppHandle,
-    label: String,
     bucket_key: String,
     limit: u32,
     remaining: u32,
     reset: u64,
 ) -> Result<(), String> {
-    emit_api_rate_limit_resolving_account(&app, &label, &bucket_key, limit, remaining, reset)
+    emit_api_rate_limit_resolving_account(
+        &app,
+        caller.label(),
+        &bucket_key,
+        limit,
+        remaining,
+        reset,
+    )
 }
 
 /// Android の column WebView（ネイティブ WebView・Tauri IPC非対応）から
@@ -253,11 +266,6 @@ pub async fn report_keyboard_shortcut(app: AppHandle, key: String) -> Result<(),
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-pub async fn open_in_browser(url: String) -> Result<(), String> {
-    tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())
-}
-
 /// モバイルスワイプバーのネイティブオーバーレイ状態（表示/位置/高さ/透過度/テーマ）を更新する。
 /// Android 以外は no-op（デスクトップはネイティブオーバーレイを持たない）。
 /// darkTheme は JS 側 camelCase キーに合わせるため non_snake_case を許容する（全ターゲット共通）。
@@ -267,12 +275,14 @@ pub async fn open_in_browser(url: String) -> Result<(), String> {
 #[allow(non_snake_case)]
 #[cfg_attr(not(target_os = "android"), allow(unused_variables))]
 pub async fn update_mobile_swipe_bar(
+    caller: tauri::Webview,
     visible: bool,
     y: i32,
     height: i32,
     opacity: i32,
     darkTheme: bool,
 ) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     #[cfg(target_os = "android")]
     {
         crate::android_bridge::set_swipe_bar_overlay(visible, y, height, opacity, darkTheme)?;
@@ -287,7 +297,11 @@ pub async fn update_mobile_swipe_bar(
 /// unused_variables を許容する。
 #[tauri::command]
 #[cfg_attr(not(target_os = "android"), allow(unused_variables))]
-pub async fn flash_mobile_swipe_bar(direction: String) -> Result<(), String> {
+pub async fn flash_mobile_swipe_bar(
+    caller: tauri::Webview,
+    direction: String,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     #[cfg(target_os = "android")]
     {
         crate::android_bridge::set_swipe_bar_flash(&direction)?;
@@ -312,6 +326,34 @@ mod tests {
         let result = parse_url("not a url");
         assert!(result.is_err());
         assert!(!result.unwrap_err().is_empty());
+    }
+
+    #[test]
+    fn 未読数の通知は送信元のラベルで作られる() {
+        let payload = build_new_posts_count_payload("column-a", 3);
+        assert_eq!(payload["label"], "column-a");
+        assert_eq!(payload["count"], 3);
+    }
+
+    #[test]
+    fn レート制限は送信元カラムのアカウントとして解決される() {
+        let mut registry = new_registry_for_resolve_test();
+        registry.register(
+            "column-a".to_string(),
+            "col-a".to_string(),
+            "account-a".to_string(),
+            "/data/a".to_string(),
+        );
+        registry.register(
+            "column-b".to_string(),
+            "col-b".to_string(),
+            "account-b".to_string(),
+            "/data/b".to_string(),
+        );
+        // 送信元(caller.label())が column-a であれば、他カラム（column-b）のアカウントを
+        // 名乗ることはできず、常に送信元自身のアカウントが解決される。
+        let result = resolve_account_id(&registry, None, "column-a");
+        assert_eq!(result, Some("account-a".to_string()));
     }
 
     #[test]

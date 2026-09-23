@@ -13,7 +13,6 @@
     "close_popup_window",
     "switch_popup_session",
     "open_compose_window",
-    "open_in_browser",
     "open_add_account_window",
     "reauth_account_window",
     "delete_account_data",

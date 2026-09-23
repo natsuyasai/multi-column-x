@@ -4,7 +4,23 @@ import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { IPC_EVENTS } from "../constants/ipc";
 import { useAppStore } from "../store/useAppStore";
+import { DEFAULT_COLUMN_SETTINGS } from "../types";
+import type { Column } from "../types";
 import { useAccounts } from "./useAccounts";
+
+function makeColumn(overrides: Partial<Column> & Pick<Column, "id">): Column {
+  return {
+    accountId: "acc-1",
+    pageType: "home",
+    width: 350,
+    order: 0,
+    gridRow: 1,
+    gridCol: 1,
+    heightMode: "auto",
+    settings: DEFAULT_COLUMN_SETTINGS,
+    ...overrides,
+  };
+}
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -373,6 +389,292 @@ describe("useAccounts (desktop addAccount)", () => {
   });
 });
 
+const ACCOUNT_DATA_DELETE_FAILED_MESSAGE =
+  "アカウントのデータフォルダを削除できませんでした。アプリ設定の「データフォルダの削除を再実行」から後で削除できます。";
+
+describe("useAccounts confirmRemoval（カラム削除・削除保留の記録）", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function setupAccountsAndColumns() {
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-1",
+          label: "A",
+          dataDirectory: "/data/acc-1",
+          color: "#1d9bf0",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+        {
+          id: "acc-2",
+          label: "B",
+          dataDirectory: "/data/acc-2",
+          color: "#e0245e",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      columns: [
+        makeColumn({ id: "col-a1", accountId: "acc-1" }),
+        makeColumn({ id: "col-a2", accountId: "acc-1" }),
+        makeColumn({ id: "col-b1", accountId: "acc-2" }),
+        makeColumn({
+          id: "col-external",
+          accountId: "col-external",
+          pageType: "external",
+        }),
+      ],
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: [],
+      },
+      isMobile: false,
+    });
+  }
+
+  it("アカウントを削除するとそのアカウントのカラムも削除され、他アカウントと外部カラムは残る", async () => {
+    setupAccountsAndColumns();
+    mockInvoke.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts());
+
+    act(() => {
+      result.current.removeAccount("acc-1");
+    });
+    await act(async () => {
+      await result.current.confirmRemoval();
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith("remove_column_webview", {
+      columnId: "col-a1",
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("remove_column_webview", {
+      columnId: "col-a2",
+    });
+    expect(mockInvoke).not.toHaveBeenCalledWith("remove_column_webview", {
+      columnId: "col-b1",
+    });
+    expect(mockInvoke).not.toHaveBeenCalledWith("remove_column_webview", {
+      columnId: "col-external",
+    });
+
+    expect(useAppStore.getState().columns.map((c) => c.id)).toEqual([
+      "col-b1",
+      "col-external",
+    ]);
+    expect(useAppStore.getState().accounts.map((a) => a.id)).toEqual(["acc-2"]);
+  });
+
+  it("保存先の削除はカラムの表示を破棄した後に行われる", async () => {
+    setupAccountsAndColumns();
+    mockInvoke.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts());
+
+    act(() => {
+      result.current.removeAccount("acc-1");
+    });
+    await act(async () => {
+      await result.current.confirmRemoval();
+    });
+
+    const callsWithOrder = mockInvoke.mock.calls.map((call, i) => ({
+      cmd: call[0],
+      order: mockInvoke.mock.invocationCallOrder[i],
+    }));
+    const removeWebviewOrders = callsWithOrder
+      .filter((c) => c.cmd === "remove_column_webview")
+      .map((c) => c.order);
+    const deleteDataOrder = callsWithOrder.find(
+      (c) => c.cmd === "delete_account_data",
+    )?.order;
+
+    expect(removeWebviewOrders).toHaveLength(2);
+    expect(deleteDataOrder).toBeDefined();
+    for (const order of removeWebviewOrders) {
+      expect(order).toBeLessThan(deleteDataOrder as number);
+    }
+  });
+
+  it("保存先の削除に失敗したときは通知され再実行対象として記録され、アカウントとカラムは削除される", async () => {
+    setupAccountsAndColumns();
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "delete_account_data") {
+        throw new Error("locked");
+      }
+      return undefined;
+    });
+    const { result } = renderHook(() => useAccounts());
+
+    act(() => {
+      result.current.removeAccount("acc-1");
+    });
+    await act(async () => {
+      await result.current.confirmRemoval();
+    });
+
+    expect(useAppStore.getState().accounts.map((a) => a.id)).toEqual(["acc-2"]);
+    expect(useAppStore.getState().columns.map((c) => c.id)).toEqual([
+      "col-b1",
+      "col-external",
+    ]);
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual(["/data/acc-1"]);
+    expect(result.current.accountNotice).toEqual({
+      title: "アカウントの削除",
+      message: ACCOUNT_DATA_DELETE_FAILED_MESSAGE,
+    });
+  });
+
+  it("データフォルダの削除に失敗したときはアカウントの削除として通知される", async () => {
+    setupAccountsAndColumns();
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "delete_account_data") {
+        throw new Error("locked");
+      }
+      return undefined;
+    });
+    const { result } = renderHook(() => useAccounts());
+
+    act(() => {
+      result.current.removeAccount("acc-1");
+    });
+    await act(async () => {
+      await result.current.confirmRemoval();
+    });
+
+    expect(result.current.accountNotice?.title).toBe("アカウントの削除");
+  });
+
+  it("保存先の削除に成功したときは通知されず再実行対象に記録されない", async () => {
+    setupAccountsAndColumns();
+    mockInvoke.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts());
+
+    act(() => {
+      result.current.removeAccount("acc-1");
+    });
+    await act(async () => {
+      await result.current.confirmRemoval();
+    });
+
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual([]);
+    expect(result.current.accountNotice).toBeNull();
+  });
+});
+
+describe("useAccounts retryPendingDataDirectoryDeletions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-2",
+          label: "B",
+          dataDirectory: "/data/acc-2",
+          color: "#e0245e",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: [],
+      },
+      isMobile: false,
+    });
+  });
+
+  it("2件中1件成功した場合、成功分は再実行対象から外れ失敗分だけが残り残数が返る", async () => {
+    useAppStore.setState({
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: ["/data/ok", "/data/ng"],
+      },
+    });
+    mockInvoke.mockImplementation(async (cmd, args) => {
+      if (cmd === "delete_account_data") {
+        const dir = (args as { dataDirectory: string }).dataDirectory;
+        if (dir === "/data/ng") throw new Error("locked");
+        return undefined;
+      }
+      return undefined;
+    });
+    const { result } = renderHook(() => useAccounts());
+
+    let retryResult: { remaining: number } = { remaining: -1 };
+    await act(async () => {
+      retryResult = await result.current.retryPendingDataDirectoryDeletions();
+    });
+
+    expect(retryResult).toEqual({ remaining: 1 });
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual(["/data/ng"]);
+  });
+
+  it("全件成功した場合は再実行対象が空になり残数0が返る", async () => {
+    useAppStore.setState({
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: ["/data/ok1", "/data/ok2"],
+      },
+    });
+    mockInvoke.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts());
+
+    let retryResult: { remaining: number } = { remaining: -1 };
+    await act(async () => {
+      retryResult = await result.current.retryPendingDataDirectoryDeletions();
+    });
+
+    expect(retryResult).toEqual({ remaining: 0 });
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual([]);
+  });
+
+  it("再実行対象が現在登録中のアカウントのdataDirectoryと一致する場合は削除せず対象から外す", async () => {
+    useAppStore.setState({
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        // acc-2 (登録中) の dataDirectory と一致するパスが誤って残っているケース
+        pendingDataDirectoryDeletions: ["/data/acc-2"],
+      },
+    });
+    mockInvoke.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts());
+
+    await act(async () => {
+      await result.current.retryPendingDataDirectoryDeletions();
+    });
+
+    expect(mockInvoke).not.toHaveBeenCalledWith("delete_account_data", {
+      dataDirectory: "/data/acc-2",
+    });
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual([]);
+  });
+
+  it("再実行対象が無い場合は何も削除せず残数0が返る", async () => {
+    mockInvoke.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts());
+
+    let retryResult: { remaining: number } = { remaining: -1 };
+    await act(async () => {
+      retryResult = await result.current.retryPendingDataDirectoryDeletions();
+    });
+
+    expect(retryResult).toEqual({ remaining: 0 });
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "delete_account_data",
+      expect.anything(),
+    );
+  });
+});
+
 const OLD_DATA_DIRECTORY = "/data/acc-1";
 const NEW_DATA_DIRECTORY = "/data/accounts/account-new";
 
@@ -436,10 +738,82 @@ describe("useAccounts (desktop reauth)", () => {
       dataDirectory: OLD_DATA_DIRECTORY,
     });
     expect(mockReload).toHaveBeenCalledTimes(1);
-    expect(result.current.reauthNotice).toBeNull();
+    expect(result.current.accountNotice).toBeNull();
     expect(mockListen).toHaveBeenCalledWith(
       IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE,
       expect.any(Function),
+    );
+  });
+
+  it("一致(match)の場合、旧保存先の削除はreloadAllWebviewsの後に行われる", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+    });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "reauth_account_window" ? reauthWindowResult : undefined,
+    );
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: "123",
+        newDataDirectory: NEW_DATA_DIRECTORY,
+      });
+      await reauthPromise;
+    });
+
+    const deleteOldDirCallIndex = mockInvoke.mock.calls.findIndex(
+      (call) =>
+        call[0] === "delete_account_data" &&
+        (call[1] as { dataDirectory: string }).dataDirectory ===
+          OLD_DATA_DIRECTORY,
+    );
+    const deleteOldDirOrder =
+      mockInvoke.mock.invocationCallOrder[deleteOldDirCallIndex];
+    const reloadOrder = mockReload.mock.invocationCallOrder[0];
+
+    expect(deleteOldDirCallIndex).toBeGreaterThanOrEqual(0);
+    expect(reloadOrder).toBeLessThan(deleteOldDirOrder);
+  });
+
+  it("再認証完了時の新しい保存先は再認証の開始結果から採用する", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+    });
+    const dataDirectoryFromStartResult = "/data/accounts/from-start-result";
+    const dataDirectoryFromEventPayload = "/data/accounts/from-event-payload";
+    const startResult = JSON.stringify({
+      accountId: "acc-1",
+      windowLabel: "reauth-acc-1",
+      newDataDirectory: dataDirectoryFromStartResult,
+    });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "reauth_account_window" ? startResult : undefined,
+    );
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: "123",
+        newDataDirectory: dataDirectoryFromEventPayload,
+      });
+      await reauthPromise;
+    });
+
+    expect(useAppStore.getState().accounts[0].dataDirectory).toBe(
+      dataDirectoryFromStartResult,
     );
   });
 
@@ -474,9 +848,11 @@ describe("useAccounts (desktop reauth)", () => {
       dataDirectory: OLD_DATA_DIRECTORY,
     });
     expect(mockReload).toHaveBeenCalledTimes(1);
-    expect(result.current.reauthNotice).toBe(
-      "初回の再認証のため同一性の照合をスキップし、アカウント識別子を記録しました",
-    );
+    expect(result.current.accountNotice).toEqual({
+      title: "再認証",
+      message:
+        "初回の再認証のため同一性の照合をスキップし、アカウント識別子を記録しました",
+    });
   });
 
   it("不一致(mismatch)の場合、xUserIdとdataDirectoryは据え置かれ新dirが削除されreloadAllWebviewsも呼ばれず警告がセットされる", async () => {
@@ -513,9 +889,11 @@ describe("useAccounts (desktop reauth)", () => {
     expect(mockInvoke).toHaveBeenCalledWith("delete_account_data", {
       dataDirectory: NEW_DATA_DIRECTORY,
     });
-    expect(result.current.reauthNotice).toBe(
-      "登録済みと異なるアカウントでログインされたため、セッションを更新しませんでした",
-    );
+    expect(result.current.accountNotice).toEqual({
+      title: "再認証",
+      message:
+        "登録済みと異なるアカウントでログインされたため、セッションを更新しませんでした",
+    });
   });
 
   it("識別子取得失敗の場合、更新もリロードもされず新dirが削除され失敗通知がセットされる", async () => {
@@ -552,12 +930,13 @@ describe("useAccounts (desktop reauth)", () => {
     expect(mockInvoke).toHaveBeenCalledWith("delete_account_data", {
       dataDirectory: NEW_DATA_DIRECTORY,
     });
-    expect(result.current.reauthNotice).toBe(
-      "再認証に失敗しました（アカウント識別子を取得できませんでした）",
-    );
+    expect(result.current.accountNotice).toEqual({
+      title: "再認証",
+      message: "再認証に失敗しました（アカウント識別子を取得できませんでした）",
+    });
   });
 
-  it("dismissReauthNoticeを呼ぶとreauthNoticeがnullに戻る", async () => {
+  it("dismissAccountNoticeを呼ぶとaccountNoticeがnullに戻る", async () => {
     useAppStore.setState({
       accounts: [makeReauthAccount("123")],
       isMobile: false,
@@ -579,13 +958,13 @@ describe("useAccounts (desktop reauth)", () => {
       });
       await reauthPromise;
     });
-    expect(result.current.reauthNotice).not.toBeNull();
+    expect(result.current.accountNotice).not.toBeNull();
 
     act(() => {
-      result.current.dismissReauthNotice();
+      result.current.dismissAccountNotice();
     });
 
-    expect(result.current.reauthNotice).toBeNull();
+    expect(result.current.accountNotice).toBeNull();
   });
 
   it("reloadAllWebviewsを渡さずuseAccounts()で呼んでもmatch時にエラーにならない", async () => {
@@ -611,7 +990,7 @@ describe("useAccounts (desktop reauth)", () => {
     });
 
     expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
-    expect(result.current.reauthNotice).toBeNull();
+    expect(result.current.accountNotice).toBeNull();
   });
 
   it("対象外accountIdのイベントは無視される", async () => {
@@ -673,7 +1052,7 @@ describe("useAccounts (desktop reauth)", () => {
       dataDirectory: NEW_DATA_DIRECTORY,
     });
     expect(mockReload).not.toHaveBeenCalled();
-    expect(result.current.reauthNotice).toBeNull();
+    expect(result.current.accountNotice).toBeNull();
   });
 });
 
@@ -712,7 +1091,7 @@ describe("useAccounts (mobile reauth)", () => {
       expect.anything(),
     );
     expect(mockReload).toHaveBeenCalledTimes(1);
-    expect(result.current.reauthNotice).toBeNull();
+    expect(result.current.accountNotice).toBeNull();
   });
 
   it("初回(skip)の場合、xUserIdが記録されreloadAllWebviewsが呼ばれスキップ通知がセットされるがdataDirectoryは据え置かれる", async () => {
@@ -741,9 +1120,11 @@ describe("useAccounts (mobile reauth)", () => {
       expect.anything(),
     );
     expect(mockReload).toHaveBeenCalledTimes(1);
-    expect(result.current.reauthNotice).toBe(
-      "初回の再認証のため同一性の照合をスキップし、アカウント識別子を記録しました",
-    );
+    expect(result.current.accountNotice).toEqual({
+      title: "再認証",
+      message:
+        "初回の再認証のため同一性の照合をスキップし、アカウント識別子を記録しました",
+    });
   });
 
   it("不一致の場合、invokeがaccount-mismatchでrejectされxUserIdは更新されず警告がセットされる", async () => {
@@ -765,9 +1146,11 @@ describe("useAccounts (mobile reauth)", () => {
 
     expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
     expect(mockReload).not.toHaveBeenCalled();
-    expect(result.current.reauthNotice).toBe(
-      "登録済みと異なるアカウントでログインされたため、セッションを更新しませんでした",
-    );
+    expect(result.current.accountNotice).toEqual({
+      title: "再認証",
+      message:
+        "登録済みと異なるアカウントでログインされたため、セッションを更新しませんでした",
+    });
   });
 
   it("キャンセルの場合、invokeがcancelledでrejectされ何も起きない", async () => {
@@ -789,7 +1172,7 @@ describe("useAccounts (mobile reauth)", () => {
 
     expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
     expect(mockReload).not.toHaveBeenCalled();
-    expect(result.current.reauthNotice).toBeNull();
+    expect(result.current.accountNotice).toBeNull();
   });
 
   it("xUserIdがnullで返る場合、更新もリロードもされず失敗通知がセットされる", async () => {
@@ -811,8 +1194,9 @@ describe("useAccounts (mobile reauth)", () => {
 
     expect(useAppStore.getState().accounts[0].xUserId).toBe("123");
     expect(mockReload).not.toHaveBeenCalled();
-    expect(result.current.reauthNotice).toBe(
-      "再認証に失敗しました（アカウント識別子を取得できませんでした）",
-    );
+    expect(result.current.accountNotice).toEqual({
+      title: "再認証",
+      message: "再認証に失敗しました（アカウント識別子を取得できませんでした）",
+    });
   });
 });
