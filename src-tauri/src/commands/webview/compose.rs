@@ -92,10 +92,12 @@ pub(super) fn create_compose_window(
 #[cfg(desktop)]
 #[tauri::command]
 pub async fn open_compose_window(
+    caller: tauri::Webview,
     app: AppHandle,
     #[allow(non_snake_case)] accountId: String,
     #[allow(non_snake_case)] dataDirectory: String,
 ) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let data_dir = PathBuf::from(&dataDirectory);
 
     let action = {
@@ -144,10 +146,12 @@ pub async fn open_compose_window(
 #[cfg(mobile)]
 #[tauri::command]
 pub async fn open_compose_window(
+    caller: tauri::Webview,
     app: AppHandle,
     #[allow(non_snake_case)] accountId: String,
     #[allow(non_snake_case)] dataDirectory: String,
 ) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let PopupInit {
         label: compose_label,
         init_script: popup_init,
