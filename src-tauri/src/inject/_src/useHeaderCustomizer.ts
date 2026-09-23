@@ -10,6 +10,23 @@ import {
   DEFAULT_NAV_LINKS,
 } from "./headerCustomizerTypes";
 
+// 共有DOM監視ハブ(dom_observer.ts, window.__mcxDomObserver)経由でDOM変化を購読する。
+// ハブは document.body を childList+subtree で監視し、MutationRecordの詳細に依存
+// しないコールバック（毎回applyHeaderVisibility/extractLinksを再実行・再試行するだけ）を
+// requestAnimationFrameで1フレームにまとめて配る。ハブが無い環境（単体テストや、
+// 注入順序が変わった場合等）では、フォールバックとして従来と同じdocument.bodyの
+// childList+subtree監視をこのファイル単独で行う。
+function subscribeDomChanges(
+  callback: (mutations: MutationRecord[]) => void,
+): () => void {
+  if (window.__mcxDomObserver) {
+    return window.__mcxDomObserver.subscribe(callback);
+  }
+  const observer = new MutationObserver(callback);
+  observer.observe(document.body, { childList: true, subtree: true });
+  return () => observer.disconnect();
+}
+
 export function useHeaderCustomizer() {
   // visibleLinks は window.__multiColumnXConfig から取得（空配列 = 全リンク表示）
   const visibleLinks: string[] =
@@ -52,12 +69,11 @@ export function useHeaderCustomizer() {
 
     applyHeaderVisibility();
 
-    const observer = new MutationObserver(applyHeaderVisibility);
-    observer.observe(document.body, { childList: true, subtree: true });
+    const unsubscribe = subscribeDomChanges(applyHeaderVisibility);
     window.addEventListener("resize", applyHeaderVisibility);
 
     return () => {
-      observer.disconnect();
+      unsubscribe();
       window.removeEventListener("resize", applyHeaderVisibility);
       document.getElementById(HEADER_HIDE_STYLE_ID)?.remove();
     };
@@ -128,13 +144,13 @@ export function useHeaderCustomizer() {
     const maxRetries = 10;
     let retryTimer: ReturnType<typeof setInterval> | null = null;
     let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
-    let observer: MutationObserver | null = null;
+    let unsubscribe: (() => void) | null = null;
 
     const tryExtractLinks = () => {
       if (extractLinks()) {
         if (retryTimer) clearInterval(retryTimer);
         if (timeoutTimer) clearTimeout(timeoutTimer);
-        if (observer) observer.disconnect();
+        unsubscribe?.();
         return true;
       }
       return false;
@@ -147,18 +163,17 @@ export function useHeaderCustomizer() {
         if (tryExtractLinks()) return;
         if (retryCount >= maxRetries) {
           if (retryTimer) clearInterval(retryTimer);
-          observer = new MutationObserver(() => {
+          unsubscribe = subscribeDomChanges(() => {
             if (extractLinks()) {
-              observer?.disconnect();
+              unsubscribe?.();
               if (timeoutTimer) clearTimeout(timeoutTimer);
             }
           });
-          observer.observe(document.body, { childList: true, subtree: true });
         }
       }, 200);
       timeoutTimer = setTimeout(() => {
         if (retryTimer) clearInterval(retryTimer);
-        if (observer) observer.disconnect();
+        unsubscribe?.();
         if (navLinks.length === 0) applyFallbackLinks();
       }, 5000);
     }, 100);
@@ -167,7 +182,7 @@ export function useHeaderCustomizer() {
       clearTimeout(startInitialDelay);
       if (retryTimer) clearInterval(retryTimer);
       if (timeoutTimer) clearTimeout(timeoutTimer);
-      if (observer) observer.disconnect();
+      unsubscribe?.();
     };
   }, []); // visibleLinks は初期化時に一度だけ読む
 

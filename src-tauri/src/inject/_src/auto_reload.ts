@@ -129,23 +129,15 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
     return null;
   }
 
-  function getWebviewLabel(): string {
-    return (
-      window.__TAURI_INTERNALS__?.metadata?.currentWebview?.label ??
-      window.__TAURI__?.core?.invoke?.name ??
-      ""
-    );
-  }
-
   function reportNewPostsCount(count: number): void {
-    const label = getWebviewLabel();
-    if (!label) return;
     const invoke =
       window.__TAURI_INTERNALS__?.invoke ??
       window.__TAURI__?.core?.invoke ??
       window.__TAURI__?.invoke;
     if (!invoke) return;
-    invoke("report_new_posts_count", { label, count }).catch(() => {});
+    // label は渡さない。実際の送信元 WebView（呼び出し元）は Rust 側が
+    // caller.label() で判定するため、JS が自己申告する必要も権限も無い。
+    invoke("report_new_posts_count", { count }).catch(() => {});
   }
 
   /**

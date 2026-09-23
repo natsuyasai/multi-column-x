@@ -101,13 +101,6 @@
   function observeNavigation(): void {
     let previousUrl = window.location.href;
 
-    setInterval(() => {
-      const currentUrl = window.location.href;
-      if (currentUrl !== previousUrl) {
-        previousUrl = currentUrl;
-      }
-    }, 500);
-
     window.addEventListener("popstate", () => {
       const wasPhotoPage = PHOTO_URL_PATTERN.test(previousUrl);
       if (wasPhotoPage && isHomePage()) {
