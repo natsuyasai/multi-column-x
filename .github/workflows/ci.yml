@@ -21,9 +21,24 @@ jobs:
       - run: npm run build:inject
       - run: npm test
       # Storybook の play function は vitest ブラウザモード(chromium)で実行するため
-      # Playwright のブラウザを先に用意する。
+      # Playwright のブラウザを先に用意する。ブラウザバイナリはキャッシュし、
+      # ダウンロードをスキップする(OS依存パッケージのインストールは毎回実行する)。
+      - name: Get installed Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('./package-lock.json').packages['node_modules/playwright-core'].version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
       - name: Install Playwright Chromium
-        run: npx playwright install chromium --with-deps
+        run: |
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+            npx playwright install-deps chromium
+          else
+            npx playwright install --with-deps chromium
+          fi
       - run: npm run test:story
 
   rust:
