@@ -21,6 +21,7 @@ const baseSettings: ColumnSettings = {
   repostHiddenUserIds: [],
   whitelistEnabled: false,
   whitelistWords: [],
+  returnToLastReadEnabled: false,
 };
 
 const pageTypeArb: fc.Arbitrary<PageType> = fc.constantFrom(

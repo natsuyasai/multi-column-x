@@ -27,6 +27,7 @@ const baseSettings = {
   repostHiddenUserIds: [],
   whitelistEnabled: false,
   whitelistWords: [],
+  returnToLastReadEnabled: false,
 };
 
 function makeCol(

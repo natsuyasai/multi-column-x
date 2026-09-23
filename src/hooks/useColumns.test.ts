@@ -90,6 +90,7 @@ describe("useColumns mobile", () => {
             repostHiddenUserIds: [],
             whitelistEnabled: false,
             whitelistWords: [],
+            returnToLastReadEnabled: false,
           },
         },
         {
@@ -120,6 +121,7 @@ describe("useColumns mobile", () => {
             repostHiddenUserIds: [],
             whitelistEnabled: false,
             whitelistWords: [],
+            returnToLastReadEnabled: false,
           },
         },
         {
@@ -150,6 +152,7 @@ describe("useColumns mobile", () => {
             repostHiddenUserIds: [],
             whitelistEnabled: false,
             whitelistWords: [],
+            returnToLastReadEnabled: false,
           },
         },
       ],

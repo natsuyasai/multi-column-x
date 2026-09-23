@@ -49,6 +49,7 @@ const mockColumn: Column = {
     repostHiddenUserIds: [],
     whitelistEnabled: false,
     whitelistWords: [],
+    returnToLastReadEnabled: false,
   },
 };
 

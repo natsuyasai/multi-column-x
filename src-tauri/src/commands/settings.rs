@@ -59,6 +59,8 @@ pub struct ColumnSettings {
     pub whitelist_words: Vec<String>,
     #[serde(rename = "desktopNotifyEnabled")]
     pub desktop_notify_enabled: bool,
+    #[serde(rename = "returnToLastReadEnabled")]
+    pub return_to_last_read_enabled: bool,
 }
 
 // ColumnSettings のデフォルト値（新規インストール時 / キー欠落時の唯一の定義元）。
@@ -85,6 +87,7 @@ impl Default for ColumnSettings {
             whitelist_enabled: false,
             whitelist_words: vec![],
             desktop_notify_enabled: false,
+            return_to_last_read_enabled: false,
         }
     }
 }
@@ -696,6 +699,35 @@ mod tests {
         });
         let settings: ColumnSettings = serde_json::from_value(json).unwrap();
         assert!(!settings.desktop_notify_enabled);
+    }
+
+    /// 新しく追加したカラムでは戻るボタン設定（returnToLastReadEnabled）がOFFになっている。
+    #[test]
+    fn returntolastreadenabledの初期値はfalse() {
+        assert!(!ColumnSettings::default().return_to_last_read_enabled);
+    }
+
+    /// returnToLastReadEnabled 追加前に保存された旧カラム設定 JSON（キー欠落）を
+    /// デシリアライズしてもエラーにならず、デフォルト値 false にフォールバックすることを確認する。
+    #[test]
+    fn returntolastreadenabledが無い旧カラム設定はデフォルトでfalseになる() {
+        let json = serde_json::json!({
+            "autoReloadEnabled": true,
+            "autoReloadInterval": 600,
+            "customCSS": "",
+        });
+        let settings: ColumnSettings = serde_json::from_value(json).unwrap();
+        assert!(!settings.return_to_last_read_enabled);
+    }
+
+    /// returnToLastReadEnabled が true で保存されたカラム設定は、rename どおり true として読み込まれる。
+    #[test]
+    fn returntolastreadenabledがtrueの保存済みカラム設定はtrueとして読み込まれる() {
+        let json = serde_json::json!({
+            "returnToLastReadEnabled": true,
+        });
+        let settings: ColumnSettings = serde_json::from_value(json).unwrap();
+        assert!(settings.return_to_last_read_enabled);
     }
 
     /// リポスト非表示ユーザーID追加前に保存された旧カラム設定 JSON（repostHiddenUserIds 欠落）を

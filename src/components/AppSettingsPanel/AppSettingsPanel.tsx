@@ -39,6 +39,7 @@ interface AppSettingsPanelProps {
       | "repostHiddenUserIds"
       | "whitelistEnabled"
       | "whitelistWords"
+      | "returnToLastReadEnabled"
     >,
   ) => void;
   onReloadAllWebviews: () => void;

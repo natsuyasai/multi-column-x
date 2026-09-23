@@ -23,6 +23,7 @@ const baseSettings = {
   repostHiddenUserIds: [],
   whitelistEnabled: false,
   whitelistWords: [],
+  returnToLastReadEnabled: false,
 };
 
 const acc1: Account = {
