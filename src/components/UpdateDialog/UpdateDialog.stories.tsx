@@ -65,6 +65,23 @@ export const Downloading: Story = {
   },
 };
 
+export const InstallFailed: Story = {
+  name: "インストール失敗",
+  args: {
+    installError:
+      "更新のインストールに失敗しました。時間をおいて再度お試しください。",
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const alert = canvas.getByRole("alert");
+    await expect(alert).toHaveTextContent(
+      "更新のインストールに失敗しました。時間をおいて再度お試しください。",
+    );
+    // 失敗表示中も更新ボタンは押せる状態
+    await expect(canvas.getByText("更新する")).toBeEnabled();
+  },
+};
+
 export const LightTheme: Story = {
   name: "ライトテーマ",
   decorators: [

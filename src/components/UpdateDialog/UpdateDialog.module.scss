@@ -84,6 +84,16 @@
   }
 }
 
+.error {
+  margin: 12px 0 0;
+  padding: 8px 10px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: var(--mcx-danger);
+  background: var(--mcx-danger-bg);
+  border: 1px solid var(--mcx-danger-border);
+}
+
 .actions {
   display: flex;
   justify-content: flex-end;
