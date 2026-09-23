@@ -3,6 +3,11 @@
 //! Cisco の特許ロイヤリティ負担は「Ciscoの配布チャネルから直接ダウンロードする」
 //! 場合にのみ適用されるため、AppImageには同梱せずこの方式を採る。
 
+use crate::commands::arch_support::validate_arch;
+use crate::commands::openh264_http_client::{
+    build_client_with, map_reqwest_error, CONNECT_TIMEOUT, READ_TIMEOUT,
+};
+
 const OPENH264_VERSION: &str = "2.4.1";
 // x86_64 (amd64) 用の実測値。ダウンロードして一致確認済み。
 const OPENH264_SHA256_AMD64: &str =
@@ -85,16 +90,15 @@ pub(crate) fn validate_window_label(window_label: &str) -> Result<(), String> {
 #[tauri::command]
 pub async fn download_and_enable_h264(caller: tauri::Webview) -> Result<(), String> {
     validate_window_label(caller.label())?;
+    validate_arch(std::env::consts::ARCH)?;
 
     let url = build_download_url(OPENH264_VERSION);
-    let client = reqwest::Client::builder()
-        .build()
-        .map_err(|e| e.to_string())?;
-    let resp = client.get(&url).send().await.map_err(|e| e.to_string())?;
+    let client = build_client_with(READ_TIMEOUT, CONNECT_TIMEOUT)?;
+    let resp = client.get(&url).send().await.map_err(map_reqwest_error)?;
     if !resp.status().is_success() {
         return Err(format!("download failed: HTTP {}", resp.status()));
     }
-    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+    let bytes = resp.bytes().await.map_err(map_reqwest_error)?;
     verify_sha256(&bytes, OPENH264_SHA256_AMD64)?;
     let decompressed = decompress_bz2(&bytes)?;
 
