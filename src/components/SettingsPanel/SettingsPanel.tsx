@@ -253,6 +253,21 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 />
                 写真閲覧後のスクロール位置を復元する
               </label>
+              {column.pageType === "home" && (
+                <label className={styles.checkLabel}>
+                  <input
+                    type="checkbox"
+                    checked={settings.returnToLastReadEnabled}
+                    onChange={(e) =>
+                      setSettings((s) => ({
+                        ...s,
+                        returnToLastReadEnabled: e.target.checked,
+                      }))
+                    }
+                  />
+                  更新後に前回の続きへ戻るボタンを表示する
+                </label>
+              )}
             </section>
           )}
 
