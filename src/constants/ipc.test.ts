@@ -32,6 +32,27 @@ describe("WEBVIEW_SCRIPTS.applyAreaVisibility", () => {
   });
 });
 
+describe("WEBVIEW_SCRIPTS.applyReturnToLastRead", () => {
+  it("enabledがtrueのときwindow.__multiColumnXConfig.returnToLastReadEnabledにtrueを書き込むスクリプトを生成する", () => {
+    const script = WEBVIEW_SCRIPTS.applyReturnToLastRead(true);
+
+    expect(script).toContain(
+      "window.__multiColumnXConfig.returnToLastReadEnabled=true",
+    );
+  });
+
+  it("enabledがfalseのときwindow.__multiColumnX.setReturnToLastReadEnabledをfalse付きで呼び出すスクリプトを生成する", () => {
+    const script = WEBVIEW_SCRIPTS.applyReturnToLastRead(false);
+
+    expect(script).toContain(
+      "window.__multiColumnXConfig.returnToLastReadEnabled=false",
+    );
+    expect(script).toContain(
+      "window.__multiColumnX.setReturnToLastReadEnabled(false)",
+    );
+  });
+});
+
 describe("WEBVIEW_SCRIPTS.applyOfficialSettingsSnapshot", () => {
   it("生成スクリプトのCookie設定処理でdomain=.x.comを明示している", () => {
     const snapshotJson = JSON.stringify({ local: {}, nightMode: "auto" });

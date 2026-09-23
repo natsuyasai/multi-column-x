@@ -13,6 +13,7 @@ const plainEntries = [
   "tab_selector",
   "custom_css",
   "auto_reload",
+  "return_to_last_read",
   "scroll_event",
   "popup_toolbar",
   "popup_video_autoplay",

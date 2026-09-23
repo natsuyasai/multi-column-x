@@ -25,6 +25,7 @@ const baseSettings = {
   repostHiddenUserIds: [],
   whitelistEnabled: false,
   whitelistWords: [],
+  returnToLastReadEnabled: false,
 };
 
 function makeColumn(overrides: Partial<Column> & { id: string }): Column {

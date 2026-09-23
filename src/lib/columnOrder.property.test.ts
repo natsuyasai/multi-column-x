@@ -26,6 +26,7 @@ const baseSettings: Column["settings"] = {
   repostHiddenUserIds: [],
   whitelistEnabled: false,
   whitelistWords: [],
+  returnToLastReadEnabled: false,
 };
 
 interface ColumnSpec {

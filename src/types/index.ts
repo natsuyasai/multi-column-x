@@ -37,6 +37,8 @@ export interface ColumnSettings {
   whitelistEnabled: boolean;
   whitelistWords: string[];
   desktopNotifyEnabled?: boolean;
+  /** 自動更新で新着が入った後、更新前の先頭（既読との境目）へ戻るボタンを表示する。対象は pageType === "home" のカラムのみ */
+  returnToLastReadEnabled: boolean;
 }
 
 export interface Column {
@@ -161,6 +163,7 @@ export interface LoadSettingsResult {
  * | whitelistEnabled        | whitelist_enabled           | false       |
  * | whitelistWords          | whitelist_words             | []          |
  * | desktopNotifyEnabled    | desktop_notify_enabled      | false       |
+ * | returnToLastReadEnabled | return_to_last_read_enabled | false       |
  */
 export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
   autoReloadEnabled: true,
@@ -181,6 +184,7 @@ export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
   whitelistEnabled: false,
   whitelistWords: [],
   desktopNotifyEnabled: false,
+  returnToLastReadEnabled: false,
 };
 
 /**

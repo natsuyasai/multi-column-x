@@ -59,6 +59,7 @@
     "repostHiddenUserIds": [],
     "whitelistEnabled": false,
     "whitelistWords": [],
-    "desktopNotifyEnabled": false
+    "desktopNotifyEnabled": false,
+    "returnToLastReadEnabled": false
   }
 }

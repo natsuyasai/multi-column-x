@@ -36,6 +36,7 @@ const baseColumn: Column = {
     repostHiddenUserIds: [],
     whitelistEnabled: false,
     whitelistWords: [],
+    returnToLastReadEnabled: false,
   },
 };
 
@@ -165,6 +166,10 @@ describe("DEFAULT_COLUMN_SETTINGS", () => {
 
   it("repostHiddenUserIdsのデフォルト値は空配列", () => {
     expect(DEFAULT_COLUMN_SETTINGS.repostHiddenUserIds).toEqual([]);
+  });
+
+  it("新しく追加したカラムでは戻るボタン設定がOFFになっている", () => {
+    expect(DEFAULT_COLUMN_SETTINGS.returnToLastReadEnabled).toBe(false);
   });
 });
 

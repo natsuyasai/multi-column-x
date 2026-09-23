@@ -19,6 +19,11 @@ declare global {
      * mobile_area_hide.ts が公開し、設定変更時の即時反映に用いる。
      */
     applyLayersHide?: () => void;
+    /**
+     * ホームタイムライン「前回の境目へ戻る」ボタンの有効/無効を即時切り替える。
+     * return_to_last_read.ts が公開する。
+     */
+    setReturnToLastReadEnabled?: (enabled: boolean) => void;
   }
 
   interface MultiColumnXConfig {
@@ -40,6 +45,7 @@ declare global {
     globalRepostHiddenUserIds?: string[];
     whitelistEnabled?: boolean;
     whitelistWords?: string[];
+    returnToLastReadEnabled?: boolean;
   }
 
   interface TauriCore {

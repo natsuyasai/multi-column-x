@@ -23,6 +23,7 @@ const columnSettings = {
   repostHiddenUserIds: [],
   whitelistEnabled: false,
   whitelistWords: [],
+  returnToLastReadEnabled: false,
 };
 
 const column: Column = {
@@ -218,6 +219,45 @@ export const WithRepostHiddenUserIds: Story = {
       350,
       undefined,
     );
+  },
+};
+
+export const ReturnToLastReadToggle: Story = {
+  name: "前回の境目へ戻るボタンの表示設定（ホームカラム）",
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const checkbox = canvas.getByRole("checkbox", {
+      name: "更新後に前回の続きへ戻るボタンを表示する",
+    });
+    await expect(checkbox).toBeInTheDocument();
+    await expect(checkbox).not.toBeChecked();
+    await userEvent.click(checkbox);
+    await expect(checkbox).toBeChecked();
+    await userEvent.click(canvas.getByRole("button", { name: "適用" }));
+    await expect(args.onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.objectContaining({ returnToLastReadEnabled: true }),
+      350,
+      undefined,
+    );
+  },
+};
+
+export const ReturnToLastReadHiddenForNonHomeColumn: Story = {
+  name: "ホーム以外のカラムでは戻るボタンの設定項目が表示されない",
+  args: {
+    column: {
+      ...column,
+      pageType: "notifications",
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.queryByRole("checkbox", {
+        name: "更新後に前回の続きへ戻るボタンを表示する",
+      }),
+    ).not.toBeInTheDocument();
   },
 };
 

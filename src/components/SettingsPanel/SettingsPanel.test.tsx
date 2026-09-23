@@ -22,6 +22,7 @@ const baseSettings = {
   repostHiddenUserIds: [],
   whitelistEnabled: false,
   whitelistWords: [],
+  returnToLastReadEnabled: false,
 };
 
 const mockColumn: Column = {
@@ -687,5 +688,53 @@ describe("SettingsPanel 表示名", () => {
     };
     render(<SettingsPanel {...defaultProps} column={externalColumn} />);
     expect(screen.getByRole("textbox", { name: "表示名" })).toBeInTheDocument();
+  });
+});
+
+describe("SettingsPanel 前回の境目へ戻るボタン設定", () => {
+  it("ホームカラムの設定パネルに戻るボタンの設定項目が表示される", () => {
+    render(<SettingsPanel {...defaultProps} column={mockColumn} />);
+    expect(
+      screen.getByRole("checkbox", {
+        name: "更新後に前回の続きへ戻るボタンを表示する",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it.each<[string, Column["pageType"]]>([
+    ["通知", "notifications"],
+    ["検索", "search"],
+    ["リスト", "list"],
+    ["カスタム", "custom"],
+  ])(
+    "%sカラムの設定パネルには戻るボタンの設定項目が表示されない",
+    (_, pageType) => {
+      const column: Column = { ...mockColumn, pageType };
+      render(<SettingsPanel {...defaultProps} column={column} />);
+      expect(
+        screen.queryByRole("checkbox", {
+          name: "更新後に前回の続きへ戻るボタンを表示する",
+        }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it("チェックして適用するとonApplyにreturnToLastReadEnabled: trueが渡る", async () => {
+    const onApply = vi.fn();
+    render(
+      <SettingsPanel {...defaultProps} column={mockColumn} onApply={onApply} />,
+    );
+    await userEvent.click(
+      screen.getByRole("checkbox", {
+        name: "更新後に前回の続きへ戻るボタンを表示する",
+      }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.objectContaining({ returnToLastReadEnabled: true }),
+      350,
+      undefined,
+    );
   });
 });

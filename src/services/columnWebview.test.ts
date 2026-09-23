@@ -111,14 +111,18 @@ describe("columnWebview service", () => {
     });
   });
 
-  it("applyColumnSettingsScriptsは5つのスクリプトを順に適用する", async () => {
+  it("applyColumnSettingsScriptsは6つのスクリプトを順に適用する", async () => {
     await applyColumnSettingsScripts(
       "col-1",
-      { ...DEFAULT_COLUMN_SETTINGS, repostHiddenUserIds: ["col_user"] },
+      {
+        ...DEFAULT_COLUMN_SETTINGS,
+        repostHiddenUserIds: ["col_user"],
+        returnToLastReadEnabled: true,
+      },
       ["ng"],
       ["global_user"],
     );
-    expect(invoke).toHaveBeenCalledTimes(5);
+    expect(invoke).toHaveBeenCalledTimes(6);
     const labels = vi
       .mocked(invoke)
       .mock.calls.map((c) => (c[1] as { label: string }).label);
@@ -149,7 +153,8 @@ describe("columnWebview service", () => {
         DEFAULT_COLUMN_SETTINGS.whitelistWords,
       ),
     );
-    expect(scripts[4]).toBe(WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD);
+    expect(scripts[4]).toBe(WEBVIEW_SCRIPTS.applyReturnToLastRead(true));
+    expect(scripts[5]).toBe(WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD);
   });
 
   it("evalInColumn経由の失敗はapplyColumnSettingsScriptsを中断しない", async () => {
@@ -158,7 +163,7 @@ describe("columnWebview service", () => {
       .spyOn(console, "error")
       .mockImplementation(() => {});
     await applyColumnSettingsScripts("col-1", DEFAULT_COLUMN_SETTINGS, [], []);
-    expect(invoke).toHaveBeenCalledTimes(5);
+    expect(invoke).toHaveBeenCalledTimes(6);
     consoleError.mockRestore();
   });
 

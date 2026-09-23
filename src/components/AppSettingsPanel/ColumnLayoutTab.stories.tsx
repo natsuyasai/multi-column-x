@@ -23,6 +23,7 @@ const columnSettings = {
   repostHiddenUserIds: [],
   whitelistEnabled: false,
   whitelistWords: [],
+  returnToLastReadEnabled: false,
 };
 
 const accounts: Account[] = [
