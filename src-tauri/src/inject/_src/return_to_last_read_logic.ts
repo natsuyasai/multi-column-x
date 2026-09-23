@@ -21,8 +21,10 @@ export const USER_INPUT_WINDOW_MS = 1000;
  * status ID（数字文字列）を抽出する。
  * auto_reload.ts の同名関数と同じ規則だが、共有チャンク化を避けるためここに複製している
  * （auto_reload.ts は IIFE の副作用を持つため import できない）。
+ * ビルド後は auto_reload.js と単純連結されるため、auto_reload.ts の extractStatusId と
+ * 関数名を分けてトップレベル宣言の重複（後勝ち上書き）を避けている。
  */
-export function extractStatusId(article: Element): string | null {
+export function extractArticleStatusId(article: Element): string | null {
   const links = article.querySelectorAll<HTMLAnchorElement>(
     'a[href*="/status/"]',
   );
@@ -80,7 +82,7 @@ export function readTimelineIds(section: Element): string[] {
     if (!article) return;
     if (isHiddenByDisplayNone(article)) return;
     if (isAdArticle(article)) return;
-    const id = extractStatusId(article);
+    const id = extractArticleStatusId(article);
     if (id === null) return;
     entries.push({ top: cell.getBoundingClientRect().top, index, id });
   });

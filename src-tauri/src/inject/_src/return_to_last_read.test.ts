@@ -492,7 +492,7 @@ describe("inject/return_to_last_read", () => {
   });
 
   describe("ユーザースクロールによる消化", () => {
-    // extractStatusId は href の数字部分しか status ID として拾わないため
+    // extractArticleStatusId は href の数字部分しか status ID として拾わないため
     // （auto_reload.ts と同じ規則）、ここでは基準・新着とも数字文字列の ID を使う。
     // 基準: 11(A)〜16(F)、新着: 101(N1)。
     it("自分でスクロールして基準投稿を画面に表示すると戻るボタンが消える", async () => {

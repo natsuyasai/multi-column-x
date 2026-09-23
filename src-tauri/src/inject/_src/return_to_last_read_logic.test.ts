@@ -6,7 +6,7 @@
 import { describe, it, expect } from "vitest";
 import {
   ANCHOR_MAX,
-  extractStatusId,
+  extractArticleStatusId,
   isAdArticle,
   isListTopRendered,
   readTimelineIds,
@@ -74,17 +74,17 @@ function addCell(
 }
 
 describe("inject/return_to_last_read_logic", () => {
-  describe("extractStatusId", () => {
+  describe("extractArticleStatusId", () => {
     it("time子要素を持つstatusリンクからIDを抽出できる", () => {
       const article = buildArticleWithStatusId("123456789");
 
-      expect(extractStatusId(article)).toBe("123456789");
+      expect(extractArticleStatusId(article)).toBe("123456789");
     });
 
     it("該当するリンクが無い場合はnullを返す", () => {
       const article = document.createElement("article");
 
-      expect(extractStatusId(article)).toBeNull();
+      expect(extractArticleStatusId(article)).toBeNull();
     });
 
     it("time子要素を持たないstatusリンクは対象外となる", () => {
@@ -93,7 +93,7 @@ describe("inject/return_to_last_read_logic", () => {
       likeLink.setAttribute("href", "/username/status/123456789/likes");
       article.appendChild(likeLink);
 
-      expect(extractStatusId(article)).toBeNull();
+      expect(extractArticleStatusId(article)).toBeNull();
     });
   });
 
@@ -126,7 +126,7 @@ describe("inject/return_to_last_read_logic", () => {
   });
 
   describe("readTimelineIds", () => {
-    // extractStatusId は status リンクの数値部分しか拾わないため、ここでは
+    // extractArticleStatusId は status リンクの数値部分しか拾わないため、ここでは
     // 判別しやすいよう status ID にそのまま数値文字列を使う。
     it("広告・status ID無し・非表示のcell/articleを除いてcellのtop昇順に並べる", () => {
       const section = addSection();

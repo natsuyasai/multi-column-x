@@ -8,7 +8,7 @@
 import {
   INITIAL_RETURN_STATE,
   USER_INPUT_WINDOW_MS,
-  extractStatusId,
+  extractArticleStatusId,
   isListTopRendered,
   readTimelineIds,
   reduceReturnState,
@@ -76,7 +76,7 @@ import {
   function findArticleById(section: Element, id: string): Element | null {
     const articles = section.querySelectorAll("article");
     for (const article of Array.from(articles)) {
-      if (extractStatusId(article) === id) return article;
+      if (extractArticleStatusId(article) === id) return article;
     }
     return null;
   }
