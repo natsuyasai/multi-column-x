@@ -3,6 +3,11 @@
 //! Cisco の特許ロイヤリティ負担は「Ciscoの配布チャネルから直接ダウンロードする」
 //! 場合にのみ適用されるため、AppImageには同梱せずこの方式を採る。
 
+use crate::commands::arch_support::validate_arch;
+use crate::commands::openh264_http_client::{
+    build_client_with, map_reqwest_error, CONNECT_TIMEOUT, READ_TIMEOUT,
+};
+
 const OPENH264_VERSION: &str = "2.4.1";
 // x86_64 (amd64) 用の実測値。ダウンロードして一致確認済み。
 const OPENH264_SHA256_AMD64: &str =
@@ -71,7 +76,7 @@ fn invalidate_gstreamer_registry_cache() {
 /// main ウィンドウ以外からの呼び出しを拒否する（column/popup WebView は x.com を
 /// 表示しておりIPCが付与されているため、任意のダウンロードトリガーを防ぐ）。
 pub(crate) fn validate_window_label(window_label: &str) -> Result<(), String> {
-    if window_label != "main" {
+    if window_label != crate::ipc_constants::labels::MAIN {
         Err("download_and_enable_h264 is only allowed from the main window".into())
     } else {
         Ok(())
@@ -83,18 +88,17 @@ pub(crate) fn validate_window_label(window_label: &str) -> Result<(), String> {
 /// レジストリキャッシュを削除する（次回起動時の再スキャンを強制するため）。
 #[cfg(all(desktop, target_os = "linux"))]
 #[tauri::command]
-pub async fn download_and_enable_h264(window: tauri::Window) -> Result<(), String> {
-    validate_window_label(window.label())?;
+pub async fn download_and_enable_h264(caller: tauri::Webview) -> Result<(), String> {
+    validate_window_label(caller.label())?;
+    validate_arch(std::env::consts::ARCH)?;
 
     let url = build_download_url(OPENH264_VERSION);
-    let client = reqwest::Client::builder()
-        .build()
-        .map_err(|e| e.to_string())?;
-    let resp = client.get(&url).send().await.map_err(|e| e.to_string())?;
+    let client = build_client_with(READ_TIMEOUT, CONNECT_TIMEOUT)?;
+    let resp = client.get(&url).send().await.map_err(map_reqwest_error)?;
     if !resp.status().is_success() {
         return Err(format!("download failed: HTTP {}", resp.status()));
     }
-    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+    let bytes = resp.bytes().await.map_err(map_reqwest_error)?;
     verify_sha256(&bytes, OPENH264_SHA256_AMD64)?;
     let decompressed = decompress_bz2(&bytes)?;
 
@@ -205,6 +209,18 @@ mod tests {
     #[test]
     fn validate_window_labelはmain以外なら_errを返す() {
         let result = validate_window_label("column-0");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn カラムのwebviewラベルからの呼び出しを拒否する() {
+        let result = validate_window_label("column-abc");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn ポップアップのwebviewラベルからの呼び出しを拒否する() {
+        let result = validate_window_label("popup-abc");
         assert!(result.is_err());
     }
 }

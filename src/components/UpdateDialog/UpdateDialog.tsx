@@ -6,6 +6,7 @@ interface Props {
   update: AppUpdate;
   installing: boolean;
   progress?: UpdateProgress | null;
+  installError?: string | null;
   onInstall: () => void;
   onLater: () => void;
 }
@@ -42,6 +43,7 @@ export const UpdateDialog: React.FC<Props> = ({
   update,
   installing,
   progress,
+  installError,
   onInstall,
   onLater,
 }) => {
@@ -79,6 +81,11 @@ export const UpdateDialog: React.FC<Props> = ({
               />
             </div>
           </div>
+        )}
+        {installError && (
+          <p className={styles.error} role="alert">
+            {installError}
+          </p>
         )}
         <div className={styles.actions}>
           <button

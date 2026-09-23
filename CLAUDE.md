@@ -38,6 +38,8 @@ React 19 + TypeScript フロントエンドと Rust バックエンドで構成�
 - `Agent` 委譲の前に「メイン=<モデル名> / サブエージェント=sonnet」を必ずテキスト出力する
 - Sonnet では対応が難しい作業が出た場合は、**ユーザーの承認を得てから**メインが対応する
 - 実装プラン（フェーズ2の `plan.md`）は Sonnet が単独で実行できる詳細度で書く（自己完結・現状コードの引用・変更後のコード断片・正確なファイルパス・落とし穴チェックリスト）
+- **コミット末尾のトレーラー（`Co-Authored-By` / `Claude-Session`）は、委譲元（メイン）がプランや委譲プロンプトで指定したものをそのまま使う。** サブエージェント側のセッションリマインダーの表記（例: `Claude Sonnet 5`）が異なっていても上書きせず、`--amend` での書き換えもしない。メインは委譲プロンプトにトレーラーを明記する（未記載だとサブエージェントごとに判断がばらけ、同一 PR 内でも表記が混在する）
+- サブエージェントは、プランに記載の無い判断（トレーラーの表記など）で迷っても作業を止めずに進め、報告に「要確認」として記載する。メインは報告を受けたら、次の委譲からプランに反映する
 
 ## 作業手順
 
@@ -100,7 +102,7 @@ X内部APIのレート制限ヘッダをツールバーのポップオーバー�
 
 ### リリースCI・テーマ切替・再認証
 
-`src/lib/theme.ts` / `src/hooks/useTheme.ts`（テーマ切替）、`src/lib/reauthIdentity.ts` / `src-tauri/src/commands/account.rs`（既存アカウントの再認証・Cookie上書き）、`src/services/updater.ts` / `src/hooks/useAppUpdater.ts` / `src-tauri/src/commands/update.rs`（自動更新・進捗表示）を変更する場合の詳細（設計判断・未確定事項・落とし穴）は `docs/development/release-theme-reauth-notes.md` を参照。**特に `defaultScrollPosRestoreEnabled` はTS側既定値とRust側serde既定値が食い違ったまま未解決なので、この設定に触れる際は現状の実際の挙動を必ず確認すること。**
+`src/lib/theme.ts` / `src/hooks/useTheme.ts`（テーマ切替）、`src/lib/reauthIdentity.ts` / `src-tauri/src/commands/account.rs`（既存アカウントの再認証・Cookie上書き）、`src/services/updater.ts` / `src/hooks/useAppUpdater.ts` / `src-tauri/src/commands/update.rs`（自動更新・進捗表示）を変更する場合の詳細（設計判断・未確定事項・落とし穴）は `docs/development/release-theme-reauth-notes.md` を参照。設定の既定値は Rust の `impl Default`（構造体レベル `#[serde(default)]`）を唯一の定義とし、TS の既定値と `contracts/default-settings.json` の契約テストで一致を保証している。**既定値を変更するときは Rust / TS / fixture の3箇所を同時に更新すること。**
 
 ### フロントエンドの品質ツール（ESLint / Storybook / プロパティテスト）
 

@@ -92,6 +92,38 @@ pub fn validate_variant_url(url: &str) -> Result<(), String> {
     }
 }
 
+/// `path` にファイルを作成し、`download` にその `std::fs::File` を渡して実行する。
+/// `download` が Err を返した場合、ファイルハンドルを閉じてから `path` のファイルを削除してから
+/// そのエラーを返す（書きかけファイルを残さないため）。
+/// desktop の保存ダイアログで選んだパス・Android のキャッシュ一時ファイルパスの両方で使う
+/// （`commands::video_download` から呼ばれる）。cfg で分岐しないため Windows 上でもテストできる。
+///
+/// `download` に渡した `std::fs::File` は、`download` が返す `Future` が完了する時点で
+/// （`download` 内部のローカル変数として）必ず drop（クローズ）されている前提。
+/// **Windows ではファイルハンドルを閉じる前に `remove_file` すると失敗する**ため、
+/// 削除は必ず `download(file).await` の完了後（＝ドロップ後）に行う。
+pub(crate) async fn download_to_file_or_cleanup<F, Fut>(
+    path: &std::path::Path,
+    download: F,
+) -> Result<(), String>
+where
+    F: FnOnce(std::fs::File) -> Fut,
+    Fut: std::future::Future<Output = Result<(), String>>,
+{
+    let file = std::fs::File::create(path).map_err(|e| e.to_string())?;
+    let result = download(file).await;
+    if result.is_err() {
+        remove_partial_file(path);
+    }
+    result
+}
+
+/// `path` のファイルを削除する。削除に失敗しても（既に存在しない等）無視する。
+/// 呼び出し前に必ずファイルハンドルを閉じておくこと（Windows対策）。
+fn remove_partial_file(path: &std::path::Path) {
+    let _ = std::fs::remove_file(path);
+}
+
 #[cfg(all(test, not(target_os = "android")))]
 mod tests {
     use super::*;
@@ -292,6 +324,49 @@ mod tests {
         fn パース不能な文字列を拒否する() {
             let result = validate_variant_url("not a url");
             assert!(result.is_err());
+        }
+    }
+
+    mod download_to_file_or_cleanupのテスト {
+        use super::*;
+
+        /// テスト用のユニークな一時ファイルパスを作る（`tempfile`クレートは未導入のため、
+        /// `std::env::temp_dir()`配下にユニーク名で作成し、テスト側で後始末する）。
+        fn unique_temp_path(name: &str) -> std::path::PathBuf {
+            std::env::temp_dir().join(format!(
+                "multicolumnx_test_{name}_{}_{:?}",
+                std::process::id(),
+                std::time::Instant::now()
+            ))
+        }
+
+        #[tokio::test]
+        async fn ダウンロードに失敗したときは書きかけファイルを削除する() {
+            let path = unique_temp_path("fail");
+
+            let result =
+                download_to_file_or_cleanup(&path, |_file| async { Err("boom".to_string()) }).await;
+
+            assert!(result.is_err());
+            assert!(!path.exists());
+        }
+
+        #[tokio::test]
+        async fn ダウンロードに成功したときはファイルを残す() {
+            let path = unique_temp_path("success");
+
+            let result = download_to_file_or_cleanup(&path, |mut file| async move {
+                use std::io::Write;
+                file.write_all(b"hello").map_err(|e| e.to_string())
+            })
+            .await;
+
+            assert!(result.is_ok());
+            assert!(path.exists());
+            let content = std::fs::read(&path).unwrap();
+            assert_eq!(content, b"hello");
+
+            let _ = std::fs::remove_file(&path);
         }
     }
 

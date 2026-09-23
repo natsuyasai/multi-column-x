@@ -3,6 +3,8 @@
 use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
 
+use crate::commands::settings::GlobalSettingsData;
+
 pub(crate) fn load_global_settings(app: &AppHandle) -> serde_json::Value {
     app.store("settings.json")
         .ok()
@@ -34,8 +36,10 @@ fn string_list(settings: &serde_json::Value, key: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// アカウント配列 JSON を、必須フィールド（id/label/color/dataDirectory）が
+/// アカウント配列 JSON を、必須フィールド（id/label/color）が
 /// 揃った要素だけを抽出した JSON 文字列へ変換する。配列でない場合は `"[]"` を返す。
+/// ポップアップ等の外部サイトが読める場所へ渡す情報のため、ローカル保存先
+/// （dataDirectory）は意図的に含めない。
 fn accounts_to_json(accounts: &serde_json::Value) -> String {
     accounts
         .as_array()
@@ -47,7 +51,6 @@ fn accounts_to_json(accounts: &serde_json::Value) -> String {
                         "id": a.get("id")?.as_str()?,
                         "label": a.get("label")?.as_str()?,
                         "color": a.get("color")?.as_str()?,
-                        "dataDirectory": a.get("dataDirectory")?.as_str()?,
                     }))
                 })
                 .collect();
@@ -56,36 +59,87 @@ fn accounts_to_json(accounts: &serde_json::Value) -> String {
         .unwrap_or_else(|| "[]".to_string())
 }
 
+/// accounts 配列から account_id に一致するアカウントの dataDirectory を返す（純粋関数）。
+/// account_id が空文字、または一致するアカウントが無い・dataDirectory が空文字の場合は None。
+#[cfg_attr(target_os = "android", allow(dead_code))]
+fn find_account_data_directory(accounts: &serde_json::Value, account_id: &str) -> Option<String> {
+    if account_id.is_empty() {
+        return None;
+    }
+    accounts.as_array()?.iter().find_map(|a| {
+        if a.get("id")?.as_str()? != account_id {
+            return None;
+        }
+        let dir = a.get("dataDirectory")?.as_str()?;
+        if dir.is_empty() {
+            return None;
+        }
+        Some(dir.to_string())
+    })
+}
+
+/// 設定に登録されたアカウントの保存先を accountId から解決する。未登録ならエラーを返す。
+#[cfg_attr(target_os = "android", allow(dead_code))]
+pub(crate) fn resolve_account_data_directory(
+    app: &AppHandle,
+    account_id: &str,
+) -> Result<String, String> {
+    let accounts = app
+        .store("settings.json")
+        .ok()
+        .and_then(|store| store.get("appSettings"))
+        .and_then(|v| v.get("accounts").cloned())
+        .unwrap_or(serde_json::Value::Null);
+    find_account_data_directory(&accounts, account_id)
+        .ok_or_else(|| format!("account not found: {account_id}"))
+}
+
 pub(crate) fn load_video_auto_play_stop_enabled(app: &AppHandle) -> bool {
     bool_flag(
         &load_global_settings(app),
         "videoAutoPlayStopEnabled",
-        false,
+        GlobalSettingsData::default().video_auto_play_stop_enabled,
     )
 }
 
 pub(crate) fn load_hide_ad_enabled(app: &AppHandle) -> bool {
-    bool_flag(&load_global_settings(app), "hideAdEnabled", false)
+    bool_flag(
+        &load_global_settings(app),
+        "hideAdEnabled",
+        GlobalSettingsData::default().hide_ad_enabled,
+    )
 }
 
 pub(crate) fn load_api_rate_limit_monitor_enabled(app: &AppHandle) -> bool {
     bool_flag(
         &load_global_settings(app),
         "apiRateLimitMonitorEnabled",
-        true,
+        GlobalSettingsData::default().api_rate_limit_monitor_enabled,
     )
 }
 
 pub(crate) fn load_popup_esc_close_enabled(app: &AppHandle) -> bool {
-    bool_flag(&load_global_settings(app), "popupEscCloseEnabled", true)
+    bool_flag(
+        &load_global_settings(app),
+        "popupEscCloseEnabled",
+        GlobalSettingsData::default().popup_esc_close_enabled,
+    )
 }
 
 pub(crate) fn load_image_popup_enabled(app: &AppHandle) -> bool {
-    bool_flag(&load_global_settings(app), "imagePopupEnabled", true)
+    bool_flag(
+        &load_global_settings(app),
+        "imagePopupEnabled",
+        GlobalSettingsData::default().image_popup_enabled,
+    )
 }
 
 pub(crate) fn load_video_popup_enabled(app: &AppHandle) -> bool {
-    bool_flag(&load_global_settings(app), "videoPopupEnabled", true)
+    bool_flag(
+        &load_global_settings(app),
+        "videoPopupEnabled",
+        GlobalSettingsData::default().video_popup_enabled,
+    )
 }
 
 pub(crate) fn load_global_ng_words(app: &AppHandle) -> Vec<String> {
@@ -98,7 +152,11 @@ pub(crate) fn load_global_repost_hidden_user_ids(app: &AppHandle) -> Vec<String>
 
 #[cfg(target_os = "android")]
 pub(crate) fn load_use_x_app_for_compose(app: &AppHandle) -> bool {
-    bool_flag(&load_global_settings(app), "useXAppForCompose", false)
+    bool_flag(
+        &load_global_settings(app),
+        "useXAppForCompose",
+        GlobalSettingsData::default().use_x_app_for_compose,
+    )
 }
 
 pub(crate) fn load_accounts_json(app: &AppHandle) -> String {
@@ -119,6 +177,25 @@ mod tests {
         let settings = serde_json::json!({});
         assert!(bool_flag(&settings, "videoAutoPlayStopEnabled", true));
         assert!(!bool_flag(&settings, "hideAdEnabled", false));
+    }
+
+    /// globalSettings が丸ごと欠落している（旧バージョンの settings.json 等）とき、
+    /// カラムへ注入する動画の自動再生停止・広告の非表示は、新規インストール時と
+    /// 同じ既定値（GlobalSettingsData::default() 相当）である true になる。
+    #[test]
+    fn キーが無いときカラムへ注入する動画の自動再生停止と広告の非表示は有効になる() {
+        let settings = serde_json::json!({});
+        let default = GlobalSettingsData::default();
+        assert!(bool_flag(
+            &settings,
+            "videoAutoPlayStopEnabled",
+            default.video_auto_play_stop_enabled
+        ));
+        assert!(bool_flag(
+            &settings,
+            "hideAdEnabled",
+            default.hide_ad_enabled
+        ));
     }
 
     #[test]
@@ -189,8 +266,7 @@ mod tests {
                 {
                     "id": "1",
                     "label": "acc1",
-                    "color": "#fff",
-                    "dataDirectory": "/data/1"
+                    "color": "#fff"
                 }
             ])
         );
@@ -199,5 +275,58 @@ mod tests {
     #[test]
     fn アカウントが配列でない場合は空配列jsonを返す() {
         assert_eq!(accounts_to_json(&serde_json::Value::Null), "[]");
+    }
+
+    #[test]
+    fn ページへ渡すアカウント情報にはidと表示名と色だけが含まれる() {
+        let accounts = serde_json::json!([
+            {
+                "id": "1",
+                "label": "acc1",
+                "color": "#fff",
+                "dataDirectory": "/data/1",
+                "createdAt": "2026-01-01"
+            }
+        ]);
+        let json = accounts_to_json(&accounts);
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            parsed,
+            serde_json::json!([
+                {
+                    "id": "1",
+                    "label": "acc1",
+                    "color": "#fff"
+                }
+            ])
+        );
+    }
+
+    #[test]
+    fn アカウントidから登録済みの保存先を解決する() {
+        let accounts = serde_json::json!([
+            { "id": "1", "label": "acc1", "color": "#fff", "dataDirectory": "/data/1" },
+            { "id": "2", "label": "acc2", "color": "#000", "dataDirectory": "/data/2" }
+        ]);
+        assert_eq!(
+            find_account_data_directory(&accounts, "2"),
+            Some("/data/2".to_string())
+        );
+    }
+
+    #[test]
+    fn 未登録のアカウントidのときは保存先を解決できない() {
+        let accounts = serde_json::json!([
+            { "id": "1", "label": "acc1", "color": "#fff", "dataDirectory": "/data/1" }
+        ]);
+        assert_eq!(find_account_data_directory(&accounts, "ghost"), None);
+    }
+
+    #[test]
+    fn 空のアカウントidのときは保存先を解決できない() {
+        let accounts = serde_json::json!([
+            { "id": "", "label": "acc1", "color": "#fff", "dataDirectory": "/data/1" }
+        ]);
+        assert_eq!(find_account_data_directory(&accounts, ""), None);
     }
 }

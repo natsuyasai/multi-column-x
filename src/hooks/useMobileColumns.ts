@@ -1,7 +1,7 @@
 // src/hooks/useMobileColumns.ts
 // モバイル（Android）のアクティブカラム管理・スワイプナビゲーション・起動時復元
 import { listen } from "@tauri-apps/api/event";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { IPC_EVENTS, STORAGE_KEYS, WEBVIEW_SCRIPTS } from "../constants/ipc";
 import { mobileColumnLayout } from "../lib/gridLayout";
 import { logError } from "../lib/log";
@@ -33,8 +33,14 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
     null,
   );
   const [swipeState, setSwipeState] = useState<SwipeState | null>(null);
+  // 短時間に連続で setActiveColumn が呼ばれたとき、古い呼び出しの残りの
+  // await 後処理を打ち切るための世代番号（最新の呼び出しのみ完走させる）。
+  const generationRef = useRef(0);
 
   const setActiveColumn = useCallback(async (id: string) => {
+    const generation = ++generationRef.current;
+    const isStale = () => generation !== generationRef.current;
+
     setActiveColumnIdState(id);
     // バックグラウンド復帰後に React がリロードされても復元できるよう保存する
     try {
@@ -52,6 +58,9 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
         );
       }
     }
+    // Cookie 切替を待っている間に別のカラムへ切り替えられていたら、
+    // この呼び出しの表示位置更新はもう不要（新しい呼び出しに委ねる）。
+    if (isStale()) return;
 
     const layout = mobileColumnLayout({
       columns: currentColumns,
@@ -74,7 +83,9 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
         ),
       ),
     );
+    if (isStale()) return;
     for (const col of shown) {
+      if (isStale()) return;
       await resizeColumnWebview(col.id, layout[col.id]).catch(
         logError("setActiveColumn:resizeColumnWebview"),
       );
