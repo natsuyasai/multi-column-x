@@ -185,6 +185,16 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
     }
   }
 
+  // Android ネイティブブリッジ（addWebMessageListener で公開される postMessage）へ、
+  // 種類（type）と内容を含む JSON 文字列としてメッセージを送る。
+  // inject スクリプトはビルドエントリ間で import を共有できないため、このファイル内に置く。
+  function postBridgeMessage(
+    bridge: { postMessage: (message: string) => void } | undefined,
+    message: Record<string, unknown>,
+  ): void {
+    bridge?.postMessage(JSON.stringify(message));
+  }
+
   const TOOLBAR_HEIGHT = 40;
 
   const toolbar = document.createElement("div");
@@ -241,18 +251,17 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
     // addJavascriptInterface で公開されたブリッジを優先して使う。
     const androidBridge = window.__mcxPopupBridge;
     if (androidBridge) {
-      androidBridge.switchPopupSession(
-        selectedAccount.id,
-        window.location.href,
-      );
+      postBridgeMessage(androidBridge, {
+        type: "switchPopupSession",
+        accountId: selectedAccount.id,
+        url: window.location.href,
+      });
       return;
     }
-    const popupLabel =
-      window.__TAURI_INTERNALS__?.metadata?.currentWebview?.label ?? "";
+    // popupLabel は渡さない。実際の送信元 WebView（呼び出し元）は Rust 側が
+    // caller.label() で判定するため、JS が自己申告する必要も権限も無い。
     tauriInvoke(SWITCH_POPUP_SESSION, {
-      popupLabel,
       accountId: selectedAccount.id,
-      dataDirectory: selectedAccount.dataDirectory,
       url: window.location.href,
     });
   });
@@ -376,7 +385,11 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
         // Android ブリッジ優先、その次に Tauri IPC。
         const androidBridge = window.__mcxPopupBridge;
         if (androidBridge) {
-          androidBridge.reportOfficialSettings(currentAccountId, snapshot);
+          postBridgeMessage(androidBridge, {
+            type: "reportOfficialSettings",
+            accountId: currentAccountId,
+            snapshot,
+          });
           onDone();
           return;
         }
@@ -399,7 +412,7 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
   exitButton.addEventListener("click", function () {
     const androidBridge = window.__mcxPopupBridge;
     if (androidBridge) {
-      androidBridge.closePopup();
+      postBridgeMessage(androidBridge, { type: "closePopup" });
       return;
     }
     tauriInvoke(CLOSE_POPUP_WINDOW, {
@@ -415,6 +428,22 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
   toolbar.appendChild(exitButton);
   toolbar.appendChild(applySettingsStatus);
 
+  // 共有DOM監視ハブ(dom_observer.ts, window.__mcxDomObserver)経由でDOM変化を購読する。
+  // ハブは document.body を childList+subtree で監視し、MutationRecordの詳細に依存
+  // しないコールバックをrequestAnimationFrameで1フレームにまとめて配る。ハブが無い
+  // 環境（単体テストや、注入順序が変わった場合等）では、フォールバックとして従来と
+  // 同じdocument.bodyのchildList+subtree監視をこのファイル単独で行う。
+  function subscribeDomChanges(
+    callback: (mutations: MutationRecord[]) => void,
+  ): () => void {
+    if (window.__mcxDomObserver) {
+      return window.__mcxDomObserver.subscribe(callback);
+    }
+    const observer = new MutationObserver(callback);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }
+
   function inject() {
     const doInject = () => {
       document.body.appendChild(toolbar);
@@ -422,11 +451,10 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
 
       // ポップアップで開かれるページは動画詳細ページとは限らないため、動画プレイヤーの
       // マウント/アンマウントを継続監視してボタンの表示状態を追従させる。ポップアップウィンドウが
-      // 閉じられればJS実行コンテキストごと破棄されるため、明示的な disconnect() は不要。
-      const videoObserver = new MutationObserver(() => {
+      // 閉じられればJS実行コンテキストごと破棄されるため、明示的な購読解除は不要。
+      subscribeDomChanges(() => {
         updateDownloadButtonVisibility();
       });
-      videoObserver.observe(document.body, { childList: true, subtree: true });
     };
 
     if (document.body) {
@@ -487,13 +515,12 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
 
   function watchAndClick(): void {
     if (tryClick(document)) return;
-    const observer = new MutationObserver(() => {
+    const unsubscribe = subscribeDomChanges(() => {
       if (tryClick(document)) {
-        observer.disconnect();
+        unsubscribe();
       }
     });
-    observer.observe(document.body, { childList: true, subtree: true });
-    setTimeout(() => observer.disconnect(), 10000);
+    setTimeout(() => unsubscribe(), 10000);
   }
 
   if (document.readyState === "loading") {

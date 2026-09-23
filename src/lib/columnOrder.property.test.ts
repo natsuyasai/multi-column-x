@@ -1,6 +1,11 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { buildGroups, moveGroup, normalizeOrder } from "@/lib/columnOrder";
+import {
+  buildGroups,
+  moveGroup,
+  normalizeOrder,
+  resolveGroupMove,
+} from "@/lib/columnOrder";
 import type { Column } from "@/types";
 
 const baseSettings: Column["settings"] = {
@@ -18,8 +23,10 @@ const baseSettings: Column["settings"] = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   ngWords: [],
+  repostHiddenUserIds: [],
   whitelistEnabled: false,
   whitelistWords: [],
+  returnToLastReadEnabled: false,
 };
 
 interface ColumnSpec {
@@ -279,6 +286,123 @@ describe("moveGroup プロパティ", () => {
           expect(moveGroup(columns, 0, tooLargeIdx)).toBe(columns);
         },
       ),
+    );
+  });
+});
+
+describe("moveGroup プロパティ（TopBar並び替え向け）", () => {
+  it("全カラムのgridRowが変わらない", () => {
+    fc.assert(
+      fc.property(moveGroupScenarioArb, ({ columns, fromIdx, toIdx }) => {
+        const result = moveGroup(columns, fromIdx, toIdx);
+        const rowById = new Map(columns.map((c) => [c.id, c.gridRow]));
+        for (const c of result) {
+          expect(c.gridRow).toBe(rowById.get(c.id));
+        }
+      }),
+    );
+  });
+
+  it("移動前に同じgridColを共有していたカラム同士は移動後も同じgridColを共有する", () => {
+    fc.assert(
+      fc.property(moveGroupScenarioArb, ({ columns, fromIdx, toIdx }) => {
+        const result = moveGroup(columns, fromIdx, toIdx);
+        const resultColById = new Map(result.map((c) => [c.id, c.gridCol]));
+        for (const group of buildGroups(columns)) {
+          const cols = new Set(
+            group.columns.map((c) => resultColById.get(c.id)),
+          );
+          expect(cols.size).toBe(1);
+        }
+      }),
+    );
+  });
+
+  it("移動後の列グループ先頭id列は元の先頭id列をspliceで並び替えた結果と一致する", () => {
+    fc.assert(
+      fc.property(moveGroupScenarioArb, ({ columns, fromIdx, toIdx }) => {
+        const beforeHeads = buildGroups(columns).map((g) => g.columns[0].id);
+        const expected = [...beforeHeads];
+        const [moved] = expected.splice(fromIdx, 1);
+        expected.splice(toIdx, 0, moved);
+
+        const result = moveGroup(columns, fromIdx, toIdx);
+        const afterHeads = buildGroups(result).map((g) => g.columns[0].id);
+        expect(afterHeads).toEqual(expected);
+      }),
+    );
+  });
+
+  it("未割当カラムのgridColとgridRowは変わらない", () => {
+    fc.assert(
+      fc.property(moveGroupScenarioArb, ({ columns, fromIdx, toIdx }) => {
+        const result = moveGroup(columns, fromIdx, toIdx);
+        const resultById = new Map(result.map((c) => [c.id, c]));
+        for (const c of columns.filter((col) => !isAssigned(col))) {
+          expect(resultById.get(c.id)?.gridCol).toBe(c.gridCol);
+          expect(resultById.get(c.id)?.gridRow).toBe(c.gridRow);
+        }
+      }),
+    );
+  });
+});
+
+describe("resolveGroupMove プロパティ", () => {
+  const scenarioArb = columnsWithGroupArb.chain((columns) => {
+    const groupCount = buildGroups(columns).length;
+    return fc.record({
+      columns: fc.constant(columns),
+      fromIdx: fc.integer({ min: 0, max: groupCount - 1 }),
+      toIdx: fc.integer({ min: 0, max: groupCount - 1 }),
+    });
+  });
+
+  it("グループ先頭idから解決したindexは元のグループ位置と一致し同一位置ならnullになる", () => {
+    fc.assert(
+      fc.property(scenarioArb, ({ columns, fromIdx, toIdx }) => {
+        const heads = buildGroups(columns).map((g) => g.columns[0].id);
+        const resolved = resolveGroupMove(
+          columns,
+          heads[fromIdx],
+          heads[toIdx],
+        );
+        if (fromIdx === toIdx) {
+          expect(resolved).toBeNull();
+        } else {
+          expect(resolved).toEqual({ fromIdx, toIdx });
+        }
+      }),
+    );
+  });
+
+  it("解決結果が非nullならmoveGroupは入力とは別の配列を返す", () => {
+    fc.assert(
+      fc.property(scenarioArb, ({ columns, fromIdx, toIdx }) => {
+        const heads = buildGroups(columns).map((g) => g.columns[0].id);
+        const resolved = resolveGroupMove(
+          columns,
+          heads[fromIdx],
+          heads[toIdx],
+        );
+        fc.pre(resolved !== null);
+        expect(moveGroup(columns, resolved!.fromIdx, resolved!.toIdx)).not.toBe(
+          columns,
+        );
+      }),
+    );
+  });
+
+  it("グループ先頭ではないidを渡すとnullを返す", () => {
+    fc.assert(
+      fc.property(columnsWithGroupArb, (columns) => {
+        const heads = new Set(buildGroups(columns).map((g) => g.columns[0].id));
+        const head = [...heads][0];
+        for (const c of columns) {
+          if (heads.has(c.id)) continue;
+          expect(resolveGroupMove(columns, c.id, head)).toBeNull();
+          expect(resolveGroupMove(columns, head, c.id)).toBeNull();
+        }
+      }),
     );
   });
 });

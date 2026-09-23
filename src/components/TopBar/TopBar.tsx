@@ -1,22 +1,12 @@
 import React from "react";
-import CloseIcon from "../../assets/icons/close.svg?react";
-import CustomIcon from "../../assets/icons/custom.svg?react";
-import HomeIcon from "../../assets/icons/home.svg?react";
 import LinkIcon from "../../assets/icons/link.svg?react";
-import ListIcon from "../../assets/icons/list.svg?react";
-import NotificationsIcon from "../../assets/icons/notifications.svg?react";
 import PencilIcon from "../../assets/icons/pencil.svg?react";
 import PersonIcon from "../../assets/icons/person.svg?react";
 import PlusIcon from "../../assets/icons/plus.svg?react";
-import SearchIcon from "../../assets/icons/search.svg?react";
 import SettingsIcon from "../../assets/icons/settings.svg?react";
-import type {
-  Account,
-  ApiRateLimitBucket,
-  Column,
-  PageType,
-} from "../../types";
+import type { Account, ApiRateLimitBucket, Column } from "../../types";
 import { ApiRateLimitIndicator } from "../ApiRateLimitIndicator/ApiRateLimitIndicator";
+import { SortableColumnGroups } from "./SortableColumnGroups";
 import styles from "./TopBar.module.scss";
 
 interface TopBarProps {
@@ -31,64 +21,10 @@ interface TopBarProps {
   onOpenLinkPopup: () => void;
   onJumpToColumn: (columnId: string) => void;
   onClose: (columnId: string) => void;
+  onReorderColumnGroup: (fromIdx: number, toIdx: number) => void;
   apiRateLimitMonitorEnabled: boolean;
   apiRateLimits: Record<string, Record<string, ApiRateLimitBucket>>;
   onApiRateLimitPopoverOpenChange: (isOpen: boolean) => void;
-}
-
-function getColumnIcon(pageType: PageType): React.ReactElement {
-  const props = {
-    width: 16,
-    height: 16,
-    "data-testid": `icon-${pageType}`,
-  } as const;
-  switch (pageType) {
-    case "home":
-      return <HomeIcon {...props} />;
-    case "notifications":
-      return <NotificationsIcon {...props} />;
-    case "search":
-      return <SearchIcon {...props} />;
-    case "list":
-      return <ListIcon {...props} />;
-    case "custom":
-      return <CustomIcon {...props} />;
-    case "external":
-      return <LinkIcon {...props} />;
-    case "compose":
-      return <PencilIcon {...props} />;
-  }
-}
-
-function getPageLabel(column: Column): string {
-  switch (column.pageType) {
-    case "home":
-      return column.homeTabName ?? "ホーム";
-    case "notifications":
-      return "通知";
-    case "search":
-      return `検索: ${column.searchQuery ?? ""}`;
-    case "list":
-      return "リスト";
-    case "custom":
-      return "カスタム";
-    case "external":
-      if (!column.customUrl) return "外部サイト";
-      try {
-        return `外部: ${new URL(column.customUrl).hostname}`;
-      } catch {
-        return "外部サイト";
-      }
-    case "compose":
-      return "投稿";
-  }
-}
-
-function columnDisplayName(column: Column, accounts: Account[]): string {
-  if (column.label) return column.label;
-  const account = accounts.find((a) => a.id === column.accountId);
-  if (account) return `${account.label} - ${getPageLabel(column)}`;
-  return getPageLabel(column);
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -103,12 +39,11 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenLinkPopup,
   onJumpToColumn,
   onClose,
+  onReorderColumnGroup,
   apiRateLimitMonitorEnabled,
   apiRateLimits,
   onApiRateLimitPopoverOpenChange,
 }) => {
-  const sorted = [...columns].sort((a, b) => a.order - b.order);
-
   return (
     <div className={`${styles.topbar}${expanded ? ` ${styles.expanded}` : ""}`}>
       <div className={styles.row1}>
@@ -191,20 +126,14 @@ export const TopBar: React.FC<TopBarProps> = ({
           <>
             <div className={styles.divider} />
             <div className={styles.columnList}>
-              {sorted.map((col, index) => (
-                <button
-                  key={col.id}
-                  className={styles.btn}
-                  onClick={() => onJumpToColumn(col.id)}
-                  title={
-                    index < 9
-                      ? `${columnDisplayName(col, accounts)} (Ctrl+${index + 1})`
-                      : columnDisplayName(col, accounts)
-                  }
-                >
-                  {getColumnIcon(col.pageType)}
-                </button>
-              ))}
+              <SortableColumnGroups
+                variant="collapsed"
+                columns={columns}
+                accounts={accounts}
+                onJumpToColumn={onJumpToColumn}
+                onClose={onClose}
+                onReorderColumnGroup={onReorderColumnGroup}
+              />
             </div>
           </>
         )}
@@ -226,35 +155,14 @@ export const TopBar: React.FC<TopBarProps> = ({
 
       {expanded && (
         <div className={styles.row2} data-testid="topbar-row2">
-          {sorted.map((col, index) => (
-            <div className={styles.columnItem} key={col.id}>
-              <button
-                key={col.id}
-                className={`${styles.btn} ${styles.btnExpanded}`}
-                onClick={() => onJumpToColumn(col.id)}
-                title={
-                  index < 9
-                    ? `${columnDisplayName(col, accounts)} (Ctrl+${index + 1})`
-                    : columnDisplayName(col, accounts)
-                }
-              >
-                <span className={styles.icon}>
-                  {getColumnIcon(col.pageType)}
-                </span>
-                <span className={styles.label}>
-                  {columnDisplayName(col, accounts)}
-                </span>
-              </button>
-              <button
-                className={styles.btn}
-                onClick={() => onClose(col.id)}
-                aria-label="カラムを閉じる"
-                title="カラムを閉じる"
-              >
-                <CloseIcon width={14} height={14} data-testid="icon-close" />
-              </button>
-            </div>
-          ))}
+          <SortableColumnGroups
+            variant="expanded"
+            columns={columns}
+            accounts={accounts}
+            onJumpToColumn={onJumpToColumn}
+            onClose={onClose}
+            onReorderColumnGroup={onReorderColumnGroup}
+          />
         </div>
       )}
     </div>

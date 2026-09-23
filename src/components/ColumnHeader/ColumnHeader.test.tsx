@@ -1,9 +1,17 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { invoke } from "@tauri-apps/api/core";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { IPC_COMMANDS, WEBVIEW_LABELS } from "@/constants/ipc";
 import type { Column, Account } from "../../types";
 import { ColumnHeader } from "./ColumnHeader";
 import styles from "./ColumnHeader.module.scss";
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn().mockResolvedValue(undefined),
+}));
+
+const mockInvoke = vi.mocked(invoke);
 
 const mockAccount: Account = {
   id: "acc-1",
@@ -38,8 +46,10 @@ const mockColumn: Column = {
     blurImageEnabled: false,
     blurImageAmount: "10px",
     ngWords: [],
+    repostHiddenUserIds: [],
     whitelistEnabled: false,
     whitelistWords: [],
+    returnToLastReadEnabled: false,
   },
 };
 
@@ -167,6 +177,23 @@ describe("ColumnHeader", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("labelが空文字のときアカウント名とページ種別の既定表示になる", () => {
+    const columnWithEmptyLabel = { ...mockColumn, label: "" };
+    render(<ColumnHeader {...defaultProps} column={columnWithEmptyLabel} />);
+    expect(
+      screen.getByText("テストアカウント - フォロー中"),
+    ).toBeInTheDocument();
+  });
+
+  it("labelが設定されていればそれが表示される", () => {
+    const columnWithLabel = { ...mockColumn, label: "カスタムラベル" };
+    render(<ColumnHeader {...defaultProps} column={columnWithLabel} />);
+    expect(screen.getByText("カスタムラベル")).toBeInTheDocument();
+    expect(
+      screen.queryByText("テストアカウント - フォロー中"),
+    ).not.toBeInTheDocument();
+  });
+
   it("accountがundefinedの場合ドット色がフォールバック値になる", () => {
     const { container } = render(
       <ColumnHeader {...defaultProps} account={undefined} />,
@@ -218,5 +245,57 @@ describe("ColumnHeader", () => {
       expect(screen.getByLabelText("設定")).toBeInTheDocument();
       expect(screen.getByLabelText("カラムを閉じる")).toBeInTheDocument();
     });
+  });
+});
+
+describe("ColumnHeader 自動更新の対象カラム", () => {
+  const listDetailColumn: Column = { ...mockColumn, pageType: "list" };
+  const homeListTabColumn: Column = {
+    ...mockColumn,
+    pageType: "home",
+    homeTabName: "main",
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const evalCallsFor = (columnId: string) =>
+    mockInvoke.mock.calls.filter(
+      ([cmd, args]) =>
+        cmd === IPC_COMMANDS.EVAL_IN_WEBVIEW &&
+        (args as { label?: string } | undefined)?.label ===
+          WEBVIEW_LABELS.column(columnId),
+    );
+
+  it("リスト詳細カラムでは自動更新の間隔が経過しても更新されない", () => {
+    render(<ColumnHeader {...defaultProps} column={listDetailColumn} />);
+    act(() => {
+      vi.advanceTimersByTime(
+        (listDetailColumn.settings.autoReloadInterval + 1) * 1000,
+      );
+    });
+    expect(evalCallsFor(listDetailColumn.id)).toHaveLength(0);
+  });
+
+  it("リスト詳細カラムではカウントダウンが表示されない", () => {
+    render(<ColumnHeader {...defaultProps} column={listDetailColumn} />);
+    expect(screen.queryByTitle("次の自動更新まで")).not.toBeInTheDocument();
+  });
+
+  it("ホームのリストタブのカラムでは自動更新が従来どおり動く", () => {
+    render(<ColumnHeader {...defaultProps} column={homeListTabColumn} />);
+    expect(screen.getByTitle("次の自動更新まで")).toBeInTheDocument();
+    act(() => {
+      vi.advanceTimersByTime(
+        homeListTabColumn.settings.autoReloadInterval * 1000,
+      );
+    });
+    expect(evalCallsFor(homeListTabColumn.id)).toHaveLength(1);
   });
 });

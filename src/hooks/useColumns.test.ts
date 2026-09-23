@@ -2,7 +2,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { OFFSCREEN } from "../constants/ipc";
-import { resolveColumnDataDirectory } from "../services/externalColumn";
+import {
+  deleteExternalColumnData,
+  resolveColumnDataDirectory,
+} from "../services/externalColumn";
 import { useAppStore } from "../store/useAppStore";
 import type { Account, Column } from "../types";
 import { DEFAULT_COLUMN_SETTINGS, DEFAULT_GLOBAL_SETTINGS } from "../types";
@@ -30,11 +33,13 @@ vi.mock("../services/externalColumn", () => ({
     async (column: Column, accounts: Account[]) =>
       accounts.find((a) => a.id === column.accountId)?.dataDirectory,
   ),
+  deleteExternalColumnData: vi.fn(async () => undefined),
 }));
 
 // calculateGridBounds のテストは src/lib/gridLayout.test.ts へ移動した
 
 const mockResolveColumnDataDirectory = vi.mocked(resolveColumnDataDirectory);
+const mockDeleteExternalColumnData = vi.mocked(deleteExternalColumnData);
 
 describe("useColumns mobile", () => {
   const mockInvoke = vi.mocked(invoke);
@@ -82,8 +87,10 @@ describe("useColumns mobile", () => {
             blurImageEnabled: false,
             blurImageAmount: "10px",
             ngWords: [],
+            repostHiddenUserIds: [],
             whitelistEnabled: false,
             whitelistWords: [],
+            returnToLastReadEnabled: false,
           },
         },
         {
@@ -111,8 +118,10 @@ describe("useColumns mobile", () => {
             blurImageEnabled: false,
             blurImageAmount: "10px",
             ngWords: [],
+            repostHiddenUserIds: [],
             whitelistEnabled: false,
             whitelistWords: [],
+            returnToLastReadEnabled: false,
           },
         },
         {
@@ -140,8 +149,10 @@ describe("useColumns mobile", () => {
             blurImageEnabled: false,
             blurImageAmount: "10px",
             ngWords: [],
+            repostHiddenUserIds: [],
             whitelistEnabled: false,
             whitelistWords: [],
+            returnToLastReadEnabled: false,
           },
         },
       ],
@@ -176,6 +187,8 @@ describe("useColumns mobile", () => {
         mobileTwoColumnEnabled: true,
         presets: [],
         ngWords: [],
+        repostHiddenUserIds: [],
+        pendingDataDirectoryDeletions: [],
       },
       isLoaded: true,
       isMobile: true,
@@ -442,6 +455,171 @@ describe("useColumns desktop recreateAllWebviews", () => {
   });
 });
 
+describe("useColumns desktop loadPresetAndRecreateWebviews", () => {
+  const mockInvoke = vi.mocked(invoke);
+
+  function attachContainer(
+    ref: { current: HTMLDivElement | null },
+    clientHeight = 900,
+  ) {
+    const div = document.createElement("div");
+    Object.defineProperty(div, "clientHeight", {
+      value: clientHeight,
+      configurable: true,
+    });
+    ref.current = div;
+  }
+
+  function makeColumn(
+    id: string,
+    gridCol: number,
+    widthOverride?: number,
+  ): Column {
+    return {
+      id,
+      accountId: "acc-1",
+      pageType: "home",
+      homeTabName: "フォロー中",
+      width: widthOverride ?? 350,
+      order: gridCol - 1,
+      gridRow: 1,
+      gridCol,
+      heightMode: "auto",
+      settings: { ...DEFAULT_COLUMN_SETTINGS },
+    };
+  }
+
+  // 読み込み前: カラム A・B。プリセット: A'（A と同じ id・width 違い）・C
+  const columnA = makeColumn("col-a", 1);
+  const columnB = makeColumn("col-b", 2);
+  const columnAPrime = makeColumn("col-a", 1, 500);
+  const columnC = makeColumn("col-c", 2);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+    mockResolveColumnDataDirectory.mockImplementation(
+      async (column, accounts) =>
+        accounts.find((a) => a.id === column.accountId)?.dataDirectory,
+    );
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-1",
+          label: "Test",
+          dataDirectory: "/data/acc-1",
+          color: "#1d9bf0",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      columns: [columnA, columnB],
+      globalSettings: {
+        ...DEFAULT_GLOBAL_SETTINGS,
+        presets: [
+          {
+            id: "preset-1",
+            name: "プリセット1",
+            columns: [columnAPrime, columnC],
+          },
+        ],
+      },
+      isLoaded: true,
+      isMobile: false,
+      topBarExpanded: false,
+    });
+  });
+
+  /** invoke 呼び出し全体から create/remove の呼び出し順・引数を拾う */
+  function callsOf(command: string) {
+    return mockInvoke.mock.calls.filter((c) => c[0] === command);
+  }
+
+  it("プリセットを読み込むと読み込み前の全カラムの表示が破棄される", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.loadPresetAndRecreateWebviews("preset-1");
+    });
+
+    const removedIds = callsOf("remove_column_webview").map(
+      (c) => (c[1] as { columnId: string }).columnId,
+    );
+    expect(removedIds).toContain("col-a");
+    expect(removedIds).toContain("col-b");
+  });
+
+  it("プリセットを読み込むとプリセットのカラムの表示が作られる", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.loadPresetAndRecreateWebviews("preset-1");
+    });
+
+    const createdIds = callsOf("create_column_webview").map(
+      (c) => (c[1] as { args: { column: Column } }).args.column.id,
+    );
+    expect(createdIds).toContain("col-a");
+    expect(createdIds).toContain("col-c");
+    // 読み込み前のカラムのうちプリセット側に存在しない col-b は作り直されない
+    expect(createdIds).not.toContain("col-b");
+  });
+
+  it("同じIDのカラムがあってもプリセット側の設定で作り直される", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.loadPresetAndRecreateWebviews("preset-1");
+    });
+
+    const removeIdx = mockInvoke.mock.calls.findIndex(
+      (c) =>
+        c[0] === "remove_column_webview" &&
+        (c[1] as { columnId: string }).columnId === "col-a",
+    );
+    const createIdx = mockInvoke.mock.calls.findIndex(
+      (c) =>
+        c[0] === "create_column_webview" &&
+        (c[1] as { args: { column: Column } }).args.column.id === "col-a",
+    );
+    expect(removeIdx).toBeGreaterThanOrEqual(0);
+    expect(createIdx).toBeGreaterThan(removeIdx);
+
+    const createCall = mockInvoke.mock.calls[createIdx] as [
+      string,
+      { args: { column: Column } },
+    ];
+    // A' の設定（width: 500）で作り直されていること
+    expect(createCall[1].args.column.width).toBe(500);
+  });
+
+  it("存在しないプリセットIDのときはカラムの表示を変更しない", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.loadPresetAndRecreateWebviews("not-exist");
+    });
+
+    expect(callsOf("remove_column_webview")).toHaveLength(0);
+    expect(callsOf("create_column_webview")).toHaveLength(0);
+    expect(useAppStore.getState().columns.map((c) => c.id)).toEqual([
+      "col-a",
+      "col-b",
+    ]);
+  });
+});
+
 describe("useColumns desktop hideColumnWebviews", () => {
   const mockInvoke = vi.mocked(invoke);
 
@@ -653,5 +831,278 @@ describe("useColumns handleAddColumn", () => {
     expect(
       useAppStore.getState().columns.some((c) => c.id === "col-orphan"),
     ).toBe(false);
+  });
+});
+
+describe("useColumns handleRemoveColumn external", () => {
+  const mockInvoke = vi.mocked(invoke);
+
+  function makeColumn(overrides: Partial<Column> & Pick<Column, "id">): Column {
+    return {
+      accountId: "acc-1",
+      pageType: "home",
+      homeTabName: "フォロー中",
+      width: 350,
+      order: 0,
+      gridRow: 1,
+      gridCol: 1,
+      heightMode: "auto",
+      settings: { ...DEFAULT_COLUMN_SETTINGS },
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+    mockDeleteExternalColumnData.mockResolvedValue(undefined);
+    useAppStore.setState({
+      accounts: [],
+      columns: [
+        makeColumn({
+          id: "col-external",
+          pageType: "external",
+          accountId: "col-external",
+        }),
+        makeColumn({ id: "col-home", pageType: "home", accountId: "acc-1" }),
+      ],
+      globalSettings: { ...DEFAULT_GLOBAL_SETTINGS },
+      isLoaded: true,
+      isMobile: false,
+      topBarExpanded: false,
+    });
+  });
+
+  it("externalカラムを削除するとWebView破棄の後に保存先データも削除される", async () => {
+    const { result } = renderHook(() => useColumns());
+
+    await act(async () => {
+      await result.current.handleRemoveColumn("col-external");
+    });
+
+    const removeIdx = mockInvoke.mock.calls.findIndex(
+      (c) =>
+        c[0] === "remove_column_webview" &&
+        (c[1] as { columnId: string }).columnId === "col-external",
+    );
+    expect(removeIdx).toBeGreaterThanOrEqual(0);
+    expect(mockDeleteExternalColumnData).toHaveBeenCalledWith("col-external");
+    // WebView破棄呼び出しの後で保存先削除が呼ばれる（vi.fn の呼び出し順は
+    // invocationCallOrder で全モック共通に比較できる）
+    const removeCallOrder = mockInvoke.mock.invocationCallOrder[removeIdx];
+    const deleteCallOrder =
+      mockDeleteExternalColumnData.mock.invocationCallOrder[0];
+    expect(deleteCallOrder).toBeGreaterThan(removeCallOrder);
+  });
+
+  it("external以外のカラムを削除しても保存先データ削除は呼ばれない", async () => {
+    const { result } = renderHook(() => useColumns());
+
+    await act(async () => {
+      await result.current.handleRemoveColumn("col-home");
+    });
+
+    expect(mockDeleteExternalColumnData).not.toHaveBeenCalled();
+  });
+});
+
+describe("useColumns desktop handleMoveColumnGroup", () => {
+  const mockInvoke = vi.mocked(invoke);
+
+  // recalculateAllBounds は containerRef.current の clientHeight を読むため、
+  // jsdom が計測しない値を固定した div を ref に差し込む。
+  function attachContainer(ref: { current: HTMLDivElement | null }) {
+    const div = document.createElement("div");
+    Object.defineProperty(div, "clientHeight", {
+      value: 900,
+      configurable: true,
+    });
+    ref.current = div;
+  }
+
+  function makeColumn(
+    id: string,
+    gridCol: number,
+    gridRow = 1,
+    order = gridCol - 1,
+  ): Column {
+    return {
+      id,
+      accountId: "acc-1",
+      pageType: "home",
+      homeTabName: "フォロー中",
+      width: 350,
+      order,
+      gridRow,
+      gridCol,
+      heightMode: "auto",
+      settings: { ...DEFAULT_COLUMN_SETTINGS },
+    };
+  }
+
+  function setColumns(columns: Column[]) {
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-1",
+          label: "Test",
+          dataDirectory: "/data/acc-1",
+          color: "#1d9bf0",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      columns,
+      globalSettings: { ...DEFAULT_GLOBAL_SETTINGS },
+      isLoaded: true,
+      isMobile: false,
+      topBarExpanded: false,
+    });
+  }
+
+  function callsOf(command: string) {
+    return mockInvoke.mock.calls.filter((call) => call[0] === command);
+  }
+
+  /** columnId ごとに最後の resize_column_webview 呼び出しの bounds を返す。 */
+  function lastResizeBoundsById(): Record<string, { x: number }> {
+    const result: Record<string, { x: number }> = {};
+    for (const call of callsOf("resize_column_webview")) {
+      const bounds = (call[1] as { bounds: { columnId: string; x: number } })
+        .bounds;
+      result[bounds.columnId] = bounds;
+    }
+    return result;
+  }
+
+  function gridColOf(id: string): number | undefined {
+    return useAppStore.getState().columns.find((c) => c.id === id)?.gridCol;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+    setColumns([
+      makeColumn("col-1", 1),
+      makeColumn("col-2", 2),
+      makeColumn("col-3", 3),
+    ]);
+  });
+
+  it("列グループを移動するとstoreのgridColが並び替え後の順序に更新される", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+
+    await act(async () => {
+      await result.current.handleMoveColumnGroup(0, 2);
+    });
+
+    expect(gridColOf("col-2")).toBe(1);
+    expect(gridColOf("col-3")).toBe(2);
+    expect(gridColOf("col-1")).toBe(3);
+  });
+
+  it("列グループを移動するとorderも並び替え後の順序に正規化される", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+
+    await act(async () => {
+      await result.current.handleMoveColumnGroup(0, 2);
+    });
+
+    const orderById = new Map(
+      useAppStore.getState().columns.map((c) => [c.id, c.order]),
+    );
+    expect(orderById.get("col-2")).toBe(0);
+    expect(orderById.get("col-3")).toBe(1);
+    expect(orderById.get("col-1")).toBe(2);
+  });
+
+  it("列グループを移動すると並び替え後のカラム配置が永続化される", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.handleMoveColumnGroup(0, 1);
+    });
+
+    const saves = callsOf("save_settings");
+    expect(saves).toHaveLength(1);
+    const saved = (saves[0][1] as { settings: { columns: Column[] } }).settings
+      .columns;
+    expect(saved.find((c) => c.id === "col-1")?.gridCol).toBe(2);
+    expect(saved.find((c) => c.id === "col-2")?.gridCol).toBe(1);
+  });
+
+  it("列グループを移動するとカラムWebViewが並び替え後のx座標へ再配置される", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.handleMoveColumnGroup(0, 1);
+    });
+
+    const last = lastResizeBoundsById();
+    // 移動前は col-1 が左端だったが、移動後は col-2 が左、col-1 がその右になる
+    expect(last["col-2"].x).toBeLessThan(last["col-1"].x);
+    expect(last["col-1"].x).toBeLessThan(last["col-3"].x);
+  });
+
+  it("縦積みの列を移動しても各カラムのgridRowは変わらず同じ列へ一緒に移動する", async () => {
+    setColumns([
+      makeColumn("col-1a", 1, 1, 0),
+      makeColumn("col-1b", 1, 2, 1),
+      makeColumn("col-2", 2, 1, 2),
+    ]);
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+
+    await act(async () => {
+      await result.current.handleMoveColumnGroup(0, 1);
+    });
+
+    const byId = new Map(useAppStore.getState().columns.map((c) => [c.id, c]));
+    expect(byId.get("col-1a")?.gridCol).toBe(2);
+    expect(byId.get("col-1b")?.gridCol).toBe(2);
+    expect(byId.get("col-2")?.gridCol).toBe(1);
+    expect(byId.get("col-1a")?.gridRow).toBe(1);
+    expect(byId.get("col-1b")?.gridRow).toBe(2);
+    expect(byId.get("col-2")?.gridRow).toBe(1);
+  });
+
+  it("同一位置への移動ではstoreの更新も永続化もWebView再配置も行わない", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    const before = useAppStore.getState().columns;
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.handleMoveColumnGroup(1, 1);
+    });
+
+    expect(useAppStore.getState().columns).toBe(before);
+    expect(callsOf("save_settings")).toHaveLength(0);
+    expect(callsOf("resize_column_webview")).toHaveLength(0);
+  });
+
+  it("範囲外のインデックスでは何も更新されない", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    const before = useAppStore.getState().columns;
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.handleMoveColumnGroup(-1, 1);
+      await result.current.handleMoveColumnGroup(0, 3);
+    });
+
+    expect(useAppStore.getState().columns).toBe(before);
+    expect(callsOf("save_settings")).toHaveLength(0);
+    expect(callsOf("resize_column_webview")).toHaveLength(0);
   });
 });

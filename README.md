@@ -21,7 +21,7 @@ TweetDeck スタイルの Twitter/X デスクトップ・モバイルクライ�
 - **キーボードショートカット** — 投稿・カラム追加・カラム 1-9 ジャンプなど（カラム WebView フォーカス中も有効）
 - **テーマ切替** — ダーク / ライト / システム連動
 - **プリセット** — カラム構成の保存・切り替え（デスクトップ）
-- **TopBar ナビゲーション** — 横方向ツールバーでカラム追加・アカウント管理・設定を操作（デスクトップ）
+- **TopBar ナビゲーション** — 横方向ツールバーでカラム追加・アカウント管理・設定を操作、ドラッグ＆ドロップでカラムを列単位に並び替え（デスクトップ）
 - **自動アップデート** — GitHub Releases からの更新確認・適用と What's New 表示（デスクトップ / Android APK）
 - **クラッシュ自動復旧** — Linux の WebProcess クラッシュを検知してカラム WebView を自動再生成
 - **Android 対応** — モバイルタブバー UI・スワイプバーでカラムを切り替え表示
@@ -203,12 +203,13 @@ src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/
 | `report_keyboard_shortcut` | inject から検出したキーボードショートカットを中継                                                           |
 | `get_mobile_insets`        | Android システム UI のインセット（ノッチ等）を取得                                                          |
 | `set_column_cookies`       | カラム WebView に Cookie を設定（Android）                                                                  |
-| `open_in_browser`          | URL をシステムブラウザで開く                                                                                |
 | `open_compose_window`      | ツイート作成ウィンドウを開く                                                                                |
 | `open_add_account_window`  | アカウント追加ウィンドウを開く（ログイン検出付き）                                                          |
 | `delete_account_data`      | アカウントデータディレクトリを削除                                                                          |
 | `close_window`             | 指定ラベルのウィンドウ / WebView を閉じる                                                                   |
 | `install_apk_update`       | APK をダウンロードしてインストーラを起動（Android。呼び出し元 main 限定・URL 許可リスト・SHA-256 検証付き） |
+
+**新しいコマンドを `lib.rs` の `generate_handler!` に追加したら、`src-tauri/build.rs` の `AppManifest::commands` と、呼び出し元に応じた `src-tauri/capabilities/*.json` の許可（`allow-<コマンド名のケバブケース>`）を必ず同時に更新すること。** アプリ独自コマンドは ACL（capability）の対象であり、どの capability にも許可されていないコマンドは main を含む全 WebView から "not allowed by ACL" として拒否される（`src-tauri/src/acl_contract.rs` の契約テストが漏れを検知する）。
 
 ## アーキテクチャ上の注意点
 
@@ -292,4 +293,4 @@ webkit2gtk は wry と同一バージョン（`=2.0.2`, `v2_40`）を `[target.'
 
 同種の不足を deb 版でも防ぐため、`bundle.linux.deb.depends` に `gstreamer1.0-plugins-{base,good,bad}` と `gstreamer1.0-libav` を明記している。
 
-なお、AAC デコーダ（AAC-LC プロファイル限定の `libfdk-aac` + GStreamer `fdkaac` プラグイン）は、AAC-LC のコア特許が失効済みと判断し、CI で `gst-plugins-bad` から `fdkaac` エレメントのみを自前ビルドして AppImage に実際に同梱している。一方 H.264 デコーダ（Cisco OpenH264）は、Cisco の特許ロイヤリティ負担が「Cisco 自身の配布チャネルから直接ダウンロードする」場合にのみ適用されるため AppImage に同梱できず、アプリ内の案内ダイアログからユーザー操作で Cisco 公式サーバーへ直接アクセスしてダウンロードする方式を採っている（Firefox/Chromium と同じ方式）。欠如検出・案内の仕組み（`check_media_codec_support` コマンド、起動時チェック、案内ダイアログのダウンロードボタン、`scripts/install.sh` の案内表示）はフォールバックとして引き続き用意している。詳細は `docs/development/linux-webview-notes.md`「AppImage の H.264/AAC コーデック対応」を参照。
+なお、AAC デコーダ（AAC-LC プロファイル限定の `libfdk-aac` + GStreamer `fdkaac` プラグイン）は、AAC-LC のコア特許が失効済みと判断し、CI で `gst-plugins-bad` から `fdkaac` エレメントのみを自前ビルドして AppImage に実際に同梱している。一方 H.264 デコーダ（Cisco OpenH264）は、Cisco の特許ロイヤリティ負担が「Cisco 自身の配布チャネルから直接ダウンロードする」場合にのみ適用されるため AppImage に同梱できず、Cisco 公式サーバーから直接ダウンロードする方式（Firefox/Chromium と同じ方式）の Rust コマンド `download_and_enable_h264` を用意している。欠如検出の `check_media_codec_support` コマンドと `scripts/install.sh` の案内表示も残しているが、アプリ内の案内 UI（起動時チェック・案内ダイアログ）は削除済みで、現在フロントからの呼び出し口は無い。詳細は `docs/development/linux-webview-notes.md`「AppImage の H.264/AAC コーデック対応」を参照。

@@ -19,6 +19,11 @@ declare global {
      * mobile_area_hide.ts が公開し、設定変更時の即時反映に用いる。
      */
     applyLayersHide?: () => void;
+    /**
+     * ホームタイムライン「前回の境目へ戻る」ボタンの有効/無効を即時切り替える。
+     * return_to_last_read.ts が公開する。
+     */
+    setReturnToLastReadEnabled?: (enabled: boolean) => void;
   }
 
   interface MultiColumnXConfig {
@@ -36,8 +41,12 @@ declare global {
     videoPopupEnabled?: boolean;
     ngWords?: string[];
     globalNgWords?: string[];
+    repostHiddenUserIds?: string[];
+    globalRepostHiddenUserIds?: string[];
     whitelistEnabled?: boolean;
     whitelistWords?: string[];
+    returnToLastReadEnabled?: boolean;
+    mobileSwipeAreaOffset?: number;
   }
 
   interface TauriCore {
@@ -72,28 +81,32 @@ declare global {
     invoke?: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
   }
 
-  // Android で MainActivity が addJavascriptInterface で公開するポップアップ操作ブリッジ
+  // Android で MainActivity が addWebMessageListener で公開するネイティブブリッジ共通の形。
+  // JS からは postMessage(JSON.stringify({ type, ... })) の形でメッセージを送る
+  // （オリジンを X 系ドメインに限定するため addJavascriptInterface ではなく
+  // addWebMessageListener を使っている。詳細は BridgeMessages.kt 参照）。
   interface McxPopupBridge {
-    switchPopupSession: (accountId: string, url: string) => void;
-    reportOfficialSettings: (accountId: string, snapshot: string) => void;
-    closePopup: () => void;
+    postMessage: (message: string) => void;
   }
 
-  // Android で MainActivity が addJavascriptInterface で公開する動画DL要求ブリッジ
   interface McxVideoDownloadBridge {
-    downloadVideo: (payloadJson: string) => void;
+    postMessage: (message: string) => void;
   }
 
-  // Android で MainActivity が addJavascriptInterface で公開するAPIレート制限報告ブリッジ
   interface McxApiRateLimitBridge {
-    report: (payloadJson: string) => void;
+    postMessage: (message: string) => void;
   }
 
   interface TvAccountInfo {
     id: string;
     label: string;
     color: string;
-    dataDirectory: string;
+  }
+
+  // document.body の childList+subtree 監視を共有する単一 MutationObserver ハブ。
+  // dom_observer.ts が公開する。詳細は同ファイルのコメント参照。
+  interface McxDomObserver {
+    subscribe: (callback: (mutations: MutationRecord[]) => void) => () => void;
   }
 
   interface Window {
@@ -111,6 +124,7 @@ declare global {
     __mobileTopInset?: number;
     __mobileBottomInset?: number;
     __xhrRateLimitPatched?: boolean;
+    __mcxDomObserver?: McxDomObserver;
   }
 }
 

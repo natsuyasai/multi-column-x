@@ -1,6 +1,10 @@
 import React, { useState } from "react";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { validateNgWordLines } from "../../lib/ngWordPattern";
+import {
+  parseUserIdLines,
+  validateUserIdLine,
+} from "../../lib/repostHiddenUserId";
 import { useAppStore } from "../../store/useAppStore";
 import type {
   GlobalSettings,
@@ -30,16 +34,24 @@ interface AppSettingsPanelProps {
   onApplyColumnDefaults: (
     patch: Omit<
       ColumnSettings,
-      "visibleLinks" | "ngWords" | "whitelistEnabled" | "whitelistWords"
+      | "visibleLinks"
+      | "ngWords"
+      | "repostHiddenUserIds"
+      | "whitelistEnabled"
+      | "whitelistWords"
+      | "returnToLastReadEnabled"
     >,
   ) => void;
   onReloadAllWebviews: () => void;
+  onLoadPreset: (id: string) => Promise<void>;
   appVersion: string;
   updateChecking: boolean;
   updateManualResult: "idle" | "none" | "error";
   onCheckUpdate: () => void;
   onOpenOfficialSettings: () => void;
   onClose: () => void;
+  pendingDataDirectoryDeletionCount: number;
+  onRetryDataDirectoryDeletion: () => Promise<{ remaining: number }>;
 }
 
 export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
@@ -50,15 +62,18 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   onApplyLayout,
   onApplyColumnDefaults,
   onReloadAllWebviews,
+  onLoadPreset,
   appVersion,
   updateChecking,
   updateManualResult,
   onCheckUpdate,
   onOpenOfficialSettings,
   onClose,
+  pendingDataDirectoryDeletionCount,
+  onRetryDataDirectoryDeletion,
 }) => {
   const isMobile = useAppStore((s) => s.isMobile);
-  const { savePreset, loadPreset, deletePreset } = useAppStore();
+  const { savePreset, deletePreset } = useAppStore();
   useEscapeKey(onClose);
   const [activeTab, setActiveTab] = useState<"general" | "layout" | "presets">(
     "general",
@@ -68,6 +83,33 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
     createSettingsDraft(settings),
   );
   const [ngWordsError, setNgWordsError] = useState<string | null>(null);
+  const [repostHiddenUserIdsError, setRepostHiddenUserIdsError] = useState<
+    string | null
+  >(null);
+
+  const [retryingDataDirectoryDeletion, setRetryingDataDirectoryDeletion] =
+    useState(false);
+  const [
+    dataDirectoryDeletionRetryResult,
+    setDataDirectoryDeletionRetryResult,
+  ] = useState<"idle" | "success" | "remaining">("idle");
+  const [
+    dataDirectoryDeletionRemainingCount,
+    setDataDirectoryDeletionRemainingCount,
+  ] = useState(0);
+
+  const handleRetryDataDirectoryDeletion = async () => {
+    setRetryingDataDirectoryDeletion(true);
+    try {
+      const { remaining } = await onRetryDataDirectoryDeletion();
+      setDataDirectoryDeletionRemainingCount(remaining);
+      setDataDirectoryDeletionRetryResult(
+        remaining === 0 ? "success" : "remaining",
+      );
+    } finally {
+      setRetryingDataDirectoryDeletion(false);
+    }
+  };
 
   const set = <K extends keyof SettingsDraft>(
     key: K,
@@ -88,6 +130,18 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       return;
     }
     setNgWordsError(null);
+    const repostHiddenUserIds = parseUserIdLines(
+      draft.globalRepostHiddenUserIdsText,
+    );
+    const repostHiddenUserIdsValidationError =
+      repostHiddenUserIds
+        .map((id) => validateUserIdLine(id))
+        .find((error) => error !== null) ?? null;
+    if (repostHiddenUserIdsValidationError) {
+      setRepostHiddenUserIdsError(repostHiddenUserIdsValidationError);
+      return;
+    }
+    setRepostHiddenUserIdsError(null);
     const patch: Partial<GlobalSettings> = {
       defaultAutoReloadEnabled: draft.defaultAutoReloadEnabled,
       defaultAutoReloadInterval: draft.defaultAutoReloadInterval,
@@ -113,6 +167,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       mobileSwipeAreaOpacity: draft.mobileSwipeAreaOpacity,
       mobileTwoColumnEnabled: draft.mobileTwoColumnEnabled,
       ngWords,
+      repostHiddenUserIds,
     };
     if (draft.columnScaleOverrideEnabled) {
       patch.columnScale = draft.columnScale;
@@ -198,6 +253,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 set={set}
                 isMobile={isMobile}
                 ngWordsError={ngWordsError}
+                repostHiddenUserIdsError={repostHiddenUserIdsError}
               />
 
               <AppInfoSections
@@ -210,6 +266,17 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 updateChecking={updateChecking}
                 updateManualResult={updateManualResult}
                 onCheckUpdate={onCheckUpdate}
+                pendingDataDirectoryDeletionCount={
+                  pendingDataDirectoryDeletionCount
+                }
+                retryingDataDirectoryDeletion={retryingDataDirectoryDeletion}
+                dataDirectoryDeletionRetryResult={
+                  dataDirectoryDeletionRetryResult
+                }
+                dataDirectoryDeletionRemainingCount={
+                  dataDirectoryDeletionRemainingCount
+                }
+                onRetryDataDirectoryDeletion={handleRetryDataDirectoryDeletion}
               />
             </form>
           )}
@@ -232,8 +299,11 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
               presets={settings.presets ?? []}
               onSave={(name) => savePreset(name)}
               onLoad={(id) => {
-                loadPreset(id);
-                onClose();
+                // WebView の作り直し完了を待ってから閉じる。dialogOpenRef が
+                // 開いている間に作り直させることで、退避状態を維持したまま
+                // プリセットのカラムを構築し、ダイアログを閉じた瞬間に
+                // App 側の anyDialogOpen effect が通常座標へ再表示する。
+                void onLoadPreset(id).then(() => onClose());
               }}
               onDelete={(id) => deletePreset(id)}
             />

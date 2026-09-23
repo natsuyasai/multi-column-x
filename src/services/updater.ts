@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check } from "@tauri-apps/plugin-updater";
 import type { Update } from "@tauri-apps/plugin-updater";
+import { IPC_COMMANDS } from "@/constants/ipc";
 import { fetchLatestRelease } from "../lib/githubRelease";
 import { isNewerVersion } from "../lib/version";
 
@@ -82,7 +83,7 @@ function createMobileUpdater(): Updater {
       onProgress?.({ phase: "downloading", downloaded: 0, total: null });
       // fail-closed: APIのdigestから得た期待ハッシュが無ければインストールしない（改ざん・欠落を fail-closed に倒す）
       if (!apkSha256) throw new Error("update rejected: apk digest not found");
-      await invoke("install_apk_update", {
+      await invoke(IPC_COMMANDS.INSTALL_APK_UPDATE, {
         url: apkUrl,
         expectedSha256: apkSha256,
       });

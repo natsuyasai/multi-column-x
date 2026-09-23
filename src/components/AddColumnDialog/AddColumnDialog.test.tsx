@@ -46,6 +46,8 @@ const mockGlobalSettings: GlobalSettings = {
   mobileTwoColumnEnabled: true,
   presets: [],
   ngWords: [],
+  repostHiddenUserIds: [],
+  pendingDataDirectoryDeletions: [],
 };
 
 describe("AddColumnDialog", () => {
@@ -112,6 +114,50 @@ describe("AddColumnDialog", () => {
     expect(onAdd).toHaveBeenCalledWith(
       expect.objectContaining<Partial<Column>>({ pageType: "compose" }),
     );
+  });
+
+  it("検索を選んで追加すると最新タブ指定つきの検索カラムが作られる", async () => {
+    const onAdd = vi.fn();
+    render(
+      <AddColumnDialog
+        accounts={mockAccounts}
+        globalSettings={mockGlobalSettings}
+        existingColumns={[]}
+        onAdd={onAdd}
+        onCancel={vi.fn()}
+      />,
+    );
+    await userEvent.selectOptions(
+      screen.getByLabelText("ページタイプ"),
+      "検索",
+    );
+    await userEvent.type(screen.getByLabelText("検索クエリ"), "rust");
+    await userEvent.click(screen.getByRole("button", { name: "追加" }));
+    expect(onAdd).toHaveBeenCalledWith(
+      expect.objectContaining<Partial<Column>>({
+        pageType: "search",
+        searchQuery: "rust",
+        searchLiveTab: true,
+      }),
+    );
+  });
+
+  it("検索以外を選んで追加すると最新タブ指定は付かない", async () => {
+    const onAdd = vi.fn();
+    render(
+      <AddColumnDialog
+        accounts={mockAccounts}
+        globalSettings={mockGlobalSettings}
+        existingColumns={[]}
+        onAdd={onAdd}
+        onCancel={vi.fn()}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "追加" }));
+    expect(onAdd).toHaveBeenCalledTimes(1);
+    const added = onAdd.mock.calls[0][0] as Column;
+    expect(added.pageType).toBe("home");
+    expect(added.searchLiveTab).toBeUndefined();
   });
 
   it("グローバル設定のdefaultHideHeaderEnabledとdefaultHideTweetInputEnabledがそれぞれ独立して新規カラムの設定にコピーされる", async () => {
@@ -291,5 +337,131 @@ describe("AddColumnDialog", () => {
       />,
     );
     expect(screen.getByRole("button", { name: "追加" })).toBeDisabled();
+  });
+
+  it("表示名を入力して追加するとonAddに渡るcolumn.labelがその値になる", async () => {
+    const onAdd = vi.fn();
+    render(
+      <AddColumnDialog
+        accounts={mockAccounts}
+        globalSettings={mockGlobalSettings}
+        existingColumns={[]}
+        onAdd={onAdd}
+        onCancel={vi.fn()}
+      />,
+    );
+    const labelInput = screen.getByRole("textbox", { name: /表示名（任意）/ });
+    await userEvent.type(labelInput, "仕事用");
+    await userEvent.click(screen.getByRole("button", { name: "追加" }));
+    expect(onAdd).toHaveBeenCalledWith(
+      expect.objectContaining<Partial<Column>>({ label: "仕事用" }),
+    );
+  });
+
+  it("表示名を入力しない場合column.labelはundefinedになる", async () => {
+    const onAdd = vi.fn();
+    render(
+      <AddColumnDialog
+        accounts={mockAccounts}
+        globalSettings={mockGlobalSettings}
+        existingColumns={[]}
+        onAdd={onAdd}
+        onCancel={vi.fn()}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "追加" }));
+    expect(onAdd).toHaveBeenCalledWith(
+      expect.objectContaining<Partial<Column>>({ label: undefined }),
+    );
+  });
+
+  it("空白のみの表示名はcolumn.labelがundefinedになる", async () => {
+    const onAdd = vi.fn();
+    render(
+      <AddColumnDialog
+        accounts={mockAccounts}
+        globalSettings={mockGlobalSettings}
+        existingColumns={[]}
+        onAdd={onAdd}
+        onCancel={vi.fn()}
+      />,
+    );
+    const labelInput = screen.getByRole("textbox", { name: /表示名（任意）/ });
+    await userEvent.type(labelInput, "   ");
+    await userEvent.click(screen.getByRole("button", { name: "追加" }));
+    expect(onAdd).toHaveBeenCalledWith(
+      expect.objectContaining<Partial<Column>>({ label: undefined }),
+    );
+  });
+
+  it("前後の空白は除去される", async () => {
+    const onAdd = vi.fn();
+    render(
+      <AddColumnDialog
+        accounts={mockAccounts}
+        globalSettings={mockGlobalSettings}
+        existingColumns={[]}
+        onAdd={onAdd}
+        onCancel={vi.fn()}
+      />,
+    );
+    const labelInput = screen.getByRole("textbox", { name: /表示名（任意）/ });
+    await userEvent.type(labelInput, "  仕事用  ");
+    await userEvent.click(screen.getByRole("button", { name: "追加" }));
+    expect(onAdd).toHaveBeenCalledWith(
+      expect.objectContaining<Partial<Column>>({ label: "仕事用" }),
+    );
+  });
+
+  it("ページタイプが外部URLのときも表示名欄が表示される", async () => {
+    render(
+      <AddColumnDialog
+        accounts={mockAccounts}
+        globalSettings={mockGlobalSettings}
+        existingColumns={[]}
+        onAdd={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    await userEvent.selectOptions(
+      screen.getByLabelText("ページタイプ"),
+      "外部URL（アカウント非依存）",
+    );
+    expect(
+      screen.getByRole("textbox", { name: /表示名（任意）/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("ページタイプが投稿（compose）のときも表示名欄が表示される", async () => {
+    render(
+      <AddColumnDialog
+        accounts={mockAccounts}
+        globalSettings={mockGlobalSettings}
+        existingColumns={[]}
+        onAdd={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    await userEvent.selectOptions(
+      screen.getByLabelText("ページタイプ"),
+      "投稿",
+    );
+    expect(
+      screen.getByRole("textbox", { name: /表示名（任意）/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("表示名欄にmaxLengthが30で設定されている", () => {
+    render(
+      <AddColumnDialog
+        accounts={mockAccounts}
+        globalSettings={mockGlobalSettings}
+        existingColumns={[]}
+        onAdd={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    const labelInput = screen.getByRole("textbox", { name: /表示名（任意）/ });
+    expect(labelInput).toHaveAttribute("maxLength", "30");
   });
 });

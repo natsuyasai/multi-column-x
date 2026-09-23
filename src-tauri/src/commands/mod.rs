@@ -1,7 +1,9 @@
 pub mod account;
+pub mod arch_support;
 pub mod media_codec;
 #[cfg(all(desktop, target_os = "linux"))]
 pub mod openh264_fetch;
+pub mod openh264_http_client;
 pub mod settings;
 pub mod settings_store;
 pub mod update;
@@ -42,5 +44,15 @@ mod tests {
     #[test]
     fn popupプレフィックスのラベルは拒否する() {
         assert!(!is_main_label("popup-abc123"));
+    }
+
+    #[test]
+    fn composeプレフィックスのラベルは拒否する() {
+        assert!(!is_main_label("compose-abc123"));
+    }
+
+    #[test]
+    fn add_accountプレフィックスのラベルは拒否する() {
+        assert!(!is_main_label("add-account-abc123"));
     }
 }

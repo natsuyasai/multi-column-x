@@ -18,8 +18,10 @@ const baseSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   ngWords: [],
+  repostHiddenUserIds: [],
   whitelistEnabled: false,
   whitelistWords: [],
+  returnToLastReadEnabled: false,
 };
 
 const mockAccounts: Account[] = [
@@ -496,6 +498,25 @@ describe("ColumnLayoutTab カラム順序", () => {
       />,
     );
     expect(screen.getAllByLabelText("ドラッグして並び替え")).toHaveLength(2);
+  });
+
+  it("labelが空文字のカラムが「アカウント名 - ページ種別」で表示される", () => {
+    const columnsWithEmptyLabel: Column[] = [
+      { ...mockColumns[0], label: "" },
+      mockColumns[1],
+    ];
+    render(
+      <ColumnLayoutTab
+        columns={columnsWithEmptyLabel}
+        accounts={mockAccounts}
+        onApply={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    const grid = screen.getByTestId("grid-preview");
+    expect(
+      within(grid).getByText("テストアカウント - ホーム"),
+    ).toBeInTheDocument();
   });
 
   it("縦積みグループでもドラッグハンドルはグループごとに1つ表示される", () => {

@@ -206,6 +206,68 @@ describe("useMobileColumns", () => {
     });
   });
 
+  it("1回だけ切り替えたときは従来どおり表示位置が更新される", async () => {
+    const { result } = renderMobileColumns();
+
+    await act(async () => {
+      await result.current.setActiveColumn("col-1");
+    });
+
+    const { order, byId } = resizeCallsByColumn();
+    expect(order).toContain("col-1");
+    expect(order[order.length - 1]).toBe("col-1");
+    expect(byId["col-1"].x).toBe(0);
+    expect(byId["col-2"].x).toBe(OFFSCREEN.MOBILE_X);
+  });
+
+  it("切替の途中で別のカラムに切り替えたときは古い切替の残りの処理が行われない", async () => {
+    // col-1 (acc-1) の Cookie 切替を手動で解決できるようにし、その解決前に
+    // col-2 (acc-2) への切替を完了させる。
+    let resolveCookieForAcc1: (() => void) | undefined;
+    mockInvoke.mockImplementation((cmd: string, args?: unknown) => {
+      if (
+        cmd === IPC_COMMANDS.SET_COLUMN_COOKIES &&
+        (args as { accountId: string } | undefined)?.accountId === "acc-1"
+      ) {
+        return new Promise<void>((resolve) => {
+          resolveCookieForAcc1 = resolve;
+        });
+      }
+      return Promise.resolve(undefined);
+    });
+
+    const { result } = renderMobileColumns();
+
+    let pendingSetActiveColumnA: Promise<void> | undefined;
+    act(() => {
+      // col-1 への切替を開始する（setColumnCookies(acc-1) が pending のまま止まる）
+      pendingSetActiveColumnA = result.current.setActiveColumn("col-1");
+    });
+
+    // col-1 の Cookie 切替が解決する前に col-2 へ切替を完了させる
+    await act(async () => {
+      await result.current.setActiveColumn("col-2");
+    });
+
+    // col-2 への切替（hidden: col-1 → shown: col-2）のみが resize 済み
+    const { order: orderBeforeResolve } = resizeCallsByColumn();
+    expect(orderBeforeResolve).toEqual(["col-1", "col-2"]);
+
+    // col-1 の Cookie 切替を今解決させる
+    resolveCookieForAcc1?.();
+    await act(async () => {
+      await pendingSetActiveColumnA;
+    });
+
+    const { order, byId } = resizeCallsByColumn();
+    // col-1 への切替（古い切替）は Cookie 解決後も resize を一切呼ばない
+    expect(order.filter((id) => id === "col-1").length).toBe(1);
+    // 最後に表示されているのは col-2（新しい切替）
+    expect(order[order.length - 1]).toBe("col-2");
+    expect(byId["col-2"].x).toBe(0);
+    expect(byId["col-1"].x).toBe(OFFSCREEN.MOBILE_X);
+  });
+
   it("restoreMobileColumnsはlocalStorageのアクティブカラムを復元する", async () => {
     localStorage.setItem(STORAGE_KEYS.ACTIVE_COLUMN_ID, "col-2");
     const { result } = renderMobileColumns();

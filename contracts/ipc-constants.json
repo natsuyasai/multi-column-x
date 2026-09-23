@@ -7,12 +7,12 @@
     "resize_column_webview",
     "eval_in_webview",
     "get_external_column_data_directory",
+    "delete_external_column_data",
     "open_popup_window",
     "open_link_popup_window",
     "close_popup_window",
     "switch_popup_session",
     "open_compose_window",
-    "open_in_browser",
     "open_add_account_window",
     "reauth_account_window",
     "delete_account_data",
@@ -27,7 +27,10 @@
     "report_api_rate_limit",
     "report_official_settings",
     "update_mobile_swipe_bar",
-    "flash_mobile_swipe_bar"
+    "flash_mobile_swipe_bar",
+    "install_apk_update",
+    "check_media_codec_support",
+    "download_and_enable_h264"
   ],
   "events": {
     "ACCOUNT_LOGIN_COMPLETE": "account-login-complete",

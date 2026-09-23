@@ -19,8 +19,10 @@ const baseSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   ngWords: [],
+  repostHiddenUserIds: [],
   whitelistEnabled: false,
   whitelistWords: [],
+  returnToLastReadEnabled: false,
 };
 
 const mockColumn: Column = {
@@ -116,6 +118,7 @@ describe("SettingsPanel NGワード", () => {
       "col-1",
       expect.objectContaining({ ngWords: ["spam", "bot"] }),
       350,
+      undefined,
     );
   });
 
@@ -132,6 +135,7 @@ describe("SettingsPanel NGワード", () => {
       "col-1",
       expect.objectContaining({ ngWords: ["spam", "bot"] }),
       350,
+      undefined,
     );
   });
 
@@ -169,7 +173,109 @@ describe("SettingsPanel NGワード", () => {
       "col-1",
       expect.objectContaining({ ngWords: ["spam", "/foo|bar/i"] }),
       350,
+      undefined,
     );
+  });
+});
+
+describe("SettingsPanel リポストを非表示にするユーザー", () => {
+  const getTextarea = () =>
+    screen.getByRole("textbox", { name: "リポストを非表示にするユーザー" });
+
+  it("既存のrepostHiddenUserIdsが入力エリアに復元表示される", () => {
+    const col = {
+      ...mockColumn,
+      settings: {
+        ...baseSettings,
+        repostHiddenUserIds: ["HAJIME_2001", "abc"],
+      },
+    };
+    render(<SettingsPanel {...defaultProps} column={col} />);
+    expect((getTextarea() as HTMLTextAreaElement).value).toBe(
+      "HAJIME_2001\nabc",
+    );
+  });
+
+  it("旧プリセット由来でrepostHiddenUserIdsが未定義でも空の入力エリアが表示される", () => {
+    const legacySettings: Record<string, unknown> = { ...baseSettings };
+    delete legacySettings.repostHiddenUserIds;
+    const col = {
+      ...mockColumn,
+      settings: legacySettings as unknown as Column["settings"],
+    };
+    render(<SettingsPanel {...defaultProps} column={col} />);
+    expect((getTextarea() as HTMLTextAreaElement).value).toBe("");
+  });
+
+  it("説明文が表示される", () => {
+    render(<SettingsPanel {...defaultProps} />);
+    expect(
+      screen.getByText(
+        "1行に1ユーザーID（@以降）。指定ユーザーがリポストした投稿を非表示にします",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("入力は1行1IDで、空行・前後空白・先頭の@・重複は無視して正規化された一覧がonApplyに渡される", async () => {
+    const onApply = vi.fn();
+    render(<SettingsPanel {...defaultProps} onApply={onApply} />);
+    const textarea = getTextarea();
+    await userEvent.clear(textarea);
+    await userEvent.type(
+      textarea,
+      "  @user_a  {Enter}{Enter}user_b{Enter}USER_A{Enter}@user_b",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.objectContaining({ repostHiddenUserIds: ["user_a", "user_b"] }),
+      350,
+      undefined,
+    );
+  });
+
+  it("不正なID行があると保存できずエラーが表示される", async () => {
+    const onApply = vi.fn();
+    render(<SettingsPanel {...defaultProps} onApply={onApply} />);
+    const textarea = getTextarea();
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, "valid_id{Enter}bad-id!");
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(
+      screen.getByText(
+        "`bad-id!` はXのユーザーIDとして正しくありません（英数字とアンダースコアの1〜15文字）",
+      ),
+    ).toBeInTheDocument();
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
+  it("不正なID行を修正して再度適用するとエラーが消えてonApplyが呼ばれる", async () => {
+    const onApply = vi.fn();
+    render(<SettingsPanel {...defaultProps} onApply={onApply} />);
+    const textarea = getTextarea();
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, "bad-id!");
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, "good_id");
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(
+      screen.queryByText(/ユーザーIDとして正しくありません/),
+    ).not.toBeInTheDocument();
+    expect(onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.objectContaining({ repostHiddenUserIds: ["good_id"] }),
+      350,
+      undefined,
+    );
+  });
+
+  it("外部URLカラムでは表示されない", () => {
+    const col = { ...mockColumn, pageType: "external" as const };
+    render(<SettingsPanel {...defaultProps} column={col} />);
+    expect(
+      screen.queryByRole("textbox", { name: "リポストを非表示にするユーザー" }),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -246,6 +352,7 @@ describe("SettingsPanel ホワイトリスト", () => {
       "col-1",
       expect.objectContaining({ whitelistWords: ["推し", "限定"] }),
       350,
+      undefined,
     );
   });
 
@@ -323,6 +430,7 @@ describe("SettingsPanel 表示設定", () => {
         hideTweetInputEnabled: false,
       }),
       350,
+      undefined,
     );
   });
 
@@ -340,6 +448,7 @@ describe("SettingsPanel 表示設定", () => {
         hideTweetInputEnabled: true,
       }),
       350,
+      undefined,
     );
   });
 
@@ -422,6 +531,30 @@ describe("SettingsPanel pageTypeがexternalの場合", () => {
   });
 });
 
+describe("SettingsPanel 自動更新セクションの表示", () => {
+  it("リスト詳細カラムの設定パネルに自動更新の設定が表示されない", () => {
+    const listColumn: Column = { ...mockColumn, pageType: "list" };
+    render(<SettingsPanel {...defaultProps} column={listColumn} />);
+    expect(screen.queryByText("自動更新")).not.toBeInTheDocument();
+    expect(screen.queryByText("自動更新を有効にする")).not.toBeInTheDocument();
+  });
+
+  it("ホームのカラムでは自動更新の設定が従来どおり表示される", () => {
+    render(<SettingsPanel {...defaultProps} column={mockColumn} />);
+    expect(screen.getByText("自動更新")).toBeInTheDocument();
+    expect(screen.getByText("自動更新を有効にする")).toBeInTheDocument();
+  });
+
+  it.each<[string, Column["pageType"]]>([
+    ["検索", "search"],
+    ["通知", "notifications"],
+  ])("%sのカラムでは自動更新の設定が従来どおり表示される", (_, pageType) => {
+    const column: Column = { ...mockColumn, pageType };
+    render(<SettingsPanel {...defaultProps} column={column} />);
+    expect(screen.getByText("自動更新")).toBeInTheDocument();
+  });
+});
+
 describe("SettingsPanel 新着デスクトップ通知", () => {
   it("新着通知トグルが表示される", () => {
     render(<SettingsPanel {...defaultProps} />);
@@ -452,6 +585,156 @@ describe("SettingsPanel 新着デスクトップ通知", () => {
       "col-1",
       expect.objectContaining({ desktopNotifyEnabled: true }),
       350,
+      undefined,
+    );
+  });
+});
+
+describe("SettingsPanel 表示名", () => {
+  it("既存のlabelが表示名欄の初期値に入る", () => {
+    const col = {
+      ...mockColumn,
+      label: "仕事用",
+    };
+    render(<SettingsPanel {...defaultProps} column={col} />);
+    const input = screen.getByRole("textbox", {
+      name: "表示名",
+    }) as HTMLInputElement;
+    expect(input.value).toBe("仕事用");
+  });
+
+  it("labelが未設定のとき表示名欄は空", () => {
+    render(<SettingsPanel {...defaultProps} />);
+    const input = screen.getByRole("textbox", {
+      name: "表示名",
+    }) as HTMLInputElement;
+    expect(input.value).toBe("");
+  });
+
+  it("表示名を変更して適用するとonApplyの第4引数が新しい表示名になる", async () => {
+    const onApply = vi.fn();
+    render(<SettingsPanel {...defaultProps} onApply={onApply} />);
+    const input = screen.getByRole("textbox", { name: "表示名" });
+    await userEvent.clear(input);
+    await userEvent.type(input, "新しい表示名");
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.anything(),
+      350,
+      "新しい表示名",
+    );
+  });
+
+  it("表示名を空にして適用すると第4引数がundefinedになる", async () => {
+    const onApply = vi.fn();
+    const col = {
+      ...mockColumn,
+      label: "旧表示名",
+    };
+    render(<SettingsPanel {...defaultProps} column={col} onApply={onApply} />);
+    const input = screen.getByRole("textbox", { name: "表示名" });
+    await userEvent.clear(input);
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.anything(),
+      350,
+      undefined,
+    );
+  });
+
+  it("前後空白のみの表示名は第4引数がundefinedになる", async () => {
+    const onApply = vi.fn();
+    render(<SettingsPanel {...defaultProps} onApply={onApply} />);
+    const input = screen.getByRole("textbox", { name: "表示名" });
+    await userEvent.type(input, "   ");
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.anything(),
+      350,
+      undefined,
+    );
+  });
+
+  it("モバイル（isMobile: true）でも表示名欄が表示され、幅（px）欄は表示されない", () => {
+    render(<SettingsPanel {...defaultProps} isMobile={true} />);
+    expect(screen.getByRole("textbox", { name: "表示名" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("幅（px）")).not.toBeInTheDocument();
+  });
+
+  it("デスクトップでは表示名欄と幅（px）欄の両方が表示される", () => {
+    render(<SettingsPanel {...defaultProps} isMobile={false} />);
+    expect(screen.getByRole("textbox", { name: "表示名" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("spinbutton", { name: "幅（px）" }),
+    ).toBeInTheDocument();
+  });
+
+  it("表示名欄のmaxLengthが30", () => {
+    render(<SettingsPanel {...defaultProps} />);
+    const input = screen.getByRole("textbox", {
+      name: "表示名",
+    }) as HTMLInputElement;
+    expect(input.maxLength).toBe(30);
+  });
+
+  it("externalカラムでも表示名欄が表示される", () => {
+    const externalColumn: Column = {
+      ...mockColumn,
+      pageType: "external",
+      customUrl: "https://example.com",
+    };
+    render(<SettingsPanel {...defaultProps} column={externalColumn} />);
+    expect(screen.getByRole("textbox", { name: "表示名" })).toBeInTheDocument();
+  });
+});
+
+describe("SettingsPanel 前回の境目へ戻るボタン設定", () => {
+  it("ホームカラムの設定パネルに戻るボタンの設定項目が表示される", () => {
+    render(<SettingsPanel {...defaultProps} column={mockColumn} />);
+    expect(
+      screen.getByRole("checkbox", {
+        name: "更新後に前回の続きへ戻るボタンを表示する",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it.each<[string, Column["pageType"]]>([
+    ["通知", "notifications"],
+    ["検索", "search"],
+    ["リスト", "list"],
+    ["カスタム", "custom"],
+  ])(
+    "%sカラムの設定パネルには戻るボタンの設定項目が表示されない",
+    (_, pageType) => {
+      const column: Column = { ...mockColumn, pageType };
+      render(<SettingsPanel {...defaultProps} column={column} />);
+      expect(
+        screen.queryByRole("checkbox", {
+          name: "更新後に前回の続きへ戻るボタンを表示する",
+        }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it("チェックして適用するとonApplyにreturnToLastReadEnabled: trueが渡る", async () => {
+    const onApply = vi.fn();
+    render(
+      <SettingsPanel {...defaultProps} column={mockColumn} onApply={onApply} />,
+    );
+    await userEvent.click(
+      screen.getByRole("checkbox", {
+        name: "更新後に前回の続きへ戻るボタンを表示する",
+      }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.objectContaining({ returnToLastReadEnabled: true }),
+      350,
+      undefined,
     );
   });
 });

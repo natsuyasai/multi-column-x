@@ -2,6 +2,13 @@
 
 use crate::ipc_constants::globals;
 
+/// 文字列値を JS の文字列リテラルとして埋め込むための JSON エンコード。
+/// `{:?}`（Rust の Debug 書式）は JS 文字列リテラルとのエスケープ規則の互換性が
+/// 保証されないため使わない。エンコードに失敗した場合は空文字列にフォールバックする。
+fn js_string(value: &str) -> String {
+    serde_json::to_string(value).unwrap_or_else(|_| "\"\"".to_string())
+}
+
 pub struct InitScriptParams<'a> {
     pub is_mobile: bool,
     pub hide_header_enabled: bool,
@@ -21,11 +28,21 @@ pub struct InitScriptParams<'a> {
     pub visible_links: &'a [String],
     pub ng_words: &'a [String],
     pub global_ng_words: &'a [String],
+    pub repost_hidden_user_ids: &'a [String],
+    pub global_repost_hidden_user_ids: &'a [String],
     pub whitelist_enabled: bool,
     pub whitelist_words: &'a [String],
     pub compose_only_enabled: bool,
     pub minimal_injection: bool,
+    pub return_to_last_read_included: bool,
+    pub return_to_last_read_enabled: bool,
+    pub mobile_swipe_area_offset: u32,
 }
+
+// document.body の childList+subtree 監視を共有する単一 MutationObserver ハブ。
+// 他のどのスクリプトよりも先に連結し、後続スクリプトが window.__mcxDomObserver を
+// 参照できるようにする（詳細は dom_observer.ts のコメント参照）。
+const DOM_OBSERVER_HUB: &str = include_str!("dom_observer.js");
 
 pub fn build_init_script(params: &InitScriptParams) -> String {
     if params.minimal_injection {
@@ -33,9 +50,9 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         let mut script = custom_css_js.to_string();
         if !params.custom_css.is_empty() {
             script.push_str(&format!(
-                "\nwindow.{}.applyCustomCSS({:?});",
+                "\nwindow.{}.applyCustomCSS({});",
                 globals::MULTI_COLUMN_X,
-                params.custom_css
+                js_string(params.custom_css)
             ));
         }
         return script;
@@ -97,28 +114,37 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     let ng_words_json = serde_json::to_string(params.ng_words).unwrap_or_else(|_| "[]".to_string());
     let global_ng_words_json =
         serde_json::to_string(params.global_ng_words).unwrap_or_else(|_| "[]".to_string());
+    let repost_hidden_user_ids_json =
+        serde_json::to_string(params.repost_hidden_user_ids).unwrap_or_else(|_| "[]".to_string());
+    let global_repost_hidden_user_ids_json =
+        serde_json::to_string(params.global_repost_hidden_user_ids)
+            .unwrap_or_else(|_| "[]".to_string());
     let whitelist_words_json =
         serde_json::to_string(params.whitelist_words).unwrap_or_else(|_| "[]".to_string());
     let effective_show_custom_menu = params.hide_header_enabled && params.show_custom_menu;
     let config = format!(
-        "window.{} = {{ hideHeaderEnabled: {}, hideTweetInputEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {:?}, blurImageEnabled: {}, blurImageAmount: {:?}, hideAdEnabled: {}, apiRateLimitMonitorEnabled: {}, imagePopupEnabled: {}, videoPopupEnabled: {}, ngWords: {}, globalNgWords: {}, whitelistEnabled: {}, whitelistWords: {} }};",
+        "window.{} = {{ hideHeaderEnabled: {}, hideTweetInputEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {}, blurImageEnabled: {}, blurImageAmount: {}, hideAdEnabled: {}, apiRateLimitMonitorEnabled: {}, imagePopupEnabled: {}, videoPopupEnabled: {}, ngWords: {}, globalNgWords: {}, repostHiddenUserIds: {}, globalRepostHiddenUserIds: {}, whitelistEnabled: {}, whitelistWords: {}, returnToLastReadEnabled: {}, mobileSwipeAreaOffset: {} }};",
         globals::MULTI_COLUMN_X_CONFIG,
         params.hide_header_enabled,
         params.hide_tweet_input_enabled,
         effective_show_custom_menu,
         visible_links_json,
         params.small_image_enabled,
-        params.small_image_width,
+        js_string(params.small_image_width),
         params.blur_image_enabled,
-        params.blur_image_amount,
+        js_string(params.blur_image_amount),
         params.hide_ad_enabled,
         params.api_rate_limit_monitor_enabled,
         params.image_popup_enabled,
         params.video_popup_enabled,
         ng_words_json,
         global_ng_words_json,
+        repost_hidden_user_ids_json,
+        global_repost_hidden_user_ids_json,
         params.whitelist_enabled,
-        whitelist_words_json
+        whitelist_words_json,
+        params.return_to_last_read_enabled,
+        params.mobile_swipe_area_offset
     );
 
     let header_part = if params.hide_header_enabled || params.hide_tweet_input_enabled {
@@ -127,6 +153,11 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         String::new()
     };
     let auto_reload_part = format!("\n{}", auto_reload);
+    let return_to_last_read_part = if params.return_to_last_read_included {
+        format!("\n{}", include_str!("return_to_last_read.js"))
+    } else {
+        String::new()
+    };
     let video_control_part = if params.video_auto_play_stop_enabled {
         format!("\n{}", video_control)
     } else {
@@ -134,11 +165,13 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     };
 
     let mut script = format!(
-        "{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
+        "{}\n{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
+        DOM_OBSERVER_HUB,
         config,
         tab_selector,
         header_part,
         auto_reload_part,
+        return_to_last_read_part,
         video_control_part,
         small_image,
         blur_image,
@@ -160,9 +193,9 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
 
     if !params.custom_css.is_empty() {
         script.push_str(&format!(
-            "\nwindow.{}.applyCustomCSS({:?});",
+            "\nwindow.{}.applyCustomCSS({});",
             globals::MULTI_COLUMN_X,
-            params.custom_css
+            js_string(params.custom_css)
         ));
     }
 
@@ -178,13 +211,14 @@ pub fn build_popup_init_script(
     let popup_toolbar = include_str!("popup_toolbar.js");
     let popup_video_autoplay = include_str!("popup_video_autoplay.js");
     format!(
-        "window.{}={};window.{}={:?};window.{}={:?};window.{}={};\n{}\n{}",
+        "{}\nwindow.{}={};window.{}={};window.{}={};window.{}={};\n{}\n{}",
+        DOM_OBSERVER_HUB,
         globals::MCX_ACCOUNTS,
         accounts_json,
         globals::MCX_CURRENT_ACCOUNT_ID,
-        current_account_id,
+        js_string(current_account_id),
         globals::MCX_TARGET_HREF,
-        target_href,
+        js_string(target_href),
         globals::MCX_ESC_CLOSE_ENABLED,
         esc_close_enabled,
         popup_toolbar,
@@ -216,10 +250,15 @@ mod tests {
             visible_links: &[],
             ng_words: &[],
             global_ng_words: &[],
+            repost_hidden_user_ids: &[],
+            global_repost_hidden_user_ids: &[],
             whitelist_enabled: false,
             whitelist_words: &[],
             compose_only_enabled: false,
             minimal_injection: false,
+            return_to_last_read_included: false,
+            return_to_last_read_enabled: false,
+            mobile_swipe_area_offset: 0,
         }
     }
 
@@ -253,6 +292,43 @@ mod tests {
     fn build_init_script_config_global_ng_words_empty_by_default() {
         let script = build_init_script(&default_params());
         assert!(script.contains("globalNgWords: []"));
+    }
+
+    #[test]
+    fn 設定したリポスト元ユーザーidがカラム個別として起動時のスクリプトに渡される() {
+        let ids = vec!["alice".to_string(), "Bob_1".to_string()];
+        let mut params = default_params();
+        params.repost_hidden_user_ids = &ids;
+        let script = build_init_script(&params);
+        assert!(script.contains(r#"repostHiddenUserIds: ["alice","Bob_1"]"#));
+    }
+
+    #[test]
+    fn 設定したリポスト元ユーザーidが全体設定として起動時のスクリプトに渡される() {
+        let ids = vec!["global_user".to_string()];
+        let mut params = default_params();
+        params.global_repost_hidden_user_ids = &ids;
+        let script = build_init_script(&params);
+        assert!(script.contains(r#"globalRepostHiddenUserIds: ["global_user"]"#));
+    }
+
+    #[test]
+    fn リポスト元ユーザーidは既定で全体もカラム個別も空配列になる() {
+        let script = build_init_script(&default_params());
+        assert!(script.contains("repostHiddenUserIds: []"));
+        assert!(script.contains("globalRepostHiddenUserIds: []"));
+    }
+
+    #[test]
+    fn 全体とカラム個別のリポスト元ユーザーidは互いに混ざらない() {
+        let column_ids = vec!["col_user".to_string()];
+        let global_ids = vec!["glob_user".to_string()];
+        let mut params = default_params();
+        params.repost_hidden_user_ids = &column_ids;
+        params.global_repost_hidden_user_ids = &global_ids;
+        let script = build_init_script(&params);
+        assert!(script.contains(r#"repostHiddenUserIds: ["col_user"]"#));
+        assert!(script.contains(r#"globalRepostHiddenUserIds: ["glob_user"]"#));
     }
 
     #[test]
@@ -355,6 +431,71 @@ mod tests {
         params.video_popup_enabled = false;
         let script = build_init_script(&params);
         assert!(script.contains("videoPopupEnabled: false"));
+    }
+
+    #[test]
+    fn small_image_widthとblur_image_amountは通常の値ではダブルクオート文字列として埋め込まれる() {
+        let mut params = default_params();
+        params.small_image_width = "50%";
+        params.blur_image_amount = "10px";
+        let script = build_init_script(&params);
+        assert!(script.contains(r#"smallImageWidth: "50%""#));
+        assert!(script.contains(r#"blurImageAmount: "10px""#));
+    }
+
+    #[test]
+    fn custom_cssは通常の値では変更前と同じダブルクオート文字列として埋め込まれる() {
+        let mut params = default_params();
+        params.custom_css = "body { color: red; }";
+        let script = build_init_script(&params);
+        assert!(script.contains(r#"applyCustomCSS("body { color: red; }");"#));
+    }
+
+    #[test]
+    fn 引用符やバックスラッシュや改行を含む値もjsの文字列として正しく埋め込まれる() {
+        let value = "a\"b\\c\nd";
+        let mut params = default_params();
+        params.custom_css = value;
+        let script = build_init_script(&params);
+
+        // custom_css.js 内の関数定義 `function applyCustomCSS(css) {` と区別するため、
+        // 実際の呼び出し `window.__multiColumnX.applyCustomCSS(...)` に一致するマーカーを使う。
+        let start_marker = format!("window.{}.applyCustomCSS(", globals::MULTI_COLUMN_X);
+        let start = script
+            .rfind(&start_marker)
+            .expect("applyCustomCSS呼び出しが見つかること")
+            + start_marker.len();
+        let end = script[start..]
+            .find(");")
+            .expect("呼び出しの終端が見つかること")
+            + start;
+        let embedded_json = &script[start..end];
+
+        let decoded: String =
+            serde_json::from_str(embedded_json).expect("有効なjson文字列として解釈できること");
+        assert_eq!(decoded, value);
+    }
+
+    #[test]
+    fn build_popup_init_scriptで引用符やバックスラッシュや改行を含む値もjsの文字列として正しく埋め込まれる(
+    ) {
+        let value = "a\"b\\c\nd";
+        let script = build_popup_init_script("[]", value, "https://x.com", true);
+
+        let marker = format!("window.{}=", globals::MCX_CURRENT_ACCOUNT_ID);
+        let start = script
+            .find(&marker)
+            .expect("current_account_idの埋め込みが見つかること")
+            + marker.len();
+        let end = script[start..]
+            .find(";window.")
+            .expect("次のwindow代入が見つかること")
+            + start;
+        let embedded_json = &script[start..end];
+
+        let decoded: String =
+            serde_json::from_str(embedded_json).expect("有効なjson文字列として解釈できること");
+        assert_eq!(decoded, value);
     }
 
     #[test]
@@ -475,6 +616,19 @@ mod tests {
     }
 
     #[test]
+    fn build_popup_init_scriptでuuidとhttpsurlは通常の値では変更前と同じダブルクオート文字列として埋め込まれる(
+    ) {
+        let script = build_popup_init_script(
+            "[]",
+            "550e8400-e29b-41d4-a716-446655440000",
+            "https://x.com/user/status/123",
+            true,
+        );
+        assert!(script.contains(r#"__mcxCurrentAccountId="550e8400-e29b-41d4-a716-446655440000""#));
+        assert!(script.contains(r#"__mcxTargetHref="https://x.com/user/status/123""#));
+    }
+
+    #[test]
     fn build_popup_init_script_esc_close_disabled() {
         let script = build_popup_init_script("[]", "acc1", "", false);
         assert!(script.contains("false"));
@@ -521,5 +675,116 @@ mod tests {
         let script = build_init_script(&params);
         assert!(script.contains("multi-column-x-header-customizer-root"));
         assert!(script.contains("__multiColumnXConfig"));
+    }
+
+    #[test]
+    fn build_init_scriptに共有domobserverハブが含まれる() {
+        let script = build_init_script(&default_params());
+        assert!(script.contains("__mcxDomObserver"));
+    }
+
+    #[test]
+    fn build_init_scriptで共有domobserverハブが他のどのスクリプトよりも先頭に連結される() {
+        let script = build_init_script(&default_params());
+        let hub_pos = script
+            .find("__mcxDomObserver")
+            .expect("dom observer hub marker not found");
+        let config_pos = script
+            .find("__multiColumnXConfig")
+            .expect("config marker not found");
+        assert!(hub_pos < config_pos);
+    }
+
+    #[test]
+    fn minimal_injectionがtrueのとき共有domobserverハブは含まれない() {
+        let mut params = default_params();
+        params.minimal_injection = true;
+        let script = build_init_script(&params);
+        assert!(!script.contains("__mcxDomObserver"));
+    }
+
+    #[test]
+    fn build_popup_init_scriptに共有domobserverハブが含まれる() {
+        let script = build_popup_init_script("[]", "acc1", "", true);
+        assert!(script.contains("__mcxDomObserver"));
+    }
+
+    #[test]
+    fn return_to_last_read_includedがtrueのとき前回の境目へ戻るスクリプトが含まれる() {
+        let mut params = default_params();
+        params.return_to_last_read_included = true;
+        let script = build_init_script(&params);
+        assert!(script.contains("mcx-return-to-last-read"));
+    }
+
+    #[test]
+    fn return_to_last_read_includedがfalseのとき前回の境目へ戻るスクリプトが含まれない() {
+        let script = build_init_script(&default_params());
+        assert!(!script.contains("mcx-return-to-last-read"));
+    }
+
+    #[test]
+    fn return_to_last_read_includedがtrueのとき前回の境目へ戻るスクリプトはauto_reloadより後ろに連結される(
+    ) {
+        let mut params = default_params();
+        params.return_to_last_read_included = true;
+        let script = build_init_script(&params);
+        let auto_reload_pos = script
+            .find("window.__multiColumnX.triggerReload = triggerReload;")
+            .expect("auto_reload marker not found");
+        let return_to_last_read_pos = script
+            .find("mcx-return-to-last-read")
+            .expect("return_to_last_read marker not found");
+        assert!(auto_reload_pos < return_to_last_read_pos);
+    }
+
+    #[test]
+    fn build_init_script_configにreturntolastreadenabled_trueが含まれる() {
+        let mut params = default_params();
+        params.return_to_last_read_enabled = true;
+        let script = build_init_script(&params);
+        assert!(script.contains("returnToLastReadEnabled: true"));
+    }
+
+    #[test]
+    fn build_init_script_configにreturntolastreadenabled_falseが含まれる() {
+        let script = build_init_script(&default_params());
+        assert!(script.contains("returnToLastReadEnabled: false"));
+    }
+
+    #[test]
+    fn build_init_script_configにmobileswipeareaoffsetのデフォルト値0が含まれる() {
+        let script = build_init_script(&default_params());
+        assert!(script.contains("mobileSwipeAreaOffset: 0"));
+    }
+
+    #[test]
+    fn build_init_script_configに設定したmobileswipeareaoffsetの値が含まれる() {
+        let mut params = default_params();
+        params.mobile_swipe_area_offset = 28;
+        let script = build_init_script(&params);
+        assert!(script.contains("mobileSwipeAreaOffset: 28"));
+    }
+
+    #[test]
+    fn minimal_injectionがtrueのときreturn_to_last_read_includedがtrueでも前回の境目へ戻るスクリプトは含まれない(
+    ) {
+        let mut params = default_params();
+        params.minimal_injection = true;
+        params.return_to_last_read_included = true;
+        let script = build_init_script(&params);
+        assert!(!script.contains("mcx-return-to-last-read"));
+    }
+
+    #[test]
+    fn build_popup_init_scriptで共有domobserverハブがpopup_toolbarよりも先頭に連結される() {
+        let script = build_popup_init_script("[]", "acc1", "", true);
+        let hub_pos = script
+            .find("__mcxDomObserver")
+            .expect("dom observer hub marker not found");
+        let toolbar_pos = script
+            .find("tv-popup-toolbar")
+            .expect("popup toolbar marker not found");
+        assert!(hub_pos < toolbar_pos);
     }
 }

@@ -15,6 +15,7 @@ export const IPC_COMMANDS = {
   RESIZE_COLUMN_WEBVIEW: "resize_column_webview",
   EVAL_IN_WEBVIEW: "eval_in_webview",
   GET_EXTERNAL_COLUMN_DATA_DIRECTORY: "get_external_column_data_directory",
+  DELETE_EXTERNAL_COLUMN_DATA: "delete_external_column_data",
 
   // ポップアップ
   OPEN_POPUP_WINDOW: "open_popup_window",
@@ -24,9 +25,6 @@ export const IPC_COMMANDS = {
 
   // コンポーズ
   OPEN_COMPOSE_WINDOW: "open_compose_window",
-
-  // ブラウザ
-  OPEN_IN_BROWSER: "open_in_browser",
 
   // アカウント管理
   OPEN_ADD_ACCOUNT_WINDOW: "open_add_account_window",
@@ -58,6 +56,13 @@ export const IPC_COMMANDS = {
   // モバイルスワイプバー（ネイティブオーバーレイ）
   UPDATE_MOBILE_SWIPE_BAR: "update_mobile_swipe_bar",
   FLASH_MOBILE_SWIPE_BAR: "flash_mobile_swipe_bar",
+
+  // アプリ自動更新（Android APK）
+  INSTALL_APK_UPDATE: "install_apk_update",
+
+  // メディアコーデック（Linux）
+  CHECK_MEDIA_CODEC_SUPPORT: "check_media_codec_support",
+  DOWNLOAD_AND_ENABLE_H264: "download_and_enable_h264",
 } as const;
 
 /** Tauri イベント名 */
@@ -110,14 +115,14 @@ export const WEBVIEW_LABELS = {
  * WebView 内に inject されたオブジェクトが存在しない場合は何もしない。
  */
 export const WEBVIEW_SCRIPTS = {
-  /** ページをリロードする */
+  /** 自動更新用（ユーザーがスクロール中は打ち切る） */
   TRIGGER_RELOAD:
     "window.__multiColumnX && window.__multiColumnX.triggerReload();",
 
   /** ページ全体を再読み込みする（location.reload()） */
   RELOAD_PAGE: "location.reload();",
 
-  /** スクロール位置を先頭に戻してからページをリロードする（ダブルタップ用） */
+  /** 手動更新用（スクロール位置にかかわらず先頭へ戻して更新する。ダブルタップ・先頭スクロールボタン・手動更新・設定適用・公式設定配布で使う） */
   SCROLL_TOP_AND_RELOAD:
     "window.__multiColumnX && window.__multiColumnX.triggerReload(true);",
 
@@ -164,11 +169,18 @@ export const WEBVIEW_SCRIPTS = {
     return `(function(){var n=${n};var m=document.cookie.match(/(?:^|; )night_mode=([^;]*)/);var current=m?m[1]:null;if(current===n)return;document.cookie='night_mode='+n+'; path=/; domain=.x.com; max-age=34560000';location.reload();})();`;
   },
 
-  /** NGワードを動的に更新し、表示中のツイートにも即時適用する */
-  applyNgWords: (ngWords: string[], globalNgWords: string[]) => {
+  /** NGワード・リポスト非表示ユーザーIDを動的に更新し、表示中のツイートにも即時適用する */
+  applyNgWords: (
+    ngWords: string[],
+    globalNgWords: string[],
+    repostHiddenUserIds: string[],
+    globalRepostHiddenUserIds: string[],
+  ) => {
     const ng = JSON.stringify(ngWords);
     const global = JSON.stringify(globalNgWords);
-    return `if(window.__multiColumnXConfig){window.__multiColumnXConfig.ngWords=${ng};window.__multiColumnXConfig.globalNgWords=${global};}window.__multiColumnX&&window.__multiColumnX.recheckNgWords&&window.__multiColumnX.recheckNgWords();`;
+    const repost = JSON.stringify(repostHiddenUserIds);
+    const globalRepost = JSON.stringify(globalRepostHiddenUserIds);
+    return `if(window.__multiColumnXConfig){window.__multiColumnXConfig.ngWords=${ng};window.__multiColumnXConfig.globalNgWords=${global};window.__multiColumnXConfig.repostHiddenUserIds=${repost};window.__multiColumnXConfig.globalRepostHiddenUserIds=${globalRepost};}window.__multiColumnX&&window.__multiColumnX.recheckNgWords&&window.__multiColumnX.recheckNgWords();`;
   },
 
   /** ホワイトリストを動的に更新し、表示中のツイートにも即時適用する */
@@ -176,6 +188,10 @@ export const WEBVIEW_SCRIPTS = {
     const words = JSON.stringify(whitelistWords);
     return `if(window.__multiColumnXConfig){window.__multiColumnXConfig.whitelistEnabled=${whitelistEnabled};window.__multiColumnXConfig.whitelistWords=${words};}window.__multiColumnX&&window.__multiColumnX.recheckNgWords&&window.__multiColumnX.recheckNgWords();`;
   },
+
+  /** ホームタイムライン「前回の境目へ戻る」ボタンの有効/無効を動的に更新し、即時反映する（非ホームカラムでは関数が無いためno-op） */
+  applyReturnToLastRead: (enabled: boolean) =>
+    `if(window.__multiColumnXConfig){window.__multiColumnXConfig.returnToLastReadEnabled=${enabled};}window.__multiColumnX&&window.__multiColumnX.setReturnToLastReadEnabled&&window.__multiColumnX.setReturnToLastReadEnabled(${enabled});`,
 } as const;
 
 /** WebView を画面外へ退避させる座標 */

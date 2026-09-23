@@ -2,6 +2,7 @@
 // モバイル/デスクトップ実装（useMobileColumns / useDesktopColumns）を組み合わせるファサード
 import { useCallback, useRef } from "react";
 import { OFFSCREEN } from "../constants/ipc";
+import { moveGroup } from "../lib/columnOrder";
 import {
   HEADER_HEIGHT,
   SCROLLBAR_HEIGHT,
@@ -15,7 +16,11 @@ import {
   removeColumnWebview,
   resizeColumnWebview,
 } from "../services/columnWebview";
-import { resolveColumnDataDirectory } from "../services/externalColumn";
+import {
+  deleteExternalColumnData,
+  isExternalColumn,
+  resolveColumnDataDirectory,
+} from "../services/externalColumn";
 import { useAppStore } from "../store/useAppStore";
 import type { Column } from "../types";
 import { useDesktopColumns } from "./useDesktopColumns";
@@ -190,6 +195,8 @@ export function useColumns() {
       const { isMobile, columns: columnsBeforeRemoval } =
         useAppStore.getState();
 
+      const removedColumn = columnsBeforeRemoval.find((c) => c.id === columnId);
+
       // 削除カラムが現在の表示ペア（アクティブ or その隣）に含まれていたかを、
       // 削除前のカラム構成で判定する。removeColumn 後だと右隣の判定基準が
       // ずれるため、必ず removeColumn 呼び出し前に計算する（recreateColumnWebview
@@ -209,6 +216,13 @@ export function useColumns() {
       await removeColumnWebview(columnId).catch(
         logError("handleRemoveColumn:removeColumnWebview"),
       );
+      if (removedColumn && isExternalColumn(removedColumn)) {
+        // external カラム専用の保存先ディレクトリは WebView 破棄後に削除する
+        // （WebView がフォルダを使用中のため）。失敗してもログのみ。
+        await deleteExternalColumnData(columnId).catch(
+          logError("handleRemoveColumn:deleteExternalColumnData"),
+        );
+      }
       removeColumn(columnId);
       const { columns: remainingColumns } = useAppStore.getState();
       if (isMobile) {
@@ -237,6 +251,19 @@ export function useColumns() {
       setActiveColumn,
       setActiveColumnIdState,
     ],
+  );
+
+  // TopBar の D&D による列グループの並び替え（gridCol の再配分・永続化・WebView 再配置）
+  const handleMoveColumnGroup = useCallback(
+    async (fromIdx: number, toIdx: number) => {
+      const { columns: current, replaceColumns } = useAppStore.getState();
+      const next = moveGroup(current, fromIdx, toIdx);
+      // 同一位置・範囲外は moveGroup が入力をそのまま返す
+      if (next === current) return;
+      replaceColumns(next);
+      await recalculateAllBounds();
+    },
+    [recalculateAllBounds],
   );
 
   // カラム更新（設定変更）
@@ -333,13 +360,18 @@ export function useColumns() {
     ],
   );
 
-  const recreateAllWebviews = useCallback(async () => {
-    const { columns: currentColumns, topBarExpanded } = useAppStore.getState();
-    for (const column of currentColumns) {
+  // 指定カラム群の WebView をすべて破棄する（remove_column_webview の失敗は握りつぶす）
+  const removeWebviewsOf = useCallback(async (cols: Column[]) => {
+    for (const column of cols) {
       await removeColumnWebview(column.id).catch(
-        logError("recreateAllWebviews:removeColumnWebview"),
+        logError("removeWebviewsOf:removeColumnWebview"),
       );
     }
+  }, []);
+
+  // store の現在の columns から WebView を作り直す（作成後の退避判定を含む）
+  const rebuildWebviews = useCallback(async () => {
+    const { topBarExpanded } = useAppStore.getState();
     await restoreColumns(getTopBarHeight(topBarExpanded));
     // ダイアログ表示中（再認証や GlobalSettings の全再読込など）に呼ばれた場合、
     // restoreColumns は列 WebView を通常座標に表示してしまう。native WebView は
@@ -351,6 +383,28 @@ export function useColumns() {
     }
   }, [restoreColumns, hideColumnWebviews]);
 
+  const recreateAllWebviews = useCallback(async () => {
+    const { columns: currentColumns } = useAppStore.getState();
+    await removeWebviewsOf(currentColumns);
+    await rebuildWebviews();
+  }, [removeWebviewsOf, rebuildWebviews]);
+
+  // プリセットを読み込み、差し替え前の全カラムの WebView を破棄したうえで
+  // プリセット側のカラムの WebView を作り直す。同じ id のカラムがあっても
+  // 一度破棄してから作り直すため、プリセット側の設定で確実に再作成される。
+  const loadPresetAndRecreateWebviews = useCallback(
+    async (presetId: string) => {
+      const { columns: before, globalSettings } = useAppStore.getState();
+      if (!(globalSettings.presets ?? []).some((p) => p.id === presetId)) {
+        return;
+      }
+      await removeWebviewsOf(before);
+      useAppStore.getState().loadPreset(presetId);
+      await rebuildWebviews();
+    },
+    [removeWebviewsOf, rebuildWebviews],
+  );
+
   return {
     columns,
     columnBounds,
@@ -359,6 +413,7 @@ export function useColumns() {
     restoreColumns,
     handleAddColumn,
     handleRemoveColumn,
+    handleMoveColumnGroup,
     handleUpdateColumn,
     recalculateAllBounds,
     hideColumnWebviews,
@@ -371,5 +426,6 @@ export function useColumns() {
     setDialogOpen,
     recreateAllWebviews,
     recreateColumnWebview,
+    loadPresetAndRecreateWebviews,
   };
 }

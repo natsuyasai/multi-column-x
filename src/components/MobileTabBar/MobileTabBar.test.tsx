@@ -20,8 +20,10 @@ const baseSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   ngWords: [],
+  repostHiddenUserIds: [],
   whitelistEnabled: false,
   whitelistWords: [],
+  returnToLastReadEnabled: false,
 };
 
 const acc1: Account = {
@@ -179,6 +181,20 @@ describe("MobileTabBar", () => {
       <MobileTabBar
         {...defaultProps}
         columns={[externalCol]}
+        activeColumnId="col-1"
+      />,
+    );
+    expect(
+      screen.queryByText(`${baseSettings.autoReloadInterval}s`),
+    ).not.toBeInTheDocument();
+  });
+
+  it("モバイルのタブバーでもリスト詳細カラムは自動更新されない", () => {
+    const listCol: Column = { ...col1, pageType: "list" };
+    render(
+      <MobileTabBar
+        {...defaultProps}
+        columns={[listCol]}
         activeColumnId="col-1"
       />,
     );

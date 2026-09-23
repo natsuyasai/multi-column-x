@@ -32,9 +32,13 @@ export interface ColumnSettings {
   blurImageEnabled: boolean;
   blurImageAmount: string;
   ngWords: string[];
+  /** リポストを非表示にするユーザーID（@なし・1件1ID）。旧保存データには無いため読み出し側は `?? []` で扱う */
+  repostHiddenUserIds: string[];
   whitelistEnabled: boolean;
   whitelistWords: string[];
   desktopNotifyEnabled?: boolean;
+  /** 自動更新で新着が入った後、更新前の先頭（既読との境目）へ戻るボタンを表示する。対象は pageType === "home" のカラムのみ */
+  returnToLastReadEnabled: boolean;
 }
 
 export interface Column {
@@ -44,6 +48,8 @@ export interface Column {
   customUrl?: string;
   homeTabName?: string;
   searchQuery?: string;
+  /** 検索カラム追加時に true を記録し、「最新」タブで開く。既存の保存済みカラムには存在しない */
+  searchLiveTab?: boolean;
   listId?: string;
   width: number;
   order: number;
@@ -90,6 +96,10 @@ export interface GlobalSettings {
   mobileTwoColumnEnabled: boolean;
   presets: ColumnPreset[];
   ngWords: string[];
+  /** リポストを非表示にするユーザーID（全カラム共通） */
+  repostHiddenUserIds: string[];
+  /** アカウント削除時にデータフォルダの削除へ失敗し、再実行対象として記録された保存先パス一覧 */
+  pendingDataDirectoryDeletions: string[];
 }
 
 export interface ApiRateLimitBucket {
@@ -110,6 +120,18 @@ export interface AppSettings {
   accounts: Account[];
   columns: Column[];
   globalSettings: GlobalSettings;
+}
+
+/**
+ * load_settings IPC の戻り値。
+ * 保存済み設定の解析に失敗した場合、Rust 側は元データを退避した上で
+ * 既定値の settings を返し、loadFailed / backupPath で失敗を通知する。
+ * Rust 側の対応定義: src-tauri/src/commands/settings.rs の LoadSettingsResult。
+ */
+export interface LoadSettingsResult {
+  settings: AppSettings;
+  loadFailed: boolean;
+  backupPath: string | null;
 }
 
 /**
@@ -141,6 +163,7 @@ export interface AppSettings {
  * | whitelistEnabled        | whitelist_enabled           | false       |
  * | whitelistWords          | whitelist_words             | []          |
  * | desktopNotifyEnabled    | desktop_notify_enabled      | false       |
+ * | returnToLastReadEnabled | return_to_last_read_enabled | false       |
  */
 export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
   autoReloadEnabled: true,
@@ -157,9 +180,11 @@ export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   ngWords: [],
+  repostHiddenUserIds: [],
   whitelistEnabled: false,
   whitelistWords: [],
   desktopNotifyEnabled: false,
+  returnToLastReadEnabled: false,
 };
 
 /**
@@ -204,13 +229,22 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   mobileTwoColumnEnabled: true,
   presets: [],
   ngWords: [],
+  repostHiddenUserIds: [],
+  pendingDataDirectoryDeletions: [],
 };
+
+export const COLUMN_LABEL_MAX_LENGTH = 30;
 
 interface GetPageTypeLabelInput {
   pageType: PageType;
   homeTabName?: string;
   searchQuery?: string;
   customUrl?: string;
+}
+
+export function normalizeColumnLabel(input: string): string | undefined {
+  const trimmed = input.trim();
+  return trimmed ? trimmed : undefined;
 }
 
 export function getPageTypeLabel(input: GetPageTypeLabelInput): string {
@@ -238,5 +272,5 @@ export function getPageTypeLabel(input: GetPageTypeLabelInput): string {
 }
 
 export function getColumnLabel(column: Column): string {
-  return column.label ?? getPageTypeLabel(column);
+  return column.label || getPageTypeLabel(column);
 }

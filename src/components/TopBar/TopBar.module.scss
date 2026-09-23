@@ -152,3 +152,35 @@ $transition: 200ms ease;
   gap: 4px;
   flex-shrink: 0;
 }
+
+// 同じ gridCol のカラムをまとめた並び替え単位（1 列 = 1 要素）
+.columnGroup {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  // グループ全体がドラッグの取っ手（ボタンは .btn の cursor: pointer を維持）
+  cursor: grab;
+  user-select: none;
+}
+
+// ドラッグ中の要素: 半透明 + 影で浮いて見せる
+.columnGroupDragging {
+  opacity: 0.4;
+  background: var(--mcx-surface-hover);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 25%);
+  cursor: grabbing;
+  z-index: 1;
+}
+
+// 子ボタンの cursor: pointer を上書きして、ドラッグ中はどこでも grabbing にする
+.columnGroupDragging * {
+  cursor: grabbing;
+}
+
+// ドロップ先の位置: 挿入位置を左端のアクセント線で示す
+.columnGroupOver {
+  box-shadow: inset 2px 0 0 var(--mcx-accent);
+}

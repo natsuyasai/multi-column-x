@@ -179,4 +179,72 @@ mod tests {
             );
         }
     }
+
+    /// lib.rs の `tauri::generate_handler![...]` マクロ本体のソーステキストから、
+    /// 登録済みコマンド名（`crate::path::to::fn_name` の最後のセグメント）を抽出する。
+    /// `#[cfg(...)]` 行はコマンド名ではないため読み飛ばす。
+    fn handler_command_names(lib_src: &str) -> Vec<String> {
+        let start = lib_src
+            .find("tauri::generate_handler![")
+            .expect("generate_handler! マクロが見つからない");
+        let body_start = start + "tauri::generate_handler![".len();
+        let end = lib_src[body_start..]
+            .find("])")
+            .expect("generate_handler! マクロの終端 `])` が見つからない");
+        let body = &lib_src[body_start..body_start + end];
+
+        body.lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty() && !line.starts_with("#["))
+            .map(|line| line.trim_end_matches(','))
+            .map(|line| {
+                line.rsplit("::")
+                    .next()
+                    .expect("`::` 区切りのコマンドパスではない")
+                    .to_string()
+            })
+            .collect()
+    }
+
+    /// lib.rs の generate_handler! に登録されているコマンドが、すべて契約 fixture に
+    /// 含まれていることを検証する（逆方向）。fixture 側の登録漏れ・記載漏れを検出する。
+    #[test]
+    fn all_registered_commands_in_lib_rs_are_in_contract_fixture() {
+        let lib_src = include_str!("lib.rs");
+        let registered = handler_command_names(lib_src);
+        assert!(
+            !registered.is_empty(),
+            "generate_handler! からコマンド名を1件も抽出できていない（パーサ不備の疑い）"
+        );
+
+        let fixture_commands = fixture()["commands"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_string())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            registered.len(),
+            fixture_commands.len(),
+            "lib.rs に登録されたコマンド数と fixture のコマンド数が一致しない: registered={registered:?}"
+        );
+
+        for cmd in &registered {
+            assert!(
+                fixture_commands.contains(cmd),
+                "コマンド {cmd} は lib.rs の generate_handler! に登録されているが、contracts/ipc-constants.json に無い"
+            );
+        }
+    }
+
+    #[test]
+    fn 廃止したブラウザ起動コマンドは登録されていない() {
+        let lib_src = include_str!("lib.rs");
+        let registered = handler_command_names(lib_src);
+        assert!(
+            !registered.contains(&"open_in_browser".to_string()),
+            "open_in_browser は削除済みのはずだが lib.rs に登録されている"
+        );
+    }
 }

@@ -85,6 +85,12 @@
   font-size: 12px;
 }
 
+.hint {
+  font-size: 11px;
+  color: var(--mcx-text-muted);
+  margin: 0;
+}
+
 .checkLabel {
   display: flex;
   align-items: center;
@@ -105,6 +111,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  font-size: 13px;
+  color: var(--mcx-text-secondary);
+}
+
+.fieldLabelBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   font-size: 13px;
   color: var(--mcx-text-secondary);
 }
@@ -141,6 +155,26 @@
   &:focus {
     outline: none;
     border-color: var(--mcx-accent);
+  }
+}
+
+.labelInput {
+  background: var(--mcx-surface-sunken);
+  border: 1px solid var(--mcx-border);
+  border-radius: 4px;
+  color: var(--mcx-text);
+  font-size: 13px;
+  padding: 7px 8px;
+  min-width: 0;
+  box-sizing: border-box;
+
+  &:focus {
+    outline: none;
+    border-color: var(--mcx-accent);
+  }
+
+  &::placeholder {
+    color: var(--mcx-text-muted);
   }
 }
 

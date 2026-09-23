@@ -2,17 +2,13 @@
 #[cfg(desktop)]
 use super::parse_url;
 use crate::commands::settings::ColumnData;
-use crate::commands::settings_store::{
-    load_api_rate_limit_monitor_enabled, load_global_ng_words, load_hide_ad_enabled,
-    load_image_popup_enabled, load_video_auto_play_stop_enabled, load_video_popup_enabled,
-};
+use crate::commands::settings_store::{column_script_settings_from, load_global_settings};
 use crate::inject::{build_init_script, InitScriptParams};
 #[cfg(any(target_os = "linux", windows))]
 use crate::ipc_constants::events;
 use crate::ipc_constants::labels;
 use crate::state::AppState;
-#[cfg(desktop)]
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 #[cfg(any(target_os = "linux", windows))]
 use tauri::Emitter;
 #[cfg(all(desktop, not(target_os = "linux")))]
@@ -25,6 +21,9 @@ fn webview_label(column_id: &str) -> String {
     format!("{}{}", labels::COLUMN_PREFIX, column_id)
 }
 
+/// 追加時に「最新」タブ指定が記録された検索カラムの URL に付ける X の検索 URL パラメータ。
+const SEARCH_LIVE_TAB_PARAM: &str = "f=live";
+
 fn resolve_url(column: &ColumnData) -> String {
     match column.page_type.as_str() {
         "home" => match column.home_tab_name.as_deref().filter(|s| !s.is_empty()) {
@@ -32,10 +31,17 @@ fn resolve_url(column: &ColumnData) -> String {
             None => "https://x.com/home".to_string(),
         },
         "notifications" => "https://x.com/notifications".to_string(),
-        "search" => format!(
-            "https://x.com/search?q={}",
-            urlencoding::encode(column.search_query.as_deref().unwrap_or(""))
-        ),
+        "search" => {
+            let base = format!(
+                "https://x.com/search?q={}",
+                urlencoding::encode(column.search_query.as_deref().unwrap_or(""))
+            );
+            if column.search_live_tab {
+                format!("{base}&{SEARCH_LIVE_TAB_PARAM}")
+            } else {
+                base
+            }
+        }
         "list" => format!(
             "https://x.com/i/lists/{}",
             column.list_id.as_deref().unwrap_or("")
@@ -79,39 +85,61 @@ fn effective_hide_tweet_input_enabled(column: &ColumnData) -> bool {
     }
 }
 
+/// 「前回の境目へ戻る」ボタンの inject スクリプトを注入するカラム種別かどうかを判定する。
+/// 対象はホームタイムライン（page_type == "home"）のみ。投稿カラム（page_type == "compose"）も
+/// URL としては /home を表示するが、対象外（インライン投稿フォーム専用のため）。
+fn is_return_to_last_read_target(column: &ColumnData) -> bool {
+    column.page_type == "home"
+}
+
+/// モバイルかつスワイプ切替領域が有効なときだけ、その高さ(px/dp)を返す。
+/// それ以外（デスクトップ、またはモバイルでも無効時）は0を返し、
+/// 「前回の続きへ戻る」ボタン等の下端位置補正に使う。
+fn resolve_mobile_swipe_area_offset(
+    is_mobile: bool,
+    settings: &crate::commands::settings_store::ColumnScriptSettings,
+) -> u32 {
+    if is_mobile && settings.mobile_swipe_area_enabled {
+        settings.mobile_swipe_area_height
+    } else {
+        0
+    }
+}
+
 /// カラム WebView に注入する init script を、設定ストアの読み出しを含めて構築する。
 /// desktop / mobile 双方の `create_column_webview` から呼ばれ、挙動差分は `is_mobile` のみ。
 fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: bool) -> String {
-    let video_auto_play_stop_enabled = load_video_auto_play_stop_enabled(app);
-    let hide_ad_enabled = load_hide_ad_enabled(app);
-    let api_rate_limit_monitor_enabled = load_api_rate_limit_monitor_enabled(app);
-    let image_popup_enabled = load_image_popup_enabled(app);
-    let video_popup_enabled = load_video_popup_enabled(app);
-    let global_ng_words = load_global_ng_words(app);
+    let global_settings = load_global_settings(app);
+    let script_settings = column_script_settings_from(&global_settings);
     build_init_script(&InitScriptParams {
         is_mobile,
         hide_header_enabled: column.settings.hide_header_enabled,
         hide_tweet_input_enabled: effective_hide_tweet_input_enabled(column),
         show_custom_menu: column.settings.show_custom_menu,
         scroll_pos_restore_enabled: column.settings.scroll_pos_restore_enabled,
-        video_auto_play_stop_enabled,
+        video_auto_play_stop_enabled: script_settings.video_auto_play_stop_enabled,
         small_image_enabled: column.settings.small_image_enabled,
         small_image_width: &column.settings.small_image_width,
         blur_image_enabled: column.settings.blur_image_enabled,
         blur_image_amount: &column.settings.blur_image_amount,
-        hide_ad_enabled,
-        api_rate_limit_monitor_enabled,
-        image_popup_enabled,
-        video_popup_enabled,
+        hide_ad_enabled: script_settings.hide_ad_enabled,
+        api_rate_limit_monitor_enabled: script_settings.api_rate_limit_monitor_enabled,
+        image_popup_enabled: script_settings.image_popup_enabled,
+        video_popup_enabled: script_settings.video_popup_enabled,
         custom_css: &column.settings.custom_css,
         visible_links: &column.settings.visible_links,
         ng_words: &column.settings.ng_words,
-        global_ng_words: &global_ng_words,
+        global_ng_words: &script_settings.global_ng_words,
+        repost_hidden_user_ids: &column.settings.repost_hidden_user_ids,
+        global_repost_hidden_user_ids: &script_settings.global_repost_hidden_user_ids,
         whitelist_enabled: column.settings.whitelist_enabled,
         whitelist_words: &column.settings.whitelist_words,
         // 投稿カラム（/home 表示）ではインライン投稿フォーム以外を隠す。
         compose_only_enabled: column.page_type == "compose",
         minimal_injection: column.page_type == "external",
+        return_to_last_read_included: is_return_to_last_read_target(column),
+        return_to_last_read_enabled: column.settings.return_to_last_read_enabled,
+        mobile_swipe_area_offset: resolve_mobile_swipe_area_offset(is_mobile, &script_settings),
     })
 }
 
@@ -124,30 +152,67 @@ fn is_safe_column_id(column_id: &str) -> bool {
         && !column_id.contains("..")
 }
 
+/// external カラム（アカウント非依存の任意URLカラム）専用のデータディレクトリのパスを組み立てる
+/// （存在確認・作成は行わない純粋関数）。column_id は IPC 経由で任意の文字列を受け取るため、
+/// パストラバーサル対策として `is_safe_column_id` を満たさない値は `None` を返す。
+fn external_column_data_dir(app_data: &Path, column_id: &str) -> Option<PathBuf> {
+    if !is_safe_column_id(column_id) {
+        return None;
+    }
+    Some(
+        app_data
+            .join("external_columns")
+            .join(format!("column-{column_id}")),
+    )
+}
+
 /// external カラム（アカウント非依存の任意URLカラム）専用のデータディレクトリを解決する。
 /// カラムIDごとに固有のディレクトリを作成し、WebView のセッション（Cookie等）を
 /// 他のカラム・アカウントと完全に分離する。
-/// column_id は IPC 経由で任意の文字列を受け取るため、パストラバーサル対策として
-/// パス区切り文字・親ディレクトリ参照を含む値は拒否する。
 #[tauri::command]
 pub async fn get_external_column_data_directory(
+    caller: tauri::Webview,
     app: AppHandle,
     column_id: String,
 ) -> Result<String, String> {
+    crate::commands::require_main_caller(&caller)?;
     if !is_safe_column_id(&column_id) {
         return Err("invalid column id".to_string());
     }
     let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let data_dir = app_data
-        .join("external_columns")
-        .join(format!("column-{column_id}"));
+    let data_dir = external_column_data_dir(&app_data, &column_id)
+        .ok_or_else(|| "invalid column id".to_string())?;
     std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
     Ok(data_dir.to_string_lossy().to_string())
 }
 
+/// external カラム専用のデータディレクトリを削除する。column_id から Rust 側でパスを
+/// 組み立てるため、呼び出し元（TS 側）は任意パスを直接指定できない。ディレクトリが
+/// 存在しない場合は何もしない（カラム追加前にキャンセルされた場合など）。
+#[tauri::command]
+pub async fn delete_external_column_data(
+    caller: tauri::Webview,
+    app: AppHandle,
+    column_id: String,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
+    let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let data_dir = external_column_data_dir(&app_data, &column_id)
+        .ok_or_else(|| "invalid column id".to_string())?;
+    if data_dir.exists() {
+        std::fs::remove_dir_all(&data_dir).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[cfg(desktop)]
 #[tauri::command]
-pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> Result<(), String> {
+pub async fn create_column_webview(
+    caller: tauri::Webview,
+    app: AppHandle,
+    args: CreateWebviewArgs,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let url = resolve_url(&args.column);
     let label = webview_label(&args.column.id);
     let data_dir = PathBuf::from(&args.data_directory);
@@ -259,7 +324,12 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
 
 #[cfg(mobile)]
 #[tauri::command]
-pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> Result<(), String> {
+pub async fn create_column_webview(
+    caller: tauri::Webview,
+    app: AppHandle,
+    args: CreateWebviewArgs,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let url = resolve_url(&args.column);
     let label = webview_label(&args.column.id);
 
@@ -297,7 +367,12 @@ pub async fn create_column_webview(app: AppHandle, args: CreateWebviewArgs) -> R
 
 #[cfg(desktop)]
 #[tauri::command]
-pub async fn remove_column_webview(app: AppHandle, column_id: String) -> Result<(), String> {
+pub async fn remove_column_webview(
+    caller: tauri::Webview,
+    app: AppHandle,
+    column_id: String,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let label = webview_label(&column_id);
 
     // On Linux, column WebViews are WebviewWindows; on other platforms they are child Webviews.
@@ -316,7 +391,12 @@ pub async fn remove_column_webview(app: AppHandle, column_id: String) -> Result<
 
 #[cfg(mobile)]
 #[tauri::command]
-pub async fn remove_column_webview(app: AppHandle, column_id: String) -> Result<(), String> {
+pub async fn remove_column_webview(
+    caller: tauri::Webview,
+    app: AppHandle,
+    column_id: String,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let label = webview_label(&column_id);
 
     #[cfg(target_os = "android")]
@@ -343,7 +423,12 @@ pub struct ResizeBounds {
 
 #[cfg(desktop)]
 #[tauri::command]
-pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Result<(), String> {
+pub async fn resize_column_webview(
+    caller: tauri::Webview,
+    app: AppHandle,
+    bounds: ResizeBounds,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let label = webview_label(&bounds.column_id);
 
     // On Linux, column WebViews are undecorated WebviewWindows. Reposition by computing
@@ -401,7 +486,12 @@ pub async fn resize_column_webview(app: AppHandle, bounds: ResizeBounds) -> Resu
 
 #[cfg(mobile)]
 #[tauri::command]
-pub async fn resize_column_webview(_app: AppHandle, bounds: ResizeBounds) -> Result<(), String> {
+pub async fn resize_column_webview(
+    caller: tauri::Webview,
+    _app: AppHandle,
+    bounds: ResizeBounds,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let label = webview_label(&bounds.column_id);
 
     #[cfg(target_os = "android")]
@@ -427,8 +517,10 @@ pub async fn resize_column_webview(_app: AppHandle, bounds: ResizeBounds) -> Res
 /// setActiveColumn から resize_column_webview より先に呼ばれ、正しいアカウントで WebView が動作する。
 #[tauri::command]
 pub async fn set_column_cookies(
+    caller: tauri::Webview,
     #[allow(non_snake_case, unused_variables)] accountId: String,
 ) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     #[cfg(target_os = "android")]
     {
         crate::android_bridge::set_account_cookies(&accountId)?;
@@ -480,6 +572,7 @@ mod tests {
             custom_url: None,
             home_tab_name: None,
             search_query: None,
+            search_live_tab: false,
             list_id: None,
             width: 400.0,
             order: 0,
@@ -521,6 +614,115 @@ mod tests {
         let mut col = column("search");
         col.search_query = Some("rust lang".into());
         assert_eq!(resolve_url(&col), "https://x.com/search?q=rust%20lang");
+    }
+
+    fn live_search_column(query: Option<&str>) -> ColumnData {
+        let mut col = column("search");
+        col.search_query = query.map(String::from);
+        col.search_live_tab = true;
+        col
+    }
+
+    #[test]
+    fn resolve_url_search最新タブ指定ありは最新タブ指定を含む() {
+        assert_eq!(
+            resolve_url(&live_search_column(Some("rust"))),
+            "https://x.com/search?q=rust&f=live"
+        );
+    }
+
+    #[test]
+    fn resolve_url_search最新タブ指定なしの既存カラムは従来のurlのまま() {
+        let mut col = column("search");
+        col.search_query = Some("東京 天気".into());
+        assert_eq!(
+            resolve_url(&col),
+            "https://x.com/search?q=%E6%9D%B1%E4%BA%AC%20%E5%A4%A9%E6%B0%97"
+        );
+    }
+
+    #[test]
+    fn resolve_url_search最新タブ指定ありはアンパサンドを含むクエリでもf_liveが独立したパラメータになる(
+    ) {
+        let url = resolve_url(&live_search_column(Some("a&f=top")));
+        assert_eq!(url, "https://x.com/search?q=a%26f%3Dtop&f=live");
+        let params: Vec<&str> = url
+            .strip_prefix("https://x.com/search?")
+            .expect("search URL は固定プレフィックスで始まる")
+            .split('&')
+            .collect();
+        assert_eq!(params, vec!["q=a%26f%3Dtop", "f=live"]);
+    }
+
+    #[test]
+    fn resolve_url_search最新タブ指定ありは空白と日本語を含むクエリでも最新タブ指定が末尾に付く() {
+        assert_eq!(
+            resolve_url(&live_search_column(Some("東京 天気"))),
+            "https://x.com/search?q=%E6%9D%B1%E4%BA%AC%20%E5%A4%A9%E6%B0%97&f=live"
+        );
+    }
+
+    #[test]
+    fn resolve_url_search最新タブ指定ありはクエリ未指定でも最新タブ指定を含む() {
+        assert_eq!(
+            resolve_url(&live_search_column(None)),
+            "https://x.com/search?q=&f=live"
+        );
+    }
+
+    #[test]
+    fn resolve_url_検索以外のカラム種別は最新タブ指定が立っていても最新タブ指定を含まない() {
+        for page_type in [
+            "home",
+            "notifications",
+            "list",
+            "custom",
+            "external",
+            "compose",
+            "unknown",
+        ] {
+            let mut col = column(page_type);
+            col.search_live_tab = true;
+            col.custom_url = Some("https://x.com/i/bookmarks".into());
+            col.list_id = Some("123".into());
+            col.home_tab_name = Some("フォロー中".into());
+            assert!(
+                !resolve_url(&col).contains("f=live"),
+                "page_type={page_type} の URL に f=live が含まれている"
+            );
+        }
+    }
+
+    #[test]
+    fn column_data_searchlivetabを持たない保存済みjsonはfalseとして読み込まれる() {
+        let mut json = serde_json::to_value(column("search")).unwrap();
+        json.as_object_mut().unwrap().remove("searchLiveTab");
+        let restored: ColumnData = serde_json::from_value(json).unwrap();
+        assert!(!restored.search_live_tab);
+    }
+
+    #[test]
+    fn column_data_searchlivetabはcamelcaseのjsonキーで読み書きされる() {
+        let json = serde_json::to_value(live_search_column(Some("rust"))).unwrap();
+        assert_eq!(json["searchLiveTab"], serde_json::Value::Bool(true));
+        let restored: ColumnData = serde_json::from_value(json).unwrap();
+        assert!(restored.search_live_tab);
+    }
+
+    #[test]
+    fn resolve_url_search保存して復元した最新タブ指定つきカラムも最新タブで開かれる() {
+        let saved = serde_json::to_string(&live_search_column(Some("rust"))).unwrap();
+        let restored: ColumnData = serde_json::from_str(&saved).unwrap();
+        assert_eq!(resolve_url(&restored), "https://x.com/search?q=rust&f=live");
+    }
+
+    #[test]
+    fn resolve_url_search保存して復元した最新タブ指定なしカラムは従来のurlのまま() {
+        let mut col = column("search");
+        col.search_query = Some("rust".into());
+        let saved = serde_json::to_string(&col).unwrap();
+        let restored: ColumnData = serde_json::from_str(&saved).unwrap();
+        assert_eq!(resolve_url(&restored), "https://x.com/search?q=rust");
     }
 
     #[test]
@@ -579,6 +781,69 @@ mod tests {
     }
 
     #[test]
+    fn is_return_to_last_read_targetはhomeカラムでtrueになる() {
+        assert!(is_return_to_last_read_target(&column("home")));
+    }
+
+    #[test]
+    fn is_return_to_last_read_targetはhome以外のカラムでfalseになる() {
+        for page_type in [
+            "compose",
+            "notifications",
+            "search",
+            "list",
+            "custom",
+            "external",
+        ] {
+            assert!(
+                !is_return_to_last_read_target(&column(page_type)),
+                "page_type={page_type} はfalseになるはず"
+            );
+        }
+    }
+
+    fn script_settings(
+        mobile_swipe_area_enabled: bool,
+        mobile_swipe_area_height: u32,
+    ) -> crate::commands::settings_store::ColumnScriptSettings {
+        crate::commands::settings_store::ColumnScriptSettings {
+            video_auto_play_stop_enabled: false,
+            hide_ad_enabled: false,
+            api_rate_limit_monitor_enabled: false,
+            image_popup_enabled: false,
+            video_popup_enabled: false,
+            global_ng_words: vec![],
+            global_repost_hidden_user_ids: vec![],
+            mobile_swipe_area_enabled,
+            mobile_swipe_area_height,
+        }
+    }
+
+    #[test]
+    fn resolve_mobile_swipe_area_offsetはモバイルかつ有効なとき高さを返す() {
+        assert_eq!(
+            resolve_mobile_swipe_area_offset(true, &script_settings(true, 28)),
+            28
+        );
+    }
+
+    #[test]
+    fn resolve_mobile_swipe_area_offsetはモバイルでも無効なとき0を返す() {
+        assert_eq!(
+            resolve_mobile_swipe_area_offset(true, &script_settings(false, 28)),
+            0
+        );
+    }
+
+    #[test]
+    fn resolve_mobile_swipe_area_offsetはデスクトップでは有効でも0を返す() {
+        assert_eq!(
+            resolve_mobile_swipe_area_offset(false, &script_settings(true, 28)),
+            0
+        );
+    }
+
+    #[test]
     fn is_safe_column_idは通常のuuidを許可する() {
         assert!(is_safe_column_id("550e8400-e29b-41d4-a716-446655440000"));
     }
@@ -601,6 +866,33 @@ mod tests {
     #[test]
     fn is_safe_column_idは空文字を拒否する() {
         assert!(!is_safe_column_id(""));
+    }
+
+    #[test]
+    fn external_column_data_dirは有効なidでexternal_columns配下のパスを返す() {
+        let app_data = Path::new("/data/app");
+        assert_eq!(
+            external_column_data_dir(app_data, "abc-123"),
+            Some(PathBuf::from("/data/app/external_columns/column-abc-123"))
+        );
+    }
+
+    #[test]
+    fn external_column_data_dirはスラッシュを含むidでnoneを返す() {
+        let app_data = Path::new("/data/app");
+        assert_eq!(external_column_data_dir(app_data, "abc/def"), None);
+    }
+
+    #[test]
+    fn external_column_data_dirは親ディレクトリ参照を含むidでnoneを返す() {
+        let app_data = Path::new("/data/app");
+        assert_eq!(external_column_data_dir(app_data, "../../etc/passwd"), None);
+    }
+
+    #[test]
+    fn external_column_data_dirは空文字のidでnoneを返す() {
+        let app_data = Path::new("/data/app");
+        assert_eq!(external_column_data_dir(app_data, ""), None);
     }
 
     #[cfg(target_os = "linux")]
@@ -730,17 +1022,44 @@ mod tests {
         proptest! {
             /// 検索クエリは URL エンコードされて埋め込まれ、デコードすると元の値に戻る（ラウンドトリップ）。
             #[test]
-            fn resolve_url_search_query_roundtrips(query in any::<String>()) {
+            fn resolve_url_search_query_roundtrips(query in any::<String>(), live in any::<bool>()) {
                 let mut col = column("search");
                 col.search_query = Some(query.clone());
+                col.search_live_tab = live;
                 let url = resolve_url(&col);
-                let encoded = url
+                let rest = url
                     .strip_prefix("https://x.com/search?q=")
                     .expect("search URL は固定プレフィックスで始まる");
+                let encoded = if live {
+                    rest.strip_suffix("&f=live").expect("最新タブ指定ありの URL は f=live で終わる")
+                } else {
+                    rest
+                };
                 let decoded = urlencoding::decode(encoded)
                     .expect("エンコード結果は常にデコード可能")
                     .into_owned();
                 prop_assert_eq!(decoded, query);
+            }
+
+            /// どんな検索クエリでも、f=live は最新タブ指定ありのときだけ独立した 2 つ目のパラメータとして付く。
+            #[test]
+            fn resolve_url_search_live_param_only_when_flagged(query in any::<String>(), live in any::<bool>()) {
+                let mut col = column("search");
+                col.search_query = Some(query);
+                col.search_live_tab = live;
+                let url = resolve_url(&col);
+                let params: Vec<&str> = url
+                    .strip_prefix("https://x.com/search?")
+                    .expect("search URL は固定プレフィックスで始まる")
+                    .split('&')
+                    .collect();
+                prop_assert!(params[0].starts_with("q="));
+                if live {
+                    prop_assert_eq!(params.len(), 2);
+                    prop_assert_eq!(params[1], "f=live");
+                } else {
+                    prop_assert_eq!(params.len(), 1);
+                }
             }
 
             /// どの page_type・どんな入力でも、生成 URL は常に https:// スキームになる。

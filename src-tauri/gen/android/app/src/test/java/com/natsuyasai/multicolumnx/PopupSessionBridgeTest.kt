@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** PopupSessionBridge（ポップアップ JS → ネイティブのアカウント切替ブリッジ）のテスト。 */
+/** PopupSessionBridge（ポップアップ連携メッセージ → コールバック振り分け）のテスト。 */
 class PopupSessionBridgeTest {
   private val switchSessionCalls = mutableListOf<Triple<String, String, String>>()
   private val reportOfficialSettingsCalls = mutableListOf<Pair<String, String>>()
@@ -19,51 +19,32 @@ class PopupSessionBridgeTest {
     )
 
   @Test
-  fun `切替要求はポップアップIDを付けてコールバックへ転送される`() {
-    bridge.switchPopupSession("acc2", "https://x.com/foo")
+  fun `switchpopupsessionメッセージはポップアップidを付けてコールバックへ転送される`() {
+    bridge.handle(BridgeMessage.SwitchPopupSession("acc2", "https://x.com/foo"))
 
     assertEquals(listOf(Triple("popup-1", "acc2", "https://x.com/foo")), switchSessionCalls)
   }
 
   @Test
-  fun `accountIdが空の場合は転送しない`() {
-    bridge.switchPopupSession("", "https://x.com/foo")
-
-    assertTrue(switchSessionCalls.isEmpty())
-  }
-
-  @Test
-  fun `urlが空の場合は転送しない`() {
-    bridge.switchPopupSession("acc2", "")
-
-    assertTrue(switchSessionCalls.isEmpty())
-  }
-
-  @Test
-  fun `公式設定スナップショット報告は accountId と snapshot をコールバックへ転送される`() {
-    bridge.reportOfficialSettings("acc2", """{"theme":"dark"}""")
+  fun `reportofficialsettingsメッセージはaccountidとsnapshotをコールバックへ転送される`() {
+    bridge.handle(BridgeMessage.ReportOfficialSettings("acc2", """{"theme":"dark"}"""))
 
     assertEquals(listOf(Pair("acc2", """{"theme":"dark"}""")), reportOfficialSettingsCalls)
   }
 
   @Test
-  fun `accountIdが空の場合は公式設定スナップショット報告を転送しない`() {
-    bridge.reportOfficialSettings("", """{"theme":"dark"}""")
-
-    assertTrue(reportOfficialSettingsCalls.isEmpty())
-  }
-
-  @Test
-  fun `snapshotが空の場合は公式設定スナップショット報告を転送しない`() {
-    bridge.reportOfficialSettings("acc2", "")
-
-    assertTrue(reportOfficialSettingsCalls.isEmpty())
-  }
-
-  @Test
-  fun `終了要求はポップアップIDを付けてコールバックへ転送される`() {
-    bridge.closePopup()
+  fun `closepopupメッセージはポップアップidを付けてコールバックへ転送される`() {
+    bridge.handle(BridgeMessage.ClosePopup)
 
     assertEquals(listOf("popup-1"), closePopupCalls)
+  }
+
+  @Test
+  fun `対象外のメッセージは無視される`() {
+    bridge.handle(BridgeMessage.DownloadVideo("payload"))
+
+    assertTrue(switchSessionCalls.isEmpty())
+    assertTrue(reportOfficialSettingsCalls.isEmpty())
+    assertTrue(closePopupCalls.isEmpty())
   }
 }

@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { GlobalSettings, Column, Account } from "../../types";
@@ -48,6 +48,8 @@ const baseGlobalSettings: GlobalSettings = {
   mobileTwoColumnEnabled: true,
   presets: [],
   ngWords: [],
+  repostHiddenUserIds: [],
+  pendingDataDirectoryDeletions: [],
 };
 
 const baseSettings = {
@@ -65,8 +67,10 @@ const baseSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   ngWords: [],
+  repostHiddenUserIds: [],
   whitelistEnabled: false,
   whitelistWords: [],
+  returnToLastReadEnabled: false,
 };
 
 const mockAccounts: Account[] = [
@@ -101,12 +105,15 @@ const defaultProps = {
   onApplyLayout: vi.fn(),
   onApplyColumnDefaults: vi.fn(),
   onReloadAllWebviews: vi.fn(),
+  onLoadPreset: vi.fn().mockResolvedValue(undefined),
   appVersion: "0.1.1",
   updateChecking: false,
   updateManualResult: "idle" as const,
   onCheckUpdate: vi.fn(),
   onOpenOfficialSettings: vi.fn(),
   onClose: vi.fn(),
+  pendingDataDirectoryDeletionCount: 0,
+  onRetryDataDirectoryDeletion: vi.fn().mockResolvedValue({ remaining: 0 }),
 };
 
 beforeEach(() => {
@@ -245,6 +252,108 @@ describe("AppSettingsPanel グローバルNGワード", () => {
       expect.objectContaining({ ngWords: ["spam", "/foo|bar/i"] }),
     );
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+describe("AppSettingsPanel リポストを非表示にするユーザー", () => {
+  const getTextarea = () =>
+    screen.getByRole("textbox", { name: "リポストを非表示にするユーザー" });
+
+  it("既存のrepostHiddenUserIdsが入力エリアに復元表示される", () => {
+    const settings = {
+      ...baseGlobalSettings,
+      repostHiddenUserIds: ["HAJIME_2001", "abc"],
+    };
+    render(<AppSettingsPanel {...defaultProps} settings={settings} />);
+    expect((getTextarea() as HTMLTextAreaElement).value).toBe(
+      "HAJIME_2001\nabc",
+    );
+  });
+
+  it("旧保存データでrepostHiddenUserIdsが未定義でも空の入力エリアが表示される", () => {
+    const settings = {
+      ...baseGlobalSettings,
+      repostHiddenUserIds: undefined,
+    } as unknown as GlobalSettings;
+    render(<AppSettingsPanel {...defaultProps} settings={settings} />);
+    expect((getTextarea() as HTMLTextAreaElement).value).toBe("");
+  });
+
+  it("説明文が表示される", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(
+      screen.getByText(
+        "1行に1ユーザーID（@以降）。指定ユーザーがリポストした投稿を非表示にします",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("入力は1行1IDで、空行・前後空白・先頭の@・重複は無視して正規化された一覧がonApplyに渡される", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    fireEvent.change(getTextarea(), {
+      target: { value: "  @user_a  \n\nuser_b\nUSER_A\n@user_b" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ repostHiddenUserIds: ["user_a", "user_b"] }),
+    );
+  });
+
+  it("不正なID行があると保存できずエラーが表示される", () => {
+    const onApply = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        onApply={onApply}
+        onClose={onClose}
+      />,
+    );
+    fireEvent.change(getTextarea(), {
+      target: { value: "valid_id\nbad-id!" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(
+      screen.getByText(
+        "`bad-id!` はXのユーザーIDとして正しくありません（英数字とアンダースコアの1〜15文字）",
+      ),
+    ).toBeInTheDocument();
+    expect(onApply).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("不正なID行を修正して再度適用するとエラーが消えてonApplyとonCloseが呼ばれる", () => {
+    const onApply = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        onApply={onApply}
+        onClose={onClose}
+      />,
+    );
+    fireEvent.change(getTextarea(), { target: { value: "bad-id!" } });
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    fireEvent.change(getTextarea(), { target: { value: "good_id" } });
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(
+      screen.queryByText(/ユーザーIDとして正しくありません/),
+    ).not.toBeInTheDocument();
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ repostHiddenUserIds: ["good_id"] }),
+    );
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("16文字以上のIDは不正として保存できない", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    fireEvent.change(getTextarea(), {
+      target: { value: "this_id_is_way_too_long" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).not.toHaveBeenCalled();
   });
 });
 
@@ -665,5 +774,111 @@ describe("AppSettingsPanel 表示サイズ・テーマの変更チェックボ�
     expect(
       screen.getByRole("checkbox", { name: "テーマを変更する" }),
     ).not.toBeChecked();
+  });
+});
+
+describe("AppSettingsPanel プリセット", () => {
+  it("プリセットの読み込みでonLoadPresetが呼ばれる", async () => {
+    const onLoadPreset = vi.fn().mockResolvedValue(undefined);
+    const onClose = vi.fn();
+    const settings = {
+      ...baseGlobalSettings,
+      presets: [{ id: "preset-1", name: "プリセット1", columns: [] }],
+    };
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={settings}
+        onLoadPreset={onLoadPreset}
+        onClose={onClose}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "プリセット" }));
+    fireEvent.click(screen.getByRole("button", { name: "読み込む" }));
+    expect(onLoadPreset).toHaveBeenCalledWith("preset-1");
+    // ストアの loadPreset を直接呼ばず、onLoadPreset 経由のみで読み込むこと
+    expect(mockStoreState.loadPreset).not.toHaveBeenCalled();
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+});
+
+describe("AppSettingsPanel 削除保留データフォルダの再実行", () => {
+  it("再実行対象が無いときは再実行の操作が表示されない", () => {
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        pendingDataDirectoryDeletionCount={0}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: "データフォルダの削除を再実行" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("再実行対象があるときは件数と再実行の操作が表示される", () => {
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        pendingDataDirectoryDeletionCount={1}
+      />,
+    );
+    expect(screen.getByText(/1件/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "データフォルダの削除を再実行" }),
+    ).toBeInTheDocument();
+  });
+
+  it("再実行して全件成功すると成功メッセージが表示される", async () => {
+    const onRetryDataDirectoryDeletion = vi
+      .fn()
+      .mockResolvedValue({ remaining: 0 });
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        pendingDataDirectoryDeletionCount={1}
+        onRetryDataDirectoryDeletion={onRetryDataDirectoryDeletion}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "データフォルダの削除を再実行" }),
+    );
+    expect(onRetryDataDirectoryDeletion).toHaveBeenCalledTimes(1);
+    expect(
+      await screen.findByText("データフォルダを削除しました"),
+    ).toBeInTheDocument();
+  });
+
+  it("再実行して一部失敗すると残数の失敗メッセージが表示される", async () => {
+    const onRetryDataDirectoryDeletion = vi
+      .fn()
+      .mockResolvedValue({ remaining: 1 });
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        pendingDataDirectoryDeletionCount={2}
+        onRetryDataDirectoryDeletion={onRetryDataDirectoryDeletion}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "データフォルダの削除を再実行" }),
+    );
+    expect(
+      await screen.findByText("1件のデータフォルダを削除できませんでした"),
+    ).toBeInTheDocument();
+  });
+
+  it("一般タブの「適用」で送られるpatchにpendingDataDirectoryDeletionsは含まれない（保存で巻き戻らないことの回帰確認）", () => {
+    const onApply = vi.fn();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        pendingDataDirectoryDeletionCount={1}
+        onApply={onApply}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledTimes(1);
+    const patch = onApply.mock.calls[0][0] as Record<string, unknown>;
+    expect(patch).not.toHaveProperty("pendingDataDirectoryDeletions");
   });
 });

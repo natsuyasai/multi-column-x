@@ -40,6 +40,8 @@ export interface SettingsDraft {
   mobileTwoColumnEnabled: boolean;
   /** textarea への入力中文字列をそのまま保持するため string で持つ */
   globalNgWordsText: string;
+  /** textarea への入力中文字列（1行1ユーザーID）をそのまま保持するため string で持つ */
+  globalRepostHiddenUserIdsText: string;
   /** 「表示サイズ」欄の変更を有効化するチェックボックスの状態（GlobalSettingsには保存しないフォーム専用フラグ） */
   columnScaleOverrideEnabled: boolean;
   /** 「テーマ」欄の変更を有効化するチェックボックスの状態（同上） */
@@ -83,6 +85,9 @@ export function createSettingsDraft(settings: GlobalSettings): SettingsDraft {
     mobileSwipeAreaOpacity: settings.mobileSwipeAreaOpacity ?? 50,
     mobileTwoColumnEnabled: settings.mobileTwoColumnEnabled,
     globalNgWordsText: (settings.ngWords ?? []).join("\n"),
+    globalRepostHiddenUserIdsText: (settings.repostHiddenUserIds ?? []).join(
+      "\n",
+    ),
     columnScaleOverrideEnabled: false,
     themeOverrideEnabled: false,
   };

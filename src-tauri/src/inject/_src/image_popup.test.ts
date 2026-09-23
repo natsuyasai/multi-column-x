@@ -221,7 +221,6 @@ describe("inject/image_popup のクリック傍受", () => {
     click(link.firstElementChild!);
 
     expect(invokeMock).toHaveBeenCalledWith("open_popup_window", {
-      webviewLabelCaller: WEBVIEW_LABEL,
       url: "https://x.com/alice/status/123/photo/1",
     });
   });
@@ -241,7 +240,6 @@ describe("inject/image_popup のクリック傍受", () => {
     click(link.firstElementChild!);
 
     expect(invokeMock).toHaveBeenCalledWith("open_popup_window", {
-      webviewLabelCaller: WEBVIEW_LABEL,
       url: "https://x.com/bob/status/789/video/1",
     });
   });
@@ -262,7 +260,6 @@ describe("inject/image_popup のクリック傍受", () => {
     click(link.firstElementChild!);
 
     expect(invokeMock).toHaveBeenCalledWith("open_popup_window", {
-      webviewLabelCaller: WEBVIEW_LABEL,
       url: "https://x.com/alice/status/123/photo/1",
     });
   });
@@ -284,7 +281,6 @@ describe("inject/image_popup のクリック傍受", () => {
     const event = click(button);
 
     expect(invokeMock).toHaveBeenCalledWith("open_popup_window", {
-      webviewLabelCaller: WEBVIEW_LABEL,
       url: "https://x.com/carol/status/555/video/2",
     });
     expect(event.defaultPrevented).toBe(true);
@@ -311,7 +307,6 @@ describe("inject/image_popup のクリック傍受", () => {
     const event = click(button);
 
     expect(invokeMock).toHaveBeenCalledWith("open_popup_window", {
-      webviewLabelCaller: WEBVIEW_LABEL,
       url: "https://x.com/i/status/2069216779545751868/video/1",
     });
     expect(event.defaultPrevented).toBe(true);
@@ -337,7 +332,6 @@ describe("inject/image_popup のクリック傍受", () => {
     click(button);
 
     expect(invokeMock).toHaveBeenCalledWith("open_popup_window", {
-      webviewLabelCaller: WEBVIEW_LABEL,
       url: "https://x.com/carol/status/555/video/1",
     });
   });

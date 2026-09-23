@@ -153,6 +153,44 @@ pub(crate) fn plan_download(variants: &[video::VideoVariantInput]) -> Result<Dow
     Err("no downloadable video variant found".to_string())
 }
 
+/// 保存ダイアログのコールバックが返す `Option<FilePath>` を `Result<Option<PathBuf>, String>` に変換する純粋関数。
+/// `FilePath::Url`（`file://` 等）は `into_path` で通常のパスへ変換を試み、変換できなければエラーにする。
+/// `None`（ダイアログをキャンセル）はそのまま `Ok(None)` として返し、呼び出し側でキャンセル扱いにする。
+#[cfg(desktop)]
+fn resolve_saved_path(
+    file_path: Option<tauri_plugin_dialog::FilePath>,
+) -> Result<Option<std::path::PathBuf>, String> {
+    match file_path {
+        None => Ok(None),
+        Some(file_path) => file_path.into_path().map(Some).map_err(|e| e.to_string()),
+    }
+}
+
+/// 保存先ファイルパスを選択する非同期ヘルパー。
+/// `blocking_save_file()` はダイアログが閉じるまで呼び出し元スレッド（asyncコマンドを実行している
+/// tokioワーカースレッド）を占有してしまうため、非ブロッキングな `save_file(callback)` を
+/// `tokio::sync::oneshot` で受け取って `.await` する形に置き換える（ワーカースレッドは
+/// ダイアログを待つ間ブロックされず、他のタスクに譲られる）。
+/// キャンセル時は `Ok(None)` を返す（エラーにしない。呼び出し側の挙動は従来通り）。
+#[cfg(desktop)]
+async fn pick_save_path(
+    app: &tauri::AppHandle,
+    file_name: String,
+) -> Result<Option<std::path::PathBuf>, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .set_file_name(file_name)
+        .save_file(move |file_path| {
+            let _ = tx.send(file_path);
+        });
+
+    let file_path = rx.await.map_err(|e| e.to_string())?;
+    resolve_saved_path(file_path)
+}
+
 /// 動画をダウンロードして保存ダイアログでユーザーが選択した場所に保存する。
 /// - mp4 progressive があれば1ファイルとして保存する。
 /// - mp4が無くHLSのみの場合は映像・音声を別ファイルとして保存する（音声トラックが無ければ映像のみ）。
@@ -165,8 +203,6 @@ pub async fn download_video(
     variants: Vec<video::VideoVariantInput>,
     #[allow(non_snake_case)] suggestedFileName: String,
 ) -> Result<(), String> {
-    use tauri_plugin_dialog::DialogExt;
-
     let window_label = window.label().to_string();
 
     let plan = plan_download(&variants)?;
@@ -177,25 +213,26 @@ pub async fn download_video(
             // 保存ダイアログを開く前に早期検証する（多重防御。download_to_writer 内部でも検証される）。
             video::validate_variant_url(&url)?;
 
-            let file_path = app
-                .dialog()
-                .file()
-                .set_file_name(format!("{base_name}.mp4"))
-                .blocking_save_file();
-            let Some(file_path) = file_path else {
+            let Some(path) = pick_save_path(&app, format!("{base_name}.mp4")).await? else {
                 return Ok(()); // キャンセルはエラーにしない
             };
-            let path = file_path.into_path().map_err(|e| e.to_string())?;
 
             let client = http::build_client()?;
-            let mut file = std::fs::File::create(&path).map_err(|e| e.to_string())?;
 
             let mut emitter = ProgressEmitter::new(&app, window_label.clone(), 1, 1);
-            let mut on_progress = |current: u64, total: Option<u64>| {
-                let is_last = total.is_some_and(|t| current >= t);
-                emitter.update(current, total, is_last);
-            };
-            let result = http::download_to_writer(&client, &url, &mut file, &mut on_progress).await;
+            let result = video::download_to_file_or_cleanup(&path, |mut file| {
+                let client = &client;
+                let url = &url;
+                let emitter = &mut emitter;
+                async move {
+                    let mut on_progress = |current: u64, total: Option<u64>| {
+                        let is_last = total.is_some_and(|t| current >= t);
+                        emitter.update(current, total, is_last);
+                    };
+                    http::download_to_writer(client, url, &mut file, &mut on_progress).await
+                }
+            })
+            .await;
             match &result {
                 Ok(()) => emitter.finish("completed"),
                 Err(_) => emitter.finish("failed"),
@@ -226,26 +263,26 @@ pub async fn download_video(
                 1
             };
 
-            if let Some(file_path) = app
-                .dialog()
-                .file()
-                .set_file_name(format!("{base_name}_video.mp4"))
-                .blocking_save_file()
-            {
-                let path = file_path.into_path().map_err(|e| e.to_string())?;
-                let mut file = std::fs::File::create(&path).map_err(|e| e.to_string())?;
-
+            if let Some(path) = pick_save_path(&app, format!("{base_name}_video.mp4")).await? {
                 let mut emitter = ProgressEmitter::new(&app, window_label.clone(), 1, file_count);
-                let mut on_progress = |current: u32, total: u32| {
-                    let is_last = current >= total;
-                    emitter.update(current as u64, Some(total as u64), is_last);
-                };
-                let result = hls::download_track_to_writer(
-                    &client,
-                    &tracks.video_playlist_url,
-                    &mut file,
-                    &mut on_progress,
-                )
+                let result = video::download_to_file_or_cleanup(&path, |mut file| {
+                    let client = &client;
+                    let video_playlist_url = &tracks.video_playlist_url;
+                    let emitter = &mut emitter;
+                    async move {
+                        let mut on_progress = |current: u32, total: u32| {
+                            let is_last = current >= total;
+                            emitter.update(current as u64, Some(total as u64), is_last);
+                        };
+                        hls::download_track_to_writer(
+                            client,
+                            video_playlist_url,
+                            &mut file,
+                            &mut on_progress,
+                        )
+                        .await
+                    }
+                })
                 .await;
                 match &result {
                     Ok(()) => emitter.finish("completed"),
@@ -255,27 +292,27 @@ pub async fn download_video(
             }
 
             if let Some(audio_url) = tracks.audio_playlist_url {
-                if let Some(file_path) = app
-                    .dialog()
-                    .file()
-                    .set_file_name(format!("{base_name}_audio.m4a"))
-                    .blocking_save_file()
-                {
-                    let path = file_path.into_path().map_err(|e| e.to_string())?;
-                    let mut file = std::fs::File::create(&path).map_err(|e| e.to_string())?;
-
+                if let Some(path) = pick_save_path(&app, format!("{base_name}_audio.m4a")).await? {
                     let mut emitter =
                         ProgressEmitter::new(&app, window_label.clone(), 2, file_count);
-                    let mut on_progress = |current: u32, total: u32| {
-                        let is_last = current >= total;
-                        emitter.update(current as u64, Some(total as u64), is_last);
-                    };
-                    let result = hls::download_track_to_writer(
-                        &client,
-                        &audio_url,
-                        &mut file,
-                        &mut on_progress,
-                    )
+                    let result = video::download_to_file_or_cleanup(&path, |mut file| {
+                        let client = &client;
+                        let audio_url = &audio_url;
+                        let emitter = &mut emitter;
+                        async move {
+                            let mut on_progress = |current: u32, total: u32| {
+                                let is_last = current >= total;
+                                emitter.update(current as u64, Some(total as u64), is_last);
+                            };
+                            hls::download_track_to_writer(
+                                client,
+                                audio_url,
+                                &mut file,
+                                &mut on_progress,
+                            )
+                            .await
+                        }
+                    })
                     .await;
                     match &result {
                         Ok(()) => emitter.finish("completed"),
@@ -397,15 +434,18 @@ pub async fn handle_android_video_download_request(
 
                 let file_name = format!("{base_name}.mp4");
                 let temp_path = cache_dir.join(&file_name);
-                {
-                    let mut file = std::fs::File::create(&temp_path).map_err(|e| e.to_string())?;
-                    let mut notifier = AndroidProgressNotifier::new(1, 1);
-                    let mut on_progress = |current: u64, total: Option<u64>| {
-                        let is_last = total.is_some_and(|t| current >= t);
-                        notifier.update(current, total, is_last);
-                    };
-                    http::download_to_writer(&client, &url, &mut file, &mut on_progress).await?;
-                }
+                video::download_to_file_or_cleanup(&temp_path, |mut file| {
+                    let client = &client;
+                    async move {
+                        let mut notifier = AndroidProgressNotifier::new(1, 1);
+                        let mut on_progress = |current: u64, total: Option<u64>| {
+                            let is_last = total.is_some_and(|t| current >= t);
+                            notifier.update(current, total, is_last);
+                        };
+                        http::download_to_writer(client, &url, &mut file, &mut on_progress).await
+                    }
+                })
+                .await?;
                 crate::android_bridge::save_downloaded_video(
                     &temp_path.to_string_lossy(),
                     &file_name,
@@ -437,22 +477,25 @@ pub async fn handle_android_video_download_request(
 
                 let video_file_name = format!("{base_name}_video.mp4");
                 let video_temp_path = cache_dir.join(&video_file_name);
-                {
-                    let mut file =
-                        std::fs::File::create(&video_temp_path).map_err(|e| e.to_string())?;
-                    let mut notifier = AndroidProgressNotifier::new(1, file_count);
-                    let mut on_progress = |current: u32, total: u32| {
-                        let is_last = current >= total;
-                        notifier.update(current as u64, Some(total as u64), is_last);
-                    };
-                    hls::download_track_to_writer(
-                        &client,
-                        &tracks.video_playlist_url,
-                        &mut file,
-                        &mut on_progress,
-                    )
-                    .await?;
-                }
+                video::download_to_file_or_cleanup(&video_temp_path, |mut file| {
+                    let client = &client;
+                    let video_playlist_url = &tracks.video_playlist_url;
+                    async move {
+                        let mut notifier = AndroidProgressNotifier::new(1, file_count);
+                        let mut on_progress = |current: u32, total: u32| {
+                            let is_last = current >= total;
+                            notifier.update(current as u64, Some(total as u64), is_last);
+                        };
+                        hls::download_track_to_writer(
+                            client,
+                            video_playlist_url,
+                            &mut file,
+                            &mut on_progress,
+                        )
+                        .await
+                    }
+                })
+                .await?;
                 crate::android_bridge::save_downloaded_video(
                     &video_temp_path.to_string_lossy(),
                     &video_file_name,
@@ -462,22 +505,24 @@ pub async fn handle_android_video_download_request(
                 if let Some(audio_url) = tracks.audio_playlist_url {
                     let audio_file_name = format!("{base_name}_audio.m4a");
                     let audio_temp_path = cache_dir.join(&audio_file_name);
-                    {
-                        let mut file =
-                            std::fs::File::create(&audio_temp_path).map_err(|e| e.to_string())?;
-                        let mut notifier = AndroidProgressNotifier::new(2, file_count);
-                        let mut on_progress = |current: u32, total: u32| {
-                            let is_last = current >= total;
-                            notifier.update(current as u64, Some(total as u64), is_last);
-                        };
-                        hls::download_track_to_writer(
-                            &client,
-                            &audio_url,
-                            &mut file,
-                            &mut on_progress,
-                        )
-                        .await?;
-                    }
+                    video::download_to_file_or_cleanup(&audio_temp_path, |mut file| {
+                        let client = &client;
+                        async move {
+                            let mut notifier = AndroidProgressNotifier::new(2, file_count);
+                            let mut on_progress = |current: u32, total: u32| {
+                                let is_last = current >= total;
+                                notifier.update(current as u64, Some(total as u64), is_last);
+                            };
+                            hls::download_track_to_writer(
+                                client,
+                                &audio_url,
+                                &mut file,
+                                &mut on_progress,
+                            )
+                            .await
+                        }
+                    })
+                    .await?;
                     crate::android_bridge::save_downloaded_video(
                         &audio_temp_path.to_string_lossy(),
                         &audio_file_name,
@@ -636,6 +681,42 @@ mod tests {
                 url: "https://video.twimg.com/thumb.jpg".to_string(),
             }];
             let result = plan_download(&variants);
+            assert!(result.is_err());
+        }
+    }
+
+    #[cfg(desktop)]
+    mod resolve_saved_pathのテスト {
+        use super::*;
+
+        #[test]
+        fn noneならnoneを返す() {
+            let result = resolve_saved_path(None);
+            assert_eq!(result, Ok(None));
+        }
+
+        #[test]
+        fn pathバリアントならそのままpathbufを返す() {
+            let file_path =
+                tauri_plugin_dialog::FilePath::from(std::path::PathBuf::from("/tmp/a.mp4"));
+            let result = resolve_saved_path(Some(file_path));
+            assert_eq!(result, Ok(Some(std::path::PathBuf::from("/tmp/a.mp4"))));
+        }
+
+        #[test]
+        fn file_urlならpathに変換される() {
+            let path = std::env::temp_dir().join("mcx_video_download_test_b.mp4");
+            let url = url::Url::from_file_path(&path).unwrap();
+            let file_path = tauri_plugin_dialog::FilePath::from(url);
+            let result = resolve_saved_path(Some(file_path));
+            assert_eq!(result, Ok(Some(path)));
+        }
+
+        #[test]
+        fn file以外のurlならエラーになる() {
+            let url = url::Url::parse("https://example.com/c.mp4").unwrap();
+            let file_path = tauri_plugin_dialog::FilePath::from(url);
+            let result = resolve_saved_path(Some(file_path));
             assert!(result.is_err());
         }
     }

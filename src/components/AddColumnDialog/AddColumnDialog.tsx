@@ -1,7 +1,11 @@
 import React, { useState } from "react";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import type { Account, Column, GlobalSettings, PageType } from "../../types";
-import { DEFAULT_COLUMN_SETTINGS } from "../../types";
+import {
+  COLUMN_LABEL_MAX_LENGTH,
+  DEFAULT_COLUMN_SETTINGS,
+  normalizeColumnLabel,
+} from "../../types";
 import styles from "./AddColumnDialog.module.scss";
 
 interface AddColumnDialogProps {
@@ -27,6 +31,7 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [listId, setListId] = useState("");
   const [customUrl, setCustomUrl] = useState("");
+  const [label, setLabel] = useState("");
 
   const isExternal = pageType === "external";
 
@@ -44,8 +49,10 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
       pageType,
       homeTabName: pageType === "home" && homeTabName ? homeTabName : undefined,
       searchQuery: pageType === "search" ? searchQuery : undefined,
+      searchLiveTab: pageType === "search" ? true : undefined,
       listId: pageType === "list" ? listId : undefined,
       customUrl: pageType === "custom" || isExternal ? customUrl : undefined,
+      label: normalizeColumnLabel(label),
       width: 350,
       order: 9999,
       gridRow: 1,
@@ -193,6 +200,21 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
             )}
           </div>
         )}
+
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="column-label">
+            表示名（任意）
+          </label>
+          <input
+            id="column-label"
+            aria-label="表示名（任意）"
+            className={styles.input}
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="例: 仕事用"
+            maxLength={COLUMN_LABEL_MAX_LENGTH}
+          />
+        </div>
 
         <div className={styles.actions}>
           <button type="button" className={styles.cancelBtn} onClick={onCancel}>

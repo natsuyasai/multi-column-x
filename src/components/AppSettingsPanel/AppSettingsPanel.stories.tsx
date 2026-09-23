@@ -20,8 +20,10 @@ const columnSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   ngWords: [],
+  repostHiddenUserIds: [],
   whitelistEnabled: false,
   whitelistWords: [],
+  returnToLastReadEnabled: false,
 };
 
 const globalSettings: GlobalSettings = {
@@ -55,6 +57,8 @@ const globalSettings: GlobalSettings = {
   mobileTwoColumnEnabled: true,
   presets: [],
   ngWords: [],
+  repostHiddenUserIds: [],
+  pendingDataDirectoryDeletions: [],
 };
 
 const accounts: Account[] = [
@@ -116,9 +120,12 @@ const meta: Meta<typeof AppSettingsPanel> = {
     onApplyLayout: fn(),
     onApplyColumnDefaults: fn(),
     onReloadAllWebviews: fn(),
+    onLoadPreset: fn().mockResolvedValue(undefined),
     onCheckUpdate: fn(),
     onOpenOfficialSettings: fn(),
     onClose: fn(),
+    pendingDataDirectoryDeletionCount: 0,
+    onRetryDataDirectoryDeletion: fn(async () => ({ remaining: 0 })),
   },
 };
 
@@ -137,6 +144,65 @@ export const Default: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "プリセット" }));
     await expect(
       canvas.getByPlaceholderText("プリセット名を入力"),
+    ).toBeInTheDocument();
+  },
+};
+
+export const InvalidRepostHiddenUserId: Story = {
+  name: "不正なユーザーIDを入力して適用するとエラーが表示される",
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const textarea = canvas.getByRole("textbox", {
+      name: "リポストを非表示にするユーザー",
+    });
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, "valid_id{Enter}bad-id!");
+    await userEvent.click(canvas.getByRole("button", { name: "適用" }));
+    await expect(
+      canvas.getByText(
+        "`bad-id!` はXのユーザーIDとして正しくありません（英数字とアンダースコアの1〜15文字）",
+      ),
+    ).toBeInTheDocument();
+    await expect(args.onApply).not.toHaveBeenCalled();
+    await expect(args.onClose).not.toHaveBeenCalled();
+  },
+};
+
+export const WithRepostHiddenUserIds: Story = {
+  name: "既存のリポスト非表示ユーザーが復元表示され正規化して適用できる",
+  args: {
+    settings: { ...globalSettings, repostHiddenUserIds: ["user_a"] },
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const textarea = canvas.getByRole("textbox", {
+      name: "リポストを非表示にするユーザー",
+    }) as HTMLTextAreaElement;
+    await expect(textarea.value).toBe("user_a");
+    await userEvent.type(textarea, "{Enter}{Enter}@USER_A{Enter}  user_b  ");
+    await userEvent.click(canvas.getByRole("button", { name: "適用" }));
+    await expect(args.onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ repostHiddenUserIds: ["user_a", "user_b"] }),
+    );
+  },
+};
+
+export const PendingDataDirectoryDeletion: Story = {
+  name: "削除保留のデータフォルダがあり再実行できる",
+  args: {
+    pendingDataDirectoryDeletionCount: 1,
+    onRetryDataDirectoryDeletion: fn(async () => ({ remaining: 0 })),
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText(/1件/)).toBeInTheDocument();
+    const retryButton = canvas.getByRole("button", {
+      name: "データフォルダの削除を再実行",
+    });
+    await userEvent.click(retryButton);
+    await expect(args.onRetryDataDirectoryDeletion).toHaveBeenCalledTimes(1);
+    await expect(
+      await canvas.findByText("データフォルダを削除しました"),
     ).toBeInTheDocument();
   },
 };

@@ -20,6 +20,7 @@ function createColumn(overrides: Partial<Column> = {}): Column {
       hideTweetInputEnabled: false,
       customCSS: "",
       ngWords: [],
+      repostHiddenUserIds: [],
     },
     ...overrides,
   } as Column;

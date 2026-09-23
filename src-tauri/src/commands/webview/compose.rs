@@ -92,10 +92,12 @@ pub(super) fn create_compose_window(
 #[cfg(desktop)]
 #[tauri::command]
 pub async fn open_compose_window(
+    caller: tauri::Webview,
     app: AppHandle,
     #[allow(non_snake_case)] accountId: String,
     #[allow(non_snake_case)] dataDirectory: String,
 ) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let data_dir = PathBuf::from(&dataDirectory);
 
     let action = {
@@ -144,10 +146,12 @@ pub async fn open_compose_window(
 #[cfg(mobile)]
 #[tauri::command]
 pub async fn open_compose_window(
+    caller: tauri::Webview,
     app: AppHandle,
     #[allow(non_snake_case)] accountId: String,
     #[allow(non_snake_case)] dataDirectory: String,
 ) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
     let PopupInit {
         label: compose_label,
         init_script: popup_init,
@@ -298,7 +302,12 @@ mod tests {
             #[test]
             fn ホストがx_com以外なら常にfalse(h in "[a-z0-9-]{1,20}\\.(com|net|org)") {
                 prop_assume!(h != "x.com");
-                let url = parse(&format!("https://{h}/compose/post"));
+                // 生成された文字列は "xn--" で始まる不正な punycode ラベル等、
+                // URL として解析できない場合がある（is_compose_post_url の不具合ではない）。
+                // その場合は URL として成立しているケースのみを検証対象とする。
+                let Ok(url) = format!("https://{h}/compose/post").parse::<tauri::Url>() else {
+                    return Ok(());
+                };
                 prop_assert!(!is_compose_post_url(&url));
             }
         }

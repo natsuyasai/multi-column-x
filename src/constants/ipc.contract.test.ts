@@ -38,7 +38,10 @@ describe("TS/Rust IPC定数の契約", () => {
     expect(WEBVIEW_SCRIPTS.TRIGGER_RELOAD).toContain(
       `window.${fixture.globals.MULTI_COLUMN_X}`,
     );
-    expect(WEBVIEW_SCRIPTS.applyNgWords([], [])).toContain(
+    expect(WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD).toContain(
+      `window.${fixture.globals.MULTI_COLUMN_X}`,
+    );
+    expect(WEBVIEW_SCRIPTS.applyNgWords([], [], [], [])).toContain(
       `window.${fixture.globals.MULTI_COLUMN_X_CONFIG}`,
     );
   });
@@ -55,6 +58,34 @@ describe("TS/Rust IPC定数の契約", () => {
     expect(script).toContain("whitelistEnabled=false");
     expect(script).toContain(`whitelistWords=${JSON.stringify([])}`);
     expect(script).toContain("recheckNgWords");
+  });
+
+  it("applyNgWordsはカラム個別と全体のリポスト非表示ユーザーIDをconfigへ埋め込み再判定する", () => {
+    const script = WEBVIEW_SCRIPTS.applyNgWords(
+      ["ng"],
+      ["gng"],
+      ["col_user"],
+      ["global_user"],
+    );
+    expect(script).toContain(`ngWords=${JSON.stringify(["ng"])}`);
+    expect(script).toContain(`globalNgWords=${JSON.stringify(["gng"])}`);
+    expect(script).toContain(
+      `repostHiddenUserIds=${JSON.stringify(["col_user"])}`,
+    );
+    expect(script).toContain(
+      `globalRepostHiddenUserIds=${JSON.stringify(["global_user"])}`,
+    );
+    expect(script).toContain("recheckNgWords");
+  });
+
+  it("applyNgWordsはIDを文字列連結せずJSON.stringifyでエスケープして埋め込む", () => {
+    const evil = `x"];alert(1);//`;
+    const script = WEBVIEW_SCRIPTS.applyNgWords([], [], [evil], [evil]);
+    expect(script).toContain(`repostHiddenUserIds=${JSON.stringify([evil])}`);
+    expect(script).toContain(
+      `globalRepostHiddenUserIds=${JSON.stringify([evil])}`,
+    );
+    expect(script).not.toContain(`["x"];alert(1)`);
   });
 
   it("inject側INJECT_COMMANDSはIPC_COMMANDS（fixture）の部分集合である", () => {

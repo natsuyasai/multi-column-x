@@ -20,8 +20,10 @@ const columnSettings = {
   blurImageEnabled: false,
   blurImageAmount: "10px",
   ngWords: [],
+  repostHiddenUserIds: [],
   whitelistEnabled: false,
   whitelistWords: [],
+  returnToLastReadEnabled: false,
 };
 
 const column: Column = {
@@ -95,6 +97,33 @@ export const Default: Story = {
         desktopNotifyEnabled: true,
       }),
       350,
+      undefined,
+    );
+  },
+};
+
+export const WithDisplayName: Story = {
+  name: "表示名を設定して適用",
+  args: {
+    column: {
+      ...column,
+      label: "仕事用",
+    },
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const displayNameInput = canvas.getByRole("textbox", {
+      name: "表示名",
+    }) as HTMLInputElement;
+    await expect(displayNameInput.value).toBe("仕事用");
+    await userEvent.clear(displayNameInput);
+    await userEvent.type(displayNameInput, "私用");
+    await userEvent.click(canvas.getByRole("button", { name: "適用" }));
+    await expect(args.onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.anything(),
+      350,
+      "私用",
     );
   },
 };
@@ -146,6 +175,89 @@ export const WhitelistEnabled: Story = {
     ) as HTMLTextAreaElement;
     await expect(textarea).not.toBeDisabled();
     await expect(textarea.value).toBe("推し\n限定");
+  },
+};
+
+export const InvalidRepostHiddenUserId: Story = {
+  name: "不正なユーザーIDを入力して適用するとエラーが表示される",
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const textarea = canvas.getByRole("textbox", {
+      name: "リポストを非表示にするユーザー",
+    });
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, "valid_id{Enter}bad-id!");
+    await userEvent.click(canvas.getByRole("button", { name: "適用" }));
+    await expect(
+      canvas.getByText(
+        "`bad-id!` はXのユーザーIDとして正しくありません（英数字とアンダースコアの1〜15文字）",
+      ),
+    ).toBeInTheDocument();
+    await expect(args.onApply).not.toHaveBeenCalled();
+  },
+};
+
+export const WithRepostHiddenUserIds: Story = {
+  name: "既存のリポスト非表示ユーザーが復元表示され正規化して適用できる",
+  args: {
+    column: {
+      ...column,
+      settings: { ...columnSettings, repostHiddenUserIds: ["user_a"] },
+    },
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const textarea = canvas.getByRole("textbox", {
+      name: "リポストを非表示にするユーザー",
+    }) as HTMLTextAreaElement;
+    await expect(textarea.value).toBe("user_a");
+    await userEvent.type(textarea, "{Enter}{Enter}@USER_A{Enter}  user_b  ");
+    await userEvent.click(canvas.getByRole("button", { name: "適用" }));
+    await expect(args.onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.objectContaining({ repostHiddenUserIds: ["user_a", "user_b"] }),
+      350,
+      undefined,
+    );
+  },
+};
+
+export const ReturnToLastReadToggle: Story = {
+  name: "前回の境目へ戻るボタンの表示設定（ホームカラム）",
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const checkbox = canvas.getByRole("checkbox", {
+      name: "更新後に前回の続きへ戻るボタンを表示する",
+    });
+    await expect(checkbox).toBeInTheDocument();
+    await expect(checkbox).not.toBeChecked();
+    await userEvent.click(checkbox);
+    await expect(checkbox).toBeChecked();
+    await userEvent.click(canvas.getByRole("button", { name: "適用" }));
+    await expect(args.onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.objectContaining({ returnToLastReadEnabled: true }),
+      350,
+      undefined,
+    );
+  },
+};
+
+export const ReturnToLastReadHiddenForNonHomeColumn: Story = {
+  name: "ホーム以外のカラムでは戻るボタンの設定項目が表示されない",
+  args: {
+    column: {
+      ...column,
+      pageType: "notifications",
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.queryByRole("checkbox", {
+        name: "更新後に前回の続きへ戻るボタンを表示する",
+      }),
+    ).not.toBeInTheDocument();
   },
 };
 

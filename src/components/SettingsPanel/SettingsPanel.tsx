@@ -1,13 +1,28 @@
 import React, { useState } from "react";
+import { isAutoReloadSupported } from "@/lib/autoReloadTarget";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { validateNgWordLines } from "../../lib/ngWordPattern";
-import type { Column, ColumnSettings } from "../../types";
+import {
+  parseUserIdLines,
+  validateUserIdLine,
+} from "../../lib/repostHiddenUserId";
+import {
+  COLUMN_LABEL_MAX_LENGTH,
+  normalizeColumnLabel,
+  type Column,
+  type ColumnSettings,
+} from "../../types";
 import { HelpPopover } from "../HelpPopover/HelpPopover";
 import styles from "./SettingsPanel.module.scss";
 
 interface SettingsPanelProps {
   column: Column;
-  onApply: (columnId: string, settings: ColumnSettings, width: number) => void;
+  onApply: (
+    columnId: string,
+    settings: ColumnSettings,
+    width: number,
+    label: string | undefined,
+  ) => void;
   onClose: () => void;
   onReload?: (columnId: string) => void;
   isMobile: boolean;
@@ -28,10 +43,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     ...column.settings,
   });
   const [width, setWidth] = useState<number>(column.width);
+  const [labelText, setLabelText] = useState<string>(column.label ?? "");
   const [ngWordsText, setNgWordsText] = useState<string>(
     (column.settings.ngWords ?? []).join("\n"),
   );
   const [ngWordsError, setNgWordsError] = useState<string | null>(null);
+  const [repostHiddenUserIdsText, setRepostHiddenUserIdsText] =
+    useState<string>((column.settings.repostHiddenUserIds ?? []).join("\n"));
+  const [repostHiddenUserIdsError, setRepostHiddenUserIdsError] = useState<
+    string | null
+  >(null);
   const [whitelistWordsText, setWhitelistWordsText] = useState<string>(
     (column.settings.whitelistWords ?? []).join("\n"),
   );
@@ -50,6 +71,17 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
     setNgWordsError(null);
 
+    const repostHiddenUserIds = parseUserIdLines(repostHiddenUserIdsText);
+    const repostHiddenUserIdsValidationError =
+      repostHiddenUserIds
+        .map((id) => validateUserIdLine(id))
+        .find((validationError) => validationError !== null) ?? null;
+    if (repostHiddenUserIdsValidationError) {
+      setRepostHiddenUserIdsError(repostHiddenUserIdsValidationError);
+      return;
+    }
+    setRepostHiddenUserIdsError(null);
+
     const whitelistWords = whitelistWordsText
       .split("\n")
       .map((w) => w.trim())
@@ -61,7 +93,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
     setWhitelistError(null);
 
-    onApply(column.id, { ...settings, ngWords, whitelistWords }, width);
+    onApply(
+      column.id,
+      { ...settings, ngWords, repostHiddenUserIds, whitelistWords },
+      width,
+      normalizeColumnLabel(labelText),
+    );
   };
 
   return (
@@ -79,9 +116,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className={styles.form}>
-          {!isMobile && (
-            <section className={styles.section}>
-              <h3 className={styles.sectionTitle}>カラム</h3>
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}>カラム</h3>
+            <label className={styles.fieldLabelBlock}>
+              表示名
+              <input
+                type="text"
+                className={styles.labelInput}
+                value={labelText}
+                onChange={(e) => setLabelText(e.target.value)}
+                maxLength={COLUMN_LABEL_MAX_LENGTH}
+                placeholder="未指定の場合は既定の表示名"
+              />
+            </label>
+            {!isMobile && (
               <label className={styles.fieldLabel}>
                 幅（px）
                 <input
@@ -93,10 +141,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   onChange={(e) => setWidth(Number(e.target.value))}
                 />
               </label>
-            </section>
-          )}
+            )}
+          </section>
 
-          {!isExternal && (
+          {isAutoReloadSupported(column) && (
             <section className={styles.section}>
               <h3 className={styles.sectionTitle}>自動更新</h3>
               <label className={styles.checkLabel}>
@@ -205,6 +253,21 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 />
                 写真閲覧後のスクロール位置を復元する
               </label>
+              {column.pageType === "home" && (
+                <label className={styles.checkLabel}>
+                  <input
+                    type="checkbox"
+                    checked={settings.returnToLastReadEnabled}
+                    onChange={(e) =>
+                      setSettings((s) => ({
+                        ...s,
+                        returnToLastReadEnabled: e.target.checked,
+                      }))
+                    }
+                  />
+                  更新後に前回の続きへ戻るボタンを表示する
+                </label>
+              )}
             </section>
           )}
 
@@ -325,6 +388,28 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               {ngWordsError && (
                 <p className={styles.errorText}>{ngWordsError}</p>
               )}
+            </section>
+          )}
+
+          {!isExternal && (
+            <section className={styles.section}>
+              <h3 className={styles.sectionTitle}>
+                リポストを非表示にするユーザー
+              </h3>
+              <textarea
+                className={styles.cssTextarea}
+                value={repostHiddenUserIdsText}
+                onChange={(e) => setRepostHiddenUserIdsText(e.target.value)}
+                aria-label="リポストを非表示にするユーザー"
+                placeholder="1行に1ユーザーIDで入力"
+                spellCheck={false}
+              />
+              {repostHiddenUserIdsError && (
+                <p className={styles.errorText}>{repostHiddenUserIdsError}</p>
+              )}
+              <p className={styles.hint}>
+                1行に1ユーザーID（@以降）。指定ユーザーがリポストした投稿を非表示にします
+              </p>
             </section>
           )}
 

@@ -1,4 +1,5 @@
 import React, { useState, useRef } from "react";
+import { isAutoReloadSupported } from "@/lib/autoReloadTarget";
 import LinkIcon from "../../assets/icons/link.svg?react";
 import PencilIcon from "../../assets/icons/pencil.svg?react";
 import PersonIcon from "../../assets/icons/person.svg?react";
@@ -63,7 +64,7 @@ const TabItem: React.FC<TabItemProps> = ({
   const isExternal = column.pageType === "external";
   const { remaining } = useAutoReload({
     columnId: column.id,
-    enabled: column.settings.autoReloadEnabled,
+    enabled: column.settings.autoReloadEnabled && isAutoReloadSupported(column),
     intervalSec: column.settings.autoReloadInterval,
   });
   const showCountdown =
