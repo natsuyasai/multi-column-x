@@ -116,6 +116,10 @@ export async function applyColumnSettingsScripts(
       settings.whitelistWords,
     ),
   );
+  await evalInColumn(
+    columnId,
+    WEBVIEW_SCRIPTS.applyReturnToLastRead(settings.returnToLastReadEnabled),
+  );
   await evalInColumn(columnId, WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD);
 }
 

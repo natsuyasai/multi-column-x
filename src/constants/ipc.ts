@@ -188,6 +188,10 @@ export const WEBVIEW_SCRIPTS = {
     const words = JSON.stringify(whitelistWords);
     return `if(window.__multiColumnXConfig){window.__multiColumnXConfig.whitelistEnabled=${whitelistEnabled};window.__multiColumnXConfig.whitelistWords=${words};}window.__multiColumnX&&window.__multiColumnX.recheckNgWords&&window.__multiColumnX.recheckNgWords();`;
   },
+
+  /** ホームタイムライン「前回の境目へ戻る」ボタンの有効/無効を動的に更新し、即時反映する（非ホームカラムでは関数が無いためno-op） */
+  applyReturnToLastRead: (enabled: boolean) =>
+    `if(window.__multiColumnXConfig){window.__multiColumnXConfig.returnToLastReadEnabled=${enabled};}window.__multiColumnX&&window.__multiColumnX.setReturnToLastReadEnabled&&window.__multiColumnX.setReturnToLastReadEnabled(${enabled});`,
 } as const;
 
 /** WebView を画面外へ退避させる座標 */

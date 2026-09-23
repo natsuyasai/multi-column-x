@@ -15,6 +15,8 @@ interface MultiColumnXAPI {
     hideHeaderEnabled: boolean,
     hideTweetInputEnabled: boolean,
   ) => void;
+  /** ホームタイムライン「前回の境目へ戻る」ボタンの有効/無効を即時切り替える */
+  setReturnToLastReadEnabled?: (enabled: boolean) => void;
 }
 
 /** カラム WebView に inject される設定オブジェクト (window.__multiColumnXConfig) */
@@ -27,6 +29,8 @@ interface MultiColumnXConfig {
   showCustomMenu: boolean;
   /** 表示するナビゲーションリンク（空配列 = すべて表示） */
   visibleLinks: string[];
+  /** ホームタイムライン「前回の境目へ戻る」ボタンを有効にするかどうか */
+  returnToLastReadEnabled?: boolean;
 }
 
 /** ポップアップ WebView に inject されるアカウント情報（ローカル保存先は含めない） */
