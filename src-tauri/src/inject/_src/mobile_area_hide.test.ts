@@ -1,14 +1,12 @@
 // mobile_area_hide.ts は IIFE のため import 時に実行される。
 // applyHeaderHeightSync() は import 時（setup() 内の apply()）に即時実行される他、
-// MutationObserver 経由の DOM 変化検知（100ms デバウンス）でも再適用される。
+// 共有DOM監視ハブ(dom_observer.ts、window.__mcxDomObserver)経由のDOM変化検知
+// （rAFで1フレームにまとめられた後、100msデバウンス）でも再適用される。
 // 公開 API が無いため、各テストは「import した／DOM を変化させた結果の副作用」として検証する。
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-// mobile_area_hide.ts は DOM 変化を監視し続ける MutationObserver を import のたびに
-// 新規登録し、自身を disconnect する手段を公開しない（ページ常駐前提）。
-// vi.resetModules で再 import するテストでは前のテストの observer が残り、
-// 後続テストの DOM 変更にも反応してしまうため、生成された observer を追跡し
-// 各テスト後に確実に disconnect する（small_image.test.ts / tab_selector.test.ts と同じ対策）。
+// dom_observer.test.ts と同様に、共有ハブが作るMutationObserverを追跡し、
+// 各テストでフレッシュなハブ（＝1本だけのMutationObserver）を使う。
 const createdObservers = new Set<MutationObserver>();
 const OriginalMutationObserver = globalThis.MutationObserver;
 
@@ -75,6 +73,8 @@ function addLayersTarget(): {
 
 async function importMobileAreaHide(): Promise<void> {
   vi.resetModules();
+  delete (window as unknown as { __mcxDomObserver?: unknown }).__mcxDomObserver;
+  await import("./dom_observer");
   await import("./mobile_area_hide");
 }
 
@@ -299,5 +299,38 @@ describe("inject/mobile_area_hide のapplyLayersHide", () => {
     await importMobileAreaHide();
 
     expect(typeof window.__multiColumnX.applyLayersHide).toBe("function");
+  });
+});
+
+describe("inject/mobile_area_hide の共有ハブ非存在時のフォールバック", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  afterEach(() => {
+    createdObservers.forEach((observer) => observer.disconnect());
+    createdObservers.clear();
+  });
+
+  it("window.__mcxDomObserverが存在しない場合でも、ローカルのMutationObserverでDOM変化に追従する", async () => {
+    const header = addHeader();
+    const tablist = addTablist(40);
+
+    // 共有ハブ(dom_observer.ts)をimportせずに、ハブ不在の状態を再現する
+    vi.resetModules();
+    delete (window as unknown as { __mcxDomObserver?: unknown })
+      .__mcxDomObserver;
+    await import("./mobile_area_hide");
+    expect(header.style.height).toBe("40px");
+
+    Object.defineProperty(tablist, "offsetHeight", {
+      value: 60,
+      configurable: true,
+    });
+    document.body.appendChild(document.createElement("div"));
+
+    await vi.waitFor(() => {
+      expect(header.style.height).toBe("60px");
+    });
   });
 });

@@ -3,7 +3,7 @@
 // デフォルト値を変更したら contracts/default-settings.json を再生成すること。
 import { describe, it, expect } from "vitest";
 import fixture from "../../contracts/default-settings.json";
-import { DEFAULT_GLOBAL_SETTINGS } from "./index";
+import { DEFAULT_COLUMN_SETTINGS, DEFAULT_GLOBAL_SETTINGS } from "./index";
 
 describe("TS/Rust デフォルト設定の契約", () => {
   it("DEFAULT_GLOBAL_SETTINGSがRust側Defaultと一致する", () => {
@@ -25,5 +25,9 @@ describe("TS/Rust デフォルト設定の契約", () => {
   it("fixtureのaccounts/columnsは空配列である", () => {
     expect(fixture.accounts).toEqual([]);
     expect(fixture.columns).toEqual([]);
+  });
+
+  it("DEFAULT_COLUMN_SETTINGSがRust側Defaultと一致する", () => {
+    expect(DEFAULT_COLUMN_SETTINGS).toEqual(fixture.columnSettings);
   });
 });

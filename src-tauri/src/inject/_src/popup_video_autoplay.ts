@@ -49,26 +49,41 @@ export function shouldAutoplay(targetHref: string | undefined): boolean {
     return true;
   };
 
+  // 共有DOM監視ハブ(dom_observer.ts, window.__mcxDomObserver)経由でDOM変化を購読する。
+  // ハブは document.body を childList+subtree で監視し、MutationRecordの詳細に依存
+  // しないコールバックをrequestAnimationFrameで1フレームにまとめて配る。ハブが無い
+  // 環境（単体テストや、注入順序が変わった場合等）では、フォールバックとして従来と
+  // 同じdocument.bodyのchildList+subtree監視をこのファイル単独で行う。
+  function subscribeDomChanges(
+    callback: (mutations: MutationRecord[]) => void,
+  ): () => void {
+    if (window.__mcxDomObserver) {
+      return window.__mcxDomObserver.subscribe(callback);
+    }
+    const observer = new MutationObserver(callback);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }
+
   const start = (): void => {
     if (tryPlay()) {
       done = true;
       return;
     }
 
-    const observer = new MutationObserver(() => {
+    const unsubscribe = subscribeDomChanges(() => {
       if (done) {
-        observer.disconnect();
+        unsubscribe();
         return;
       }
       if (tryPlay()) {
         done = true;
-        observer.disconnect();
+        unsubscribe();
       }
     });
-    observer.observe(document.body, { childList: true, subtree: true });
 
     // X のメディアモーダルが描画されない場合に備えてタイムアウトで打ち切る
-    setTimeout(() => observer.disconnect(), 10000);
+    setTimeout(() => unsubscribe(), 10000);
   };
 
   if (document.body) {
