@@ -89,6 +89,28 @@ export function readTimelineIds(section: Element): string[] {
   return entries.map((entry) => entry.id);
 }
 
+const LIST_TOP_TRANSFORM = "translateY(0px)";
+
+/**
+ * section 内の仮想リストの先頭セルが描画されているかを判定する。
+ * X の実DOMでは、仮想リストの先頭セルの style.transform は必ず "translateY(0px)"（実測）。
+ * 手動更新 triggerReload(true) で scrollTop を 0 にした直後は、まだ深い位置のセルしか
+ * 描画されていないことがあるため、そのタイミングで先頭スナップショットを誤って
+ * 取り込まないための判定に使う。
+ * transform を持つセルが1つも無い場合（テスト用の素の DOM 等、判定材料が無い場合）は
+ * 判定できないため true を返す（従来どおり許可する）。
+ */
+export function isListTopRendered(section: Element): boolean {
+  const cells = Array.from(
+    section.querySelectorAll<HTMLElement>('[data-testid="cellInnerDiv"]'),
+  );
+  const withTransform = cells.filter((cell) => cell.style.transform !== "");
+  if (withTransform.length === 0) return true;
+  return withTransform.some(
+    (cell) => cell.style.transform === LIST_TOP_TRANSFORM,
+  );
+}
+
 /** 先頭から最大 max 件を基準として選ぶ。 */
 export function selectAnchorIds(
   ids: string[],

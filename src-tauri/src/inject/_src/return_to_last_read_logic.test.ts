@@ -8,6 +8,7 @@ import {
   ANCHOR_MAX,
   extractStatusId,
   isAdArticle,
+  isListTopRendered,
   readTimelineIds,
   selectAnchorIds,
   hasNewPostsAbove,
@@ -151,6 +152,40 @@ describe("inject/return_to_last_read_logic", () => {
       addCell(section, buildArticleWithStatusId("400"), { top: 5 });
 
       expect(readTimelineIds(section)).toEqual(["300", "400"]);
+    });
+  });
+
+  describe("isListTopRendered", () => {
+    // X の実DOMでは、仮想リストの先頭セルは必ず style.transform: translateY(0px) になる（実測）。
+    // 手動更新 triggerReload(true) で scrollTop=0 にした直後は、まだ深い位置のセルしか
+    // 描画されていないことがあり、そのタイミングで先頭スナップショットを取り込むと
+    // 誤った基準になってしまうため、先頭セルの描画有無を判定する。
+    it("先頭セル（translateY(0px)）が描画されていればtrueを返す", () => {
+      const section = addSection();
+      const cell1 = addCell(section, buildArticleWithStatusId("1"), { top: 0 });
+      cell1.style.transform = "translateY(0px)";
+      const cell2 = addCell(section, buildArticleWithStatusId("2"), { top: 1 });
+      cell2.style.transform = "translateY(900px)";
+
+      expect(isListTopRendered(section)).toBe(true);
+    });
+
+    it("深い位置のセルしか描画されていないときはfalseを返す", () => {
+      const section = addSection();
+      const cell1 = addCell(section, buildArticleWithStatusId("1"), { top: 0 });
+      cell1.style.transform = "translateY(1200px)";
+      const cell2 = addCell(section, buildArticleWithStatusId("2"), { top: 1 });
+      cell2.style.transform = "translateY(1900px)";
+
+      expect(isListTopRendered(section)).toBe(false);
+    });
+
+    it("transformを持つcellが1つも無い場合はtrueを返す（テスト用の素のDOM等）", () => {
+      const section = addSection();
+      addCell(section, buildArticleWithStatusId("1"), { top: 0 });
+      addCell(section, buildArticleWithStatusId("2"), { top: 1 });
+
+      expect(isListTopRendered(section)).toBe(true);
     });
   });
 
