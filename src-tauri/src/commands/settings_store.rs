@@ -22,6 +22,16 @@ fn bool_flag(settings: &serde_json::Value, key: &str, default: bool) -> bool {
         .unwrap_or(default)
 }
 
+/// `settings` オブジェクトから `key` の u32 値を取り出す。
+/// キーが存在しない・値が非負整数として表現できない場合は `default` を返す。
+fn u32_flag(settings: &serde_json::Value, key: &str, default: u32) -> u32 {
+    settings
+        .get(key)
+        .and_then(|v| v.as_u64())
+        .and_then(|v| u32::try_from(v).ok())
+        .unwrap_or(default)
+}
+
 /// `settings` オブジェクトから `key` の文字列配列を取り出す。
 /// キーが存在しない・配列でない場合は空配列を返し、配列内の文字列以外の要素は除外する。
 fn string_list(settings: &serde_json::Value, key: &str) -> Vec<String> {
@@ -114,6 +124,8 @@ pub(crate) struct ColumnScriptSettings {
     pub(crate) video_popup_enabled: bool,
     pub(crate) global_ng_words: Vec<String>,
     pub(crate) global_repost_hidden_user_ids: Vec<String>,
+    pub(crate) mobile_swipe_area_enabled: bool,
+    pub(crate) mobile_swipe_area_height: u32,
 }
 
 /// 読み込み済みの `globalSettings` JSON からカラム起動スクリプト用の値をまとめて取り出す。
@@ -136,6 +148,16 @@ pub(crate) fn column_script_settings_from(global: &serde_json::Value) -> ColumnS
         video_popup_enabled: bool_flag(global, "videoPopupEnabled", defaults.video_popup_enabled),
         global_ng_words: string_list(global, "ngWords"),
         global_repost_hidden_user_ids: string_list(global, "repostHiddenUserIds"),
+        mobile_swipe_area_enabled: bool_flag(
+            global,
+            "mobileSwipeAreaEnabled",
+            defaults.mobile_swipe_area_enabled,
+        ),
+        mobile_swipe_area_height: u32_flag(
+            global,
+            "mobileSwipeAreaHeight",
+            defaults.mobile_swipe_area_height,
+        ),
     }
 }
 
@@ -185,6 +207,36 @@ mod tests {
             "hideAdEnabled",
             default.hide_ad_enabled
         ));
+    }
+
+    #[test]
+    fn u32flagはキーが存在しない場合はデフォルト値を返す() {
+        let settings = serde_json::json!({});
+        assert_eq!(u32_flag(&settings, "mobileSwipeAreaHeight", 28), 28);
+    }
+
+    #[test]
+    fn u32flagは数値が設定されていればその値を返す() {
+        let settings = serde_json::json!({ "mobileSwipeAreaHeight": 56 });
+        assert_eq!(u32_flag(&settings, "mobileSwipeAreaHeight", 28), 56);
+    }
+
+    #[test]
+    fn u32flagは数値以外の型のときはデフォルト値を返す() {
+        let settings = serde_json::json!({ "mobileSwipeAreaHeight": "56" });
+        assert_eq!(u32_flag(&settings, "mobileSwipeAreaHeight", 28), 28);
+    }
+
+    #[test]
+    fn u32flagは負の値のときはデフォルト値を返す() {
+        let settings = serde_json::json!({ "mobileSwipeAreaHeight": -1 });
+        assert_eq!(u32_flag(&settings, "mobileSwipeAreaHeight", 28), 28);
+    }
+
+    #[test]
+    fn u32flagはu32範囲外の数値のときはデフォルト値を返す() {
+        let settings = serde_json::json!({ "mobileSwipeAreaHeight": u64::from(u32::MAX) + 1 });
+        assert_eq!(u32_flag(&settings, "mobileSwipeAreaHeight", 28), 28);
     }
 
     #[test]
@@ -240,6 +292,8 @@ mod tests {
             "videoPopupEnabled": false,
             "ngWords": ["spam"],
             "repostHiddenUserIds": ["alice"],
+            "mobileSwipeAreaEnabled": false,
+            "mobileSwipeAreaHeight": 56,
         });
         assert_eq!(
             column_script_settings_from(&settings),
@@ -251,6 +305,8 @@ mod tests {
                 video_popup_enabled: false,
                 global_ng_words: vec!["spam".to_string()],
                 global_repost_hidden_user_ids: vec!["alice".to_string()],
+                mobile_swipe_area_enabled: false,
+                mobile_swipe_area_height: 56,
             }
         );
     }
@@ -268,8 +324,29 @@ mod tests {
                 video_popup_enabled: true,
                 global_ng_words: vec![],
                 global_repost_hidden_user_ids: vec![],
+                mobile_swipe_area_enabled: true,
+                mobile_swipe_area_height: 28,
             }
         );
+    }
+
+    #[test]
+    fn mobileswipeareaenabledとmobileswipeareaheightのキーが無いときはデフォルト値になる() {
+        let settings = serde_json::json!({});
+        let result = column_script_settings_from(&settings);
+        assert!(result.mobile_swipe_area_enabled);
+        assert_eq!(result.mobile_swipe_area_height, 28);
+    }
+
+    #[test]
+    fn mobileswipeareaenabledとmobileswipeareaheightに設定した値が反映される() {
+        let settings = serde_json::json!({
+            "mobileSwipeAreaEnabled": false,
+            "mobileSwipeAreaHeight": 56,
+        });
+        let result = column_script_settings_from(&settings);
+        assert!(!result.mobile_swipe_area_enabled);
+        assert_eq!(result.mobile_swipe_area_height, 56);
     }
 
     #[test]

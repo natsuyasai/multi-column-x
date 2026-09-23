@@ -93,9 +93,15 @@ import {
 
   // --- ボタン / トースト ---
 
+  function bottomOffset(): number {
+    const navInset = window.__mobileBottomInset ?? 0;
+    const swipeAreaOffset =
+      window.__multiColumnXConfig?.mobileSwipeAreaOffset ?? 0;
+    return 24 + navInset + swipeAreaOffset;
+  }
+
   function containerStyle(): string {
-    const bottomInset = window.__mobileBottomInset ?? 0;
-    return `position:fixed; left:50%; transform:translateX(-50%); bottom: calc(24px + ${bottomInset}px); z-index:2147483000; display:flex; gap:8px; align-items:center;`;
+    return `position:fixed; left:50%; transform:translateX(-50%); bottom: ${bottomOffset()}px; z-index:2147483000; display:flex; gap:8px; align-items:center;`;
   }
 
   function buttonStyle(): string {
@@ -107,8 +113,7 @@ import {
   }
 
   function toastStyle(): string {
-    const bottomInset = window.__mobileBottomInset ?? 0;
-    return `position:fixed; left:50%; transform:translateX(-50%); bottom: calc(24px + ${bottomInset}px); z-index:2147483000; background:rgba(0,0,0,.8); color:#fff; border-radius:9999px; padding:8px 16px; font:bold 14px/1.2 system-ui, sans-serif;`;
+    return `position:fixed; left:50%; transform:translateX(-50%); bottom: ${bottomOffset()}px; z-index:2147483000; background:rgba(0,0,0,.8); color:#fff; border-radius:9999px; padding:8px 16px; font:bold 14px/1.2 system-ui, sans-serif;`;
   }
 
   function ensureContainer(): HTMLElement {

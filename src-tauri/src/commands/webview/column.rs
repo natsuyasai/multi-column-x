@@ -92,6 +92,20 @@ fn is_return_to_last_read_target(column: &ColumnData) -> bool {
     column.page_type == "home"
 }
 
+/// モバイルかつスワイプ切替領域が有効なときだけ、その高さ(px/dp)を返す。
+/// それ以外（デスクトップ、またはモバイルでも無効時）は0を返し、
+/// 「前回の続きへ戻る」ボタン等の下端位置補正に使う。
+fn resolve_mobile_swipe_area_offset(
+    is_mobile: bool,
+    settings: &crate::commands::settings_store::ColumnScriptSettings,
+) -> u32 {
+    if is_mobile && settings.mobile_swipe_area_enabled {
+        settings.mobile_swipe_area_height
+    } else {
+        0
+    }
+}
+
 /// カラム WebView に注入する init script を、設定ストアの読み出しを含めて構築する。
 /// desktop / mobile 双方の `create_column_webview` から呼ばれ、挙動差分は `is_mobile` のみ。
 fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: bool) -> String {
@@ -125,6 +139,7 @@ fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: boo
         minimal_injection: column.page_type == "external",
         return_to_last_read_included: is_return_to_last_read_target(column),
         return_to_last_read_enabled: column.settings.return_to_last_read_enabled,
+        mobile_swipe_area_offset: resolve_mobile_swipe_area_offset(is_mobile, &script_settings),
     })
 }
 
@@ -785,6 +800,47 @@ mod tests {
                 "page_type={page_type} はfalseになるはず"
             );
         }
+    }
+
+    fn script_settings(
+        mobile_swipe_area_enabled: bool,
+        mobile_swipe_area_height: u32,
+    ) -> crate::commands::settings_store::ColumnScriptSettings {
+        crate::commands::settings_store::ColumnScriptSettings {
+            video_auto_play_stop_enabled: false,
+            hide_ad_enabled: false,
+            api_rate_limit_monitor_enabled: false,
+            image_popup_enabled: false,
+            video_popup_enabled: false,
+            global_ng_words: vec![],
+            global_repost_hidden_user_ids: vec![],
+            mobile_swipe_area_enabled,
+            mobile_swipe_area_height,
+        }
+    }
+
+    #[test]
+    fn resolve_mobile_swipe_area_offsetはモバイルかつ有効なとき高さを返す() {
+        assert_eq!(
+            resolve_mobile_swipe_area_offset(true, &script_settings(true, 28)),
+            28
+        );
+    }
+
+    #[test]
+    fn resolve_mobile_swipe_area_offsetはモバイルでも無効なとき0を返す() {
+        assert_eq!(
+            resolve_mobile_swipe_area_offset(true, &script_settings(false, 28)),
+            0
+        );
+    }
+
+    #[test]
+    fn resolve_mobile_swipe_area_offsetはデスクトップでは有効でも0を返す() {
+        assert_eq!(
+            resolve_mobile_swipe_area_offset(false, &script_settings(true, 28)),
+            0
+        );
     }
 
     #[test]

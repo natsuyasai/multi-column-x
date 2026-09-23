@@ -36,6 +36,7 @@ pub struct InitScriptParams<'a> {
     pub minimal_injection: bool,
     pub return_to_last_read_included: bool,
     pub return_to_last_read_enabled: bool,
+    pub mobile_swipe_area_offset: u32,
 }
 
 // document.body の childList+subtree 監視を共有する単一 MutationObserver ハブ。
@@ -122,7 +123,7 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         serde_json::to_string(params.whitelist_words).unwrap_or_else(|_| "[]".to_string());
     let effective_show_custom_menu = params.hide_header_enabled && params.show_custom_menu;
     let config = format!(
-        "window.{} = {{ hideHeaderEnabled: {}, hideTweetInputEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {}, blurImageEnabled: {}, blurImageAmount: {}, hideAdEnabled: {}, apiRateLimitMonitorEnabled: {}, imagePopupEnabled: {}, videoPopupEnabled: {}, ngWords: {}, globalNgWords: {}, repostHiddenUserIds: {}, globalRepostHiddenUserIds: {}, whitelistEnabled: {}, whitelistWords: {}, returnToLastReadEnabled: {} }};",
+        "window.{} = {{ hideHeaderEnabled: {}, hideTweetInputEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {}, blurImageEnabled: {}, blurImageAmount: {}, hideAdEnabled: {}, apiRateLimitMonitorEnabled: {}, imagePopupEnabled: {}, videoPopupEnabled: {}, ngWords: {}, globalNgWords: {}, repostHiddenUserIds: {}, globalRepostHiddenUserIds: {}, whitelistEnabled: {}, whitelistWords: {}, returnToLastReadEnabled: {}, mobileSwipeAreaOffset: {} }};",
         globals::MULTI_COLUMN_X_CONFIG,
         params.hide_header_enabled,
         params.hide_tweet_input_enabled,
@@ -142,7 +143,8 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         global_repost_hidden_user_ids_json,
         params.whitelist_enabled,
         whitelist_words_json,
-        params.return_to_last_read_enabled
+        params.return_to_last_read_enabled,
+        params.mobile_swipe_area_offset
     );
 
     let header_part = if params.hide_header_enabled || params.hide_tweet_input_enabled {
@@ -256,6 +258,7 @@ mod tests {
             minimal_injection: false,
             return_to_last_read_included: false,
             return_to_last_read_enabled: false,
+            mobile_swipe_area_offset: 0,
         }
     }
 
@@ -747,6 +750,20 @@ mod tests {
     fn build_init_script_configにreturntolastreadenabled_falseが含まれる() {
         let script = build_init_script(&default_params());
         assert!(script.contains("returnToLastReadEnabled: false"));
+    }
+
+    #[test]
+    fn build_init_script_configにmobileswipeareaoffsetのデフォルト値0が含まれる() {
+        let script = build_init_script(&default_params());
+        assert!(script.contains("mobileSwipeAreaOffset: 0"));
+    }
+
+    #[test]
+    fn build_init_script_configに設定したmobileswipeareaoffsetの値が含まれる() {
+        let mut params = default_params();
+        params.mobile_swipe_area_offset = 28;
+        let script = build_init_script(&params);
+        assert!(script.contains("mobileSwipeAreaOffset: 28"));
     }
 
     #[test]
