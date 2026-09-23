@@ -672,7 +672,7 @@ describe("useAppStore", () => {
     expect(result.current.settingsLoadNotice).toBeNull();
   });
 
-  it("addPendingDataDirectoryDeletionで削除保留フォルダを追加できる", () => {
+  it("addPendingDataDirectoryDeletionで削除保留フォルダを追加できる", async () => {
     const { result } = renderHook(() => useAppStore());
     act(() => {
       result.current.addPendingDataDirectoryDeletion("/data/acc-1");
@@ -680,7 +680,12 @@ describe("useAppStore", () => {
     expect(result.current.globalSettings.pendingDataDirectoryDeletions).toEqual(
       ["/data/acc-1"],
     );
-    expect(mockInvoke).toHaveBeenCalledWith("save_settings", expect.anything());
+    await waitFor(() =>
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "save_settings",
+        expect.anything(),
+      ),
+    );
   });
 
   it("addPendingDataDirectoryDeletionは同じパスを重複追加しない", () => {
