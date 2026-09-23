@@ -487,6 +487,27 @@ describe("inject/return_to_last_read", () => {
   });
 
   describe("閉じるボタン", () => {
+    it("閉じるボタンの×が中央に表示されるようdisplay:flexが設定される", async () => {
+      const tablist = addTablist();
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["1", "2", "3", "4", "5"]);
+
+      await importReturnToLastRead({ enabled: true });
+      window.__multiColumnX.triggerReload?.();
+
+      setTimeline(section, ["100", "1", "2", "3", "4"]);
+      window.dispatchEvent(new Event("scroll"));
+
+      const closeBtn = getCloseButton();
+      expect(closeBtn).not.toBeNull();
+      expect(closeBtn?.style.display).toBe("flex");
+      expect(closeBtn?.style.alignItems).toBe("center");
+      expect(closeBtn?.style.justifyContent).toBe("center");
+      expect(closeBtn?.style.padding).toBe("0px");
+      expect(closeBtn?.style.lineHeight).toBe("1");
+    });
+
     it("戻るボタンが表示されているときはその隣に閉じるボタンが表示される", async () => {
       const tablist = addTablist();
       addTab(tablist, "おすすめ", true);
