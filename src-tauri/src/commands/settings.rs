@@ -134,7 +134,6 @@ impl Default for GlobalSettingsData {
             video_auto_play_stop_enabled: true,
             image_popup_enabled: true,
             video_popup_enabled: true,
-            show_sort_buttons: false,
             small_image_enabled: false,
             small_image_width: "50%".to_string(),
             blur_image_enabled: false,
@@ -234,8 +233,6 @@ pub struct GlobalSettingsData {
     pub image_popup_enabled: bool,
     #[serde(rename = "videoPopupEnabled")]
     pub video_popup_enabled: bool,
-    #[serde(rename = "showSortButtons")]
-    pub show_sort_buttons: bool,
     #[serde(rename = "defaultShowCountdown")]
     pub default_show_countdown: bool,
     #[serde(rename = "defaultHideHeaderEnabled")]
@@ -621,14 +618,6 @@ mod tests {
         let settings: GlobalSettingsData = serde_json::from_value(serde_json::json!({})).unwrap();
         let actual = serde_json::to_value(&settings).unwrap();
         assert_eq!(actual, fixture["globalSettings"]);
-    }
-
-    /// showSortButtons が欠落した旧全体設定は、新規インストール時と同じ false になる
-    /// （旧 serde 既定値 true から変更）。
-    #[test]
-    fn showsortbuttonsが無い旧全体設定はデフォルトでfalseになる() {
-        let settings: GlobalSettingsData = serde_json::from_value(serde_json::json!({})).unwrap();
-        assert!(!settings.show_sort_buttons);
     }
 
     /// defaultScrollPosRestoreEnabled が欠落した旧全体設定は、新規インストール時と同じ false になる

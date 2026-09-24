@@ -33,7 +33,6 @@ const baseGlobalSettings: GlobalSettings = {
   videoAutoPlayStopEnabled: true,
   imagePopupEnabled: true,
   videoPopupEnabled: true,
-  showSortButtons: false,
   smallImageEnabled: false,
   smallImageWidth: "50%",
   blurImageEnabled: false,
