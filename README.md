@@ -5,26 +5,31 @@ TweetDeck スタイルの Twitter/X デスクトップ・モバイルクライ�
 ## 機能
 
 - **マルチアカウント対応** — アカウントごとに独立したセッション（Cookie）を保持
-- **カラムレイアウト** — ホーム・通知・検索・リスト・カスタム URL を任意の数だけ並べて表示
+- **カラムレイアウト** — ホーム・通知・検索・リスト・カスタム URL・投稿専用・外部 URL（アカウント非依存）を任意の数だけ並べて表示
 - **グリッドレイアウト** — `gridRow` / `gridCol` でカラムをマトリクス状に配置。列内での縦積みに対応
 - **カラム設定** — 各カラムごとに自動更新間隔・ヘッダー非表示・カスタム CSS を設定可能
 - **自動更新** — 設定した間隔で自動リロード。スクロール中は更新をスキップ
+- **前回の境目へ戻るボタン** — ホームカラムで自動更新により新着が入った際、更新前の先頭（既読との境目）へワンタップで戻れる
 - **メディアポップアップ** — 画像・動画リンクを別ウィンドウで開く
+- **動画長押しメニュー** — カラム上の動画を長押し（PC は右クリック）でポップアップ表示・ダウンロード（ダウンロードは Android のみ）
 - **リンクポップアップ** — 任意の URL を専用ウィンドウで開く
 - **ツイート投稿ウィンドウ** — TopBar / モバイルタブバーからツイート作成ウィンドウを開く
 - **ポップアップセッション切替** — ポップアップウィンドウのアカウントをその場で切り替え
 - **カスタムコンテキストメニュー** — WebView 右クリックメニューを拡張
 - **動画自動再生停止** — ページ読み込み時に動画の自動再生を停止
-- **NG ワード** — カラム別・グローバルの NG ワードでタイムラインをフィルタ
+- **NG ワード / ホワイトリスト** — カラム別・グローバルの NG ワードでタイムラインをフィルタ、ホワイトリスト指定時は該当ワードを含む投稿のみ表示
+- **リポスト非表示** — 指定ユーザーのリポストをカラム別・グローバルで非表示
+- **通知ページのヘッダー非表示** — 通知カラムの設定リンクを含むヘッダーを自動的に非表示
 - **画像の縮小・ぼかし表示 / 広告非表示** — カラムごとのタイムライン表示調整
 - **新着バッジ・デスクトップ通知** — カラムごとの新着件数バッジ、通知カラムのデスクトップ通知
+- **API レート制限モニター** — X 内部 API のレート制限状況をツールバーのポップオーバーに表示
 - **キーボードショートカット** — 投稿・カラム追加・カラム 1-9 ジャンプなど（カラム WebView フォーカス中も有効）
 - **テーマ切替** — ダーク / ライト / システム連動
 - **プリセット** — カラム構成の保存・切り替え（デスクトップ）
 - **TopBar ナビゲーション** — 横方向ツールバーでカラム追加・アカウント管理・設定を操作、ドラッグ＆ドロップでカラムを列単位に並び替え（デスクトップ）
 - **自動アップデート** — GitHub Releases からの更新確認・適用と What's New 表示（デスクトップ / Android APK）
 - **クラッシュ自動復旧** — Linux の WebProcess クラッシュを検知してカラム WebView を自動再生成
-- **Android 対応** — モバイルタブバー UI・スワイプバーでカラムを切り替え表示
+- **Android 対応** — モバイルタブバー UI・スワイプバーでカラムを切り替え表示、広い画面（タブレット・横向き）では 2 カラム同時表示にも対応
 
 ## 技術スタック
 
@@ -41,7 +46,7 @@ TweetDeck スタイルの Twitter/X デスクトップ・モバイルクライ�
 
 ### 必要なもの
 
-- [Node.js](https://nodejs.org/) 18 以上
+- [Node.js](https://nodejs.org/) 22 以上（CI では 22 系で検証）
 - [Rust](https://rustup.rs/) / Cargo
 - [Tauri の前提条件](https://tauri.app/start/prerequisites/)（WebView2 など）
 
@@ -105,9 +110,22 @@ multi-column-x/
 │   ├── store/useAppStore.ts          # Zustand ストア（設定読み書き・状態管理）
 │   ├── lib/
 │   │   ├── gridLayout.ts             # グリッド座標計算（純粋関数・calculateGridBounds）
-│   │   └── log.ts                    # 文脈名付きエラーロガー（plugin-log 連携）
+│   │   ├── log.ts                    # 文脈名付きエラーロガー（plugin-log 連携）
+│   │   ├── theme.ts                  # テーマ解決（ダーク/ライト/システム）
+│   │   ├── reauthIdentity.ts         # 既存アカウント再認証時の同一アカウント判定
+│   │   ├── apiRateLimit.ts           # API レート制限バケットの severity 判定
+│   │   ├── rafThrottle.ts            # requestAnimationFrame 単位のスロットル
+│   │   ├── githubRelease.ts          # GitHub Releases API 応答の解析（APK 自己更新のハッシュ取得等）
+│   │   ├── updatePrompt.ts / version.ts  # 更新案内の要否・バージョン比較
+│   │   ├── autoReloadTarget.ts       # 自動更新対象カラムの判定
+│   │   ├── columnOrder.ts            # TopBar のカラム並び順計算
+│   │   ├── linkPopupUrl.ts           # リンクポップアップ URL のスキーム補完
+│   │   ├── ngWordPattern.ts          # NG ワードのマッチ判定
+│   │   └── repostHiddenUserId.ts     # リポスト非表示ユーザー ID の正規化・検証
 │   ├── services/
-│   │   └── columnWebview.ts          # カラム WebView への Tauri IPC 呼び出しを集約
+│   │   ├── columnWebview.ts          # カラム WebView への Tauri IPC 呼び出しを集約
+│   │   ├── externalColumn.ts         # 外部 URL カラムのデータディレクトリ操作
+│   │   └── updater.ts                # 自動アップデート（デスクトップ/Android）の IPC 呼び出し
 │   ├── hooks/
 │   │   ├── useColumns.ts             # カラム操作の公開 API（mobile/desktop 実装へ委譲）
 │   │   ├── useMobileColumns.ts       # モバイル: アクティブカラム・スワイプ・起動時復元
@@ -115,12 +133,19 @@ multi-column-x/
 │   │   ├── useWebviewEvents.ts       # WebView 発のイベント listen（スクロール・新着数）
 │   │   ├── useAccounts.ts            # アカウント追加・削除
 │   │   ├── useAutoReload.ts          # 自動更新カウントダウン
+│   │   ├── useAppUpdater.ts          # 自動アップデートの確認・進捗表示
+│   │   ├── useWhatsNew.ts            # 更新後の What's New 表示
+│   │   ├── useTheme.ts               # テーマ（ダーク/ライト/システム）切替
 │   │   ├── useDialogState.ts         # ダイアログ開閉状態管理
+│   │   ├── useEscapeKey.ts           # Esc キーでのダイアログ/ポップアップ閉じる処理
+│   │   ├── useOutsideClick.ts        # 要素外クリック検出
 │   │   └── useKeyboardShortcuts.ts   # キーボードショートカット処理
 │   └── components/
 │       ├── ColumnHeader/             # カラムヘッダー（更新・設定・削除ボタン）
 │       ├── AddColumnDialog/          # カラム追加ダイアログ
 │       ├── AccountManager/           # アカウント管理ダイアログ
+│       ├── AccountNameDialog/        # アカウント名入力ダイアログ
+│       ├── ApiRateLimitIndicator/    # API レート制限モニターのツールバー表示
 │       ├── SettingsPanel/            # カラム個別設定パネル
 │       ├── AppSettingsPanel/         # アプリ全体設定
 │       │   ├── ColumnLayoutTab.tsx   # グリッドレイアウト設定タブ
@@ -128,7 +153,12 @@ multi-column-x/
 │       ├── TopBar/                   # 横方向ツールバー（デスクトップ）
 │       ├── MobileTabBar/             # モバイルタブバー（Android）
 │       ├── TabActionDialog/          # モバイルタブ長押しアクションダイアログ
-│       └── LinkPopupDialog/          # リンクポップアップ URL 入力ダイアログ
+│       ├── LinkPopupDialog/          # リンクポップアップ URL 入力ダイアログ
+│       ├── ConfirmDialog/            # 汎用確認ダイアログ
+│       ├── HelpPopover/              # ヘルプ用ポップオーバー
+│       ├── ShortcutHelpDialog/       # キーボードショートカット一覧ダイアログ
+│       ├── UpdateDialog/             # アプリ更新確認・進捗ダイアログ
+│       └── WhatsNewDialog/           # 更新後の What's New ダイアログ
 └── src-tauri/                        # Rust バックエンド
     ├── tauri.conf.json
     ├── Cargo.toml
@@ -137,34 +167,49 @@ multi-column-x/
         ├── state.rs                  # WebView レジストリ（label → accountId / dataDir）
         ├── ipc_constants.rs          # IPC 定数（Rust 側）
         ├── android_bridge.rs         # JNI ブリッジ（Android WebView 操作）
+        ├── acl_contract.rs           # コマンドの capability(ACL) 許可漏れを検知する契約テスト
+        ├── linux_codec_env.rs        # Linux のメディアコーデック（GStreamer 等）環境判定
+        ├── video/                    # 動画ダウンロード（hls.rs=HLS/m3u8 処理, http.rs=HTTP I/O）
         ├── commands/
         │   ├── settings.rs           # 設定の保存・読み込み（tauri-plugin-store）
         │   ├── settings_store.rs     # Rust 側の設定読み出しヘルパー（store 直接参照）
         │   ├── webview/
-        │   │   ├── column.rs         # カラム WebView の作成・削除・リサイズ・URL 解決
+        │   │   ├── column.rs         # カラム WebView の作成・削除・リサイズ・URL 解決（Linux 配置・クリッピングを含む）
         │   │   ├── popup.rs          # メディア/リンクポップアップ・セッション切替
         │   │   └── compose.rs        # ツイート作成ウィンドウ
-        │   └── account.rs            # アカウントウィンドウ・ログイン検出（desktop/mobile 分岐）
+        │   ├── account.rs            # アカウントウィンドウ・ログイン検出・再認証（desktop/mobile 分岐）
+        │   ├── update.rs             # Android APK 自己更新（呼び出し元制限・URL 許可リスト・SHA-256 検証）
+        │   ├── media_codec.rs        # Linux AppImage のメディアコーデック対応状況判定
+        │   ├── openh264_fetch.rs / openh264_http_client.rs  # Cisco OpenH264 ランタイムのダウンロード・有効化
+        │   ├── arch_support.rs       # 対応アーキテクチャ（x86_64）の判定
+        │   └── video_download.rs     # カラム上の動画ダウンロード（デスクトップ）
         └── inject/                   # WebView に注入する JS
             ├── _src/                 # TypeScript ソース（Vite でバンドル → *.js に出力）
             │   ├── auto_reload.ts    # 自動更新（新着数報告を含む）
+            │   ├── api_rate_limit_monitor.ts # X内部APIのレート制限ヘッダ監視
             │   ├── blur_image.ts     # 画像ぼかし表示
+            │   ├── compose_only.ts   # 投稿専用カラム（投稿フォーム以外をスポットライト非表示）
             │   ├── context_menu.ts   # カスタムコンテキストメニュー
             │   ├── custom_css.ts     # カスタム CSS 適用
-            │   ├── header_customizer.ts / useHeaderCustomizer.ts  # ヘッダー非表示
+            │   ├── dom_observer.ts   # DOM 変化監視を共有する単一 MutationObserver ハブ
+            │   ├── header_customizer.ts / useHeaderCustomizer.ts / HeaderCustomizer.tsx  # ヘッダー非表示
             │   ├── hide_ad.ts        # 広告非表示
             │   ├── image_popup.ts    # メディアリンクをポップアップで開く
             │   ├── keyboard_shortcut.ts # ショートカットキーを main へ転送
             │   ├── mobile_area_hide.ts  # モバイル用の領域非表示
-            │   ├── ng_word.ts        # NG ワードフィルタ
+            │   ├── ng_word.ts / ng_word_matcher.ts  # NG ワードフィルタ
+            │   ├── notification_header_hide.ts # 通知ページの設定ヘッダー非表示
             │   ├── popup_toolbar.ts  # ポップアップツールバー（アカウント切替）
             │   ├── popup_video_autoplay.ts # ポップアップ動画の自動再生
+            │   ├── repost_hide_matcher.ts # 指定ユーザーのリポスト非表示判定
+            │   ├── return_to_last_read.ts / return_to_last_read_logic.ts # 前回の境目へ戻るボタン
             │   ├── scroll_event.ts   # 横スクロールイベントを main WebView に中継
             │   ├── scroll_pos_restore.ts # 写真閲覧後のスクロール位置復元
             │   ├── sidebar_hide.ts   # x.com サイドバー非表示
             │   ├── small_image.ts    # 画像縮小表示
             │   ├── tab_selector.ts   # ホームタブ選択
-            │   └── video_control.ts  # 動画自動再生停止
+            │   ├── video_control.ts  # 動画自動再生停止
+            │   └── video_long_press_menu.ts # 動画の長押し/右クリックメニュー（ポップアップ表示・ダウンロード）
             ├── *.js                  # _src をビルドした成果物（gitignore 対象・直接編集禁止）
             └── mod.rs                # build_init_script / build_popup_init_script
 ```
@@ -173,41 +218,60 @@ Kotlin 層（Android）:
 
 ```
 src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/
-├── MainActivity.kt              # カラム/ポップアップ WebView 管理・バックボタン処理
-├── DoubleTapGestureDetector.kt  # アクティブカラムのダブルタップ検出器
-├── PopupGestureBlock.kt         # ポップアップ表示中のジェスチャー抑止
-├── PopupSessionBridge.kt        # ポップアップのセッション切替ブリッジ
-├── WebViewProfiles.kt           # WebView Profile API のサポート判定・適用
-├── AddAccount.kt                # ログイン用 Activity（センチネルファイル書き込みで完了通知）
-├── AppBridge.kt                 # Rust JNI 呼び出しの窓口
-├── ThreadUtils.kt               # UI スレッド実行ヘルパー
-└── UrlUtils.kt                  # URL ユーティリティ
+├── MainActivity.kt                  # カラム/ポップアップ WebView 管理・バックボタン処理
+├── AddAccount.kt                    # ログイン用 Activity（センチネルファイル書き込みで完了通知）
+├── ApiRateLimitBridge.kt            # APIレート制限ヘッダの JS ブリッジ
+├── ApkHashVerifier.kt               # APK 自己更新の SHA-256 検証
+├── AppBridge.kt                     # Rust JNI 呼び出しの窓口
+├── BackupFileSelector.kt / MultiColumnXBackupAgent.kt  # Auto Backup 対象ファイルの選定
+├── BridgeMessage.kt / BridgeOrigins.kt  # JS ブリッジのメッセージ形式・許可オリジン
+├── ColumnWebViewUtils.kt            # カラム WebView 生成・操作ヘルパー
+├── FileChooserUtils.kt              # ファイル選択ダイアログ処理
+├── PopupSessionBridge.kt            # ポップアップのセッション切替ブリッジ
+├── ReauthUtils.kt                   # 既存アカウント再認証ヘルパー
+├── SwipeBarOverlayView.kt / SwipeGestureResolver.kt  # スワイプ切替バーの描画・ジェスチャー判定
+├── ThreadUtils.kt                   # UI スレッド実行ヘルパー
+├── TwidUtils.kt                     # X ユーザー ID 抽出ユーティリティ
+├── UrlUtils.kt                      # URL ユーティリティ
+├── VideoDownloadForegroundService.kt / VideoDownloadRequestBridge.kt  # 動画ダウンロード（フォアグラウンドサービス）
+└── WebViewProfiles.kt               # WebView Profile API のサポート判定・適用
 ```
 
 ## Tauri コマンド一覧
 
-| コマンド                   | 説明                                                                                                        |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `load_settings`            | 設定ファイルの読み込み                                                                                      |
-| `save_settings`            | 設定ファイルへの書き込み                                                                                    |
-| `create_column_webview`    | カラム WebView の作成                                                                                       |
-| `remove_column_webview`    | カラム WebView の削除                                                                                       |
-| `resize_column_webview`    | カラム WebView のリサイズ・移動                                                                             |
-| `open_popup_window`        | メディアポップアップを開く                                                                                  |
-| `open_link_popup_window`   | 任意 URL のリンクポップアップを開く                                                                         |
-| `close_popup_window`       | ポップアップを閉じる                                                                                        |
-| `switch_popup_session`     | ポップアップのアカウントを切り替え（ウィンドウ再作成）                                                      |
-| `eval_in_webview`          | 指定 WebView で JS を評価                                                                                   |
-| `report_webview_scroll`    | WebView からの横スクロールを main に中継                                                                    |
-| `report_new_posts_count`   | カラムの新着投稿数を main WebView に中継                                                                    |
-| `report_keyboard_shortcut` | inject から検出したキーボードショートカットを中継                                                           |
-| `get_mobile_insets`        | Android システム UI のインセット（ノッチ等）を取得                                                          |
-| `set_column_cookies`       | カラム WebView に Cookie を設定（Android）                                                                  |
-| `open_compose_window`      | ツイート作成ウィンドウを開く                                                                                |
-| `open_add_account_window`  | アカウント追加ウィンドウを開く（ログイン検出付き）                                                          |
-| `delete_account_data`      | アカウントデータディレクトリを削除                                                                          |
-| `close_window`             | 指定ラベルのウィンドウ / WebView を閉じる                                                                   |
-| `install_apk_update`       | APK をダウンロードしてインストーラを起動（Android。呼び出し元 main 限定・URL 許可リスト・SHA-256 検証付き） |
+| コマンド                             | 説明                                                                                                        |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `load_settings`                      | 設定ファイルの読み込み                                                                                      |
+| `save_settings`                      | 設定ファイルへの書き込み                                                                                    |
+| `create_column_webview`              | カラム WebView の作成                                                                                       |
+| `get_external_column_data_directory` | 外部 URL カラム（アカウント非依存）のデータ保存先ディレクトリを取得                                         |
+| `delete_external_column_data`        | 外部 URL カラムの保存先データディレクトリを削除                                                             |
+| `remove_column_webview`              | カラム WebView の削除                                                                                       |
+| `resize_column_webview`              | カラム WebView のリサイズ・移動                                                                             |
+| `open_popup_window`                  | メディアポップアップを開く                                                                                  |
+| `open_link_popup_window`             | 任意 URL のリンクポップアップを開く                                                                         |
+| `close_popup_window`                 | ポップアップを閉じる                                                                                        |
+| `switch_popup_session`               | ポップアップのアカウントを切り替え（ウィンドウ再作成）                                                      |
+| `eval_in_webview`                    | 指定 WebView で JS を評価                                                                                   |
+| `report_webview_scroll`              | WebView からの横スクロールを main に中継                                                                    |
+| `report_new_posts_count`             | カラムの新着投稿数を main WebView に中継                                                                    |
+| `report_official_settings`           | X 公式の表示設定変更を配布先カラムへ中継                                                                    |
+| `report_api_rate_limit`              | inject が検出した X 内部 API のレート制限ヘッダを main へ中継                                               |
+| `report_keyboard_shortcut`           | inject から検出したキーボードショートカットを中継                                                           |
+| `get_mobile_insets`                  | Android システム UI のインセット（ノッチ等）を取得                                                          |
+| `set_column_cookies`                 | カラム WebView に Cookie を設定（Android）                                                                  |
+| `is_webview_profile_supported`       | Android の WebView Profile API 対応可否を判定（2 カラム同時表示の可否判定に使用）                           |
+| `update_mobile_swipe_bar`            | モバイルのスワイプ切替バー設定（高さ・透過度等）を反映                                                      |
+| `flash_mobile_swipe_bar`             | モバイルのスワイプ切替バーを一時的に表示                                                                    |
+| `open_add_account_window`            | アカウント追加ウィンドウを開く（ログイン検出付き）                                                          |
+| `reauth_account_window`              | 既存アカウントの再認証ウィンドウを開く                                                                      |
+| `delete_account_data`                | アカウントデータディレクトリを削除                                                                          |
+| `close_window`                       | 指定ラベルのウィンドウ / WebView を閉じる                                                                   |
+| `open_compose_window`                | ツイート作成ウィンドウを開く                                                                                |
+| `install_apk_update`                 | APK をダウンロードしてインストーラを起動（Android。呼び出し元 main 限定・URL 許可リスト・SHA-256 検証付き） |
+| `check_media_codec_support`          | Linux AppImage でのメディアコーデック（H.264/AAC）対応状況を判定                                            |
+| `download_and_enable_h264`           | Cisco OpenH264 ランタイムをダウンロードして有効化（デスクトップ Linux のみ）                                |
+| `download_video`                     | カラム上の動画をダウンロード（デスクトップのみ。Android は別経路でネイティブ実装）                          |
 
 **新しいコマンドを `lib.rs` の `generate_handler!` に追加したら、`src-tauri/build.rs` の `AppManifest::commands` と、呼び出し元に応じた `src-tauri/capabilities/*.json` の許可（`allow-<コマンド名のケバブケース>`）を必ず同時に更新すること。** アプリ独自コマンドは ACL（capability）の対象であり、どの capability にも許可されていないコマンドは main を含む全 WebView から "not allowed by ACL" として拒否される（`src-tauri/src/acl_contract.rs` の契約テストが漏れを検知する）。
 
