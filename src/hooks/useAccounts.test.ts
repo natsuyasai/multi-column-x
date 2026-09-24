@@ -1054,6 +1054,184 @@ describe("useAccounts (desktop reauth)", () => {
     expect(mockReload).not.toHaveBeenCalled();
     expect(result.current.accountNotice).toBeNull();
   });
+
+  it("再認証が失敗したとき新しい保存先の削除に失敗すると削除保留リストに記録され、失敗通知のみが表示される", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: [],
+      },
+    });
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "reauth_account_window") return reauthWindowResult;
+      if (cmd === "delete_account_data") throw new Error("locked");
+      return undefined;
+    });
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: null,
+        newDataDirectory: NEW_DATA_DIRECTORY,
+      });
+      await reauthPromise;
+    });
+
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual([NEW_DATA_DIRECTORY]);
+    expect(result.current.accountNotice).toEqual({
+      title: "再認証",
+      message: "再認証に失敗しました（アカウント識別子を取得できませんでした）",
+    });
+  });
+
+  it("別アカウントでログインしたとき新しい保存先の削除に失敗すると削除保留リストに記録され、不一致通知のみが表示される", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: [],
+      },
+    });
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "reauth_account_window") return reauthWindowResult;
+      if (cmd === "delete_account_data") throw new Error("locked");
+      return undefined;
+    });
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: "999",
+        newDataDirectory: NEW_DATA_DIRECTORY,
+      });
+      await reauthPromise;
+    });
+
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual([NEW_DATA_DIRECTORY]);
+    expect(result.current.accountNotice).toEqual({
+      title: "再認証",
+      message:
+        "登録済みと異なるアカウントでログインされたため、セッションを更新しませんでした",
+    });
+  });
+
+  it("再認証をキャンセルしたとき新しい保存先の削除に失敗すると削除保留リストに記録され、通知は表示されない", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: [],
+      },
+    });
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "reauth_account_window") return reauthWindowResult;
+      if (cmd === "delete_account_data") throw new Error("locked");
+      return undefined;
+    });
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireDestroyedEvent("reauth-acc-1");
+      await reauthPromise;
+    });
+
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual([NEW_DATA_DIRECTORY]);
+    expect(result.current.accountNotice).toBeNull();
+  });
+
+  it("再認証が成功したとき旧保存先の削除に失敗すると削除保留リストに記録され、アカウントは新しい保存先に更新され通知は表示されない", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: [],
+      },
+    });
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "reauth_account_window") return reauthWindowResult;
+      if (cmd === "delete_account_data") throw new Error("locked");
+      return undefined;
+    });
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: "123",
+        newDataDirectory: NEW_DATA_DIRECTORY,
+      });
+      await reauthPromise;
+    });
+
+    expect(useAppStore.getState().accounts[0].dataDirectory).toBe(
+      NEW_DATA_DIRECTORY,
+    );
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual([OLD_DATA_DIRECTORY]);
+    expect(result.current.accountNotice).toBeNull();
+  });
+
+  it("再認証後の保存先の削除に成功したとき削除保留リストには何も追加されない", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: [],
+      },
+    });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "reauth_account_window" ? reauthWindowResult : undefined,
+    );
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: "123",
+        newDataDirectory: NEW_DATA_DIRECTORY,
+      });
+      await reauthPromise;
+    });
+
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual([]);
+  });
 });
 
 describe("useAccounts (mobile reauth)", () => {

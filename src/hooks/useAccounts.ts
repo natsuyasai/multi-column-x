@@ -327,16 +327,21 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
             );
           };
 
-          const deleteDataDirectory = (dataDirectory: string) => {
-            invoke(IPC_COMMANDS.DELETE_ACCOUNT_DATA, { dataDirectory }).catch(
-              () => {},
-            );
+          const deleteDataDirectory = async (dataDirectory: string) => {
+            try {
+              await invoke(IPC_COMMANDS.DELETE_ACCOUNT_DATA, {
+                dataDirectory,
+              });
+            } catch (e) {
+              logError("startReauth:deleteAccountData")(e);
+              addPendingDataDirectoryDeletion(dataDirectory);
+            }
           };
 
           const handleComplete = async (xUserId: string | null) => {
             if (!xUserId) {
               closeReauthWindow();
-              deleteDataDirectory(newDataDirectory);
+              await deleteDataDirectory(newDataDirectory);
               setAccountNotice({
                 title: REAUTH_NOTICE_TITLE,
                 message: REAUTH_FAILED_MESSAGE,
@@ -348,7 +353,7 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
             const verdict = evaluateReauthIdentity(account.xUserId, xUserId);
             if (verdict === "mismatch") {
               closeReauthWindow();
-              deleteDataDirectory(newDataDirectory);
+              await deleteDataDirectory(newDataDirectory);
               setAccountNotice({
                 title: REAUTH_NOTICE_TITLE,
                 message: REAUTH_MISMATCH_MESSAGE,
@@ -366,7 +371,7 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
             // 新セッションで全WebViewを作り直した後に旧保存先を削除する
             // （Windows の WebView2 はプロセス生存中フォルダをロックするため）。
             await reloadAllWebviews?.();
-            deleteDataDirectory(oldDataDirectory);
+            await deleteDataDirectory(oldDataDirectory);
             if (verdict === "skip") {
               setAccountNotice({
                 title: REAUTH_NOTICE_TITLE,
@@ -397,11 +402,11 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
                 .then((reauthWindow) => {
                   if (!reauthWindow) return;
                   reauthWindow
-                    .once("tauri://destroyed", () => {
+                    .once("tauri://destroyed", async () => {
                       if (settled) return;
                       settled = true;
                       cleanup();
-                      deleteDataDirectory(newDataDirectory);
+                      await deleteDataDirectory(newDataDirectory);
                       resolve();
                     })
                     .then((fn) => {
@@ -426,7 +431,13 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
         isReauthingRef.current = false;
       }
     },
-    [accounts, isMobile, reloadAllWebviews, updateAccount],
+    [
+      accounts,
+      isMobile,
+      reloadAllWebviews,
+      updateAccount,
+      addPendingDataDirectoryDeletion,
+    ],
   );
 
   const requestRemoveAccount = useCallback(
