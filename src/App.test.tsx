@@ -10,6 +10,7 @@ import {
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import App from "./App";
 import { WEBVIEW_SCRIPTS } from "./constants/ipc";
+import { HEADER_HEIGHT, getTopBarHeight } from "./lib/gridLayout";
 import { useAppStore } from "./store/useAppStore";
 import type { Column, GlobalSettings } from "./types";
 import { DEFAULT_GLOBAL_SETTINGS, DEFAULT_COLUMN_SETTINGS } from "./types";
@@ -131,6 +132,164 @@ describe("App (desktop)", () => {
         x: -9999,
       });
     });
+  });
+
+  it("TopBarを展開するとカラムの表示位置が待ち時間なしで展開後のTopBarの直下に移動する", async () => {
+    useAppStore.setState({ columns: [column], topBarExpanded: false });
+    render(<App />);
+    // 起動時のカラム復元（非同期）が完了するのを待ってから、TopBar操作の効果だけを検証する
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "create_column_webview",
+        expect.anything(),
+      );
+    });
+    mockInvoke.mockClear();
+
+    fireEvent.click(screen.getByTitle("ツールバーを展開 (Ctrl+B)"));
+
+    const expectedY = getTopBarHeight(true) + HEADER_HEIGHT;
+    await waitFor(
+      () => {
+        const resizeCalls = mockInvoke.mock.calls.filter(
+          (c) => c[0] === "resize_column_webview",
+        );
+        expect(resizeCalls.length).toBeGreaterThan(0);
+        expect((resizeCalls[0][1] as any).bounds).toMatchObject({
+          columnId: "col-1",
+          y: expectedY,
+        });
+      },
+      { timeout: 100 },
+    );
+  });
+
+  it("TopBarを折りたたむとカラムの表示位置が待ち時間なしで折りたたみ後のTopBarの直下に移動する", async () => {
+    useAppStore.setState({ columns: [column], topBarExpanded: true });
+    render(<App />);
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "create_column_webview",
+        expect.anything(),
+      );
+    });
+    mockInvoke.mockClear();
+
+    fireEvent.click(screen.getByTitle("ツールバーを折りたたむ (Ctrl+B)"));
+
+    const expectedY = getTopBarHeight(false) + HEADER_HEIGHT;
+    await waitFor(
+      () => {
+        const resizeCalls = mockInvoke.mock.calls.filter(
+          (c) => c[0] === "resize_column_webview",
+        );
+        expect(resizeCalls.length).toBeGreaterThan(0);
+        expect((resizeCalls[0][1] as any).bounds).toMatchObject({
+          columnId: "col-1",
+          y: expectedY,
+        });
+      },
+      { timeout: 100 },
+    );
+  });
+
+  it("キーボードショートカットでTopBarを開閉してもカラムの表示位置が待ち時間なしで追従する", async () => {
+    useAppStore.setState({ columns: [column], topBarExpanded: false });
+    render(<App />);
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "create_column_webview",
+        expect.anything(),
+      );
+    });
+    mockInvoke.mockClear();
+
+    fireEvent.keyDown(window, { key: "b", ctrlKey: true });
+
+    const expectedY = getTopBarHeight(true) + HEADER_HEIGHT;
+    await waitFor(
+      () => {
+        const resizeCalls = mockInvoke.mock.calls.filter(
+          (c) => c[0] === "resize_column_webview",
+        );
+        expect(resizeCalls.length).toBeGreaterThan(0);
+        expect((resizeCalls[0][1] as any).bounds).toMatchObject({
+          columnId: "col-1",
+          y: expectedY,
+        });
+      },
+      { timeout: 100 },
+    );
+  });
+
+  it("ダイアログ表示中にTopBarを開閉してもカラムは退避したままで閉じると新しい位置に表示される", async () => {
+    useAppStore.setState({ columns: [column], topBarExpanded: false });
+    render(<App />);
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "create_column_webview",
+        expect.anything(),
+      );
+    });
+
+    fireEvent.click(screen.getByTitle("カラムを追加 (Ctrl+N)"));
+    await waitFor(() => {
+      const resizeCalls = mockInvoke.mock.calls.filter(
+        (c) => c[0] === "resize_column_webview",
+      );
+      expect(resizeCalls.length).toBeGreaterThan(0);
+      expect(
+        (resizeCalls[resizeCalls.length - 1][1] as any).bounds,
+      ).toMatchObject({ columnId: "col-1", x: -9999 });
+    });
+
+    mockInvoke.mockClear();
+    fireEvent.click(screen.getByTitle("ツールバーを展開 (Ctrl+B)"));
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const resizeCallsDuringDialog = mockInvoke.mock.calls.filter(
+      (c) => c[0] === "resize_column_webview",
+    );
+    const expectedExpandedY = getTopBarHeight(true) + HEADER_HEIGHT;
+    expect(
+      resizeCallsDuringDialog.some(
+        (c) => (c[1] as any).bounds?.y === expectedExpandedY,
+      ),
+    ).toBe(false);
+
+    fireEvent.click(screen.getByText("キャンセル"));
+
+    await waitFor(() => {
+      const resizeCalls = mockInvoke.mock.calls.filter(
+        (c) => c[0] === "resize_column_webview",
+      );
+      expect(
+        resizeCalls.some((c) => (c[1] as any).bounds?.y === expectedExpandedY),
+      ).toBe(true);
+    });
+  });
+
+  it("アプリ起動時にはTopBar開閉による再配置は行われない", async () => {
+    useAppStore.setState({ columns: [column], topBarExpanded: false });
+    render(<App />);
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "create_column_webview",
+        expect.anything(),
+      );
+    });
+
+    const countAfterRestore = mockInvoke.mock.calls.filter(
+      (c) => c[0] === "resize_column_webview",
+    ).length;
+
+    // 起動時の復元処理が落ち着いた後、追加の再配置（新設effect起因）が発生しないことを確認する
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const countAfterSettle = mockInvoke.mock.calls.filter(
+      (c) => c[0] === "resize_column_webview",
+    ).length;
+
+    expect(countAfterSettle).toBe(countAfterRestore);
   });
 
   it("ツイート作成ボタンでopen_compose_windowが呼ばれる", async () => {
