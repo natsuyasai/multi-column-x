@@ -84,6 +84,19 @@ function fireListenEvent(eventName: string, payload: unknown) {
   callback({ payload });
 }
 
+// 呼び出し側から任意のタイミングで settle できる Promise を作る。
+// 「delete_account_data の完了を待ってから startReauth が完了する」ことを
+// 検証するため、削除処理の完了タイミングをテストから制御する。
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 const addAccountResult = JSON.stringify({
   accountId: "acc-new",
   dataDirectory: "/data/acc-new",
@@ -1231,6 +1244,205 @@ describe("useAccounts (desktop reauth)", () => {
     expect(
       useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
     ).toEqual([]);
+  });
+
+  it("再認証が失敗したとき保存先の削除が終わるまで再認証処理は完了せず、完了時には削除保留リストに記録されている", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: [],
+      },
+    });
+    const deleteDeferred = createDeferred<void>();
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "reauth_account_window") return reauthWindowResult;
+      if (cmd === "delete_account_data") return deleteDeferred.promise;
+      return undefined;
+    });
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    let done = false;
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      reauthPromise
+        .then(() => {
+          done = true;
+        })
+        .catch(() => {});
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: null,
+        newDataDirectory: NEW_DATA_DIRECTORY,
+      });
+      await flushMicrotasks();
+    });
+
+    // 削除がまだ完了していない間は startReauth も完了していない
+    expect(done).toBe(false);
+
+    await act(async () => {
+      deleteDeferred.reject(new Error("locked"));
+      await reauthPromise;
+    });
+
+    expect(done).toBe(true);
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual([NEW_DATA_DIRECTORY]);
+  });
+
+  it("別アカウントでログインしたとき保存先の削除が終わるまで再認証処理は完了せず、完了時には削除保留リストに記録されている", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: [],
+      },
+    });
+    const deleteDeferred = createDeferred<void>();
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "reauth_account_window") return reauthWindowResult;
+      if (cmd === "delete_account_data") return deleteDeferred.promise;
+      return undefined;
+    });
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    let done = false;
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      reauthPromise
+        .then(() => {
+          done = true;
+        })
+        .catch(() => {});
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: "999",
+        newDataDirectory: NEW_DATA_DIRECTORY,
+      });
+      await flushMicrotasks();
+    });
+
+    // 削除がまだ完了していない間は startReauth も完了していない
+    expect(done).toBe(false);
+
+    await act(async () => {
+      deleteDeferred.reject(new Error("locked"));
+      await reauthPromise;
+    });
+
+    expect(done).toBe(true);
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual([NEW_DATA_DIRECTORY]);
+  });
+
+  it("再認証が成功したとき旧保存先の削除が終わるまで再認証処理は完了せず、完了時には削除保留リストに記録されている", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: [],
+      },
+    });
+    const deleteDeferred = createDeferred<void>();
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "reauth_account_window") return reauthWindowResult;
+      if (cmd === "delete_account_data") return deleteDeferred.promise;
+      return undefined;
+    });
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    let done = false;
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      reauthPromise
+        .then(() => {
+          done = true;
+        })
+        .catch(() => {});
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: "123",
+        newDataDirectory: NEW_DATA_DIRECTORY,
+      });
+      await flushMicrotasks();
+    });
+
+    // 削除がまだ完了していない間は startReauth も完了していない
+    expect(done).toBe(false);
+
+    await act(async () => {
+      deleteDeferred.reject(new Error("locked"));
+      await reauthPromise;
+    });
+
+    expect(done).toBe(true);
+    expect(useAppStore.getState().accounts[0].dataDirectory).toBe(
+      NEW_DATA_DIRECTORY,
+    );
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual([OLD_DATA_DIRECTORY]);
+  });
+
+  it("再認証をキャンセルしたとき保存先の削除が終わるまで再認証処理は完了せず、完了時には削除保留リストに記録されている", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: [],
+      },
+    });
+    const deleteDeferred = createDeferred<void>();
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "reauth_account_window") return reauthWindowResult;
+      if (cmd === "delete_account_data") return deleteDeferred.promise;
+      return undefined;
+    });
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    let done = false;
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      reauthPromise
+        .then(() => {
+          done = true;
+        })
+        .catch(() => {});
+      await flushMicrotasks();
+      fireDestroyedEvent("reauth-acc-1");
+      await flushMicrotasks();
+    });
+
+    // 削除がまだ完了していない間は startReauth も完了していない
+    expect(done).toBe(false);
+
+    await act(async () => {
+      deleteDeferred.reject(new Error("locked"));
+      await reauthPromise;
+    });
+
+    expect(done).toBe(true);
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual([NEW_DATA_DIRECTORY]);
   });
 });
 
