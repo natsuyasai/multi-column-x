@@ -279,17 +279,20 @@ describe("App (desktop)", () => {
       );
     });
 
-    const countAfterRestore = mockInvoke.mock.calls.filter(
-      (c) => c[0] === "resize_column_webview",
-    ).length;
+    // 観点: 起動時のカラム復元（create_column_webview）より前に発生する
+    // resize_column_webviewは、既存のダイアログ復元effect（anyDialogOpen初期値false
+    // による1回分）のみであり、TopBar開閉用effectが追加でもう1回発火しないこと。
+    // useLayoutEffectはマウント時のDOM反映直後に同期実行されるため、
+    // 初回マウントでも実行してしまう実装では、この余分なresize呼び出しが
+    // 非同期のcreate_column_webviewより先に発生し、件数が2件に増える。
+    const firstCreateIndex = mockInvoke.mock.calls.findIndex(
+      (c) => c[0] === "create_column_webview",
+    );
+    const resizeCallsBeforeCreate = mockInvoke.mock.calls
+      .slice(0, firstCreateIndex)
+      .filter((c) => c[0] === "resize_column_webview").length;
 
-    // 起動時の復元処理が落ち着いた後、追加の再配置（新設effect起因）が発生しないことを確認する
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    const countAfterSettle = mockInvoke.mock.calls.filter(
-      (c) => c[0] === "resize_column_webview",
-    ).length;
-
-    expect(countAfterSettle).toBe(countAfterRestore);
+    expect(resizeCallsBeforeCreate).toBe(1);
   });
 
   it("ツイート作成ボタンでopen_compose_windowが呼ばれる", async () => {
