@@ -17,7 +17,6 @@
     "videoAutoPlayStopEnabled": true,
     "imagePopupEnabled": true,
     "videoPopupEnabled": true,
-    "showSortButtons": false,
     "defaultShowCountdown": true,
     "defaultHideHeaderEnabled": true,
     "defaultHideTweetInputEnabled": true,

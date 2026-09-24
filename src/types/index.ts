@@ -79,7 +79,6 @@ export interface GlobalSettings {
   videoAutoPlayStopEnabled: boolean;
   imagePopupEnabled: boolean;
   videoPopupEnabled: boolean;
-  showSortButtons: boolean;
   smallImageEnabled: boolean;
   smallImageWidth: string;
   blurImageEnabled: boolean;
@@ -214,7 +213,6 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   videoAutoPlayStopEnabled: true,
   imagePopupEnabled: true,
   videoPopupEnabled: true,
-  showSortButtons: false,
   smallImageEnabled: false,
   smallImageWidth: "50%",
   blurImageEnabled: false,

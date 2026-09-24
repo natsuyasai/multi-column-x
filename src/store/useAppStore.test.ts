@@ -84,7 +84,6 @@ describe("useAppStore", () => {
         videoAutoPlayStopEnabled: false,
         imagePopupEnabled: true,
         videoPopupEnabled: true,
-        showSortButtons: true,
         smallImageEnabled: false,
         smallImageWidth: "50%",
         blurImageEnabled: false,

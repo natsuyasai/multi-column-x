@@ -6,7 +6,7 @@
 
 - ヘッダーカスタマイズ用スクリプト（数百 KB の React バンドル）の軽量化は、inject アーキテクチャの再設計が必要になるため見送っている。
 - IPC 定数の TS/Rust コード生成一本化も、契約テスト（fixture 比較）方式で十分と判断し見送っている。
-- TS/Rust のデフォルト値を突き合わせる契約テストで発見されていた `defaultScrollPosRestoreEnabled`（および `showSortButtons` / `videoAutoPlayStopEnabled` / `hideAdEnabled` / カラム設定 `showCustomMenu`）の食い違いは解消済み（`src-tauri/src/commands/settings.rs` の `GlobalSettingsData` / `ColumnSettings` を構造体レベル `#[serde(default)]` に統一し、キー欠落時は `impl Default`＝TS 側 `DEFAULT_GLOBAL_SETTINGS` / `DEFAULT_COLUMN_SETTINGS` と同じ値になる）。`defaultScrollPosRestoreEnabled` は欠落時も新規インストール時と同じ `false` に統一されている。
+- TS/Rust のデフォルト値を突き合わせる契約テストで発見されていた `defaultScrollPosRestoreEnabled`（および `showSortButtons`（その後、未使用のため撤去） / `videoAutoPlayStopEnabled` / `hideAdEnabled` / カラム設定 `showCustomMenu`）の食い違いは解消済み（`src-tauri/src/commands/settings.rs` の `GlobalSettingsData` / `ColumnSettings` を構造体レベル `#[serde(default)]` に統一し、キー欠落時は `impl Default`＝TS 側 `DEFAULT_GLOBAL_SETTINGS` / `DEFAULT_COLUMN_SETTINGS` と同じ値になる）。`defaultScrollPosRestoreEnabled` は欠落時も新規インストール時と同じ `false` に統一されている。
 
 ## リリース CI / 自動更新
 
