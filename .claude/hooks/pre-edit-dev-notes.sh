@@ -24,7 +24,7 @@ case "$norm" in
   *"/src/services/columnWebview.ts")               note="docs/development/column-layout-notes.md" ;;
   *"/src-tauri/src/commands/webview/column.rs")    note="docs/development/linux-webview-notes.md" ;;
   *"/src/lib/rafThrottle.ts")                      note="docs/development/linux-webview-notes.md" ;;
-  *"/src-tauri/src/lib.rs")                        note="docs/development/compose-popup-sidebar-notes.md" ;;
+  *"/src-tauri/src/lib.rs")                        note="docs/development/compose-popup-topbar-notes.md" ;;
   *"/src-tauri/gen/android/app/proguard-rules.pro") note="docs/development/android-notes.md" ;;
   *"/MainActivity.kt")                             note="docs/development/android-notes.md" ;;
   *"/src/constants/apiRateLimitLabels.ts")         note="docs/development/api-rate-limit-operations-notes.md" ;;

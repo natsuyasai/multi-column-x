@@ -23,5 +23,7 @@
 
 ## 確認事項
 
+- [ ] 機能追加・挙動変更・バグ修正の場合、Gherkin仕様（`docs/specs/*.feature`）を作成しユーザー承認を得た
 - [ ] テストを追加・更新した
-- [ ] `npm run lint` / `npm run typecheck` / `npm test` がグリーン
+- [ ] `npm run format` を実行し、`npm run lint` / `npm run typecheck` / `npm test` がグリーン
+- [ ] 自動化できない手動確認項目がある場合、`integration-test.md` に記載した

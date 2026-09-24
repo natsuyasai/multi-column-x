@@ -86,7 +86,7 @@ Linux ではカラムが独立 `WebviewWindow`（親クリップが効かない�
 
 ### Tauri ウィンドウの close() と destroy()（常駐ウィンドウの破棄）
 
-`WebviewWindow::close()` は `prevent_close()` + `hide()` で閉じる操作を握っている常駐ウィンドウ（例: 常駐コンポーズ `compose-`）には効かない。`src-tauri/src/lib.rs` を変更する場合の詳細は `docs/development/compose-popup-sidebar-notes.md` を参照。`prevent_close` を使う常駐ウィンドウを新設したら、メインウィンドウの `CloseRequested`（`lib.rs`）に明示 `destroy()` を必ず追加すること。
+`WebviewWindow::close()` は `prevent_close()` + `hide()` で閉じる操作を握っている常駐ウィンドウ（例: 常駐コンポーズ `compose-`）には効かない。`src-tauri/src/lib.rs` を変更する場合の詳細は `docs/development/compose-popup-topbar-notes.md` を参照。`prevent_close` を使う常駐ウィンドウを新設したら、メインウィンドウの `CloseRequested`（`lib.rs`）に明示 `destroy()` を必ず追加すること。
 
 ### アカウントログイン検出（desktop vs mobile）
 

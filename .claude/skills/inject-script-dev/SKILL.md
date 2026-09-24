@@ -29,8 +29,8 @@ inject スクリプトは x.com の実 DOM 構造（セレクタ・React 内部�
 1. `src/types/index.ts`: `GlobalSettings` interface に型追加 + `DEFAULT_GLOBAL_SETTINGS` に既定値
 2. `contracts/default-settings.json`: `globalSettings` に既定値を追加（`src/types/defaults.contract.test.ts` と Rust側 `default_settings_match_contract_fixture`（`src-tauri/src/commands/settings.rs`）が突合する）
 3. `src-tauri/src/commands/settings.rs`: `GlobalSettingsData` にフィールド追加（`#[serde(rename = "camelCase名")]` + `#[serde(default = ...)]`）、`Default` impl にも既定値
-4. `src-tauri/src/commands/settings_store.rs`: `load_xxx_enabled(app: &AppHandle) -> bool` 形式のローダ関数を追加（既存例: `load_video_auto_play_stop_enabled` / `load_hide_ad_enabled` / `load_image_popup_enabled` / `load_video_popup_enabled`）
-5. `src-tauri/src/commands/webview/column.rs`: **desktop（`#[cfg(desktop)]`）/ mobile（`#[cfg(mobile)]`）両方**の `create_column_webview` でローダを呼び出し、`InitScriptParams`（`src-tauri/src/inject/mod.rs` 定義）へ渡す
+4. `src-tauri/src/commands/settings_store.rs`: `ColumnScriptSettings` 構造体にフィールド追加 + `column_script_settings_from(global: &serde_json::Value) -> ColumnScriptSettings` 内で `bool_flag` 等のヘルパーを使って既定値付きで取り出す処理を追加（既存例: `video_auto_play_stop_enabled` / `hide_ad_enabled` / `image_popup_enabled` / `video_popup_enabled`）
+5. `src-tauri/src/commands/webview/column.rs`: `build_column_init_script`（desktop/mobile 両方の `create_column_webview` から共通で呼ばれるヘルパー関数）内で `script_settings.xxx` を `InitScriptParams`（`src-tauri/src/inject/mod.rs` 定義）へ渡す。desktop（`#[cfg(desktop)]`）/ mobile（`#[cfg(mobile)]`）の `create_column_webview` 自体は `build_column_init_script` を呼ぶだけなので個別の修正は不要
 6. `src-tauri/src/inject/mod.rs`: `InitScriptParams` にフィールド追加 + `build_init_script` 内の `window.__multiColumnXConfig = {...}` 生成文字列に追加
 7. `src-tauri/src/inject/_src/types.d.ts`: `MultiColumnXConfig` interface に optional フィールド追加
 
