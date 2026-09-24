@@ -30,7 +30,11 @@
 ## TopBar
 
 - TopBar（`src/App.tsx` の `<TopBar>`）は `position: fixed` ではなく通常の React レイアウト内に描画される要素で、旧サイドバーのように x 座標へ手動でオフセットを加算する必要はない。折りたたみ/展開時の高さ（`getTopBarHeight` / `src/lib/gridLayout.ts` の `TOPBAR_COLLAPSED_HEIGHT` = 32px・`TOPBAR_EXPANDED_HEIGHT` = 64px）が `calculateGridBounds` の `topBarHeight` オプション経由で各カラムの `bounds.y` に加算され（`src/lib/gridLayout.ts` L102）、カラム WebView が TopBar の下に来るよう y 方向にオフセットされる。
-- `handleToggleTopBar`（`src/App.tsx` L362 付近）は `setTopBarExpanded` の直後に `setTimeout(() => recalculateAllBounds(), 220)` で `recalculateAllBounds()` を遅延実行している。ただし現在の TopBar 実装（`src/components/TopBar/TopBar.tsx`）は展開時に `row2` を条件付きレンダリングで即座にマウント/アンマウントするだけで、`TopBar.module.scss` にもコンテナ自体の高さや `row2` の出現に対する CSS transition は無い（`.btn` の `width` / `background` の 200ms transition のみで、これは各ボタンのラベル表示用であり高さ変化とは無関係）。つまりこの 220ms 遅延は、旧サイドバーの「幅の CSS transition が終わるのを待つ」実装をそのまま引き継いだもので、現状の TopBar には対応する実アニメーションが無い。挙動に実害はないため残置されているが、TopBar 側に見た目の遅延復元アニメーションを新設する場合はこの `setTimeout` の値を実際の transition 時間に合わせて見直すこと。**アニメーション付きレイアウト変更で「CSS transition の完了を待ってから `recalculateAllBounds()` を呼ぶ」という設計パターン自体は、実際にアニメーションを伴う箇所を新設する際には踏襲してよい。**
+- TopBar の開閉（ボタン・`Ctrl+B` のどちらも `handleToggleTopBar` で `topBarExpanded` を更新する）に対するカラム WebView の再配置は、`src/App.tsx` の `useLayoutEffect`（`topBarExpanded` の変化を検知）で行う。`recalculateAllBounds()` は DOM の `containerRef.clientHeight` を読むため、React が TopBar の高さ変化を DOM に反映した直後・描画前に呼ぶ必要があり、`useLayoutEffect` はこの条件を満たす。以前は旧サイドバーの幅アニメーション（200ms）待ちの名残で `setTimeout(..., 220)` で遅延していたが、TopBar には高さのアニメーションが無く、その間 WebView が古い位置に残って 2 段目が WebView の裏に隠れるため廃止した。
+- この effect には次の2つのガードがある。
+  - **前回値比較（`prevTopBarExpandedRef`）**: 値が変わったときだけ実行する。初回マウント時は起動時の復元（`restoreColumns`）に任せる。`src/main.tsx` は `<React.StrictMode>` を使っており、開発時は effect が二重実行されるため、「初回だけスキップ」のフラグ方式にするとずれる。
+  - **ダイアログ表示中のスキップ（`anyDialogOpen`）**: WebView を画面外に退避している間は再配置しない。閉じたときの復元（`anyDialogOpen` の effect）が、その時点の最新の `topBarExpanded` で正しい位置に戻す。
+- 同種のレイアウト変更（DOM の寸法に依存して WebView を再配置するもの）を追加する場合は、固定時間の `setTimeout` ではなく、状態の変化を `useLayoutEffect` で検知する方式を踏襲すること。実際に CSS transition を伴うレイアウト変更を新設する場合に限り、transition の完了（`transitionend` 等）を待ってから `recalculateAllBounds()` を呼ぶこと。
 - `defaultAccountId`（投稿ボタン＝TopBar の「ツイート」ボタン、`handleComposeTweet` / `src/App.tsx` L497 付近）が指すアカウントが削除済み・未設定の場合は、先頭のアカウント（`accounts[0]`）にフォールバックする設計。同じフォールバックは `linkPopupDefaultAccountId`（L486）でも使われている。「デフォルト◯◯」系の設定を追加する際の定番のエッジケース処理として参考になる。
 
 TopBar のカラム並び替え（dnd-kit によるドラッグ）の詳細は [topbar-column-reorder-notes.md](topbar-column-reorder-notes.md) を参照。

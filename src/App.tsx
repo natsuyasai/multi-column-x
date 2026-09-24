@@ -5,6 +5,7 @@ import { platform } from "@tauri-apps/plugin-os";
 import React, {
   useEffect,
   useCallback,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -272,6 +273,19 @@ const App: React.FC = () => {
     !!settingsLoadNotice ||
     apiRateLimitPopoverOpen;
 
+  // TopBar の開閉で高さが変わったら、DOM 反映直後（描画前）にカラム WebView を追従させる。
+  // ダイアログ表示中（WebView 退避中）は閉じたときの復元（anyDialogOpen effect）に任せる。
+  // StrictMode の effect 二重実行でもずれないよう、前回値を ref に保持し値が変わったときだけ実行する。
+  const prevTopBarExpandedRef = useRef(topBarExpanded);
+  useLayoutEffect(() => {
+    if (prevTopBarExpandedRef.current === topBarExpanded) return;
+    prevTopBarExpandedRef.current = topBarExpanded;
+    if (anyDialogOpen) return;
+    recalculateAllBounds();
+    // topBarExpanded 変化時のみ実行する（他の依存で再実行させない）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topBarExpanded]);
+
   // モバイルスワイプバー（ネイティブオーバーレイ）の状態を Kotlin 側へ同期する。
   // visible は「設定で有効」「透過度>0（0のまま表示し続けるとView.alphaが透明でもタッチを
   // 吸収してしまい、見えないのにタップを奪われる事故になるため非表示にする。詳細は
@@ -361,8 +375,7 @@ const App: React.FC = () => {
 
   const handleToggleTopBar = useCallback(() => {
     setTopBarExpanded(!topBarExpanded);
-    setTimeout(() => recalculateAllBounds(), 220);
-  }, [topBarExpanded, setTopBarExpanded, recalculateAllBounds]);
+  }, [topBarExpanded, setTopBarExpanded]);
 
   // 「フォーカスカラム」= 最後に 1-9 ジャンプ／TopBar クリックでジャンプしたカラム。
   // r キーでのリロード対象を決めるために使う（無ければ order 最小の先頭カラムにフォールバック）。
