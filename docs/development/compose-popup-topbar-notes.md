@@ -1,6 +1,8 @@
-# Compose・ポップアップ・サイドバー・ウィンドウ永続化 開発ノート
+# Compose・ポップアップ・TopBar・ウィンドウ永続化 開発ノート
 
-投稿ポップアップ、アカウントセッション切り替え、サイドバー、ウィンドウ位置永続化に関する実装時の設計判断・落とし穴を記録する。
+投稿ポップアップ、アカウントセッション切り替え、TopBar、ウィンドウ位置永続化に関する実装時の設計判断・落とし穴を記録する。
+
+以前はサイドバーだったが、TopBar（`src/components/TopBar/`）に置き換えられている。
 
 ## 対象ファイル
 
@@ -25,8 +27,10 @@
 - ツールバー高さ（40px 相当）は TS 側の定数と、Rust 側のウィンドウ高さ計算（コンテンツ高さ + ツールバー高さ）の**両方にマジックナンバーとして重複**している。ツールバー高さを変更する場合は両方を同期する必要があり、キーボードショートカット追加時の複数箇所同期と同種のデグレしやすいポイント。
 - ツールバーは `initialization_script` で DOM に `position: fixed; z-index: 99999` として注入し、`document.body.paddingTop` でコンテンツをずらす方式。これは同一 WebView 内への注入なので z-index が機能する。親子 WebView 間で z-index が機能しない（`CLAUDE.md` 記載）話とは別の話であり、混同しないこと。
 
-## サイドバー
+## TopBar
 
-- サイドバーは CSS の `position: fixed` で React レイアウト外に存在するため、子 WebView の x 座標オフセットは CSS ではなく座標計算関数に `sidebarWidth` を手動で加算する必要がある。「ネイティブ WebView は CSS の変化に追従しない」という問題の、グリッドレイアウトとは別のインスタンス。
-- サイドバー開閉時は、幅の CSS transition（200ms）が終わるのを待ってから `recalculateAllBounds()` を呼ぶよう、意図的に遅延（220ms 程度）させている。アニメーション中に WebView 位置を更新すると視覚的にズレるための対策。同種のアニメーション付きレイアウト変更を実装する際はこのパターンを踏襲すること。
-- `defaultAccountId` が指すアカウントが削除済みの場合は、先頭のアカウントにフォールバックする設計。「デフォルト◯◯」系の設定を追加する際の定番のエッジケース処理として参考になる。
+- TopBar（`src/App.tsx` の `<TopBar>`）は `position: fixed` ではなく通常の React レイアウト内に描画される要素で、旧サイドバーのように x 座標へ手動でオフセットを加算する必要はない。折りたたみ/展開時の高さ（`getTopBarHeight` / `src/lib/gridLayout.ts` の `TOPBAR_COLLAPSED_HEIGHT` = 32px・`TOPBAR_EXPANDED_HEIGHT` = 64px）が `calculateGridBounds` の `topBarHeight` オプション経由で各カラムの `bounds.y` に加算され（`src/lib/gridLayout.ts` L102）、カラム WebView が TopBar の下に来るよう y 方向にオフセットされる。
+- `handleToggleTopBar`（`src/App.tsx` L362 付近）は `setTopBarExpanded` の直後に `setTimeout(() => recalculateAllBounds(), 220)` で `recalculateAllBounds()` を遅延実行している。ただし現在の TopBar 実装（`src/components/TopBar/TopBar.tsx`）は展開時に `row2` を条件付きレンダリングで即座にマウント/アンマウントするだけで、`TopBar.module.scss` にもコンテナ自体の高さや `row2` の出現に対する CSS transition は無い（`.btn` の `width` / `background` の 200ms transition のみで、これは各ボタンのラベル表示用であり高さ変化とは無関係）。つまりこの 220ms 遅延は、旧サイドバーの「幅の CSS transition が終わるのを待つ」実装をそのまま引き継いだもので、現状の TopBar には対応する実アニメーションが無い。挙動に実害はないため残置されているが、TopBar 側に見た目の遅延復元アニメーションを新設する場合はこの `setTimeout` の値を実際の transition 時間に合わせて見直すこと。**アニメーション付きレイアウト変更で「CSS transition の完了を待ってから `recalculateAllBounds()` を呼ぶ」という設計パターン自体は、実際にアニメーションを伴う箇所を新設する際には踏襲してよい。**
+- `defaultAccountId`（投稿ボタン＝TopBar の「ツイート」ボタン、`handleComposeTweet` / `src/App.tsx` L497 付近）が指すアカウントが削除済み・未設定の場合は、先頭のアカウント（`accounts[0]`）にフォールバックする設計。同じフォールバックは `linkPopupDefaultAccountId`（L486）でも使われている。「デフォルト◯◯」系の設定を追加する際の定番のエッジケース処理として参考になる。
+
+TopBar のカラム並び替え（dnd-kit によるドラッグ）の詳細は [topbar-column-reorder-notes.md](topbar-column-reorder-notes.md) を参照。
