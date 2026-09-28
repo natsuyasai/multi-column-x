@@ -45,6 +45,18 @@ pub(super) fn validate_media_popup_url(url: &str) -> Result<(), String> {
     }
 }
 
+/// リンクポップアップ・セッション切替の移動先として開ける URL か検証する（純粋関数）。
+/// スキームが http / https のみ許可する（file: / javascript: / data: / 独自スキーム等を拒否）。
+pub(super) fn validate_link_popup_url(url: &str) -> Result<(), String> {
+    let parsed = url::Url::parse(url).map_err(|e| format!("invalid popup url: {e}"))?;
+    match parsed.scheme() {
+        "http" | "https" => Ok(()),
+        other => Err(format!(
+            "invalid popup url: scheme '{other}' is not allowed"
+        )),
+    }
+}
+
 #[cfg(desktop)]
 const POPUP_FALLBACK_BOUNDS: (LogicalPosition<f64>, LogicalSize<f64>) = (
     LogicalPosition { x: 50.0, y: 50.0 },
@@ -951,5 +963,41 @@ mod validate_media_popup_url_tests {
         for url in urls {
             assert!(validate_media_popup_url(url).is_err(), "{url}");
         }
+    }
+}
+
+#[cfg(test)]
+mod validate_link_popup_url_tests {
+    use super::*;
+
+    #[test]
+    fn リンクのポップアップはhttpまたはhttpsのurlなら開ける() {
+        let urls = [
+            "https://x.com/settings",
+            "https://example.com/article",
+            "http://example.com/",
+        ];
+        for url in urls {
+            assert!(validate_link_popup_url(url).is_ok(), "{url}");
+        }
+    }
+
+    #[test]
+    fn リンクのポップアップはhttpとhttps以外のurlでは開かずエラーになる() {
+        let urls = [
+            "file:///C:/Windows/win.ini",
+            "javascript:alert(1)",
+            "data:text/html,<p>x</p>",
+            "ms-settings:",
+            "not a url",
+        ];
+        for url in urls {
+            assert!(validate_link_popup_url(url).is_err(), "{url}");
+        }
+    }
+
+    #[test]
+    fn ポップアップのアカウント切替でhttpとhttps以外の移動先を指定するとエラーになる() {
+        assert!(validate_link_popup_url("file:///C:/Windows/win.ini").is_err());
     }
 }
