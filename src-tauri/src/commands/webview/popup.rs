@@ -972,6 +972,44 @@ mod validate_media_popup_url_tests {
             assert!(validate_media_popup_url(url).is_err(), "{url}");
         }
     }
+
+    /// validate_media_popup_url のプロパティテスト。
+    /// 仕様「https かつホストが x.com / twitter.com またはそのサブドメインのときのみ Ok」を
+    /// 広い入力域で検証する。
+    mod properties {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            #[test]
+            fn ホストがx系以外なら常にエラーになる(h in "[a-z0-9-]{1,20}\\.(com|net|org)") {
+                prop_assume!(
+                    h != "x.com"
+                        && h != "twitter.com"
+                        && !h.ends_with(".x.com")
+                        && !h.ends_with(".twitter.com")
+                );
+                let url = format!("https://{h}/");
+                prop_assert!(validate_media_popup_url(&url).is_err());
+            }
+
+            #[test]
+            fn xホストの任意のサブドメインと任意のパスなら常に許可される(
+                base in "x\\.com|twitter\\.com",
+                sub in "[a-z0-9]{1,10}",
+                path in "[a-zA-Z0-9/_-]{0,30}"
+            ) {
+                let url = format!("https://{sub}.{base}/{path}");
+                prop_assert!(validate_media_popup_url(&url).is_ok());
+            }
+
+            #[test]
+            fn httpスキームならホストがxでも常にエラーになる(path in "[a-zA-Z0-9/_-]{0,30}") {
+                let url = format!("http://x.com/{path}");
+                prop_assert!(validate_media_popup_url(&url).is_err());
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1007,5 +1045,44 @@ mod validate_link_popup_url_tests {
     #[test]
     fn ポップアップのアカウント切替でhttpとhttps以外の移動先を指定するとエラーになる() {
         assert!(validate_link_popup_url("file:///C:/Windows/win.ini").is_err());
+    }
+
+    /// validate_link_popup_url のプロパティテスト。
+    /// 仕様「スキームが http / https のときのみ Ok」を広い入力域で検証する。
+    mod properties {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            #[test]
+            fn httpとhttps以外のスキームなら常にエラーになる(
+                scheme in "[a-z][a-z0-9+.-]{0,10}",
+                rest in "[a-zA-Z0-9/_.-]{0,20}"
+            ) {
+                prop_assume!(scheme != "http" && scheme != "https");
+                let candidate = format!("{scheme}:{rest}");
+                // 生成された文字列は URL として解析できない場合がある
+                // （validate_link_popup_url の不具合ではない）。
+                // その場合は URL として成立しているケースのみを検証対象とする。
+                if url::Url::parse(&candidate).is_err() {
+                    return Ok(());
+                }
+                prop_assert!(validate_link_popup_url(&candidate).is_err());
+            }
+
+            #[test]
+            fn httpまたはhttpsとランダムホストなら常に許可される(
+                scheme in "http|https",
+                host in "[a-z0-9-]{1,20}\\.(com|net|org|dev)"
+            ) {
+                let candidate = format!("{scheme}://{host}/");
+                // 生成されたホストは URL として解析できない場合がある
+                // （validate_link_popup_url の不具合ではない）。
+                if url::Url::parse(&candidate).is_err() {
+                    return Ok(());
+                }
+                prop_assert!(validate_link_popup_url(&candidate).is_ok());
+            }
+        }
     }
 }
