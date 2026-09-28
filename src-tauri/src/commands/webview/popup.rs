@@ -272,6 +272,7 @@ pub async fn open_popup_window(
     app: AppHandle,
     url: String,
 ) -> Result<(), String> {
+    validate_media_popup_url(&url)?;
     let state = app.state::<AppState>();
     let (data_dir, current_account_id) = {
         let registry = state.registry.lock().expect("registry mutex poisoned");
@@ -303,6 +304,7 @@ pub async fn open_popup_window(
     app: AppHandle,
     url: String,
 ) -> Result<(), String> {
+    validate_media_popup_url(&url)?;
     let state = app.state::<AppState>();
     let current_account_id = {
         let registry = state.registry.lock().expect("registry mutex poisoned");
@@ -358,6 +360,7 @@ pub async fn open_link_popup_window(
     #[allow(non_snake_case)] accountId: Option<String>,
     url: String,
 ) -> Result<(), String> {
+    validate_link_popup_url(&url)?;
     let (data_dir, current_account_id) =
         match link_popup_account_source(caller.label(), accountId.as_deref()) {
             LinkPopupAccountSource::Explicit(aid) => {
@@ -403,6 +406,7 @@ pub async fn open_link_popup_window(
     #[allow(non_snake_case)] accountId: Option<String>,
     url: String,
 ) -> Result<(), String> {
+    validate_link_popup_url(&url)?;
     let caller_label = caller.label();
     let current_account_id = match link_popup_account_source(caller_label, accountId.as_deref()) {
         LinkPopupAccountSource::Explicit(aid) => aid.to_string(),
@@ -467,6 +471,9 @@ pub fn switch_popup_session_android(
     account_id: &str,
     url: &str,
 ) -> Result<(), String> {
+    // popup_toolbar → PopupSessionBridge → AppBridge.onPopupSwitchSession（JNI）経由の
+    // 呼び出しは switch_popup_session（Tauri コマンド）を経由しないため、ここでも検証する。
+    validate_link_popup_url(url)?;
     // compose（COMPOSE_PREFIX）のセッション切替は「常駐の置換」として扱う。
     // POPUP_PREFIX 固定で再作成すると常駐ラベルが popup- になり compose 扱いから
     // 外れてしまう（旧バグ）ため、COMPOSE_PREFIX を維持し常駐状態も更新する。
@@ -516,6 +523,7 @@ pub async fn switch_popup_session(
     if !is_switchable_popup_caller_label(&popup_label) {
         return Err("forbidden: caller must be a popup or compose webview".to_string());
     }
+    validate_link_popup_url(&url)?;
 
     #[cfg(target_os = "android")]
     {
