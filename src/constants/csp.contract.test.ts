@@ -34,4 +34,14 @@ describe("メイン画面CSPの契約", () => {
     expect(connectSrc.has("https:")).toBe(false);
     expect(connectSrc.has("*")).toBe(false);
   });
+
+  it("メイン画面の画像はアプリ自身とdata URLだけが許可されている", () => {
+    const csp = tauriConf.app.security.csp;
+    const directives = parseCsp(csp);
+
+    const imgSrc = new Set(directives["img-src"]);
+
+    expect(imgSrc).toEqual(new Set(["'self'", "data:"]));
+    expect(imgSrc.has("https:")).toBe(false);
+  });
 });
