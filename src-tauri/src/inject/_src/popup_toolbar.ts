@@ -133,6 +133,29 @@ export function isOfficialSettingsPagePath(pathname: string): boolean {
   return pathname.startsWith("/settings");
 }
 
+/** hostname が x.com / twitter.com またはそのサブドメインかどうかを判定する。 */
+export function isXHostname(hostname: string): boolean {
+  return (
+    hostname === "x.com" ||
+    hostname.endsWith(".x.com") ||
+    hostname === "twitter.com" ||
+    hostname.endsWith(".twitter.com")
+  );
+}
+
+/**
+ * 初期化スクリプトが埋め込んだアカウント一覧を取り出し、window から削除する。
+ * X 系のページでなければ空配列を返す（外部サイトへアカウント情報を渡さないため）。
+ */
+export function takePopupAccounts(
+  win: Window,
+  hostname: string,
+): TvAccountInfo[] {
+  const accounts = win.__mcxAccounts ?? [];
+  delete win.__mcxAccounts;
+  return isXHostname(hostname) ? accounts : [];
+}
+
 /** Cookie文字列から "night_mode" の値を読む。存在しなければ null（システム設定を使う状態）を返す。 */
 export function readNightModeCookie(cookieString: string): string | null {
   const match = cookieString.match(/(?:^|; )night_mode=([^;]*)/);
@@ -154,7 +177,7 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
 }
 
 (function () {
-  const accounts: TvAccountInfo[] = window.__mcxAccounts ?? [];
+  const accounts = takePopupAccounts(window, location.hostname);
   const currentAccountId: string = window.__mcxCurrentAccountId ?? "";
   const targetHref: string = window.__mcxTargetHref ?? "";
   const escCloseEnabled: boolean = window.__mcxEscCloseEnabled ?? true;
