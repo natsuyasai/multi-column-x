@@ -20,6 +20,31 @@ use tauri::{AppHandle, Emitter, Manager};
 #[cfg(desktop)]
 use tauri::{LogicalPosition, LogicalSize};
 
+/// hostname が x.com / twitter.com またはそのサブドメインかどうかを判定する（純粋関数）。
+fn is_x_hostname(host: &str) -> bool {
+    host == "x.com"
+        || host.ends_with(".x.com")
+        || host == "twitter.com"
+        || host.ends_with(".twitter.com")
+}
+
+/// 画像・動画ポップアップで開ける URL か検証する（純粋関数）。
+/// https かつホストが x.com / twitter.com またはそのサブドメインのみ許可する。
+pub(super) fn validate_media_popup_url(url: &str) -> Result<(), String> {
+    let parsed = url::Url::parse(url).map_err(|e| format!("invalid popup url: {e}"))?;
+    if parsed.scheme() != "https" {
+        return Err("invalid popup url: only https scheme is allowed".to_string());
+    }
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| "invalid popup url: missing host".to_string())?;
+    if is_x_hostname(host) {
+        Ok(())
+    } else {
+        Err(format!("invalid popup url: host '{host}' is not allowed"))
+    }
+}
+
 #[cfg(desktop)]
 const POPUP_FALLBACK_BOUNDS: (LogicalPosition<f64>, LogicalSize<f64>) = (
     LogicalPosition { x: 50.0, y: 50.0 },
@@ -893,5 +918,38 @@ mod tests {
         let (pos, size) = POPUP_FALLBACK_BOUNDS;
         assert_eq!((pos.x, pos.y), (50.0, 50.0));
         assert_eq!((size.width, size.height), (800.0, 600.0));
+    }
+}
+
+#[cfg(test)]
+mod validate_media_popup_url_tests {
+    use super::*;
+
+    #[test]
+    fn 画像や動画のポップアップはxのhttpsページなら開ける() {
+        let urls = [
+            "https://x.com/user/status/1/photo/1",
+            "https://twitter.com/user/status/1/video/1",
+            "https://mobile.x.com/user/status/1/photo/1",
+        ];
+        for url in urls {
+            assert!(validate_media_popup_url(url).is_ok(), "{url}");
+        }
+    }
+
+    #[test]
+    fn 画像や動画のポップアップはx以外やhttps以外のurlでは開かずエラーになる() {
+        let urls = [
+            "http://x.com/user/status/1",
+            "https://example.com/",
+            "https://x.com.example.com/",
+            "https://evilx.com/",
+            "file:///C:/Windows/win.ini",
+            "javascript:alert(1)",
+            "not a url",
+        ];
+        for url in urls {
+            assert!(validate_media_popup_url(url).is_err(), "{url}");
+        }
     }
 }
