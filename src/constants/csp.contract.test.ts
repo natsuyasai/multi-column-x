@@ -44,4 +44,15 @@ describe("メイン画面CSPの契約", () => {
     expect(imgSrc).toEqual(new Set(["'self'", "data:"]));
     expect(imgSrc.has("https:")).toBe(false);
   });
+
+  it("スクリプトの読み込み元はアプリ自身だけのまま変わらない", () => {
+    const csp = tauriConf.app.security.csp;
+    const directives = parseCsp(csp);
+
+    const scriptSrc = new Set(directives["script-src"]);
+
+    expect(scriptSrc).toEqual(new Set(["'self'"]));
+    expect(scriptSrc.has("'unsafe-inline'")).toBe(false);
+    expect(scriptSrc.has("'unsafe-eval'")).toBe(false);
+  });
 });
