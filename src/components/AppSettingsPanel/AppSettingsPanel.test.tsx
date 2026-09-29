@@ -801,6 +801,106 @@ describe("AppSettingsPanel プリセット", () => {
   });
 });
 
+describe("AppSettingsPanel 設定パッチの全項目反映", () => {
+  const distinctGlobalSettings: GlobalSettings = {
+    ...baseGlobalSettings,
+    defaultAutoReloadEnabled: false,
+    defaultAutoReloadInterval: 123,
+    defaultShowCountdown: false,
+    defaultHideHeaderEnabled: false,
+    defaultHideTweetInputEnabled: false,
+    defaultShowCustomMenu: true,
+    defaultScrollPosRestoreEnabled: true,
+    defaultColumnCustomCSS: ".test{}",
+    popupEscCloseEnabled: false,
+    videoAutoPlayStopEnabled: false,
+    imagePopupEnabled: false,
+    videoPopupEnabled: false,
+    smallImageEnabled: true,
+    smallImageWidth: "70%",
+    blurImageEnabled: true,
+    blurImageAmount: "20px",
+    hideAdEnabled: false,
+    apiRateLimitMonitorEnabled: false,
+    useXAppForCompose: true,
+    mobileSwipeAreaEnabled: false,
+    mobileSwipeAreaHeight: 30,
+    mobileSwipeAreaOpacity: 80,
+    mobileTwoColumnEnabled: false,
+    ngWords: ["spam", "bot"],
+    repostHiddenUserIds: ["user_a", "user_b"],
+  };
+
+  it("適用すると全体設定の全項目がonApplyに渡される", () => {
+    const onApply = vi.fn();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={distinctGlobalSettings}
+        onApply={onApply}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledTimes(1);
+    expect(onApply).toHaveBeenCalledWith({
+      defaultAutoReloadEnabled: false,
+      defaultAutoReloadInterval: 123,
+      defaultShowCountdown: false,
+      defaultHideHeaderEnabled: false,
+      defaultHideTweetInputEnabled: false,
+      defaultShowCustomMenu: true,
+      defaultScrollPosRestoreEnabled: true,
+      defaultColumnCustomCSS: ".test{}",
+      popupEscCloseEnabled: false,
+      videoAutoPlayStopEnabled: false,
+      imagePopupEnabled: false,
+      videoPopupEnabled: false,
+      smallImageEnabled: true,
+      smallImageWidth: "70%",
+      blurImageEnabled: true,
+      blurImageAmount: "20px",
+      hideAdEnabled: false,
+      apiRateLimitMonitorEnabled: false,
+      useXAppForCompose: true,
+      mobileSwipeAreaEnabled: false,
+      mobileSwipeAreaHeight: 30,
+      mobileSwipeAreaOpacity: 80,
+      mobileTwoColumnEnabled: false,
+      ngWords: ["spam", "bot"],
+      repostHiddenUserIds: ["user_a", "user_b"],
+    });
+  });
+
+  it("カラムデフォルトを全カラムに適用すると全項目がonApplyColumnDefaultsに渡される", () => {
+    const onApplyColumnDefaults = vi.fn();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={distinctGlobalSettings}
+        onApplyColumnDefaults={onApplyColumnDefaults}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "既存の全カラムに適用" }),
+    );
+    expect(onApplyColumnDefaults).toHaveBeenCalledTimes(1);
+    expect(onApplyColumnDefaults).toHaveBeenCalledWith({
+      autoReloadEnabled: false,
+      autoReloadInterval: 123,
+      showCountdown: false,
+      hideHeaderEnabled: false,
+      hideTweetInputEnabled: false,
+      showCustomMenu: true,
+      scrollPosRestoreEnabled: true,
+      customCSS: ".test{}",
+      smallImageEnabled: true,
+      smallImageWidth: "70%",
+      blurImageEnabled: true,
+      blurImageAmount: "20px",
+    });
+  });
+});
+
 describe("AppSettingsPanel 削除保留データフォルダの再実行", () => {
   it("再実行対象が無いときは再実行の操作が表示されない", () => {
     render(

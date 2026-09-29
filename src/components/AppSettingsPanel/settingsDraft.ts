@@ -1,4 +1,4 @@
-import type { ColumnScale, GlobalSettings } from "../../types";
+import type { ColumnScale, ColumnSettings, GlobalSettings } from "../../types";
 
 export const SWIPE_AREA_MIN_HEIGHT = 16;
 export const SWIPE_AREA_MAX_HEIGHT = 56;
@@ -99,4 +99,80 @@ export function clampSwipeAreaHeight(value: string): number {
     SWIPE_AREA_MAX_HEIGHT,
     Math.max(SWIPE_AREA_MIN_HEIGHT, Number(value) || SWIPE_AREA_MIN_HEIGHT),
   );
+}
+
+/**
+ * フォームドラフトと検証済みのNGワード・リポスト非表示ユーザーID一覧から、
+ * 「一般」タブ適用時に onApply へ渡す GlobalSettings のパッチを組み立てる。
+ */
+export function toGlobalSettingsPatch(
+  draft: SettingsDraft,
+  lists: { ngWords: string[]; repostHiddenUserIds: string[] },
+): Partial<GlobalSettings> {
+  const patch: Partial<GlobalSettings> = {
+    defaultAutoReloadEnabled: draft.defaultAutoReloadEnabled,
+    defaultAutoReloadInterval: draft.defaultAutoReloadInterval,
+    defaultShowCountdown: draft.defaultShowCountdown,
+    defaultHideHeaderEnabled: draft.defaultHideHeaderEnabled,
+    defaultHideTweetInputEnabled: draft.defaultHideTweetInputEnabled,
+    defaultShowCustomMenu: draft.defaultShowCustomMenu,
+    defaultScrollPosRestoreEnabled: draft.defaultScrollPosRestoreEnabled,
+    defaultColumnCustomCSS: draft.defaultColumnCustomCSS,
+    popupEscCloseEnabled: draft.popupEscCloseEnabled,
+    videoAutoPlayStopEnabled: draft.videoAutoPlayStopEnabled,
+    imagePopupEnabled: draft.imagePopupEnabled,
+    videoPopupEnabled: draft.videoPopupEnabled,
+    smallImageEnabled: draft.smallImageEnabled,
+    smallImageWidth: draft.smallImageWidth,
+    blurImageEnabled: draft.blurImageEnabled,
+    blurImageAmount: draft.blurImageAmount,
+    hideAdEnabled: draft.hideAdEnabled,
+    apiRateLimitMonitorEnabled: draft.apiRateLimitMonitorEnabled,
+    useXAppForCompose: draft.useXAppForCompose,
+    mobileSwipeAreaEnabled: draft.mobileSwipeAreaEnabled,
+    mobileSwipeAreaHeight: clampSwipeAreaHeight(draft.mobileSwipeAreaHeight),
+    mobileSwipeAreaOpacity: draft.mobileSwipeAreaOpacity,
+    mobileTwoColumnEnabled: draft.mobileTwoColumnEnabled,
+    ngWords: lists.ngWords,
+    repostHiddenUserIds: lists.repostHiddenUserIds,
+  };
+  if (draft.columnScaleOverrideEnabled) {
+    patch.columnScale = draft.columnScale;
+  }
+  if (draft.themeOverrideEnabled) {
+    patch.theme = draft.theme;
+  }
+  return patch;
+}
+
+/** `onApplyColumnDefaults` に渡す既存カラムへ一括適用するパッチの型 */
+export type ColumnDefaultsPatch = Omit<
+  ColumnSettings,
+  | "visibleLinks"
+  | "ngWords"
+  | "repostHiddenUserIds"
+  | "whitelistEnabled"
+  | "whitelistWords"
+  | "returnToLastReadEnabled"
+>;
+
+/**
+ * フォームドラフトから、「既存の全カラムに適用」時に onApplyColumnDefaults へ
+ * 渡すカラムデフォルトのパッチを組み立てる。
+ */
+export function toColumnDefaults(draft: SettingsDraft): ColumnDefaultsPatch {
+  return {
+    autoReloadEnabled: draft.defaultAutoReloadEnabled,
+    autoReloadInterval: draft.defaultAutoReloadInterval,
+    showCountdown: draft.defaultShowCountdown,
+    hideHeaderEnabled: draft.defaultHideHeaderEnabled,
+    hideTweetInputEnabled: draft.defaultHideTweetInputEnabled,
+    showCustomMenu: draft.defaultShowCustomMenu,
+    scrollPosRestoreEnabled: draft.defaultScrollPosRestoreEnabled,
+    customCSS: draft.defaultColumnCustomCSS,
+    smallImageEnabled: draft.smallImageEnabled,
+    smallImageWidth: draft.smallImageWidth,
+    blurImageEnabled: draft.blurImageEnabled,
+    blurImageAmount: draft.blurImageAmount,
+  };
 }
