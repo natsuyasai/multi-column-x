@@ -6,6 +6,7 @@ import type { ComponentProps } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Column, Account } from "../../types";
 import { TopBar } from "./TopBar";
+import styles from "./TopBar.module.scss";
 
 // jsdom では getBoundingClientRect が全て 0 となり実 D&D の衝突判定が成立しないため、
 // DndContext に渡された onDragEnd を捕捉して、ドロップ結果を直接流し込む。
@@ -204,6 +205,37 @@ describe("TopBar", () => {
         .querySelector('[title="カラムを閉じる"]')
         ?.querySelector('[data-testid="icon-close"]'),
     ).toBeInTheDocument();
+  });
+
+  describe("展開時のボタンラベルとクラス", () => {
+    it.each([
+      ["ツイートを作成 (Ctrl+T)", "ツイート"],
+      ["URLをポップアップで開く (Ctrl+L)", "URLを開く"],
+      ["カラムを追加 (Ctrl+N)", "カラム追加"],
+      ["アカウント管理 (Ctrl+Shift+A)", "アカウント"],
+      ["アプリ設定 (Ctrl+,)", "設定"],
+    ])(
+      "「%s」ボタンは展開時にラベル「%s」が表示されbtnExpandedクラスが付き、折りたたみ時はどちらも無い",
+      (title, label) => {
+        const { rerender } = render(
+          <TopBar {...defaultProps} expanded={false} />,
+        );
+        const collapsedButton = screen.getByTitle(title);
+        expect(
+          within(collapsedButton).queryByText(label),
+        ).not.toBeInTheDocument();
+        expect(collapsedButton.classList.contains(styles.btnExpanded)).toBe(
+          false,
+        );
+
+        rerender(<TopBar {...defaultProps} expanded={true} />);
+        const expandedButton = screen.getByTitle(title);
+        expect(within(expandedButton).getByText(label)).toBeInTheDocument();
+        expect(expandedButton.classList.contains(styles.btnExpanded)).toBe(
+          true,
+        );
+      },
+    );
   });
 
   describe("アクションボタンの SVG アイコン", () => {

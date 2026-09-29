@@ -3,6 +3,7 @@ import { render, screen, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { IPC_COMMANDS, WEBVIEW_LABELS } from "@/constants/ipc";
+import { useAutoReload } from "../../hooks/useAutoReload";
 import type { Column, Account } from "../../types";
 import { ColumnHeader } from "./ColumnHeader";
 import styles from "./ColumnHeader.module.scss";
@@ -11,7 +12,15 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue(undefined),
 }));
 
+// 実装は素通しし、特定のテストだけ mockReturnValueOnce で remaining を強制できるようにする
+vi.mock("../../hooks/useAutoReload", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../hooks/useAutoReload")>();
+  return { ...actual, useAutoReload: vi.fn(actual.useAutoReload) };
+});
+
 const mockInvoke = vi.mocked(invoke);
+const mockUseAutoReload = vi.mocked(useAutoReload);
 
 const mockAccount: Account = {
   id: "acc-1",
@@ -297,5 +306,61 @@ describe("ColumnHeader 自動更新の対象カラム", () => {
       );
     });
     expect(evalCallsFor(homeListTabColumn.id)).toHaveLength(1);
+  });
+});
+
+describe("ColumnHeader 外部カラムでのカウントダウン非表示", () => {
+  it("外部カラムでは自動更新のカウントダウンを表示しない", () => {
+    // isAutoReloadSupported が external を弾くため remaining は本来 null になるが、
+    // ここではフックを差し替えて remaining を強制し、isExternal 側の条件だけを検証する
+    mockUseAutoReload.mockReturnValueOnce({ remaining: 5, reset: vi.fn() });
+    const externalColumn: Column = {
+      ...mockColumn,
+      pageType: "external",
+      settings: { ...mockColumn.settings, showCountdown: true },
+    };
+    render(<ColumnHeader {...defaultProps} column={externalColumn} />);
+    expect(screen.queryByTitle("次の自動更新まで")).not.toBeInTheDocument();
+  });
+});
+
+describe("ColumnHeader 更新ボタンのカウントダウンリセット", () => {
+  const autoReloadColumn: Column = {
+    ...mockColumn,
+    settings: {
+      ...mockColumn.settings,
+      autoReloadEnabled: true,
+      showCountdown: true,
+      autoReloadInterval: 60,
+    },
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("更新ボタンを押すと自動更新のカウントダウンが最初からになる", () => {
+    render(<ColumnHeader {...defaultProps} column={autoReloadColumn} />);
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+    expect(screen.getByTitle("次の自動更新まで")).toHaveTextContent("55s");
+    fireEvent.click(screen.getByLabelText("更新"));
+    expect(screen.getByTitle("次の自動更新まで")).toHaveTextContent("60s");
+  });
+
+  it("ページを再読み込みボタンを押すと自動更新のカウントダウンが最初からになる", () => {
+    render(<ColumnHeader {...defaultProps} column={autoReloadColumn} />);
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+    expect(screen.getByTitle("次の自動更新まで")).toHaveTextContent("55s");
+    fireEvent.click(screen.getByLabelText("ページを再読み込み"));
+    expect(screen.getByTitle("次の自動更新まで")).toHaveTextContent("60s");
   });
 });
