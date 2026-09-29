@@ -60,46 +60,77 @@ fn custom_css_call(custom_css: &str) -> Option<String> {
     }
 }
 
+/// 文字列配列を JS の配列リテラルとして埋め込むための JSON エンコード。
+/// エンコードに失敗した場合は空配列にフォールバックする。
+fn json_array(values: &[String]) -> String {
+    serde_json::to_string(values).unwrap_or_else(|_| "[]".to_string())
+}
+
 /// カラム設定（`window.__multiColumnXConfig`）を組み立てる。
 /// キーの順序・区切り・空白は既存の出力と完全に同一にすること。
 fn config_script(params: &InitScriptParams) -> String {
-    let visible_links_json =
-        serde_json::to_string(params.visible_links).unwrap_or_else(|_| "[]".to_string());
-    let ng_words_json = serde_json::to_string(params.ng_words).unwrap_or_else(|_| "[]".to_string());
-    let global_ng_words_json =
-        serde_json::to_string(params.global_ng_words).unwrap_or_else(|_| "[]".to_string());
-    let repost_hidden_user_ids_json =
-        serde_json::to_string(params.repost_hidden_user_ids).unwrap_or_else(|_| "[]".to_string());
-    let global_repost_hidden_user_ids_json =
-        serde_json::to_string(params.global_repost_hidden_user_ids)
-            .unwrap_or_else(|_| "[]".to_string());
-    let whitelist_words_json =
-        serde_json::to_string(params.whitelist_words).unwrap_or_else(|_| "[]".to_string());
     let effective_show_custom_menu = params.hide_header_enabled && params.show_custom_menu;
+    let entries: [(&str, String); 20] = [
+        ("hideHeaderEnabled", params.hide_header_enabled.to_string()),
+        (
+            "hideTweetInputEnabled",
+            params.hide_tweet_input_enabled.to_string(),
+        ),
+        ("showCustomMenu", effective_show_custom_menu.to_string()),
+        ("visibleLinks", json_array(params.visible_links)),
+        ("smallImageEnabled", params.small_image_enabled.to_string()),
+        ("smallImageWidth", js_string(params.small_image_width)),
+        ("blurImageEnabled", params.blur_image_enabled.to_string()),
+        ("blurImageAmount", js_string(params.blur_image_amount)),
+        ("hideAdEnabled", params.hide_ad_enabled.to_string()),
+        (
+            "apiRateLimitMonitorEnabled",
+            params.api_rate_limit_monitor_enabled.to_string(),
+        ),
+        ("imagePopupEnabled", params.image_popup_enabled.to_string()),
+        ("videoPopupEnabled", params.video_popup_enabled.to_string()),
+        ("ngWords", json_array(params.ng_words)),
+        ("globalNgWords", json_array(params.global_ng_words)),
+        (
+            "repostHiddenUserIds",
+            json_array(params.repost_hidden_user_ids),
+        ),
+        (
+            "globalRepostHiddenUserIds",
+            json_array(params.global_repost_hidden_user_ids),
+        ),
+        ("whitelistEnabled", params.whitelist_enabled.to_string()),
+        ("whitelistWords", json_array(params.whitelist_words)),
+        (
+            "returnToLastReadEnabled",
+            params.return_to_last_read_enabled.to_string(),
+        ),
+        (
+            "mobileSwipeAreaOffset",
+            params.mobile_swipe_area_offset.to_string(),
+        ),
+    ];
+    let body = entries
+        .iter()
+        .map(|(k, v)| format!("{k}: {v}"))
+        .collect::<Vec<_>>()
+        .join(", ");
     format!(
-        "window.{} = {{ hideHeaderEnabled: {}, hideTweetInputEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {}, blurImageEnabled: {}, blurImageAmount: {}, hideAdEnabled: {}, apiRateLimitMonitorEnabled: {}, imagePopupEnabled: {}, videoPopupEnabled: {}, ngWords: {}, globalNgWords: {}, repostHiddenUserIds: {}, globalRepostHiddenUserIds: {}, whitelistEnabled: {}, whitelistWords: {}, returnToLastReadEnabled: {}, mobileSwipeAreaOffset: {} }};",
+        "window.{} = {{ {} }};",
         globals::MULTI_COLUMN_X_CONFIG,
-        params.hide_header_enabled,
-        params.hide_tweet_input_enabled,
-        effective_show_custom_menu,
-        visible_links_json,
-        params.small_image_enabled,
-        js_string(params.small_image_width),
-        params.blur_image_enabled,
-        js_string(params.blur_image_amount),
-        params.hide_ad_enabled,
-        params.api_rate_limit_monitor_enabled,
-        params.image_popup_enabled,
-        params.video_popup_enabled,
-        ng_words_json,
-        global_ng_words_json,
-        repost_hidden_user_ids_json,
-        global_repost_hidden_user_ids_json,
-        params.whitelist_enabled,
-        whitelist_words_json,
-        params.return_to_last_read_enabled,
-        params.mobile_swipe_area_offset
+        body
     )
+}
+
+/// `cond` が true のときだけ `script` を返し、false なら空文字列を返す。
+/// `include_str!` はコンパイル時に静的文字列を埋め込むだけのマクロなので、
+/// 呼び出し側で `include_if(cond, include_str!("..."))` のように渡す。
+fn include_if(cond: bool, script: &'static str) -> &'static str {
+    if cond {
+        script
+    } else {
+        ""
+    }
 }
 
 // 連結順どおりに並べたスクリプト片。tab_selector の直後に続く
@@ -116,46 +147,21 @@ fn script_parts(params: &InitScriptParams) -> Vec<Cow<'static, str>> {
     let blur_image = include_str!("blur_image.js");
     let hide_ad = include_str!("hide_ad.js");
     let ng_word = include_str!("ng_word.js");
-    let image_popup = if params.is_mobile {
-        ""
-    } else {
-        include_str!("image_popup.js")
-    };
-    let scroll_pos_restore = if params.scroll_pos_restore_enabled {
-        include_str!("scroll_pos_restore.js")
-    } else {
-        ""
-    };
+    let image_popup = include_if(!params.is_mobile, include_str!("image_popup.js"));
+    let scroll_pos_restore = include_if(
+        params.scroll_pos_restore_enabled,
+        include_str!("scroll_pos_restore.js"),
+    );
     // 表示サイズは x.com 自身の設定 (IndexedDB device:rweb:settings.scale) で管理するため
     // CSS zoom inject は使用しない
-    let context_menu = if params.is_mobile {
-        ""
-    } else {
-        include_str!("context_menu.js")
-    };
-    let scroll_event = if params.is_mobile {
-        ""
-    } else {
-        include_str!("scroll_event.js")
-    };
-    let keyboard_shortcut = if params.is_mobile {
-        ""
-    } else {
-        include_str!("keyboard_shortcut.js")
-    };
+    let context_menu = include_if(!params.is_mobile, include_str!("context_menu.js"));
+    let scroll_event = include_if(!params.is_mobile, include_str!("scroll_event.js"));
+    let keyboard_shortcut = include_if(!params.is_mobile, include_str!("keyboard_shortcut.js"));
     let video_control = include_str!("video_control.js");
     let sidebar_hide = include_str!("sidebar_hide.js");
-    let mobile_area_hide = if params.is_mobile {
-        include_str!("mobile_area_hide.js")
-    } else {
-        ""
-    };
+    let mobile_area_hide = include_if(params.is_mobile, include_str!("mobile_area_hide.js"));
     let notification_header_hide = include_str!("notification_header_hide.js");
-    let compose_only = if params.compose_only_enabled {
-        include_str!("compose_only.js")
-    } else {
-        ""
-    };
+    let compose_only = include_if(params.compose_only_enabled, include_str!("compose_only.js"));
     let video_long_press_menu = include_str!("video_long_press_menu.js");
     let api_rate_limit_monitor = include_str!("api_rate_limit_monitor.js");
 
