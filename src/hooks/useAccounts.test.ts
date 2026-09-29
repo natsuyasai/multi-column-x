@@ -1444,6 +1444,40 @@ describe("useAccounts (desktop reauth)", () => {
       useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
     ).toEqual([NEW_DATA_DIRECTORY]);
   });
+
+  it("再認証の処理中に同じアカウントの再認証を開始しても再認証ウィンドウは1回しか開かれない", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+    });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "reauth_account_window" ? reauthWindowResult : undefined,
+    );
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let firstReauthPromise: Promise<void> = Promise.resolve();
+    let secondReauthPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      firstReauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      secondReauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: "123",
+        newDataDirectory: NEW_DATA_DIRECTORY,
+      });
+      await firstReauthPromise;
+      await secondReauthPromise;
+    });
+
+    expect(
+      mockInvoke.mock.calls.filter(
+        (call) => call[0] === "reauth_account_window",
+      ),
+    ).toHaveLength(1);
+  });
 });
 
 describe("useAccounts (mobile reauth)", () => {
