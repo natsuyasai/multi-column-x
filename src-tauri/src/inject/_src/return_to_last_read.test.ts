@@ -873,4 +873,136 @@ describe("inject/return_to_last_read", () => {
       expect(toast?.style.display).toBe("none");
     }, 15000);
   });
+
+  describe("先頭スナップショット更新・目視判定の境界条件", () => {
+    it("先頭から離れた位置にいるときは基準候補の読み直しを行わない", async () => {
+      const tablist = addTablist();
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["1", "2", "3", "4", "5"]);
+
+      await importReturnToLastRead({ enabled: true });
+      window.__multiColumnX.triggerReload?.();
+
+      // 新着が入りボタンが表示される
+      setTimeline(section, ["100", "1", "2", "3", "4"]);
+      window.dispatchEvent(new Event("scroll"));
+      expect(isButtonVisible()).toBe(true);
+
+      // 先頭から離れた位置（scrollTop > 1）で、先頭の内容が基準と完全一致する状態に
+      // 戻っても、基準候補の読み直しは行われないため表示状態は変わらない
+      setScrollTop(50);
+      setTimeline(section, ["1", "2", "3", "4", "5"]);
+      window.dispatchEvent(new Event("scroll"));
+
+      expect(isButtonVisible()).toBe(true);
+    });
+
+    it("DOM変化による呼び出しでは、戻り先が画面内にあっても目視済みにしない", async () => {
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["11", "12", "13", "14", "15", "16"]);
+
+      await importReturnToLastRead({ enabled: true });
+      window.__multiColumnX.triggerReload?.();
+
+      setTimeline(section, ["101", "11", "12", "13", "14"]);
+      window.dispatchEvent(new Event("scroll"));
+      expect(isButtonVisible()).toBe(true);
+
+      // 直前にユーザー操作があった状態を作り、戻り先（run一致する "11"）が
+      // 画面内にある状況を用意する
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown" }));
+      setScrollTop(200);
+      setTimeline(section, ["101", "11", "12", "13", "14"], { topStep: 200 });
+      const articles = section.querySelectorAll("article");
+      setElementRect(articles[0], { top: -100 }); // 101: 画面外（上）
+      setElementRect(articles[1], { top: 100 }); // 11: 画面内
+      setElementRect(articles[2], { top: 300 }); // 12: 画面内
+
+      // scroll イベントではなく、DOM 変化契機の呼び出し（source="dom"）を
+      // setReturnToLastReadEnabled の再適用で模す
+      window.__multiColumnX.setReturnToLastReadEnabled?.(true);
+
+      // DOM変化による呼び出しでは目視済みにしないため、ボタンは表示されたまま
+      expect(isButtonVisible()).toBe(true);
+    });
+
+    it("ユーザーのスクロールでも、戻り先が画面外なら目視済みにしない", async () => {
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["11", "12", "13", "14", "15", "16"]);
+
+      await importReturnToLastRead({ enabled: true });
+      window.__multiColumnX.triggerReload?.();
+
+      setTimeline(section, ["101", "11", "12", "13", "14"]);
+      window.dispatchEvent(new Event("scroll"));
+      expect(isButtonVisible()).toBe(true);
+
+      // ユーザー操作直後に、run一致する戻り先（"11"）が画面外（上端未満）にある
+      // 状態でスクロールする
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown" }));
+      setScrollTop(200);
+      setTimeline(section, ["101", "11", "12", "13", "14"], { topStep: 200 });
+      const articles = section.querySelectorAll("article");
+      setElementRect(articles[0], { top: -300 }); // 101
+      setElementRect(articles[1], { top: -100 }); // 11: 画面外（上）
+      setElementRect(articles[2], { top: 100 }); // 12: 画面内
+
+      window.dispatchEvent(new Event("scroll"));
+
+      // "11" が画面外なので目視済みにならず、ボタンは表示されたまま
+      expect(isButtonVisible()).toBe(true);
+    });
+
+    it("探索中は先頭の基準候補を読み直さない", async () => {
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["11", "12", "13", "14", "15"]);
+
+      await importReturnToLastRead({ enabled: true });
+      window.__multiColumnX.triggerReload?.();
+
+      // 新着（101）が入り、先頭スナップショットは [101,11,12,13,14] になる
+      setTimeline(section, ["101", "11", "12", "13", "14"]);
+      window.dispatchEvent(new Event("scroll"));
+      expect(isButtonVisible()).toBe(true);
+
+      // 探索対象（11〜15）がどこにもヒットしないタイムラインに変え、
+      // スクロール可能範囲を現在位置（300）でクランプする（＝仮想リスト終端）
+      setTimeline(section, ["901"]);
+      setClampedScrollingElement(300, 300);
+
+      vi.useFakeTimers();
+      const btn = getButton();
+      btn?.click();
+      await vi.advanceTimersByTimeAsync(0);
+
+      // 探索中（scrollTopは探索開始により0）に scroll イベントが発生しても、
+      // 探索中は先頭スナップショットの読み直しを行わないはず。
+      // ここで読み直しが起きると、[901] のみの1件が誤って先頭スナップショットとして
+      // 記録されてしまう。
+      window.dispatchEvent(new Event("scroll"));
+
+      // 探索を終わらせる（見つからず notFound で終了する）
+      await vi.advanceTimersByTimeAsync(3300);
+      expect(isButtonVisible()).toBe(false);
+
+      // 探索終了後に更新すると、探索中に読み直されていなければ元の
+      // 先頭スナップショット [101,11,12,13,14] が基準として記録される
+      window.__multiColumnX.triggerReload?.();
+      setScrollTop(0);
+      setTimeline(section, ["101", "11", "12", "13", "14"]);
+      window.dispatchEvent(new Event("scroll"));
+
+      // 新しい基準と完全一致する並びのため新着扱いされない
+      // （探索中に [901] のみへ読み直されていた場合、101 が基準に無いため
+      // 新着扱いされてボタンが表示されてしまう）
+      expect(isButtonVisible()).toBe(false);
+    }, 15000);
+  });
 });
