@@ -20,8 +20,9 @@ import { DisplaySettingsSection } from "./DisplaySettingsSection";
 import { GeneralSettingsSections } from "./GeneralSettingsSections";
 import { PresetsTab } from "./PresetsTab";
 import {
-  clampSwipeAreaHeight,
   createSettingsDraft,
+  toColumnDefaults,
+  toGlobalSettingsPatch,
   type SettingsDraft,
 } from "./settingsDraft";
 
@@ -142,58 +143,12 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
       return;
     }
     setRepostHiddenUserIdsError(null);
-    const patch: Partial<GlobalSettings> = {
-      defaultAutoReloadEnabled: draft.defaultAutoReloadEnabled,
-      defaultAutoReloadInterval: draft.defaultAutoReloadInterval,
-      defaultShowCountdown: draft.defaultShowCountdown,
-      defaultHideHeaderEnabled: draft.defaultHideHeaderEnabled,
-      defaultHideTweetInputEnabled: draft.defaultHideTweetInputEnabled,
-      defaultShowCustomMenu: draft.defaultShowCustomMenu,
-      defaultScrollPosRestoreEnabled: draft.defaultScrollPosRestoreEnabled,
-      defaultColumnCustomCSS: draft.defaultColumnCustomCSS,
-      popupEscCloseEnabled: draft.popupEscCloseEnabled,
-      videoAutoPlayStopEnabled: draft.videoAutoPlayStopEnabled,
-      imagePopupEnabled: draft.imagePopupEnabled,
-      videoPopupEnabled: draft.videoPopupEnabled,
-      smallImageEnabled: draft.smallImageEnabled,
-      smallImageWidth: draft.smallImageWidth,
-      blurImageEnabled: draft.blurImageEnabled,
-      blurImageAmount: draft.blurImageAmount,
-      hideAdEnabled: draft.hideAdEnabled,
-      apiRateLimitMonitorEnabled: draft.apiRateLimitMonitorEnabled,
-      useXAppForCompose: draft.useXAppForCompose,
-      mobileSwipeAreaEnabled: draft.mobileSwipeAreaEnabled,
-      mobileSwipeAreaHeight: clampSwipeAreaHeight(draft.mobileSwipeAreaHeight),
-      mobileSwipeAreaOpacity: draft.mobileSwipeAreaOpacity,
-      mobileTwoColumnEnabled: draft.mobileTwoColumnEnabled,
-      ngWords,
-      repostHiddenUserIds,
-    };
-    if (draft.columnScaleOverrideEnabled) {
-      patch.columnScale = draft.columnScale;
-    }
-    if (draft.themeOverrideEnabled) {
-      patch.theme = draft.theme;
-    }
-    onApply(patch);
+    onApply(toGlobalSettingsPatch(draft, { ngWords, repostHiddenUserIds }));
     onClose();
   };
 
   const handleApplyColumnDefaults = () => {
-    onApplyColumnDefaults({
-      autoReloadEnabled: draft.defaultAutoReloadEnabled,
-      autoReloadInterval: draft.defaultAutoReloadInterval,
-      showCountdown: draft.defaultShowCountdown,
-      hideHeaderEnabled: draft.defaultHideHeaderEnabled,
-      hideTweetInputEnabled: draft.defaultHideTweetInputEnabled,
-      showCustomMenu: draft.defaultShowCustomMenu,
-      scrollPosRestoreEnabled: draft.defaultScrollPosRestoreEnabled,
-      customCSS: draft.defaultColumnCustomCSS,
-      smallImageEnabled: draft.smallImageEnabled,
-      smallImageWidth: draft.smallImageWidth,
-      blurImageEnabled: draft.blurImageEnabled,
-      blurImageAmount: draft.blurImageAmount,
-    });
+    onApplyColumnDefaults(toColumnDefaults(draft));
   };
 
   return (
