@@ -19,9 +19,9 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import React from "react";
-import type { ColumnGroup } from "../../lib/columnOrder";
-import type { Column } from "../../types";
-import { rowCountForCol } from "./columnLayoutDraft";
+import { rowCountForCol } from "@/components/AppSettingsPanel/columnLayoutDraft";
+import type { ColumnGroup } from "@/lib/columnOrder";
+import type { Column } from "@/types";
 import styles from "./ColumnLayoutTab.module.scss";
 
 export interface CellKey {
