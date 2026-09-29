@@ -1,19 +1,30 @@
 import React, { useState } from "react";
 import { isAutoReloadSupported } from "@/lib/autoReloadTarget";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
-import { validateNgWordLines } from "../../lib/ngWordPattern";
-import {
-  parseUserIdLines,
-  validateUserIdLine,
-} from "../../lib/repostHiddenUserId";
 import {
   COLUMN_LABEL_MAX_LENGTH,
   normalizeColumnLabel,
   type Column,
   type ColumnSettings,
 } from "../../types";
-import { HelpPopover } from "../HelpPopover/HelpPopover";
+import {
+  nextLineListErrors,
+  validateLineListInputs,
+  type LineListErrors,
+  type LineListTexts,
+} from "./lineListInputs";
 import styles from "./SettingsPanel.module.scss";
+import {
+  AutoReloadSection,
+  CustomCssSection,
+  DisplaySection,
+  ImageBlurSection,
+  ImageSection,
+  NgWordsSection,
+  NotificationSection,
+  RepostHiddenUsersSection,
+  WhitelistSection,
+} from "./SettingsSections";
 
 interface SettingsPanelProps {
   column: Column;
@@ -44,58 +55,33 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   });
   const [width, setWidth] = useState<number>(column.width);
   const [labelText, setLabelText] = useState<string>(column.label ?? "");
-  const [ngWordsText, setNgWordsText] = useState<string>(
-    (column.settings.ngWords ?? []).join("\n"),
-  );
-  const [ngWordsError, setNgWordsError] = useState<string | null>(null);
-  const [repostHiddenUserIdsText, setRepostHiddenUserIdsText] =
-    useState<string>((column.settings.repostHiddenUserIds ?? []).join("\n"));
-  const [repostHiddenUserIdsError, setRepostHiddenUserIdsError] = useState<
-    string | null
-  >(null);
-  const [whitelistWordsText, setWhitelistWordsText] = useState<string>(
-    (column.settings.whitelistWords ?? []).join("\n"),
-  );
-  const [whitelistError, setWhitelistError] = useState<string | null>(null);
+  const [lineListTexts, setLineListTexts] = useState<LineListTexts>({
+    ngWords: (column.settings.ngWords ?? []).join("\n"),
+    repostHiddenUserIds: (column.settings.repostHiddenUserIds ?? []).join("\n"),
+    whitelistWords: (column.settings.whitelistWords ?? []).join("\n"),
+  });
+  const [lineListErrors, setLineListErrors] = useState<LineListErrors>({
+    ngWords: null,
+    repostHiddenUserIds: null,
+    whitelistWords: null,
+  });
+
+  const updateSetting = <K extends keyof ColumnSettings>(
+    key: K,
+    value: ColumnSettings[K],
+  ) => setSettings((s) => ({ ...s, [key]: value }));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const ngWords = ngWordsText
-      .split("\n")
-      .map((w) => w.trim())
-      .filter((w) => w.length > 0);
-    const error = validateNgWordLines(ngWords);
-    if (error) {
-      setNgWordsError(error);
+    const result = validateLineListInputs(lineListTexts);
+    setLineListErrors((prev) => nextLineListErrors(prev, result));
+    if (result.kind === "invalid") {
       return;
     }
-    setNgWordsError(null);
-
-    const repostHiddenUserIds = parseUserIdLines(repostHiddenUserIdsText);
-    const repostHiddenUserIdsValidationError =
-      repostHiddenUserIds
-        .map((id) => validateUserIdLine(id))
-        .find((validationError) => validationError !== null) ?? null;
-    if (repostHiddenUserIdsValidationError) {
-      setRepostHiddenUserIdsError(repostHiddenUserIdsValidationError);
-      return;
-    }
-    setRepostHiddenUserIdsError(null);
-
-    const whitelistWords = whitelistWordsText
-      .split("\n")
-      .map((w) => w.trim())
-      .filter((w) => w.length > 0);
-    const whitelistLinesError = validateNgWordLines(whitelistWords);
-    if (whitelistLinesError) {
-      setWhitelistError(whitelistLinesError);
-      return;
-    }
-    setWhitelistError(null);
 
     onApply(
       column.id,
-      { ...settings, ngWords, repostHiddenUserIds, whitelistWords },
+      { ...settings, ...result.values },
       width,
       normalizeColumnLabel(labelText),
     );
@@ -145,328 +131,58 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </section>
 
           {isAutoReloadSupported(column) && (
-            <section className={styles.section}>
-              <h3 className={styles.sectionTitle}>自動更新</h3>
-              <label className={styles.checkLabel}>
-                <input
-                  type="checkbox"
-                  checked={settings.autoReloadEnabled}
-                  onChange={(e) =>
-                    setSettings((s) => ({
-                      ...s,
-                      autoReloadEnabled: e.target.checked,
-                    }))
-                  }
-                />
-                自動更新を有効にする
-              </label>
-              {settings.autoReloadEnabled && (
-                <>
-                  <label className={styles.fieldLabel}>
-                    更新間隔（秒）
-                    <input
-                      type="number"
-                      className={styles.numberInput}
-                      min={10}
-                      max={3600}
-                      value={settings.autoReloadInterval}
-                      onChange={(e) =>
-                        setSettings((s) => ({
-                          ...s,
-                          autoReloadInterval: Number(e.target.value),
-                        }))
-                      }
-                    />
-                  </label>
-                  <label className={styles.checkLabel}>
-                    <input
-                      type="checkbox"
-                      checked={settings.showCountdown}
-                      onChange={(e) =>
-                        setSettings((s) => ({
-                          ...s,
-                          showCountdown: e.target.checked,
-                        }))
-                      }
-                    />
-                    カウントダウンを表示する
-                  </label>
-                </>
-              )}
-            </section>
-          )}
-
-          {!isExternal && (
-            <section className={styles.section}>
-              <h3 className={styles.sectionTitle}>表示</h3>
-              <label className={styles.checkLabel}>
-                <input
-                  type="checkbox"
-                  checked={settings.hideHeaderEnabled}
-                  onChange={(e) =>
-                    setSettings((s) => ({
-                      ...s,
-                      hideHeaderEnabled: e.target.checked,
-                    }))
-                  }
-                />
-                ヘッダーを非表示にする
-              </label>
-              <label className={styles.checkLabel}>
-                <input
-                  type="checkbox"
-                  checked={settings.hideTweetInputEnabled}
-                  onChange={(e) =>
-                    setSettings((s) => ({
-                      ...s,
-                      hideTweetInputEnabled: e.target.checked,
-                    }))
-                  }
-                />
-                投稿欄を非表示にする
-              </label>
-              {settings.hideHeaderEnabled && (
-                <label className={styles.checkLabel}>
-                  <input
-                    type="checkbox"
-                    checked={settings.showCustomMenu}
-                    onChange={(e) =>
-                      setSettings((s) => ({
-                        ...s,
-                        showCustomMenu: e.target.checked,
-                      }))
-                    }
-                  />
-                  カスタムメニューボタンを表示する
-                </label>
-              )}
-              <label className={styles.checkLabel}>
-                <input
-                  type="checkbox"
-                  checked={settings.scrollPosRestoreEnabled}
-                  onChange={(e) =>
-                    setSettings((s) => ({
-                      ...s,
-                      scrollPosRestoreEnabled: e.target.checked,
-                    }))
-                  }
-                />
-                写真閲覧後のスクロール位置を復元する
-              </label>
-              {column.pageType === "home" && (
-                <label className={styles.checkLabel}>
-                  <input
-                    type="checkbox"
-                    checked={settings.returnToLastReadEnabled}
-                    onChange={(e) =>
-                      setSettings((s) => ({
-                        ...s,
-                        returnToLastReadEnabled: e.target.checked,
-                      }))
-                    }
-                  />
-                  更新後に前回の続きへ戻るボタンを表示する
-                </label>
-              )}
-            </section>
-          )}
-
-          {!isExternal && (
-            <section className={styles.section}>
-              <h3 className={styles.sectionTitle}>画像</h3>
-              <label className={styles.checkLabel}>
-                <input
-                  type="checkbox"
-                  checked={settings.smallImageEnabled}
-                  onChange={(e) =>
-                    setSettings((s) => ({
-                      ...s,
-                      smallImageEnabled: e.target.checked,
-                    }))
-                  }
-                />
-                画像を縮小表示する
-              </label>
-              {settings.smallImageEnabled && (
-                <label className={styles.fieldLabel}>
-                  幅（例: 50%, 200px）
-                  <input
-                    type="text"
-                    className={styles.numberInput}
-                    value={settings.smallImageWidth}
-                    onChange={(e) =>
-                      setSettings((s) => ({
-                        ...s,
-                        smallImageWidth: e.target.value,
-                      }))
-                    }
-                    placeholder="50%"
-                  />
-                </label>
-              )}
-            </section>
-          )}
-
-          {!isExternal && (
-            <section className={styles.section}>
-              <h3 className={styles.sectionTitle}>画像ブラー</h3>
-              <label className={styles.checkLabel}>
-                <input
-                  type="checkbox"
-                  checked={settings.blurImageEnabled}
-                  onChange={(e) =>
-                    setSettings((s) => ({
-                      ...s,
-                      blurImageEnabled: e.target.checked,
-                    }))
-                  }
-                />
-                画像をぼかして表示する
-              </label>
-              {settings.blurImageEnabled && (
-                <label className={styles.fieldLabel}>
-                  ブラー量（例: 10px）
-                  <input
-                    type="text"
-                    className={styles.textInput}
-                    value={settings.blurImageAmount}
-                    onChange={(e) =>
-                      setSettings((s) => ({
-                        ...s,
-                        blurImageAmount: e.target.value,
-                      }))
-                    }
-                    placeholder="10px"
-                  />
-                </label>
-              )}
-              <p className={styles.fieldLabel}>
-                右クリック（PC）または長押し（モバイル）でブラーを解除できます
-              </p>
-            </section>
-          )}
-
-          {!isExternal && (
-            <section className={styles.section}>
-              <h3 className={styles.sectionTitle}>通知</h3>
-              <label className={styles.checkLabel}>
-                <input
-                  type="checkbox"
-                  checked={settings.desktopNotifyEnabled ?? false}
-                  onChange={(e) =>
-                    setSettings((s) => ({
-                      ...s,
-                      desktopNotifyEnabled: e.target.checked,
-                    }))
-                  }
-                />
-                新着をデスクトップ通知する
-              </label>
-            </section>
-          )}
-
-          {!isExternal && (
-            <section className={styles.section}>
-              <h3 className={styles.sectionTitle}>
-                NGワード
-                <HelpPopover label="NGワードの書き方">
-                  <p>1行に1ワードを入力してください。</p>
-                  <p>
-                    <code>/pattern/flags</code>{" "}
-                    の形式で入力すると正規表現として扱われます（大文字・小文字は区別しません）。
-                  </p>
-                  <p>例: {"/spam|広告/"}</p>
-                </HelpPopover>
-              </h3>
-              <textarea
-                className={styles.cssTextarea}
-                value={ngWordsText}
-                onChange={(e) => setNgWordsText(e.target.value)}
-                placeholder="1行に1ワードで入力（/正規表現/flags 形式も指定可）"
-                spellCheck={false}
-              />
-              {ngWordsError && (
-                <p className={styles.errorText}>{ngWordsError}</p>
-              )}
-            </section>
-          )}
-
-          {!isExternal && (
-            <section className={styles.section}>
-              <h3 className={styles.sectionTitle}>
-                リポストを非表示にするユーザー
-              </h3>
-              <textarea
-                className={styles.cssTextarea}
-                value={repostHiddenUserIdsText}
-                onChange={(e) => setRepostHiddenUserIdsText(e.target.value)}
-                aria-label="リポストを非表示にするユーザー"
-                placeholder="1行に1ユーザーIDで入力"
-                spellCheck={false}
-              />
-              {repostHiddenUserIdsError && (
-                <p className={styles.errorText}>{repostHiddenUserIdsError}</p>
-              )}
-              <p className={styles.hint}>
-                1行に1ユーザーID（@以降）。指定ユーザーがリポストした投稿を非表示にします
-              </p>
-            </section>
-          )}
-
-          {!isExternal && (
-            <section className={styles.section}>
-              <h3 className={styles.sectionTitle}>
-                ホワイトリスト
-                <HelpPopover label="ホワイトリストの書き方">
-                  <p>
-                    指定したワードを含むツイートのみを表示します（NGワードとは逆の効果です）。
-                  </p>
-                  <p>1行に1ワードを入力してください。</p>
-                  <p>
-                    <code>/pattern/flags</code>{" "}
-                    の形式で入力すると正規表現として扱われます（大文字・小文字は区別しません）。
-                  </p>
-                </HelpPopover>
-              </h3>
-              <label className={styles.checkLabel}>
-                <input
-                  type="checkbox"
-                  checked={settings.whitelistEnabled}
-                  onChange={(e) =>
-                    setSettings((s) => ({
-                      ...s,
-                      whitelistEnabled: e.target.checked,
-                    }))
-                  }
-                />
-                ホワイトリストを有効にする
-              </label>
-              <textarea
-                className={styles.cssTextarea}
-                value={whitelistWordsText}
-                onChange={(e) => setWhitelistWordsText(e.target.value)}
-                placeholder="1行に1ワードで入力（/正規表現/flags 形式も指定可、ホワイトリスト）"
-                spellCheck={false}
-                disabled={!settings.whitelistEnabled}
-              />
-              {whitelistError && (
-                <p className={styles.errorText}>{whitelistError}</p>
-              )}
-            </section>
-          )}
-
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>カスタム CSS</h3>
-            <textarea
-              className={styles.cssTextarea}
-              value={settings.customCSS}
-              onChange={(e) =>
-                setSettings((s) => ({ ...s, customCSS: e.target.value }))
-              }
-              placeholder="/* カスタムCSSを入力 */"
-              spellCheck={false}
+            <AutoReloadSection
+              settings={settings}
+              updateSetting={updateSetting}
             />
-          </section>
+          )}
+
+          {!isExternal && (
+            <>
+              <DisplaySection
+                settings={settings}
+                updateSetting={updateSetting}
+                showReturnToLastRead={column.pageType === "home"}
+              />
+              <ImageSection settings={settings} updateSetting={updateSetting} />
+              <ImageBlurSection
+                settings={settings}
+                updateSetting={updateSetting}
+              />
+              <NotificationSection
+                settings={settings}
+                updateSetting={updateSetting}
+              />
+              <NgWordsSection
+                text={lineListTexts.ngWords}
+                error={lineListErrors.ngWords}
+                onChange={(value) =>
+                  setLineListTexts((t) => ({ ...t, ngWords: value }))
+                }
+              />
+              <RepostHiddenUsersSection
+                text={lineListTexts.repostHiddenUserIds}
+                error={lineListErrors.repostHiddenUserIds}
+                onChange={(value) =>
+                  setLineListTexts((t) => ({
+                    ...t,
+                    repostHiddenUserIds: value,
+                  }))
+                }
+              />
+              <WhitelistSection
+                text={lineListTexts.whitelistWords}
+                error={lineListErrors.whitelistWords}
+                onChange={(value) =>
+                  setLineListTexts((t) => ({ ...t, whitelistWords: value }))
+                }
+                settings={settings}
+                updateSetting={updateSetting}
+              />
+            </>
+          )}
+
+          <CustomCssSection settings={settings} updateSetting={updateSetting} />
 
           <div className={styles.actions}>
             {onReload && (

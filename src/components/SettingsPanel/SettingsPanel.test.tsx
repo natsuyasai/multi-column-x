@@ -738,3 +738,112 @@ describe("SettingsPanel 前回の境目へ戻るボタン設定", () => {
     );
   });
 });
+
+describe("SettingsPanel onChangeキー対応の特性テスト", () => {
+  it.each<[string, keyof typeof baseSettings, Partial<typeof baseSettings>]>([
+    ["自動更新を有効にする", "autoReloadEnabled", {}],
+    ["カウントダウンを表示する", "showCountdown", { autoReloadEnabled: true }],
+    [
+      "カスタムメニューボタンを表示する",
+      "showCustomMenu",
+      { hideHeaderEnabled: true },
+    ],
+    ["写真閲覧後のスクロール位置を復元する", "scrollPosRestoreEnabled", {}],
+    ["更新後に前回の続きへ戻るボタンを表示する", "returnToLastReadEnabled", {}],
+    ["画像を縮小表示する", "smallImageEnabled", {}],
+    ["画像をぼかして表示する", "blurImageEnabled", {}],
+  ])(
+    "%sのチェックボックスを操作すると%sが反転してonApplyに渡される",
+    async (label, key, overrides) => {
+      const onApply = vi.fn();
+      const col = {
+        ...mockColumn,
+        settings: { ...baseSettings, ...overrides },
+      };
+      render(
+        <SettingsPanel {...defaultProps} column={col} onApply={onApply} />,
+      );
+      const checkbox = screen.getByRole("checkbox", {
+        name: label,
+      }) as HTMLInputElement;
+      const before = checkbox.checked;
+      await userEvent.click(checkbox);
+      await userEvent.click(screen.getByRole("button", { name: "適用" }));
+      expect(onApply).toHaveBeenCalledWith(
+        "col-1",
+        expect.objectContaining({ [key]: !before }),
+        350,
+        undefined,
+      );
+    },
+  );
+
+  it.each<
+    [
+      string,
+      keyof typeof baseSettings,
+      Partial<typeof baseSettings>,
+      string,
+      string | number,
+    ]
+  >([
+    [
+      "更新間隔（秒）",
+      "autoReloadInterval",
+      { autoReloadEnabled: true },
+      "120",
+      120,
+    ],
+    [
+      "幅（例: 50%, 200px）",
+      "smallImageWidth",
+      { smallImageEnabled: true },
+      "80%",
+      "80%",
+    ],
+    [
+      "ブラー量（例: 10px）",
+      "blurImageAmount",
+      { blurImageEnabled: true },
+      "5px",
+      "5px",
+    ],
+  ])(
+    "%sの入力欄を編集すると%sがonApplyに渡される",
+    async (label, key, overrides, inputValue, expected) => {
+      const onApply = vi.fn();
+      const col = {
+        ...mockColumn,
+        settings: { ...baseSettings, ...overrides },
+      };
+      render(
+        <SettingsPanel {...defaultProps} column={col} onApply={onApply} />,
+      );
+      const field = screen.getByLabelText(label);
+      await userEvent.clear(field);
+      await userEvent.type(field, inputValue);
+      await userEvent.click(screen.getByRole("button", { name: "適用" }));
+      expect(onApply).toHaveBeenCalledWith(
+        "col-1",
+        expect.objectContaining({ [key]: expected }),
+        350,
+        undefined,
+      );
+    },
+  );
+
+  it("カスタムCSS入力欄を編集するとcustomCSSがonApplyに渡される", async () => {
+    const onApply = vi.fn();
+    render(<SettingsPanel {...defaultProps} onApply={onApply} />);
+    const textarea = screen.getByPlaceholderText("/* カスタムCSSを入力 */");
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, ".foo {{ color: red; }");
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.objectContaining({ customCSS: ".foo { color: red; }" }),
+      350,
+      undefined,
+    );
+  });
+});
