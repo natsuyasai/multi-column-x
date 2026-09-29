@@ -58,6 +58,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   );
   const [whitelistError, setWhitelistError] = useState<string | null>(null);
 
+  const updateSetting = <K extends keyof ColumnSettings>(
+    key: K,
+    value: ColumnSettings[K],
+  ) => setSettings((s) => ({ ...s, [key]: value }));
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const ngWords = ngWordsText
@@ -152,10 +157,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   type="checkbox"
                   checked={settings.autoReloadEnabled}
                   onChange={(e) =>
-                    setSettings((s) => ({
-                      ...s,
-                      autoReloadEnabled: e.target.checked,
-                    }))
+                    updateSetting("autoReloadEnabled", e.target.checked)
                   }
                 />
                 自動更新を有効にする
@@ -171,10 +173,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       max={3600}
                       value={settings.autoReloadInterval}
                       onChange={(e) =>
-                        setSettings((s) => ({
-                          ...s,
-                          autoReloadInterval: Number(e.target.value),
-                        }))
+                        updateSetting(
+                          "autoReloadInterval",
+                          Number(e.target.value),
+                        )
                       }
                     />
                   </label>
@@ -183,10 +185,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       type="checkbox"
                       checked={settings.showCountdown}
                       onChange={(e) =>
-                        setSettings((s) => ({
-                          ...s,
-                          showCountdown: e.target.checked,
-                        }))
+                        updateSetting("showCountdown", e.target.checked)
                       }
                     />
                     カウントダウンを表示する
@@ -204,10 +203,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   type="checkbox"
                   checked={settings.hideHeaderEnabled}
                   onChange={(e) =>
-                    setSettings((s) => ({
-                      ...s,
-                      hideHeaderEnabled: e.target.checked,
-                    }))
+                    updateSetting("hideHeaderEnabled", e.target.checked)
                   }
                 />
                 ヘッダーを非表示にする
@@ -217,10 +213,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   type="checkbox"
                   checked={settings.hideTweetInputEnabled}
                   onChange={(e) =>
-                    setSettings((s) => ({
-                      ...s,
-                      hideTweetInputEnabled: e.target.checked,
-                    }))
+                    updateSetting("hideTweetInputEnabled", e.target.checked)
                   }
                 />
                 投稿欄を非表示にする
@@ -231,10 +224,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     type="checkbox"
                     checked={settings.showCustomMenu}
                     onChange={(e) =>
-                      setSettings((s) => ({
-                        ...s,
-                        showCustomMenu: e.target.checked,
-                      }))
+                      updateSetting("showCustomMenu", e.target.checked)
                     }
                   />
                   カスタムメニューボタンを表示する
@@ -245,10 +235,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   type="checkbox"
                   checked={settings.scrollPosRestoreEnabled}
                   onChange={(e) =>
-                    setSettings((s) => ({
-                      ...s,
-                      scrollPosRestoreEnabled: e.target.checked,
-                    }))
+                    updateSetting("scrollPosRestoreEnabled", e.target.checked)
                   }
                 />
                 写真閲覧後のスクロール位置を復元する
@@ -259,10 +246,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     type="checkbox"
                     checked={settings.returnToLastReadEnabled}
                     onChange={(e) =>
-                      setSettings((s) => ({
-                        ...s,
-                        returnToLastReadEnabled: e.target.checked,
-                      }))
+                      updateSetting("returnToLastReadEnabled", e.target.checked)
                     }
                   />
                   更新後に前回の続きへ戻るボタンを表示する
@@ -279,10 +263,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   type="checkbox"
                   checked={settings.smallImageEnabled}
                   onChange={(e) =>
-                    setSettings((s) => ({
-                      ...s,
-                      smallImageEnabled: e.target.checked,
-                    }))
+                    updateSetting("smallImageEnabled", e.target.checked)
                   }
                 />
                 画像を縮小表示する
@@ -295,10 +276,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     className={styles.numberInput}
                     value={settings.smallImageWidth}
                     onChange={(e) =>
-                      setSettings((s) => ({
-                        ...s,
-                        smallImageWidth: e.target.value,
-                      }))
+                      updateSetting("smallImageWidth", e.target.value)
                     }
                     placeholder="50%"
                   />
@@ -315,10 +293,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   type="checkbox"
                   checked={settings.blurImageEnabled}
                   onChange={(e) =>
-                    setSettings((s) => ({
-                      ...s,
-                      blurImageEnabled: e.target.checked,
-                    }))
+                    updateSetting("blurImageEnabled", e.target.checked)
                   }
                 />
                 画像をぼかして表示する
@@ -331,10 +306,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     className={styles.textInput}
                     value={settings.blurImageAmount}
                     onChange={(e) =>
-                      setSettings((s) => ({
-                        ...s,
-                        blurImageAmount: e.target.value,
-                      }))
+                      updateSetting("blurImageAmount", e.target.value)
                     }
                     placeholder="10px"
                   />
@@ -354,10 +326,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   type="checkbox"
                   checked={settings.desktopNotifyEnabled ?? false}
                   onChange={(e) =>
-                    setSettings((s) => ({
-                      ...s,
-                      desktopNotifyEnabled: e.target.checked,
-                    }))
+                    updateSetting("desktopNotifyEnabled", e.target.checked)
                   }
                 />
                 新着をデスクトップ通知する
@@ -433,10 +402,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   type="checkbox"
                   checked={settings.whitelistEnabled}
                   onChange={(e) =>
-                    setSettings((s) => ({
-                      ...s,
-                      whitelistEnabled: e.target.checked,
-                    }))
+                    updateSetting("whitelistEnabled", e.target.checked)
                   }
                 />
                 ホワイトリストを有効にする
@@ -460,9 +426,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <textarea
               className={styles.cssTextarea}
               value={settings.customCSS}
-              onChange={(e) =>
-                setSettings((s) => ({ ...s, customCSS: e.target.value }))
-              }
+              onChange={(e) => updateSetting("customCSS", e.target.value)}
               placeholder="/* カスタムCSSを入力 */"
               spellCheck={false}
             />
