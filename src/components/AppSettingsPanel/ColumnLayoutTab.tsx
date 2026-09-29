@@ -27,6 +27,15 @@ import {
   type ColumnGroup,
 } from "../../lib/columnOrder";
 import { getPageTypeLabel, type Account, type Column } from "../../types";
+import {
+  assignToCell,
+  findColumnAtCell,
+  isAssignedWithin,
+  rowCountForCol,
+  setHeight,
+  unassign,
+  unassignBeyond,
+} from "./columnLayoutDraft";
 import styles from "./ColumnLayoutTab.module.scss";
 
 interface ColumnLayoutTabProps {
@@ -174,22 +183,8 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
   const [selectedCellKey, setSelectedCellKey] = useState<CellKey | null>(null);
   const [pendingCell, setPendingCell] = useState<CellKey | null>(null);
 
-  const rowCountForCol = useCallback(
-    (colNum: number): number => {
-      const assigned = draft.filter(
-        (c) => c.gridCol === colNum && c.gridRow >= 1 && c.gridCol >= 1,
-      );
-      return Math.max(...assigned.map((c) => c.gridRow), 1);
-    },
-    [draft],
-  );
-
-  const assigned = draft.filter(
-    (c) => c.gridRow >= 1 && c.gridCol >= 1 && c.gridCol <= cols,
-  );
-  const unassigned = draft.filter(
-    (c) => !(c.gridRow >= 1 && c.gridCol >= 1 && c.gridCol <= cols),
-  );
+  const assigned = draft.filter((c) => isAssignedWithin(c, cols));
+  const unassigned = draft.filter((c) => !isAssignedWithin(c, cols));
 
   const selectedColumn = selectedCellKey
     ? (assigned.find(
@@ -199,18 +194,9 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
       ) ?? null)
     : null;
 
-  const handleCellClick = useCallback((row: number, col: number) => {
-    // ここは読み取り専用（prevをそのまま返す）なので updateDraft を通さない。
-    // 通すと毎回新しい配列が生成され無駄な再レンダリングになる
-    setDraft((prev) => {
-      const colAtCell =
-        prev.find(
-          (c) =>
-            c.gridRow === row &&
-            c.gridCol === col &&
-            c.gridRow >= 1 &&
-            c.gridCol >= 1,
-        ) ?? null;
+  const handleCellClick = useCallback(
+    (row: number, col: number) => {
+      const colAtCell = findColumnAtCell(draft, row, col);
       if (colAtCell) {
         setSelectedCellKey({ row, col });
         setPendingCell(null);
@@ -218,20 +204,14 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
         setPendingCell({ row, col });
         setSelectedCellKey(null);
       }
-      return prev;
-    });
-  }, []);
+    },
+    [draft],
+  );
 
   const handleAssign = useCallback(
     (columnId: string) => {
       if (!pendingCell) return;
-      updateDraft((prev) =>
-        prev.map((c) =>
-          c.id === columnId
-            ? { ...c, gridRow: pendingCell.row, gridCol: pendingCell.col }
-            : c,
-        ),
-      );
+      updateDraft((prev) => assignToCell(prev, columnId, pendingCell));
       setPendingCell(null);
     },
     [pendingCell, updateDraft],
@@ -239,11 +219,7 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
 
   const handleRemove = useCallback(
     (columnId: string) => {
-      updateDraft((prev) =>
-        prev.map((c) =>
-          c.id === columnId ? { ...c, gridRow: 0, gridCol: 0 } : c,
-        ),
-      );
+      updateDraft((prev) => unassign(prev, columnId));
       setSelectedCellKey(null);
     },
     [updateDraft],
@@ -256,13 +232,7 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
       value?: number,
       unit?: "px" | "%",
     ) => {
-      updateDraft((prev) =>
-        prev.map((c) =>
-          c.id === columnId
-            ? { ...c, heightMode: mode, heightValue: value, heightUnit: unit }
-            : c,
-        ),
-      );
+      updateDraft((prev) => setHeight(prev, columnId, mode, value, unit));
     },
     [updateDraft],
   );
@@ -285,11 +255,7 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
               onChange={(e) => {
                 const newCols = Math.max(1, Number(e.target.value));
                 setCols(newCols);
-                updateDraft((prev) =>
-                  prev.map((c) =>
-                    c.gridCol > newCols ? { ...c, gridRow: 0, gridCol: 0 } : c,
-                  ),
-                );
+                updateDraft((prev) => unassignBeyond(prev, newCols));
                 setSelectedCellKey(null);
                 setPendingCell(null);
               }}
@@ -300,7 +266,7 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
             <div className={styles.gridPreview} data-testid="grid-preview">
               {Array.from({ length: cols }, (_, cIdx) => {
                 const colNum = cIdx + 1;
-                const rows = rowCountForCol(colNum);
+                const rows = rowCountForCol(draft, colNum);
                 return (
                   <div key={cIdx} className={styles.gridColumn}>
                     <div className={styles.gridColHeader}>列 {colNum}</div>
