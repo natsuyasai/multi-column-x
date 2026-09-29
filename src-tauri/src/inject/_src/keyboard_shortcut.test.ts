@@ -67,6 +67,13 @@ describe("inject/keyboard_shortcut", () => {
     });
   });
 
+  it("Shift+R（Ctrl なし）を押すと reload_column が転送される", () => {
+    pressKey("R", false, true);
+    expect(invokeMock).toHaveBeenCalledWith("report_keyboard_shortcut", {
+      key: "reload_column",
+    });
+  });
+
   it("? キー（Ctrl なし）を押すと show_shortcut_help が転送される", () => {
     pressKey("?", false);
     expect(invokeMock).toHaveBeenCalledWith("report_keyboard_shortcut", {
@@ -97,5 +104,29 @@ describe("inject/keyboard_shortcut", () => {
     );
     expect(invokeMock).not.toHaveBeenCalled();
     document.body.removeChild(textarea);
+  });
+
+  it.each([
+    ["l", "open_link_popup"],
+    ["n", "add_column"],
+    [",", "app_settings"],
+    ["b", "toggle_top_bar"],
+  ])("Ctrl+%s を押すと%sが転送される", (key, expected) => {
+    pressKey(key);
+    expect(invokeMock).toHaveBeenCalledWith("report_keyboard_shortcut", {
+      key: expected,
+    });
+  });
+
+  it("Shift なしの Ctrl+A では何も転送されない", () => {
+    pressKey("a", true, false);
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("ショートカットを転送したときはブラウザ既定の動作を止める", () => {
+    const event = new KeyboardEvent("keydown", { key: "t", ctrlKey: true });
+    const preventDefaultSpy = vi.spyOn(event, "preventDefault");
+    window.dispatchEvent(event);
+    expect(preventDefaultSpy).toHaveBeenCalled();
   });
 });
