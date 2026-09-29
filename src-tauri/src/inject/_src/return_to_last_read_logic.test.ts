@@ -16,6 +16,7 @@ import {
   INITIAL_RETURN_STATE,
   reduceReturnState,
   searchReturnTarget,
+  type ReturnEvent,
   type ReturnState,
   type SearchDeps,
 } from "./return_to_last_read_logic";
@@ -600,6 +601,154 @@ describe("inject/return_to_last_read_logic", () => {
       const next = reduceReturnState(withAnchor, { type: "disabled" });
 
       expect(next).toEqual(INITIAL_RETURN_STATE);
+    });
+
+    describe("状態が変わらないイベントでは同じ参照を返す", () => {
+      const CONSUMING_EVENT_TYPES = [
+        "targetSeenByUser",
+        "returnFinished",
+        "dismissed",
+      ] as const satisfies readonly ReturnEvent["type"][];
+
+      it("未消化の基準があるときのreloadでは同じ参照を返す", () => {
+        const state: ReturnState = {
+          anchorIds: ["A", "B", "C", "D", "E"],
+          tabName: "おすすめ",
+          consumed: false,
+          buttonVisible: false,
+        };
+
+        const next = reduceReturnState(state, {
+          type: "reload",
+          snapshot: ["N1", "N2", "A", "B", "C"],
+          tabName: "おすすめ",
+        });
+
+        expect(next).toBe(state);
+      });
+
+      it("表示中の投稿が無いときのreloadでは同じ参照を返す", () => {
+        const state: ReturnState = { ...INITIAL_RETURN_STATE };
+
+        const next = reduceReturnState(state, {
+          type: "reload",
+          snapshot: [],
+          tabName: "おすすめ",
+        });
+
+        expect(next).toBe(state);
+      });
+
+      it("基準が無いときのtopUpdatedでは同じ参照を返す", () => {
+        const state: ReturnState = { ...INITIAL_RETURN_STATE };
+
+        const next = reduceReturnState(state, {
+          type: "topUpdated",
+          topIds: ["N1", "N2"],
+        });
+
+        expect(next).toBe(state);
+      });
+
+      it("消化済みの基準へのtopUpdatedでは同じ参照を返す", () => {
+        const state: ReturnState = {
+          anchorIds: ["A", "B", "C", "D", "E"],
+          tabName: "おすすめ",
+          consumed: true,
+          buttonVisible: false,
+        };
+
+        const next = reduceReturnState(state, {
+          type: "topUpdated",
+          topIds: ["N1", "N2"],
+        });
+
+        expect(next).toBe(state);
+      });
+
+      it.each([
+        {
+          label: "buttonVisibleがfalseのまま",
+          buttonVisible: false,
+          topIds: ["A", "B"],
+        },
+        {
+          label: "buttonVisibleがtrueのまま",
+          buttonVisible: true,
+          topIds: ["N1", "A"],
+        },
+      ])(
+        "戻るボタンの表示状態が変わらないtopUpdatedでは同じ参照を返す（$label）",
+        ({ buttonVisible, topIds }) => {
+          const state: ReturnState = {
+            anchorIds: ["A", "B", "C", "D", "E"],
+            tabName: "おすすめ",
+            consumed: false,
+            buttonVisible,
+          };
+
+          const next = reduceReturnState(state, {
+            type: "topUpdated",
+            topIds,
+          });
+
+          expect(next).toBe(state);
+        },
+      );
+
+      it("基準が無いときのtabChangedでは同じ参照を返す", () => {
+        const state: ReturnState = { ...INITIAL_RETURN_STATE };
+
+        const next = reduceReturnState(state, {
+          type: "tabChanged",
+          tabName: "フォロー中",
+        });
+
+        expect(next).toBe(state);
+      });
+
+      it("同じタブへのtabChangedでは同じ参照を返す", () => {
+        const state: ReturnState = {
+          anchorIds: ["A", "B", "C", "D", "E"],
+          tabName: "おすすめ",
+          consumed: false,
+          buttonVisible: true,
+        };
+
+        const next = reduceReturnState(state, {
+          type: "tabChanged",
+          tabName: "おすすめ",
+        });
+
+        expect(next).toBe(state);
+      });
+
+      it.each(CONSUMING_EVENT_TYPES)(
+        "基準が無いときの%sでは同じ参照を返す",
+        (type) => {
+          const state: ReturnState = { ...INITIAL_RETURN_STATE };
+
+          const next = reduceReturnState(state, { type });
+
+          expect(next).toBe(state);
+        },
+      );
+
+      it.each(CONSUMING_EVENT_TYPES)(
+        "消化済みでボタンが消えている基準への%sでは同じ参照を返す",
+        (type) => {
+          const state: ReturnState = {
+            anchorIds: ["A", "B", "C", "D", "E"],
+            tabName: "おすすめ",
+            consumed: true,
+            buttonVisible: false,
+          };
+
+          const next = reduceReturnState(state, { type });
+
+          expect(next).toBe(state);
+        },
+      );
     });
   });
 
