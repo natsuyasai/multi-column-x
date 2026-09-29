@@ -32,6 +32,22 @@ export {
 } from "../lib/gridLayout";
 export type { ColumnBounds } from "../lib/gridLayout";
 
+// モバイルの新規カラム WebView を画面外（非表示）で作成する。
+// handleAddColumn / recreateColumnWebview の mobile 分岐から共通利用する。
+// logTag は呼び出し元ごとの logError タグ文字列（呼び出し元の識別を維持するため引数で渡す）。
+async function createOffscreenMobileColumnWebview(
+  column: Column,
+  dataDirectory: string,
+  logTag: string,
+): Promise<void> {
+  const offscreenLayout = mobileLayoutForViewport([column], null);
+  await createColumnWebview(
+    column,
+    dataDirectory,
+    offscreenLayout[column.id],
+  ).catch(logError(logTag));
+}
+
 export function useColumns() {
   const { columns, accounts, addColumn, removeColumn, updateColumn } =
     useAppStore();
@@ -103,12 +119,11 @@ export function useColumns() {
       const { isMobile } = useAppStore.getState();
       if (isMobile) {
         // 追加カラムは非表示で作成する（activeColumnId: null なので必ず画面外 bounds になる）
-        const offscreenLayout = mobileLayoutForViewport([column], null);
-        await createColumnWebview(
+        await createOffscreenMobileColumnWebview(
           column,
           dataDirectory,
-          offscreenLayout[column.id],
-        ).catch(logError("handleAddColumn:createColumnWebview(mobile)"));
+          "handleAddColumn:createColumnWebview(mobile)",
+        );
         if (activeColumnId === null) {
           await setActiveColumn(column.id);
         }
@@ -277,12 +292,11 @@ export function useColumns() {
       );
 
       if (isMobile) {
-        const offscreenLayout = mobileLayoutForViewport([column], null);
-        await createColumnWebview(
+        await createOffscreenMobileColumnWebview(
           column,
           dataDirectory,
-          offscreenLayout[column.id],
-        ).catch(logError("recreateColumnWebview:createColumnWebview(mobile)"));
+          "recreateColumnWebview:createColumnWebview(mobile)",
+        );
         // 再作成したカラムが現在の表示ペア（アクティブ or その隣）に含まれるなら
         // setActiveColumn で再配置して可視化する（2カラム時、右隣カラムの再作成でも必要）
         if (activeColumnId) {
