@@ -32,7 +32,8 @@ import { useDialogState } from "./hooks/useDialogState";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useMobileSwipeBarSync } from "./hooks/useMobileSwipeBarSync";
 import { usePopupWindowHandlers } from "./hooks/usePopupWindowHandlers";
-import { getMql, useTheme } from "./hooks/useTheme";
+import { useSettingsApplyHandlers } from "./hooks/useSettingsApplyHandlers";
+import { useTheme } from "./hooks/useTheme";
 import {
   useApiRateLimitReports,
   useColumnCrashRecovery,
@@ -44,14 +45,8 @@ import {
 } from "./hooks/useWebviewEvents";
 import { useWhatsNew } from "./hooks/useWhatsNew";
 import { HEADER_HEIGHT, getTopBarHeight } from "./lib/gridLayout";
-import { resolveTheme } from "./lib/theme";
-import {
-  applyColumnSettingsScripts,
-  buildGlobalNgScripts,
-  evalInColumn,
-} from "./services/columnWebview";
+import { evalInColumn } from "./services/columnWebview";
 import { useAppStore } from "./store/useAppStore";
-import type { ColumnSettings, GlobalSettings } from "./types";
 
 const App: React.FC = () => {
   const {
@@ -281,48 +276,13 @@ const App: React.FC = () => {
     [recreateColumnWebview],
   );
 
-  const handleApplySettings = useCallback(
-    async (
-      columnId: string,
-      settings: ColumnSettings,
-      width: number,
-      label: string | undefined,
-    ) => {
-      handleUpdateColumn(columnId, { settings, width, label });
-      setSettingsColumnId(null);
-      const { globalSettings: currentGlobal } = useAppStore.getState();
-      await applyColumnSettingsScripts(
-        columnId,
-        settings,
-        currentGlobal.ngWords ?? [],
-        currentGlobal.repostHiddenUserIds ?? [],
-      );
-    },
-    [handleUpdateColumn, setSettingsColumnId],
-  );
-
-  const handleApplyGlobalSettings = useCallback(
-    (patch: Partial<GlobalSettings>) => {
-      updateGlobalSettings(patch);
-      const { columns: ngColumns, globalSettings: currentGlobal } =
-        useAppStore.getState();
-      buildGlobalNgScripts(patch, currentGlobal, ngColumns).forEach(
-        ({ columnId, script }) => {
-          evalInColumn(columnId, script);
-        },
-      );
-      if (patch.theme !== undefined) {
-        const prefersDark = getMql()?.matches ?? false;
-        const nightMode =
-          resolveTheme(patch.theme, prefersDark) === "dark" ? "2" : "0";
-        const { columns: currentColumns } = useAppStore.getState();
-        currentColumns.forEach((col) => {
-          evalInColumn(col.id, WEBVIEW_SCRIPTS.applyNightModeCookie(nightMode));
-        });
-      }
-    },
-    [updateGlobalSettings],
-  );
+  // カラム個別設定・全体設定の「適用」処理をまとめたフック。
+  const { handleApplySettings, handleApplyGlobalSettings } =
+    useSettingsApplyHandlers({
+      handleUpdateColumn,
+      setSettingsColumnId,
+      updateGlobalSettings,
+    });
 
   const linkPopupDefaultAccountId =
     globalSettings.defaultAccountId ?? accounts[0]?.id ?? "";
