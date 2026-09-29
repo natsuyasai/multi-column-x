@@ -1,4 +1,5 @@
 import React from "react";
+import type { ReactNode } from "react";
 import LinkIcon from "../../assets/icons/link.svg?react";
 import PencilIcon from "../../assets/icons/pencil.svg?react";
 import PersonIcon from "../../assets/icons/person.svg?react";
@@ -8,6 +9,33 @@ import type { Account, ApiRateLimitBucket, Column } from "../../types";
 import { ApiRateLimitIndicator } from "../ApiRateLimitIndicator/ApiRateLimitIndicator";
 import { SortableColumnGroups } from "./SortableColumnGroups";
 import styles from "./TopBar.module.scss";
+
+interface ToolbarButtonProps {
+  baseClassName: string;
+  expanded: boolean;
+  onClick: () => void;
+  title: string;
+  icon: ReactNode;
+  label: string;
+}
+
+const ToolbarButton: React.FC<ToolbarButtonProps> = ({
+  baseClassName,
+  expanded,
+  onClick,
+  title,
+  icon,
+  label,
+}) => (
+  <button
+    className={`${baseClassName}${expanded ? ` ${styles.btnExpanded}` : ""}`}
+    onClick={onClick}
+    title={title}
+  >
+    {icon}
+    {expanded && <span className={styles.label}>{label}</span>}
+  </button>
+);
 
 interface TopBarProps {
   columns: Column[];
@@ -48,71 +76,81 @@ export const TopBar: React.FC<TopBarProps> = ({
     <div className={`${styles.topbar}${expanded ? ` ${styles.expanded}` : ""}`}>
       <div className={styles.row1}>
         <div className={styles.actions}>
-          <button
-            className={`${styles.composeBtn}${expanded ? ` ${styles.btnExpanded}` : ""}`}
+          <ToolbarButton
+            baseClassName={styles.composeBtn}
+            expanded={expanded}
             onClick={onComposeTweet}
             title="ツイートを作成 (Ctrl+T)"
-          >
-            <PencilIcon
-              width={16}
-              height={16}
-              data-testid="icon-pencil"
-              className={styles.icon}
-            />
-            {expanded && <span className={styles.label}>ツイート</span>}
-          </button>
-          <button
-            className={`${styles.btn}${expanded ? ` ${styles.btnExpanded}` : ""}`}
+            icon={
+              <PencilIcon
+                width={16}
+                height={16}
+                data-testid="icon-pencil"
+                className={styles.icon}
+              />
+            }
+            label="ツイート"
+          />
+          <ToolbarButton
+            baseClassName={styles.btn}
+            expanded={expanded}
             onClick={onOpenLinkPopup}
             title="URLをポップアップで開く (Ctrl+L)"
-          >
-            <LinkIcon
-              width={16}
-              height={16}
-              data-testid="icon-link"
-              className={styles.icon}
-            />
-            {expanded && <span className={styles.label}>URLを開く</span>}
-          </button>
-          <button
-            className={`${styles.btn}${expanded ? ` ${styles.btnExpanded}` : ""}`}
+            icon={
+              <LinkIcon
+                width={16}
+                height={16}
+                data-testid="icon-link"
+                className={styles.icon}
+              />
+            }
+            label="URLを開く"
+          />
+          <ToolbarButton
+            baseClassName={styles.btn}
+            expanded={expanded}
             onClick={onAddColumn}
             title="カラムを追加 (Ctrl+N)"
-          >
-            <PlusIcon
-              width={16}
-              height={16}
-              data-testid="icon-plus"
-              className={styles.icon}
-            />
-            {expanded && <span className={styles.label}>カラム追加</span>}
-          </button>
-          <button
-            className={`${styles.btn}${expanded ? ` ${styles.btnExpanded}` : ""}`}
+            icon={
+              <PlusIcon
+                width={16}
+                height={16}
+                data-testid="icon-plus"
+                className={styles.icon}
+              />
+            }
+            label="カラム追加"
+          />
+          <ToolbarButton
+            baseClassName={styles.btn}
+            expanded={expanded}
             onClick={onAccountManager}
             title="アカウント管理 (Ctrl+Shift+A)"
-          >
-            <PersonIcon
-              width={16}
-              height={16}
-              data-testid="icon-person"
-              className={styles.icon}
-            />
-            {expanded && <span className={styles.label}>アカウント</span>}
-          </button>
-          <button
-            className={`${styles.btn}${expanded ? ` ${styles.btnExpanded}` : ""}`}
+            icon={
+              <PersonIcon
+                width={16}
+                height={16}
+                data-testid="icon-person"
+                className={styles.icon}
+              />
+            }
+            label="アカウント"
+          />
+          <ToolbarButton
+            baseClassName={styles.btn}
+            expanded={expanded}
             onClick={onAppSettings}
             title="アプリ設定 (Ctrl+,)"
-          >
-            <SettingsIcon
-              width={16}
-              height={16}
-              data-testid="icon-settings"
-              className={styles.icon}
-            />
-            {expanded && <span className={styles.label}>設定</span>}
-          </button>
+            icon={
+              <SettingsIcon
+                width={16}
+                height={16}
+                data-testid="icon-settings"
+                className={styles.icon}
+              />
+            }
+            label="設定"
+          />
           {apiRateLimitMonitorEnabled && (
             <ApiRateLimitIndicator
               accounts={accounts}
