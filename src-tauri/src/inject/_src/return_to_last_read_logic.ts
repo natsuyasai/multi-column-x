@@ -300,6 +300,74 @@ export type SearchResult =
   | { kind: "notFound" }
   | { kind: "interrupted" };
 
+// 単独一致した基準ごとに、見えたときの scrollTop と、そのとき読み取った
+// 列内での並び位置（画面内で上から何番目か）を覚えておく。
+// フォールバック選定は (scrollTop, position) の辞書順最大＝画面内で最も下のもの。
+interface SingleSeen {
+  scrollTop: number;
+  position: number;
+}
+
+/** scan.singles を、見えたときの scrollTop / 並び位置とともに記録する。 */
+function recordSingles(
+  singlesSeen: Map<string, SingleSeen>,
+  singles: string[],
+  scrollTop: number,
+): void {
+  singles.forEach((id, position) => {
+    singlesSeen.set(id, { scrollTop, position });
+  });
+}
+
+/**
+ * 記録済みの単独一致のうち、(scrollTop, position) の辞書順最大＝画面内で
+ * 最も下のものを選ぶ。同値なら先に入った方を残す（Map の反復順＝挿入順）。
+ */
+function pickBottomSingle(
+  singlesSeen: Map<string, SingleSeen>,
+): { id: string; seen: SingleSeen } | null {
+  let bottomId: string | null = null;
+  let bottom: SingleSeen | null = null;
+  for (const [id, seen] of singlesSeen) {
+    if (
+      bottom === null ||
+      seen.scrollTop > bottom.scrollTop ||
+      (seen.scrollTop === bottom.scrollTop && seen.position > bottom.position)
+    ) {
+      bottom = seen;
+      bottomId = id;
+    }
+  }
+  if (bottomId !== null && bottom !== null) {
+    return { id: bottomId, seen: bottom };
+  }
+  return null;
+}
+
+/**
+ * 末尾でスクロールが進まなくなったとき、追加読み込みで scrollHeight が
+ * 増えるのを待つ。中断されたら "interrupted"、上限まで増えなければ
+ * "notGrew"、増えれば "grew" を返す。
+ */
+async function waitForListGrowth(
+  deps: SearchDeps,
+  opts: SearchOptions,
+): Promise<"grew" | "notGrew" | "interrupted"> {
+  const beforeHeight = deps.getScrollHeight();
+  let waited = 0;
+  while (waited < opts.endWaitMs) {
+    if (deps.isInterrupted()) {
+      return "interrupted";
+    }
+    await deps.wait(END_POLL_INTERVAL_MS);
+    waited += END_POLL_INTERVAL_MS;
+    if (deps.getScrollHeight() > beforeHeight) {
+      return "grew";
+    }
+  }
+  return "notGrew";
+}
+
 /**
  * 基準（anchorIds）の戻り先を、先頭からスクロールしながら探す。
  * アルゴリズムは plan §4-1 のとおり（run 一致 → 単独基準の即時一致 →
@@ -316,14 +384,7 @@ export async function searchReturnTarget(
   deps.setScrollTop(0);
   await deps.wait(opts.stepWaitMs);
 
-  // 単独一致した基準ごとに、見えたときの scrollTop と、そのとき読み取った
-  // 列内での並び位置（画面内で上から何番目か）を覚えておく。
-  // フォールバック選定は (scrollTop, position) の辞書順最大＝画面内で最も下のもの。
   // 同じ ID を後のステップで再び見た場合は新しい位置で上書きする。
-  interface SingleSeen {
-    scrollTop: number;
-    position: number;
-  }
   const singlesSeen = new Map<string, SingleSeen>();
   let firstSingleSeenStep: number | null = null;
 
@@ -347,9 +408,7 @@ export async function searchReturnTarget(
 
     if (scan.singles.length > 0) {
       const currentScrollTop = deps.getScrollTop();
-      scan.singles.forEach((id, position) => {
-        singlesSeen.set(id, { scrollTop: currentScrollTop, position });
-      });
+      recordSingles(singlesSeen, scan.singles, currentScrollTop);
       if (firstSingleSeenStep === null) {
         firstSingleSeenStep = step;
       }
@@ -367,42 +426,21 @@ export async function searchReturnTarget(
     await deps.wait(opts.stepWaitMs);
 
     if (deps.getScrollTop() === prev) {
-      const beforeHeight = deps.getScrollHeight();
-      let grew = false;
-      let waited = 0;
-      while (waited < opts.endWaitMs) {
-        if (deps.isInterrupted()) {
-          return { kind: "interrupted" };
-        }
-        await deps.wait(END_POLL_INTERVAL_MS);
-        waited += END_POLL_INTERVAL_MS;
-        if (deps.getScrollHeight() > beforeHeight) {
-          grew = true;
-          break;
-        }
+      const growth = await waitForListGrowth(deps, opts);
+      if (growth === "interrupted") {
+        return { kind: "interrupted" };
       }
-      if (!grew) break;
+      if (growth === "notGrew") break;
     }
   }
 
   if (singlesSeen.size > 0) {
-    let bottomId: string | null = null;
-    let bottom: SingleSeen | null = null;
-    for (const [id, seen] of singlesSeen) {
-      if (
-        bottom === null ||
-        seen.scrollTop > bottom.scrollTop ||
-        (seen.scrollTop === bottom.scrollTop && seen.position > bottom.position)
-      ) {
-        bottom = seen;
-        bottomId = id;
-      }
-    }
-    if (bottomId !== null && bottom !== null) {
-      deps.setScrollTop(bottom.scrollTop);
+    const picked = pickBottomSingle(singlesSeen);
+    if (picked !== null) {
+      deps.setScrollTop(picked.seen.scrollTop);
       await deps.wait(opts.stepWaitMs);
-      deps.scrollIdToTop(bottomId);
-      return { kind: "found", id: bottomId, fallback: true };
+      deps.scrollIdToTop(picked.id);
+      return { kind: "found", id: picked.id, fallback: true };
     }
   }
 

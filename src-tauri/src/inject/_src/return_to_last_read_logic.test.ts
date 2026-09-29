@@ -842,5 +842,40 @@ describe("inject/return_to_last_read_logic", () => {
       expect(waitCalls).toBe(2);
       expect(getScrollHeightCalls).toBe(1);
     });
+
+    it("単独一致を見つけた後は追加ステップ数の上限で探索を打ち切り、最も下の単独一致へフォールバックする", async () => {
+      const anchorIds = ["A", "B", "C", "D", "E"];
+      // スクロールすれば常に進む（末尾に到達しない）リストを模す。
+      let scrollTop = 0;
+      let readCalls = 0;
+      const deps: SearchDeps = {
+        readIds: () => {
+          const page = readCalls;
+          readCalls += 1;
+          if (page === 0) return ["A", "N1"];
+          if (page === 1) return ["N2", "B"];
+          return ["N3"];
+        },
+        getScrollTop: () => scrollTop,
+        setScrollTop: (value: number) => {
+          scrollTop = value; // クランプしない＝常に進む
+        },
+        getViewportHeight: () => 800,
+        getScrollHeight: () => 999999,
+        wait: () => Promise.resolve(),
+        isInterrupted: () => false,
+        scrollIdToTop: () => false,
+      };
+
+      const result = await searchReturnTarget(anchorIds, deps, {
+        extraStepsAfterSingle: 3,
+        maxSteps: 1000,
+      });
+
+      // 最初の単独一致（step0のA）から3ステップ後（step3）で打ち切られる＝readIds呼び出しは4回のみ
+      expect(readCalls).toBe(4);
+      // 後から見えたBの方がscrollTopが大きい（画面内でより下）ためBへフォールバックする
+      expect(result).toEqual({ kind: "found", id: "B", fallback: true });
+    });
   });
 });
