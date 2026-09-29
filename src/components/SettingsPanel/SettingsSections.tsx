@@ -1,6 +1,6 @@
 import React, { type ReactNode } from "react";
-import type { ColumnSettings } from "../../types";
-import { HelpPopover } from "../HelpPopover/HelpPopover";
+import { HelpPopover } from "@/components/HelpPopover/HelpPopover";
+import type { ColumnSettings } from "@/types";
 import styles from "./SettingsPanel.module.scss";
 
 export type UpdateSetting = <K extends keyof ColumnSettings>(

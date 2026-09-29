@@ -7,7 +7,12 @@ import {
   type Column,
   type ColumnSettings,
 } from "../../types";
-import { nextLineListErrors, validateLineListInputs } from "./lineListInputs";
+import {
+  nextLineListErrors,
+  validateLineListInputs,
+  type LineListErrors,
+  type LineListTexts,
+} from "./lineListInputs";
 import styles from "./SettingsPanel.module.scss";
 import {
   AutoReloadSection,
@@ -50,15 +55,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   });
   const [width, setWidth] = useState<number>(column.width);
   const [labelText, setLabelText] = useState<string>(column.label ?? "");
-  const [lineListTexts, setLineListTexts] = useState({
+  const [lineListTexts, setLineListTexts] = useState<LineListTexts>({
     ngWords: (column.settings.ngWords ?? []).join("\n"),
     repostHiddenUserIds: (column.settings.repostHiddenUserIds ?? []).join("\n"),
     whitelistWords: (column.settings.whitelistWords ?? []).join("\n"),
   });
-  const [lineListErrors, setLineListErrors] = useState({
-    ngWords: null as string | null,
-    repostHiddenUserIds: null as string | null,
-    whitelistWords: null as string | null,
+  const [lineListErrors, setLineListErrors] = useState<LineListErrors>({
+    ngWords: null,
+    repostHiddenUserIds: null,
+    whitelistWords: null,
   });
 
   const updateSetting = <K extends keyof ColumnSettings>(
