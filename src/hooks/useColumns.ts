@@ -8,7 +8,6 @@ import {
   SCROLLBAR_HEIGHT,
   getTopBarHeight,
   calculateGridBounds,
-  mobileColumnLayout,
 } from "../lib/gridLayout";
 import { logError } from "../lib/log";
 import {
@@ -24,7 +23,7 @@ import {
 import { useAppStore } from "../store/useAppStore";
 import type { Column } from "../types";
 import { useDesktopColumns } from "./useDesktopColumns";
-import { resolveTwoColumnEnabled, useMobileColumns } from "./useMobileColumns";
+import { mobileLayoutForViewport, useMobileColumns } from "./useMobileColumns";
 
 // グリッド座標計算は src/lib/gridLayout.ts へ移動した。既存 import 互換のため re-export する。
 export {
@@ -109,13 +108,7 @@ export function useColumns() {
       const { isMobile } = useAppStore.getState();
       if (isMobile) {
         // 追加カラムは非表示で作成する（activeColumnId: null なので必ず画面外 bounds になる）
-        const offscreenLayout = mobileColumnLayout({
-          columns: [column],
-          activeColumnId: null,
-          twoColumnEnabled: resolveTwoColumnEnabled(),
-          viewportWidth: window.innerWidth,
-          viewportHeight: window.innerHeight,
-        });
+        const offscreenLayout = mobileLayoutForViewport([column], null);
         await createColumnWebview(
           column,
           dataDirectory,
@@ -156,13 +149,7 @@ export function useColumns() {
   const hideColumnWebviews = useCallback(async () => {
     const { columns: currentColumns, isMobile } = useAppStore.getState();
     const mobileLayout = isMobile
-      ? mobileColumnLayout({
-          columns: currentColumns,
-          activeColumnId: null,
-          twoColumnEnabled: resolveTwoColumnEnabled(),
-          viewportWidth: window.innerWidth,
-          viewportHeight: window.innerHeight,
-        })
+      ? mobileLayoutForViewport(currentColumns, null)
       : null;
     await Promise.all(
       currentColumns.map((col) =>
@@ -205,13 +192,8 @@ export function useColumns() {
         isMobile &&
         activeColumnId != null &&
         activeColumnId !== columnId &&
-        mobileColumnLayout({
-          columns: columnsBeforeRemoval,
-          activeColumnId,
-          twoColumnEnabled: resolveTwoColumnEnabled(),
-          viewportWidth: window.innerWidth,
-          viewportHeight: window.innerHeight,
-        })[columnId]?.x >= 0;
+        mobileLayoutForViewport(columnsBeforeRemoval, activeColumnId)[columnId]
+          ?.x >= 0;
 
       await removeColumnWebview(columnId).catch(
         logError("handleRemoveColumn:removeColumnWebview"),
@@ -302,13 +284,7 @@ export function useColumns() {
       );
 
       if (isMobile) {
-        const offscreenLayout = mobileColumnLayout({
-          columns: [column],
-          activeColumnId: null,
-          twoColumnEnabled: resolveTwoColumnEnabled(),
-          viewportWidth: window.innerWidth,
-          viewportHeight: window.innerHeight,
-        });
+        const offscreenLayout = mobileLayoutForViewport([column], null);
         await createColumnWebview(
           column,
           dataDirectory,
@@ -317,13 +293,10 @@ export function useColumns() {
         // 再作成したカラムが現在の表示ペア（アクティブ or その隣）に含まれるなら
         // setActiveColumn で再配置して可視化する（2カラム時、右隣カラムの再作成でも必要）
         if (activeColumnId) {
-          const displayLayout = mobileColumnLayout({
-            columns: currentColumns,
+          const displayLayout = mobileLayoutForViewport(
+            currentColumns,
             activeColumnId,
-            twoColumnEnabled: resolveTwoColumnEnabled(),
-            viewportWidth: window.innerWidth,
-            viewportHeight: window.innerHeight,
-          });
+          );
           if (displayLayout[columnId].x >= 0) {
             await setActiveColumn(activeColumnId);
           }

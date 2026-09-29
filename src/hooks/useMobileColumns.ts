@@ -3,7 +3,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { IPC_EVENTS, STORAGE_KEYS, WEBVIEW_SCRIPTS } from "../constants/ipc";
-import { mobileColumnLayout } from "../lib/gridLayout";
+import { mobileColumnLayout, type ColumnBounds } from "../lib/gridLayout";
 import { logError } from "../lib/log";
 import {
   createColumnWebview,
@@ -25,6 +25,23 @@ export interface SwipeState {
 export function resolveTwoColumnEnabled(): boolean {
   const { globalSettings, profileApiSupported } = useAppStore.getState();
   return globalSettings.mobileTwoColumnEnabled && profileApiSupported;
+}
+
+/**
+ * 現在のビューポート・2カラム設定から、モバイルの全カラム WebView 配置を計算する。
+ * twoColumnEnabled / viewportWidth / viewportHeight の取得元を一本化するためのラッパー。
+ */
+export function mobileLayoutForViewport(
+  columns: Column[],
+  activeColumnId: string | null,
+): Record<string, ColumnBounds> {
+  return mobileColumnLayout({
+    columns,
+    activeColumnId,
+    twoColumnEnabled: resolveTwoColumnEnabled(),
+    viewportWidth: window.innerWidth,
+    viewportHeight: window.innerHeight,
+  });
 }
 
 export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
@@ -62,13 +79,7 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
     // この呼び出しの表示位置更新はもう不要（新しい呼び出しに委ねる）。
     if (isStale()) return;
 
-    const layout = mobileColumnLayout({
-      columns: currentColumns,
-      activeColumnId: id,
-      twoColumnEnabled: resolveTwoColumnEnabled(),
-      viewportWidth: window.innerWidth,
-      viewportHeight: window.innerHeight,
-    });
+    const layout = mobileLayoutForViewport(currentColumns, id);
     // 非表示（hide）分は並列でよい。表示（show）分は Kotlin 側
     // activeColumnWebViewId（戻るボタン/ダブルタップ対象）が最後の
     // showColumnWebView で決まるため、アクティブカラムを必ず最後に送る。
@@ -110,13 +121,10 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
       const targetColumn =
         (savedId ? sortedByOrder.find((c) => c.id === savedId) : null) ??
         firstColumn;
-      const layout = mobileColumnLayout({
-        columns: sortedByOrder,
-        activeColumnId: targetColumn?.id ?? null,
-        twoColumnEnabled: resolveTwoColumnEnabled(),
-        viewportWidth: window.innerWidth,
-        viewportHeight: window.innerHeight,
-      });
+      const layout = mobileLayoutForViewport(
+        sortedByOrder,
+        targetColumn?.id ?? null,
+      );
       // 全カラムを並列作成して loadUrl を一斉に開始する。mobile の
       // create_column_webview は visible = args.x >= 0.0 で可視判定するため、
       // 表示ペア（1〜2枚）が visible で作成される。
