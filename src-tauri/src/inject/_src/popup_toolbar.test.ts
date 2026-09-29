@@ -1,5 +1,9 @@
+// @vitest-environment-options {"url":"https://x.com/"}
 // popup_toolbar.ts は IIFE のため、import 時にツールバーが DOM へ注入される。
 // vi.resetModules で再 import し、Android ブリッジ有無それぞれの転送先を検証する。
+// takePopupAccounts が hostname を検証するようになったため、location を明示的に
+// 上書きしないテストでも X 系ホストとして扱われるよう、テスト環境の URL を
+// https://x.com/ に固定する（jsdom のデフォルトは localhost で空配列になってしまうため）。
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { formatVideoDownloadProgressText } from "./popup_toolbar";
 
@@ -645,6 +649,68 @@ describe("isOfficialSettingsPagePath", () => {
     expect(isOfficialSettingsPagePath("/home")).toBe(false);
     expect(isOfficialSettingsPagePath("/explore")).toBe(false);
     expect(isOfficialSettingsPagePath("/messages")).toBe(false);
+  });
+});
+
+describe("isXHostname", () => {
+  it("x.comとそのサブドメインはtrueを返す", async () => {
+    const { isXHostname } = await import("./popup_toolbar");
+    expect(isXHostname("x.com")).toBe(true);
+    expect(isXHostname("mobile.x.com")).toBe(true);
+  });
+
+  it("twitter.comとそのサブドメインはtrueを返す", async () => {
+    const { isXHostname } = await import("./popup_toolbar");
+    expect(isXHostname("twitter.com")).toBe(true);
+    expect(isXHostname("mobile.twitter.com")).toBe(true);
+  });
+
+  it("x.comに似た別ドメインはfalseを返す", async () => {
+    const { isXHostname } = await import("./popup_toolbar");
+    expect(isXHostname("x.com.example.com")).toBe(false);
+    expect(isXHostname("evilx.com")).toBe(false);
+    expect(isXHostname("example.com")).toBe(false);
+  });
+});
+
+describe("takePopupAccounts", () => {
+  const popupAccounts: TvAccountInfo[] = [
+    { id: "acc1", label: "アカウント1", color: "#fff" },
+    { id: "acc2", label: "アカウント2", color: "#000" },
+  ];
+
+  function fakeWindow(initialAccounts?: TvAccountInfo[]): Window {
+    return { __mcxAccounts: initialAccounts } as unknown as Window;
+  }
+
+  it("ポップアップのページがXのときはアカウント一覧が渡される", async () => {
+    const { takePopupAccounts } = await import("./popup_toolbar");
+    const win = fakeWindow(popupAccounts);
+
+    expect(takePopupAccounts(win, "x.com")).toEqual(popupAccounts);
+  });
+
+  it("ポップアップのページがX以外のときはアカウント一覧が空になる", async () => {
+    const { takePopupAccounts } = await import("./popup_toolbar");
+    const win = fakeWindow(popupAccounts);
+
+    expect(takePopupAccounts(win, "example.com")).toEqual([]);
+  });
+
+  it("Xに似た名前の別サイトではアカウント一覧が空になる", async () => {
+    const { takePopupAccounts } = await import("./popup_toolbar");
+    const win = fakeWindow(popupAccounts);
+
+    expect(takePopupAccounts(win, "x.com.example.com")).toEqual([]);
+  });
+
+  it("呼び出し後はwindowからアカウント一覧が削除される", async () => {
+    const { takePopupAccounts } = await import("./popup_toolbar");
+    const win = fakeWindow(popupAccounts);
+
+    takePopupAccounts(win, "example.com");
+
+    expect(win.__mcxAccounts).toBeUndefined();
   });
 });
 

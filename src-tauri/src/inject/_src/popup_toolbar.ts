@@ -133,6 +133,52 @@ export function isOfficialSettingsPagePath(pathname: string): boolean {
   return pathname.startsWith("/settings");
 }
 
+/** hostname が x.com / twitter.com またはそのサブドメインかどうかを判定する。 */
+export function isXHostname(hostname: string): boolean {
+  return (
+    hostname === "x.com" ||
+    hostname.endsWith(".x.com") ||
+    hostname === "twitter.com" ||
+    hostname.endsWith(".twitter.com")
+  );
+}
+
+/**
+ * 初期化スクリプトが埋め込んだアカウント一覧を取り出し、window から削除する。
+ * ホストによる絞り込みは行わない（ツールバー自体を表示するかどうかの判定は
+ * ホストに関わらず「アカウントが登録されているか」で行うため、生の値が必要）。
+ */
+export function readAndClearPopupAccounts(win: Window): TvAccountInfo[] {
+  const accounts = win.__mcxAccounts ?? [];
+  delete win.__mcxAccounts;
+  return accounts;
+}
+
+/**
+ * アカウント一覧を、X 系のページでなければ空配列にする。
+ * 外部サイトのスクリプトにアカウント名等を渡さないための絞り込み。
+ */
+export function filterPopupAccountsByHostname(
+  accounts: TvAccountInfo[],
+  hostname: string,
+): TvAccountInfo[] {
+  return isXHostname(hostname) ? accounts : [];
+}
+
+/**
+ * 初期化スクリプトが埋め込んだアカウント一覧を取り出し、window から削除したうえで、
+ * X 系のページでなければ空配列を返す（外部サイトへアカウント情報を渡さないため）。
+ */
+export function takePopupAccounts(
+  win: Window,
+  hostname: string,
+): TvAccountInfo[] {
+  return filterPopupAccountsByHostname(
+    readAndClearPopupAccounts(win),
+    hostname,
+  );
+}
+
 /** Cookie文字列から "night_mode" の値を読む。存在しなければ null（システム設定を使う状態）を返す。 */
 export function readNightModeCookie(cookieString: string): string | null {
   const match = cookieString.match(/(?:^|; )night_mode=([^;]*)/);
@@ -154,7 +200,11 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
 }
 
 (function () {
-  const accounts: TvAccountInfo[] = window.__mcxAccounts ?? [];
+  const rawAccounts = readAndClearPopupAccounts(window);
+  const accounts = filterPopupAccountsByHostname(
+    rawAccounts,
+    location.hostname,
+  );
   const currentAccountId: string = window.__mcxCurrentAccountId ?? "";
   const targetHref: string = window.__mcxTargetHref ?? "";
   const escCloseEnabled: boolean = window.__mcxEscCloseEnabled ?? true;
@@ -164,7 +214,10 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
 
   if (document.getElementById("tv-popup-toolbar")) return;
 
-  if (accounts.length === 0) return;
+  // ツールバー自体の表示可否は「アカウントが登録されているか」で判定する
+  // （ホストによる絞り込み前）。X 以外のホストでもツールバー自体（閉じるボタン等）は
+  // 必要なため、アカウント切替 UI の表示可否とは分けて判定する。
+  if (rawAccounts.length === 0) return;
 
   function tauriInvoke(
     cmd: string,
@@ -217,54 +270,66 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
     "color: #e7e9ea",
   ].join(";");
 
-  const label = document.createElement("span");
-  label.textContent = "アカウント: ";
-  label.style.cssText = "margin-right: 8px; white-space: nowrap;";
+  // アカウント切替 UI（ラベル・select・option）は X 系ホストでのみ生成する。
+  // 非対象ホストでは accounts が空になっている（takePopupAccounts 参照）ため、
+  // ここで生成しなければページのスクリプトからアカウント名が読めることもない
+  // （非表示にするだけでは DOM に残ってしまうため、生成自体を行わない）。
+  let accountSwitcher: HTMLSpanElement | null = null;
+  let accountSelect: HTMLSelectElement | null = null;
 
-  const select = document.createElement("select");
-  select.style.cssText = [
-    "background: #253341",
-    "color: #e7e9ea",
-    "border: 1px solid #38444d",
-    "border-radius: 4px",
-    "padding: 4px 8px",
-    "font-size: 13px",
-    "cursor: pointer",
-    "max-width: 200px",
-  ].join(";");
+  if (accounts.length > 0) {
+    const label = document.createElement("span");
+    label.textContent = "アカウント: ";
+    label.style.cssText = "margin-right: 8px; white-space: nowrap;";
 
-  accounts.forEach((account) => {
-    const option = document.createElement("option");
-    option.value = account.id;
-    option.textContent = account.label;
-    if (account.id === currentAccountId) {
-      option.selected = true;
-    }
-    select.appendChild(option);
-  });
+    const select = document.createElement("select");
+    select.style.cssText = [
+      "background: #253341",
+      "color: #e7e9ea",
+      "border: 1px solid #38444d",
+      "border-radius: 4px",
+      "padding: 4px 8px",
+      "font-size: 13px",
+      "cursor: pointer",
+      "max-width: 200px",
+    ].join(";");
 
-  select.addEventListener("change", function () {
-    const selectedId = select.value;
-    const selectedAccount = accounts.find((a) => a.id === selectedId);
-    if (!selectedAccount) return;
-    // Android のネイティブ WebView には Tauri IPC が無いため、
-    // addJavascriptInterface で公開されたブリッジを優先して使う。
-    const androidBridge = window.__mcxPopupBridge;
-    if (androidBridge) {
-      postBridgeMessage(androidBridge, {
-        type: "switchPopupSession",
+    accounts.forEach((account) => {
+      const option = document.createElement("option");
+      option.value = account.id;
+      option.textContent = account.label;
+      if (account.id === currentAccountId) {
+        option.selected = true;
+      }
+      select.appendChild(option);
+    });
+
+    select.addEventListener("change", function () {
+      const selectedId = select.value;
+      const selectedAccount = accounts.find((a) => a.id === selectedId);
+      if (!selectedAccount) return;
+      // Android のネイティブ WebView には Tauri IPC が無いため、
+      // addJavascriptInterface で公開されたブリッジを優先して使う。
+      const androidBridge = window.__mcxPopupBridge;
+      if (androidBridge) {
+        postBridgeMessage(androidBridge, {
+          type: "switchPopupSession",
+          accountId: selectedAccount.id,
+          url: window.location.href,
+        });
+        return;
+      }
+      // popupLabel は渡さない。実際の送信元 WebView（呼び出し元）は Rust 側が
+      // caller.label() で判定するため、JS が自己申告する必要も権限も無い。
+      tauriInvoke(SWITCH_POPUP_SESSION, {
         accountId: selectedAccount.id,
         url: window.location.href,
       });
-      return;
-    }
-    // popupLabel は渡さない。実際の送信元 WebView（呼び出し元）は Rust 側が
-    // caller.label() で判定するため、JS が自己申告する必要も権限も無い。
-    tauriInvoke(SWITCH_POPUP_SESSION, {
-      accountId: selectedAccount.id,
-      url: window.location.href,
     });
-  });
+
+    accountSwitcher = label;
+    accountSelect = select;
+  }
 
   const downloadButton = document.createElement("button");
   downloadButton.type = "button";
@@ -420,8 +485,10 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
     });
   });
 
-  toolbar.appendChild(label);
-  toolbar.appendChild(select);
+  if (accountSwitcher && accountSelect) {
+    toolbar.appendChild(accountSwitcher);
+    toolbar.appendChild(accountSelect);
+  }
   toolbar.appendChild(downloadButton);
   toolbar.appendChild(downloadStatus);
   toolbar.appendChild(applySettingsButton);
