@@ -257,6 +257,27 @@ describe("useColumns mobile", () => {
     expect(mockInvoke).not.toHaveBeenCalled();
   });
 
+  it("モバイルで表示ペアに含まれないカラムを作り直してもアクティブカラムの再配置は行わない", async () => {
+    const { result } = renderHook(() => useColumns());
+    await act(async () => {
+      await result.current.setActiveColumn("col-1");
+    });
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    // profileApiSupported: false のため1カラム表示（表示ペアは col-1 のみ）。
+    // col-3 は表示ペアに含まれない。
+    await act(async () => {
+      await result.current.recreateColumnWebview("col-3");
+    });
+
+    // 表示ペアに含まれないため setActiveColumn による再配置(resize)は発生しない
+    const resizeCalls = mockInvoke.mock.calls.filter(
+      (c) => c[0] === "resize_column_webview",
+    );
+    expect(resizeCalls).toHaveLength(0);
+  });
+
   it("handleRemoveColumn でアクティブ列を削除すると order が最小の列がアクティブになる", async () => {
     const { result } = renderHook(() => useColumns());
     // set col-1 active first
@@ -830,6 +851,194 @@ describe("useColumns handleAddColumn", () => {
     expect(
       useAppStore.getState().columns.some((c) => c.id === "col-orphan"),
     ).toBe(false);
+  });
+
+  it("デスクトップでカラムを追加するとトップバーの高さを考慮した位置に作成される", async () => {
+    useAppStore.setState({ topBarExpanded: true });
+    const column = makeColumn({ id: "col-new" });
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+
+    await act(async () => {
+      await result.current.handleAddColumn(column);
+    });
+
+    const createCall = mockInvoke.mock.calls.find(
+      (c) => c[0] === "create_column_webview",
+    );
+    expect(createCall).toBeDefined();
+    // topBarExpanded: true のとき y は TOPBAR_EXPANDED_HEIGHT(64) + HEADER_HEIGHT(36) = 100
+    expect((createCall?.[1] as { args: { y: number } }).args.y).toBe(100);
+  });
+});
+
+describe("useColumns handleAddColumn mobile", () => {
+  const mockInvoke = vi.mocked(invoke);
+
+  function attachContainer(
+    ref: { current: HTMLDivElement | null },
+    clientHeight = 900,
+  ) {
+    const div = document.createElement("div");
+    Object.defineProperty(div, "clientHeight", {
+      value: clientHeight,
+      configurable: true,
+    });
+    ref.current = div;
+  }
+
+  function makeColumn(overrides: Partial<Column> & Pick<Column, "id">): Column {
+    return {
+      accountId: "acc-1",
+      pageType: "home",
+      homeTabName: "フォロー中",
+      width: 350,
+      order: 0,
+      gridRow: 1,
+      gridCol: 1,
+      heightMode: "auto",
+      settings: { ...DEFAULT_COLUMN_SETTINGS },
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+    mockResolveColumnDataDirectory.mockImplementation(
+      async (column, accounts) =>
+        accounts.find((a) => a.id === column.accountId)?.dataDirectory,
+    );
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-1",
+          label: "Test",
+          dataDirectory: "/data/acc-1",
+          color: "#1d9bf0",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      columns: [],
+      globalSettings: { ...DEFAULT_GLOBAL_SETTINGS },
+      isLoaded: true,
+      isMobile: true,
+      profileApiSupported: false,
+    });
+  });
+
+  it("モバイルでカラムを追加すると新しいカラムは画面外に作成される", async () => {
+    const column = makeColumn({ id: "col-new" });
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+
+    await act(async () => {
+      await result.current.handleAddColumn(column);
+    });
+
+    const createCall = mockInvoke.mock.calls.find(
+      (c) => c[0] === "create_column_webview",
+    );
+    expect(createCall).toBeDefined();
+    expect((createCall?.[1] as { args: { x: number } }).args.x).toBe(
+      OFFSCREEN.MOBILE_X,
+    );
+  });
+});
+
+describe("useColumns desktop recreateColumnWebview", () => {
+  const mockInvoke = vi.mocked(invoke);
+
+  function attachContainer(
+    ref: { current: HTMLDivElement | null },
+    clientHeight = 900,
+  ) {
+    const div = document.createElement("div");
+    Object.defineProperty(div, "clientHeight", {
+      value: clientHeight,
+      configurable: true,
+    });
+    ref.current = div;
+  }
+
+  function makeColumn(id: string, gridCol: number): Column {
+    return {
+      id,
+      accountId: "acc-1",
+      pageType: "home",
+      homeTabName: "フォロー中",
+      width: 350,
+      order: gridCol - 1,
+      gridRow: 1,
+      gridCol,
+      heightMode: "auto",
+      settings: { ...DEFAULT_COLUMN_SETTINGS },
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+    mockResolveColumnDataDirectory.mockImplementation(
+      async (column, accounts) =>
+        accounts.find((a) => a.id === column.accountId)?.dataDirectory,
+    );
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-1",
+          label: "Test",
+          dataDirectory: "/data/acc-1",
+          color: "#1d9bf0",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      columns: [makeColumn("col-1", 1), makeColumn("col-2", 2)],
+      globalSettings: { ...DEFAULT_GLOBAL_SETTINGS },
+      isLoaded: true,
+      isMobile: false,
+      topBarExpanded: true,
+    });
+  });
+
+  it("デスクトップでカラムを作り直すとトップバーの高さを考慮した位置に作成される", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.recreateColumnWebview("col-1");
+    });
+
+    const createCall = mockInvoke.mock.calls.find(
+      (c) =>
+        c[0] === "create_column_webview" &&
+        (c[1] as { args: { column: Column } }).args.column.id === "col-1",
+    );
+    expect(createCall).toBeDefined();
+    // topBarExpanded: true のとき y は TOPBAR_EXPANDED_HEIGHT(64) + HEADER_HEIGHT(36) = 100
+    expect((createCall?.[1] as { args: { y: number } }).args.y).toBe(100);
+  });
+
+  it("デスクトップでカラムを作り直すと作成後に全カラムの位置を再計算する", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.recreateColumnWebview("col-1");
+    });
+
+    // 再作成対象ではない col-2 が resize されていれば、作成後に
+    // recalculateAllBounds が実行された証拠になる
+    const col2Resize = mockInvoke.mock.calls.find(
+      (c) =>
+        c[0] === "resize_column_webview" &&
+        (c[1] as { bounds: { columnId: string } }).bounds.columnId === "col-2",
+    );
+    expect(col2Resize).toBeDefined();
   });
 });
 
