@@ -30,6 +30,29 @@ interface DesktopColumnsArgs {
   setActiveColumn: (id: string) => Promise<void>;
 }
 
+interface DesktopViewport {
+  containerHeight: number;
+  scrollLeft: number;
+  topBarHeight: number;
+}
+
+/**
+ * デスクトップの全カラム WebView 配置を計算する。
+ * HEADER_HEIGHT / SCROLLBAR_HEIGHT の取得元を一本化するためのラッパー。
+ */
+export function desktopGridBounds(
+  columns: Column[],
+  viewport: DesktopViewport,
+): Record<string, ColumnBounds> {
+  return calculateGridBounds(columns, {
+    containerHeight: viewport.containerHeight,
+    scrollLeft: viewport.scrollLeft,
+    headerHeight: HEADER_HEIGHT,
+    scrollbarHeight: SCROLLBAR_HEIGHT,
+    topBarHeight: viewport.topBarHeight,
+  });
+}
+
 export function useDesktopColumns({
   containerRef,
   scrollbarRef,
@@ -58,11 +81,9 @@ export function useDesktopColumns({
     const { columns: currentColumns, topBarExpanded } = useAppStore.getState();
     const topBarHeight = getTopBarHeight(topBarExpanded);
 
-    const bounds = calculateGridBounds(currentColumns, {
+    const bounds = desktopGridBounds(currentColumns, {
       containerHeight,
       scrollLeft,
-      headerHeight: HEADER_HEIGHT,
-      scrollbarHeight: SCROLLBAR_HEIGHT,
       topBarHeight,
     });
 
@@ -85,11 +106,9 @@ export function useDesktopColumns({
       scrollLeft: number,
       topBarHeight: number,
     ) => {
-      const bounds = calculateGridBounds(currentColumns, {
+      const bounds = desktopGridBounds(currentColumns, {
         containerHeight,
         scrollLeft,
-        headerHeight: HEADER_HEIGHT,
-        scrollbarHeight: SCROLLBAR_HEIGHT,
         topBarHeight,
       });
 

@@ -3,12 +3,7 @@
 import { useCallback, useRef } from "react";
 import { OFFSCREEN } from "../constants/ipc";
 import { moveGroup } from "../lib/columnOrder";
-import {
-  HEADER_HEIGHT,
-  SCROLLBAR_HEIGHT,
-  getTopBarHeight,
-  calculateGridBounds,
-} from "../lib/gridLayout";
+import { HEADER_HEIGHT, getTopBarHeight } from "../lib/gridLayout";
 import { logError } from "../lib/log";
 import {
   createColumnWebview,
@@ -22,7 +17,7 @@ import {
 } from "../services/externalColumn";
 import { useAppStore } from "../store/useAppStore";
 import type { Column } from "../types";
-import { useDesktopColumns } from "./useDesktopColumns";
+import { desktopGridBounds, useDesktopColumns } from "./useDesktopColumns";
 import { mobileLayoutForViewport, useMobileColumns } from "./useMobileColumns";
 
 // グリッド座標計算は src/lib/gridLayout.ts へ移動した。既存 import 互換のため re-export する。
@@ -126,11 +121,9 @@ export function useColumns() {
         useAppStore.getState();
       const topBarHeight = getTopBarHeight(topBarExpanded);
 
-      const bounds = calculateGridBounds(updatedColumns, {
+      const bounds = desktopGridBounds(updatedColumns, {
         containerHeight,
         scrollLeft,
-        headerHeight: HEADER_HEIGHT,
-        scrollbarHeight: SCROLLBAR_HEIGHT,
         topBarHeight,
       });
 
@@ -307,11 +300,9 @@ export function useColumns() {
       if (!containerRef.current) return;
       const containerHeight = containerRef.current.clientHeight;
       const scrollLeft = scrollbarRef.current?.scrollLeft ?? 0;
-      const bounds = calculateGridBounds(currentColumns, {
+      const bounds = desktopGridBounds(currentColumns, {
         containerHeight,
         scrollLeft,
-        headerHeight: HEADER_HEIGHT,
-        scrollbarHeight: SCROLLBAR_HEIGHT,
         topBarHeight: getTopBarHeight(topBarExpanded),
       });
       const b = bounds[columnId];
