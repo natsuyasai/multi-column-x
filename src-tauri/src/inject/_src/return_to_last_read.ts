@@ -208,6 +208,43 @@ import {
 
   // --- 更新検知・ユーザースクロール検知 ---
 
+  // 先頭表示中（探索中でなく、スクロール位置が先頭付近で、仮想リストの先頭セルが
+  // 描画済み）なら、基準候補（topSnapshot）を読み直して topUpdated を dispatch する。
+  function refreshTopSnapshot(
+    section: Element | null,
+    scrollTop: number,
+  ): void {
+    if (!section || searching || scrollTop > 1 || !isListTopRendered(section)) {
+      return;
+    }
+    topSnapshot = selectAnchorIds(readTimelineIds(section));
+    dispatch({ type: "topUpdated", topIds: topSnapshot });
+  }
+
+  // ユーザー操作によるスクロール（source === "scroll" かつ直近のユーザー入力から
+  // USER_INPUT_WINDOW_MS 以内）で、戻り先（run 一致する基準）が画面内に入ったら
+  // targetSeenByUser を dispatch する。
+  function detectTargetSeenByUser(
+    section: Element | null,
+    source: "dom" | "scroll",
+  ): void {
+    if (
+      !section ||
+      source !== "scroll" ||
+      searching ||
+      state.anchorIds === null ||
+      Date.now() - lastUserInputAt >= USER_INPUT_WINDOW_MS
+    ) {
+      return;
+    }
+    const scan = scanReturnTarget(readTimelineIds(section), state.anchorIds);
+    if (scan.kind !== "run") return;
+    const article = findArticleById(section, scan.id);
+    if (article && isInViewport(article)) {
+      dispatch({ type: "targetSeenByUser" });
+    }
+  }
+
   function onDomOrScroll(source: "dom" | "scroll"): void {
     if (!enabled || !isHomePath()) {
       render();
@@ -226,26 +263,8 @@ import {
     const scrollingElement = document.scrollingElement;
     const scrollTop = scrollingElement ? scrollingElement.scrollTop : 0;
 
-    if (section && !searching && scrollTop <= 1 && isListTopRendered(section)) {
-      topSnapshot = selectAnchorIds(readTimelineIds(section));
-      dispatch({ type: "topUpdated", topIds: topSnapshot });
-    }
-
-    if (
-      section &&
-      source === "scroll" &&
-      !searching &&
-      state.anchorIds !== null &&
-      Date.now() - lastUserInputAt < USER_INPUT_WINDOW_MS
-    ) {
-      const scan = scanReturnTarget(readTimelineIds(section), state.anchorIds);
-      if (scan.kind === "run") {
-        const article = findArticleById(section, scan.id);
-        if (article && isInViewport(article)) {
-          dispatch({ type: "targetSeenByUser" });
-        }
-      }
-    }
+    refreshTopSnapshot(section, scrollTop);
+    detectTargetSeenByUser(section, source);
 
     render();
   }
