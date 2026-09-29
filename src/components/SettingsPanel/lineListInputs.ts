@@ -2,8 +2,10 @@
 // SettingsPanel の行リスト入力（NGワード / リポスト非表示ユーザー / ホワイトリスト）の
 // parse・validate をまとめた純粋関数（Tauri 非依存）。
 
-import { validateNgWordLines } from "@/lib/ngWordPattern";
-import { parseUserIdLines, validateUserIdLine } from "@/lib/repostHiddenUserId";
+import {
+  parseAndValidateUserIdLines,
+  parseAndValidateWordLines,
+} from "@/lib/lineListValidation";
 
 export type LineListField =
   | "ngWords"
@@ -18,49 +20,38 @@ export type LineListValidation =
   | { kind: "valid"; values: Record<LineListField, string[]> }
   | { kind: "invalid"; field: LineListField; error: string };
 
-function splitLines(text: string): string[] {
-  return text
-    .split("\n")
-    .map((w) => w.trim())
-    .filter((w) => w.length > 0);
-}
-
 export function validateLineListInputs(
   texts: LineListTexts,
 ): LineListValidation {
-  const ngWords = splitLines(texts.ngWords);
-  const ngWordsError = validateNgWordLines(ngWords);
-  if (ngWordsError) {
-    return { kind: "invalid", field: "ngWords", error: ngWordsError };
+  const ngWords = parseAndValidateWordLines(texts.ngWords);
+  if (ngWords.kind === "invalid") {
+    return { kind: "invalid", field: "ngWords", error: ngWords.error };
   }
 
-  const repostHiddenUserIds = parseUserIdLines(texts.repostHiddenUserIds);
-  const repostHiddenUserIdsError =
-    repostHiddenUserIds
-      .map((id) => validateUserIdLine(id))
-      .find((error) => error !== null) ?? null;
-  if (repostHiddenUserIdsError) {
+  const repostHiddenUserIds = parseAndValidateUserIdLines(
+    texts.repostHiddenUserIds,
+  );
+  if (repostHiddenUserIds.kind === "invalid") {
     return {
       kind: "invalid",
       field: "repostHiddenUserIds",
-      error: repostHiddenUserIdsError,
+      error: repostHiddenUserIds.error,
     };
   }
 
-  const whitelistWords = splitLines(texts.whitelistWords);
-  const whitelistWordsError = validateNgWordLines(whitelistWords);
-  if (whitelistWordsError) {
+  const whitelistWords = parseAndValidateWordLines(texts.whitelistWords);
+  if (whitelistWords.kind === "invalid") {
     return {
       kind: "invalid",
       field: "whitelistWords",
-      error: whitelistWordsError,
+      error: whitelistWords.error,
     };
   }
 
   const values: Record<LineListField, string[]> = {
-    ngWords,
-    repostHiddenUserIds,
-    whitelistWords,
+    ngWords: ngWords.values,
+    repostHiddenUserIds: repostHiddenUserIds.values,
+    whitelistWords: whitelistWords.values,
   };
 
   return { kind: "valid", values };
