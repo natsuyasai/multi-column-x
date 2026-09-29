@@ -3,13 +3,7 @@
 import { useCallback, useRef } from "react";
 import { OFFSCREEN } from "../constants/ipc";
 import { moveGroup } from "../lib/columnOrder";
-import {
-  HEADER_HEIGHT,
-  SCROLLBAR_HEIGHT,
-  getTopBarHeight,
-  calculateGridBounds,
-  mobileColumnLayout,
-} from "../lib/gridLayout";
+import { HEADER_HEIGHT, getTopBarHeight } from "../lib/gridLayout";
 import { logError } from "../lib/log";
 import {
   createColumnWebview,
@@ -23,8 +17,8 @@ import {
 } from "../services/externalColumn";
 import { useAppStore } from "../store/useAppStore";
 import type { Column } from "../types";
-import { useDesktopColumns } from "./useDesktopColumns";
-import { resolveTwoColumnEnabled, useMobileColumns } from "./useMobileColumns";
+import { desktopGridBounds, useDesktopColumns } from "./useDesktopColumns";
+import { mobileLayoutForViewport, useMobileColumns } from "./useMobileColumns";
 
 // グリッド座標計算は src/lib/gridLayout.ts へ移動した。既存 import 互換のため re-export する。
 export {
@@ -37,6 +31,22 @@ export {
   calculateGridBounds,
 } from "../lib/gridLayout";
 export type { ColumnBounds } from "../lib/gridLayout";
+
+// モバイルの新規カラム WebView を画面外（非表示）で作成する。
+// handleAddColumn / recreateColumnWebview の mobile 分岐から共通利用する。
+// logTag は呼び出し元ごとの logError タグ文字列（呼び出し元の識別を維持するため引数で渡す）。
+async function createOffscreenMobileColumnWebview(
+  column: Column,
+  dataDirectory: string,
+  logTag: string,
+): Promise<void> {
+  const offscreenLayout = mobileLayoutForViewport([column], null);
+  await createColumnWebview(
+    column,
+    dataDirectory,
+    offscreenLayout[column.id],
+  ).catch(logError(logTag));
+}
 
 export function useColumns() {
   const { columns, accounts, addColumn, removeColumn, updateColumn } =
@@ -109,18 +119,11 @@ export function useColumns() {
       const { isMobile } = useAppStore.getState();
       if (isMobile) {
         // 追加カラムは非表示で作成する（activeColumnId: null なので必ず画面外 bounds になる）
-        const offscreenLayout = mobileColumnLayout({
-          columns: [column],
-          activeColumnId: null,
-          twoColumnEnabled: resolveTwoColumnEnabled(),
-          viewportWidth: window.innerWidth,
-          viewportHeight: window.innerHeight,
-        });
-        await createColumnWebview(
+        await createOffscreenMobileColumnWebview(
           column,
           dataDirectory,
-          offscreenLayout[column.id],
-        ).catch(logError("handleAddColumn:createColumnWebview(mobile)"));
+          "handleAddColumn:createColumnWebview(mobile)",
+        );
         if (activeColumnId === null) {
           await setActiveColumn(column.id);
         }
@@ -133,11 +136,9 @@ export function useColumns() {
         useAppStore.getState();
       const topBarHeight = getTopBarHeight(topBarExpanded);
 
-      const bounds = calculateGridBounds(updatedColumns, {
+      const bounds = desktopGridBounds(updatedColumns, {
         containerHeight,
         scrollLeft,
-        headerHeight: HEADER_HEIGHT,
-        scrollbarHeight: SCROLLBAR_HEIGHT,
         topBarHeight,
       });
 
@@ -156,13 +157,7 @@ export function useColumns() {
   const hideColumnWebviews = useCallback(async () => {
     const { columns: currentColumns, isMobile } = useAppStore.getState();
     const mobileLayout = isMobile
-      ? mobileColumnLayout({
-          columns: currentColumns,
-          activeColumnId: null,
-          twoColumnEnabled: resolveTwoColumnEnabled(),
-          viewportWidth: window.innerWidth,
-          viewportHeight: window.innerHeight,
-        })
+      ? mobileLayoutForViewport(currentColumns, null)
       : null;
     await Promise.all(
       currentColumns.map((col) =>
@@ -205,13 +200,8 @@ export function useColumns() {
         isMobile &&
         activeColumnId != null &&
         activeColumnId !== columnId &&
-        mobileColumnLayout({
-          columns: columnsBeforeRemoval,
-          activeColumnId,
-          twoColumnEnabled: resolveTwoColumnEnabled(),
-          viewportWidth: window.innerWidth,
-          viewportHeight: window.innerHeight,
-        })[columnId]?.x >= 0;
+        mobileLayoutForViewport(columnsBeforeRemoval, activeColumnId)[columnId]
+          ?.x >= 0;
 
       await removeColumnWebview(columnId).catch(
         logError("handleRemoveColumn:removeColumnWebview"),
@@ -302,28 +292,18 @@ export function useColumns() {
       );
 
       if (isMobile) {
-        const offscreenLayout = mobileColumnLayout({
-          columns: [column],
-          activeColumnId: null,
-          twoColumnEnabled: resolveTwoColumnEnabled(),
-          viewportWidth: window.innerWidth,
-          viewportHeight: window.innerHeight,
-        });
-        await createColumnWebview(
+        await createOffscreenMobileColumnWebview(
           column,
           dataDirectory,
-          offscreenLayout[column.id],
-        ).catch(logError("recreateColumnWebview:createColumnWebview(mobile)"));
+          "recreateColumnWebview:createColumnWebview(mobile)",
+        );
         // 再作成したカラムが現在の表示ペア（アクティブ or その隣）に含まれるなら
         // setActiveColumn で再配置して可視化する（2カラム時、右隣カラムの再作成でも必要）
         if (activeColumnId) {
-          const displayLayout = mobileColumnLayout({
-            columns: currentColumns,
+          const displayLayout = mobileLayoutForViewport(
+            currentColumns,
             activeColumnId,
-            twoColumnEnabled: resolveTwoColumnEnabled(),
-            viewportWidth: window.innerWidth,
-            viewportHeight: window.innerHeight,
-          });
+          );
           if (displayLayout[columnId].x >= 0) {
             await setActiveColumn(activeColumnId);
           }
@@ -334,11 +314,9 @@ export function useColumns() {
       if (!containerRef.current) return;
       const containerHeight = containerRef.current.clientHeight;
       const scrollLeft = scrollbarRef.current?.scrollLeft ?? 0;
-      const bounds = calculateGridBounds(currentColumns, {
+      const bounds = desktopGridBounds(currentColumns, {
         containerHeight,
         scrollLeft,
-        headerHeight: HEADER_HEIGHT,
-        scrollbarHeight: SCROLLBAR_HEIGHT,
         topBarHeight: getTopBarHeight(topBarExpanded),
       });
       const b = bounds[columnId];

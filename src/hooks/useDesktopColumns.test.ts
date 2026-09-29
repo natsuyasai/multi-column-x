@@ -226,6 +226,35 @@ describe("useDesktopColumns", () => {
     expect(resizeCalls).toHaveLength(2);
   });
 
+  it("デスクトップで全カラムを再配置するとスクロール位置を考慮したx座標になる", async () => {
+    const containerRef = makeContainerRef(900);
+    const scrollbarRef = makeScrollbarRef(50);
+    const { result } = renderHook(() =>
+      useDesktopColumns({
+        containerRef,
+        scrollbarRef,
+        dialogOpenRef: { current: false },
+        activeColumnId: null,
+        setActiveColumn: vi.fn().mockResolvedValue(undefined),
+      }),
+    );
+    mockInvoke.mockClear();
+
+    await act(async () => {
+      await result.current.recalculateAllBounds();
+    });
+
+    const col1Resize = mockInvoke.mock.calls.find(
+      (c) =>
+        c[0] === IPC_COMMANDS.RESIZE_COLUMN_WEBVIEW &&
+        (c[1] as { bounds: { columnId: string; x: number } }).bounds
+          .columnId === "col-1",
+    );
+    expect(col1Resize).toBeDefined();
+    // col-1 は gridCol=1 のため xOffset=0。scrollLeft(50) を引いた x になる
+    expect((col1Resize?.[1] as { bounds: { x: number } }).bounds.x).toBe(-50);
+  });
+
   it("restoreDesktopColumnsはカラムごとにWebViewを作成し最後に全体を再配置する", async () => {
     const { result } = renderDesktopColumns();
     const columns = [
