@@ -8,6 +8,18 @@ import type { Account, Column } from "../../types";
 import { getPageTypeLabel } from "../../types";
 import styles from "./ColumnHeader.module.scss";
 
+function resolveHeaderLabel(
+  column: Column,
+  account: Account | undefined,
+): string {
+  return (
+    column.label ||
+    (account
+      ? `${account.label} - ${getPageTypeLabel(column)}`
+      : getPageTypeLabel(column))
+  );
+}
+
 interface ColumnHeaderProps {
   column: Column;
   account: Account | undefined;
@@ -32,11 +44,7 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
   onClearUnread,
 }) => {
   const isExternal = column.pageType === "external";
-  const label =
-    column.label ||
-    (account
-      ? `${account.label} - ${getPageTypeLabel(column)}`
-      : getPageTypeLabel(column));
+  const label = resolveHeaderLabel(column, account);
   const { remaining, reset } = useAutoReload({
     columnId: column.id,
     enabled: column.settings.autoReloadEnabled && isAutoReloadSupported(column),
@@ -45,6 +53,11 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
 
   const showCountdown =
     !isExternal && column.settings.showCountdown && remaining !== null;
+
+  const withCountdownReset = (action: (columnId: string) => void) => () => {
+    action(column.id);
+    reset();
+  };
 
   return (
     <div
@@ -88,10 +101,7 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
         {!isExternal && (
           <button
             className={styles.actionBtn}
-            onClick={() => {
-              onReload(column.id);
-              reset();
-            }}
+            onClick={withCountdownReset(onReload)}
             aria-label="更新"
             title="更新"
           >
@@ -100,10 +110,7 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
         )}
         <button
           className={styles.actionBtn}
-          onClick={() => {
-            onReloadPage(column.id);
-            reset();
-          }}
+          onClick={withCountdownReset(onReloadPage)}
           aria-label="ページを再読み込み"
           title="ページを再読み込み"
         >
