@@ -1,10 +1,9 @@
 import React, { useState } from "react";
-import { useEscapeKey } from "../../hooks/useEscapeKey";
-import { validateNgWordLines } from "../../lib/ngWordPattern";
 import {
-  parseUserIdLines,
-  validateUserIdLine,
-} from "../../lib/repostHiddenUserId";
+  parseAndValidateUserIdLines,
+  parseAndValidateWordLines,
+} from "@/lib/lineListValidation";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useAppStore } from "../../store/useAppStore";
 import type {
   GlobalSettings,
@@ -121,29 +120,26 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const ngWords = draft.globalNgWordsText
-      .split("\n")
-      .map((w) => w.trim())
-      .filter((w) => w.length > 0);
-    const ngWordsValidationError = validateNgWordLines(ngWords);
-    if (ngWordsValidationError) {
-      setNgWordsError(ngWordsValidationError);
+    const ngWords = parseAndValidateWordLines(draft.globalNgWordsText);
+    if (ngWords.kind === "invalid") {
+      setNgWordsError(ngWords.error);
       return;
     }
     setNgWordsError(null);
-    const repostHiddenUserIds = parseUserIdLines(
+    const repostHiddenUserIds = parseAndValidateUserIdLines(
       draft.globalRepostHiddenUserIdsText,
     );
-    const repostHiddenUserIdsValidationError =
-      repostHiddenUserIds
-        .map((id) => validateUserIdLine(id))
-        .find((error) => error !== null) ?? null;
-    if (repostHiddenUserIdsValidationError) {
-      setRepostHiddenUserIdsError(repostHiddenUserIdsValidationError);
+    if (repostHiddenUserIds.kind === "invalid") {
+      setRepostHiddenUserIdsError(repostHiddenUserIds.error);
       return;
     }
     setRepostHiddenUserIdsError(null);
-    onApply(toGlobalSettingsPatch(draft, { ngWords, repostHiddenUserIds }));
+    onApply(
+      toGlobalSettingsPatch(draft, {
+        ngWords: ngWords.values,
+        repostHiddenUserIds: repostHiddenUserIds.values,
+      }),
+    );
     onClose();
   };
 

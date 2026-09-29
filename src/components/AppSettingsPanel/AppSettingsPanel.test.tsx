@@ -202,6 +202,19 @@ describe("AppSettingsPanel グローバルNGワード", () => {
     );
   });
 
+  it("NGワードの前後の空白を除いてngWordsに含める", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    const textarea = screen.getByPlaceholderText(
+      "1行に1ワードで入力（全カラムに適用・/正規表現/flags 形式も指定可）",
+    );
+    fireEvent.change(textarea, { target: { value: "  spam  \n bot " } });
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ ngWords: ["spam", "bot"] }),
+    );
+  });
+
   it("NGワードの書き方ヘルプポップオーバーが表示される", () => {
     render(<AppSettingsPanel {...defaultProps} />);
     expect(
@@ -228,6 +241,33 @@ describe("AppSettingsPanel グローバルNGワード", () => {
     expect(screen.getByText("正規表現が不正です: /[/")).toBeInTheDocument();
     expect(onApply).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("不正なNGワードを修正して再度適用するとNGワードのエラーが消える", async () => {
+    const onApply = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        onApply={onApply}
+        onClose={onClose}
+      />,
+    );
+    const textarea = screen.getByPlaceholderText(
+      "1行に1ワードで入力（全カラムに適用・/正規表現/flags 形式も指定可）",
+    );
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, "/[[/");
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(screen.getByText("正規表現が不正です: /[/")).toBeInTheDocument();
+
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, "spam");
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(screen.queryByText(/正規表現が不正です/)).not.toBeInTheDocument();
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ ngWords: ["spam"] }),
+    );
   });
 
   it("有効なNGワード（通常文字列・正規表現）を入力して適用すると、エラーは表示されずonApplyとonCloseが呼ばれる", async () => {
