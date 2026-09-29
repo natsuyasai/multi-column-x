@@ -635,3 +635,112 @@ describe("App (手動更新のスクロール扱い)", () => {
     expect(getEvalScripts()).toEqual([WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD]);
   });
 });
+
+// 手順0: フック抽出前の特性テスト（既存の振る舞いを固定する。追加直後はGreenが正しい）
+describe("App (フック抽出前の特性テスト)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+    mockPlatform.mockReturnValue("windows");
+    useAppStore.setState({
+      accounts: [account],
+      columns: [],
+      globalSettings,
+      isLoaded: true,
+      isMobile: false,
+      topBarExpanded: false,
+      unreadCounts: {},
+    });
+  });
+
+  const createCallsOf = (columnId: string) =>
+    mockInvoke.mock.calls.filter(
+      (c) =>
+        c[0] === "create_column_webview" &&
+        (c[1] as any).args?.column?.id === columnId,
+    );
+
+  it("Ctrl+数字のジャンプは表示順（order）で数えたカラムへ移動する", async () => {
+    // 配列上の並びと order フィールドの大小関係をあえて逆にする
+    const columnB: Column = {
+      ...column,
+      id: "col-b",
+      order: 1,
+      gridCol: 2,
+      width: 200,
+    };
+    const columnA: Column = {
+      ...column,
+      id: "col-a",
+      order: 0,
+      gridCol: 1,
+      width: 100,
+    };
+    useAppStore.setState({ columns: [columnB, columnA] });
+    const { container } = render(<App />);
+
+    await waitFor(() => {
+      expect(createCallsOf("col-a").length).toBeGreaterThan(0);
+      expect(createCallsOf("col-b").length).toBeGreaterThan(0);
+    });
+    const xOfColA = (createCallsOf("col-a")[0][1] as any).args.x;
+    const xOfColB = (createCallsOf("col-b")[0][1] as any).args.x;
+    expect(xOfColA).not.toBe(xOfColB);
+
+    const scrollbar = container.querySelector(
+      '[class*="_bottomScrollbar_"]',
+    ) as HTMLDivElement;
+    expect(scrollbar).toBeTruthy();
+
+    fireEvent.keyDown(window, { key: "1", ctrlKey: true });
+
+    // order が最小(0)の col-a（配列では2番目）へジャンプするはず
+    expect(scrollbar.scrollLeft).toBe(xOfColA);
+  });
+
+  it("リンクを開くときに指定アカウントが見つからなければ先頭のアカウントで開く", async () => {
+    useAppStore.setState({
+      globalSettings: { ...globalSettings, defaultAccountId: "acc-missing" },
+    });
+    render(<App />);
+    mockInvoke.mockClear();
+
+    fireEvent.click(screen.getByTitle("URLをポップアップで開く (Ctrl+L)"));
+    fireEvent.change(screen.getByPlaceholderText("https://x.com/..."), {
+      target: { value: "https://x.com/foo" },
+    });
+    fireEvent.click(screen.getByText("開く"));
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "open_link_popup_window",
+        expect.objectContaining({ accountId: "acc-1" }),
+      );
+    });
+  });
+
+  it("起動時に各カラムへ表示サイズの設定を適用する", async () => {
+    useAppStore.setState({ columns: [column] });
+    render(<App />);
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("eval_in_webview", {
+        label: expect.stringContaining("col-1"),
+        script: WEBVIEW_SCRIPTS.applyColumnScale("default"),
+      });
+    });
+  });
+
+  it("アカウントが無いときに投稿のショートカットを押しても何も起きない", () => {
+    useAppStore.setState({ accounts: [] });
+    render(<App />);
+    mockInvoke.mockClear();
+
+    fireEvent.keyDown(window, { key: "t", ctrlKey: true });
+
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "open_compose_window",
+      expect.anything(),
+    );
+  });
+});

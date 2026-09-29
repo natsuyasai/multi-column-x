@@ -1,7 +1,4 @@
 // src/App.tsx
-import { getVersion } from "@tauri-apps/api/app";
-import { invoke } from "@tauri-apps/api/core";
-import { platform } from "@tauri-apps/plugin-os";
 import React, {
   useEffect,
   useCallback,
@@ -25,13 +22,18 @@ import { TabActionDialog } from "./components/TabActionDialog/TabActionDialog";
 import { TopBar } from "./components/TopBar/TopBar";
 import { UpdateDialog } from "./components/UpdateDialog/UpdateDialog";
 import { WhatsNewDialog } from "./components/WhatsNewDialog/WhatsNewDialog";
-import { IPC_COMMANDS, WEBVIEW_SCRIPTS } from "./constants/ipc";
+import { WEBVIEW_SCRIPTS } from "./constants/ipc";
 import { useAccounts } from "./hooks/useAccounts";
+import { useAppBootstrap } from "./hooks/useAppBootstrap";
 import { useAppUpdater } from "./hooks/useAppUpdater";
+import { useColumnNavigation } from "./hooks/useColumnNavigation";
 import { useColumns } from "./hooks/useColumns";
 import { useDialogState } from "./hooks/useDialogState";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
-import { getMql, useTheme } from "./hooks/useTheme";
+import { useMobileSwipeBarSync } from "./hooks/useMobileSwipeBarSync";
+import { usePopupWindowHandlers } from "./hooks/usePopupWindowHandlers";
+import { useSettingsApplyHandlers } from "./hooks/useSettingsApplyHandlers";
+import { useTheme } from "./hooks/useTheme";
 import {
   useApiRateLimitReports,
   useColumnCrashRecovery,
@@ -42,23 +44,9 @@ import {
   useWebviewScrollRelay,
 } from "./hooks/useWebviewEvents";
 import { useWhatsNew } from "./hooks/useWhatsNew";
-import {
-  HEADER_HEIGHT,
-  MOBILE_TAB_BAR_HEIGHT,
-  getTopBarHeight,
-  resolveSwipeAreaHeight,
-} from "./lib/gridLayout";
-import { resolveLinkPopupUrl } from "./lib/linkPopupUrl";
-import { logError } from "./lib/log";
-import { resolveTheme } from "./lib/theme";
-import {
-  applyColumnSettingsScripts,
-  buildGlobalNgScripts,
-  evalInColumn,
-  updateMobileSwipeBar,
-} from "./services/columnWebview";
+import { HEADER_HEIGHT, getTopBarHeight } from "./lib/gridLayout";
+import { evalInColumn } from "./services/columnWebview";
 import { useAppStore } from "./store/useAppStore";
-import type { ColumnSettings, GlobalSettings } from "./types";
 
 const App: React.FC = () => {
   const {
@@ -137,15 +125,6 @@ const App: React.FC = () => {
     dialogOpen,
   } = useDialogState();
 
-  // カラム（ネイティブ WebView）の復元が完了したかどうか。
-  // 起動時の更新チェックは復元完了後にゲートし、UpdateDialog がカラムの裏に隠れるのを防ぐ。
-  const [columnsRestored, setColumnsRestored] = useState(false);
-  const updater = useAppUpdater(isMobile, columnsRestored);
-  const whatsNew = useWhatsNew(columnsRestored);
-  const [appVersion, setAppVersion] = useState("");
-  // APIレート制限ポップオーバーの開閉状態（カラムWebView退避判定の anyDialogOpen に含めるため）
-  const [apiRateLimitPopoverOpen, setApiRateLimitPopoverOpen] = useState(false);
-
   const topBarHeight = getTopBarHeight(topBarExpanded);
 
   const scrollbarWidth = useMemo(() => {
@@ -156,55 +135,23 @@ const App: React.FC = () => {
     );
   }, [columnBounds, scrollbarRef]);
 
-  // プラットフォーム検出は loadSettings より先に完了させる必要がある。
-  // restoreColumns（isLoaded 後に呼ばれる）が isMobile を読むため、
-  // setIsMobile は同期的に完了しなければならない。effect の順序を変えないこと。
-  useEffect(() => {
-    try {
-      const mobile = platform() === "android";
-      setIsMobile(mobile);
-      if (mobile) {
-        invoke<boolean>(IPC_COMMANDS.IS_WEBVIEW_PROFILE_SUPPORTED)
-          .then(setProfileApiSupported)
-          .catch(logError("is_webview_profile_supported"));
-      }
-    } catch (e) {
-      logError("platform()")(e);
-    }
-  }, [setIsMobile, setProfileApiSupported]);
-
-  // マウント時のみ設定をロードする（loadSettings 変化で再実行させない）
-  useEffect(() => {
-    loadSettings();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    getVersion().then(setAppVersion).catch(logError("getVersion"));
-  }, []);
-
-  // isLoaded が true になった（= DOM レンダリング完了後）タイミングで WebView を復元
-  // isLoaded の true 遷移時のみ実行し、topBarHeight 変化で再復元させない
-  useEffect(() => {
-    if (isLoaded) {
-      // 復元が一巡したら（成功・失敗どちらでも）フラグを立て、起動時更新チェックを解放する
-      restoreColumns(topBarHeight).finally(() => setColumnsRestored(true));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoaded]);
-
-  // x.com の表示サイズを IndexedDB 経由で設定する
-  // localforage の device:rweb:settings.scale を更新し、変化があればページをリロードする
-  // isLoaded 後のみ実行し、WebView 作成前に呼び出されることを防ぐ
-  useEffect(() => {
-    const scale = globalSettings.columnScale ?? "default";
-    if (!isLoaded) return;
-    columns.forEach((column) => {
-      evalInColumn(column.id, WEBVIEW_SCRIPTS.applyColumnScale(scale));
-    });
-    // columnScale/isLoaded 変化時のみ scale を適用し、columns 変化では再適用しない
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [globalSettings.columnScale, isLoaded]);
+  // 起動時初期化（プラットフォーム検出→設定ロード→バージョン取得→カラム復元→
+  // 表示サイズ適用）をまとめたフック。columnsRestored は起動時の更新チェックを
+  // 復元完了後にゲートするために使う（UpdateDialog がカラムの裏に隠れるのを防ぐ）。
+  const { columnsRestored, appVersion } = useAppBootstrap({
+    setIsMobile,
+    setProfileApiSupported,
+    loadSettings,
+    isLoaded,
+    restoreColumns,
+    topBarHeight,
+    columns,
+    columnScale: globalSettings.columnScale,
+  });
+  const updater = useAppUpdater(isMobile, columnsRestored);
+  const whatsNew = useWhatsNew(columnsRestored);
+  // APIレート制限ポップオーバーの開閉状態（カラムWebView退避判定の anyDialogOpen に含めるため）
+  const [apiRateLimitPopoverOpen, setApiRateLimitPopoverOpen] = useState(false);
 
   // 本体UIのテーマを data-theme 属性へ反映する。戻り値（解決済みテーマ）は
   // モバイルスワイプバーのネイティブオーバーレイ同期にも再利用する（matchMedia 購読の重複を避ける）。
@@ -223,43 +170,19 @@ const App: React.FC = () => {
     setShowLinkPopupDialog(true);
   }, [setShowLinkPopupDialog]);
 
-  const handleSubmitLinkPopup = useCallback(
-    async (url: string, accountId: string) => {
-      setShowLinkPopupDialog(false);
-      const trimmedUrl = url.trim();
-      if (!trimmedUrl) return;
-      const resolved = resolveLinkPopupUrl(trimmedUrl);
-      const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
-      if (!account) return;
-      // webviewLabelCaller は渡さない。実際の送信元 WebView（呼び出し元）は
-      // Rust 側が caller.label() で判定するため、JS が自己申告する必要も権限も無い。
-      await invoke(IPC_COMMANDS.OPEN_LINK_POPUP_WINDOW, {
-        accountId: account.id,
-        url: resolved,
-      }).catch(logError("handleSubmitLinkPopup:openLinkPopupWindow"));
-    },
-    [accounts, setShowLinkPopupDialog],
-  );
-
-  const handleOpenOfficialSettings = useCallback(() => {
-    setShowAppSettings(false);
-    setShowOfficialSettingsDialog(true);
-  }, [setShowAppSettings, setShowOfficialSettingsDialog]);
-
-  const handleSubmitOfficialSettings = useCallback(
-    async (url: string, accountId: string) => {
-      setShowOfficialSettingsDialog(false);
-      const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
-      if (!account) return;
-      // webviewLabelCaller は渡さない。実際の送信元 WebView（呼び出し元）は
-      // Rust 側が caller.label() で判定するため、JS が自己申告する必要も権限も無い。
-      await invoke(IPC_COMMANDS.OPEN_LINK_POPUP_WINDOW, {
-        accountId: account.id,
-        url,
-      }).catch(logError("handleSubmitOfficialSettings:openLinkPopupWindow"));
-    },
-    [accounts, setShowOfficialSettingsDialog],
-  );
+  // リンクポップアップ・公式設定ポップアップ・投稿ウィンドウの起動処理をまとめたフック。
+  const {
+    handleSubmitLinkPopup,
+    handleOpenOfficialSettings,
+    handleSubmitOfficialSettings,
+    handleComposeTweet,
+  } = usePopupWindowHandlers({
+    accounts,
+    defaultAccountId: globalSettings.defaultAccountId,
+    setShowLinkPopupDialog,
+    setShowAppSettings,
+    setShowOfficialSettingsDialog,
+  });
 
   // ダイアログ表示中は列WebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
   // 更新ポップアップ・アカウント名入力ダイアログも同様に退避対象に含める。
@@ -286,53 +209,16 @@ const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topBarExpanded]);
 
-  // モバイルスワイプバー（ネイティブオーバーレイ）の状態を Kotlin 側へ同期する。
-  // visible は「設定で有効」「透過度>0（0のまま表示し続けるとView.alphaが透明でもタッチを
-  // 吸収してしまい、見えないのにタップを奪われる事故になるため非表示にする。詳細は
-  // tmp/plans/2026-08-11-mobile-swipe-bar-native-overlay/plan.md の
-  // 『View.alphaとヒットテストの関係』参照）」「ダイアログが開いていない」の全てを満たす場合のみ true。
-  // y/height は mobileColumnLayout が算出する隙間の絶対座標と同じ計算式を使う（座標の単一ソース化。
-  // Gravity+bottomMargin ではなく絶対 y にするのは、IME表示・回転時のズレを避けるため）。
-  // カラム復元前・非モバイルでは呼ばない。
-  const syncMobileSwipeBar = useCallback(() => {
-    if (!isMobile || !columnsRestored) return;
-    const swipeAreaHeight = resolveSwipeAreaHeight(globalSettings);
-    const visible =
-      globalSettings.mobileSwipeAreaEnabled &&
-      globalSettings.mobileSwipeAreaOpacity > 0 &&
-      !anyDialogOpen;
-    const y = window.innerHeight - MOBILE_TAB_BAR_HEIGHT - swipeAreaHeight;
-    updateMobileSwipeBar(
-      visible,
-      y,
-      swipeAreaHeight,
-      globalSettings.mobileSwipeAreaOpacity,
-      resolvedTheme === "dark",
-    ).catch(logError("syncMobileSwipeBar"));
-  }, [isMobile, columnsRestored, globalSettings, anyDialogOpen, resolvedTheme]);
-
-  // (a) 起動時: カラム復元完了後に初回反映する
-  useEffect(() => {
-    syncMobileSwipeBar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [columnsRestored]);
-
-  // (b) 設定変更時: スワイプ領域の有効/高さ/透過度が変わるたびに反映する
-  useEffect(() => {
-    syncMobileSwipeBar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    globalSettings.mobileSwipeAreaEnabled,
-    globalSettings.mobileSwipeAreaHeight,
-    globalSettings.mobileSwipeAreaOpacity,
-  ]);
-
-  // (c) テーマ変更時: useTheme の戻り値（resolvedTheme）は "system" 選択中の
-  // OS配色変更にもライブ追従するため、この変化を見るだけで反映できる
-  useEffect(() => {
-    syncMobileSwipeBar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolvedTheme]);
+  // モバイルスワイプバー（ネイティブオーバーレイ）の状態を Kotlin 側へ同期するフック。
+  // (a)(b)(c)(e) の反映タイミングはフック内部に移した。(d)（ダイアログ開閉時の反映）は
+  // 下の anyDialogOpen effect から syncMobileSwipeBar を呼ぶ形のまま残す。
+  const syncMobileSwipeBar = useMobileSwipeBarSync({
+    isMobile,
+    columnsRestored,
+    globalSettings,
+    anyDialogOpen,
+    resolvedTheme,
+  });
 
   useEffect(() => {
     setDialogOpen(anyDialogOpen);
@@ -347,63 +233,18 @@ const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anyDialogOpen]);
 
-  // (e) 画面回転・ウィンドウリサイズ時: syncMobileSwipeBar 内の y は
-  // window.innerHeight から算出するため、リサイズ/回転で再計算しないと
-  // カラムWebView（useDesktopColumns.ts の handleResize 経由で再配置される）と
-  // オーバーレイの位置がズレる。デバウンス時間は useDesktopColumns.ts の
-  // handleResize と揃えて100msにする。
-  // syncMobileSwipeBar は globalSettings/anyDialogOpen/resolvedTheme が変わるたびに
-  // 再生成されるため、ref 経由で最新版を呼ぶことでデバウンス中の再レンダーが
-  // タイマーをリセットしてしまう競合を避ける（useDesktopColumns.ts の
-  // recalculateRef と同じパターン）。
-  const syncMobileSwipeBarRef = useRef(syncMobileSwipeBar);
-  syncMobileSwipeBarRef.current = syncMobileSwipeBar;
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
-    const handleResize = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        syncMobileSwipeBarRef.current();
-      }, 100);
-    };
-    window.addEventListener("resize", handleResize);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener("resize", handleResize);
-    };
-  }, []);
-
   const handleToggleTopBar = useCallback(() => {
     setTopBarExpanded(!topBarExpanded);
   }, [topBarExpanded, setTopBarExpanded]);
 
-  // 「フォーカスカラム」= 最後に 1-9 ジャンプ／TopBar クリックでジャンプしたカラム。
-  // r キーでのリロード対象を決めるために使う（無ければ order 最小の先頭カラムにフォールバック）。
-  const [lastFocusedColumnId, setLastFocusedColumnId] = useState<string | null>(
-    null,
-  );
-
-  const handleJumpToColumn = useCallback(
-    (columnId: string) => {
-      setLastFocusedColumnId(columnId);
-      const el = scrollbarRef.current;
-      if (!el) return;
-      const bounds = columnBounds[columnId];
-      if (!bounds) return;
-      const currentScroll = el.scrollLeft ?? 0;
-      el.scrollLeft = currentScroll + bounds.x;
-    },
-    [columnBounds, scrollbarRef],
-  );
-
-  const handleJumpToColumnByIndex = useCallback(
-    (index: number) => {
-      const sorted = [...columns].sort((a, b) => a.order - b.order);
-      const col = sorted[index];
-      if (col) handleJumpToColumn(col.id);
-    },
-    [columns, handleJumpToColumn],
-  );
+  // カラムへのジャンプ・手動更新（先頭スクロール＋リロード）をまとめたフック。
+  const {
+    handleJumpToColumn,
+    handleJumpToColumnByIndex,
+    handleReload,
+    handleReloadFocusedColumn,
+    handleDoubleTapColumn,
+  } = useColumnNavigation({ columns, columnBounds, scrollbarRef });
 
   const handleOpenAddColumnDialog = useCallback(() => {
     setShowAddColumn(true);
@@ -421,24 +262,6 @@ const App: React.FC = () => {
     setShowShortcutHelp(true);
   }, [setShowShortcutHelp]);
 
-  // 手動更新（ヘッダー・設定パネル・r キー）: スクロール位置にかかわらず先頭へ戻して更新する
-  const handleReload = useCallback(async (columnId: string) => {
-    await evalInColumn(columnId, WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD);
-  }, []);
-
-  // タブバーのダブルタップ／カラムヘッダーの先頭スクロールボタン共通: 対象カラムを先頭スクロール＋リロードする
-  const handleDoubleTapColumn = useCallback((columnId: string) => {
-    evalInColumn(columnId, WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD);
-  }, []);
-
-  // r キー用: フォーカスカラム（無ければ order 最小の先頭カラム）をリロードする
-  const handleReloadFocusedColumn = useCallback(() => {
-    const sorted = [...columns].sort((a, b) => a.order - b.order);
-    const target =
-      columns.find((c) => c.id === lastFocusedColumnId) ?? sorted[0];
-    if (target) handleReload(target.id);
-  }, [columns, lastFocusedColumnId, handleReload]);
-
   const handleReloadPage = useCallback(
     async (columnId: string) => {
       // デスクトップ（特に Linux）では WebProcess クラッシュで location.reload が
@@ -453,48 +276,13 @@ const App: React.FC = () => {
     [recreateColumnWebview],
   );
 
-  const handleApplySettings = useCallback(
-    async (
-      columnId: string,
-      settings: ColumnSettings,
-      width: number,
-      label: string | undefined,
-    ) => {
-      handleUpdateColumn(columnId, { settings, width, label });
-      setSettingsColumnId(null);
-      const { globalSettings: currentGlobal } = useAppStore.getState();
-      await applyColumnSettingsScripts(
-        columnId,
-        settings,
-        currentGlobal.ngWords ?? [],
-        currentGlobal.repostHiddenUserIds ?? [],
-      );
-    },
-    [handleUpdateColumn, setSettingsColumnId],
-  );
-
-  const handleApplyGlobalSettings = useCallback(
-    (patch: Partial<GlobalSettings>) => {
-      updateGlobalSettings(patch);
-      const { columns: ngColumns, globalSettings: currentGlobal } =
-        useAppStore.getState();
-      buildGlobalNgScripts(patch, currentGlobal, ngColumns).forEach(
-        ({ columnId, script }) => {
-          evalInColumn(columnId, script);
-        },
-      );
-      if (patch.theme !== undefined) {
-        const prefersDark = getMql()?.matches ?? false;
-        const nightMode =
-          resolveTheme(patch.theme, prefersDark) === "dark" ? "2" : "0";
-        const { columns: currentColumns } = useAppStore.getState();
-        currentColumns.forEach((col) => {
-          evalInColumn(col.id, WEBVIEW_SCRIPTS.applyNightModeCookie(nightMode));
-        });
-      }
-    },
-    [updateGlobalSettings],
-  );
+  // カラム個別設定・全体設定の「適用」処理をまとめたフック。
+  const { handleApplySettings, handleApplyGlobalSettings } =
+    useSettingsApplyHandlers({
+      handleUpdateColumn,
+      setSettingsColumnId,
+      updateGlobalSettings,
+    });
 
   const linkPopupDefaultAccountId =
     globalSettings.defaultAccountId ?? accounts[0]?.id ?? "";
@@ -506,16 +294,6 @@ const App: React.FC = () => {
     },
     [hideColumnWebviews, setTabActionColumnId],
   );
-
-  const handleComposeTweet = useCallback(() => {
-    if (accounts.length === 0) return;
-    const defaultId = globalSettings.defaultAccountId ?? accounts[0].id;
-    const account = accounts.find((a) => a.id === defaultId) ?? accounts[0];
-    invoke(IPC_COMMANDS.OPEN_COMPOSE_WINDOW, {
-      accountId: account.id,
-      dataDirectory: account.dataDirectory,
-    }).catch(logError("handleComposeTweet:openComposeWindow"));
-  }, [accounts, globalSettings.defaultAccountId]);
 
   useKeyboardShortcuts({
     onComposeTweet: handleComposeTweet,
