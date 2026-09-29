@@ -207,6 +207,17 @@ export type ReturnEvent =
   | { type: "dismissed" }
   | { type: "disabled" };
 
+/**
+ * 戻り先が消費済み（ユーザーが目視した／戻り操作が完了した／閉じられた）
+ * になったことを表す状態遷移。3つの event（targetSeenByUser / returnFinished /
+ * dismissed）で共通の処理。
+ */
+function markConsumed(state: ReturnState): ReturnState {
+  if (state.anchorIds === null) return state;
+  if (state.consumed && !state.buttonVisible) return state;
+  return { ...state, consumed: true, buttonVisible: false };
+}
+
 export function reduceReturnState(
   state: ReturnState,
   event: ReturnEvent,
@@ -236,23 +247,10 @@ export function reduceReturnState(
       return state;
     }
 
-    case "targetSeenByUser": {
-      if (state.anchorIds === null) return state;
-      if (state.consumed && !state.buttonVisible) return state;
-      return { ...state, consumed: true, buttonVisible: false };
-    }
-
-    case "returnFinished": {
-      if (state.anchorIds === null) return state;
-      if (state.consumed && !state.buttonVisible) return state;
-      return { ...state, consumed: true, buttonVisible: false };
-    }
-
-    case "dismissed": {
-      if (state.anchorIds === null) return state;
-      if (state.consumed && !state.buttonVisible) return state;
-      return { ...state, consumed: true, buttonVisible: false };
-    }
+    case "targetSeenByUser":
+    case "returnFinished":
+    case "dismissed":
+      return markConsumed(state);
 
     case "disabled":
       return INITIAL_RETURN_STATE;
