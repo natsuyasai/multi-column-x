@@ -1,11 +1,6 @@
 import React, { useState } from "react";
 import { isAutoReloadSupported } from "@/lib/autoReloadTarget";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
-import { validateNgWordLines } from "../../lib/ngWordPattern";
-import {
-  parseUserIdLines,
-  validateUserIdLine,
-} from "../../lib/repostHiddenUserId";
 import {
   COLUMN_LABEL_MAX_LENGTH,
   normalizeColumnLabel,
@@ -13,6 +8,7 @@ import {
   type ColumnSettings,
 } from "../../types";
 import { HelpPopover } from "../HelpPopover/HelpPopover";
+import { nextLineListErrors, validateLineListInputs } from "./lineListInputs";
 import styles from "./SettingsPanel.module.scss";
 
 interface SettingsPanelProps {
@@ -44,19 +40,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   });
   const [width, setWidth] = useState<number>(column.width);
   const [labelText, setLabelText] = useState<string>(column.label ?? "");
-  const [ngWordsText, setNgWordsText] = useState<string>(
-    (column.settings.ngWords ?? []).join("\n"),
-  );
-  const [ngWordsError, setNgWordsError] = useState<string | null>(null);
-  const [repostHiddenUserIdsText, setRepostHiddenUserIdsText] =
-    useState<string>((column.settings.repostHiddenUserIds ?? []).join("\n"));
-  const [repostHiddenUserIdsError, setRepostHiddenUserIdsError] = useState<
-    string | null
-  >(null);
-  const [whitelistWordsText, setWhitelistWordsText] = useState<string>(
-    (column.settings.whitelistWords ?? []).join("\n"),
-  );
-  const [whitelistError, setWhitelistError] = useState<string | null>(null);
+  const [lineListTexts, setLineListTexts] = useState({
+    ngWords: (column.settings.ngWords ?? []).join("\n"),
+    repostHiddenUserIds: (column.settings.repostHiddenUserIds ?? []).join("\n"),
+    whitelistWords: (column.settings.whitelistWords ?? []).join("\n"),
+  });
+  const [lineListErrors, setLineListErrors] = useState({
+    ngWords: null as string | null,
+    repostHiddenUserIds: null as string | null,
+    whitelistWords: null as string | null,
+  });
 
   const updateSetting = <K extends keyof ColumnSettings>(
     key: K,
@@ -65,42 +58,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const ngWords = ngWordsText
-      .split("\n")
-      .map((w) => w.trim())
-      .filter((w) => w.length > 0);
-    const error = validateNgWordLines(ngWords);
-    if (error) {
-      setNgWordsError(error);
+    const result = validateLineListInputs(lineListTexts);
+    setLineListErrors((prev) => nextLineListErrors(prev, result));
+    if (result.kind === "invalid") {
       return;
     }
-    setNgWordsError(null);
-
-    const repostHiddenUserIds = parseUserIdLines(repostHiddenUserIdsText);
-    const repostHiddenUserIdsValidationError =
-      repostHiddenUserIds
-        .map((id) => validateUserIdLine(id))
-        .find((validationError) => validationError !== null) ?? null;
-    if (repostHiddenUserIdsValidationError) {
-      setRepostHiddenUserIdsError(repostHiddenUserIdsValidationError);
-      return;
-    }
-    setRepostHiddenUserIdsError(null);
-
-    const whitelistWords = whitelistWordsText
-      .split("\n")
-      .map((w) => w.trim())
-      .filter((w) => w.length > 0);
-    const whitelistLinesError = validateNgWordLines(whitelistWords);
-    if (whitelistLinesError) {
-      setWhitelistError(whitelistLinesError);
-      return;
-    }
-    setWhitelistError(null);
 
     onApply(
       column.id,
-      { ...settings, ngWords, repostHiddenUserIds, whitelistWords },
+      { ...settings, ...result.values },
       width,
       normalizeColumnLabel(labelText),
     );
@@ -349,13 +315,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </h3>
               <textarea
                 className={styles.cssTextarea}
-                value={ngWordsText}
-                onChange={(e) => setNgWordsText(e.target.value)}
+                value={lineListTexts.ngWords}
+                onChange={(e) =>
+                  setLineListTexts((t) => ({ ...t, ngWords: e.target.value }))
+                }
                 placeholder="1行に1ワードで入力（/正規表現/flags 形式も指定可）"
                 spellCheck={false}
               />
-              {ngWordsError && (
-                <p className={styles.errorText}>{ngWordsError}</p>
+              {lineListErrors.ngWords && (
+                <p className={styles.errorText}>{lineListErrors.ngWords}</p>
               )}
             </section>
           )}
@@ -367,14 +335,21 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </h3>
               <textarea
                 className={styles.cssTextarea}
-                value={repostHiddenUserIdsText}
-                onChange={(e) => setRepostHiddenUserIdsText(e.target.value)}
+                value={lineListTexts.repostHiddenUserIds}
+                onChange={(e) =>
+                  setLineListTexts((t) => ({
+                    ...t,
+                    repostHiddenUserIds: e.target.value,
+                  }))
+                }
                 aria-label="リポストを非表示にするユーザー"
                 placeholder="1行に1ユーザーIDで入力"
                 spellCheck={false}
               />
-              {repostHiddenUserIdsError && (
-                <p className={styles.errorText}>{repostHiddenUserIdsError}</p>
+              {lineListErrors.repostHiddenUserIds && (
+                <p className={styles.errorText}>
+                  {lineListErrors.repostHiddenUserIds}
+                </p>
               )}
               <p className={styles.hint}>
                 1行に1ユーザーID（@以降）。指定ユーザーがリポストした投稿を非表示にします
@@ -409,14 +384,21 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </label>
               <textarea
                 className={styles.cssTextarea}
-                value={whitelistWordsText}
-                onChange={(e) => setWhitelistWordsText(e.target.value)}
+                value={lineListTexts.whitelistWords}
+                onChange={(e) =>
+                  setLineListTexts((t) => ({
+                    ...t,
+                    whitelistWords: e.target.value,
+                  }))
+                }
                 placeholder="1行に1ワードで入力（/正規表現/flags 形式も指定可、ホワイトリスト）"
                 spellCheck={false}
                 disabled={!settings.whitelistEnabled}
               />
-              {whitelistError && (
-                <p className={styles.errorText}>{whitelistError}</p>
+              {lineListErrors.whitelistWords && (
+                <p className={styles.errorText}>
+                  {lineListErrors.whitelistWords}
+                </p>
               )}
             </section>
           )}
