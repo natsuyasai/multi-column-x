@@ -67,6 +67,13 @@ describe("inject/keyboard_shortcut", () => {
     });
   });
 
+  it("Shift+R（Ctrl なし）を押すと reload_column が転送される", () => {
+    pressKey("R", false, true);
+    expect(invokeMock).toHaveBeenCalledWith("report_keyboard_shortcut", {
+      key: "reload_column",
+    });
+  });
+
   it("? キー（Ctrl なし）を押すと show_shortcut_help が転送される", () => {
     pressKey("?", false);
     expect(invokeMock).toHaveBeenCalledWith("report_keyboard_shortcut", {
