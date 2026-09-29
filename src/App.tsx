@@ -1,5 +1,4 @@
 // src/App.tsx
-import { invoke } from "@tauri-apps/api/core";
 import React, {
   useEffect,
   useCallback,
@@ -23,7 +22,7 @@ import { TabActionDialog } from "./components/TabActionDialog/TabActionDialog";
 import { TopBar } from "./components/TopBar/TopBar";
 import { UpdateDialog } from "./components/UpdateDialog/UpdateDialog";
 import { WhatsNewDialog } from "./components/WhatsNewDialog/WhatsNewDialog";
-import { IPC_COMMANDS, WEBVIEW_SCRIPTS } from "./constants/ipc";
+import { WEBVIEW_SCRIPTS } from "./constants/ipc";
 import { useAccounts } from "./hooks/useAccounts";
 import { useAppBootstrap } from "./hooks/useAppBootstrap";
 import { useAppUpdater } from "./hooks/useAppUpdater";
@@ -32,6 +31,7 @@ import { useColumns } from "./hooks/useColumns";
 import { useDialogState } from "./hooks/useDialogState";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useMobileSwipeBarSync } from "./hooks/useMobileSwipeBarSync";
+import { usePopupWindowHandlers } from "./hooks/usePopupWindowHandlers";
 import { getMql, useTheme } from "./hooks/useTheme";
 import {
   useApiRateLimitReports,
@@ -44,8 +44,6 @@ import {
 } from "./hooks/useWebviewEvents";
 import { useWhatsNew } from "./hooks/useWhatsNew";
 import { HEADER_HEIGHT, getTopBarHeight } from "./lib/gridLayout";
-import { resolveLinkPopupUrl } from "./lib/linkPopupUrl";
-import { logError } from "./lib/log";
 import { resolveTheme } from "./lib/theme";
 import {
   applyColumnSettingsScripts,
@@ -177,43 +175,19 @@ const App: React.FC = () => {
     setShowLinkPopupDialog(true);
   }, [setShowLinkPopupDialog]);
 
-  const handleSubmitLinkPopup = useCallback(
-    async (url: string, accountId: string) => {
-      setShowLinkPopupDialog(false);
-      const trimmedUrl = url.trim();
-      if (!trimmedUrl) return;
-      const resolved = resolveLinkPopupUrl(trimmedUrl);
-      const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
-      if (!account) return;
-      // webviewLabelCaller は渡さない。実際の送信元 WebView（呼び出し元）は
-      // Rust 側が caller.label() で判定するため、JS が自己申告する必要も権限も無い。
-      await invoke(IPC_COMMANDS.OPEN_LINK_POPUP_WINDOW, {
-        accountId: account.id,
-        url: resolved,
-      }).catch(logError("handleSubmitLinkPopup:openLinkPopupWindow"));
-    },
-    [accounts, setShowLinkPopupDialog],
-  );
-
-  const handleOpenOfficialSettings = useCallback(() => {
-    setShowAppSettings(false);
-    setShowOfficialSettingsDialog(true);
-  }, [setShowAppSettings, setShowOfficialSettingsDialog]);
-
-  const handleSubmitOfficialSettings = useCallback(
-    async (url: string, accountId: string) => {
-      setShowOfficialSettingsDialog(false);
-      const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
-      if (!account) return;
-      // webviewLabelCaller は渡さない。実際の送信元 WebView（呼び出し元）は
-      // Rust 側が caller.label() で判定するため、JS が自己申告する必要も権限も無い。
-      await invoke(IPC_COMMANDS.OPEN_LINK_POPUP_WINDOW, {
-        accountId: account.id,
-        url,
-      }).catch(logError("handleSubmitOfficialSettings:openLinkPopupWindow"));
-    },
-    [accounts, setShowOfficialSettingsDialog],
-  );
+  // リンクポップアップ・公式設定ポップアップ・投稿ウィンドウの起動処理をまとめたフック。
+  const {
+    handleSubmitLinkPopup,
+    handleOpenOfficialSettings,
+    handleSubmitOfficialSettings,
+    handleComposeTweet,
+  } = usePopupWindowHandlers({
+    accounts,
+    defaultAccountId: globalSettings.defaultAccountId,
+    setShowLinkPopupDialog,
+    setShowAppSettings,
+    setShowOfficialSettingsDialog,
+  });
 
   // ダイアログ表示中は列WebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
   // 更新ポップアップ・アカウント名入力ダイアログも同様に退避対象に含める。
@@ -360,16 +334,6 @@ const App: React.FC = () => {
     },
     [hideColumnWebviews, setTabActionColumnId],
   );
-
-  const handleComposeTweet = useCallback(() => {
-    if (accounts.length === 0) return;
-    const defaultId = globalSettings.defaultAccountId ?? accounts[0].id;
-    const account = accounts.find((a) => a.id === defaultId) ?? accounts[0];
-    invoke(IPC_COMMANDS.OPEN_COMPOSE_WINDOW, {
-      accountId: account.id,
-      dataDirectory: account.dataDirectory,
-    }).catch(logError("handleComposeTweet:openComposeWindow"));
-  }, [accounts, globalSettings.defaultAccountId]);
 
   useKeyboardShortcuts({
     onComposeTweet: handleComposeTweet,
