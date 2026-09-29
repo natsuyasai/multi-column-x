@@ -1,5 +1,4 @@
 import React from "react";
-import type { ReactNode } from "react";
 import LinkIcon from "../../assets/icons/link.svg?react";
 import PencilIcon from "../../assets/icons/pencil.svg?react";
 import PersonIcon from "../../assets/icons/person.svg?react";
@@ -15,7 +14,8 @@ interface ToolbarButtonProps {
   expanded: boolean;
   onClick: () => void;
   title: string;
-  icon: ReactNode;
+  Icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  iconTestId: string;
   label: string;
 }
 
@@ -24,7 +24,8 @@ const ToolbarButton: React.FC<ToolbarButtonProps> = ({
   expanded,
   onClick,
   title,
-  icon,
+  Icon,
+  iconTestId,
   label,
 }) => (
   <button
@@ -32,7 +33,12 @@ const ToolbarButton: React.FC<ToolbarButtonProps> = ({
     onClick={onClick}
     title={title}
   >
-    {icon}
+    <Icon
+      width={16}
+      height={16}
+      data-testid={iconTestId}
+      className={styles.icon}
+    />
     {expanded && <span className={styles.label}>{label}</span>}
   </button>
 );
@@ -81,14 +87,8 @@ export const TopBar: React.FC<TopBarProps> = ({
             expanded={expanded}
             onClick={onComposeTweet}
             title="ツイートを作成 (Ctrl+T)"
-            icon={
-              <PencilIcon
-                width={16}
-                height={16}
-                data-testid="icon-pencil"
-                className={styles.icon}
-              />
-            }
+            Icon={PencilIcon}
+            iconTestId="icon-pencil"
             label="ツイート"
           />
           <ToolbarButton
@@ -96,14 +96,8 @@ export const TopBar: React.FC<TopBarProps> = ({
             expanded={expanded}
             onClick={onOpenLinkPopup}
             title="URLをポップアップで開く (Ctrl+L)"
-            icon={
-              <LinkIcon
-                width={16}
-                height={16}
-                data-testid="icon-link"
-                className={styles.icon}
-              />
-            }
+            Icon={LinkIcon}
+            iconTestId="icon-link"
             label="URLを開く"
           />
           <ToolbarButton
@@ -111,14 +105,8 @@ export const TopBar: React.FC<TopBarProps> = ({
             expanded={expanded}
             onClick={onAddColumn}
             title="カラムを追加 (Ctrl+N)"
-            icon={
-              <PlusIcon
-                width={16}
-                height={16}
-                data-testid="icon-plus"
-                className={styles.icon}
-              />
-            }
+            Icon={PlusIcon}
+            iconTestId="icon-plus"
             label="カラム追加"
           />
           <ToolbarButton
@@ -126,14 +114,8 @@ export const TopBar: React.FC<TopBarProps> = ({
             expanded={expanded}
             onClick={onAccountManager}
             title="アカウント管理 (Ctrl+Shift+A)"
-            icon={
-              <PersonIcon
-                width={16}
-                height={16}
-                data-testid="icon-person"
-                className={styles.icon}
-              />
-            }
+            Icon={PersonIcon}
+            iconTestId="icon-person"
             label="アカウント"
           />
           <ToolbarButton
@@ -141,14 +123,8 @@ export const TopBar: React.FC<TopBarProps> = ({
             expanded={expanded}
             onClick={onAppSettings}
             title="アプリ設定 (Ctrl+,)"
-            icon={
-              <SettingsIcon
-                width={16}
-                height={16}
-                data-testid="icon-settings"
-                className={styles.icon}
-              />
-            }
+            Icon={SettingsIcon}
+            iconTestId="icon-settings"
             label="設定"
           />
           {apiRateLimitMonitorEnabled && (
