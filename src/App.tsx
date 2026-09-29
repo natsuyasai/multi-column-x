@@ -30,6 +30,7 @@ import { useAppUpdater } from "./hooks/useAppUpdater";
 import { useColumns } from "./hooks/useColumns";
 import { useDialogState } from "./hooks/useDialogState";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import { useMobileSwipeBarSync } from "./hooks/useMobileSwipeBarSync";
 import { getMql, useTheme } from "./hooks/useTheme";
 import {
   useApiRateLimitReports,
@@ -41,12 +42,7 @@ import {
   useWebviewScrollRelay,
 } from "./hooks/useWebviewEvents";
 import { useWhatsNew } from "./hooks/useWhatsNew";
-import {
-  HEADER_HEIGHT,
-  MOBILE_TAB_BAR_HEIGHT,
-  getTopBarHeight,
-  resolveSwipeAreaHeight,
-} from "./lib/gridLayout";
+import { HEADER_HEIGHT, getTopBarHeight } from "./lib/gridLayout";
 import { resolveLinkPopupUrl } from "./lib/linkPopupUrl";
 import { logError } from "./lib/log";
 import { resolveTheme } from "./lib/theme";
@@ -54,7 +50,6 @@ import {
   applyColumnSettingsScripts,
   buildGlobalNgScripts,
   evalInColumn,
-  updateMobileSwipeBar,
 } from "./services/columnWebview";
 import { useAppStore } from "./store/useAppStore";
 import type { ColumnSettings, GlobalSettings } from "./types";
@@ -244,53 +239,16 @@ const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topBarExpanded]);
 
-  // モバイルスワイプバー（ネイティブオーバーレイ）の状態を Kotlin 側へ同期する。
-  // visible は「設定で有効」「透過度>0（0のまま表示し続けるとView.alphaが透明でもタッチを
-  // 吸収してしまい、見えないのにタップを奪われる事故になるため非表示にする。詳細は
-  // tmp/plans/2026-08-11-mobile-swipe-bar-native-overlay/plan.md の
-  // 『View.alphaとヒットテストの関係』参照）」「ダイアログが開いていない」の全てを満たす場合のみ true。
-  // y/height は mobileColumnLayout が算出する隙間の絶対座標と同じ計算式を使う（座標の単一ソース化。
-  // Gravity+bottomMargin ではなく絶対 y にするのは、IME表示・回転時のズレを避けるため）。
-  // カラム復元前・非モバイルでは呼ばない。
-  const syncMobileSwipeBar = useCallback(() => {
-    if (!isMobile || !columnsRestored) return;
-    const swipeAreaHeight = resolveSwipeAreaHeight(globalSettings);
-    const visible =
-      globalSettings.mobileSwipeAreaEnabled &&
-      globalSettings.mobileSwipeAreaOpacity > 0 &&
-      !anyDialogOpen;
-    const y = window.innerHeight - MOBILE_TAB_BAR_HEIGHT - swipeAreaHeight;
-    updateMobileSwipeBar(
-      visible,
-      y,
-      swipeAreaHeight,
-      globalSettings.mobileSwipeAreaOpacity,
-      resolvedTheme === "dark",
-    ).catch(logError("syncMobileSwipeBar"));
-  }, [isMobile, columnsRestored, globalSettings, anyDialogOpen, resolvedTheme]);
-
-  // (a) 起動時: カラム復元完了後に初回反映する
-  useEffect(() => {
-    syncMobileSwipeBar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [columnsRestored]);
-
-  // (b) 設定変更時: スワイプ領域の有効/高さ/透過度が変わるたびに反映する
-  useEffect(() => {
-    syncMobileSwipeBar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    globalSettings.mobileSwipeAreaEnabled,
-    globalSettings.mobileSwipeAreaHeight,
-    globalSettings.mobileSwipeAreaOpacity,
-  ]);
-
-  // (c) テーマ変更時: useTheme の戻り値（resolvedTheme）は "system" 選択中の
-  // OS配色変更にもライブ追従するため、この変化を見るだけで反映できる
-  useEffect(() => {
-    syncMobileSwipeBar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolvedTheme]);
+  // モバイルスワイプバー（ネイティブオーバーレイ）の状態を Kotlin 側へ同期するフック。
+  // (a)(b)(c)(e) の反映タイミングはフック内部に移した。(d)（ダイアログ開閉時の反映）は
+  // 下の anyDialogOpen effect から syncMobileSwipeBar を呼ぶ形のまま残す。
+  const syncMobileSwipeBar = useMobileSwipeBarSync({
+    isMobile,
+    columnsRestored,
+    globalSettings,
+    anyDialogOpen,
+    resolvedTheme,
+  });
 
   useEffect(() => {
     setDialogOpen(anyDialogOpen);
@@ -304,32 +262,6 @@ const App: React.FC = () => {
     // anyDialogOpen 変化時のみ退避/復元する（他の依存で再実行させない）
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anyDialogOpen]);
-
-  // (e) 画面回転・ウィンドウリサイズ時: syncMobileSwipeBar 内の y は
-  // window.innerHeight から算出するため、リサイズ/回転で再計算しないと
-  // カラムWebView（useDesktopColumns.ts の handleResize 経由で再配置される）と
-  // オーバーレイの位置がズレる。デバウンス時間は useDesktopColumns.ts の
-  // handleResize と揃えて100msにする。
-  // syncMobileSwipeBar は globalSettings/anyDialogOpen/resolvedTheme が変わるたびに
-  // 再生成されるため、ref 経由で最新版を呼ぶことでデバウンス中の再レンダーが
-  // タイマーをリセットしてしまう競合を避ける（useDesktopColumns.ts の
-  // recalculateRef と同じパターン）。
-  const syncMobileSwipeBarRef = useRef(syncMobileSwipeBar);
-  syncMobileSwipeBarRef.current = syncMobileSwipeBar;
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
-    const handleResize = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        syncMobileSwipeBarRef.current();
-      }, 100);
-    };
-    window.addEventListener("resize", handleResize);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener("resize", handleResize);
-    };
-  }, []);
 
   const handleToggleTopBar = useCallback(() => {
     setTopBarExpanded(!topBarExpanded);
