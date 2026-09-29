@@ -1,9 +1,9 @@
 import React, { useState } from "react";
-import { useEscapeKey } from "../../hooks/useEscapeKey";
 import {
   parseAndValidateUserIdLines,
   parseAndValidateWordLines,
-} from "../../lib/lineListValidation";
+} from "@/lib/lineListValidation";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useAppStore } from "../../store/useAppStore";
 import type {
   GlobalSettings,
