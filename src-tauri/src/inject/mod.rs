@@ -1,5 +1,7 @@
 // src-tauri/src/inject/mod.rs
 
+use std::borrow::Cow;
+
 use crate::ipc_constants::globals;
 
 /// 文字列値を JS の文字列リテラルとして埋め込むための JSON エンコード。
@@ -44,20 +46,99 @@ pub struct InitScriptParams<'a> {
 // 参照できるようにする（詳細は dom_observer.ts のコメント参照）。
 const DOM_OBSERVER_HUB: &str = include_str!("dom_observer.js");
 
-pub fn build_init_script(params: &InitScriptParams) -> String {
-    if params.minimal_injection {
-        let custom_css_js = include_str!("custom_css.js");
-        let mut script = custom_css_js.to_string();
-        if !params.custom_css.is_empty() {
-            script.push_str(&format!(
-                "\nwindow.{}.applyCustomCSS({});",
-                globals::MULTI_COLUMN_X,
-                js_string(params.custom_css)
-            ));
-        }
-        return script;
+/// カスタムCSSが空でなければ `applyCustomCSS` 呼び出し断片を返す。
+/// 空なら何も注入しない（`None`）。
+fn custom_css_call(custom_css: &str) -> Option<String> {
+    if custom_css.is_empty() {
+        None
+    } else {
+        Some(format!(
+            "\nwindow.{}.applyCustomCSS({});",
+            globals::MULTI_COLUMN_X,
+            js_string(custom_css)
+        ))
     }
+}
 
+/// 文字列配列を JS の配列リテラルとして埋め込むための JSON エンコード。
+/// エンコードに失敗した場合は空配列にフォールバックする。
+fn json_array(values: &[String]) -> String {
+    serde_json::to_string(values).unwrap_or_else(|_| "[]".to_string())
+}
+
+/// カラム設定（`window.__multiColumnXConfig`）を組み立てる。
+/// キーの順序・区切り・空白は既存の出力と完全に同一にすること。
+fn config_script(params: &InitScriptParams) -> String {
+    let effective_show_custom_menu = params.hide_header_enabled && params.show_custom_menu;
+    let entries: [(&str, String); 20] = [
+        ("hideHeaderEnabled", params.hide_header_enabled.to_string()),
+        (
+            "hideTweetInputEnabled",
+            params.hide_tweet_input_enabled.to_string(),
+        ),
+        ("showCustomMenu", effective_show_custom_menu.to_string()),
+        ("visibleLinks", json_array(params.visible_links)),
+        ("smallImageEnabled", params.small_image_enabled.to_string()),
+        ("smallImageWidth", js_string(params.small_image_width)),
+        ("blurImageEnabled", params.blur_image_enabled.to_string()),
+        ("blurImageAmount", js_string(params.blur_image_amount)),
+        ("hideAdEnabled", params.hide_ad_enabled.to_string()),
+        (
+            "apiRateLimitMonitorEnabled",
+            params.api_rate_limit_monitor_enabled.to_string(),
+        ),
+        ("imagePopupEnabled", params.image_popup_enabled.to_string()),
+        ("videoPopupEnabled", params.video_popup_enabled.to_string()),
+        ("ngWords", json_array(params.ng_words)),
+        ("globalNgWords", json_array(params.global_ng_words)),
+        (
+            "repostHiddenUserIds",
+            json_array(params.repost_hidden_user_ids),
+        ),
+        (
+            "globalRepostHiddenUserIds",
+            json_array(params.global_repost_hidden_user_ids),
+        ),
+        ("whitelistEnabled", params.whitelist_enabled.to_string()),
+        ("whitelistWords", json_array(params.whitelist_words)),
+        (
+            "returnToLastReadEnabled",
+            params.return_to_last_read_enabled.to_string(),
+        ),
+        (
+            "mobileSwipeAreaOffset",
+            params.mobile_swipe_area_offset.to_string(),
+        ),
+    ];
+    let body = entries
+        .iter()
+        .map(|(k, v)| format!("{k}: {v}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!(
+        "window.{} = {{ {} }};",
+        globals::MULTI_COLUMN_X_CONFIG,
+        body
+    )
+}
+
+/// `cond` が true のときだけ `script` を返し、false なら空文字列を返す。
+/// `include_str!` はコンパイル時に静的文字列を埋め込むだけのマクロなので、
+/// 呼び出し側で `include_if(cond, include_str!("..."))` のように渡す。
+fn include_if(cond: bool, script: &'static str) -> &'static str {
+    if cond {
+        script
+    } else {
+        ""
+    }
+}
+
+// 連結順どおりに並べたスクリプト片。tab_selector の直後に続く
+// header/auto_reload/return_to_last_read/video_control の4つは自身の
+// 先頭に "\n" を含む（無効時は空文字列）。それ以降は区切りなしで連結する。
+// 既存テストが連結順（例: return_to_last_read は auto_reload より後ろ）を
+// 検証しているため、並び順を変えないこと。
+fn script_parts(params: &InitScriptParams) -> Vec<Cow<'static, str>> {
     let tab_selector = include_str!("tab_selector.js");
     let header_customizer = include_str!("header_customizer.js");
     let auto_reload = include_str!("auto_reload.js");
@@ -66,86 +147,23 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     let blur_image = include_str!("blur_image.js");
     let hide_ad = include_str!("hide_ad.js");
     let ng_word = include_str!("ng_word.js");
-    let image_popup = if params.is_mobile {
-        ""
-    } else {
-        include_str!("image_popup.js")
-    };
-    let scroll_pos_restore = if params.scroll_pos_restore_enabled {
-        include_str!("scroll_pos_restore.js")
-    } else {
-        ""
-    };
+    let image_popup = include_if(!params.is_mobile, include_str!("image_popup.js"));
+    let scroll_pos_restore = include_if(
+        params.scroll_pos_restore_enabled,
+        include_str!("scroll_pos_restore.js"),
+    );
     // 表示サイズは x.com 自身の設定 (IndexedDB device:rweb:settings.scale) で管理するため
     // CSS zoom inject は使用しない
-    let context_menu = if params.is_mobile {
-        ""
-    } else {
-        include_str!("context_menu.js")
-    };
-    let scroll_event = if params.is_mobile {
-        ""
-    } else {
-        include_str!("scroll_event.js")
-    };
-    let keyboard_shortcut = if params.is_mobile {
-        ""
-    } else {
-        include_str!("keyboard_shortcut.js")
-    };
+    let context_menu = include_if(!params.is_mobile, include_str!("context_menu.js"));
+    let scroll_event = include_if(!params.is_mobile, include_str!("scroll_event.js"));
+    let keyboard_shortcut = include_if(!params.is_mobile, include_str!("keyboard_shortcut.js"));
     let video_control = include_str!("video_control.js");
     let sidebar_hide = include_str!("sidebar_hide.js");
-    let mobile_area_hide = if params.is_mobile {
-        include_str!("mobile_area_hide.js")
-    } else {
-        ""
-    };
+    let mobile_area_hide = include_if(params.is_mobile, include_str!("mobile_area_hide.js"));
     let notification_header_hide = include_str!("notification_header_hide.js");
-    let compose_only = if params.compose_only_enabled {
-        include_str!("compose_only.js")
-    } else {
-        ""
-    };
+    let compose_only = include_if(params.compose_only_enabled, include_str!("compose_only.js"));
     let video_long_press_menu = include_str!("video_long_press_menu.js");
     let api_rate_limit_monitor = include_str!("api_rate_limit_monitor.js");
-
-    let visible_links_json =
-        serde_json::to_string(params.visible_links).unwrap_or_else(|_| "[]".to_string());
-    let ng_words_json = serde_json::to_string(params.ng_words).unwrap_or_else(|_| "[]".to_string());
-    let global_ng_words_json =
-        serde_json::to_string(params.global_ng_words).unwrap_or_else(|_| "[]".to_string());
-    let repost_hidden_user_ids_json =
-        serde_json::to_string(params.repost_hidden_user_ids).unwrap_or_else(|_| "[]".to_string());
-    let global_repost_hidden_user_ids_json =
-        serde_json::to_string(params.global_repost_hidden_user_ids)
-            .unwrap_or_else(|_| "[]".to_string());
-    let whitelist_words_json =
-        serde_json::to_string(params.whitelist_words).unwrap_or_else(|_| "[]".to_string());
-    let effective_show_custom_menu = params.hide_header_enabled && params.show_custom_menu;
-    let config = format!(
-        "window.{} = {{ hideHeaderEnabled: {}, hideTweetInputEnabled: {}, showCustomMenu: {}, visibleLinks: {}, smallImageEnabled: {}, smallImageWidth: {}, blurImageEnabled: {}, blurImageAmount: {}, hideAdEnabled: {}, apiRateLimitMonitorEnabled: {}, imagePopupEnabled: {}, videoPopupEnabled: {}, ngWords: {}, globalNgWords: {}, repostHiddenUserIds: {}, globalRepostHiddenUserIds: {}, whitelistEnabled: {}, whitelistWords: {}, returnToLastReadEnabled: {}, mobileSwipeAreaOffset: {} }};",
-        globals::MULTI_COLUMN_X_CONFIG,
-        params.hide_header_enabled,
-        params.hide_tweet_input_enabled,
-        effective_show_custom_menu,
-        visible_links_json,
-        params.small_image_enabled,
-        js_string(params.small_image_width),
-        params.blur_image_enabled,
-        js_string(params.blur_image_amount),
-        params.hide_ad_enabled,
-        params.api_rate_limit_monitor_enabled,
-        params.image_popup_enabled,
-        params.video_popup_enabled,
-        ng_words_json,
-        global_ng_words_json,
-        repost_hidden_user_ids_json,
-        global_repost_hidden_user_ids_json,
-        params.whitelist_enabled,
-        whitelist_words_json,
-        params.return_to_last_read_enabled,
-        params.mobile_swipe_area_offset
-    );
 
     let header_part = if params.hide_header_enabled || params.hide_tweet_input_enabled {
         format!("\n{}", header_customizer)
@@ -164,39 +182,47 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
         String::new()
     };
 
-    let mut script = format!(
-        "{}\n{}\n{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
-        DOM_OBSERVER_HUB,
-        config,
-        tab_selector,
-        header_part,
-        auto_reload_part,
-        return_to_last_read_part,
-        video_control_part,
-        small_image,
-        blur_image,
-        hide_ad,
-        ng_word,
-        custom_css_js,
-        image_popup,
-        scroll_pos_restore,
-        context_menu,
-        scroll_event,
-        keyboard_shortcut,
-        sidebar_hide,
-        mobile_area_hide,
-        notification_header_hide,
-        compose_only,
-        video_long_press_menu,
-        api_rate_limit_monitor
-    );
+    vec![
+        Cow::Borrowed(tab_selector),
+        Cow::Owned(header_part),
+        Cow::Owned(auto_reload_part),
+        Cow::Owned(return_to_last_read_part),
+        Cow::Owned(video_control_part),
+        Cow::Borrowed(small_image),
+        Cow::Borrowed(blur_image),
+        Cow::Borrowed(hide_ad),
+        Cow::Borrowed(ng_word),
+        Cow::Borrowed(custom_css_js),
+        Cow::Borrowed(image_popup),
+        Cow::Borrowed(scroll_pos_restore),
+        Cow::Borrowed(context_menu),
+        Cow::Borrowed(scroll_event),
+        Cow::Borrowed(keyboard_shortcut),
+        Cow::Borrowed(sidebar_hide),
+        Cow::Borrowed(mobile_area_hide),
+        Cow::Borrowed(notification_header_hide),
+        Cow::Borrowed(compose_only),
+        Cow::Borrowed(video_long_press_menu),
+        Cow::Borrowed(api_rate_limit_monitor),
+    ]
+}
 
-    if !params.custom_css.is_empty() {
-        script.push_str(&format!(
-            "\nwindow.{}.applyCustomCSS({});",
-            globals::MULTI_COLUMN_X,
-            js_string(params.custom_css)
-        ));
+pub fn build_init_script(params: &InitScriptParams) -> String {
+    if params.minimal_injection {
+        let mut script = include_str!("custom_css.js").to_string();
+        if let Some(call) = custom_css_call(params.custom_css) {
+            script.push_str(&call);
+        }
+        return script;
+    }
+
+    let config = config_script(params);
+    let parts = script_parts(params);
+
+    let mut script = format!("{}\n{}\n{}", DOM_OBSERVER_HUB, config, parts.concat());
+
+    if let Some(call) = custom_css_call(params.custom_css) {
+        script.push_str(&call);
     }
 
     script
