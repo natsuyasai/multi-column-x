@@ -8,15 +8,12 @@ use tauri_plugin_opener::OpenerExt;
 const OPENABLE_SCHEMES: [&str; 4] = ["http", "https", "mailto", "tel"];
 
 /// 新規ウィンドウ要求の URL を外部ブラウザで開いてよいか（純粋関数）。
-// ステップ2で builder に適用するまで未使用になるため一時的に許容する。
-#[allow(dead_code)]
 pub(crate) fn is_openable_external_url(url: &Url) -> bool {
     OPENABLE_SCHEMES.contains(&url.scheme())
 }
 
 /// 新規ウィンドウ要求を処理する。`open` は外部ブラウザ起動（テストで差し替える）。
 /// 応答は常に Deny（アプリ内に新規ウィンドウを作らない）。
-#[allow(dead_code)]
 pub(crate) fn handle_new_window<R: Runtime>(
     url: &Url,
     open: impl FnOnce(&str),
@@ -38,7 +35,6 @@ fn open_if_openable(url: &Url, open: impl FnOnce(&str)) -> bool {
 
 /// builder の `.on_new_window(..)` に渡すハンドラを作る。
 /// 失敗時のログには URL（クエリに個人情報があり得る）を出さない。
-#[allow(dead_code)]
 pub(crate) fn new_window_handler<R: Runtime>(
     app: AppHandle<R>,
 ) -> impl Fn(Url, NewWindowFeatures) -> NewWindowResponse<R> + Send + 'static {

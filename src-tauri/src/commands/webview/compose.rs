@@ -1,5 +1,6 @@
 //! ツイート作成ウィンドウ。
 #[cfg(not(target_os = "android"))]
+use super::external_link;
 use super::parse_url;
 use super::popup::{build_popup_init, PopupInit};
 #[cfg(target_os = "android")]
@@ -53,6 +54,7 @@ pub(super) fn create_compose_window(
     .title("X - ツイート")
     .inner_size(COMPOSE_WIDTH, COMPOSE_WINDOW_HEIGHT)
     .initialization_script(&popup_init)
+    .on_new_window(external_link::new_window_handler(app.clone()))
     .data_directory(data_dir);
 
     if let Some(window) = app.get_window(labels::MAIN) {
@@ -214,6 +216,7 @@ pub async fn open_compose_window(
             WebviewUrl::External(parse_url("https://x.com/compose/post")?),
         )
         .initialization_script(&popup_init)
+        .on_new_window(external_link::new_window_handler(app.clone()))
         .data_directory(data_dir)
         .build()
         .map_err(|e| e.to_string())?;

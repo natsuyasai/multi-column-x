@@ -1,5 +1,6 @@
 //! カラム WebView の作成・削除・リサイズ・Cookie 切替。
 #[cfg(desktop)]
+use super::external_link;
 use super::parse_url;
 use crate::commands::settings::ColumnData;
 use crate::commands::settings_store::{column_script_settings_from, load_global_settings};
@@ -246,6 +247,7 @@ pub async fn create_column_webview(
         let webview_window =
             tauri::WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(parse_url(&url)?))
                 .initialization_script(&init_script)
+                .on_new_window(external_link::new_window_handler(app.clone()))
                 .data_directory(data_dir)
                 .decorations(false)
                 .skip_taskbar(true)
@@ -284,6 +286,7 @@ pub async fn create_column_webview(
         .add_child(
             WebviewBuilder::new(&label, WebviewUrl::External(parse_url(&url)?))
                 .initialization_script(&init_script)
+                .on_new_window(external_link::new_window_handler(app.clone()))
                 .data_directory(data_dir),
             LogicalPosition::new(args.x, args.y),
             LogicalSize::new(args.width, args.height),
