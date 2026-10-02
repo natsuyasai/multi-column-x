@@ -74,13 +74,25 @@ fn save_window_bounds(window: &tauri::Window) {
     }
 }
 
+/// opener プラグインの自動クリックスクリプト（全フレームで target=_blank を IPC に変換する）を有効にするか。
+///
+/// デスクトップでは別オリジン iframe から IPC が ACL 拒否され既定動作だけ潰れるため無効にし、
+/// 新規ウィンドウ要求を `on_new_window` で処理する。mobile は従来どおり有効。
+fn opener_js_links_on_click() -> bool {
+    cfg!(mobile)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(all(desktop, target_os = "linux"))]
     linux_codec_env::ensure_openh264_ld_library_path();
 
     let builder = tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
+        .plugin(
+            tauri_plugin_opener::Builder::new()
+                .open_js_links_on_click(opener_js_links_on_click())
+                .build(),
+        )
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
@@ -314,6 +326,51 @@ mod tests {
         assert_eq!(
             merged_from_array["globalSettings"]["windowBounds"],
             sample_bounds()
+        );
+    }
+}
+
+#[cfg(test)]
+mod opener_tests {
+    use super::*;
+
+    #[cfg(desktop)]
+    #[test]
+    fn デスクトップではopenerの自動クリックスクリプトが無効() {
+        assert!(!opener_js_links_on_click());
+    }
+
+    #[cfg(mobile)]
+    #[test]
+    fn モバイルではopenerの自動クリックスクリプトが有効() {
+        assert!(opener_js_links_on_click());
+    }
+
+    #[test]
+    fn openerプラグインは自動クリックスクリプトの有無を明示して登録されている() {
+        let src = include_str!("lib.rs");
+        // テストモジュール以降（このテスト自身の文字列リテラルを含む）は照合対象外にする
+        let body = src
+            .split("#[cfg(all(test, desktop))]")
+            .next()
+            .expect("split は必ず1要素以上を返す");
+        let code: String = body
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(
+            code.contains("tauri_plugin_opener::Builder::new()"),
+            "opener は Builder 経由で登録されていない"
+        );
+        assert!(
+            code.contains(".open_js_links_on_click(opener_js_links_on_click())"),
+            "opener の自動クリックスクリプトの有無が判定関数で指定されていない"
+        );
+        assert!(
+            !code.contains("tauri_plugin_opener::init()"),
+            "opener が init() で直接登録されている（自動クリックスクリプトが常に有効になる）"
         );
     }
 }
