@@ -1311,4 +1311,81 @@ describe("inject/auto_reload 通知ページの更新", () => {
 
     expectReportedNewPostOnce();
   });
+
+  describe("先頭固定", () => {
+    /** 先頭固定の時間（ms）。 */
+    const PIN_MS = 1500;
+
+    it("往復で先頭へ戻した直後にDOMが変化してscrollTopがずれても0に戻される", async () => {
+      const section = addSection();
+
+      triggerReload();
+      await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+
+      setScrolling(120);
+      section.appendChild(buildNotificationArticle("2026-09-19T00:45:55Z"));
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(scrollingElementStub.scrollTop).toBe(0);
+    });
+
+    it("先頭固定中にscrollイベントでずれた場合も0に戻される", async () => {
+      addSection();
+
+      triggerReload();
+      await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+
+      setScrolling(80);
+      window.dispatchEvent(new Event("scroll"));
+
+      expect(scrollingElementStub.scrollTop).toBe(0);
+    });
+
+    for (const type of ["wheel", "touchstart", "keydown", "mousedown"]) {
+      it(`先頭固定中に${type}のユーザー操作があったら以後は補正しない`, async () => {
+        const section = addSection();
+
+        triggerReload();
+        await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+
+        window.dispatchEvent(new Event(type));
+        setScrolling(120);
+        section.appendChild(buildNotificationArticle("2026-09-19T00:45:55Z"));
+        window.dispatchEvent(new Event("scroll"));
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(scrollingElementStub.scrollTop).toBe(120);
+      });
+    }
+
+    it("先頭固定の時間経過後は補正しない", async () => {
+      const section = addSection();
+
+      triggerReload();
+      await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+      await vi.advanceTimersByTimeAsync(PIN_MS);
+
+      setScrolling(120);
+      section.appendChild(buildNotificationArticle("2026-09-19T00:45:55Z"));
+      window.dispatchEvent(new Event("scroll"));
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(scrollingElementStub.scrollTop).toBe(120);
+    });
+
+    it("先頭固定中のずれ補正の後でも新着の通知は報告される", async () => {
+      const section = addSection();
+      section.appendChild(buildNotificationArticle("2026-09-19T00:45:55Z"));
+
+      triggerReload();
+      await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+
+      setScrolling(120);
+      section.appendChild(buildNotificationArticle("2026-09-19T01:00:00Z"));
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(scrollingElementStub.scrollTop).toBe(0);
+      expectReportedNewPostOnce();
+    });
+  });
 });

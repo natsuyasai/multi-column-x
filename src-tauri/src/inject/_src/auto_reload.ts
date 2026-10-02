@@ -88,8 +88,20 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
   // 実測: 同一タスク内・rAF での即戻しは取得されないため setTimeout で待つ。
   const SCROLL_ROUNDTRIP_WAIT_MS = 60;
 
+  // 先頭へ戻した後に scrollTop = 0 を再主張する時間（ms）。
+  const SCROLL_TOP_PIN_MS = 1500;
+  // 先頭固定を即座に解除するユーザー操作。
+  const SCROLL_TOP_PIN_RELEASE_EVENTS = [
+    "wheel",
+    "touchstart",
+    "keydown",
+    "mousedown",
+  ] as const;
+
   // スクロール往復の実行中フラグ。二重実行を防ぐ。
   let scrollRoundtripRunning = false;
+  // 実行中の先頭固定の解除関数。二重固定を防ぐ。
+  let releaseScrollTopPin: (() => void) | null = null;
 
   function isScrolling(): boolean {
     return document.scrollingElement
@@ -305,6 +317,41 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
   }
 
   /**
+   * 先頭へ戻した後、短時間だけ scrollTop = 0 を再主張する（先頭固定）。
+   * 戻した直後に X が新規項目を挿入するとスクロール位置がずれるため、
+   * DOM 変化・scroll 時に補正する。ユーザー操作の検知か固定時間の経過で解除する。
+   */
+  function pinScrollTop(scrollingElement: Element): void {
+    releaseScrollTopPin?.();
+
+    const section = document.querySelector("section[aria-labelledby]");
+    const repin = (): void => {
+      if (scrollingElement.scrollTop > 0) scrollingElement.scrollTop = 0;
+    };
+    const observer = new MutationObserver(repin);
+    observer.observe(section ?? document.body, {
+      childList: true,
+      subtree: true,
+    });
+    window.addEventListener("scroll", repin);
+    for (const type of SCROLL_TOP_PIN_RELEASE_EVENTS) {
+      window.addEventListener(type, release, { passive: true });
+    }
+    const timeoutId = setTimeout(release, SCROLL_TOP_PIN_MS);
+
+    function release(): void {
+      observer.disconnect();
+      window.removeEventListener("scroll", repin);
+      for (const type of SCROLL_TOP_PIN_RELEASE_EVENTS) {
+        window.removeEventListener(type, release);
+      }
+      clearTimeout(timeoutId);
+      if (releaseScrollTopPin === release) releaseScrollTopPin = null;
+    }
+    releaseScrollTopPin = release;
+  }
+
+  /**
    * 検索・通知ページの更新。選択中のタブへの再クリックや新着ボタンは効かないため、
    * 下へスクロールしてから先頭へ戻すことで X にタイムラインを取得し直させる。
    */
@@ -325,6 +372,9 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
       scrollRoundtripRunning = false;
       if (!isScrollRoundtripPage()) return;
       scrollingElement.scrollTop = 0;
+      // 戻した直後の新規項目挿入によるずれを補正する。waitForNewTweet() の observer より
+      // 先に登録し、isScrolling() による打ち切りが誤作動しないようにする。
+      pinScrollTop(scrollingElement);
       // 先頭へ戻した後に監視を始める（往復中は isScrolling() で打ち切られてしまうため）。
       waitForNewTweet();
     }, SCROLL_ROUNDTRIP_WAIT_MS);
