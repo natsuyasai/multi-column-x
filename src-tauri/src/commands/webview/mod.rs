@@ -3,6 +3,7 @@
 //! lib.rs の generate_handler! からは従来どおり commands::webview::xxx で参照できるよう再エクスポートする。
 mod column;
 mod compose;
+mod external_link;
 mod popup;
 
 pub use column::*;
