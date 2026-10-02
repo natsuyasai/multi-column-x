@@ -1,5 +1,6 @@
 //! メディア／リンクポップアップウィンドウの作成・セッション切替・クローズ。
 #[cfg(not(target_os = "android"))]
+use super::external_link;
 use super::parse_url;
 #[cfg(not(target_os = "android"))]
 use crate::commands::settings_store::resolve_account_data_directory;
@@ -290,6 +291,7 @@ pub async fn open_popup_window(
         .inner_size(size.width, size.height)
         .position(pos.x, pos.y)
         .initialization_script(&popup_init)
+        .on_new_window(external_link::new_window_handler(app.clone()))
         .data_directory(data_dir)
         .build()
         .map_err(|e| e.to_string())?;
@@ -345,6 +347,7 @@ pub async fn open_popup_window(
             WebviewUrl::External(parse_url(&url)?),
         )
         .initialization_script(&popup_init)
+        .on_new_window(external_link::new_window_handler(app.clone()))
         .data_directory(data_dir)
         .build()
         .map_err(|e| e.to_string())?;
@@ -390,6 +393,7 @@ pub async fn open_link_popup_window(
     .inner_size(size.width, size.height)
     .position(pos.x, pos.y)
     .initialization_script(&popup_init)
+    .on_new_window(external_link::new_window_handler(app.clone()))
     .data_directory(data_dir);
 
     builder.build().map_err(|e| e.to_string())?;
@@ -452,6 +456,7 @@ pub async fn open_link_popup_window(
             WebviewUrl::External(parse_url(&url)?),
         )
         .initialization_script(&popup_init)
+        .on_new_window(external_link::new_window_handler(app.clone()))
         .data_directory(data_dir)
         .build()
         .map_err(|e| e.to_string())?;
@@ -599,6 +604,7 @@ async fn switch_popup_session_window(
         tauri::WebviewWindowBuilder::new(&app, &new_label, WebviewUrl::External(parse_url(&url)?))
             .title("X - メディア")
             .initialization_script(&popup_init)
+            .on_new_window(external_link::new_window_handler(app.clone()))
             .data_directory(data_dir);
 
     if let (Some(p), Some(s)) = (pos, size) {

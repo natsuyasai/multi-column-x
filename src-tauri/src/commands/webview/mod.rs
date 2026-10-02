@@ -3,6 +3,7 @@
 //! lib.rs の generate_handler! からは従来どおり commands::webview::xxx で参照できるよう再エクスポートする。
 mod column;
 mod compose;
+mod external_link;
 mod popup;
 
 pub use column::*;
@@ -472,5 +473,45 @@ mod tests {
             payload,
             serde_json::json!({"accountId": "acc1", "snapshot": "snap-data"})
         );
+    }
+
+    /// テストモジュールを除いた本体部分の、コメント行以外を返す。
+    fn production_code(source: &str) -> String {
+        source
+            .split("#[cfg(test)]")
+            .next()
+            .unwrap_or_default()
+            .lines()
+            .filter(|l| !l.trim_start().starts_with("//"))
+            .collect::<Vec<_>>()
+            .join(
+                "
+",
+            )
+    }
+
+    #[test]
+    fn 全てのwebview生成箇所に新規ウィンドウハンドラが付いている() {
+        let sources = [
+            ("column.rs", include_str!("column.rs")),
+            ("popup.rs", include_str!("popup.rs")),
+            ("compose.rs", include_str!("compose.rs")),
+        ];
+        for (name, source) in sources {
+            let code = production_code(source);
+            let window_builders = code.matches("WebviewWindowBuilder::new").count();
+            // `WebviewWindowBuilder::new` は `WebviewBuilder::new` を部分文字列に含まないが、念のため区別して数える
+            let child_builders = code.matches("WebviewBuilder::new").count();
+            let handlers = code.matches("external_link::new_window_handler").count();
+            assert!(
+                window_builders + child_builders > 0,
+                "{name}: webview 生成箇所が見つからない"
+            );
+            assert_eq!(
+                window_builders + child_builders,
+                handlers,
+                "{name}: webview 生成箇所の数と新規ウィンドウハンドラの数が一致しない"
+            );
+        }
     }
 }

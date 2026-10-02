@@ -92,6 +92,10 @@ Linux ではカラムが独立 `WebviewWindow`（親クリップが効かない�
 
 `WebviewWindow::close()` は `prevent_close()` + `hide()` で閉じる操作を握っている常駐ウィンドウ（例: 常駐コンポーズ `compose-`）には効かない。`src-tauri/src/lib.rs` を変更する場合の詳細は `docs/development/compose-popup-topbar-notes.md` を参照。`prevent_close` を使う常駐ウィンドウを新設したら、メインウィンドウの `CloseRequested`（`lib.rs`）に明示 `destroy()` を必ず追加すること。
 
+### 外部リンクの新規ウィンドウ処理（`on_new_window`）
+
+デスクトップでは、`target=_blank` / `window.open` の新規ウィンドウ要求を Rust の `on_new_window`（`src-tauri/src/commands/webview/external_link.rs`）で受け、http/https/mailto/tel だけ既定ブラウザで開いて常に Deny する。opener プラグインの自動クリックスクリプトは別オリジン iframe（YouTube 埋め込み等）で ACL 拒否され既定動作だけ潰れるため、デスクトップでは無効（`lib.rs` の `opener_js_links_on_click()`）。**カラム / ポップアップ / コンポーズの WebView builder を新設・変更したら、必ず `.on_new_window(external_link::new_window_handler(app.clone()))` を付けること**（契約テストが検査する）。詳細・実機 CDP 検証手順は `docs/development/external-link-new-window-notes.md` を参照。
+
 ### アカウントログイン検出（desktop vs mobile）
 
 - **desktop**: tokio タスクが URL を 500ms ポーリング → `account-login-complete` イベントを emit
