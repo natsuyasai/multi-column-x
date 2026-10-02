@@ -1,0 +1,64 @@
+.board {
+  display: flex;
+  gap: 8px;
+  height: 100vh;
+  padding: 8px;
+  box-sizing: border-box;
+  background: var(--mcx-app-bg);
+  color: var(--mcx-text);
+  font-family: system-ui, sans-serif;
+}
+
+.column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--mcx-surface);
+  border: 1px solid var(--mcx-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.timeline {
+  flex: 1;
+  overflow: hidden;
+}
+
+.post {
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  border-bottom: 1px solid var(--mcx-border-subtle);
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.body {
+  min-width: 0;
+}
+
+.name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--mcx-text);
+}
+
+.handle {
+  margin-left: 6px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--mcx-text-tertiary);
+}
+
+.text {
+  margin-top: 4px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--mcx-text-secondary);
+}

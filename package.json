@@ -29,7 +29,8 @@
     "tauri:android:build:debug": "tauri android build --debug",
     "tauri:android:dev:clear-cache": "tauri android dev -- --clear-cache",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "docs:screenshots": "storybook build && node scripts/docs-screenshots/capture.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
