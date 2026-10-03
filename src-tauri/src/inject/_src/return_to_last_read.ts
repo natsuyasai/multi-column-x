@@ -10,12 +10,16 @@ import {
   USER_INPUT_WINDOW_MS,
   extractArticleStatusId,
   isListTopRendered,
+  isPullRefreshGesture,
+  isRefreshClickTarget,
+  isRefreshShortcut,
   readTimelineIds,
   reduceReturnState,
   scanReturnTarget,
   searchReturnTarget,
   selectAnchorIds,
   waitForTimelineReady,
+  type PullGesture,
   type ReturnEvent,
   type ReturnState,
   type SearchDeps,
@@ -300,7 +304,45 @@ import {
     lastUserInputAt = Date.now();
   }
 
+  function handleRefreshClick(event: MouseEvent): void {
+    if (isRefreshClickTarget(event.target)) recordReload();
+  }
+
+  // プルダウン更新の検知（touchstart で起点を保持し touchend で判定）
+  let pullStart: { x: number; y: number; scrollTop: number } | null = null;
+
+  function handlePullStart(event: TouchEvent): void {
+    // 複数指・ボタン上の操作は対象外
+    if (event.touches.length !== 1 || isFromButton(event.target)) {
+      pullStart = null;
+      return;
+    }
+    const t = event.touches[0];
+    pullStart = {
+      x: t.clientX,
+      y: t.clientY,
+      scrollTop: document.scrollingElement?.scrollTop ?? 0,
+    };
+  }
+
+  function handlePullEnd(event: TouchEvent): void {
+    const start = pullStart;
+    pullStart = null;
+    const t = event.changedTouches[0];
+    if (!start || !t) return;
+    const gesture: PullGesture = {
+      startX: start.x,
+      startY: start.y,
+      endX: t.clientX,
+      endY: t.clientY,
+      startScrollTop: start.scrollTop,
+      endScrollTop: document.scrollingElement?.scrollTop ?? 0,
+    };
+    if (isPullRefreshGesture(gesture)) recordReload();
+  }
+
   function handleKeydown(event: KeyboardEvent): void {
+    if (isRefreshShortcut(event)) recordReload();
     if (!SCROLL_KEYS.has(event.key)) return;
     handleUserInput(event);
   }
@@ -529,6 +571,18 @@ import {
       { capture: true, passive: true },
     );
     window.addEventListener("click", handlePhotoLinkClick, { capture: true });
+    window.addEventListener("click", handleRefreshClick, {
+      capture: true,
+      passive: true,
+    });
+    window.addEventListener("touchstart", handlePullStart, {
+      capture: true,
+      passive: true,
+    });
+    window.addEventListener("touchend", handlePullEnd, {
+      capture: true,
+      passive: true,
+    });
     observeNavigation();
     onDomOrScroll("dom");
   }

@@ -1326,4 +1326,325 @@ describe("inject/return_to_last_read", () => {
       expect(getToast()).toBeNull();
     }, 15000);
   });
+
+  describe("直接の更新操作での基準の記録", () => {
+    /** section の末尾に、投稿を含まないセル内の「新着ピル」ボタンを追加する。 */
+    function addPill(section: HTMLElement): HTMLButtonElement {
+      const cell = document.createElement("div");
+      cell.dataset.testid = "cellInnerDiv";
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "新しいポストを表示";
+      cell.appendChild(button);
+      section.appendChild(cell);
+      return button;
+    }
+
+    function touch(
+      clientX: number,
+      clientY: number,
+    ): { clientX: number; clientY: number } {
+      return { clientX, clientY };
+    }
+
+    function dispatchTouch(
+      type: "touchstart" | "touchend",
+      touches: { clientX: number; clientY: number }[],
+      changedTouches: { clientX: number; clientY: number }[] = touches,
+    ): void {
+      const event = new Event(type, { bubbles: true });
+      Object.defineProperty(event, "touches", { value: touches });
+      Object.defineProperty(event, "changedTouches", { value: changedTouches });
+      window.dispatchEvent(event);
+    }
+
+    /** 先頭 A..E(1..5) を表示した状態で、おすすめタブ選択中のホームカラムを用意する。 */
+    async function setupHome(options: { enabled?: boolean } = {}): Promise<{
+      tablist: HTMLElement;
+      tab: HTMLElement;
+      section: HTMLElement;
+    }> {
+      const tablist = addTablist();
+      const tab = addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["1", "2", "3", "4", "5"]);
+      await importReturnToLastRead({ enabled: options.enabled ?? true });
+      return { tablist, tab, section };
+    }
+
+    /** 更新で先頭が N1,N2,A,B になった状態を作り、scroll で反映する。 */
+    // タッチ操作は直近のユーザー入力として扱われ、基準が画面内に見えると消化されて
+    // しまうため、基準側の投稿が画面外になるよう topStep を大きくできるようにする。
+    function showNewPosts(section: HTMLElement, topStep = 100): void {
+      setTimeline(section, ["101", "102", "1", "2"], { topStep });
+      window.dispatchEvent(new Event("scroll"));
+    }
+
+    it("新着ピルを直接クリックして更新すると更新前の先頭が基準として記録される", async () => {
+      const { section } = await setupHome();
+      const pill = addPill(section);
+
+      pill.click();
+      showNewPosts(section);
+
+      expect(isButtonVisible()).toBe(true);
+    });
+
+    it("新着ピルをクリックして新しい投稿が入ると戻るボタンが表示される", async () => {
+      const { section } = await setupHome();
+      const pill = addPill(section);
+
+      pill.click();
+      showNewPosts(section);
+
+      expect(getButton()?.textContent).toBe("↓ 前回の続きへ");
+      expect(getButton()?.getAttribute("aria-label")).toBe("前回の続きへ戻る");
+      expect(getContainer()?.style.display).not.toBe("none");
+    });
+
+    it("選択中のタブを直接クリックして更新すると更新前の先頭が基準として記録される", async () => {
+      const { tab, section } = await setupHome();
+
+      tab.click();
+      showNewPosts(section);
+
+      expect(isButtonVisible()).toBe(true);
+    });
+
+    it("選択されていない別のタブをクリックしても基準は記録されず切り替え前の基準は破棄される", async () => {
+      const { tablist, tab, section } = await setupHome();
+      const other = addTab(tablist, "フォロー中", false);
+
+      tab.click();
+      showNewPosts(section);
+      expect(isButtonVisible()).toBe(true);
+
+      // 未選択タブのクリックは更新ではない（キャプチャ時点ではまだ選択されていない）
+      other.click();
+      selectOnlyTab(tablist, "フォロー中");
+      setTimeline(section, ["201", "202", "203"]);
+      window.dispatchEvent(new Event("scroll"));
+      expect(isButtonVisible()).toBe(false);
+
+      // 切り替え前の基準は破棄されており、基準に無い並びが先頭に来ても表示されない
+      setTimeline(section, ["900", "201", "202", "203"]);
+      window.dispatchEvent(new Event("scroll"));
+      expect(isButtonVisible()).toBe(false);
+    });
+
+    it("先頭でのプルダウンで更新すると更新前の先頭が基準として記録される", async () => {
+      const { section } = await setupHome();
+
+      setScrollTop(0);
+      dispatchTouch("touchstart", [touch(100, 100)]);
+      dispatchTouch("touchend", [], [touch(105, 300)]);
+      showNewPosts(section, 1000);
+
+      expect(isButtonVisible()).toBe(true);
+    });
+
+    it("複数指のタッチでは基準を記録しない", async () => {
+      const { section } = await setupHome();
+
+      dispatchTouch("touchstart", [touch(100, 100), touch(200, 100)]);
+      dispatchTouch("touchend", [], [touch(100, 300)]);
+      showNewPosts(section, 1000);
+
+      expect(isButtonVisible()).toBe(false);
+    });
+
+    it("引き下げ量が足りないタッチでは基準を記録しない", async () => {
+      const { section } = await setupHome();
+
+      dispatchTouch("touchstart", [touch(100, 100)]);
+      dispatchTouch("touchend", [], [touch(100, 110)]);
+      showNewPosts(section, 1000);
+
+      expect(isButtonVisible()).toBe(false);
+    });
+
+    it("先頭でないスクロール位置から始まったタッチでは基準を記録しない", async () => {
+      const { section } = await setupHome();
+
+      setScrollTop(500);
+      dispatchTouch("touchstart", [touch(100, 100)]);
+      setScrollTop(0);
+      dispatchTouch("touchend", [], [touch(100, 300)]);
+      showNewPosts(section, 1000);
+
+      expect(isButtonVisible()).toBe(false);
+    });
+
+    it("更新のショートカットキーで更新すると更新前の先頭が基準として記録される", async () => {
+      const { section } = await setupHome();
+
+      document.body.dispatchEvent(
+        new KeyboardEvent("keydown", { key: ".", bubbles: true }),
+      );
+      showNewPosts(section);
+
+      expect(isButtonVisible()).toBe(true);
+    });
+
+    it("入力欄にフォーカスがある間のショートカットキーは基準を記録しない", async () => {
+      const { section } = await setupHome();
+      const input = document.createElement("input");
+      const textarea = document.createElement("textarea");
+      document.body.append(input, textarea);
+
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", { key: ".", bubbles: true }),
+      );
+      textarea.dispatchEvent(
+        new KeyboardEvent("keydown", { key: ".", bubbles: true }),
+      );
+      showNewPosts(section);
+
+      expect(isButtonVisible()).toBe(false);
+    });
+
+    it("基準を消化していないうちに直接更新しても基準は変わらない", async () => {
+      const { tab, section } = await setupHome();
+
+      tab.click();
+      // 1回目の更新: 先頭が N1,N2,A,B になる
+      showNewPosts(section);
+      expect(isButtonVisible()).toBe(true);
+
+      // 先頭の並びが変わった状態でもう一度直接更新する
+      tab.click();
+      window.dispatchEvent(new Event("scroll"));
+
+      // 基準が最初の A..E のままなら、N1,N2,A,B は引き続き新着扱いになる
+      // （基準が N1,N2,A,B に置き換わっていたら表示されなくなる）
+      expect(isButtonVisible()).toBe(true);
+    });
+
+    it("戻るボタンで基準へ戻った後の直接更新では新しい基準を記録する", async () => {
+      const { tab, section } = await setupHome();
+      // 戻り先は連続2件の一致で見つかる基準 A..E
+      tab.click();
+      setTimeline(section, ["101", "1", "2", "3", "4"]);
+      window.dispatchEvent(new Event("scroll"));
+      expect(isButtonVisible()).toBe(true);
+
+      vi.useFakeTimers();
+      getButton()?.click();
+      await vi.advanceTimersByTimeAsync(500);
+      vi.useRealTimers();
+      expect(isButtonVisible()).toBe(false);
+
+      // 先頭へ戻って新しい並びで更新する
+      setScrollTop(0);
+      setTimeline(section, ["21", "22", "23", "24", "25"]);
+      window.dispatchEvent(new Event("scroll"));
+      tab.click();
+      setTimeline(section, ["900", "21", "22", "23", "24"]);
+      window.dispatchEvent(new Event("scroll"));
+
+      expect(isButtonVisible()).toBe(true);
+    });
+
+    it("本アプリの自動更新が新着ピルや選択中タブを自動でクリックしても基準は1回だけ記録される", async () => {
+      const tablist = addTablist();
+      const tab = addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["1", "2", "3", "4", "5"]);
+      const triggerReload = vi.fn(() => {
+        // 更新が走り、先頭が差し替わってから合成クリックが発生する状況を模す
+        setTimeline(section, ["101", "102", "1", "2"]);
+        window.dispatchEvent(new Event("scroll"));
+        addPill(section).click();
+        tab.click();
+      });
+      await importReturnToLastRead({ enabled: true, triggerReload });
+
+      window.__multiColumnX.triggerReload?.();
+
+      expect(triggerReload).toHaveBeenCalledTimes(1);
+      // 基準が最初のスナップショット A..E のままなら新着として表示される
+      expect(isButtonVisible()).toBe(true);
+    });
+
+    it("戻るボタンで基準を探している間の直接操作は基準を変えない", async () => {
+      const { tab, section } = await setupHome();
+      tab.click();
+      showNewPosts(section);
+      expect(isButtonVisible()).toBe(true);
+
+      // 閉じて消化済みにする（基準は残るが新しい基準を記録できる状態）
+      getCloseButton()?.click();
+      expect(isButtonVisible()).toBe(false);
+
+      // 探索を開始する（非表示のボタンを直接押す）。基準がどこにも見つからず末尾まで
+      // 探索が続く状況にして、探索中に直接更新し、その後ユーザー操作で中断する。
+      setClampedScrollingElement(300, 300);
+      vi.useFakeTimers();
+      getButton()?.click();
+      await vi.advanceTimersByTimeAsync(0);
+      setTimeline(section, ["901"]);
+      await vi.advanceTimersByTimeAsync(10);
+      expect(getButton()?.textContent).toBe("探しています…");
+      tab.click();
+      await vi.advanceTimersByTimeAsync(10);
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown" }));
+      await vi.advanceTimersByTimeAsync(500);
+      vi.useRealTimers();
+
+      // 探索中の直接更新が基準として記録されていたら、以下の並びは新着として表示される
+      setScrollTop(0);
+      // 直前のキー操作がユーザー入力として扱われるため、基準側が画面内に見えて
+      // 消化されないよう topStep を大きくして画面外に置く。
+      setTimeline(section, ["900", "101", "102", "1", "2"], { topStep: 1000 });
+      window.dispatchEvent(new Event("scroll"));
+
+      expect(isButtonVisible()).toBe(false);
+    }, 15000);
+
+    it("ホーム以外のページで更新操作をしても基準は記録されない", async () => {
+      const { tab, section } = await setupHome();
+
+      history.replaceState(null, "", "/search");
+      tab.click();
+      history.replaceState(null, "", "/home");
+      showNewPosts(section);
+
+      expect(isButtonVisible()).toBe(false);
+    });
+
+    it("更新操作ではない要素をクリックしても基準は記録されない", async () => {
+      const { section } = await setupHome();
+      const postButton = document.createElement("button");
+      postButton.type = "button";
+      section.querySelector("article")?.appendChild(postButton);
+      const plain = document.createElement("div");
+      document.body.appendChild(plain);
+
+      postButton.click();
+      plain.click();
+      showNewPosts(section, 1000);
+
+      expect(isButtonVisible()).toBe(false);
+    });
+
+    it("設定OFFの間に直接更新した後で設定をONにしても古い基準は残らない", async () => {
+      const { tab, section } = await setupHome();
+      window.__multiColumnX.setReturnToLastReadEnabled?.(false);
+
+      tab.click();
+      window.__multiColumnX.setReturnToLastReadEnabled?.(true);
+      showNewPosts(section, 1000);
+
+      expect(isButtonVisible()).toBe(false);
+    });
+
+    it("設定がOFFのときは直接更新しても戻るボタンが表示されない", async () => {
+      const { tab, section } = await setupHome({ enabled: false });
+
+      tab.click();
+      showNewPosts(section);
+
+      expect(isButtonVisible()).toBe(false);
+    });
+  });
 });
