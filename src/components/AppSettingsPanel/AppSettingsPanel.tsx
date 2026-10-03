@@ -3,6 +3,7 @@ import {
   parseAndValidateUserIdLines,
   parseAndValidateWordLines,
 } from "@/lib/lineListValidation";
+import { nextDraftOnSmallImageChange } from "@/lib/scrollRestoreSetting";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useAppStore } from "../../store/useAppStore";
 import type {
@@ -115,7 +116,11 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
     key: K,
     value: SettingsDraft[K],
   ) => {
-    setDraft((prev) => ({ ...prev, [key]: value }));
+    setDraft((prev) =>
+      key === "smallImageEnabled"
+        ? nextDraftOnSmallImageChange(prev, value as boolean)
+        : { ...prev, [key]: value },
+    );
   };
 
   const handleSubmit = (e: React.FormEvent) => {

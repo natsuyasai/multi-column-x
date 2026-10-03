@@ -112,12 +112,16 @@ export const DisplaySection: React.FC<DisplaySectionProps> = ({
         カスタムメニューボタンを表示する
       </SettingCheckbox>
     )}
-    <SettingCheckbox
-      checked={settings.scrollPosRestoreEnabled}
-      onChange={(checked) => updateSetting("scrollPosRestoreEnabled", checked)}
-    >
-      写真閲覧後のスクロール位置を復元する
-    </SettingCheckbox>
+    {settings.smallImageEnabled && (
+      <SettingCheckbox
+        checked={settings.scrollPosRestoreEnabled}
+        onChange={(checked) =>
+          updateSetting("scrollPosRestoreEnabled", checked)
+        }
+      >
+        写真閲覧後のスクロール位置を復元する
+      </SettingCheckbox>
+    )}
     {showReturnToLastRead && (
       <SettingCheckbox
         checked={settings.returnToLastReadEnabled}

@@ -1021,3 +1021,82 @@ describe("AppSettingsPanel 削除保留データフォルダの再実行", () =>
     expect(patch).not.toHaveProperty("pendingDataDirectoryDeletions");
   });
 });
+
+describe("AppSettingsPanel カラムデフォルトの写真閲覧後スクロール位置復元と画像縮小の連動", () => {
+  const label = "写真閲覧後のスクロール位置を復元する";
+  const renderWith = (overrides: Partial<GlobalSettings>) => {
+    const onApply = vi.fn();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={{ ...baseGlobalSettings, ...overrides }}
+        onApply={onApply}
+      />,
+    );
+    return onApply;
+  };
+  const toggleSmallImage = () =>
+    screen.getByRole("checkbox", { name: "画像を縮小表示する" });
+
+  it("画像を縮小表示するがONのとき写真閲覧後のスクロール位置を復元する設定が表示される", () => {
+    renderWith({ smallImageEnabled: true });
+    expect(screen.getByRole("checkbox", { name: label })).toBeInTheDocument();
+  });
+
+  it("画像を縮小表示するがOFFのとき写真閲覧後のスクロール位置を復元する設定は表示されない", () => {
+    renderWith({ smallImageEnabled: false });
+    expect(
+      screen.queryByRole("checkbox", { name: label }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("画像を縮小表示するをOFFにすると写真閲覧後のスクロール位置を復元する設定もOFFになる", () => {
+    const onApply = renderWith({
+      smallImageEnabled: true,
+      defaultScrollPosRestoreEnabled: true,
+    });
+    fireEvent.click(toggleSmallImage());
+    expect(
+      screen.queryByRole("checkbox", { name: label }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        smallImageEnabled: false,
+        defaultScrollPosRestoreEnabled: false,
+      }),
+    );
+  });
+
+  it("画像を縮小表示するをOFFにしてから再度ONにしても復元設定はOFFのままである", () => {
+    const onApply = renderWith({
+      smallImageEnabled: true,
+      defaultScrollPosRestoreEnabled: true,
+    });
+    fireEvent.click(toggleSmallImage());
+    fireEvent.click(toggleSmallImage());
+    expect(screen.getByRole("checkbox", { name: label })).not.toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        smallImageEnabled: true,
+        defaultScrollPosRestoreEnabled: false,
+      }),
+    );
+  });
+
+  it("画像を縮小表示するをOFFにしても復元設定がもともとOFFならOFFのままである", () => {
+    const onApply = renderWith({
+      smallImageEnabled: true,
+      defaultScrollPosRestoreEnabled: false,
+    });
+    fireEvent.click(toggleSmallImage());
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        smallImageEnabled: false,
+        defaultScrollPosRestoreEnabled: false,
+      }),
+    );
+  });
+});

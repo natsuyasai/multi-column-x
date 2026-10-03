@@ -23,7 +23,6 @@ const plainEntries = [
   "hide_ad",
   "keyboard_shortcut",
   "ng_word",
-  "scroll_pos_restore",
   "blur_image",
   "sidebar_hide",
   "mobile_area_hide",

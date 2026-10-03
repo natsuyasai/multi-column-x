@@ -758,7 +758,11 @@ describe("SettingsPanel onChangeキー対応の特性テスト", () => {
       "showCustomMenu",
       { hideHeaderEnabled: true },
     ],
-    ["写真閲覧後のスクロール位置を復元する", "scrollPosRestoreEnabled", {}],
+    [
+      "写真閲覧後のスクロール位置を復元する",
+      "scrollPosRestoreEnabled",
+      { smallImageEnabled: true },
+    ],
     ["更新後に前回の続きへ戻るボタンを表示する", "returnToLastReadEnabled", {}],
     ["画像を縮小表示する", "smallImageEnabled", {}],
     ["画像をぼかして表示する", "blurImageEnabled", {}],
@@ -852,6 +856,99 @@ describe("SettingsPanel onChangeキー対応の特性テスト", () => {
     expect(onApply).toHaveBeenCalledWith(
       "col-1",
       expect.objectContaining({ customCSS: ".foo { color: red; }" }),
+      350,
+      undefined,
+    );
+  });
+});
+
+describe("SettingsPanel 写真閲覧後のスクロール位置を復元する設定と画像縮小の連動", () => {
+  const label = "写真閲覧後のスクロール位置を復元する";
+  const renderWith = (overrides: Partial<typeof baseSettings>) => {
+    const onApply = vi.fn();
+    const column = {
+      ...mockColumn,
+      settings: { ...baseSettings, ...overrides },
+    };
+    render(
+      <SettingsPanel {...defaultProps} column={column} onApply={onApply} />,
+    );
+    return onApply;
+  };
+  const apply = () =>
+    userEvent.click(screen.getByRole("button", { name: "適用" }));
+
+  it("画像を縮小表示するがONのとき写真閲覧後のスクロール位置を復元する設定が表示される", () => {
+    renderWith({ smallImageEnabled: true });
+    expect(screen.getByRole("checkbox", { name: label })).toBeInTheDocument();
+  });
+
+  it("画像を縮小表示するがOFFのとき写真閲覧後のスクロール位置を復元する設定は表示されない", () => {
+    renderWith({ smallImageEnabled: false });
+    expect(
+      screen.queryByRole("checkbox", { name: label }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("画像を縮小表示するをOFFにすると写真閲覧後のスクロール位置を復元する設定もOFFになる", async () => {
+    const onApply = renderWith({
+      smallImageEnabled: true,
+      scrollPosRestoreEnabled: true,
+    });
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: "画像を縮小表示する" }),
+    );
+    expect(
+      screen.queryByRole("checkbox", { name: label }),
+    ).not.toBeInTheDocument();
+    await apply();
+    expect(onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.objectContaining({
+        smallImageEnabled: false,
+        scrollPosRestoreEnabled: false,
+      }),
+      350,
+      undefined,
+    );
+  });
+
+  it("画像を縮小表示するをOFFにしてから再度ONにしても復元設定はOFFのままである", async () => {
+    const onApply = renderWith({
+      smallImageEnabled: true,
+      scrollPosRestoreEnabled: true,
+    });
+    const toggle = screen.getByRole("checkbox", { name: "画像を縮小表示する" });
+    await userEvent.click(toggle);
+    await userEvent.click(toggle);
+    expect(screen.getByRole("checkbox", { name: label })).not.toBeChecked();
+    await apply();
+    expect(onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.objectContaining({
+        smallImageEnabled: true,
+        scrollPosRestoreEnabled: false,
+      }),
+      350,
+      undefined,
+    );
+  });
+
+  it("画像を縮小表示するをOFFにしても復元設定がもともとOFFならOFFのままである", async () => {
+    const onApply = renderWith({
+      smallImageEnabled: true,
+      scrollPosRestoreEnabled: false,
+    });
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: "画像を縮小表示する" }),
+    );
+    await apply();
+    expect(onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.objectContaining({
+        smallImageEnabled: false,
+        scrollPosRestoreEnabled: false,
+      }),
       350,
       undefined,
     );

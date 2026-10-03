@@ -40,6 +40,11 @@ window.addEventListener = ((
   return originalAddEventListener(type, listener, options);
 }) as typeof window.addEventListener;
 
+// 写真復元の移植で history.pushState / replaceState をフックするため、
+// テスト間でフックが積み重ならないよう afterEach で元の関数に戻す。
+const originalPushState = history.pushState;
+const originalReplaceState = history.replaceState;
+
 // --- DOM構築ヘルパー ---
 
 function setElementRect(el: Element, rect: Partial<DOMRect>): void {
@@ -192,6 +197,7 @@ function getCloseButton(): HTMLButtonElement | null {
 async function importReturnToLastRead(
   options: {
     enabled?: boolean;
+    scrollPosRestoreEnabled?: boolean;
     triggerReload?: ReturnType<typeof vi.fn> | null;
     mobileSwipeAreaOffset?: number;
   } = {},
@@ -206,6 +212,7 @@ async function importReturnToLastRead(
   ) as MultiColumnXAPI;
   window.__multiColumnXConfig = {
     returnToLastReadEnabled: options.enabled ?? false,
+    scrollPosRestoreEnabled: options.scrollPosRestoreEnabled ?? false,
     mobileSwipeAreaOffset: options.mobileSwipeAreaOffset,
   } as MultiColumnXConfig;
 
@@ -227,6 +234,8 @@ describe("inject/return_to_last_read", () => {
       window.removeEventListener(type, listener, options);
     });
     addedListeners.length = 0;
+    history.pushState = originalPushState;
+    history.replaceState = originalReplaceState;
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
@@ -1003,6 +1012,318 @@ describe("inject/return_to_last_read", () => {
       // （探索中に [901] のみへ読み直されていた場合、101 が基準に無いため
       // 新着扱いされてボタンが表示されてしまう）
       expect(isButtonVisible()).toBe(false);
+    }, 15000);
+  });
+
+  describe("写真閲覧後の位置復元", () => {
+    // 写真ページへの遷移で jsdom が実ナビゲーションを試みないよう、クリックの既定動作を止める。
+    function preventLinkNavigation(): void {
+      document.addEventListener("click", (e) => e.preventDefault());
+    }
+
+    function addPhotoLink(section: HTMLElement, id: string): HTMLAnchorElement {
+      const article = Array.from(section.querySelectorAll("article")).find(
+        (a) => a.querySelector(`a[href="/u/status/${id}"]`),
+      ) as HTMLElement;
+      const link = document.createElement("a");
+      link.setAttribute("href", `/u/status/${id}/photo/1`);
+      article.appendChild(link);
+      return link;
+    }
+
+    /** scrollTop 書き込みのたびに onSet を呼ぶスクロール要素スタブ。 */
+    function setHookedScrollingElement(
+      initial: number,
+      onSet: (value: number) => void,
+    ): { readonly scrollTop: number } {
+      let top = initial;
+      const stub = {
+        get scrollTop(): number {
+          return top;
+        },
+        set scrollTop(value: number) {
+          top = value;
+          onSet(value);
+        },
+        scrollHeight: 100000,
+      };
+      Object.defineProperty(document, "scrollingElement", {
+        value: stub,
+        configurable: true,
+      });
+      return stub;
+    }
+
+    /** 写真リンクをクリックして写真ページへ遷移する（その後にタイムラインの状態を整える）。 */
+    function openPhoto(link: HTMLAnchorElement): void {
+      link.click();
+      history.pushState(null, "", "/u/status/5/photo/1");
+    }
+
+    /** ホームへ戻る（フェイクタイマーは戻る直前に有効化）。 */
+    function returnHome(): void {
+      vi.useFakeTimers();
+      history.pushState(null, "", "/home");
+    }
+
+    it("ホームで写真を開いて戻ると、開いたツイートが画面上端に合わされる", async () => {
+      preventLinkNavigation();
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["3", "4", "5"]);
+      const link = addPhotoLink(section, "5");
+
+      await importReturnToLastRead({
+        enabled: true,
+        scrollPosRestoreEnabled: true,
+      });
+      openPhoto(link);
+
+      // 開いたツイート(5)は、スクロールして読み込まれる範囲より下にある
+      const scroller = setHookedScrollingElement(400, (value) => {
+        if (value >= 500) setTimeline(section, ["4", "5", "6"]);
+        else setTimeline(section, ["1", "2", "3"]);
+      });
+      setTimeline(section, ["1", "2", "3"]);
+
+      returnHome();
+      await vi.advanceTimersByTimeAsync(1000);
+
+      // 5 は 2 番目(top=100)、ヘッダー下端(53)に合わせるため +47
+      expect(scroller.scrollTop).toBe(window.innerHeight + 47);
+      // ボタンは出さず、見つからない通知も出ない
+      expect(isButtonVisible()).toBe(false);
+      expect(getToast()).toBeNull();
+    }, 15000);
+
+    it("戻った直後にタイムラインが未表示のときは、表示されるまで待ってから復元する", async () => {
+      preventLinkNavigation();
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["3", "4", "5"]);
+      const link = addPhotoLink(section, "5");
+
+      await importReturnToLastRead({ scrollPosRestoreEnabled: true });
+      openPhoto(link);
+
+      const scroller = setHookedScrollingElement(400, () => {});
+      // 戻った直後はツイートが1件も表示されていない
+      section.innerHTML = "";
+
+      returnHome();
+      await vi.advanceTimersByTimeAsync(1500);
+      // 表示されるまでは補正しない（探索の開始＝scrollTop 0 への移動も起きない）
+      expect(scroller.scrollTop).toBe(400);
+
+      // ツイートが表示される（5 は先頭付近にあり、探索開始後すぐ見つかる）
+      setTimeline(section, ["5", "6", "7"]);
+      await vi.advanceTimersByTimeAsync(1000);
+
+      // 5 は先頭(top=0)。ヘッダー下端(53)に合わせるため 0 + (0 - 53) = -53
+      expect(scroller.scrollTop).toBe(-53);
+    }, 15000);
+
+    it("復元中に戻り先が見つからないときは通知を表示する", async () => {
+      preventLinkNavigation();
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["3", "4", "5"]);
+      const link = addPhotoLink(section, "5");
+
+      await importReturnToLastRead({ scrollPosRestoreEnabled: true });
+      openPhoto(link);
+
+      // 開いたツイート(5)はどこにも現れず、これ以上スクロールできない
+      setTimeline(section, ["901"]);
+      setClampedScrollingElement(300, 300);
+
+      returnHome();
+      await vi.advanceTimersByTimeAsync(3500);
+
+      const toast = getToast();
+      expect(toast).not.toBeNull();
+      expect(toast?.textContent).toBe("前回の位置が見つかりませんでした");
+      expect(toast?.style.display).not.toBe("none");
+      // 元の位置に戻っている
+      expect(document.scrollingElement?.scrollTop).toBe(300);
+    }, 15000);
+
+    it("復元中にユーザーがスクロール操作をすると探索を中断する", async () => {
+      preventLinkNavigation();
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["3", "4", "5"]);
+      const link = addPhotoLink(section, "5");
+
+      await importReturnToLastRead({ scrollPosRestoreEnabled: true });
+      openPhoto(link);
+
+      // 開いたツイートが見つからないまま探索が長く続く状況
+      setTimeline(section, ["901"]);
+      setScrollTop(0);
+
+      returnHome();
+      await vi.advanceTimersByTimeAsync(400);
+      expect(document.scrollingElement?.scrollTop).toBeGreaterThan(0);
+
+      // ユーザーがスクロール操作
+      document.body.dispatchEvent(new Event("wheel", { bubbles: true }));
+      await vi.advanceTimersByTimeAsync(200);
+      const stoppedAt = document.scrollingElement?.scrollTop;
+
+      // 以降は自動でスクロールされず、通知も出ない
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(document.scrollingElement?.scrollTop).toBe(stoppedAt);
+      expect(getToast()).toBeNull();
+    }, 15000);
+
+    it("写真閲覧後のスクロール位置を復元する設定がOFFのときは戻っても位置を補正しない", async () => {
+      preventLinkNavigation();
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["3", "4", "5"]);
+      const link = addPhotoLink(section, "5");
+
+      await importReturnToLastRead({ scrollPosRestoreEnabled: false });
+      openPhoto(link);
+
+      const writes: number[] = [];
+      const scroller = setHookedScrollingElement(400, (v) => writes.push(v));
+      setTimeline(section, ["901"]);
+
+      returnHome();
+      await vi.advanceTimersByTimeAsync(6000);
+
+      expect(writes).toEqual([]);
+      expect(scroller.scrollTop).toBe(400);
+      expect(getToast()).toBeNull();
+    }, 15000);
+
+    it("復元探索は前回の続きへ戻るボタンの表示状態に影響しない", async () => {
+      preventLinkNavigation();
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["11", "12", "13", "14", "15"]);
+
+      await importReturnToLastRead({
+        enabled: true,
+        scrollPosRestoreEnabled: true,
+      });
+      window.__multiColumnX.triggerReload?.();
+
+      // 新着が入り、戻るボタンが表示されている
+      setTimeline(section, ["101", "11", "12", "13", "14"]);
+      window.dispatchEvent(new Event("scroll"));
+      expect(isButtonVisible()).toBe(true);
+      const link = addPhotoLink(section, "12");
+
+      // 開いたツイートは見つからない（探索に時間がかかる）状況にする
+      link.click();
+      history.pushState(null, "", "/u/status/12/photo/1");
+      setTimeline(section, ["901"]);
+      setClampedScrollingElement(300, 300);
+      returnHome();
+
+      // 復元の最中も「探しています…」にならず、ボタンは表示されたまま
+      await vi.advanceTimersByTimeAsync(300);
+      expect(isButtonVisible()).toBe(true);
+      expect(getButton()?.textContent).toBe("↓ 前回の続きへ");
+      expect(getButton()?.disabled).toBe(false);
+
+      // 復元が終わっても表示状態は変わらない
+      await vi.advanceTimersByTimeAsync(3500);
+      expect(getToast()?.textContent).toBe("前回の位置が見つかりませんでした");
+      expect(isButtonVisible()).toBe(true);
+      expect(getButton()?.textContent).toBe("↓ 前回の続きへ");
+    }, 15000);
+
+    it("待機中にユーザーがスクロール操作をするとタイムライン表示後も位置を補正しない", async () => {
+      preventLinkNavigation();
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["3", "4", "5"]);
+      const link = addPhotoLink(section, "5");
+
+      await importReturnToLastRead({ scrollPosRestoreEnabled: true });
+      openPhoto(link);
+
+      const writes: number[] = [];
+      const scroller = setHookedScrollingElement(400, (v) => writes.push(v));
+      section.innerHTML = "";
+
+      returnHome();
+      await vi.advanceTimersByTimeAsync(300);
+      document.body.dispatchEvent(new Event("wheel", { bubbles: true }));
+      await vi.advanceTimersByTimeAsync(200);
+
+      // ユーザー操作の後でタイムラインが表示される
+      setTimeline(section, ["5", "6", "7"]);
+      await vi.advanceTimersByTimeAsync(6000);
+
+      expect(writes).toEqual([]);
+      expect(scroller.scrollTop).toBe(400);
+      expect(getToast()).toBeNull();
+    }, 15000);
+
+    it("待機中にホーム以外へ遷移したら復元しない", async () => {
+      preventLinkNavigation();
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["3", "4", "5"]);
+      const link = addPhotoLink(section, "5");
+
+      await importReturnToLastRead({ scrollPosRestoreEnabled: true });
+      openPhoto(link);
+
+      const writes: number[] = [];
+      const scroller = setHookedScrollingElement(400, (v) => writes.push(v));
+      section.innerHTML = "";
+
+      returnHome();
+      await vi.advanceTimersByTimeAsync(300);
+      // ホーム以外（通知ページ）へ移動してから、ホーム相当の一覧が表示される
+      history.pushState(null, "", "/notifications");
+      setTimeline(section, ["5", "6", "7"]);
+      await vi.advanceTimersByTimeAsync(6000);
+
+      expect(writes).toEqual([]);
+      expect(scroller.scrollTop).toBe(400);
+      expect(getToast()).toBeNull();
+    }, 15000);
+
+    it("5秒経ってもタイムラインが表示されなければ探索せず通知も出さない", async () => {
+      preventLinkNavigation();
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["3", "4", "5"]);
+      const link = addPhotoLink(section, "5");
+
+      await importReturnToLastRead({ scrollPosRestoreEnabled: true });
+      openPhoto(link);
+
+      const writes: number[] = [];
+      const scroller = setHookedScrollingElement(400, (v) => writes.push(v));
+      section.innerHTML = "";
+
+      returnHome();
+      await vi.advanceTimersByTimeAsync(5500);
+
+      // 上限を過ぎてからタイムラインが表示されても補正しない
+      setTimeline(section, ["5", "6", "7"]);
+      await vi.advanceTimersByTimeAsync(3000);
+
+      expect(writes).toEqual([]);
+      expect(scroller.scrollTop).toBe(400);
+      expect(getToast()).toBeNull();
     }, 15000);
   });
 });
