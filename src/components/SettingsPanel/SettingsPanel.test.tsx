@@ -588,6 +588,16 @@ describe("SettingsPanel 新着デスクトップ通知", () => {
       undefined,
     );
   });
+
+  it("モバイル（isMobile: true）では通知セクションが表示されない", () => {
+    render(<SettingsPanel {...defaultProps} isMobile={true} />);
+    expect(
+      screen.queryByRole("checkbox", { name: "新着をデスクトップ通知する" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "通知" }),
+    ).not.toBeInTheDocument();
+  });
 });
 
 describe("SettingsPanel 表示名", () => {
