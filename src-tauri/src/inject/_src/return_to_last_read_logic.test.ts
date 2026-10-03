@@ -9,6 +9,10 @@ import {
   extractArticleStatusId,
   isAdArticle,
   isListTopRendered,
+  isPullRefreshGesture,
+  isRefreshClickTarget,
+  isRefreshShortcut,
+  PULL_REFRESH_MIN_DISTANCE_PX,
   readTimelineIds,
   selectAnchorIds,
   hasNewPostsAbove,
@@ -17,6 +21,7 @@ import {
   reduceReturnState,
   searchReturnTarget,
   waitForTimelineReady,
+  type PullGesture,
   type ReturnEvent,
   type ReturnState,
   type SearchDeps,
@@ -1113,5 +1118,164 @@ describe("inject/return_to_last_read_logic", () => {
       expect(aborted).not.toBe("ready");
       expect(timedOut).not.toBe("ready");
     });
+  });
+});
+
+// --- 直接更新操作の判定 ---
+
+describe("更新操作のクリック判定 (isRefreshClickTarget)", () => {
+  /** section[aria-labelledby] > cellInnerDiv > 子 を構築して section を返す。 */
+  function buildCell(inner: string): HTMLElement {
+    document.body.innerHTML = `<section aria-labelledby="h"><div data-testid="cellInnerDiv">${inner}</div></section>`;
+    return document.body.querySelector("section")!;
+  }
+
+  it("新着ピルをクリックして更新したとき更新操作と判定される", () => {
+    const section = buildCell(
+      '<button type="button"><span id="t">3件のポストを表示</span></button>',
+    );
+    expect(isRefreshClickTarget(section.querySelector("#t"))).toBe(true);
+    expect(isRefreshClickTarget(section.querySelector("button"))).toBe(true);
+  });
+
+  it("投稿を含むセル内のボタンのクリックは更新操作と判定されない", () => {
+    const section = buildCell(
+      '<article><button type="button" id="like">いいね</button></article>',
+    );
+    expect(isRefreshClickTarget(section.querySelector("#like"))).toBe(false);
+  });
+
+  it("UserCell のボタンのクリックは更新操作と判定されない", () => {
+    const section = buildCell(
+      '<button type="button" data-testid="UserCell">ユーザー</button>',
+    );
+    expect(isRefreshClickTarget(section.querySelector("button"))).toBe(false);
+  });
+
+  it("section の外にあるボタンのクリックは更新操作と判定されない", () => {
+    document.body.innerHTML =
+      '<div data-testid="cellInnerDiv"><button type="button">x</button></div>';
+    expect(isRefreshClickTarget(document.querySelector("button"))).toBe(false);
+  });
+
+  it("aria-labelledby の無い section 内のボタンは更新操作と判定されない", () => {
+    document.body.innerHTML =
+      '<section><div data-testid="cellInnerDiv"><button type="button">x</button></div></section>';
+    expect(isRefreshClickTarget(document.querySelector("button"))).toBe(false);
+  });
+
+  it("target が Element でなければ更新操作と判定されない", () => {
+    expect(isRefreshClickTarget(null)).toBe(false);
+    expect(isRefreshClickTarget(document)).toBe(false);
+  });
+
+  it("選択中のタブのクリックは更新操作と判定される", () => {
+    document.body.innerHTML =
+      '<div role="tablist"><div role="tab" aria-selected="true"><span id="l">おすすめ</span></div></div>';
+    expect(isRefreshClickTarget(document.querySelector("#l"))).toBe(true);
+    expect(isRefreshClickTarget(document.querySelector('[role="tab"]'))).toBe(
+      true,
+    );
+  });
+
+  it("選択されていない別のタブのクリックは更新操作と判定されない", () => {
+    document.body.innerHTML =
+      '<div role="tablist"><div role="tab" aria-selected="false"><span id="l">フォロー中</span></div></div>';
+    expect(isRefreshClickTarget(document.querySelector("#l"))).toBe(false);
+  });
+
+  it("フォロー中タブ（選択中だが aria-expanded あり）のクリックは更新操作と判定されない", () => {
+    document.body.innerHTML =
+      '<div role="tablist"><div role="tab" aria-selected="true" aria-expanded="false"><span id="l">フォロー中</span></div></div>';
+    expect(isRefreshClickTarget(document.querySelector("#l"))).toBe(false);
+  });
+});
+
+describe("プルダウン更新の判定 (isPullRefreshGesture)", () => {
+  const base: PullGesture = {
+    startX: 100,
+    startY: 100,
+    endX: 100,
+    endY: 100 + PULL_REFRESH_MIN_DISTANCE_PX + 120,
+    startScrollTop: 0,
+    endScrollTop: 0,
+  };
+
+  it("先頭で下方向に更新とみなせる距離だけ引き下げて指を離すとプルダウン更新と判定される", () => {
+    expect(isPullRefreshGesture(base)).toBe(true);
+  });
+
+  it("引き下げ距離が足りないまま指を離しても更新と判定されない（境界値）", () => {
+    expect(PULL_REFRESH_MIN_DISTANCE_PX).toBe(80);
+    expect(isPullRefreshGesture({ ...base, endY: 100 + 79 })).toBe(false);
+    expect(isPullRefreshGesture({ ...base, endY: 100 + 80 })).toBe(true);
+  });
+
+  it("上方向への移動は更新と判定されない", () => {
+    expect(isPullRefreshGesture({ ...base, endY: 100 - 200 })).toBe(false);
+  });
+
+  it("先頭でない位置から始まった下方向の操作は更新と判定されない", () => {
+    expect(isPullRefreshGesture({ ...base, startScrollTop: 2 })).toBe(false);
+    expect(isPullRefreshGesture({ ...base, startScrollTop: 500 })).toBe(false);
+  });
+
+  it("先頭でない位置で終わった下方向の操作は更新と判定されない", () => {
+    expect(isPullRefreshGesture({ ...base, endScrollTop: 2 })).toBe(false);
+  });
+
+  it("scrollTop が 1 以下なら先頭とみなして更新と判定される", () => {
+    expect(
+      isPullRefreshGesture({ ...base, startScrollTop: 1, endScrollTop: 1 }),
+    ).toBe(true);
+  });
+
+  it("縦移動より横移動のほうが大きいスワイプは更新と判定されない", () => {
+    expect(
+      isPullRefreshGesture({ ...base, endX: 100 + 400, endY: 100 + 150 }),
+    ).toBe(false);
+    expect(
+      isPullRefreshGesture({ ...base, endX: 100 - 400, endY: 100 + 150 }),
+    ).toBe(false);
+  });
+});
+
+describe("更新ショートカットの判定 (isRefreshShortcut)", () => {
+  type ShortcutEvent = Parameters<typeof isRefreshShortcut>[0];
+  const key = (over: Partial<ShortcutEvent> = {}): ShortcutEvent => ({
+    key: ".",
+    ctrlKey: false,
+    metaKey: false,
+    altKey: false,
+    shiftKey: false,
+    target: document.body,
+    ...over,
+  });
+
+  it("更新のショートカットキー . は更新操作と判定される", () => {
+    expect(isRefreshShortcut(key())).toBe(true);
+    expect(isRefreshShortcut(key({ target: null }))).toBe(true);
+  });
+
+  it("入力欄にフォーカスがある間の . は更新と判定されない", () => {
+    document.body.innerHTML =
+      '<input id="i"><textarea id="t"></textarea><div id="c" contenteditable="true"><span id="cs"></span></div><div id="r" role="textbox"></div>';
+    for (const id of ["i", "t", "c", "cs", "r"]) {
+      expect(
+        isRefreshShortcut(key({ target: document.getElementById(id) })),
+      ).toBe(false);
+    }
+  });
+
+  it("修飾キー付きの . は更新と判定されない", () => {
+    expect(isRefreshShortcut(key({ ctrlKey: true }))).toBe(false);
+    expect(isRefreshShortcut(key({ metaKey: true }))).toBe(false);
+    expect(isRefreshShortcut(key({ altKey: true }))).toBe(false);
+    expect(isRefreshShortcut(key({ shiftKey: true }))).toBe(false);
+  });
+
+  it("別のキーは更新と判定されない", () => {
+    expect(isRefreshShortcut(key({ key: "j" }))).toBe(false);
+    expect(isRefreshShortcut(key({ key: "," }))).toBe(false);
   });
 });

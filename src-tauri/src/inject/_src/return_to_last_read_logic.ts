@@ -478,3 +478,76 @@ export async function waitForTimelineReady(
     waited += pollIntervalMs;
   }
 }
+
+// --- 直接更新操作の判定 ---
+// プルダウン更新とみなす下方向の最小移動量（px）。暫定値。Android 実機で X の更新と
+// 一致する距離を計測して確定する。
+export const PULL_REFRESH_MIN_DISTANCE_PX = 80;
+
+export interface PullGesture {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  startScrollTop: number;
+  endScrollTop: number;
+}
+
+// 先頭（scrollTop <= 1）で始まり先頭のまま終わり、下方向へ十分引き下げ、
+// かつ横移動より縦移動が大きいときだけプルダウン更新とみなす。
+export function isPullRefreshGesture(g: PullGesture): boolean {
+  if (g.startScrollTop > 1 || g.endScrollTop > 1) return false;
+  const dy = g.endY - g.startY;
+  const dx = Math.abs(g.endX - g.startX);
+  return dy >= PULL_REFRESH_MIN_DISTANCE_PX && dy > dx;
+}
+
+// 入力欄（編集可能要素）か。keyboard_shortcut.ts の isEditableTarget とは
+// 連結後のトップレベル名が重複しないよう別名にしている。
+export function isEditableEventTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return (
+    target.closest(
+      'input, textarea, select, [contenteditable=""], [contenteditable="true"], [role="textbox"]',
+    ) !== null
+  );
+}
+
+// X の「新しいポストを読み込む」ショートカット（"."）。修飾キー無し・編集可能要素以外のとき。
+export function isRefreshShortcut(event: {
+  key: string;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  altKey: boolean;
+  shiftKey: boolean;
+  target: EventTarget | null;
+}): boolean {
+  if (event.key !== ".") return false;
+  if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) {
+    return false;
+  }
+  return !isEditableEventTarget(event.target);
+}
+
+// 更新操作となるクリック対象か。
+// (1) タイムライン内の新着ピル（投稿を含まないセル内の button[type=button]、UserCell 除く。
+//     auto_reload.ts の findNewPostsButton と同じ条件）
+// (2) 選択中で aria-expanded を持たないタブ（auto_reload の reselectTab と同じ条件）
+export function isRefreshClickTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+
+  const tab = target.closest<HTMLElement>('div[role="tab"]');
+  if (tab) {
+    return (
+      tab.getAttribute("aria-selected") === "true" &&
+      !tab.hasAttribute("aria-expanded")
+    );
+  }
+
+  const button = target.closest<HTMLButtonElement>('button[type="button"]');
+  if (!button) return false;
+  if (button.getAttribute("data-testid") === "UserCell") return false;
+  const cell = button.closest('[data-testid="cellInnerDiv"]');
+  if (!cell || cell.querySelector("article")) return false;
+  return cell.closest("section[aria-labelledby]") !== null;
+}
