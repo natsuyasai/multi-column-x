@@ -198,7 +198,7 @@ export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
  * 値を変更したら両側を更新し、fixture を再生成すること。
  */
 export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
-  theme: "dark",
+  theme: "system",
   customCSS: "",
   windowBounds: { x: 0, y: 0, width: 1400, height: 900 },
   defaultAutoReloadEnabled: true,
