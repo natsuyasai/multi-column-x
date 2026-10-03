@@ -460,6 +460,19 @@ import {
 
   // --- 公開 API / triggerReload のラップ ---
 
+  function recordReload(): void {
+    if (!enabled || !isHomePath() || isAnySearching()) return;
+    const tabName = currentTabName();
+    // タブバーが一時的に見つからない（tabName === null）ときに tabChanged を
+    // dispatch すると基準が誤って破棄されるため、null のときは dispatch しない。
+    // reload イベントの tabName に null を渡すこと自体は問題ない。
+    if (tabName !== null) {
+      dispatch({ type: "tabChanged", tabName });
+    }
+    dispatch({ type: "reload", snapshot: topSnapshot, tabName });
+    render();
+  }
+
   window.__multiColumnX =
     window.__multiColumnX || ({} as Window["__multiColumnX"]);
 
@@ -481,17 +494,7 @@ import {
     window.__multiColumnX.triggerReload = function (
       scrollToTop?: boolean,
     ): void {
-      if (enabled && isHomePath() && !isAnySearching()) {
-        const tabName = currentTabName();
-        // タブバーが一時的に見つからない（tabName === null）ときに tabChanged を
-        // dispatch すると基準が誤って破棄されるため、null のときは dispatch しない。
-        // reload イベントの tabName に null を渡すこと自体は問題ない。
-        if (tabName !== null) {
-          dispatch({ type: "tabChanged", tabName });
-        }
-        dispatch({ type: "reload", snapshot: topSnapshot, tabName });
-        render();
-      }
+      recordReload();
       originalTriggerReload(scrollToTop);
     };
   }
