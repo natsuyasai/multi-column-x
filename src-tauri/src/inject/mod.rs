@@ -70,7 +70,7 @@ fn json_array(values: &[String]) -> String {
 /// キーの順序・区切り・空白は既存の出力と完全に同一にすること。
 fn config_script(params: &InitScriptParams) -> String {
     let effective_show_custom_menu = params.hide_header_enabled && params.show_custom_menu;
-    let entries: [(&str, String); 20] = [
+    let entries: [(&str, String); 21] = [
         ("hideHeaderEnabled", params.hide_header_enabled.to_string()),
         (
             "hideTweetInputEnabled",
@@ -104,6 +104,10 @@ fn config_script(params: &InitScriptParams) -> String {
         (
             "returnToLastReadEnabled",
             params.return_to_last_read_enabled.to_string(),
+        ),
+        (
+            "scrollPosRestoreEnabled",
+            params.scroll_pos_restore_enabled.to_string(),
         ),
         (
             "mobileSwipeAreaOffset",
@@ -148,10 +152,6 @@ fn script_parts(params: &InitScriptParams) -> Vec<Cow<'static, str>> {
     let hide_ad = include_str!("hide_ad.js");
     let ng_word = include_str!("ng_word.js");
     let image_popup = include_if(!params.is_mobile, include_str!("image_popup.js"));
-    let scroll_pos_restore = include_if(
-        params.scroll_pos_restore_enabled,
-        include_str!("scroll_pos_restore.js"),
-    );
     // 表示サイズは x.com 自身の設定 (IndexedDB device:rweb:settings.scale) で管理するため
     // CSS zoom inject は使用しない
     let context_menu = include_if(!params.is_mobile, include_str!("context_menu.js"));
@@ -194,7 +194,6 @@ fn script_parts(params: &InitScriptParams) -> Vec<Cow<'static, str>> {
         Cow::Borrowed(ng_word),
         Cow::Borrowed(custom_css_js),
         Cow::Borrowed(image_popup),
-        Cow::Borrowed(scroll_pos_restore),
         Cow::Borrowed(context_menu),
         Cow::Borrowed(scroll_event),
         Cow::Borrowed(keyboard_shortcut),
@@ -776,6 +775,36 @@ mod tests {
     fn build_init_script_configにreturntolastreadenabled_falseが含まれる() {
         let script = build_init_script(&default_params());
         assert!(script.contains("returnToLastReadEnabled: false"));
+    }
+
+    #[test]
+    fn build_init_script_configにscrollposrestoreenabled_trueが含まれる() {
+        let mut params = default_params();
+        params.scroll_pos_restore_enabled = true;
+        let script = build_init_script(&params);
+        assert!(script.contains("scrollPosRestoreEnabled: true"));
+    }
+
+    #[test]
+    fn build_init_script_configにscrollposrestoreenabled_falseが含まれる() {
+        let mut params = default_params();
+        params.scroll_pos_restore_enabled = false;
+        let script = build_init_script(&params);
+        assert!(script.contains("scrollPosRestoreEnabled: false"));
+    }
+
+    #[test]
+    fn scroll_pos_restore_enabledの値に関わらず写真閲覧後のスクロール復元スクリプトは単独連結されない(
+    ) {
+        for enabled in [true, false] {
+            let mut params = default_params();
+            params.scroll_pos_restore_enabled = enabled;
+            let script = build_init_script(&params);
+            assert!(
+                !script.contains("x-home-previous-photo-url"),
+                "scroll_pos_restore_enabled={enabled} でも連結されないはず"
+            );
+        }
     }
 
     #[test]

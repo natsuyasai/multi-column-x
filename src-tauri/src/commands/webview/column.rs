@@ -93,6 +93,12 @@ fn is_return_to_last_read_target(column: &ColumnData) -> bool {
     column.page_type == "home"
 }
 
+/// 写真閲覧後のスクロール位置復元は、画像縮小表示が有効なときだけ有効にする。
+/// 縮小表示がOFFのときは復元設定がONでも無効として扱う。
+fn effective_scroll_pos_restore_enabled(column: &ColumnData) -> bool {
+    column.settings.scroll_pos_restore_enabled && column.settings.small_image_enabled
+}
+
 /// モバイルかつスワイプ切替領域が有効なときだけ、その高さ(px/dp)を返す。
 /// それ以外（デスクトップ、またはモバイルでも無効時）は0を返し、
 /// 「前回の続きへ戻る」ボタン等の下端位置補正に使う。
@@ -117,7 +123,7 @@ fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: boo
         hide_header_enabled: column.settings.hide_header_enabled,
         hide_tweet_input_enabled: effective_hide_tweet_input_enabled(column),
         show_custom_menu: column.settings.show_custom_menu,
-        scroll_pos_restore_enabled: column.settings.scroll_pos_restore_enabled,
+        scroll_pos_restore_enabled: effective_scroll_pos_restore_enabled(column),
         video_auto_play_stop_enabled: script_settings.video_auto_play_stop_enabled,
         small_image_enabled: column.settings.small_image_enabled,
         small_image_width: &column.settings.small_image_width,
@@ -781,6 +787,30 @@ mod tests {
         let mut col = column("home");
         col.settings.hide_tweet_input_enabled = false;
         assert!(!effective_hide_tweet_input_enabled(&col));
+    }
+
+    #[test]
+    fn effective_scroll_pos_restore_enabledは縮小表示onかつ復元onでtrueになる() {
+        let mut col = column("home");
+        col.settings.small_image_enabled = true;
+        col.settings.scroll_pos_restore_enabled = true;
+        assert!(effective_scroll_pos_restore_enabled(&col));
+    }
+
+    #[test]
+    fn effective_scroll_pos_restore_enabledは縮小表示offなら復元onでもfalseになる() {
+        let mut col = column("home");
+        col.settings.small_image_enabled = false;
+        col.settings.scroll_pos_restore_enabled = true;
+        assert!(!effective_scroll_pos_restore_enabled(&col));
+    }
+
+    #[test]
+    fn effective_scroll_pos_restore_enabledは復元offなら縮小表示onでもfalseになる() {
+        let mut col = column("home");
+        col.settings.small_image_enabled = true;
+        col.settings.scroll_pos_restore_enabled = false;
+        assert!(!effective_scroll_pos_restore_enabled(&col));
     }
 
     #[test]
