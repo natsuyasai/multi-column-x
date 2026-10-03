@@ -16,7 +16,11 @@ CLAUDE.mdの「セキュリティルールに従うこと」を、本プロジ�
 - [ ] `src-tauri/capabilities/*.json`（`default.json` / `column-webview.json` / `updater.json`）の許可コマンド・permissions が**最小限**か
   - WebView ごとに付与する権限が広すぎないか（特に column WebView は信頼できない x.com を表示する）
   - `core:*` / プラグインの危険な権限（fs / shell / process など）が不必要に許可されていないか
-- [ ] 新規コマンドを追加した際、対応する capability の許可リスト更新が伴っているか
+- [ ] 新規コマンドを追加した際、`src-tauri/build.rs` の `AppManifest` と capability（`default.json` か `column-webview.json`）の許可リスト更新が伴っているか
+  - tauri 2.x は build.rs に `AppManifest` が無いとアプリ独自コマンドの ACL を検査しない。`AppManifest` が維持されているか確認する
+  - `src-tauri/src/acl_contract.rs` の契約テスト（`generate_handler!` 登録コマンド ⊆ AppManifest ⊆ capability 許可、`column-webview.json` 許可 = inject 実利用コマンド集合）が通るか
+- [ ] `column-webview.json` の `remote.urls` が x.com / twitter.com 系に限定されているか（X 以外の外部サイトにはアプリのコマンドを一切許可しない方針）
+- [ ] メインウィンドウ専用のコマンドが、呼び出し元を `require_main_caller`（`src-tauri/src/commands/mod.rs`）で検証しているか。desktop のカラムは main ウィンドウの子 WebView で `Window::label()` は `"main"` になるため、判定は必ず `tauri::Webview` のラベルで行う
 
 ### 2. CSP / WebView 設定（`src-tauri/tauri.conf.json`）
 
@@ -25,8 +29,9 @@ CLAUDE.mdの「セキュリティルールに従うこと」を、本プロジ�
   - `script-src` に `'unsafe-inline'` や `*` が含まれる → 報告（インラインスクリプト注入・任意スクリプト読み込みのリスク）
   - `connect-src https:` / `img-src https:` のような広い許可 → アプリの実際の通信先と比べて妥当か評価（不要に広ければ Medium 程度で報告）
   - `default-src 'self'` を起点に、各ディレクティブが必要最小限に絞られているか確認
-- [ ] `withGlobalTauri: true` の影響範囲を確認（`window.__TAURI__` が WebView に露出する）。x.com を表示する column WebView から Tauri API が呼べる状態になっていないか（`dangerousRemoteDomainIpcAccess` 等の設定有無）
-- [ ] 外部 URL を WebView にロードする際、信頼ドメインの検証があるか
+- [ ] `withGlobalTauri: true` の影響範囲を確認（`window.__TAURI__` が WebView に露出する）。x.com を表示する column WebView から呼べるコマンドが、capability の `remote.urls` と許可リストで必要最小限に絞られているか（Tauri v2 では v1 の `dangerousRemoteDomainIpcAccess` ではなく capability の `remote` で制御する）
+- [ ] 外部 URL を WebView にロードする際、信頼ドメイン・URL スキームの検証があるか（ポップアップの URL 検証を含む）
+- [ ] カラム / ポップアップ / コンポーズの WebView builder に `.on_new_window(external_link::new_window_handler(app.clone()))` が付いており、http/https/mailto/tel 以外を既定ブラウザへ渡していないか（`src-tauri/src/commands/webview/external_link.rs`）
 
 ### 3. inject スクリプト（`src-tauri/src/inject/_src/`）
 
@@ -46,6 +51,7 @@ x.com のページに JS を注入するため、DOM操作・スクリプト生�
 - [ ] `eval_in_webview` 等、WebView に文字列を流し込むコマンドの入力経路に外部由来の値が混ざらないか
 - [ ] serde のフィールドは `#[serde(rename)]` で正しくマッピングされているか（型不整合による想定外挙動の防止）
 - [ ] desktop / mobile（`#[cfg(desktop)]` / `#[cfg(mobile)]`）双方の実装で同じ検証が入っているか
+- [ ] Android のカラム・ポップアップ（ネイティブ WebView）の JS ブリッジが `addWebMessageListener` の X 系オリジン限定で登録されており、オリジン制約の無い `addJavascriptInterface` に戻っていないか（`BridgeOrigins.kt` / `MainActivity.kt`）
 
 ### 5. パストラバーサル / ファイルアクセス
 
