@@ -15,6 +15,7 @@ import {
   scanReturnTarget,
   searchReturnTarget,
   selectAnchorIds,
+  waitForTimelineReady,
   type ReturnEvent,
   type ReturnState,
   type SearchDeps,
@@ -27,6 +28,7 @@ import {
   const TOAST_ID = "mcx-return-to-last-read-toast";
   const TOAST_DURATION_MS = 3000;
   const NOT_FOUND_MESSAGE = "前回の位置が見つかりませんでした";
+  const PHOTO_PATH_PATTERN = /^\/[^/]+\/status\/\d+\/photo\/\d+/;
   const SCROLL_KEYS = new Set([
     "PageDown",
     "PageUp",
@@ -43,6 +45,11 @@ import {
   let enabled = window.__multiColumnXConfig?.returnToLastReadEnabled ?? false;
   let topSnapshot: string[] = [];
   let searching = false;
+  // 写真閲覧後の位置復元中（待機＋探索）。render() の可視判定には混ぜない
+  // （「探しています…」ボタンを出さないため）。他機能との排他にだけ使う。
+  let photoRestoring = false;
+  // 写真リンクをクリックしたツイートの ID（SPA 遷移を跨いで保持するモジュール内変数）。
+  let pendingPhotoReturnId: string | null = null;
   let lastUserInputAt = 0;
   let searchStartedAt = 0;
   let containerEl: HTMLElement | null = null;
@@ -57,6 +64,14 @@ import {
 
   function isHomePath(): boolean {
     return location.pathname === "/home";
+  }
+
+  function isAnySearching(): boolean {
+    return searching || photoRestoring;
+  }
+
+  function isPhotoPath(pathname: string): boolean {
+    return PHOTO_PATH_PATTERN.test(pathname);
   }
 
   function currentTabName(): string | null {
@@ -214,7 +229,12 @@ import {
     section: Element | null,
     scrollTop: number,
   ): void {
-    if (!section || searching || scrollTop > 1 || !isListTopRendered(section)) {
+    if (
+      !section ||
+      isAnySearching() ||
+      scrollTop > 1 ||
+      !isListTopRendered(section)
+    ) {
       return;
     }
     topSnapshot = selectAnchorIds(readTimelineIds(section));
@@ -231,7 +251,7 @@ import {
     if (
       !section ||
       source !== "scroll" ||
-      searching ||
+      isAnySearching() ||
       state.anchorIds === null ||
       Date.now() - lastUserInputAt >= USER_INPUT_WINDOW_MS
     ) {
@@ -298,37 +318,45 @@ import {
 
   // --- 探索 ---
 
+  function buildSearchDeps(): SearchDeps {
+    const getSection = (): Element | null => timelineSection();
+    const getScroller = (): Element | null => document.scrollingElement;
+    return {
+      readIds: () => {
+        const section = getSection();
+        return section ? readTimelineIds(section) : [];
+      },
+      getScrollTop: () => getScroller()?.scrollTop ?? 0,
+      setScrollTop: (value: number) => {
+        const scroller = getScroller();
+        if (scroller) scroller.scrollTop = value;
+      },
+      getViewportHeight: () => window.innerHeight,
+      getScrollHeight: () => getScroller()?.scrollHeight ?? 0,
+      wait: (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
+      isInterrupted: () => lastUserInputAt > searchStartedAt,
+      scrollIdToTop: (id: string) => {
+        const section = getSection();
+        const scroller = getScroller();
+        if (!section || !scroller) return false;
+        const article = findArticleById(section, id);
+        if (!article) return false;
+        const rect = (article as HTMLElement).getBoundingClientRect();
+        scroller.scrollTop += rect.top - headerOffset();
+        return true;
+      },
+    };
+  }
+
   async function handleClick(): Promise<void> {
-    if (searching || state.anchorIds === null) return;
+    if (isAnySearching() || state.anchorIds === null) return;
 
     searching = true;
     searchStartedAt = Date.now();
     render();
 
     const anchorIds = state.anchorIds;
-    const section = timelineSection();
-    const scrollingElement = document.scrollingElement;
-
-    const deps: SearchDeps = {
-      readIds: () => (section ? readTimelineIds(section) : []),
-      getScrollTop: () => (scrollingElement ? scrollingElement.scrollTop : 0),
-      setScrollTop: (value: number) => {
-        if (scrollingElement) scrollingElement.scrollTop = value;
-      },
-      getViewportHeight: () => window.innerHeight,
-      getScrollHeight: () =>
-        scrollingElement ? scrollingElement.scrollHeight : 0,
-      wait: (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
-      isInterrupted: () => lastUserInputAt > searchStartedAt,
-      scrollIdToTop: (id: string) => {
-        if (!section || !scrollingElement) return false;
-        const article = findArticleById(section, id);
-        if (!article) return false;
-        const rect = (article as HTMLElement).getBoundingClientRect();
-        scrollingElement.scrollTop += rect.top - headerOffset();
-        return true;
-      },
-    };
+    const deps = buildSearchDeps();
 
     try {
       const result = await searchReturnTarget(anchorIds, deps);
@@ -345,6 +373,89 @@ import {
       searching = false;
       render();
     }
+  }
+
+  // --- 写真閲覧後の位置復元 ---
+
+  function isPhotoRestoreEnabled(): boolean {
+    return window.__multiColumnXConfig?.scrollPosRestoreEnabled ?? false;
+  }
+
+  function isTimelineReady(): boolean {
+    if (!isHomePath()) return false;
+    const section = timelineSection();
+    return (
+      !!section &&
+      readTimelineIds(section).length > 0 &&
+      isListTopRendered(section)
+    );
+  }
+
+  async function restoreAfterPhoto(): Promise<void> {
+    const id = pendingPhotoReturnId;
+    if (id === null || isAnySearching()) return;
+
+    photoRestoring = true;
+    searchStartedAt = Date.now();
+    try {
+      const ready = await waitForTimelineReady({
+        isReady: isTimelineReady,
+        shouldAbort: () => lastUserInputAt > searchStartedAt || !isHomePath(),
+        wait: (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
+      });
+      if (ready !== "ready") return;
+      const result = await searchReturnTarget([id], buildSearchDeps());
+      if (result.kind === "notFound") {
+        showToast(NOT_FOUND_MESSAGE);
+      }
+    } catch (e) {
+      console.error("[return_to_last_read]", e);
+    } finally {
+      pendingPhotoReturnId = null;
+      photoRestoring = false;
+    }
+  }
+
+  function startPhotoRestore(): void {
+    restoreAfterPhoto().catch((e) => {
+      console.error("[return_to_last_read]", e);
+    });
+  }
+
+  function handlePhotoLinkClick(event: MouseEvent): void {
+    if (!isPhotoRestoreEnabled() || !isHomePath()) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const link = target.closest("a");
+    if (!link || link.origin !== location.origin) return;
+    if (!isPhotoPath(link.pathname)) return;
+    const article = link.closest("article");
+    if (!article) return;
+    const id = extractArticleStatusId(article);
+    if (id !== null) pendingPhotoReturnId = id;
+  }
+
+  function observeNavigation(): void {
+    let previousPath = location.pathname;
+
+    const onNavigated = (): void => {
+      const returnedFromPhoto = isPhotoPath(previousPath) && isHomePath();
+      previousPath = location.pathname;
+      if (returnedFromPhoto && isPhotoRestoreEnabled()) startPhotoRestore();
+    };
+
+    window.addEventListener("popstate", onNavigated);
+
+    const originalPushState = history.pushState;
+    const originalReplaceState = history.replaceState;
+    history.pushState = function (...args) {
+      originalPushState.apply(history, args);
+      onNavigated();
+    };
+    history.replaceState = function (...args) {
+      originalReplaceState.apply(history, args);
+      previousPath = location.pathname;
+    };
   }
 
   // --- 公開 API / triggerReload のラップ ---
@@ -370,7 +481,7 @@ import {
     window.__multiColumnX.triggerReload = function (
       scrollToTop?: boolean,
     ): void {
-      if (enabled && isHomePath() && !searching) {
+      if (enabled && isHomePath() && !isAnySearching()) {
         const tabName = currentTabName();
         // タブバーが一時的に見つからない（tabName === null）ときに tabChanged を
         // dispatch すると基準が誤って破棄されるため、null のときは dispatch しない。
@@ -414,6 +525,8 @@ import {
       handleKeydown as EventListenerOrEventListenerObject,
       { capture: true, passive: true },
     );
+    window.addEventListener("click", handlePhotoLinkClick, { capture: true });
+    observeNavigation();
     onDomOrScroll("dom");
   }
 

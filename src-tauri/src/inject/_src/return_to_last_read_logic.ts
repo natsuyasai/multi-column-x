@@ -445,3 +445,36 @@ export async function searchReturnTarget(
   deps.setScrollTop(start);
   return { kind: "notFound" };
 }
+
+export const PHOTO_RESTORE_POLL_INTERVAL_MS = 100;
+export const PHOTO_RESTORE_READY_TIMEOUT_MS = 5000;
+
+export interface TimelineReadyDeps {
+  /** タイムラインが表示完了している（探索を始めてよい）か。 */
+  isReady: () => boolean;
+  /** ユーザー入力があった、またはホームでなくなったなど、待機を中止すべきか。 */
+  shouldAbort: () => boolean;
+  wait: (ms: number) => Promise<void>;
+}
+
+/**
+ * タイムラインの表示完了を、固定時間ではなくポーリングで待つ。
+ * 準備完了なら "ready"、中止条件を満たしたら "aborted"、上限まで待っても
+ * 準備できなければ "timeout" を返す。
+ */
+export async function waitForTimelineReady(
+  deps: TimelineReadyDeps,
+  options: { pollIntervalMs?: number; timeoutMs?: number } = {},
+): Promise<"ready" | "aborted" | "timeout"> {
+  const pollIntervalMs =
+    options.pollIntervalMs ?? PHOTO_RESTORE_POLL_INTERVAL_MS;
+  const timeoutMs = options.timeoutMs ?? PHOTO_RESTORE_READY_TIMEOUT_MS;
+  let waited = 0;
+  for (;;) {
+    if (deps.shouldAbort()) return "aborted";
+    if (deps.isReady()) return "ready";
+    if (waited >= timeoutMs) return "timeout";
+    await deps.wait(pollIntervalMs);
+    waited += pollIntervalMs;
+  }
+}

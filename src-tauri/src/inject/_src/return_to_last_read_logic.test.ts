@@ -16,6 +16,7 @@ import {
   INITIAL_RETURN_STATE,
   reduceReturnState,
   searchReturnTarget,
+  waitForTimelineReady,
   type ReturnEvent,
   type ReturnState,
   type SearchDeps,
@@ -1025,6 +1026,92 @@ describe("inject/return_to_last_read_logic", () => {
       expect(readCalls).toBe(4);
       // 後から見えたBの方がscrollTopが大きい（画面内でより下）ためBへフォールバックする
       expect(result).toEqual({ kind: "found", id: "B", fallback: true });
+    });
+  });
+
+  describe("waitForTimelineReady", () => {
+    function makeDeps(opts: {
+      isReady: () => boolean;
+      shouldAbort?: () => boolean;
+    }) {
+      const waits: number[] = [];
+      return {
+        waits,
+        deps: {
+          isReady: opts.isReady,
+          shouldAbort: opts.shouldAbort ?? (() => false),
+          wait: async (ms: number) => {
+            waits.push(ms);
+          },
+        },
+      };
+    }
+
+    it("準備完了ならすぐ ready を返し待機しない", async () => {
+      const { deps, waits } = makeDeps({ isReady: () => true });
+      expect(await waitForTimelineReady(deps)).toBe("ready");
+      expect(waits).toEqual([]);
+    });
+
+    it("途中で準備完了になれば ready を返す", async () => {
+      let calls = 0;
+      const { deps, waits } = makeDeps({ isReady: () => ++calls > 3 });
+      expect(await waitForTimelineReady(deps)).toBe("ready");
+      expect(waits).toEqual([100, 100, 100]);
+    });
+
+    it("中止条件を満たしたら aborted を返す", async () => {
+      const { deps } = makeDeps({
+        isReady: () => false,
+        shouldAbort: () => true,
+      });
+      expect(await waitForTimelineReady(deps)).toBe("aborted");
+    });
+
+    it("準備完了でも中止条件が先に成立していれば aborted を返す", async () => {
+      const { deps } = makeDeps({
+        isReady: () => true,
+        shouldAbort: () => true,
+      });
+      expect(await waitForTimelineReady(deps)).toBe("aborted");
+    });
+
+    it("待機中に中止条件を満たしたら aborted を返し、以降は待たない", async () => {
+      let calls = 0;
+      const { deps, waits } = makeDeps({
+        isReady: () => false,
+        shouldAbort: () => ++calls > 2,
+      });
+      expect(await waitForTimelineReady(deps)).toBe("aborted");
+      expect(waits).toEqual([100, 100]);
+    });
+
+    it("上限を超えても準備できなければ timeout を返す", async () => {
+      const { deps, waits } = makeDeps({ isReady: () => false });
+      expect(await waitForTimelineReady(deps)).toBe("timeout");
+      expect(waits.length).toBe(50);
+    });
+
+    it("上限を指定した場合はその時間で timeout を返す", async () => {
+      const { deps, waits } = makeDeps({ isReady: () => false });
+      expect(
+        await waitForTimelineReady(deps, {
+          pollIntervalMs: 10,
+          timeoutMs: 30,
+        }),
+      ).toBe("timeout");
+      expect(waits).toEqual([10, 10, 10]);
+    });
+
+    it("ready 以外の戻り値は ready と区別できる（後続処理を呼ばない判定に使える）", async () => {
+      const aborted = await waitForTimelineReady(
+        makeDeps({ isReady: () => false, shouldAbort: () => true }).deps,
+      );
+      const timedOut = await waitForTimelineReady(
+        makeDeps({ isReady: () => false }).deps,
+      );
+      expect(aborted).not.toBe("ready");
+      expect(timedOut).not.toBe("ready");
     });
   });
 });
