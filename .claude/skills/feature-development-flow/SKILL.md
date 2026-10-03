@@ -60,6 +60,8 @@ digraph flow {
 
 ## 横断ルール（全フェーズ共通）
 
+- **ブランチ運用**: 最新化した `develop` から作業ブランチを切り、PR は **`develop` 宛て**に作成する（`main` 宛てにしない。`main` へは `version-release` でのみ反映する）。`superpowers:finishing-a-development-branch` や既定の PR 作成手順は `main` を前提にしがちなので、base を必ず `develop` に指定する。
+- **PR 本文**: `.github/pull_request_template.md` に従い、ユーザー向けの変更点を `## リリースノート` に箇条書きする（リリースノートはこのセクションから自動生成され、カテゴリは PR タイトル接頭辞 `feat:` / `fix:` / その他で決まる）。内部的な変更のみの PR はセクションを空にする。
 - **同様のミスの指摘が複数回発生したら、必ず `CLAUDE.md` に再発防止ルールを追記する。** → `record-recurring-mistakes`
 - セキュリティに関わる変更（WebView/IPC/inject/capabilities/外部入力）では `security-review` を併用する。
 - **各フェーズの手順は途中で打ち切らず、定義された順番通り最後まで実行する。** → `skill-order-discipline`
@@ -68,6 +70,8 @@ digraph flow {
 
 - **desktop / mobile**: 同名コマンドでも `#[cfg(desktop)]` / `#[cfg(mobile)]` で実装が異なる。両方確認する。
 - **inject スクリプト**: `src-tauri/src/inject/_src/` を変更したら `npm run build:inject`。ビルド済み `.js` は編集禁止。inject の開発手順は `inject-script-dev` スキルに従う。
+- **Tauri コマンドの追加・削除**: `src-tauri/build.rs` の `AppManifest` と capability（`default.json` / `column-webview.json`）の更新が必須（`acl_contract.rs` の契約テストで検出される）。
+- **領域別の設計ノート**: 変更対象に対応する `docs/development/*-notes.md`（CLAUDE.md「アーキテクチャ上の重要な制約」が参照先を示す）を着手前に読む。
 - **serde 命名**: JS側 camelCase には `#[serde(rename)]` が必須。
 - **Android**: `MainActivity.kt` のメソッド変更時は ProGuard keep ルールを同期（リリースビルドで動作確認）。
 
@@ -76,7 +80,7 @@ digraph flow {
 - 各フェーズの完了判定とフェーズ間のゲート管理
 - フェーズ1.5での Gherkin 仕様の承認取得と、シナリオ↔テスト/手動項目の漏れチェック
 - フェーズ2でのプラン確定（複数案はユーザーに選択を確認）
-- フェーズ3では**実装そのものをサブエージェントに委譲**し、自身はレビューと進行管理に徹する
+- フェーズ3では**実装そのものをサブエージェント（`model: sonnet`）に委譲**し、自身はレビュー・進行管理・コミット・品質チェック実行・ドキュメント整備に徹する
 - 横断ルールの監視（同じ指摘の再発をCLAUDE.mdに反映）
 
 ## 禁止事項
@@ -85,7 +89,8 @@ digraph flow {
 - Gherkin 仕様が未承認のまま（対象外の変更を除き）実装プランや実装に進むこと
 - `@unit` / `@integration` シナリオにテストがない、または `@manual` シナリオが手動テスト項目に出力されていない状態で「完了」と報告すること
 - プラン未確定のまま実装に着手すること
-- 作業ブランチを切らずに（mainで）実装を進めること
+- 作業ブランチを切らずに（develop / main で）実装を進めること
+- PR を `main` 宛てに作成すること（`version-release` を除く）
 - メインエージェントが自分で実装を書き進めてしまうこと（委譲が原則）
 - TDDのRed-Green-Refactorを飛ばすこと（ただしGherkinから導出するテストを「実装後作成」で進める場合を除く）
 - 完了処理（format/lint/test/build）を省略して「完了」と報告すること

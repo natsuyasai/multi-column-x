@@ -10,7 +10,7 @@ argument-hint: "明確にしたい要求や対応内容"
 
 ## 進め方
 
-1. **要求の理解**: ユーザーの要求と関連コードを読み、何を実現したいのかを把握する。広範囲の調査が必要なら `Explore` / `general-purpose` サブエージェントで既存実装・パターンを調べる。
+1. **要求の理解**: ユーザーの要求と関連コードを読み、何を実現したいのかを把握する。コード調査はまず CodeGraph（`codegraph_explore`）で対象シンボルの定義・呼び出し元・影響範囲を確認し、必要最小限のファイルだけを読む（CLAUDE.md）。変更領域に対応する `docs/development/*-notes.md` があれば読み、既知の設計判断・落とし穴を把握する。
 2. **曖昧点・不足の洗い出し**: 下記チェックリストで欠けている情報や複数解釈できる箇所を特定する。
 3. **質問**: 不明点は `AskUserQuestion` で確認する。仕様や指示に疑問があれば作業を中断して質問する（CLAUDE.md基本ルール）。
 4. **要求の確定**: 合意した要求を箇条書きで言語化し、ユーザーに認識合わせをする。
@@ -29,6 +29,8 @@ argument-hint: "明確にしたい要求や対応内容"
 - **desktop / mobile**: Rust側は `#[cfg(desktop)]` / `#[cfg(mobile)]` で分岐する。対象がどちらのプラットフォームか、両方かを確認する。
 - **WebView / IPC**: カラムWebViewやinjectスクリプトに影響するか。serdeのフィールド命名（camelCaseは `#[serde(rename)]` 必須）に関わるか。
 - **Android**: MainActivity のメソッド変更を伴うなら ProGuard keep ルールの同期が必要になる（CLAUDE.md参照）。
+- **IPC / ACL**: Tauri コマンドの追加・削除を伴うか（伴う場合は build.rs の `AppManifest` と capability の更新が必要）。
+- **設定の既定値**: 設定項目の追加・既定値変更を伴うか（Rust の `impl Default` / TS の既定値 / `contracts/default-settings.json` の3箇所同期が必要）。
 
 ## 完了条件
 

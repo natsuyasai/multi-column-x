@@ -51,11 +51,15 @@ npm run build
 - **`src-tauri/` を変更した場合**:
 
   ```bash
+  npm run build:inject   # 先に必須（下記）
   npm run lint:rust
   cargo test --manifest-path src-tauri/Cargo.toml
   ```
 
-  `lint:rust` は `cargo clippy --all-targets -- -D warnings` で、テスト関数名の ASCII 大文字（`non_snake_case`）も検出する。
+  - `lint:rust` は `cargo clippy --all-targets -- -D warnings` で、テスト関数名の ASCII 大文字（`non_snake_case`）も検出する。
+  - Rust 側は `include_str!` で gitignore 済みのビルド済み inject `.js` を埋め込むため、**`npm run build:inject` を実行していない状態（新規 worktree 等）では clippy / cargo test がコンパイルエラーになる**。
+  - CI の `rust` ジョブは ubuntu のみで実行される。`#[cfg(windows)]` / `#[cfg(target_os = "macos")]` 等のコードパスを変更した場合は、ローカルでの clippy / cargo test が唯一の検証手段になる。
+  - コマンドを追加・削除した場合は `acl_contract.rs` の契約テストが `cargo test` に含まれる（build.rs の `AppManifest` と capability の更新漏れを検出する）。
 
 - **Kotlin/Android を変更した場合**:
 
