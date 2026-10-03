@@ -1,4 +1,4 @@
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WEBVIEW_SCRIPTS } from "@/constants/ipc";
 import type { ColumnBounds } from "@/lib/gridLayout";
@@ -49,7 +49,9 @@ describe("useColumnNavigation の保留ジャンプ", () => {
       dialogOpen: false,
     });
 
-    result.current.jumpToColumnWhenReady("new");
+    act(() => {
+      result.current.jumpToColumnWhenReady("new");
+    });
     rerender({
       columns: [old],
       columnBounds: { old: bounds(0) },
@@ -74,7 +76,9 @@ describe("useColumnNavigation の保留ジャンプ", () => {
       dialogOpen: false,
     });
 
-    result.current.jumpToColumnWhenReady("new");
+    act(() => {
+      result.current.jumpToColumnWhenReady("new");
+    });
     rerender({
       columns: [old, added],
       columnBounds: { old: bounds(0), new: bounds(320) },
@@ -98,7 +102,9 @@ describe("useColumnNavigation の保留ジャンプ", () => {
       dialogOpen: true,
     });
 
-    result.current.jumpToColumnWhenReady("new");
+    act(() => {
+      result.current.jumpToColumnWhenReady("new");
+    });
     rerender({ columns, columnBounds, dialogOpen: true });
     expect(scrollbar.scrollLeft).toBe(0);
 
@@ -137,7 +143,9 @@ describe("useColumnNavigation の保留ジャンプ", () => {
       dialogOpen: false,
     });
 
-    result.current.jumpToColumnWhenReady("new");
+    act(() => {
+      result.current.jumpToColumnWhenReady("new");
+    });
     rerender({
       columns,
       columnBounds: { old: bounds(0), new: bounds(320) },
