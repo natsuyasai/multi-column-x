@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { isAutoReloadSupported } from "@/lib/autoReloadTarget";
+import { nextColumnSettingsOnSmallImageChange } from "@/lib/scrollRestoreSetting";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import {
   COLUMN_LABEL_MAX_LENGTH,
@@ -69,7 +70,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const updateSetting = <K extends keyof ColumnSettings>(
     key: K,
     value: ColumnSettings[K],
-  ) => setSettings((s) => ({ ...s, [key]: value }));
+  ) =>
+    setSettings((s) =>
+      key === "smallImageEnabled"
+        ? nextColumnSettingsOnSmallImageChange(s, value as boolean)
+        : { ...s, [key]: value },
+    );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

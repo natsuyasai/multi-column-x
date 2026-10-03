@@ -82,16 +82,18 @@ export const ColumnDefaultsSections: React.FC<ColumnDefaultsSectionsProps> = ({
           カスタムメニューボタンを表示する
         </label>
       )}
-      <label className={styles.checkLabel}>
-        <input
-          type="checkbox"
-          checked={draft.defaultScrollPosRestoreEnabled}
-          onChange={(e) =>
-            set("defaultScrollPosRestoreEnabled", e.target.checked)
-          }
-        />
-        写真閲覧後のスクロール位置を復元する
-      </label>
+      {draft.smallImageEnabled && (
+        <label className={styles.checkLabel}>
+          <input
+            type="checkbox"
+            checked={draft.defaultScrollPosRestoreEnabled}
+            onChange={(e) =>
+              set("defaultScrollPosRestoreEnabled", e.target.checked)
+            }
+          />
+          写真閲覧後のスクロール位置を復元する
+        </label>
+      )}
     </section>
 
     <section className={styles.section}>
