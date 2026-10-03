@@ -149,10 +149,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 settings={settings}
                 updateSetting={updateSetting}
               />
-              <NotificationSection
-                settings={settings}
-                updateSetting={updateSetting}
-              />
+              {!isMobile && (
+                <NotificationSection
+                  settings={settings}
+                  updateSetting={updateSetting}
+                />
+              )}
               <NgWordsSection
                 text={lineListTexts.ngWords}
                 error={lineListErrors.ngWords}
