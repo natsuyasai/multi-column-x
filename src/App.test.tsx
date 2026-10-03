@@ -35,6 +35,39 @@ vi.mock("@tauri-apps/plugin-log", () => ({
   error: vi.fn().mockResolvedValue(undefined),
 }));
 
+// 実フックを素通しし、配線の検証に必要な箇所だけ差し替える
+const hookSpies = vi.hoisted(() => ({
+  jumpToColumnWhenReady: vi.fn(),
+  addColumnResult: { value: undefined as boolean | undefined },
+}));
+
+vi.mock("./hooks/useColumnNavigation", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("./hooks/useColumnNavigation")>();
+  return {
+    ...actual,
+    useColumnNavigation: (
+      args: Parameters<typeof actual.useColumnNavigation>[0],
+    ) => ({
+      ...actual.useColumnNavigation(args),
+      jumpToColumnWhenReady: hookSpies.jumpToColumnWhenReady,
+    }),
+  };
+});
+
+vi.mock("./hooks/useColumns", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./hooks/useColumns")>();
+  return {
+    ...actual,
+    useColumns: () => {
+      const result = actual.useColumns();
+      const forced = hookSpies.addColumnResult.value;
+      if (forced === undefined) return result;
+      return { ...result, handleAddColumn: async () => forced };
+    },
+  };
+});
+
 const mockInvoke = vi.mocked(invoke);
 const mockPlatform = vi.mocked(platform);
 
@@ -728,6 +761,72 @@ describe("App (フック抽出前の特性テスト)", () => {
         label: expect.stringContaining("col-1"),
         script: WEBVIEW_SCRIPTS.applyColumnScale("default"),
       });
+    });
+  });
+
+  describe("カラム追加後のジャンプ", () => {
+    beforeEach(() => {
+      hookSpies.addColumnResult.value = undefined;
+    });
+
+    afterEach(() => {
+      hookSpies.addColumnResult.value = undefined;
+    });
+
+    const openDialogAndSubmit = (openTitle: string) => {
+      fireEvent.click(screen.getByTitle(openTitle));
+      fireEvent.click(screen.getByRole("button", { name: "追加" }));
+    };
+
+    it("デスクトップでAddColumnDialogからカラムを追加すると新カラムへジャンプする", async () => {
+      useAppStore.setState({ columns: [column] });
+      render(<App />);
+
+      openDialogAndSubmit("カラムを追加 (Ctrl+N)");
+
+      await waitFor(() => {
+        expect(hookSpies.jumpToColumnWhenReady).toHaveBeenCalledTimes(1);
+      });
+      const addedId = useAppStore
+        .getState()
+        .columns.find((c) => c.id !== column.id)?.id;
+      expect(addedId).toBeDefined();
+      expect(hookSpies.jumpToColumnWhenReady).toHaveBeenCalledWith(addedId);
+    });
+
+    it("モバイルでカラムを追加してもデスクトップ用の横スクロールジャンプは行わない", async () => {
+      mockPlatform.mockReturnValue("android");
+      useAppStore.setState({ columns: [column], isMobile: true });
+      render(<App />);
+
+      fireEvent.click(screen.getByTitle("メニュー表示の切り替え"));
+      openDialogAndSubmit("カラムを追加");
+
+      await waitFor(() => {
+        expect(useAppStore.getState().columns).toHaveLength(2);
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(hookSpies.jumpToColumnWhenReady).not.toHaveBeenCalled();
+    });
+
+    it("カラム追加に失敗したときは新カラムへジャンプしない", async () => {
+      hookSpies.addColumnResult.value = false;
+      useAppStore.setState({ columns: [column] });
+      render(<App />);
+
+      openDialogAndSubmit("カラムを追加 (Ctrl+N)");
+
+      await waitFor(() => {
+        expect(
+          screen.queryByRole("button", { name: "追加" }),
+        ).not.toBeInTheDocument();
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(hookSpies.jumpToColumnWhenReady).not.toHaveBeenCalled();
     });
   });
 

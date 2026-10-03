@@ -109,10 +109,11 @@ export function useColumns() {
 
   // カラム追加
   const handleAddColumn = useCallback(
-    async (column: Column) => {
-      if (!containerRef.current) return;
+    // store へ追加できたら true、追加前に中断したら false を返す
+    async (column: Column): Promise<boolean> => {
+      if (!containerRef.current) return false;
       const dataDirectory = await resolveColumnDataDirectory(column, accounts);
-      if (dataDirectory === undefined) return;
+      if (dataDirectory === undefined) return false;
 
       addColumn(column);
 
@@ -124,10 +125,9 @@ export function useColumns() {
           dataDirectory,
           "handleAddColumn:createColumnWebview(mobile)",
         );
-        if (activeColumnId === null) {
-          await setActiveColumn(column.id);
-        }
-        return;
+        // 追加したカラムを常にアクティブにする
+        await setActiveColumn(column.id);
+        return true;
       }
 
       const containerHeight = containerRef.current.clientHeight;
@@ -144,13 +144,14 @@ export function useColumns() {
 
       setColumnBounds(bounds);
       const b = bounds[column.id];
-      if (!b) return;
+      if (!b) return true;
 
       await createColumnWebview(column, dataDirectory, b).catch(
         logError("handleAddColumn:createColumnWebview"),
       );
+      return true;
     },
-    [accounts, addColumn, activeColumnId, setActiveColumn, setColumnBounds],
+    [accounts, addColumn, setActiveColumn, setColumnBounds],
   );
 
   // ダイアログ表示時に全カラムWebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）

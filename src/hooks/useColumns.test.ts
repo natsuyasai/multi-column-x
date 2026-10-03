@@ -853,6 +853,52 @@ describe("useColumns handleAddColumn", () => {
     ).toBe(false);
   });
 
+  it("カラム追加に成功すると真を返す（デスクトップ）", async () => {
+    const column = makeColumn({ id: "col-new" });
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+
+    let added: boolean | undefined;
+    await act(async () => {
+      added = await result.current.handleAddColumn(column);
+    });
+
+    expect(added).toBe(true);
+    expect(useAppStore.getState().columns.map((c) => c.id)).toEqual([
+      "col-new",
+    ]);
+  });
+
+  it("データディレクトリを解決できないカラムを追加すると偽を返しカラムは追加されない", async () => {
+    const orphanColumn = makeColumn({
+      id: "col-orphan",
+      accountId: "acc-missing",
+    });
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+
+    let added: boolean | undefined;
+    await act(async () => {
+      added = await result.current.handleAddColumn(orphanColumn);
+    });
+
+    expect(added).toBe(false);
+    expect(useAppStore.getState().columns).toEqual([]);
+  });
+
+  it("コンテナが未設定のときにカラムを追加すると偽を返しカラムは追加されない", async () => {
+    const column = makeColumn({ id: "col-new" });
+    const { result } = renderHook(() => useColumns());
+
+    let added: boolean | undefined;
+    await act(async () => {
+      added = await result.current.handleAddColumn(column);
+    });
+
+    expect(added).toBe(false);
+    expect(useAppStore.getState().columns).toEqual([]);
+  });
+
   it("デスクトップでカラムを追加するとトップバーの高さを考慮した位置に作成される", async () => {
     useAppStore.setState({ topBarExpanded: true });
     const column = makeColumn({ id: "col-new" });
@@ -943,6 +989,74 @@ describe("useColumns handleAddColumn mobile", () => {
     expect((createCall?.[1] as { args: { x: number } }).args.x).toBe(
       OFFSCREEN.MOBILE_X,
     );
+  });
+
+  it("カラム追加に成功すると真を返す（モバイル）", async () => {
+    const column = makeColumn({ id: "col-new" });
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+
+    let added: boolean | undefined;
+    await act(async () => {
+      added = await result.current.handleAddColumn(column);
+    });
+
+    expect(added).toBe(true);
+    expect(useAppStore.getState().columns.map((c) => c.id)).toEqual([
+      "col-new",
+    ]);
+  });
+
+  it("モバイルでアクティブなカラムが無いときにカラムを追加すると新カラムがアクティブになる", async () => {
+    const column = makeColumn({ id: "col-new" });
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    expect(result.current.activeColumnId).toBeNull();
+
+    await act(async () => {
+      await result.current.handleAddColumn(column);
+    });
+
+    expect(result.current.activeColumnId).toBe("col-new");
+  });
+
+  it("モバイルで別のカラムがアクティブなときにカラムを追加しても新カラムへ切り替わる", async () => {
+    const existing = makeColumn({ id: "col-existing" });
+    useAppStore.setState({ columns: [existing] });
+    const column = makeColumn({ id: "col-new", order: 1, gridCol: 2 });
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    await act(async () => {
+      await result.current.setActiveColumn("col-existing");
+    });
+    expect(result.current.activeColumnId).toBe("col-existing");
+
+    await act(async () => {
+      await result.current.handleAddColumn(column);
+    });
+
+    expect(result.current.activeColumnId).toBe("col-new");
+  });
+
+  it("カラム追加が失敗したときはアクティブなカラムが変わらない", async () => {
+    const existing = makeColumn({ id: "col-existing" });
+    useAppStore.setState({ columns: [existing] });
+    const column = makeColumn({ id: "col-new", order: 1, gridCol: 2 });
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    await act(async () => {
+      await result.current.setActiveColumn("col-existing");
+    });
+    mockResolveColumnDataDirectory.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.handleAddColumn(column);
+    });
+
+    expect(result.current.activeColumnId).toBe("col-existing");
+    expect(useAppStore.getState().columns.map((c) => c.id)).toEqual([
+      "col-existing",
+    ]);
   });
 });
 
