@@ -138,3 +138,12 @@ Chrome 拡張だけでは、カラムの寸法など実アプリ固有の条件�
 ### 未確認事項
 
 - フォロー中タブでのボタン表示から戻り動作までの通し確認（検証時は新着が出なかった）、Android のボタン位置（`__mobileBottomInset`・スワイプバーとの重なり）、ヘッダー非表示設定時の上端位置、ライト/ダークでの見え方は手動テストで確認する。
+
+## 写真閲覧後のスクロール位置復元（`return_to_last_read.ts` に統合）
+
+旧 `scroll_pos_restore.ts`（localStorage に写真 URL を保存し、500px ずつスクロールしてリンクを探す独自処理）は廃止し、`return_to_last_read.ts` に統合した（2026-10-03）。
+
+- 設定は `scrollPosRestoreEnabled`（カラム設定）。「画像を縮小表示」が ON のときだけ UI に表示し、縮小を OFF にすると復元設定も false に書き換える。Rust 側でも `scroll_pos_restore_enabled && small_image_enabled` を実効値として config（`window.__multiColumnXConfig.scrollPosRestoreEnabled`）に渡す（旧データ保護）。注入は config 経由で、ボタン機能（`returnToLastReadEnabled`）とは独立。config は WebView 生成時の値で、設定適用での即時反映はしない（旧実装も同じ）。
+- ホームで写真リンクをクリックしたとき、`closest("article")` のステータス ID をモジュール内変数 `pendingPhotoReturnId` に保存する。写真 → ホームの遷移（popstate / pushState）を検知したら、`waitForTimelineReady`（100ms ポーリング・上限 5 秒、ホーム離脱 or ユーザー入力で中止）でタイムライン表示を待ち、`searchReturnTarget([id])` で上端に合わせる。見つからなければ「前回の位置が見つかりませんでした」のトースト。
+- 写真復元中は `photoRestoring` を立てて他機能と排他するが、`render()` の可視判定には混ぜない（「探しています…」ボタンを出さないため）。
+- 未検証（実機）: X 実 DOM での article からの ID 取得、5 秒上限の十分性、ネイティブ WebView ごとの pushState/popstate の挙動。

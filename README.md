@@ -202,9 +202,8 @@ multi-column-x/
             │   ├── popup_toolbar.ts  # ポップアップツールバー（アカウント切替）
             │   ├── popup_video_autoplay.ts # ポップアップ動画の自動再生
             │   ├── repost_hide_matcher.ts # 指定ユーザーのリポスト非表示判定
-            │   ├── return_to_last_read.ts / return_to_last_read_logic.ts # 前回の境目へ戻るボタン
+            │   ├── return_to_last_read.ts / return_to_last_read_logic.ts # 前回の境目へ戻るボタン・写真閲覧後の位置復元
             │   ├── scroll_event.ts   # 横スクロールイベントを main WebView に中継
-            │   ├── scroll_pos_restore.ts # 写真閲覧後のスクロール位置復元
             │   ├── sidebar_hide.ts   # x.com サイドバー非表示
             │   ├── small_image.ts    # 画像縮小表示
             │   ├── tab_selector.ts   # ホームタブ選択
