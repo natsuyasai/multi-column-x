@@ -112,6 +112,15 @@ Chrome 拡張だけでは、カラムの寸法など実アプリ固有の条件�
 - **閉じるボタン**: 戻るボタンの右隣に丸い「×」を置く（2 つをコンテナ `#mcx-return-to-last-read-container` にまとめ、表示/非表示はコンテナ単位）。押すと戻らずに消え、境目は消化扱いになる（次の更新で新しい基準を記録）。探索中は押せない。
 - **消化**: ボタンで戻ったとき、閉じるボタンで閉じたとき、または**直前 1000ms 以内のユーザー入力（wheel/touch/mousedown/スクロール系キー）を伴うスクロール**で戻り先が画面に入ったとき。自前のスクロール（`scrollTop = 0`・探索）で消化・中断しないための条件。未消化の間は次の更新で基準を上書きしない。タブ名が変わったら破棄（タブ名が一時的に取れない `null` のときは破棄しない）。
 - **更新の検知**: `window.__multiColumnX.triggerReload` をラップする。そのため `build_init_script` で **`auto_reload` より後ろに連結**する必要がある（Rust のテストで順序を検証）。
+- **x.com 上の直接更新操作の検知**（2026-10-03）: アプリ経由でなくても、次の操作で `reload` を記録する。いずれも `recordReload()`（`triggerReload` のラップと共通）を呼び、`window` の capture 相・passive リスナーで X 自身のハンドラより先に動く。判定の純粋部分は `return_to_last_read_logic.ts`（`isRefreshClickTarget` / `isPullRefreshGesture` / `isRefreshShortcut`）。
+  - 新着ピルのクリック: タイムライン内で投稿（`article`）を含まないセルの `button[type="button"]`（`UserCell` を除く）。**`auto_reload.ts` の `findNewPostsButton` と同じ条件を複製している**ため、X の DOM 変更時は両方を直す。
+  - 選択中タブの再クリック: `aria-selected="true"` かつ `aria-expanded` を持たない `div[role="tab"]`（`reselectTab` と同じ条件）。フォロー中タブは `aria-expanded` を持ち、クリックはドロップダウンを開くだけで更新ではないため対象外。未選択タブのクリックは更新ではなく、タブ切り替えとして既存の `tabChanged` が基準を破棄する。
+  - プルダウン更新（モバイル）: 1 本指で先頭（`scrollTop <= 1`）から始まり先頭のまま終わり、下方向へ `PULL_REFRESH_MIN_DISTANCE_PX`（暫定 80px）以上、かつ縦移動が横移動より大きい `touchstart` → `touchend`。**80px は未計測の暫定値**。長すぎると基準が記録されずボタンが出ない。短すぎても新着が無ければボタンは出ない（`topUpdated` が判定する）ので、迷ったら短めに倒す。
+  - 更新ショートカット: 修飾キー無しの `.`（X の「新しいポストを読み込む」）。`input` / `textarea` / `select` / `contenteditable` / `role="textbox"` の中では対象外。
+  - **アプリ自身の更新との二重記録は `isTrusted` で弾かず、reducer の冪等性に任せる**。`auto_reload.ts` の合成 `.click()` もこれらのリスナーに届くが、`reload` は `anchorIds === null || consumed` のときしか記録されないため、同じ更新の 2 回目は無視される。
+  - 探索中（`isAnySearching()`）・ホーム以外・設定 OFF のときは記録しない（`recordReload()` のガード）。設定 OFF の間に記録すると、後で ON にしたときに古い基準が残る。
+  - 落とし穴: `touchstart` は `handleUserInput` により「直近のユーザー入力」として扱われる。そのためプルダウン直後の `scroll` で基準側の投稿が画面内に見えていると `targetSeenByUser` で消化され、ボタンは出ない（基準側が見えているので境目は分かる、という既存の消化ルールどおり）。結合テストで否定系を書くときは、基準側を画面外に置かないと「誤って記録されてもボタンが出ない」空振りのテストになる（実際に発生した）。
+  - 未確認（実機・実 DOM）: プルダウンの発火距離、X が `.` を受け付けるフォーカス状態、Android でのピル・タブのタッチ操作が `click` として届くこと。
 - **描画の差分更新**: ボタン・トーストの `textContent` などは値が変わるときだけ代入する。無条件に代入すると、自分の描画が共有 DOM 監視ハブ（`document.body` の childList+subtree）に拾われて再描画を呼ぶ無限ループになる（テストでハングして発覚）。
 
 ### 探索パラメータ（実測。変更時は再計測すること）
