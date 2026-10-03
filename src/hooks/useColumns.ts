@@ -124,9 +124,8 @@ export function useColumns() {
           dataDirectory,
           "handleAddColumn:createColumnWebview(mobile)",
         );
-        if (activeColumnId === null) {
-          await setActiveColumn(column.id);
-        }
+        // 追加したカラムを常にアクティブにする
+        await setActiveColumn(column.id);
         return;
       }
 
@@ -150,7 +149,7 @@ export function useColumns() {
         logError("handleAddColumn:createColumnWebview"),
       );
     },
-    [accounts, addColumn, activeColumnId, setActiveColumn, setColumnBounds],
+    [accounts, addColumn, setActiveColumn, setColumnBounds],
   );
 
   // ダイアログ表示時に全カラムWebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）

@@ -944,6 +944,58 @@ describe("useColumns handleAddColumn mobile", () => {
       OFFSCREEN.MOBILE_X,
     );
   });
+
+  it("モバイルでアクティブなカラムが無いときにカラムを追加すると新カラムがアクティブになる", async () => {
+    const column = makeColumn({ id: "col-new" });
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    expect(result.current.activeColumnId).toBeNull();
+
+    await act(async () => {
+      await result.current.handleAddColumn(column);
+    });
+
+    expect(result.current.activeColumnId).toBe("col-new");
+  });
+
+  it("モバイルで別のカラムがアクティブなときにカラムを追加しても新カラムへ切り替わる", async () => {
+    const existing = makeColumn({ id: "col-existing" });
+    useAppStore.setState({ columns: [existing] });
+    const column = makeColumn({ id: "col-new", order: 1, gridCol: 2 });
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    await act(async () => {
+      await result.current.setActiveColumn("col-existing");
+    });
+    expect(result.current.activeColumnId).toBe("col-existing");
+
+    await act(async () => {
+      await result.current.handleAddColumn(column);
+    });
+
+    expect(result.current.activeColumnId).toBe("col-new");
+  });
+
+  it("カラム追加が失敗したときはアクティブなカラムが変わらない", async () => {
+    const existing = makeColumn({ id: "col-existing" });
+    useAppStore.setState({ columns: [existing] });
+    const column = makeColumn({ id: "col-new", order: 1, gridCol: 2 });
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    await act(async () => {
+      await result.current.setActiveColumn("col-existing");
+    });
+    mockResolveColumnDataDirectory.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.handleAddColumn(column);
+    });
+
+    expect(result.current.activeColumnId).toBe("col-existing");
+    expect(useAppStore.getState().columns.map((c) => c.id)).toEqual([
+      "col-existing",
+    ]);
+  });
 });
 
 describe("useColumns desktop recreateColumnWebview", () => {
