@@ -157,12 +157,15 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
    * 基準はページ読み込み（IIFE 再実行）でリセットされ、更新をまたいで引き継がれる。
    * 仮想リストの表示入れ替えで古いポストが出入りしても、基準より新しいものが
    * 現れない限り新着とは扱わない。
+   * 基準が無い間の最初の取り込み（起動直後・ページ読み込み直後の取得分）は
+   * 基準になるだけで新着とは扱わない。
    */
   interface NewnessTracker {
     /**
      * section の最大値を基準へ取り込む（基準 = max(基準, 現在の最大値)）。
-     * 取り込み前の基準より新しいものが section にあったときだけ true を返す。
-     * section に読み取れる値が無ければ何もせず false。
+     * 基準が既にある状態で、それより新しいものが section に現れたときだけ true を返す。
+     * 基準がまだ無いときは値を基準に取り込むだけで false を返す。
+     * section に読み取れる値が無ければ何もせず false（基準も作らない）。
      */
     absorb(section: Element): boolean;
   }
@@ -176,7 +179,11 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
       absorb(section: Element): boolean {
         const current = readMax(section);
         if (current === null) return false;
-        if (session !== null && compare(current, session) <= 0) return false;
+        if (session === null) {
+          session = current;
+          return false;
+        }
+        if (compare(current, session) <= 0) return false;
         session = current;
         return true;
       },
@@ -202,11 +209,14 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
     return isNotificationsPage() ? notificationTimeTracker : statusIdTracker;
   }
 
-  /** 現在表示中のポストを「見たことがある」ものとして基準へ取り込む。 */
-  function primeNewnessBaseline(): void {
+  /**
+   * 現在表示中のポストを「見たことがある」ものとして基準へ取り込む。
+   * 基準より新しいものが表示されていた（= 前回の監視窓の外で入った新着）ときだけ true。
+   */
+  function primeNewnessBaseline(): boolean {
     const section = document.querySelector("section[aria-labelledby]");
-    if (!section) return;
-    getNewnessTracker().absorb(section);
+    if (!section) return false;
+    return getNewnessTracker().absorb(section);
   }
 
   /**
@@ -362,7 +372,9 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
 
     scrollRoundtripRunning = true;
     // 往復で取得された結果が基準に混ざらないよう、先に基準を確定する。
-    primeNewnessBaseline();
+    // 通知ページでは X が自前で取得するため、前回の監視窓の外で入った新着が
+    // ここで初めて基準より新しいものとして見つかる。基準へ取り込む前に報告する。
+    if (primeNewnessBaseline()) reportNewPostsCount(1);
     scrollingElement.scrollTop = Math.max(
       scrollingElement.scrollTop,
       getScrollRoundtripDistance(),

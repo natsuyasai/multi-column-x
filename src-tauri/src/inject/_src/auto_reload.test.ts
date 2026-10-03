@@ -411,7 +411,7 @@ describe("inject/auto_reload", () => {
     expect(clickSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("更新前にarticleが存在しない場合更新後に新しいstatus IDのarticleが出現すると報告される", async () => {
+  it("更新前にarticleが存在しない場合更新後に最初に出現したarticleは基準になるだけで報告されない", async () => {
     addTab(true, false);
     const section = addSection();
     // 最初は article が無い
@@ -421,15 +421,13 @@ describe("inject/auto_reload", () => {
 
     triggerReload();
 
-    // 更新後に新しいstatus IDのarticleが出現
+    // 見たことのある最新がまだ無いので、最初に出現したarticleは基準になるだけ
     addArticleWithStatusId(section, "999");
 
     // MutationObserver の callback 実行を待つ
     await vi.runAllTimersAsync();
 
-    expect(invokeMock).toHaveBeenCalledWith("report_new_posts_count", {
-      count: 1,
-    });
+    expect(invokeMock).not.toHaveBeenCalled();
   });
 
   it("MutationObserver がタイムアウト（30秒）で打ち切られるとその後の変化は報告されない", async () => {
@@ -1310,6 +1308,106 @@ describe("inject/auto_reload 通知ページの更新", () => {
     await vi.advanceTimersByTimeAsync(0);
 
     expectReportedNewPostOnce();
+  });
+
+  describe("更新の開始時の新着判定", () => {
+    /** 往復の待ち時間と、続く監視窓（30 秒）を流し切る。 */
+    async function finishRoundtripAndWindow(): Promise<void> {
+      await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS + 30000);
+    }
+
+    /** 更新を 1 回実行し、往復と監視窓の完了まで進める。 */
+    async function reloadAndFinish(): Promise<void> {
+      triggerReload();
+      await finishRoundtripAndWindow();
+    }
+
+    it("更新の開始時に、基準より新しい通知が表示されていれば新着として報告する", async () => {
+      const section = addSection();
+      section.appendChild(buildNotificationArticle("2026-09-19T10:00:00Z"));
+      await reloadAndFinish();
+      expect(invokeMock).not.toHaveBeenCalled();
+
+      // 更新の間に X が自前で取得して新しい通知が入る
+      section.appendChild(buildNotificationArticle("2026-09-19T10:05:00Z"));
+      triggerReload();
+
+      expectReportedNewPostOnce();
+
+      // 基準は 10:05 になっているので、次の更新では報告されない
+      await finishRoundtripAndWindow();
+      await reloadAndFinish();
+      expectReportedNewPostOnce();
+    });
+
+    it("更新の開始時に、基準より新しい通知が無ければ報告しない", async () => {
+      const section = addSection();
+      section.appendChild(buildNotificationArticle("2026-09-19T10:05:00Z"));
+      await reloadAndFinish();
+
+      await reloadAndFinish();
+
+      expect(invokeMock).not.toHaveBeenCalled();
+    });
+
+    it("最初に取り込んだ通知は基準になるだけで新着として報告しない（起動直後の取得分）", async () => {
+      const section = addSection();
+      section.appendChild(buildNotificationArticle("2026-09-19T10:00:00Z"));
+
+      await reloadAndFinish();
+      expect(invokeMock).not.toHaveBeenCalled();
+
+      // 基準は 10:00 になっているので、10:05 は次の更新で新着になる
+      section.appendChild(buildNotificationArticle("2026-09-19T10:05:00Z"));
+      triggerReload();
+      expectReportedNewPostOnce();
+    });
+
+    it("通知がまだ1件も表示されていない間は基準を作らず、その後の初回取得分を新着として報告しない", async () => {
+      const section = addSection();
+
+      await reloadAndFinish();
+      expect(invokeMock).not.toHaveBeenCalled();
+
+      // 初回取得で通知が表示される。基準が無かったので基準になるだけ
+      section.appendChild(buildNotificationArticle("2026-09-19T10:00:00Z"));
+      await reloadAndFinish();
+      expect(invokeMock).not.toHaveBeenCalled();
+
+      // 基準は表示中の最大時刻（10:00）になっているので、同じ時刻では報告されない
+      await reloadAndFinish();
+      expect(invokeMock).not.toHaveBeenCalled();
+    });
+
+    it("ユーザーがスクロール中は更新自体を行わず、新着も報告しない", async () => {
+      const section = addSection();
+      section.appendChild(buildNotificationArticle("2026-09-19T10:00:00Z"));
+      await reloadAndFinish();
+      section.appendChild(buildNotificationArticle("2026-09-19T10:05:00Z"));
+      setScrolling(100);
+      scrollWrites.length = 0;
+
+      triggerReload();
+      await finishRoundtripAndWindow();
+
+      expect(scrollWrites).toEqual([]);
+      expect(invokeMock).not.toHaveBeenCalled();
+    });
+
+    it("更新開始時に報告した新着を、続く監視窓で二重に報告しない", async () => {
+      const section = addSection();
+      section.appendChild(buildNotificationArticle("2026-09-19T10:00:00Z"));
+      await reloadAndFinish();
+      section.appendChild(buildNotificationArticle("2026-09-19T10:05:00Z"));
+
+      triggerReload();
+      expectReportedNewPostOnce();
+
+      // 先頭へ戻した後の監視窓で新しい通知が現れないまま 30 秒経つ
+      await finishRoundtripAndWindow();
+
+      expectReportedNewPostOnce();
+    });
   });
 
   describe("先頭固定", () => {
