@@ -3,7 +3,10 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
+  PULL_REFRESH_MIN_DISTANCE_PX,
   hasNewPostsAbove,
+  isPullRefreshGesture,
+  isRefreshShortcut,
   reduceReturnState,
   scanReturnTarget,
   selectAnchorIds,
@@ -200,6 +203,249 @@ describe("reduceReturnState プロパティ", () => {
           expect(next.anchorIds).toEqual(state.anchorIds);
         },
       ),
+    );
+  });
+});
+
+const coordArb = fc.integer({ min: -5000, max: 5000 });
+const topScrollArb = fc.integer({ min: 0, max: 1 });
+
+describe("isPullRefreshGesture プロパティ", () => {
+  // 性質1: 開始時または終了時の scrollTop が 1 より大きければ常に false。
+  it("開始時または終了時のscrollTopが1より大きければ常にfalseになる", () => {
+    const scrollArb = fc.integer({ min: 2, max: 10_000 });
+    const scenarioArb = fc.oneof(
+      fc.record({ startScrollTop: scrollArb, endScrollTop: coordArb }),
+      fc.record({ startScrollTop: coordArb, endScrollTop: scrollArb }),
+    );
+    fc.assert(
+      fc.property(
+        coordArb,
+        coordArb,
+        coordArb,
+        coordArb,
+        scenarioArb,
+        (startX, startY, endX, endY, scrolls) => {
+          expect(
+            isPullRefreshGesture({ startX, startY, endX, endY, ...scrolls }),
+          ).toBe(false);
+        },
+      ),
+    );
+  });
+
+  // 性質2: 下方向の移動量が閾値未満（上方向・移動なし含む）なら常に false。
+  it("下方向の移動量が閾値未満なら常にfalseになる", () => {
+    fc.assert(
+      fc.property(
+        coordArb,
+        coordArb,
+        coordArb,
+        fc.integer({ min: -5000, max: PULL_REFRESH_MIN_DISTANCE_PX - 1 }),
+        fc.integer({ min: -5, max: 5 }),
+        fc.integer({ min: -5, max: 5 }),
+        (startX, startY, endX, dy, startScrollTop, endScrollTop) => {
+          expect(
+            isPullRefreshGesture({
+              startX,
+              startY,
+              endX,
+              endY: startY + dy,
+              startScrollTop,
+              endScrollTop,
+            }),
+          ).toBe(false);
+        },
+      ),
+    );
+  });
+
+  // 性質3: 横移動量が縦移動量以上なら（縦が大きくないなら）常に false。
+  it("横移動量が縦移動量以上なら常にfalseになる", () => {
+    fc.assert(
+      fc.property(
+        coordArb,
+        coordArb,
+        fc.integer({ min: 0, max: 5000 }),
+        fc.boolean(),
+        fc.integer({ min: 0, max: 5000 }),
+        topScrollArb,
+        topScrollArb,
+        (startX, startY, dy, negative, extra, startScrollTop, endScrollTop) => {
+          const absDx = dy + extra; // |dx| >= dy
+          expect(
+            isPullRefreshGesture({
+              startX,
+              startY,
+              endX: startX + (negative ? -absDx : absDx),
+              endY: startY + dy,
+              startScrollTop,
+              endScrollTop,
+            }),
+          ).toBe(false);
+        },
+      ),
+    );
+  });
+
+  // 性質4: 先頭で、閾値以上かつ縦移動が横移動より大きければ常に true。
+  it("先頭で閾値以上かつ縦移動が横移動より大きければ常にtrueになる", () => {
+    const scenarioArb = fc
+      .integer({ min: PULL_REFRESH_MIN_DISTANCE_PX, max: 5000 })
+      .chain((dy) =>
+        fc.record({
+          dy: fc.constant(dy),
+          dx: fc.integer({ min: -(dy - 1), max: dy - 1 }),
+        }),
+      );
+    fc.assert(
+      fc.property(
+        coordArb,
+        coordArb,
+        scenarioArb,
+        topScrollArb,
+        topScrollArb,
+        (startX, startY, { dy, dx }, startScrollTop, endScrollTop) => {
+          expect(
+            isPullRefreshGesture({
+              startX,
+              startY,
+              endX: startX + dx,
+              endY: startY + dy,
+              startScrollTop,
+              endScrollTop,
+            }),
+          ).toBe(true);
+        },
+      ),
+    );
+  });
+
+  // 性質5: 全座標に同じオフセットを足しても結果は変わらない。
+  it("全座標に同じオフセットを足しても結果は変わらない", () => {
+    fc.assert(
+      fc.property(
+        fc.record({
+          startX: coordArb,
+          startY: coordArb,
+          endX: coordArb,
+          endY: coordArb,
+          startScrollTop: fc.integer({ min: 0, max: 5 }),
+          endScrollTop: fc.integer({ min: 0, max: 5 }),
+        }),
+        coordArb,
+        coordArb,
+        (g, offsetX, offsetY) => {
+          const shifted = {
+            ...g,
+            startX: g.startX + offsetX,
+            endX: g.endX + offsetX,
+            startY: g.startY + offsetY,
+            endY: g.endY + offsetY,
+          };
+          expect(isPullRefreshGesture(shifted)).toBe(isPullRefreshGesture(g));
+        },
+      ),
+    );
+  });
+
+  // 境界値の例示（ランダム生成では境界のみの変異を見つけにくいため）。
+  it("境界値: 閾値ちょうどはtrue、閾値未満はfalse、縦横同量はfalse", () => {
+    const base = {
+      startX: 0,
+      startY: 0,
+      endX: 0,
+      startScrollTop: 0,
+      endScrollTop: 0,
+    };
+    const min = PULL_REFRESH_MIN_DISTANCE_PX;
+    expect(isPullRefreshGesture({ ...base, endY: min })).toBe(true);
+    expect(isPullRefreshGesture({ ...base, endY: min - 1 })).toBe(false);
+    expect(isPullRefreshGesture({ ...base, endX: min, endY: min })).toBe(false);
+    expect(isPullRefreshGesture({ ...base, endX: -min, endY: min })).toBe(
+      false,
+    );
+    expect(isPullRefreshGesture({ ...base, endX: min - 1, endY: min })).toBe(
+      true,
+    );
+  });
+});
+
+describe("isRefreshShortcut プロパティ", () => {
+  const targetArb = fc.constantFrom<EventTarget | null>(
+    null,
+    document.body,
+    document.createElement("div"),
+  );
+
+  // 性質6: key が "." 以外なら修飾キー・target によらず常に false。
+  it("keyがピリオド以外なら修飾キーやtargetによらず常にfalseになる", () => {
+    fc.assert(
+      fc.property(
+        fc.string().filter((k) => k !== "."),
+        fc.boolean(),
+        fc.boolean(),
+        fc.boolean(),
+        fc.boolean(),
+        targetArb,
+        (key, ctrlKey, metaKey, altKey, shiftKey, target) => {
+          expect(
+            isRefreshShortcut({
+              key,
+              ctrlKey,
+              metaKey,
+              altKey,
+              shiftKey,
+              target,
+            }),
+          ).toBe(false);
+        },
+      ),
+    );
+  });
+
+  // 性質7: 修飾キーのいずれかが true なら key が "." でも常に false。
+  it("修飾キーがひとつでも押されていればkeyがピリオドでも常にfalseになる", () => {
+    fc.assert(
+      fc.property(
+        fc
+          .tuple(fc.boolean(), fc.boolean(), fc.boolean(), fc.boolean())
+          .filter((mods) => mods.some(Boolean)),
+        targetArb,
+        ([ctrlKey, metaKey, altKey, shiftKey], target) => {
+          expect(
+            isRefreshShortcut({
+              key: ".",
+              ctrlKey,
+              metaKey,
+              altKey,
+              shiftKey,
+              target,
+            }),
+          ).toBe(false);
+        },
+      ),
+    );
+  });
+
+  // 性質8: "."・修飾キー無し・通常の要素 target なら常に true。
+  it("ピリオドで修飾キー無しかつ通常の要素がtargetなら常にtrueになる", () => {
+    const plainTargetArb = fc
+      .constantFrom("div", "span", "button", "a", "article", "section")
+      .map((tag) => document.createElement(tag));
+    fc.assert(
+      fc.property(plainTargetArb, (target) => {
+        expect(
+          isRefreshShortcut({
+            key: ".",
+            ctrlKey: false,
+            metaKey: false,
+            altKey: false,
+            shiftKey: false,
+            target,
+          }),
+        ).toBe(true);
+      }),
     );
   });
 });
