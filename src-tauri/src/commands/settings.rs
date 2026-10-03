@@ -118,7 +118,7 @@ impl Default for WindowBounds {
 impl Default for GlobalSettingsData {
     fn default() -> Self {
         Self {
-            theme: "dark".to_string(),
+            theme: "system".to_string(),
             custom_css: String::new(),
             window_bounds: WindowBounds::default(),
             default_account_id: None,
@@ -522,9 +522,9 @@ mod tests {
     }
 
     #[test]
-    fn global_settings_default_theme_is_dark() {
+    fn global_settings_default_theme_is_system() {
         let gs = GlobalSettingsData::default();
-        assert_eq!(gs.theme, "dark");
+        assert_eq!(gs.theme, "system");
     }
 
     #[test]
@@ -980,7 +980,7 @@ mod tests {
         let result = parse_stored_settings(Some(json));
         match result {
             ParsedSettings::Loaded(settings) => {
-                assert_eq!(settings.global_settings.theme, "dark");
+                assert_eq!(settings.global_settings.theme, "system");
             }
             _ => panic!("Loaded になるはず"),
         }

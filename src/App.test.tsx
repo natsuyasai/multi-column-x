@@ -414,6 +414,7 @@ describe("App (mobile)", () => {
   });
 
   it("カラム復元完了後にupdate_mobile_swipe_barがvisible:trueで呼ばれる", async () => {
+    installMatchMedia(true); // 既定テーマ system が OS ダークに解決される
     render(<App />);
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith(
@@ -422,7 +423,7 @@ describe("App (mobile)", () => {
           visible: true,
           height: 28,
           opacity: 50,
-          darkTheme: true, // DEFAULT_GLOBAL_SETTINGS.theme === "dark"
+          darkTheme: true, // DEFAULT_GLOBAL_SETTINGS.theme === "system"（OS ダーク）
         }),
       );
     });
