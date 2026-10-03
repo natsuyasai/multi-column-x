@@ -240,6 +240,7 @@ const App: React.FC = () => {
   // カラムへのジャンプ・手動更新（先頭スクロール＋リロード）をまとめたフック。
   const {
     handleJumpToColumn,
+    jumpToColumnWhenReady,
     handleJumpToColumnByIndex,
     handleReload,
     handleReloadFocusedColumn,
@@ -447,8 +448,14 @@ const App: React.FC = () => {
           globalSettings={globalSettings}
           existingColumns={columns}
           onAdd={(column) => {
-            handleAddColumn(column);
+            const added = handleAddColumn(column);
             setShowAddColumn(false);
+            // デスクトップでは追加成功後に新カラムへ横スクロールする（mobile は追加時にアクティブ化済み）
+            void added.then((ok) => {
+              if (ok && !useAppStore.getState().isMobile) {
+                jumpToColumnWhenReady(column.id);
+              }
+            });
           }}
           onCancel={() => setShowAddColumn(false)}
         />
