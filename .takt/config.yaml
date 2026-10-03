@@ -2,5 +2,5 @@
 # 作業は最新化した develop から派生したブランチで行い、完了したら develop 向けの PR を作成する
 # （規約は facets/policies/mcx-dev-rules.md の「ブランチ・PR 運用」を参照）
 # 注: auto_fetch（クローン前の fetch）はグローバル専用キーのため ~/.takt/config.yaml 側で設定する
-base_branch: develop   # クローン作成のベースブランチ（PR のベースも develop）
-auto_pr: true          # worktree 実行後に PR を自動作成
+base_branch: develop # クローン作成のベースブランチ（PR のベースも develop）
+auto_pr: true # worktree 実行後に PR を自動作成
