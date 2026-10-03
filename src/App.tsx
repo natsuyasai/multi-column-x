@@ -244,7 +244,12 @@ const App: React.FC = () => {
     handleReload,
     handleReloadFocusedColumn,
     handleDoubleTapColumn,
-  } = useColumnNavigation({ columns, columnBounds, scrollbarRef });
+  } = useColumnNavigation({
+    columns,
+    columnBounds,
+    scrollbarRef,
+    dialogOpen,
+  });
 
   const handleOpenAddColumnDialog = useCallback(() => {
     setShowAddColumn(true);

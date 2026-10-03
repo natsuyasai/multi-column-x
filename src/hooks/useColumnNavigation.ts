@@ -1,7 +1,7 @@
 // src/hooks/useColumnNavigation.ts
 // カラムへのジャンプ・スクロールバー追従・手動更新（先頭スクロール＋リロード）を
 // まとめたフック。「フォーカスカラム」の状態もここに閉じ込める。
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { WEBVIEW_SCRIPTS } from "@/constants/ipc";
 import type { ColumnBounds } from "@/lib/gridLayout";
 import { evalInColumn } from "@/services/columnWebview";
@@ -11,10 +11,12 @@ interface UseColumnNavigationArgs {
   columns: Column[];
   columnBounds: Record<string, ColumnBounds>;
   scrollbarRef: React.RefObject<HTMLDivElement | null>;
+  dialogOpen: boolean;
 }
 
 interface UseColumnNavigationResult {
   handleJumpToColumn: (columnId: string) => void;
+  jumpToColumnWhenReady: (columnId: string) => void;
   handleJumpToColumnByIndex: (index: number) => void;
   handleReload: (columnId: string) => Promise<void>;
   handleReloadFocusedColumn: () => void;
@@ -25,6 +27,7 @@ export function useColumnNavigation({
   columns,
   columnBounds,
   scrollbarRef,
+  dialogOpen,
 }: UseColumnNavigationArgs): UseColumnNavigationResult {
   // 「フォーカスカラム」= 最後に 1-9 ジャンプ／TopBar クリックでジャンプしたカラム。
   // r キーでのリロード対象を決めるために使う（無ければ order 最小の先頭カラムにフォールバック）。
@@ -44,6 +47,20 @@ export function useColumnNavigation({
     },
     [columnBounds, scrollbarRef],
   );
+
+  // カラム追加直後など、bounds がまだ無いカラムへのジャンプ予約。
+  // bounds が揃い、かつダイアログが閉じた時点で 1 回だけジャンプする。
+  const [pendingJumpId, setPendingJumpId] = useState<string | null>(null);
+  const jumpToColumnWhenReady = useCallback((columnId: string) => {
+    setPendingJumpId(columnId);
+  }, []);
+
+  useEffect(() => {
+    if (pendingJumpId === null || dialogOpen) return;
+    if (!columnBounds[pendingJumpId]) return;
+    handleJumpToColumn(pendingJumpId);
+    setPendingJumpId(null);
+  }, [pendingJumpId, dialogOpen, columnBounds, handleJumpToColumn]);
 
   const handleJumpToColumnByIndex = useCallback(
     (index: number) => {
@@ -74,6 +91,7 @@ export function useColumnNavigation({
 
   return {
     handleJumpToColumn,
+    jumpToColumnWhenReady,
     handleJumpToColumnByIndex,
     handleReload,
     handleReloadFocusedColumn,
