@@ -102,6 +102,7 @@ describe("useAppStore", () => {
         pendingDataDirectoryDeletions: [],
       },
       isLoaded: false,
+      settingsSaveBlocked: false,
       isMobile: false,
       unreadCounts: {},
     });
@@ -649,6 +650,77 @@ describe("useAppStore", () => {
     });
     expect(result.current.settingsLoadNotice).toContain("バックアップ");
     expect(result.current.settingsLoadNotice).not.toContain("次の場所");
+  });
+
+  it("設定の読み込み自体に失敗したとき既定の状態で起動し読み込み失敗が通知される", async () => {
+    mockInvoke.mockRejectedValueOnce(new Error("ipc failed"));
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    expect(result.current.isLoaded).toBe(true);
+    expect(result.current.settingsLoadNotice).not.toBeNull();
+  });
+
+  it("設定の読み込み自体に失敗した状態では変更しても設定ファイルへ保存されない", async () => {
+    mockInvoke.mockRejectedValueOnce(new Error("ipc failed"));
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    mockInvoke.mockClear();
+    await act(async () => {
+      result.current.addAccount(mockAccount);
+      await result.current.saveSettings();
+    });
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "save_settings",
+      expect.anything(),
+    );
+  });
+
+  it("設定を正常に読み込めた状態では変更が設定ファイルへ保存される", async () => {
+    mockInvoke.mockResolvedValueOnce({
+      settings: {
+        accounts: [],
+        columns: [],
+        globalSettings: DEFAULT_GLOBAL_SETTINGS,
+      },
+      loadFailed: false,
+      backupPath: null,
+    });
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    mockInvoke.mockClear();
+    await act(async () => {
+      result.current.addAccount(mockAccount);
+      await result.current.saveSettings();
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("save_settings", expect.anything());
+  });
+
+  it("壊れた設定を退避して既定の状態で起動したときは変更が設定ファイルへ保存される", async () => {
+    mockInvoke.mockResolvedValueOnce({
+      settings: {
+        accounts: [],
+        columns: [],
+        globalSettings: DEFAULT_GLOBAL_SETTINGS,
+      },
+      loadFailed: true,
+      backupPath: "/data/settings.json.20260922-120000.bak",
+    });
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    mockInvoke.mockClear();
+    await act(async () => {
+      result.current.addAccount(mockAccount);
+      await result.current.saveSettings();
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("save_settings", expect.anything());
   });
 
   it("dismissSettingsLoadNoticeを呼ぶと通知が消える", async () => {

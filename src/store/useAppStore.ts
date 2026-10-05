@@ -17,6 +17,9 @@ const SETTINGS_LOAD_FAILED_WITH_BACKUP_MESSAGE = (backupPath: string) =>
 const SETTINGS_LOAD_FAILED_WITHOUT_BACKUP_MESSAGE =
   "設定ファイルを読み込めなかったため、初期設定で起動しました。元の設定のバックアップにも失敗しました。";
 
+const SETTINGS_LOAD_ERROR_MESSAGE =
+  "設定を読み込めなかったため、初期状態で起動しました。保存済みの設定を上書きしないよう、アプリを再起動するまで変更は保存されません。";
+
 export function migrateColumn(
   col: Partial<Column> &
     Pick<
@@ -47,6 +50,7 @@ interface AppStore {
   columns: Column[];
   globalSettings: GlobalSettings;
   isLoaded: boolean;
+  settingsSaveBlocked: boolean;
   settingsLoadNotice: string | null;
   dismissSettingsLoadNotice: () => void;
   topBarExpanded: boolean;
@@ -93,6 +97,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   columns: [],
   globalSettings: DEFAULT_GLOBAL_SETTINGS,
   isLoaded: false,
+  settingsSaveBlocked: false,
   settingsLoadNotice: null,
   dismissSettingsLoadNotice: () => set({ settingsLoadNotice: null }),
   topBarExpanded: false,
@@ -136,6 +141,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           ...settings.globalSettings,
         },
         isLoaded: true,
+        settingsSaveBlocked: false,
         settingsLoadNotice: loadFailed
           ? backupPath
             ? SETTINGS_LOAD_FAILED_WITH_BACKUP_MESSAGE(backupPath)
@@ -143,7 +149,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
           : null,
       });
     } catch {
-      set({ isLoaded: true });
+      // 既定状態のまま保存すると保存済みの設定を空で上書きしてしまうため、保存を止める。
+      set({
+        isLoaded: true,
+        settingsSaveBlocked: true,
+        settingsLoadNotice: SETTINGS_LOAD_ERROR_MESSAGE,
+      });
     }
   },
 
@@ -151,6 +162,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     // 前の保存の完了を待ってから実行する。状態は実行時点(get())で読むため、
     // 連続して呼ばれても最後に書き込まれるのは最新の状態になる。
     saveChain = saveChain.then(async () => {
+      if (get().settingsSaveBlocked) return;
       const { accounts, columns, globalSettings } = get();
       await invoke(IPC_COMMANDS.SAVE_SETTINGS, {
         settings: { accounts, columns, globalSettings },

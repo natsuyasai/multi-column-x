@@ -117,10 +117,24 @@ const column: Column = {
 
 const globalSettings: GlobalSettings = { ...DEFAULT_GLOBAL_SETTINGS };
 
+// App のマウント時に走る load_settings が、テストで setState した状態をそのまま返すようにする。
+// （load_settings が失敗すると保存ブロック＋通知ダイアログが出て、カラム位置の検証に影響するため）
+function mockInvokeWithCurrentSettings() {
+  mockInvoke.mockImplementation(async (cmd: string) => {
+    if (cmd !== "load_settings") return undefined;
+    const { accounts, columns, globalSettings } = useAppStore.getState();
+    return {
+      settings: { accounts, columns, globalSettings },
+      loadFailed: false,
+      backupPath: null,
+    };
+  });
+}
+
 describe("App (desktop)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockInvoke.mockResolvedValue(undefined);
+    mockInvokeWithCurrentSettings();
     mockPlatform.mockReturnValue("windows");
     useAppStore.setState({
       accounts: [account],
@@ -392,7 +406,7 @@ describe("App (desktop)", () => {
 describe("App (mobile)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockInvoke.mockResolvedValue(undefined);
+    mockInvokeWithCurrentSettings();
     mockPlatform.mockReturnValue("android");
     useAppStore.setState({
       accounts: [account],
@@ -524,7 +538,7 @@ describe("App (mobile)", () => {
 describe("App (テーマ適用時のnight_mode Cookie反映)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockInvoke.mockResolvedValue(undefined);
+    mockInvokeWithCurrentSettings();
     mockPlatform.mockReturnValue("windows");
     useAppStore.setState({
       accounts: [account],
@@ -623,7 +637,7 @@ describe("App (テーマ適用時のnight_mode Cookie反映)", () => {
 describe("App (手動更新のスクロール扱い)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockInvoke.mockResolvedValue(undefined);
+    mockInvokeWithCurrentSettings();
     mockPlatform.mockReturnValue("windows");
     useAppStore.setState({
       accounts: [account],
@@ -674,7 +688,7 @@ describe("App (手動更新のスクロール扱い)", () => {
 describe("App (フック抽出前の特性テスト)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockInvoke.mockResolvedValue(undefined);
+    mockInvokeWithCurrentSettings();
     mockPlatform.mockReturnValue("windows");
     useAppStore.setState({
       accounts: [account],
