@@ -1,11 +1,32 @@
-# Multi Column X
+<p align="center">
+  <img src="src-tauri/icons/128x128.png" alt="Multi Column X アイコン" width="128" height="128">
+</p>
 
-[![CI](https://github.com/natsuyasai/multi-column-x/actions/workflows/ci.yml/badge.svg)](https://github.com/natsuyasai/multi-column-x/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/natsuyasai/multi-column-x)](https://github.com/natsuyasai/multi-column-x/releases/latest)
-![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20Android-blue)
-![Tauri](https://img.shields.io/badge/Tauri-v2-24C8DB)
+<h1 align="center">Multi Column X</h1>
 
-TweetDeck スタイルの Twitter/X クライアント。複数アカウント・複数カラムを同時に並べて表示できる、Tauri v2 製のデスクトップ / Android アプリです。
+<p align="center">
+  TweetDeck スタイルの Twitter/X クライアント。<br>
+  複数アカウント・複数カラムを同時に並べて表示できる、Tauri v2 製のデスクトップ / Android アプリ。
+</p>
+
+<p align="center">
+  <a href="https://github.com/natsuyasai/multi-column-x/actions/workflows/ci.yml"><img src="https://github.com/natsuyasai/multi-column-x/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/natsuyasai/multi-column-x/releases/latest"><img src="https://img.shields.io/github/v/release/natsuyasai/multi-column-x" alt="Release"></a>
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20Android-blue" alt="Platforms">
+  <img src="https://img.shields.io/badge/Tauri-v2-24C8DB?logo=tauri&logoColor=white" alt="Tauri v2">
+  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React 19">
+  <img src="https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white" alt="Rust">
+</p>
+
+<p align="center">
+  <a href="https://github.com/natsuyasai/multi-column-x/releases/latest">ダウンロード</a> ·
+  <a href="docs/USER_GUIDE.md">利用ガイド</a> ·
+  <a href="docs/development/README.md">開発ノート</a>
+</p>
+
+<p align="center">
+  <img src="docs/images/columns-overview.png" alt="カラム表示の例" width="800">
+</p>
 
 ## 特長
 
