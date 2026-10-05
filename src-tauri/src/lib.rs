@@ -10,8 +10,9 @@ mod state;
 mod video;
 
 use state::AppState;
+use tauri::Manager;
 #[cfg(desktop)]
-use tauri::{Manager, PhysicalPosition, PhysicalSize};
+use tauri::{PhysicalPosition, PhysicalSize};
 #[cfg(desktop)]
 use tauri_plugin_store::StoreExt;
 
@@ -69,7 +70,9 @@ fn save_window_bounds(window: &tauri::Window) {
     });
     let value = merge_window_bounds(settings, bounds);
     store.set("appSettings", value);
-    if let Err(e) = store.save() {
+    if let Err(e) =
+        crate::commands::settings_file::save_store_atomically(window.app_handle(), &store)
+    {
         log::error!("failed to save window bounds: {e}");
     }
 }
@@ -110,6 +113,23 @@ pub fn run() {
         )
         .manage(AppState::new())
         .setup(|app| {
+            // 設定ファイルの検査・復旧は、プラグインが読み込み失敗を握りつぶす前（ストア生成前）に行う。
+            let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+            let unix_secs = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            let recovery =
+                crate::commands::settings_file::recover_settings_file(&data_dir, unix_secs);
+            app.manage(crate::commands::settings_file::SettingsRecoveryState(
+                std::sync::Mutex::new(Some(recovery)),
+            ));
+            // 自動保存を無効にしたストアを先に登録する（以降の app.store("settings.json") はこれを返す）。
+            // 自動保存が生きているとアトミック書き込みをすり抜けるため必須。
+            tauri_plugin_store::StoreBuilder::new(app, "settings.json")
+                .disable_auto_save()
+                .build()
+                .map_err(|e| e.to_string())?;
             #[cfg(desktop)]
             {
                 use crate::commands::settings::AppSettingsData;
@@ -147,8 +167,6 @@ pub fn run() {
             }
             #[cfg(target_os = "android")]
             crate::android_bridge::store_app_handle(app.handle().clone());
-            #[cfg(not(desktop))]
-            let _ = app;
             Ok(())
         });
 

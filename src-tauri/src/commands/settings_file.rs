@@ -1,8 +1,7 @@
 //! settings.json の破損耐性（アトミック書き込み・起動時の検査と復旧）。
-// 配線（lib.rs / settings.rs）は後続コミットで行うため、それまで未使用警告を抑止する。
-#![allow(dead_code)]
-
 use std::{fs, io, path::Path, sync::Mutex};
+
+use tauri::Manager;
 
 pub(crate) const SETTINGS_FILE: &str = "settings.json";
 pub(crate) const PREV_FILE: &str = "settings.json.prev";
@@ -73,6 +72,22 @@ pub(crate) fn write_settings_atomically(dir: &Path, bytes: &[u8]) -> io::Result<
         }
     }
     atomic_write(&main, bytes)
+}
+
+/// 並行する保存（save_settings と save_window_bounds）で一時ファイルが衝突しないようにする。
+static SAVE_LOCK: Mutex<()> = Mutex::new(());
+
+/// ストアの全エントリをアトミックに settings.json へ保存する（Store::save の代替）。
+pub(crate) fn save_store_atomically(
+    app: &tauri::AppHandle,
+    store: &tauri_plugin_store::Store<tauri::Wry>,
+) -> Result<(), String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let map: serde_json::Map<String, serde_json::Value> = store.entries().into_iter().collect();
+    let bytes = serde_json::to_vec_pretty(&map).map_err(|e| e.to_string())?;
+    let _guard = SAVE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    write_settings_atomically(&dir, &bytes).map_err(|e| e.to_string())
 }
 
 /// 起動時に settings.json を検査し、壊れていれば退避して直前世代から復元する。
