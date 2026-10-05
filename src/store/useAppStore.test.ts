@@ -723,6 +723,32 @@ describe("useAppStore", () => {
     expect(mockInvoke).toHaveBeenCalledWith("save_settings", expect.anything());
   });
 
+  it("読み込み失敗後に再度読み込みに成功すると変更が保存される", async () => {
+    mockInvoke.mockRejectedValueOnce(new Error("ipc failed"));
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    mockInvoke.mockResolvedValueOnce({
+      settings: {
+        accounts: [],
+        columns: [],
+        globalSettings: DEFAULT_GLOBAL_SETTINGS,
+      },
+      loadFailed: false,
+      backupPath: null,
+    });
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    mockInvoke.mockClear();
+    await act(async () => {
+      result.current.addAccount(mockAccount);
+      await result.current.saveSettings();
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("save_settings", expect.anything());
+  });
+
   it("dismissSettingsLoadNoticeを呼ぶと通知が消える", async () => {
     mockInvoke.mockResolvedValueOnce({
       settings: {
