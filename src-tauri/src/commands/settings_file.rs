@@ -2,11 +2,20 @@
 // 配線（lib.rs / settings.rs）は後続コミットで行うため、それまで未使用警告を抑止する。
 #![allow(dead_code)]
 
-use std::{fs, io, path::Path};
+use std::{fs, io, path::Path, sync::Mutex};
 
 pub(crate) const SETTINGS_FILE: &str = "settings.json";
 pub(crate) const PREV_FILE: &str = "settings.json.prev";
 const TMP_FILE: &str = "settings.json.tmp";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum SettingsRecovery {
+    Healthy,
+    Restored,
+    Unrecoverable { backup_path: Option<String> },
+}
+
+pub(crate) struct SettingsRecoveryState(pub Mutex<Option<SettingsRecovery>>);
 
 /// JSON としてパースでき、トップレベルがオブジェクトなら true。
 fn is_valid_settings_bytes(bytes: &[u8]) -> bool {
@@ -66,6 +75,45 @@ pub(crate) fn write_settings_atomically(dir: &Path, bytes: &[u8]) -> io::Result<
     atomic_write(&main, bytes)
 }
 
+/// 起動時に settings.json を検査し、壊れていれば退避して直前世代から復元する。
+pub(crate) fn recover_settings_file(dir: &Path, unix_secs: u64) -> SettingsRecovery {
+    let main = dir.join(SETTINGS_FILE);
+    let main_bytes = match fs::read(&main) {
+        Ok(b) => b,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return SettingsRecovery::Healthy,
+        Err(e) => {
+            log::error!("設定ファイルの読み込みに失敗しました: {e}");
+            Vec::new()
+        }
+    };
+    if is_valid_settings_bytes(&main_bytes) {
+        return SettingsRecovery::Healthy;
+    }
+
+    let backup_path = backup_broken_file(dir, &main, unix_secs);
+    let prev = dir.join(PREV_FILE);
+    let prev_valid = fs::read(&prev).is_ok_and(|b| is_valid_settings_bytes(&b));
+    if prev_valid {
+        match fs::copy(&prev, &main) {
+            Ok(_) => return SettingsRecovery::Restored,
+            Err(e) => log::error!("直前世代からの設定の復元に失敗しました: {e}"),
+        }
+    }
+    SettingsRecovery::Unrecoverable { backup_path }
+}
+
+/// 壊れた main を dir 配下へ退避する。失敗しても起動は継続するため None を返しログに出す。
+fn backup_broken_file(dir: &Path, main: &Path, unix_secs: u64) -> Option<String> {
+    let backup = dir.join(crate::commands::settings::backup_file_name(unix_secs));
+    match fs::copy(main, &backup) {
+        Ok(_) => Some(backup.to_string_lossy().to_string()),
+        Err(e) => {
+            log::error!("壊れた設定ファイルの退避に失敗しました: {e}");
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -115,6 +163,119 @@ mod tests {
         assert!(!is_valid_settings_bytes(b""));
         assert!(!is_valid_settings_bytes(b"{\"a\":"));
         assert!(!is_valid_settings_bytes(b"[1]"));
+    }
+
+    const SECS: u64 = 1_700_000_000;
+
+    fn backup_path_of(dir: &Path) -> std::path::PathBuf {
+        dir.join(crate::commands::settings::backup_file_name(SECS))
+    }
+
+    #[test]
+    fn 保存すると新しい内容が次回起動時に正常として扱われる() {
+        let dir = tempfile::tempdir().unwrap();
+        write_settings_atomically(dir.path(), b"{\"a\":1}").unwrap();
+
+        assert_eq!(
+            recover_settings_file(dir.path(), SECS),
+            SettingsRecovery::Healthy
+        );
+        assert_eq!(
+            fs::read(dir.path().join(SETTINGS_FILE)).unwrap(),
+            b"{\"a\":1}"
+        );
+    }
+
+    #[test]
+    fn 空の設定ファイルは退避され復旧不能として報告される() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join(SETTINGS_FILE), b"").unwrap();
+
+        let result = recover_settings_file(dir.path(), SECS);
+
+        let backup = backup_path_of(dir.path());
+        assert_eq!(
+            result,
+            SettingsRecovery::Unrecoverable {
+                backup_path: Some(backup.to_string_lossy().to_string())
+            }
+        );
+        assert!(backup.exists());
+    }
+
+    #[test]
+    fn 途中で切れたjsonの設定ファイルは退避され復旧不能として報告される() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join(SETTINGS_FILE), b"{\"appSettings\":{\"acc").unwrap();
+
+        let result = recover_settings_file(dir.path(), SECS);
+
+        assert!(matches!(
+            result,
+            SettingsRecovery::Unrecoverable {
+                backup_path: Some(_)
+            }
+        ));
+        assert_eq!(
+            fs::read(backup_path_of(dir.path())).unwrap(),
+            b"{\"appSettings\":{\"acc"
+        );
+    }
+
+    #[test]
+    fn 直前世代も壊れているときは復旧不能として報告される() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join(SETTINGS_FILE), b"").unwrap();
+        fs::write(dir.path().join(PREV_FILE), b"{").unwrap();
+
+        assert!(matches!(
+            recover_settings_file(dir.path(), SECS),
+            SettingsRecovery::Unrecoverable { .. }
+        ));
+    }
+
+    #[test]
+    fn 設定ファイルが無いときは何もせず正常として扱う() {
+        let dir = tempfile::tempdir().unwrap();
+
+        let result = recover_settings_file(dir.path(), SECS);
+
+        assert_eq!(result, SettingsRecovery::Healthy);
+        assert!(!dir.path().join(SETTINGS_FILE).exists());
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn 壊れた設定ファイルは直前の世代から復元される() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join(SETTINGS_FILE), b"{\"a\":").unwrap();
+        fs::write(dir.path().join(PREV_FILE), b"{\"a\":1}").unwrap();
+
+        let result = recover_settings_file(dir.path(), SECS);
+
+        assert_eq!(result, SettingsRecovery::Restored);
+        assert_eq!(
+            fs::read(dir.path().join(SETTINGS_FILE)).unwrap(),
+            b"{\"a\":1}"
+        );
+        assert_eq!(fs::read(backup_path_of(dir.path())).unwrap(), b"{\"a\":");
+    }
+
+    #[test]
+    fn 正常な設定ファイルは退避も復元もされない() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join(SETTINGS_FILE), b"{\"a\":2}").unwrap();
+        fs::write(dir.path().join(PREV_FILE), b"{\"a\":1}").unwrap();
+
+        assert_eq!(
+            recover_settings_file(dir.path(), SECS),
+            SettingsRecovery::Healthy
+        );
+        assert_eq!(
+            fs::read(dir.path().join(SETTINGS_FILE)).unwrap(),
+            b"{\"a\":2}"
+        );
+        assert!(!backup_path_of(dir.path()).exists());
     }
 
     #[test]
