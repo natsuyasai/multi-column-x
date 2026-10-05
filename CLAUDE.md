@@ -113,6 +113,10 @@ X内部APIのレート制限ヘッダをツールバーのポップオーバー�
 
 `src/lib/theme.ts` / `src/hooks/useTheme.ts`（テーマ切替）、`src/lib/reauthIdentity.ts` / `src-tauri/src/commands/account.rs`（既存アカウントの再認証・Cookie上書き）、`src/services/updater.ts` / `src/hooks/useAppUpdater.ts` / `src-tauri/src/commands/update.rs`（自動更新・進捗表示）を変更する場合の詳細（設計判断・未確定事項・落とし穴）は `docs/development/release-theme-reauth-notes.md` を参照。設定の既定値は Rust の `impl Default`（構造体レベル `#[serde(default)]`）を唯一の定義とし、TS の既定値と `contracts/default-settings.json` の契約テストで一致を保証している。**既定値を変更するときは Rust / TS / fixture の3箇所を同時に更新すること。**
 
+### 設定ファイル（settings.json）の永続化
+
+`src-tauri/src/commands/settings_file.rs` / `settings.rs` / `lib.rs` の `setup`、`src/store/useAppStore.ts` の保存まわりを変更する場合は `docs/development/settings-file-crash-safety-notes.md` を参照。`Store::save` を直接呼ばず `save_store_atomically` を使い、`setup` 冒頭の「復旧 → 自動保存無効のストア登録」の順序を崩さないこと。
+
 ### フロントエンドの品質ツール（ESLint / Storybook / プロパティテスト）
 
 - **ESLint**（flat config: `eslint.config.js`）はフロント `src` の TS/TSX のみを対象にする。`import-x/order` で import 順を統一し、`@/` は internal グループ。`npm run lint` / 自動整列は `npm run lint:fix`。
