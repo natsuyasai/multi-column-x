@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_store::StoreExt;
 
+use crate::commands::settings_file::{SettingsRecovery, SettingsRecoveryState};
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AccountData {
     pub id: String,
@@ -460,12 +462,35 @@ pub struct LoadSettingsResult {
     pub backup_path: Option<String>,
 }
 
+/// 起動時の復旧結果から load_settings の戻り値を決める（純粋関数）。
+/// 復旧不能のときだけ「読み込み失敗」として返し、それ以外は従来処理へ進める（None）。
+fn apply_recovery(recovery: Option<SettingsRecovery>) -> Option<LoadSettingsResult> {
+    match recovery {
+        Some(SettingsRecovery::Unrecoverable { backup_path }) => Some(LoadSettingsResult {
+            settings: AppSettingsData::default(),
+            load_failed: true,
+            backup_path,
+        }),
+        Some(SettingsRecovery::Restored) => {
+            log::warn!("壊れた設定ファイルを直前の世代から復元しました");
+            None
+        }
+        Some(SettingsRecovery::Healthy) | None => None,
+    }
+}
+
 #[tauri::command]
 pub async fn load_settings(
     caller: tauri::Webview,
     app: AppHandle,
 ) -> Result<LoadSettingsResult, String> {
     crate::commands::require_main_caller(&caller)?;
+    let recovery = app
+        .try_state::<SettingsRecoveryState>()
+        .and_then(|state| state.0.lock().unwrap_or_else(|e| e.into_inner()).take());
+    if let Some(result) = apply_recovery(recovery) {
+        return Ok(result);
+    }
     let store = app.store("settings.json").map_err(|e| e.to_string())?;
     let stored = store.get("appSettings");
 
@@ -504,7 +529,7 @@ pub async fn save_settings(
         "appSettings",
         serde_json::to_value(&settings).map_err(|e| e.to_string())?,
     );
-    store.save().map_err(|e| e.to_string())?;
+    crate::commands::settings_file::save_store_atomically(&app, &store)?;
     Ok(())
 }
 
@@ -1152,5 +1177,35 @@ mod tests {
                 prop_assert_eq!(once, twice);
             }
         }
+    }
+
+    #[test]
+    fn 復旧不能のときは読み込み失敗と退避先を返す() {
+        let result = apply_recovery(Some(SettingsRecovery::Unrecoverable {
+            backup_path: Some("/data/settings.json.bak".to_string()),
+        }))
+        .expect("復旧不能なら結果を返す");
+
+        assert!(result.load_failed);
+        assert_eq!(
+            result.backup_path.as_deref(),
+            Some("/data/settings.json.bak")
+        );
+    }
+
+    #[test]
+    fn 退避に失敗した復旧不能でも読み込み失敗として返す() {
+        let result = apply_recovery(Some(SettingsRecovery::Unrecoverable { backup_path: None }))
+            .expect("復旧不能なら結果を返す");
+
+        assert!(result.load_failed);
+        assert_eq!(result.backup_path, None);
+    }
+
+    #[test]
+    fn 正常_復元済み_復旧結果なしのときは従来処理へ進む() {
+        assert!(apply_recovery(Some(SettingsRecovery::Healthy)).is_none());
+        assert!(apply_recovery(Some(SettingsRecovery::Restored)).is_none());
+        assert!(apply_recovery(None).is_none());
     }
 }

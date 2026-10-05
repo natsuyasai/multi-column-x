@@ -38,6 +38,8 @@ m3u8-rs = "6"
 proptest = "1"
 # 動画ダウンロードのHTTP I/O層のテスト用モックHTTPサーバ
 wiremock = "0.6"
+# 設定ファイルの破損耐性テスト用の一時ディレクトリ
+tempfile = "3"
 
 [target.'cfg(target_os = "android")'.dependencies]
 jni = { version = "0.21", default-features = false }
