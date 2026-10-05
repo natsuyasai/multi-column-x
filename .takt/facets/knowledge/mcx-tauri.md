@@ -4,16 +4,16 @@ Tauri v2 製 TweetDeck 風 X クライアント（React 19 + TypeScript と Rust
 
 ## 領域別の誘導
 
-| 触れる領域                                                              | 参照するノート                                                         |
-| ----------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `src-tauri/src/inject/_src/**`、IPC 定数、キーボードショートカット      | `docs/development/inject-ipc-shortcuts-notes.md`                       |
-| `src/App.tsx`、`src/lib/gridLayout.ts`、`src/services/columnWebview.ts` | `docs/development/column-layout-notes.md`                              |
-| `src-tauri/src/lib.rs`、投稿ポップアップ、TopBar、常駐ウィンドウ        | `docs/development/compose-popup-topbar-notes.md`                       |
-| `src-tauri/src/commands/webview/external_link.rs`（`on_new_window`）    | `docs/development/external-link-new-window-notes.md`                   |
-| `linux_column_layout`（`src-tauri/src/commands/webview/column.rs`）     | `docs/development/linux-webview-notes.md`、`README.md` の Linux 仕様節 |
-| `src-tauri/gen/android/**`                                              | `docs/development/android-notes.md`                                    |
-| テーマ・再認証・自動更新・設定の既定値                                  | `docs/development/release-theme-reauth-notes.md`                       |
-| API レート制限モニター                                                  | `docs/development/api-rate-limit-operations-notes.md`                  |
+| 触れる領域                                                              | 参照するノート                                                                     |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `src-tauri/src/inject/_src/**`、IPC 定数、キーボードショートカット      | `docs/development/inject-ipc-shortcuts-notes.md`                                   |
+| `src/App.tsx`、`src/lib/gridLayout.ts`、`src/services/columnWebview.ts` | `docs/development/column-layout-notes.md`                                          |
+| `src-tauri/src/lib.rs`、投稿ポップアップ、TopBar、常駐ウィンドウ        | `docs/development/compose-popup-topbar-notes.md`                                   |
+| `src-tauri/src/commands/webview/external_link.rs`（`on_new_window`）    | `docs/development/external-link-new-window-notes.md`                               |
+| `linux_column_layout`（`src-tauri/src/commands/webview/column.rs`）     | `docs/development/linux-webview-notes.md`、`docs/development/linux-column-spec.md` |
+| `src-tauri/gen/android/**`                                              | `docs/development/android-notes.md`                                                |
+| テーマ・再認証・自動更新・設定の既定値                                  | `docs/development/release-theme-reauth-notes.md`                                   |
+| API レート制限モニター                                                  | `docs/development/api-rate-limit-operations-notes.md`                              |
 
 ## desktop / mobile の条件コンパイル
 

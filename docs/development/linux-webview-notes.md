@@ -1,6 +1,6 @@
 # Linux カラム WebView 開発ノート
 
-Linux 環境固有のカラム WebView 配置・クリッピング・WebProcess クラッシュ対策に関する実装知見を記録する。配置・クリッピングの正式仕様は `README.md`「Linux カラム WebView の配置・クリッピング仕様」に明記されているので、変更時は必ずそちらも参照・更新すること。
+Linux 環境固有のカラム WebView 配置・クリッピング・WebProcess クラッシュ対策に関する実装知見を記録する。配置・クリッピングの正式仕様は `docs/development/linux-column-spec.md`に明記されているので、変更時は必ずそちらも参照・更新すること。
 
 ## 対象ファイル
 
@@ -31,7 +31,7 @@ WebKitGTK の WebProcess は横スクロールでの `resize_column_webview` 連
 
 ## AppImage の H.264/AAC コーデック対応
 
-`README.md`「AppImage への GStreamer 同梱（必須）」にあるとおり `bundle.linux.appimage.bundleMediaFramework` は `true` を維持し `gst-plugins-base`/`gst-plugins-good` を同梱している。H.264/AAC についても以下の方式で対応済み:
+`docs/development/linux-column-spec.md`「AppImage への GStreamer 同梱（必須）」にあるとおり `bundle.linux.appimage.bundleMediaFramework` は `true` を維持し `gst-plugins-base`/`gst-plugins-good` を同梱している。H.264/AAC についても以下の方式で対応済み:
 
 - **AAC**: AAC-LC プロファイルのコア特許は失効済み（Fedora が2017年以降 `fdk-aac-free` として採用している判断に準拠）。CI（`.github/workflows/release.yml`）が `gst-plugins-bad`（GStreamerモノレポ `subprojects/gst-plugins-bad`）から `fdkaac` エレメントのみを自前ビルドし、`tauri.conf.json` の `bundle.linux.appimage.files` で AAC-LC 本体（`libfdk-aac.so.2`、Ubuntu universe の `libfdk-aac-dev` 由来）とともに AppImage へ直接同梱している。**同梱するのは AAC-LC 限定ビルドのみ**（HE-AAC 等の拡張プロファイルは対象外）。
 - **H.264**: Cisco OpenH264 の特許ロイヤリティ負担は「Cisco 自身の配布チャネルから直接ダウンロードする」場合にのみ適用されるため（`openh264.org/faq.html`）、AppImage に同梱すると特許ライセンス上問題がある。そのため `gst-plugins-bad` の `openh264` エレメント（LGPL/BSDのグルーコードのみ、Ciscoバイナリ本体は含まない）だけを同梱し、実体の `libopenh264.so.7` は `download_and_enable_h264` コマンドが呼ばれた時のみ、Cisco 公式サーバーから直接ダウンロード・SHA256検証して取得する（Debian/Ubuntu の `libopenh264-cisco7` パッケージ、および Firefox/Chromium と同じ方式）。

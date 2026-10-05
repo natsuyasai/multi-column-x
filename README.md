@@ -1,8 +1,34 @@
-# Multi Column X
+<p align="center">
+  <img src="src-tauri/icons/128x128.png" alt="Multi Column X アイコン" width="128" height="128">
+</p>
 
-TweetDeck スタイルの Twitter/X デスクトップ・モバイルクライアント。複数アカウント・複数カラムを同時表示できる Tauri v2 製アプリ。
+<h1 align="center">Multi Column X</h1>
 
-## 機能
+<p align="center">
+  TweetDeck スタイルの Twitter/X クライアント。<br>
+  複数アカウント・複数カラムを同時に並べて表示できる、Tauri v2 製のデスクトップ / Android アプリ。
+</p>
+
+<p align="center">
+  <a href="https://github.com/natsuyasai/multi-column-x/actions/workflows/ci.yml"><img src="https://github.com/natsuyasai/multi-column-x/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/natsuyasai/multi-column-x/releases/latest"><img src="https://img.shields.io/github/v/release/natsuyasai/multi-column-x" alt="Release"></a>
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20Android-blue" alt="Platforms">
+  <img src="https://img.shields.io/badge/Tauri-v2-24C8DB?logo=tauri&logoColor=white" alt="Tauri v2">
+  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React 19">
+  <img src="https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white" alt="Rust">
+</p>
+
+<p align="center">
+  <a href="https://github.com/natsuyasai/multi-column-x/releases/latest">ダウンロード</a> ·
+  <a href="docs/USER_GUIDE.md">利用ガイド</a> ·
+  <a href="docs/development/README.md">開発ノート</a>
+</p>
+
+<p align="center">
+  <img src="docs/images/columns-overview.png" alt="カラム表示の例" width="800">
+</p>
+
+## 特長
 
 - **マルチアカウント対応** — アカウントごとに独立したセッション（Cookie）を保持
 - **カラムレイアウト** — ホーム・通知・検索・リスト・カスタム URL・投稿専用・外部 URL（アカウント非依存）を任意の数だけ並べて表示
@@ -31,6 +57,26 @@ TweetDeck スタイルの Twitter/X デスクトップ・モバイルクライ�
 - **クラッシュ自動復旧** — Linux の WebProcess クラッシュを検知してカラム WebView を自動再生成
 - **Android 対応** — モバイルタブバー UI・スワイプバーでカラムを切り替え表示、広い画面（タブレット・横向き）では 2 カラム同時表示にも対応
 
+## ダウンロード・インストール
+
+[Releases](https://github.com/natsuyasai/multi-column-x/releases/latest) から OS に合ったファイルをダウンロードして実行してください。
+
+| OS      | 配布物         |
+| ------- | -------------- |
+| Windows | インストーラ   |
+| Linux   | AppImage / deb |
+| Android | APK            |
+
+インストール手順や初回セットアップの詳細は [利用ガイド](docs/USER_GUIDE.md) を参照してください。インストール後は、アプリ内の自動アップデートで最新版に更新できます。
+
+## 使い方
+
+1. アカウントを追加する（ツールバーの「アカウント」→「＋ アカウントを追加」→ X にログイン）
+2. カラムを追加する（ツールバーの「カラム追加」でアカウントとページタイプを選択）
+3. グリッド配置・自動更新・NG ワードなどを必要に応じて設定する
+
+画面の見方・設定項目・ショートカット・Android での操作・FAQ は [利用ガイド](docs/USER_GUIDE.md) にまとめています。
+
 ## 技術スタック
 
 | 層             | 技術                            |
@@ -38,322 +84,55 @@ TweetDeck スタイルの Twitter/X デスクトップ・モバイルクライ�
 | フロントエンド | React 19 + TypeScript + Vite    |
 | スタイル       | SCSS Modules                    |
 | 状態管理       | Zustand                         |
-| デスクトップ   | Tauri v2                        |
+| バックエンド   | Rust + Tauri v2                 |
 | 設定永続化     | tauri-plugin-store v2           |
 | テスト         | Vitest + @testing-library/react |
 
-## 開発環境のセットアップ
+## 開発
 
 ### 必要なもの
 
-- [Node.js](https://nodejs.org/) 22 以上（CI では 22 系で検証）
+- [Node.js](https://nodejs.org/) 22 以上
 - [Rust](https://rustup.rs/) / Cargo
 - [Tauri の前提条件](https://tauri.app/start/prerequisites/)（WebView2 など）
 
-Rust をインストールした後、Cargo を PATH に追加：
+Windows で Cargo が見つからない場合は、PATH に `%USERPROFILE%\.cargo\bin` を追加してください。
 
-```powershell
-# PowerShell (永続設定)
-[Environment]::SetEnvironmentVariable(
-  "PATH",
-  "$env:USERPROFILE\.cargo\bin;" + [Environment]::GetEnvironmentVariable("PATH", "User"),
-  "User"
-)
-```
-
-### インストール
+### セットアップと起動
 
 ```bash
 npm install
-```
-
-### 起動
-
-```bash
 npm run tauri:dev
 ```
 
 ### ビルド
 
 ```bash
-# リリースビルド
-npm run tauri:build
-
-# デバッグビルド
-npm run tauri:build:debug
-
-# Android ビルド
-npm run tauri:android:build
+npm run tauri:build          # リリースビルド
+npm run tauri:build:debug    # デバッグビルド
+npm run tauri:android:build  # Android ビルド
 ```
 
 ### テスト・品質チェック
 
 ```bash
-npm test                 # Vitest 単体テスト
-npm run test:property    # fast-check プロパティテスト
-npm run test:story       # Storybook play function（chromium）
-npm run lint             # ESLint
-npm run typecheck        # tsc --noEmit
-npm run lint:rust        # cargo clippy（-D warnings）
+npm test                     # Vitest 単体テスト
+npm run test:property        # fast-check プロパティテスト
+npm run test:story           # Storybook play function（chromium）
+npm run lint                 # ESLint
+npm run typecheck            # tsc --noEmit
+npm run lint:rust            # cargo clippy（-D warnings）
 cd src-tauri && cargo test   # Rust 単体テスト
 ```
 
-## プロジェクト構成
+## ドキュメント
 
-```
-multi-column-x/
-├── src/                              # React フロントエンド
-│   ├── main.tsx
-│   ├── App.tsx                       # ルートコンポーネント・イベント配線
-│   ├── types/index.ts                # 型定義（Column, Account, GlobalSettings 等）
-│   ├── constants/ipc.ts              # IPC 定数（コマンド名・イベント名・ラベル・スクリプト）
-│   ├── store/useAppStore.ts          # Zustand ストア（設定読み書き・状態管理）
-│   ├── lib/
-│   │   ├── gridLayout.ts             # グリッド座標計算（純粋関数・calculateGridBounds）
-│   │   ├── log.ts                    # 文脈名付きエラーロガー（plugin-log 連携）
-│   │   ├── theme.ts                  # テーマ解決（ダーク/ライト/システム）
-│   │   ├── reauthIdentity.ts         # 既存アカウント再認証時の同一アカウント判定
-│   │   ├── apiRateLimit.ts           # API レート制限バケットの severity 判定
-│   │   ├── rafThrottle.ts            # requestAnimationFrame 単位のスロットル
-│   │   ├── githubRelease.ts          # GitHub Releases API 応答の解析（APK 自己更新のハッシュ取得等）
-│   │   ├── updatePrompt.ts / version.ts  # 更新案内の要否・バージョン比較
-│   │   ├── autoReloadTarget.ts       # 自動更新対象カラムの判定
-│   │   ├── columnOrder.ts            # TopBar のカラム並び順計算
-│   │   ├── linkPopupUrl.ts           # リンクポップアップ URL のスキーム補完
-│   │   ├── ngWordPattern.ts          # NG ワードのマッチ判定
-│   │   └── repostHiddenUserId.ts     # リポスト非表示ユーザー ID の正規化・検証
-│   ├── services/
-│   │   ├── columnWebview.ts          # カラム WebView への Tauri IPC 呼び出しを集約
-│   │   ├── externalColumn.ts         # 外部 URL カラムのデータディレクトリ操作
-│   │   └── updater.ts                # 自動アップデート（デスクトップ/Android）の IPC 呼び出し
-│   ├── hooks/
-│   │   ├── useColumns.ts             # カラム操作の公開 API（mobile/desktop 実装へ委譲）
-│   │   ├── useMobileColumns.ts       # モバイル: アクティブカラム・スワイプ・起動時復元
-│   │   ├── useDesktopColumns.ts      # デスクトップ: グリッド再配置・リサイズ監視
-│   │   ├── useWebviewEvents.ts       # WebView 発のイベント listen（スクロール・新着数）
-│   │   ├── useAccounts.ts            # アカウント追加・削除
-│   │   ├── useAutoReload.ts          # 自動更新カウントダウン
-│   │   ├── useAppUpdater.ts          # 自動アップデートの確認・進捗表示
-│   │   ├── useWhatsNew.ts            # 更新後の What's New 表示
-│   │   ├── useTheme.ts               # テーマ（ダーク/ライト/システム）切替
-│   │   ├── useDialogState.ts         # ダイアログ開閉状態管理
-│   │   ├── useEscapeKey.ts           # Esc キーでのダイアログ/ポップアップ閉じる処理
-│   │   ├── useOutsideClick.ts        # 要素外クリック検出
-│   │   └── useKeyboardShortcuts.ts   # キーボードショートカット処理
-│   └── components/
-│       ├── ColumnHeader/             # カラムヘッダー（更新・設定・削除ボタン）
-│       ├── AddColumnDialog/          # カラム追加ダイアログ
-│       ├── AccountManager/           # アカウント管理ダイアログ
-│       ├── AccountNameDialog/        # アカウント名入力ダイアログ
-│       ├── ApiRateLimitIndicator/    # API レート制限モニターのツールバー表示
-│       ├── SettingsPanel/            # カラム個別設定パネル
-│       ├── AppSettingsPanel/         # アプリ全体設定
-│       │   ├── ColumnLayoutTab.tsx   # グリッドレイアウト設定タブ
-│       │   └── PresetsTab.tsx        # カラムプリセット管理タブ
-│       ├── TopBar/                   # 横方向ツールバー（デスクトップ）
-│       ├── MobileTabBar/             # モバイルタブバー（Android）
-│       ├── TabActionDialog/          # モバイルタブ長押しアクションダイアログ
-│       ├── LinkPopupDialog/          # リンクポップアップ URL 入力ダイアログ
-│       ├── ConfirmDialog/            # 汎用確認ダイアログ
-│       ├── HelpPopover/              # ヘルプ用ポップオーバー
-│       ├── ShortcutHelpDialog/       # キーボードショートカット一覧ダイアログ
-│       ├── UpdateDialog/             # アプリ更新確認・進捗ダイアログ
-│       └── WhatsNewDialog/           # 更新後の What's New ダイアログ
-└── src-tauri/                        # Rust バックエンド
-    ├── tauri.conf.json
-    ├── Cargo.toml
-    └── src/
-        ├── lib.rs                    # Tauri ビルダー・コマンド登録・ウィンドウ位置復元
-        ├── state.rs                  # WebView レジストリ（label → accountId / dataDir）
-        ├── ipc_constants.rs          # IPC 定数（Rust 側）
-        ├── android_bridge.rs         # JNI ブリッジ（Android WebView 操作）
-        ├── acl_contract.rs           # コマンドの capability(ACL) 許可漏れを検知する契約テスト
-        ├── linux_codec_env.rs        # Linux のメディアコーデック（GStreamer 等）環境判定
-        ├── video/                    # 動画ダウンロード（hls.rs=HLS/m3u8 処理, http.rs=HTTP I/O）
-        ├── commands/
-        │   ├── settings.rs           # 設定の保存・読み込み（tauri-plugin-store）
-        │   ├── settings_store.rs     # Rust 側の設定読み出しヘルパー（store 直接参照）
-        │   ├── webview/
-        │   │   ├── column.rs         # カラム WebView の作成・削除・リサイズ・URL 解決（Linux 配置・クリッピングを含む）
-        │   │   ├── popup.rs          # メディア/リンクポップアップ・セッション切替
-        │   │   └── compose.rs        # ツイート作成ウィンドウ
-        │   ├── account.rs            # アカウントウィンドウ・ログイン検出・再認証（desktop/mobile 分岐）
-        │   ├── update.rs             # Android APK 自己更新（呼び出し元制限・URL 許可リスト・SHA-256 検証）
-        │   ├── media_codec.rs        # Linux AppImage のメディアコーデック対応状況判定
-        │   ├── openh264_fetch.rs / openh264_http_client.rs  # Cisco OpenH264 ランタイムのダウンロード・有効化
-        │   ├── arch_support.rs       # 対応アーキテクチャ（x86_64）の判定
-        │   └── video_download.rs     # カラム上の動画ダウンロード（デスクトップ）
-        └── inject/                   # WebView に注入する JS
-            ├── _src/                 # TypeScript ソース（Vite でバンドル → *.js に出力）
-            │   ├── auto_reload.ts    # 自動更新（新着数報告を含む）
-            │   ├── api_rate_limit_monitor.ts # X内部APIのレート制限ヘッダ監視
-            │   ├── blur_image.ts     # 画像ぼかし表示
-            │   ├── compose_only.ts   # 投稿専用カラム（投稿フォーム以外をスポットライト非表示）
-            │   ├── context_menu.ts   # カスタムコンテキストメニュー
-            │   ├── custom_css.ts     # カスタム CSS 適用
-            │   ├── dom_observer.ts   # DOM 変化監視を共有する単一 MutationObserver ハブ
-            │   ├── header_customizer.ts / useHeaderCustomizer.ts / HeaderCustomizer.tsx  # ヘッダー非表示
-            │   ├── hide_ad.ts        # 広告非表示
-            │   ├── image_popup.ts    # メディアリンクをポップアップで開く
-            │   ├── keyboard_shortcut.ts # ショートカットキーを main へ転送
-            │   ├── mobile_area_hide.ts  # モバイル用の領域非表示
-            │   ├── ng_word.ts / ng_word_matcher.ts  # NG ワードフィルタ
-            │   ├── notification_header_hide.ts # 通知ページの設定ヘッダー非表示
-            │   ├── popup_toolbar.ts  # ポップアップツールバー（アカウント切替）
-            │   ├── popup_video_autoplay.ts # ポップアップ動画の自動再生
-            │   ├── repost_hide_matcher.ts # 指定ユーザーのリポスト非表示判定
-            │   ├── return_to_last_read.ts / return_to_last_read_logic.ts # 前回の境目へ戻るボタン・写真閲覧後の位置復元
-            │   ├── scroll_event.ts   # 横スクロールイベントを main WebView に中継
-            │   ├── sidebar_hide.ts   # x.com サイドバー非表示
-            │   ├── small_image.ts    # 画像縮小表示
-            │   ├── tab_selector.ts   # ホームタブ選択
-            │   ├── video_control.ts  # 動画自動再生停止
-            │   └── video_long_press_menu.ts # 動画の長押し/右クリックメニュー（ポップアップ表示・ダウンロード）
-            ├── *.js                  # _src をビルドした成果物（gitignore 対象・直接編集禁止）
-            └── mod.rs                # build_init_script / build_popup_init_script
-```
-
-Kotlin 層（Android）:
-
-```
-src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/
-├── MainActivity.kt                  # カラム/ポップアップ WebView 管理・バックボタン処理
-├── AddAccount.kt                    # ログイン用 Activity（センチネルファイル書き込みで完了通知）
-├── ApiRateLimitBridge.kt            # APIレート制限ヘッダの JS ブリッジ
-├── ApkHashVerifier.kt               # APK 自己更新の SHA-256 検証
-├── AppBridge.kt                     # Rust JNI 呼び出しの窓口
-├── BackupFileSelector.kt / MultiColumnXBackupAgent.kt  # Auto Backup 対象ファイルの選定
-├── BridgeMessage.kt / BridgeOrigins.kt  # JS ブリッジのメッセージ形式・許可オリジン
-├── ColumnWebViewUtils.kt            # カラム WebView 生成・操作ヘルパー
-├── FileChooserUtils.kt              # ファイル選択ダイアログ処理
-├── PopupSessionBridge.kt            # ポップアップのセッション切替ブリッジ
-├── ReauthUtils.kt                   # 既存アカウント再認証ヘルパー
-├── SwipeBarOverlayView.kt / SwipeGestureResolver.kt  # スワイプ切替バーの描画・ジェスチャー判定
-├── ThreadUtils.kt                   # UI スレッド実行ヘルパー
-├── TwidUtils.kt                     # X ユーザー ID 抽出ユーティリティ
-├── UrlUtils.kt                      # URL ユーティリティ
-├── VideoDownloadForegroundService.kt / VideoDownloadRequestBridge.kt  # 動画ダウンロード（フォアグラウンドサービス）
-└── WebViewProfiles.kt               # WebView Profile API のサポート判定・適用
-```
-
-## Tauri コマンド一覧
-
-| コマンド                             | 説明                                                                                                        |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| `load_settings`                      | 設定ファイルの読み込み                                                                                      |
-| `save_settings`                      | 設定ファイルへの書き込み                                                                                    |
-| `create_column_webview`              | カラム WebView の作成                                                                                       |
-| `get_external_column_data_directory` | 外部 URL カラム（アカウント非依存）のデータ保存先ディレクトリを取得                                         |
-| `delete_external_column_data`        | 外部 URL カラムの保存先データディレクトリを削除                                                             |
-| `remove_column_webview`              | カラム WebView の削除                                                                                       |
-| `resize_column_webview`              | カラム WebView のリサイズ・移動                                                                             |
-| `open_popup_window`                  | メディアポップアップを開く                                                                                  |
-| `open_link_popup_window`             | 任意 URL のリンクポップアップを開く                                                                         |
-| `close_popup_window`                 | ポップアップを閉じる                                                                                        |
-| `switch_popup_session`               | ポップアップのアカウントを切り替え（ウィンドウ再作成）                                                      |
-| `eval_in_webview`                    | 指定 WebView で JS を評価                                                                                   |
-| `report_webview_scroll`              | WebView からの横スクロールを main に中継                                                                    |
-| `report_new_posts_count`             | カラムの新着投稿数を main WebView に中継                                                                    |
-| `report_official_settings`           | X 公式の表示設定変更を配布先カラムへ中継                                                                    |
-| `report_api_rate_limit`              | inject が検出した X 内部 API のレート制限ヘッダを main へ中継                                               |
-| `report_keyboard_shortcut`           | inject から検出したキーボードショートカットを中継                                                           |
-| `get_mobile_insets`                  | Android システム UI のインセット（ノッチ等）を取得                                                          |
-| `set_column_cookies`                 | カラム WebView に Cookie を設定（Android）                                                                  |
-| `is_webview_profile_supported`       | Android の WebView Profile API 対応可否を判定（2 カラム同時表示の可否判定に使用）                           |
-| `update_mobile_swipe_bar`            | モバイルのスワイプ切替バー設定（高さ・透過度等）を反映                                                      |
-| `flash_mobile_swipe_bar`             | モバイルのスワイプ切替バーを一時的に表示                                                                    |
-| `open_add_account_window`            | アカウント追加ウィンドウを開く（ログイン検出付き）                                                          |
-| `reauth_account_window`              | 既存アカウントの再認証ウィンドウを開く                                                                      |
-| `delete_account_data`                | アカウントデータディレクトリを削除                                                                          |
-| `close_window`                       | 指定ラベルのウィンドウ / WebView を閉じる                                                                   |
-| `open_compose_window`                | ツイート作成ウィンドウを開く                                                                                |
-| `install_apk_update`                 | APK をダウンロードしてインストーラを起動（Android。呼び出し元 main 限定・URL 許可リスト・SHA-256 検証付き） |
-| `check_media_codec_support`          | Linux AppImage でのメディアコーデック（H.264/AAC）対応状況を判定                                            |
-| `download_and_enable_h264`           | Cisco OpenH264 ランタイムをダウンロードして有効化（デスクトップ Linux のみ）                                |
-| `download_video`                     | カラム上の動画をダウンロード（デスクトップのみ。Android は別経路でネイティブ実装）                          |
-
-**新しいコマンドを `lib.rs` の `generate_handler!` に追加したら、`src-tauri/build.rs` の `AppManifest::commands` と、呼び出し元に応じた `src-tauri/capabilities/*.json` の許可（`allow-<コマンド名のケバブケース>`）を必ず同時に更新すること。** アプリ独自コマンドは ACL（capability）の対象であり、どの capability にも許可されていないコマンドは main を含む全 WebView から "not allowed by ACL" として拒否される（`src-tauri/src/acl_contract.rs` の契約テストが漏れを検知する）。
-
-## アーキテクチャ上の注意点
-
-### Tauri 子 WebView と z-index
-
-Tauri v2 の `window.add_child()` で作成した子 WebView は OS ネイティブウィンドウのため、CSS の `z-index` が効かない。ダイアログ表示中は全カラム WebView を画面外（x: -9999）に退避し、閉じたときに座標を復元する。
-
-### 外部 WebView への IPC 注入（remote capability）
-
-x.com などの外部 URL を表示するカラム / ポップアップ WebView には、`src-tauri/capabilities/column-webview.json` の `remote` 設定によって IPC（`window.__TAURI__`）が注入される。inject スクリプト（新着数報告・横スクロール中継・メディアポップアップ等）はこの IPC を通じて Tauri コマンドを invoke する。リモートページにアプリのコマンドを開放する設定であるため、`remote.urls` の対象ドメインは必要最小限に保つこと。
-
-なお、ログイン完了の検出だけは IPC ではなく、デスクトップでは Rust 側の tokio タスクが URL を 500ms ごとにポーリングして行う（ログイン画面の遷移を JS 注入に依存させないため）。
-
-### remote capability のドメイン限定
-
-`src-tauri/capabilities/column-webview.json` の `remote.urls` はカラム/ポップアップ WebView に IPC（`window.__TAURI__`）を注入する対象を制御する。inject スクリプト（`auto_reload.ts` / `scroll_event.ts` / `image_popup.ts` 等）が x.com 上で `invoke` を使うため IPC 注入自体は必要だが、`https://*` のような全ドメイン許可はリモートページに全カスタムコマンドの呼び出しを許してしまう（サプライチェーン侵害・任意 https サイトへのリンクポップアップ経由での攻撃面拡大）。
-
-- **対象ドメイン**: `https://x.com/*` / `https://*.x.com/*` / `https://twitter.com/*` / `https://*.twitter.com/*` のみ。`http://*` は許可しない。
-- **縮退挙動**: 上記以外のドメイン（リンクポップアップで開いた外部サイト等）では IPC が注入されないため、ページ表示自体は正常に行われるが、ツールバーの invoke 系機能（新着バッジ通知・画像ポップアップ等）は無効化される。inject スクリプトは `if (invoke)` 等のガードで未注入時も例外を出さない設計。
-- **多層防御**: ドメイン限定に加え、破壊的コマンド（`delete_account_data` / `eval_in_webview` / `close_window` / `save_settings`）は呼び出し元ウィンドウが `main` であることを要求する（`commands::require_main_caller`）。x.com 自体がリモートコンテンツであるため、ドメイン限定だけに依存せず両輪で防御する。
-
-### アップデート方式のセキュリティ
-
-更新の配信・適用は改ざんを前提に多層で検証する。
-
-- **デスクトップ**: `tauri-plugin-updater` が `tauri.conf.json` の `pubkey`（minisign 公開鍵）で `latest.json` と成果物の署名を検証してから適用する。エンドポイントは自リポジトリの GitHub Releases（HTTPS）に固定。
-- **Android（APK 自己更新）**: `install_apk_update` コマンドを 3 層で検証する。
-  1. **呼び出し元制限**: 純関数 `validate_install_request`（`commands/update.rs`）が呼び出し元ウィンドウを `main` に限定する。x.com を表示するカラム/ポップアップ WebView（remote capability で IPC が注入される）からの invoke を拒否する。
-  2. **URL 許可リスト**: ダウンロード URL は自リポジトリの GitHub Releases（`https://github.com/natsuyasai/multi-column-x/releases/download/` プレフィックス）配下の `.apk` のみ許可。`..` / `\` / `?` / `#` / `@` / 空白などパストラバーサル・リダイレクト誘導・userinfo トリックに使われる文字を拒否する。
-  3. **SHA-256 検証（fail-closed）**: 期待ハッシュは GitHub Releases API（`/releases/latest`）の APK アセットの `digest` フィールド（`sha256:<hex>`）から取得する（`githubRelease.ts` の `parseDigestSha256`）。API は CORS ヘッダ（`Access-Control-Allow-Origin: *`）を返すため WebView から読める。TS 側（`updater.ts` / `githubRelease.ts`）がこの期待ハッシュを `install_apk_update` に渡し、Kotlin の `ApkHashVerifier` がダウンロード後に照合してから OS インストーラを起動する。`digest` が取得できない・不正な場合はインストールを中止する。
-     - **なぜ API digest か**: リリースの `.apk` ダウンロード URL（`release-assets.githubusercontent.com`）は CORS ヘッダを返さないため、WebView の `fetch()` で直接ハッシュ（サイドカー等）を取得すると reject されて更新が中断する。CORS の効く API レスポンスに含まれる `digest` を使うことでこれを回避する。`release.yml` が併載する `.apk.sha256` はアプリでは使わず、`sha256sum -c` 等の手動検証用アーティファクトとして残している。
-- **CI/配信**: `release.yml` / `ci.yml` の GitHub Actions はすべてコミット SHA にピン留めし（タグ差し替え攻撃対策。特に署名鍵が渡る `tauri-action`）、署名鍵・keystore を扱う `desktop` / `android` ジョブは `environment: release` 下に置く（承認ゲート・Secrets 保護）。
-
-`MainActivity.downloadAndInstallApk` のシグネチャを変更した場合は、`proguard-rules.pro` の keep ルールも同時に更新すること（R8 難読化でのリリースビルド限定 `NoSuchMethodException` を防ぐ）。
-
-### serde の camelCase / snake_case
-
-Tauri v2 は JS → Rust の自動ケース変換を行わない。JS 側が camelCase で送るフィールドには `#[serde(rename = "camelCaseName")]` が必要。
-
-### desktop / mobile 条件コンパイル
-
-機能を `#[cfg(desktop)]` / `#[cfg(mobile)]` で分岐している。
-
-- **desktop**: `window.add_child()` で子 WebView を作成。URL を 500ms ポーリングしてログイン完了を検出し `account-login-complete` イベントを emit する。
-- **mobile (Android)**: カラム WebView はネイティブ Android WebView を content FrameLayout のオーバーレイとして JNI 経由（`android_bridge.rs` → `MainActivity.kt`）で生成する。アカウント追加はセンチネルファイル方式で、`AddAccount.kt` が `add_account_login_complete` ファイルを書き込み、`open_add_account_window` が tokio でポーリングしてブロックする。
-
-### inject スクリプトのビルドフロー
-
-`src-tauri/src/inject/_src/` に TypeScript / React ソースを置き、`vite.inject.config.ts` でバンドルして `src-tauri/src/inject/*.js` に出力する。`npm run tauri:dev` / `tauri:build` は前段で `build:inject` を実行するため、`_src` を変更したら再ビルドが必要。ビルド済み `.js` は管理対象外のため、直接作成編集は禁止。
-
-### グリッドレイアウト
-
-`Column.gridRow` / `Column.gridCol` でカラムをマトリクス状に配置する。同じ `gridCol` に複数カラムを配置すると縦積みになり、`heightMode`（`auto` / `fixed`）と `heightValue` / `heightUnit`（`px` / `%`）で各カラムの高さを制御する。`src/lib/gridLayout.ts` の `calculateGridBounds` が各カラムの絶対座標を計算して Rust に渡す。
-
-### Linux カラム WebView の配置・クリッピング仕様
-
-Windows / macOS ではカラムは `window.add_child()` の子 WebView で、親ウィンドウのクライアント領域によって自動的にクリップされる。一方 **Linux ではカラムが独立した `WebviewWindow`（OS ネイティブウィンドウ）** のため親クリップが効かず、横スクロールで画面端にはみ出すカラムの表示を Rust 側の座標計算で明示的に制御する。このロジックは `resize_column_webview`（`src-tauri/src/commands/webview/column.rs`）の純粋関数 `linux_column_layout` に集約されている。
-
-仕様（横スクロール時の各カラムの可視領域）:
-
-- **ウィンドウは常に画面内（論理 X 座標 `>= 0`）に配置する**。Linux の WM はウィンドウ X 座標を画面内へクランプするため、負の座標を指定して「スクリーン左端で自然クリップ」させる方式は機能しない（左端カラムが全幅のまま左端に居座り、完全に画面外になるまで縮まないデグレードを引き起こす）。
-- **左右対称の「幅クリップ」**: 画面端にはみ出したカラムは、はみ出した分だけ幅を縮めて表示する（左端・右端とも同じ挙動）。可視領域は `left = max(0, x)` 〜 `right = min(x + width, ウィンドウ幅)` で求め、幅 `right - left` で配置する。
-- **完全に画面外**（`x + width <= 0` または `x >= ウィンドウ幅`）のカラムは `hide()` する。
-- **起動時は `visible(false)` で非表示作成**し、全カラム作成後に `recalculateAllBounds`（→ `resize_column_webview`）で WM が確定した座標へ配置してから `show()` する。WM がウィンドウ位置を確定する前に誤った座標で可視化すると WebKit WebProcess が不正状態で起動し、カラムが空白になる。
-
-`linux_column_layout` は純粋関数として example テストとプロパティテスト（`x_offset >= 0` など WM クランプ回避の不変条件）で仕様を固定している。**このクリッピング挙動を変更する場合は、必ず `linux_column_layout` のテストで仕様を表現してから実装すること**（過去にインライン実装のままテストなしで挙動が変わりデグレードした経緯がある）。
-
-#### WebProcess クラッシュ対策（横スクロール・スリープ復帰）
-
-Linux の独立 `WebviewWindow` は WebKitGTK の WebProcess で描画されるが、(1) 横スクロールで `resize_column_webview` が高頻度に連続発火したとき、(2) スリープ復帰後などに、WebProcess がクラッシュして白画面/フリーズになることがある。次の3層で予防と復旧を行う:
-
-- **予防（スクロール）**: スクロールバー操作 → 全カラム再配置を `rafThrottle`（`src/lib/rafThrottle.ts`）で 1 フレーム 1 回に間引き、`resize_column_webview` の連続発火を抑える（`useDesktopColumns.handleScrollbarScroll`）。
-- **自動復旧**: カラム作成時に webkit2gtk の `connect_web_process_terminated` を接続し、クラッシュ時に `column-webview-crashed`（payload=columnId）を emit する。TS 側 `useColumnCrashRecovery` が当該カラムを再生成して自動復旧する。無限ループを防ぐため復旧には二重のガードを設ける: (a) 直近再生成から `CRASH_RECOVERY_COOLDOWN_MS`（5秒）以内の重複クラッシュは無視、(b) 同一カラムの連続再生成が `MAX_CRASH_RECOVERY_ATTEMPTS`（3回）に達したら自動復旧を諦めて手動再読込に委ねる。ただし `CRASH_RECOVERY_STABILITY_RESET_MS`（60秒）以上安定稼働してからのクラッシュは新規事象として試行回数をリセットする（スリープ復帰などでの再発は再び自動復旧できる=バックオフ）。
-- **手動復旧**: カラムヘッダの「⟳ ページを再読み込み」ボタンはデスクトップでは `location.reload` ではなく WebView 自体の再生成（`recreateColumnWebview`）を行い、`location.reload` が効かない白画面からも復旧できる。モバイル（Android ネイティブ WebView）は従来どおりページ再読み込み。
-
-webkit2gtk は wry と同一バージョン（`=2.0.2`, `v2_40`）を `[target.'cfg(target_os = "linux")'.dependencies]` でピン留めする（`PlatformWebview::inner()` の戻り型を一致させるため）。
-
-#### AppImage への GStreamer 同梱（必須）
-
-`tauri.conf.json` の `bundle.linux.appimage.bundleMediaFramework` は **`true` を維持すること**。AppImage は `LD_LIBRARY_PATH` を同梱ライブラリに向けて動作するため、GStreamer プラグイン（`appsink`=gst-plugins-base、`autoaudiosink`=gst-plugins-good ほか）を同梱しないと、同梱 WebKit が動画/音声再生時に見つからないメディア要素（NULL）へ `g_signal_connect` して **WebProcess がクラッシュ（reason=Crashed）** する。x.com の home タイムラインは動画を含むため、可視状態のカラムが起動直後からクラッシュ → 上記自動復旧が延々と再生成する無限ループに陥る（システムに GStreamer が入っていても AppImage 内からは参照されないため `npm run tauri:dev` や素のバイナリ実行では再現せず、AppImage 起動でのみ再現する点に注意）。
-
-同種の不足を deb 版でも防ぐため、`bundle.linux.deb.depends` に `gstreamer1.0-plugins-{base,good,bad}` と `gstreamer1.0-libav` を明記している。
-
-なお、AAC デコーダ（AAC-LC プロファイル限定の `libfdk-aac` + GStreamer `fdkaac` プラグイン）は、AAC-LC のコア特許が失効済みと判断し、CI で `gst-plugins-bad` から `fdkaac` エレメントのみを自前ビルドして AppImage に実際に同梱している。一方 H.264 デコーダ（Cisco OpenH264）は、Cisco の特許ロイヤリティ負担が「Cisco 自身の配布チャネルから直接ダウンロードする」場合にのみ適用されるため AppImage に同梱できず、Cisco 公式サーバーから直接ダウンロードする方式（Firefox/Chromium と同じ方式）の Rust コマンド `download_and_enable_h264` を用意している。欠如検出の `check_media_codec_support` コマンドと `scripts/install.sh` の案内表示も残しているが、アプリ内の案内 UI（起動時チェック・案内ダイアログ）は削除済みで、現在フロントからの呼び出し口は無い。詳細は `docs/development/linux-webview-notes.md`「AppImage の H.264/AAC コーデック対応」を参照。
+| ドキュメント                                                          | 内容                                                         |
+| --------------------------------------------------------------------- | ------------------------------------------------------------ |
+| [利用ガイド](docs/USER_GUIDE.md)                                      | アプリの使い方（利用者向け）                                 |
+| [開発ノート一覧](docs/development/README.md)                          | 設計判断・落とし穴・仕様の背景（開発者向け）                 |
+| [プロジェクト構成](docs/development/project-structure.md)             | `src/` / `src-tauri/` / Android Kotlin 層のファイル構成      |
+| [Tauri コマンド一覧](docs/development/tauri-commands.md)              | アプリ独自コマンドと ACL 更新ルール                          |
+| [アーキテクチャ上の注意点](docs/development/architecture-overview.md) | WebView・remote capability・更新セキュリティ・条件コンパイル |
+| [Linux カラム WebView 仕様](docs/development/linux-column-spec.md)    | 配置・クリッピング・クラッシュ対策・GStreamer 同梱           |
+| [CLAUDE.md](CLAUDE.md)                                                | 開発ガイドライン・アーキテクチャ上の制約                     |

@@ -6,7 +6,7 @@ Multi Column X — TweetDeck スタイルの Twitter/X クライアント（Taur
 React 19 + TypeScript フロントエンドと Rust バックエンドで構成。  
 デスクトップ（Windows/Mac/Linux）と Android に対応。
 
-詳細は `README.md` を参照。
+詳細は `README.md`（概要）と `docs/development/`（技術詳細。構成は `project-structure.md`、コマンドは `tauri-commands.md`、設計上の注意は `architecture-overview.md`）を参照。
 
 このプロジェクトではCodeGraphを利用しています。
 
@@ -86,7 +86,7 @@ Tauri v2 は JS→Rust のケース変換を行わない。JS 側 camelCase フ�
 
 ### Linux カラム WebView のクリッピング・WebProcess クラッシュ対策（デグレ注意）
 
-Linux ではカラムが独立 `WebviewWindow`（親クリップが効かない）ため、横スクロール時のはみ出し表示を `linux_column_layout`（`src-tauri/src/commands/webview/column.rs`）で制御する。正式仕様は **README.md「Linux カラム WebView の配置・クリッピング仕様」** に明記。実装ファイル・落とし穴・テスト方針の詳細は `docs/development/linux-webview-notes.md` を参照。**過去にインライン実装・テスト無しで複数回デグレードしている領域のため、変更する場合は必ず参照ノートのテスト方針に従うこと。**
+Linux ではカラムが独立 `WebviewWindow`（親クリップが効かない）ため、横スクロール時のはみ出し表示を `linux_column_layout`（`src-tauri/src/commands/webview/column.rs`）で制御する。正式仕様は **`docs/development/linux-column-spec.md`** に明記。実装ファイル・落とし穴・テスト方針の詳細は `docs/development/linux-webview-notes.md` を参照。**過去にインライン実装・テスト無しで複数回デグレードしている領域のため、変更する場合は必ず参照ノートのテスト方針に従うこと。**
 
 ### Tauri ウィンドウの close() と destroy()（常駐ウィンドウの破棄）
 
