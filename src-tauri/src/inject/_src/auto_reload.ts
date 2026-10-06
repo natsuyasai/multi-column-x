@@ -98,6 +98,40 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
     "mousedown",
   ] as const;
 
+  // 自分で scrollTop = 0 にしたことがあるか。無い間（ページ読み込み直後）の
+  // スクロール位置は、X の復元スクロールを尊重するためユーザーのものとして扱う。
+  let hasProgrammaticTop = false;
+  // 最後に自分で先頭へ戻して以降、ユーザー操作（ホイール・タッチ・キー・マウス押下）があったか。
+  let userInteractedSinceTop = false;
+  for (const type of SCROLL_TOP_PIN_RELEASE_EVENTS) {
+    window.addEventListener(
+      type,
+      () => {
+        userInteractedSinceTop = true;
+      },
+      { passive: true },
+    );
+  }
+
+  /** 自分で先頭へ戻す（ユーザー操作の記録をリセットする）。 */
+  function scrollToTopByScript(scrollingElement: Element): void {
+    scrollingElement.scrollTop = 0;
+    hasProgrammaticTop = true;
+    userInteractedSinceTop = false;
+  }
+
+  /**
+   * 通知・検索ページで、ユーザー操作によらないスクロールのずれ（遅れて挿入された新着による
+   * スクロールアンカリング等）を先頭へ補正する。ユーザー自身のスクロール位置は触らない。
+   */
+  function correctExternalScrollOffset(): void {
+    const el = document.scrollingElement;
+    if (!el || el.scrollTop <= 0) return;
+    if (!isScrollRoundtripPage()) return;
+    if (!hasProgrammaticTop || userInteractedSinceTop) return;
+    el.scrollTop = 0;
+  }
+
   // スクロール往復の実行中フラグ。二重実行を防ぐ。
   let scrollRoundtripRunning = false;
   // 実行中の先頭固定の解除関数。二重固定を防ぐ。
@@ -250,6 +284,8 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
 
       // 監視期間中（最大30秒）にユーザーがスクロールしていたら、DOM recycle による
       // 誤検出を避けるためその回の判定を打ち切る（新着報告しない）。
+      // ただしユーザー操作によらないずれ（遅れて挿入された新着等）は先に先頭へ補正する。
+      correctExternalScrollOffset();
       if (isScrolling()) {
         observer.disconnect();
         cleanUp();
@@ -383,7 +419,7 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
       // 先頭へ戻す直前に解除する（往復完了後は次の更新を実行できる）。
       scrollRoundtripRunning = false;
       if (!isScrollRoundtripPage()) return;
-      scrollingElement.scrollTop = 0;
+      scrollToTopByScript(scrollingElement);
       // 戻した直後の新規項目挿入によるずれを補正する。waitForNewTweet() の observer より
       // 先に登録し、isScrolling() による打ち切りが誤作動しないようにする。
       pinScrollTop(scrollingElement);
@@ -394,8 +430,9 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
 
   function triggerReload(scrollToTop?: boolean): void {
     if (scrollToTop && document.scrollingElement) {
-      document.scrollingElement.scrollTop = 0;
+      scrollToTopByScript(document.scrollingElement);
     }
+    correctExternalScrollOffset();
     if (isScrolling()) return;
 
     if (isScrollRoundtripPage()) {
