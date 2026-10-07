@@ -67,7 +67,7 @@ npm run build
   cd src-tauri/gen/android && ./gradlew.bat :app:testUniversalDebugUnitTest
   ```
 
-  app モジュールは universal フレーバー付きのため `testDebugUnitTest` では app のテストが実行されない（CLAUDE.md参照）。
+  app モジュールは universal フレーバー付きのため `testDebugUnitTest` では app のテストが実行されない（`docs/development/android-notes.md` 参照）。
 
 ## エラー修正の優先順位
 

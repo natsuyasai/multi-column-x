@@ -80,8 +80,14 @@ digraph cycle {
 レビュー合格したら、その作業ステップ単位でコミットする。
 
 ```bash
-git add -A && git commit -m "<このステップの内容>"
+git add <このステップで変更したファイル>   # git add -A は使わず対象を明示する
+git commit -m "<このステップの内容>
+
+Co-Authored-By: <プランに明記したトレーラー>
+Claude-Session: <プランに明記したトレーラー>"
 ```
+
+- トレーラーはプラン（`plan.md`）に明記したものをそのまま使う（CLAUDE.md「サブエージェント運用」）。
 
 コミット後、`progress.md` の該当ステップを「コミット済み」に更新し、コミットハッシュを記録する。
 
@@ -89,12 +95,14 @@ git add -A && git commit -m "<このステップの内容>"
 
 実装対象に応じて以下を作る。配置は対象ソースと同じディレクトリ（コロケーション）。
 
-| テスト種別             | ツール                  | 配置                                                        | 目的                                           |
-| ---------------------- | ----------------------- | ----------------------------------------------------------- | ---------------------------------------------- |
-| 単体テスト             | vitest                  | `src/**/<name>.test.ts(x)`                                  | 関数・hook・ロジック・コンポーネントの単体検証 |
-| コンポーネントカタログ | Storybook Story         | `src/components/<Name>/<Name>.stories.tsx`                  | 見た目のバリエーション（Light/Dark等）         |
-| インタラクションテスト | Storybook play function | 同上のStory内 `play`（`npm run test:story` でchromium実行） | コンポーネントのインタラクション検証           |
-| プロパティテスト       | fast-check + vitest     | `src/**/<name>.property.test.ts`                            | 仕様が明確な純粋関数の不変条件検証             |
+| テスト種別             | ツール                  | 配置                                                        | 目的                                                              |
+| ---------------------- | ----------------------- | ----------------------------------------------------------- | ----------------------------------------------------------------- |
+| 単体テスト             | vitest                  | `src/**/<name>.test.ts(x)`                                  | 関数・hook・ロジック・コンポーネントの単体検証                    |
+| コンポーネントカタログ | Storybook Story         | `src/components/<Name>/<Name>.stories.tsx`                  | 見た目のバリエーション（Light/Dark等）                            |
+| インタラクションテスト | Storybook play function | 同上のStory内 `play`（`npm run test:story` でchromium実行） | コンポーネントのインタラクション検証                              |
+| プロパティテスト       | fast-check + vitest     | `src/**/<name>.property.test.ts`                            | 仕様が明確な純粋関数の不変条件検証                                |
+| Rust 単体テスト        | cargo test              | 対象モジュール内の `#[cfg(test)] mod tests`                 | コマンド・純粋関数の検証（関数名に ASCII 大文字禁止）             |
+| Kotlin 単体テスト      | JUnit4                  | `src-tauri/gen/android/app/src/test/java/...`               | Android ネイティブ処理の検証（`:app:testUniversalDebugUnitTest`） |
 
 - Story/play function の書き方・テーマバリエーションは `storybook-dev` スキルに従う。
 - 新規コンポーネントの雛形は `component-create` スキルを使う。

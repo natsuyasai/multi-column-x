@@ -4,7 +4,7 @@ user-invocable: true
 argument-hint: "対象のプラン名や対象範囲（省略時は現在のブランチのgit diffと直近のtmp/plansから判断する）"
 ---
 
-# 結合テスト観点出力
+# 手動テスト項目出力（フェーズ6）
 
 `check-creation`（format/typecheck/lint/test/build）では検出できない、ブラウザ・実機での手動確認観点を構造化して出力する。
 

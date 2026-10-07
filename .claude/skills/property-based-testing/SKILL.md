@@ -100,7 +100,7 @@ mod properties {
 - 配置: `src-tauri/gen/android/app/src/test/java/.../<Name>PropertyTest.kt`
 - 依存: `app/build.gradle.kts` に `testImplementation("io.kotest:kotest-property:5.9.1")`（kotest 5.x は jvmTarget 1.8 互換。6.x は JVM 11 なので**上げない**）
 - 既存テストは JUnit4 のため、kotest ランナーは使わず **JUnit4 の `@Test` から `runBlocking { forAll(...) }`** を呼ぶ
-- 実行: `cd src-tauri/gen/android && ./gradlew.bat :app:testUniversalDebugUnitTest`（universal フレーバーのため `testDebugUnitTest` では実行されない。CLAUDE.md参照）
+- 実行: `cd src-tauri/gen/android && ./gradlew.bat :app:testUniversalDebugUnitTest`（universal フレーバーのため `testDebugUnitTest` では実行されない。`docs/development/android-notes.md` 参照）
 - 実装例: `UrlUtilsPropertyTest.kt`
 
 ```kotlin
