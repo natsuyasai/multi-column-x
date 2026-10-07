@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { renderHook, act } from "@testing-library/react";
+import { StrictMode } from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { WEBVIEW_SCRIPTS } from "@/constants/ipc";
 import { useAutoReload } from "./useAutoReload";
@@ -68,6 +69,19 @@ describe("useAutoReload", () => {
     expect(script).toBe(WEBVIEW_SCRIPTS.TRIGGER_RELOAD);
     expect(script).toContain("triggerReload");
     expect(script).not.toContain("triggerReload(true)");
+  });
+
+  it("自動更新の間隔が経過したとき、StrictModeでも更新は1回だけ実行される", () => {
+    renderHook(
+      () => useAutoReload({ columnId: "col-1", enabled: true, intervalSec: 3 }),
+      { wrapper: StrictMode },
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(mockInvoke).toHaveBeenCalledTimes(1);
   });
 
   it("resetでカウントがintervalSecに戻る", () => {
