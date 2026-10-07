@@ -46,7 +46,7 @@ digraph flow {
 | 1.5 Gherkin仕様定義           | 確定要求を Gherkin 記法（`docs/specs/<機能名>.feature`）で仕様化し、シナリオごとに `@unit` / `@integration` / `@manual` を付けてユーザー承認を得る         | `gherkin-spec`                                                                              |
 | 2. 実装プラン策定             | 確定要求を元にプランを設計。複数案があれば選択を確認。別セッションに引き継げるよう一時ドキュメント化                                                       | `implementation-planning`                                                                   |
 | 3. 実装                       | 作業ブランチを切り、実装はサブエージェントに委譲。メインはレビュー・全体管理。t-wada推奨TDDで進め（Gherkin由来のテストは実装後作成も可）、作業毎にコミット | `subagent-tdd-implementation`（内部で `tdd` / `storybook-dev` / `component-create` を利用） |
-| 4. プロパティベーステスト     | 仕様が明確かつ対応コードから実装可能ならfast-checkで作成                                                                                                   | `property-based-testing`                                                                    |
+| 4. プロパティベーステスト     | 仕様が明確かつ対応コードから実装可能なら作成（TS=fast-check / Rust=proptest / Kotlin=kotest-property）                                                     | `property-based-testing`                                                                    |
 | 5. 完了処理                   | フォーマッタ適用・Lint・全テスト実行・ビルド確認                                                                                                           | `check-creation`                                                                            |
 | 6. 手動テスト項目出力（必須） | `@manual` シナリオと自動チェックで検出できない手動QA観点を `integration-test.md` に出力する                                                                | `integration-test-viewpoints`                                                               |
 

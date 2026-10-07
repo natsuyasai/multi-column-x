@@ -23,7 +23,7 @@ argument-hint: "再発しているミスの内容"
 
 - 何を・なぜ・どうするかを具体的に。再現条件と正しい対応をセットで書く。
 - 悪い例: 「import順に注意する」
-- 良い例: 「import順は外部パッケージ → `@/` エイリアス（internal）→ 相対パスの順。グループ間の空行は入れない（`newlines-between: "never"`）。`eslint --fix` で自動整列できる」
+- 良い例: 「import順は外部パッケージ → vitest/storybook → `@/` エイリアス（internal）→ 相対パスの順。グループ間の空行は入れない（`newlines-between: "never"`）。`npm run lint:fix` で自動整列できる」
 
 ## このプロジェクトで特に再発しやすい論点
 
