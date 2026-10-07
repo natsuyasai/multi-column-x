@@ -10,6 +10,10 @@ declare global {
     ) => void;
     recheckNgWords: () => void;
     /**
+     * 通知・検索ページの常時監視（auto_reload.ts）を解除する。多重注入時に前回の監視を外すために使う。
+     */
+    disposeAutoReloadWatchers?: () => void;
+    /**
      * 投稿カラム（/home）でインライン投稿フォーム以外を隠すスポットライトの再適用。
      * compose_only.ts が公開し、テストからの検証にも用いる。
      */

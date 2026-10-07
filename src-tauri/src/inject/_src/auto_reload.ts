@@ -98,38 +98,76 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
     "mousedown",
   ] as const;
 
-  // 自分で scrollTop = 0 にしたことがあるか。無い間（ページ読み込み直後）の
-  // スクロール位置は、X の復元スクロールを尊重するためユーザーのものとして扱う。
-  let hasProgrammaticTop = false;
-  // 最後に自分で先頭へ戻して以降、ユーザー操作（ホイール・タッチ・キー・マウス押下）があったか。
-  let userInteractedSinceTop = false;
-  for (const type of SCROLL_TOP_PIN_RELEASE_EVENTS) {
-    window.addEventListener(
-      type,
-      () => {
-        userInteractedSinceTop = true;
-      },
-      { passive: true },
+  // ユーザー入力の直後とみなす時間（ms）。この間に起きたスクロールのずれはユーザーによるもの。
+  // ホイール・キーのスクロールアニメーションは入力の直後に始まる。
+  const USER_INPUT_GRACE_MS = 1000;
+  // ページを開いた直後・戻る/進む操作の直後とみなす時間（ms）。X が表示位置を復元することがあるため、
+  // この間に起きたずれはユーザーによるもの（復元された位置）として扱う。
+  const NAVIGATION_GRACE_MS = 2000;
+
+  // 最後に観測したスクロール位置。null は未観測（ページを開いた直後）。
+  // 「先頭にいたのにずれた」かどうかの判定に使う。
+  let lastObservedTop: number | null = null;
+  // 最後のユーザー入力の時刻（Date.now()）。
+  let lastUserInputAt = Number.NEGATIVE_INFINITY;
+  // マウスボタン・タッチが押されたままか（スクロールバーのドラッグ・タッチスクロール中）。
+  let pointerHeld = false;
+  // ページを開いた・戻る/進む操作をした時刻（Date.now()）。
+  let lastNavigationAt = Date.now();
+
+  /** ユーザーによるスクロールの可能性があるか（あれば補正しない。誤判定は常にこちらへ倒す）。 */
+  function isLikelyUserScroll(): boolean {
+    const now = Date.now();
+    return (
+      pointerHeld ||
+      now - lastUserInputAt < USER_INPUT_GRACE_MS ||
+      now - lastNavigationAt < NAVIGATION_GRACE_MS
     );
   }
 
-  /** 自分で先頭へ戻す（ユーザー操作の記録をリセットする）。 */
+  /** 自分で先頭へ戻す。 */
   function scrollToTopByScript(scrollingElement: Element): void {
     scrollingElement.scrollTop = 0;
-    hasProgrammaticTop = true;
-    userInteractedSinceTop = false;
+    lastObservedTop = 0;
   }
 
   /**
-   * 通知・検索ページで、ユーザー操作によらないスクロールのずれ（遅れて挿入された新着による
-   * スクロールアンカリング等）を先頭へ補正する。ユーザー自身のスクロール位置は触らない。
+   * 通知・検索ページで、先頭にいたのにユーザー操作によらずずれた（X の新着挿入等）なら先頭へ戻す。
+   * それ以外は現在位置を観測値として記録する。往復の実行中は往復の位置を崩さない。
    */
   function correctExternalScrollOffset(): void {
     const el = document.scrollingElement;
-    if (!el || el.scrollTop <= 0) return;
+    if (!el) return;
+    const top = el.scrollTop;
+    if (
+      top > 0 &&
+      lastObservedTop === 0 &&
+      isScrollRoundtripPage() &&
+      !scrollRoundtripRunning &&
+      !isLikelyUserScroll()
+    ) {
+      el.scrollTop = 0;
+      return;
+    }
+    lastObservedTop = top;
+  }
+
+  /**
+   * 通知・検索ページのスクロール・DOM 変化ごとに呼ぶ。ずれを補正し、先頭を表示していれば
+   * 基準より新しいものを新着として報告する（基準が無ければ基準になるだけ）。
+   * 先頭以外を表示している間に見えたものは、報告せず基準へ取り込まない。
+   */
+  function handleScrollRoundtripPageChange(): void {
+    if (scrollRoundtripRunning) return;
+    correctExternalScrollOffset();
     if (!isScrollRoundtripPage()) return;
-    if (!hasProgrammaticTop || userInteractedSinceTop) return;
-    el.scrollTop = 0;
+    // 先頭以外を表示している間は基準へ取り込まない。取り込むと、ユーザーが下を読んでいる間に
+    // 先頭へ入った新着が黙って基準に吸収され、先頭へ戻っても報告されなくなる。
+    // 先頭へ戻ったときの scroll イベントで取り込まれ、その場で報告される。
+    if (isScrolling()) return;
+    const section = document.querySelector("section[aria-labelledby]");
+    if (!section) return;
+    if (getNewnessTracker().absorb(section)) reportNewPostsCount(1);
   }
 
   // スクロール往復の実行中フラグ。二重実行を防ぐ。
@@ -453,7 +491,84 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
     waitForNewTweet();
   }
 
+  // DOM 変化は共有ハブ（dom_observer.ts）を使わず、独自の MutationObserver で監視する。
+  // ハブは requestAnimationFrame でまとめて配信するため、描画されていないカラム
+  // （Android の非アクティブタブ、ダイアログ表示中に退避したカラム）では止まり、
+  // 見ていないカラムの新着報告が表示されるまで遅れてしまう。
+  function subscribeDomChanges(callback: () => void): () => void {
+    const observer = new MutationObserver(callback);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }
+
+  /** ユーザー入力・スクロール・DOM 変化の常時監視を始め、解除関数を返す。 */
+  function startWatchers(): () => void {
+    const onUserInput = (event: Event): void => {
+      // 縦に動かないホイール（カラム群の横スクロール。scroll_event.ts が親へ中継する）は
+      // カラム内のスクロール操作ではないので数えない。数えると、横スクロール直後の X の挿入が
+      // ユーザー扱いになり、ずれたまま固着する。
+      if (event.type === "wheel" && (event as WheelEvent).deltaY === 0) return;
+      lastUserInputAt = Date.now();
+    };
+    const onPointerDown = (): void => {
+      pointerHeld = true;
+    };
+    const onPointerUp = (): void => {
+      pointerHeld = false;
+      lastUserInputAt = Date.now();
+    };
+    const onNavigation = (): void => {
+      lastNavigationAt = Date.now();
+    };
+    const pointerDownEvents = ["mousedown", "touchstart"] as const;
+    const pointerUpEvents = [
+      "mouseup",
+      "touchend",
+      "touchcancel",
+      "blur",
+    ] as const;
+    for (const type of SCROLL_TOP_PIN_RELEASE_EVENTS) {
+      window.addEventListener(type, onUserInput, { passive: true });
+    }
+    for (const type of pointerDownEvents) {
+      window.addEventListener(type, onPointerDown, { passive: true });
+    }
+    for (const type of pointerUpEvents) {
+      window.addEventListener(type, onPointerUp, { passive: true });
+    }
+    window.addEventListener("popstate", onNavigation);
+    window.addEventListener("scroll", handleScrollRoundtripPageChange, {
+      passive: true,
+    });
+
+    let unsubscribeDom: (() => void) | null = null;
+    const startDom = (): void => {
+      unsubscribeDom = subscribeDomChanges(handleScrollRoundtripPageChange);
+    };
+    if (document.body) startDom();
+    else document.addEventListener("DOMContentLoaded", startDom);
+
+    return function dispose(): void {
+      for (const type of SCROLL_TOP_PIN_RELEASE_EVENTS) {
+        window.removeEventListener(type, onUserInput);
+      }
+      for (const type of pointerDownEvents) {
+        window.removeEventListener(type, onPointerDown);
+      }
+      for (const type of pointerUpEvents) {
+        window.removeEventListener(type, onPointerUp);
+      }
+      window.removeEventListener("popstate", onNavigation);
+      window.removeEventListener("scroll", handleScrollRoundtripPageChange);
+      document.removeEventListener("DOMContentLoaded", startDom);
+      unsubscribeDom?.();
+    };
+  }
+
   window.__multiColumnX =
     window.__multiColumnX || ({} as Window["__multiColumnX"]);
+  // 多重注入（単体テストでのモジュール再読み込みを含む）に備え、前回の監視を解除してから登録する。
+  window.__multiColumnX.disposeAutoReloadWatchers?.();
   window.__multiColumnX.triggerReload = triggerReload;
+  window.__multiColumnX.disposeAutoReloadWatchers = startWatchers();
 })();

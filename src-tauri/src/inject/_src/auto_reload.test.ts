@@ -873,6 +873,10 @@ function restoreScrollTopRecorder(): void {
 const ROUNDTRIP_WAIT_MS = 60;
 /** スクロール往復で下へスクロールする最小距離（px）。 */
 const ROUNDTRIP_MIN_DISTANCE_PX = 250;
+/** ページを開いた直後・戻る/進む操作の直後とみなす時間（ms）。 */
+const NAVIGATION_GRACE_MS = 2000;
+/** ユーザー入力の直後とみなす時間（ms）。 */
+const USER_INPUT_GRACE_MS = 1000;
 /** 下限（250px）が効く低いビューポートの高さ（px）。既定で使う。 */
 const LOW_VIEWPORT_HEIGHT_PX = 300;
 
@@ -906,6 +910,17 @@ async function setUpAutoReloadPage(): Promise<void> {
   };
   window.__TAURI__ = { core: { invoke: invokeMock } };
   vi.useFakeTimers();
+}
+
+// 各テストが読み込んだモジュールの常時監視を、テストの終了時に解除する。
+afterEach(() => {
+  window.__multiColumnX?.disposeAutoReloadWatchers?.();
+});
+
+/** スクロール位置を変え、scroll イベントで通知する（実環境では位置が変われば scroll イベントが出る）。 */
+function scrollTo(scrollTop: number): void {
+  setScrolling(scrollTop);
+  window.dispatchEvent(new Event("scroll"));
 }
 
 function expectReportedNewPostOnce(): void {
@@ -1184,6 +1199,7 @@ describe("inject/auto_reload 検索ページの更新", () => {
   });
 
   it("先頭固定の時間が過ぎた後に遅れて新着が挿入されてずれても、ユーザー操作が無ければ補正して新着を報告する", async () => {
+    await vi.advanceTimersByTimeAsync(NAVIGATION_GRACE_MS);
     addSearchTabs(TAB_NAMES, 1);
     const section = addSection();
     addArticleWithStatusId(section, "1000");
@@ -1492,6 +1508,7 @@ describe("inject/auto_reload 通知ページの更新", () => {
     }
 
     it("先頭固定の時間経過後も、ユーザー操作が無ければX起因のずれは補正され新着が報告される", async () => {
+      await vi.advanceTimersByTimeAsync(NAVIGATION_GRACE_MS);
       const section = addSection();
       section.appendChild(buildNotificationArticle("2026-09-19T00:45:55Z"));
 
@@ -1527,6 +1544,7 @@ describe("inject/auto_reload 通知ページの更新", () => {
     }
 
     it("先頭固定の時間が過ぎた後にX起因でずれたままでも、次の自動更新は先頭へ補正してスクロール往復を行う", async () => {
+      await vi.advanceTimersByTimeAsync(NAVIGATION_GRACE_MS);
       addSection();
       triggerReload();
       await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
@@ -1557,18 +1575,6 @@ describe("inject/auto_reload 通知ページの更新", () => {
       expect(scrollingElementStub.scrollTop).toBe(120);
     });
 
-    it("ページを開いた直後でまだ一度も先頭へ戻していない間のずれは、ユーザー操作が無くてもユーザーによるものとして扱い自動更新を行わない", async () => {
-      addSection();
-      setScrolling(30);
-      scrollWrites.length = 0;
-
-      triggerReload();
-      await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS + 5000);
-
-      expect(scrollWrites).toEqual([]);
-      expect(scrollingElementStub.scrollTop).toBe(30);
-    });
-
     it("先頭固定中のずれ補正の後でも新着の通知は報告される", async () => {
       const section = addSection();
       section.appendChild(buildNotificationArticle("2026-09-19T00:45:55Z"));
@@ -1583,5 +1589,306 @@ describe("inject/auto_reload 通知ページの更新", () => {
       expect(scrollingElementStub.scrollTop).toBe(0);
       expectReportedNewPostOnce();
     });
+  });
+});
+
+/** 通知・検索ページごとの、基準となる記事・新しい記事の作り方。 */
+const WATCHED_PAGES = [
+  {
+    label: "通知",
+    path: "/notifications",
+    addBaseline: (section: HTMLElement) =>
+      section.appendChild(buildNotificationArticle("2026-09-19T10:00:00Z")),
+    addNewer: (section: HTMLElement) =>
+      section.appendChild(buildNotificationArticle("2026-09-19T10:05:00Z")),
+  },
+  {
+    label: "検索",
+    path: "/search?q=rust&f=live",
+    addBaseline: (section: HTMLElement) =>
+      addArticleWithStatusId(section, "1000"),
+    addNewer: (section: HTMLElement) => addArticleWithStatusId(section, "1001"),
+  },
+] as const;
+
+/** MutationObserver の通知（マイクロタスク）を流す。 */
+async function flushDomChanges(): Promise<void> {
+  await vi.advanceTimersByTimeAsync(0);
+}
+
+describe("inject/auto_reload 通知・検索ページの常時監視", () => {
+  let scrollWrites: number[];
+
+  beforeEach(async () => {
+    await setUpAutoReloadPage();
+    history.pushState({}, "", "/notifications");
+    scrollWrites = recordScrollTopWrites();
+    // ページを開いた直後の猶予を抜けた状態から始める
+    await vi.advanceTimersByTimeAsync(NAVIGATION_GRACE_MS);
+  });
+
+  afterEach(() => {
+    vi.runAllTimers();
+    vi.useRealTimers();
+    restoreScrollTopRecorder();
+    restoreViewportHeight();
+    vi.restoreAllMocks();
+    history.replaceState({}, "", "/");
+  });
+
+  /** 基準となる記事を表示し、先頭を表示している状態にする。 */
+  async function showBaseline(
+    page: (typeof WATCHED_PAGES)[number] = WATCHED_PAGES[0],
+  ): Promise<HTMLElement> {
+    history.replaceState({}, "", page.path);
+    const section = addSection();
+    page.addBaseline(section);
+    await flushDomChanges();
+    return section;
+  }
+
+  for (const page of WATCHED_PAGES) {
+    it(`${page.label}ページで先頭を表示中にXが新着を挿入してずれたとき、ユーザー操作が無ければ先頭へ戻して新着を報告する`, async () => {
+      const section = await showBaseline(page);
+
+      setScrolling(136);
+      page.addNewer(section);
+      await flushDomChanges();
+
+      expect(scrollingElementStub.scrollTop).toBe(0);
+      expectReportedNewPostOnce();
+    });
+  }
+
+  it("ページを開いてから最初の自動更新より前にずれても、先頭へ戻され自動更新は止まらない", async () => {
+    const section = await showBaseline();
+    setScrolling(136);
+    WATCHED_PAGES[0].addNewer(section);
+    await flushDomChanges();
+    expect(scrollingElementStub.scrollTop).toBe(0);
+
+    scrollWrites.length = 0;
+    triggerReload();
+    expect(scrollWrites).toEqual([ROUNDTRIP_MIN_DISTANCE_PX]);
+
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+    expect(scrollWrites).toEqual([ROUNDTRIP_MIN_DISTANCE_PX, 0]);
+  });
+
+  it("ページを開いてから最初の自動更新までに入った新着も報告される", async () => {
+    const section = await showBaseline();
+    expect(invokeMock).not.toHaveBeenCalled();
+
+    WATCHED_PAGES[0].addNewer(section);
+    await flushDomChanges();
+
+    expect(scrollingElementStub.scrollTop).toBe(0);
+    expectReportedNewPostOnce();
+  });
+
+  it("ページを開いて最初に表示された通知は、新着として報告しない", async () => {
+    history.replaceState({}, "", "/notifications");
+    const section = addSection();
+    await flushDomChanges();
+
+    WATCHED_PAGES[0].addBaseline(section);
+    await vi.advanceTimersByTimeAsync(30000);
+
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("同じ新着は 1 回だけ報告される", async () => {
+    const section = await showBaseline();
+    WATCHED_PAGES[0].addNewer(section);
+    await flushDomChanges();
+    expectReportedNewPostOnce();
+
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS + 30000);
+
+    expectReportedNewPostOnce();
+  });
+
+  it("ユーザーがスクロール操作をした後に新着が挿入されても、先頭へ戻さず報告もしない", async () => {
+    const section = await showBaseline();
+    window.dispatchEvent(new Event("wheel"));
+    scrollTo(100);
+    // ユーザー入力の直後の猶予を超える
+    await vi.advanceTimersByTimeAsync(USER_INPUT_GRACE_MS + 1);
+
+    setScrolling(220);
+    WATCHED_PAGES[0].addNewer(section);
+    await flushDomChanges();
+
+    expect(scrollingElementStub.scrollTop).toBe(220);
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  for (const type of ["mousedown", "touchstart"]) {
+    it(`${type}で押したままのずれは、先頭へ戻さない`, async () => {
+      await showBaseline();
+      window.dispatchEvent(new Event(type));
+      // 入力直後の猶予を超えても、押したまま（mouseup / touchend を送らない）
+      await vi.advanceTimersByTimeAsync(USER_INPUT_GRACE_MS + 500);
+
+      scrollTo(120);
+
+      expect(scrollingElementStub.scrollTop).toBe(120);
+    });
+  }
+
+  it("ユーザーが先頭へ戻した後は、再び X によるずれが補正される", async () => {
+    const section = await showBaseline();
+    window.dispatchEvent(new Event("wheel"));
+    scrollTo(100);
+    scrollTo(0);
+    // 先頭へ戻ってからはユーザー操作が無いまま、入力直後の猶予を超える
+    await vi.advanceTimersByTimeAsync(USER_INPUT_GRACE_MS + 1);
+
+    setScrolling(136);
+    WATCHED_PAGES[0].addNewer(section);
+    await flushDomChanges();
+
+    expect(scrollingElementStub.scrollTop).toBe(0);
+    expectReportedNewPostOnce();
+  });
+
+  it("下を読んでいる間に先頭へ入った新着は、先頭へ戻ったときに報告される", async () => {
+    const section = await showBaseline();
+    window.dispatchEvent(new Event("wheel"));
+    scrollTo(100);
+
+    WATCHED_PAGES[0].addNewer(section);
+    await flushDomChanges();
+    expect(invokeMock).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(USER_INPUT_GRACE_MS + 1);
+    scrollTo(0);
+
+    expectReportedNewPostOnce();
+  });
+
+  it("カラム群の横スクロールは、カラムの操作として数えない", async () => {
+    const section = await showBaseline();
+    window.dispatchEvent(new WheelEvent("wheel", { deltaX: 100, deltaY: 0 }));
+
+    setScrolling(136);
+    WATCHED_PAGES[0].addNewer(section);
+    await flushDomChanges();
+
+    expect(scrollingElementStub.scrollTop).toBe(0);
+    expectReportedNewPostOnce();
+  });
+
+  it("ユーザーが操作してスクロールした位置では、自動更新を行わない", async () => {
+    await showBaseline();
+    window.dispatchEvent(new Event("keydown"));
+    scrollTo(120);
+    await vi.advanceTimersByTimeAsync(USER_INPUT_GRACE_MS + 1);
+
+    scrollWrites.length = 0;
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS + 5000);
+
+    expect(scrollWrites).toEqual([]);
+    expect(scrollingElementStub.scrollTop).toBe(120);
+  });
+
+  it("自動更新のスクロール往復の途中では、下へのスクロールを先頭へ戻さない", async () => {
+    await showBaseline();
+    scrollWrites.length = 0;
+
+    triggerReload();
+    expect(scrollingElementStub.scrollTop).toBe(ROUNDTRIP_MIN_DISTANCE_PX);
+    window.dispatchEvent(new Event("scroll"));
+    // 往復の途中でもう一度自動更新が実行されても戻さない
+    triggerReload();
+
+    expect(scrollingElementStub.scrollTop).toBe(ROUNDTRIP_MIN_DISTANCE_PX);
+
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS);
+    expect(scrollingElementStub.scrollTop).toBe(0);
+    expect(scrollWrites).toEqual([ROUNDTRIP_MIN_DISTANCE_PX, 0]);
+  });
+
+  describe("通常ページ", () => {
+    beforeEach(() => {
+      history.replaceState({}, "", "/");
+    });
+
+    it("ホームでは新着の監視中にスクロール位置がずれても、報告せず位置も補正しない", async () => {
+      const section = addSection();
+      addArticleWithStatusId(section, "1000");
+      await flushDomChanges();
+
+      triggerReload();
+      scrollTo(136);
+      addArticleWithStatusId(section, "1001");
+      await flushDomChanges();
+
+      expect(scrollingElementStub.scrollTop).toBe(136);
+      expect(invokeMock).not.toHaveBeenCalled();
+    });
+
+    it("ホームでは先頭を表示中に基準より新しいポストが現れても、常時監視としては報告しない", async () => {
+      const section = addSection();
+      addArticleWithStatusId(section, "1000");
+      await flushDomChanges();
+
+      addArticleWithStatusId(section, "1001");
+      await vi.advanceTimersByTimeAsync(30000);
+
+      expect(invokeMock).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("inject/auto_reload 通知・検索ページを開いた直後と戻る/進む操作の直後", () => {
+  let scrollWrites: number[];
+
+  beforeEach(async () => {
+    await setUpAutoReloadPage();
+    history.pushState({}, "", "/notifications");
+    scrollWrites = recordScrollTopWrites();
+  });
+
+  afterEach(() => {
+    vi.runAllTimers();
+    vi.useRealTimers();
+    restoreScrollTopRecorder();
+    restoreViewportHeight();
+    vi.restoreAllMocks();
+    history.replaceState({}, "", "/");
+  });
+
+  it("ページを開いた時点で先頭以外が表示されていたら、その位置はユーザーによるものとして扱う", async () => {
+    const section = addSection();
+    WATCHED_PAGES[0].addBaseline(section);
+    await flushDomChanges();
+
+    // ページを開いた直後に、X が先頭以外の位置を復元する（ユーザー操作は無い）
+    scrollTo(30);
+    await vi.advanceTimersByTimeAsync(NAVIGATION_GRACE_MS);
+    expect(scrollingElementStub.scrollTop).toBe(30);
+
+    scrollWrites.length = 0;
+    triggerReload();
+    await vi.advanceTimersByTimeAsync(ROUNDTRIP_WAIT_MS + 5000);
+
+    expect(scrollWrites).toEqual([]);
+    expect(scrollingElementStub.scrollTop).toBe(30);
+  });
+
+  it("戻る/進む操作の直後に X が表示位置を復元しても、先頭へ戻さない", async () => {
+    const section = addSection();
+    WATCHED_PAGES[0].addBaseline(section);
+    await flushDomChanges();
+    // ページを開いた直後の猶予を抜ける
+    await vi.advanceTimersByTimeAsync(NAVIGATION_GRACE_MS);
+
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    scrollTo(300);
+
+    expect(scrollingElementStub.scrollTop).toBe(300);
   });
 });
