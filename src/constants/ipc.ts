@@ -9,6 +9,11 @@ export const IPC_COMMANDS = {
   LOAD_SETTINGS: "load_settings",
   SAVE_SETTINGS: "save_settings",
 
+  // バックアップ／リストア
+  EXPORT_BACKUP: "export_backup",
+  READ_BACKUP: "read_backup",
+  APPLY_RESTORE: "apply_restore",
+
   // カラム WebView 管理
   CREATE_COLUMN_WEBVIEW: "create_column_webview",
   REMOVE_COLUMN_WEBVIEW: "remove_column_webview",
@@ -31,6 +36,7 @@ export const IPC_COMMANDS = {
   REAUTH_ACCOUNT_WINDOW: "reauth_account_window",
   DELETE_ACCOUNT_DATA: "delete_account_data",
   CLOSE_WINDOW: "close_window",
+  DETECT_ACCOUNT_USER_IDS: "detect_account_user_ids",
 
   // モバイル
   REPORT_WEBVIEW_SCROLL: "report_webview_scroll",

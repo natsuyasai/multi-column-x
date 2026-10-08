@@ -6,6 +6,8 @@ import { AppSettingsPanel } from "./AppSettingsPanel";
 
 const mockStoreState = {
   isMobile: false,
+  accounts: [] as Account[],
+  settingsSaveBlocked: false,
   savePreset: vi.fn(),
   loadPreset: vi.fn(),
   deletePreset: vi.fn(),
@@ -105,6 +107,7 @@ const defaultProps = {
   onApplyColumnDefaults: vi.fn(),
   onReloadAllWebviews: vi.fn(),
   onLoadPreset: vi.fn().mockResolvedValue(undefined),
+  onReplaceColumnsAndRecreate: vi.fn().mockResolvedValue(undefined),
   appVersion: "0.1.1",
   updateChecking: false,
   updateManualResult: "idle" as const,
@@ -1098,5 +1101,30 @@ describe("AppSettingsPanel カラムデフォルトの写真閲覧後スクロ�
         defaultScrollPosRestoreEnabled: false,
       }),
     );
+  });
+});
+
+describe("AppSettingsPanel バックアップタブ", () => {
+  it("デスクトップでもバックアップタブが表示され、開くと作成と復元の操作が出る", () => {
+    mockStoreState.isMobile = false;
+    render(<AppSettingsPanel {...defaultProps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "バックアップ" }));
+
+    expect(
+      screen.getByRole("button", { name: "バックアップを書き出す" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "バックアップファイルを選択" }),
+    ).toBeInTheDocument();
+  });
+
+  it("isMobile=true（Android）でもバックアップタブが表示される", () => {
+    mockStoreState.isMobile = true;
+    render(<AppSettingsPanel {...defaultProps} />);
+
+    expect(
+      screen.getByRole("button", { name: "バックアップ" }),
+    ).toBeInTheDocument();
   });
 });

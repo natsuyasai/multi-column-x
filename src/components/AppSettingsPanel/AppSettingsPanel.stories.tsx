@@ -120,6 +120,7 @@ const meta: Meta<typeof AppSettingsPanel> = {
     onApplyColumnDefaults: fn(),
     onReloadAllWebviews: fn(),
     onLoadPreset: fn().mockResolvedValue(undefined),
+    onReplaceColumnsAndRecreate: fn().mockResolvedValue(undefined),
     onCheckUpdate: fn(),
     onOpenOfficialSettings: fn(),
     onClose: fn(),

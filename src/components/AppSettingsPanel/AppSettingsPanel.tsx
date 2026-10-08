@@ -4,6 +4,8 @@ import {
   parseAndValidateWordLines,
 } from "@/lib/lineListValidation";
 import { nextDraftOnSmallImageChange } from "@/lib/scrollRestoreSetting";
+import type { ReplaceColumnsAndRecreate } from "@/services/backup";
+import { useBackupFlow } from "../../hooks/useBackupFlow";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useAppStore } from "../../store/useAppStore";
 import type {
@@ -14,6 +16,7 @@ import type {
 } from "../../types";
 import { AppInfoSections } from "./AppInfoSections";
 import styles from "./AppSettingsPanel.module.scss";
+import { BackupTab } from "./BackupTab";
 import { ColumnDefaultsSections } from "./ColumnDefaultsSections";
 import { ColumnLayoutTab } from "./ColumnLayoutTab";
 import { DisplaySettingsSection } from "./DisplaySettingsSection";
@@ -45,6 +48,8 @@ interface AppSettingsPanelProps {
   ) => void;
   onReloadAllWebviews: () => void;
   onLoadPreset: (id: string) => Promise<void>;
+  /** バックアップ復元: 旧カラムの WebView 破棄 → ストア置換 → WebView 再生成 */
+  onReplaceColumnsAndRecreate: ReplaceColumnsAndRecreate;
   appVersion: string;
   updateChecking: boolean;
   updateManualResult: "idle" | "none" | "error";
@@ -64,6 +69,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   onApplyColumnDefaults,
   onReloadAllWebviews,
   onLoadPreset,
+  onReplaceColumnsAndRecreate,
   appVersion,
   updateChecking,
   updateManualResult,
@@ -76,9 +82,10 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   const isMobile = useAppStore((s) => s.isMobile);
   const { savePreset, deletePreset } = useAppStore();
   useEscapeKey(onClose);
-  const [activeTab, setActiveTab] = useState<"general" | "layout" | "presets">(
-    "general",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "general" | "layout" | "presets" | "backup"
+  >("general");
+  const backup = useBackupFlow(onReplaceColumnsAndRecreate, onClose);
 
   const [draft, setDraft] = useState<SettingsDraft>(() =>
     createSettingsDraft(settings),
@@ -187,6 +194,12 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
               プリセット
             </button>
           )}
+          <button
+            className={`${styles.tab} ${activeTab === "backup" ? styles.tabActive : ""}`}
+            onClick={() => setActiveTab("backup")}
+          >
+            バックアップ
+          </button>
         </div>
 
         <div className={styles.tabContent}>
@@ -262,6 +275,25 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 void onLoadPreset(id).then(() => onClose());
               }}
               onDelete={(id) => deletePreset(id)}
+            />
+          )}
+
+          {activeTab === "backup" && (
+            <BackupTab
+              accounts={backup.accounts}
+              step={backup.step}
+              content={backup.content}
+              mapping={backup.mapping}
+              busy={backup.busy}
+              saveBlocked={backup.saveBlocked}
+              message={backup.message}
+              onExport={() => void backup.exportToFile()}
+              onPickFile={() => void backup.pickFile()}
+              onChangeMapping={backup.changeMapping}
+              onCancel={backup.cancel}
+              onProceedToConfirm={backup.proceedToConfirm}
+              onBackToMapping={backup.backToMapping}
+              onExecute={() => void backup.execute()}
             />
           )}
         </div>

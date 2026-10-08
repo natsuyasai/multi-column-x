@@ -5,6 +5,7 @@ import { logError } from "../lib/log";
 import type {
   Account,
   ApiRateLimitBucket,
+  AppSettings,
   Column,
   ColumnPreset,
   GlobalSettings,
@@ -51,6 +52,14 @@ interface AppStore {
   globalSettings: GlobalSettings;
   isLoaded: boolean;
   settingsSaveBlocked: boolean;
+  /** バックアップ復元の実行中。true の間は自動保存を発行しない */
+  restoreInProgress: boolean;
+  beginRestore: () => void;
+  finishRestore: () => void;
+  /** 復元結果をメモリへ反映する（保存は発行しない。ディスクは apply_restore が更新済み）。accounts は置き換えない */
+  applyRestoredSettings: (settings: AppSettings) => void;
+  /** これまでに要求された保存がすべて完了するまで待つ */
+  flushPendingSaves: () => Promise<void>;
   settingsLoadNotice: string | null;
   dismissSettingsLoadNotice: () => void;
   topBarExpanded: boolean;
@@ -98,6 +107,20 @@ export const useAppStore = create<AppStore>((set, get) => ({
   globalSettings: DEFAULT_GLOBAL_SETTINGS,
   isLoaded: false,
   settingsSaveBlocked: false,
+  restoreInProgress: false,
+  beginRestore: () => set({ restoreInProgress: true }),
+  finishRestore: () => set({ restoreInProgress: false }),
+  applyRestoredSettings: (settings) =>
+    set({
+      columns: settings.columns
+        .map(migrateColumn)
+        .sort((a, b) => a.order - b.order),
+      globalSettings: {
+        ...DEFAULT_GLOBAL_SETTINGS,
+        ...settings.globalSettings,
+      },
+    }),
+  flushPendingSaves: () => saveChain,
   settingsLoadNotice: null,
   dismissSettingsLoadNotice: () => set({ settingsLoadNotice: null }),
   topBarExpanded: false,
@@ -159,6 +182,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   saveSettings: () => {
+    // 復元中は保存を発行しない（要求時点で判定する）。復元前に積まれた保存は
+    // 復元開始前に flushPendingSaves で完了させ、復元後の内容はディスクが既に持っている。
+    if (get().restoreInProgress) return saveChain;
     // 前の保存の完了を待ってから実行する。状態は実行時点(get())で読むため、
     // 連続して呼ばれても最後に書き込まれるのは最新の状態になる。
     saveChain = saveChain.then(async () => {
