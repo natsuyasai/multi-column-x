@@ -122,6 +122,78 @@ class MainActivity : TauriActivity() {
       callback(uris)
     }
 
+  // バックアップのエクスポート（SAF「名前を付けて保存」）で、コピー元となる一時ファイルのパス。
+  // UI スレッドからのみアクセスする。
+  private var pendingBackupExportTempPath: String? = null
+
+  // バックアップの読込（SAF「ファイルを開く」）で、選択結果のコピー先パスと上限バイト数。
+  // UI スレッドからのみアクセスする。
+  private var pendingBackupImportDestPath: String? = null
+  private var pendingBackupImportMaxBytes: Long = 0L
+
+  // バックアップのエクスポート先を選ぶ SAF ダイアログ。
+  // registerForActivityResult は Activity 生成完了前に呼ぶ必要があるためプロパティ初期化子で登録する。
+  private val backupExportLauncher: ActivityResultLauncher<String> =
+    registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+      val tempPath = pendingBackupExportTempPath
+      pendingBackupExportTempPath = null
+      if (tempPath == null) {
+        // Activity の再生成などで要求が失われた場合も、Rust の待受を解放する。
+        AppBridge.onBackupFileResult("error", "request lost")
+        return@registerForActivityResult
+      }
+      if (uri == null) {
+        // キャンセルはエラー扱いにしない。
+        AppBridge.onBackupFileResult("cancelled", "")
+        return@registerForActivityResult
+      }
+      Thread {
+        try {
+          contentResolver.openOutputStream(uri)?.use { output ->
+            File(tempPath).inputStream().use { input -> input.copyTo(output) }
+          } ?: throw IllegalStateException("failed to open output stream")
+          AppBridge.onBackupFileResult("saved", "")
+        } catch (e: Exception) {
+          Log.e(TAG, "backupExport: failed to copy to $uri: ${e.message}")
+          AppBridge.onBackupFileResult("error", e.message ?: "export failed")
+        }
+      }.start()
+    }
+
+  // バックアップファイルを選ぶ SAF ダイアログ。選択結果は上限付きで一時ファイルへコピーする。
+  private val backupImportLauncher: ActivityResultLauncher<Array<String>> =
+    registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+      val destPath = pendingBackupImportDestPath
+      val maxBytes = pendingBackupImportMaxBytes
+      pendingBackupImportDestPath = null
+      if (destPath == null) {
+        AppBridge.onBackupFileResult("error", "request lost")
+        return@registerForActivityResult
+      }
+      if (uri == null) {
+        AppBridge.onBackupFileResult("cancelled", "")
+        return@registerForActivityResult
+      }
+      Thread {
+        try {
+          val withinLimit =
+            contentResolver.openInputStream(uri)?.use { input ->
+              File(destPath).outputStream().use { output -> copyWithLimit(input, output, maxBytes) }
+            } ?: throw IllegalStateException("failed to open input stream")
+          if (withinLimit) {
+            AppBridge.onBackupFileResult("picked", "")
+          } else {
+            File(destPath).delete()
+            AppBridge.onBackupFileResult("tooLarge", "")
+          }
+        } catch (e: Exception) {
+          Log.e(TAG, "backupImport: failed to copy from $uri: ${e.message}")
+          File(destPath).delete()
+          AppBridge.onBackupFileResult("error", e.message ?: "import failed")
+        }
+      }.start()
+    }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
@@ -291,6 +363,54 @@ class MainActivity : TauriActivity() {
           File(tempPath).delete()
         }
       saveVideoLauncher.launch(suggestedFileName)
+    }
+  }
+
+  // アカウントのプロファイルの CookieManager から twid Cookie を読み、X ユーザー ID を返す
+  // （バックアップ復元の自動候補に使う後追い補完）。取得できない場合は空文字列。
+  // プロファイル API 非対応端末の CookieManager は全アカウント共有でアカウントを特定できないため、取得しない。
+  // JNI スレッドから呼ばれる。ProfileStore の操作は UI スレッドで行う必要があるため runOnUiThreadSync で同期する。
+  fun detectXUserId(accountId: String): String {
+    if (!WebViewProfiles.isSupported) return ""
+    var detected = ""
+    runOnUiThreadSync {
+      val cookieManager =
+        WebViewProfiles.getProfileByName(getCookieProfileName(accountId))?.cookieManager
+      if (cookieManager != null) {
+        detected = twidUserIdFromCookieString(cookieManager.getCookie("https://x.com") ?: "") ?: ""
+      }
+    }
+    return detected
+  }
+
+  // バックアップのエクスポート: Rust が書いた一時ファイルを、SAF で選んだ場所へコピーする。
+  // 結果は AppBridge.onBackupFileResult で Rust へ通知する。
+  // JNI スレッドから呼ばれるため、ActivityResultLauncher.launch は UI スレッドで実行する。
+  fun startBackupExport(
+    tempPath: String,
+    suggestedFileName: String,
+  ) {
+    runOnUiThread {
+      if (!File(tempPath).exists()) {
+        Log.e(TAG, "startBackupExport: temp file not found: $tempPath")
+        AppBridge.onBackupFileResult("error", "temp file not found")
+        return@runOnUiThread
+      }
+      pendingBackupExportTempPath = tempPath
+      backupExportLauncher.launch(suggestedFileName)
+    }
+  }
+
+  // バックアップの読込: SAF で選んだファイルを maxBytes を超えた時点で打ち切りながら destPath へコピーする。
+  // 結果は AppBridge.onBackupFileResult で Rust へ通知する。
+  fun startBackupImport(
+    destPath: String,
+    maxBytes: Long,
+  ) {
+    runOnUiThread {
+      pendingBackupImportDestPath = destPath
+      pendingBackupImportMaxBytes = maxBytes
+      backupImportLauncher.launch(arrayOf("*/*"))
     }
   }
 

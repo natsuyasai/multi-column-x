@@ -48,6 +48,9 @@
     public void launchComposeTweet();
     public void downloadAndInstallApk(java.lang.String, java.lang.String);
     public void saveDownloadedVideo(java.lang.String, java.lang.String, java.lang.String);
+    public void startBackupExport(java.lang.String, java.lang.String);
+    public void startBackupImport(java.lang.String, long);
+    public java.lang.String detectXUserId(java.lang.String);
     public void notifyVideoDownloadStarted();
     public void notifyVideoDownloadProgress(int, int, long, long);
     public void notifyVideoDownloadFinished();

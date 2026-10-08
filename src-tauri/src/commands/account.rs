@@ -47,7 +47,11 @@ pub async fn open_add_account_window(
                 Some(w) => {
                     if let Ok(url) = w.url() {
                         if url.path() == "/home" {
-                            let _ = app_clone.emit(events::ACCOUNT_LOGIN_COMPLETE, ());
+                            let x_user_id = read_x_user_id(&w, "open_add_account_window");
+                            let _ = app_clone.emit(
+                                events::ACCOUNT_LOGIN_COMPLETE,
+                                AccountLoginCompletePayload { x_user_id },
+                            );
                             break;
                         }
                     }
@@ -88,13 +92,6 @@ pub async fn open_add_account_window(
     let _ = std::fs::remove_file(&cancel_sentinel);
     log::info!("[open_add_account] sentinel_dir={}", sentinel_dir.display());
 
-    let result_json = serde_json::json!({
-        "accountId": account_id,
-        "dataDirectory": data_dir.to_string_lossy(),
-        "windowLabel": "add-account",
-    })
-    .to_string();
-
     // AddAccount Activity を JNI 経由で起動する（account_id を渡して WebView Profile を分離する）
     #[cfg(target_os = "android")]
     {
@@ -119,8 +116,15 @@ pub async fn open_add_account_window(
 
         if success_sentinel.exists() {
             log::info!("[open_add_account] success sentinel found at poll #{i}");
+            let content = std::fs::read_to_string(&success_sentinel).unwrap_or_default();
             let _ = std::fs::remove_file(&success_sentinel);
-            return Ok(result_json);
+            return Ok(serde_json::json!({
+                "accountId": account_id,
+                "dataDirectory": data_dir.to_string_lossy(),
+                "windowLabel": "add-account",
+                "xUserId": x_user_id_from_sentinel(&content),
+            })
+            .to_string());
         }
         if cancel_sentinel.exists() {
             log::info!("[open_add_account] cancel sentinel found at poll #{i}");
@@ -162,6 +166,133 @@ fn twid_user_id_from_cookies<'a>(
         }
     }
     None
+}
+
+/// ログインウィンドウの x.com Cookie から twid を読み、数値ユーザーIDを取り出す。
+/// cookies_for_url は Windows で同期コマンド内から呼ぶとデッドロックするため、
+/// 呼び出し元は必ず tokio::spawn した非同期タスク内で使うこと。取得できなければ None。
+#[cfg(desktop)]
+fn read_x_user_id(window: &tauri::WebviewWindow, log_tag: &str) -> Option<String> {
+    let cookie_url = match "https://x.com".parse() {
+        Ok(url) => url,
+        Err(e) => {
+            log::warn!("[{log_tag}] cookie url parse error: {e}");
+            return None;
+        }
+    };
+    match window.cookies_for_url(cookie_url) {
+        Ok(cookies) => twid_user_id_from_cookies(cookies.iter().map(|c| (c.name(), c.value()))),
+        Err(e) => {
+            log::warn!("[{log_tag}] cookies_for_url error: {e}");
+            None
+        }
+    }
+}
+
+/// アカウント追加完了イベント（ACCOUNT_LOGIN_COMPLETE）の payload。
+/// 追加直後のアカウントへ X ユーザーID を保存するために載せる（取得できなければ None）。
+#[cfg(desktop)]
+#[derive(Clone, serde::Serialize)]
+struct AccountLoginCompletePayload {
+    #[serde(rename = "xUserId")]
+    x_user_id: Option<String>,
+}
+
+/// アカウント追加完了のセンチネル本文（AddAccount.kt の `addAccountSentinelBody`）から
+/// X ユーザーIDを取り出す。数値のみを許可し、空・不正な本文は None。
+/// mobile 以外では test でのみ使うため、通常の desktop ビルドでは未使用警告にならないよう限定する。
+#[cfg(any(test, mobile))]
+fn x_user_id_from_sentinel(content: &str) -> Option<String> {
+    let id = content.trim();
+    if !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit()) {
+        Some(id.to_string())
+    } else {
+        None
+    }
+}
+
+/// detect_account_user_ids の入力。X ユーザーID未取得のアカウントと、その Cookie を持つカラム。
+#[derive(serde::Deserialize)]
+pub struct DetectUserIdTarget {
+    #[serde(rename = "accountId")]
+    pub account_id: String,
+    /// desktop ではこのカラムの WebView の Cookie を読む。mobile ではプロファイルを accountId で特定するため未使用。
+    #[serde(rename = "columnId")]
+    #[cfg_attr(mobile, allow(dead_code))]
+    pub column_id: String,
+}
+
+/// detect_account_user_ids の出力。取得できなかったアカウントは `x_user_id` が None。
+#[derive(serde::Serialize, Debug, PartialEq)]
+pub struct DetectedUserId {
+    #[serde(rename = "accountId")]
+    pub account_id: String,
+    #[serde(rename = "xUserId")]
+    pub x_user_id: Option<String>,
+}
+
+/// 既存アカウントの X ユーザーIDを、ログイン済みセッションの twid Cookie から後追いで取得する。
+/// 取得できなかったアカウントは None を返す（エラーにしない。呼び出し側は再認証のヒントを出す）。
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn detect_account_user_ids(
+    caller: tauri::Webview,
+    app: AppHandle,
+    targets: Vec<DetectUserIdTarget>,
+) -> Result<Vec<DetectedUserId>, String> {
+    crate::commands::require_main_caller(&caller)?;
+    let cookie_url: url::Url = "https://x.com"
+        .parse()
+        .map_err(|e: url::ParseError| e.to_string())?;
+    Ok(targets
+        .into_iter()
+        .map(|target| {
+            let label = format!("{}{}", labels::COLUMN_PREFIX, target.column_id);
+            let x_user_id = app.get_webview(&label).and_then(|webview| {
+                match webview.cookies_for_url(cookie_url.clone()) {
+                    Ok(cookies) => {
+                        twid_user_id_from_cookies(cookies.iter().map(|c| (c.name(), c.value())))
+                    }
+                    Err(e) => {
+                        log::warn!("[detect_account_user_ids] cookies_for_url error: {e}");
+                        None
+                    }
+                }
+            });
+            DetectedUserId {
+                account_id: target.account_id,
+                x_user_id,
+            }
+        })
+        .collect())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn detect_account_user_ids(
+    caller: tauri::Webview,
+    targets: Vec<DetectUserIdTarget>,
+) -> Result<Vec<DetectedUserId>, String> {
+    crate::commands::require_main_caller(&caller)?;
+    Ok(targets
+        .into_iter()
+        .map(|target| {
+            #[cfg(target_os = "android")]
+            let x_user_id = match crate::android_bridge::detect_x_user_id(&target.account_id) {
+                Ok(id) => id,
+                Err(e) => {
+                    log::warn!("[detect_account_user_ids] JNI error: {e}");
+                    None
+                }
+            };
+            #[cfg(not(target_os = "android"))]
+            let x_user_id = None;
+            DetectedUserId {
+                account_id: target.account_id,
+                x_user_id,
+            }
+        })
+        .collect())
 }
 
 /// 再認証完了イベント（ACCOUNT_REAUTH_COMPLETE）の payload。
@@ -244,25 +375,7 @@ pub async fn reauth_account_window(
                 Some(w) => {
                     if let Ok(url) = w.url() {
                         if url.path() == "/home" {
-                            let x_user_id = match "https://x.com".parse() {
-                                Ok(cookie_url) => {
-                                    match w.cookies_for_url(cookie_url) {
-                                        Ok(cookies) => twid_user_id_from_cookies(
-                                            cookies.iter().map(|c| (c.name(), c.value())),
-                                        ),
-                                        Err(e) => {
-                                            log::warn!("[reauth_account_window] cookies_for_url error: {e}");
-                                            None
-                                        }
-                                    }
-                                }
-                                Err(e) => {
-                                    log::warn!(
-                                        "[reauth_account_window] cookie url parse error: {e}"
-                                    );
-                                    None
-                                }
-                            };
+                            let x_user_id = read_x_user_id(&w, "reauth_account_window");
                             let _ = app_clone.emit(
                                 events::ACCOUNT_REAUTH_COMPLETE,
                                 ReauthCompletePayload {
@@ -487,6 +600,24 @@ pub async fn close_window(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn センチネル本文の数値idをxユーザーidとして取り出す() {
+        assert_eq!(
+            x_user_id_from_sentinel(
+                "1234567890
+"
+            ),
+            Some("1234567890".to_string())
+        );
+    }
+
+    #[test]
+    fn センチネル本文が空または数値以外ならxユーザーidは未設定() {
+        for body in ["", "  ", "abc", "12a4", "u=123", "-1"] {
+            assert_eq!(x_user_id_from_sentinel(body), None, "body={body:?}");
+        }
+    }
 
     #[test]
     fn cleanup_created_data_dirは存在するディレクトリを削除する() {

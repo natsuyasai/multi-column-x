@@ -7,6 +7,9 @@ fn main() {
             // capability による許可の有無に関わらず ACL 未定義として拒否される。
             "load_settings",
             "save_settings",
+            "export_backup",
+            "read_backup",
+            "apply_restore",
             "create_column_webview",
             "get_external_column_data_directory",
             "delete_external_column_data",
@@ -32,6 +35,7 @@ fn main() {
             "reauth_account_window",
             "delete_account_data",
             "close_window",
+            "detect_account_user_ids",
             "open_compose_window",
             "install_apk_update",
             "check_media_codec_support",

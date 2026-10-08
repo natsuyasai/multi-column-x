@@ -235,6 +235,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::settings::load_settings,
             commands::settings::save_settings,
+            commands::backup::export_backup,
+            commands::backup::read_backup,
+            commands::backup::apply_restore,
             commands::webview::create_column_webview,
             commands::webview::get_external_column_data_directory,
             commands::webview::delete_external_column_data,
@@ -259,6 +262,7 @@ pub fn run() {
             commands::account::reauth_account_window,
             commands::account::delete_account_data,
             commands::account::close_window,
+            commands::account::detect_account_user_ids,
             commands::webview::open_compose_window,
             commands::update::install_apk_update,
             commands::media_codec::check_media_codec_support,
