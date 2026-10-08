@@ -14,6 +14,13 @@ interface AccountWindowResult {
   accountId: string;
   dataDirectory: string;
   windowLabel: string;
+  /** ログイン済みセッションの twid Cookie から取得した X ユーザー ID（mobile のみ。取得できなければ無し） */
+  xUserId?: string | null;
+}
+
+// desktop: ACCOUNT_LOGIN_COMPLETE イベントの payload
+interface AccountLoginCompletePayload {
+  xUserId: string | null;
 }
 
 interface ReauthCompletePayload {
@@ -134,6 +141,8 @@ export interface PendingAccountName {
   dataDirectory: string;
   windowLabel: string;
   defaultValue: string;
+  /** 追加時に取得できた X ユーザー ID。バックアップ復元の自動候補に使う */
+  xUserId?: string;
 }
 
 // アカウント削除の確認待ちであることを表す状態。
@@ -167,13 +176,19 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
   );
 
   const requestAccountName = useCallback(
-    (accountId: string, dataDirectory: string, windowLabel: string) => {
+    (
+      accountId: string,
+      dataDirectory: string,
+      windowLabel: string,
+      xUserId?: string | null,
+    ) => {
       const currentAccounts = useAppStore.getState().accounts;
       setPendingAccountName({
         accountId,
         dataDirectory,
         windowLabel,
         defaultValue: `アカウント ${currentAccounts.length + 1}`,
+        xUserId: xUserId ?? undefined,
       });
     },
     [],
@@ -193,6 +208,7 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
         dataDirectory: pending.dataDirectory,
         color,
         createdAt: new Date().toISOString(),
+        ...(pending.xUserId ? { xUserId: pending.xUserId } : {}),
       };
 
       addAccount(account);
@@ -223,7 +239,13 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
   }, [pendingAccountName]);
 
   const startAddAccount = useCallback(async () => {
-    if (isAddingRef.current || pendingAccountName) return;
+    // バックアップ復元中はアカウントの追加を始めない（復元の置換と競合するため）
+    if (
+      isAddingRef.current ||
+      pendingAccountName ||
+      useAppStore.getState().restoreInProgress
+    )
+      return;
     isAddingRef.current = true;
 
     try {
@@ -242,6 +264,7 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
           parsed.accountId,
           parsed.dataDirectory,
           parsed.windowLabel,
+          parsed.xUserId,
         );
       } else {
         // -----------------------------------------------
@@ -264,11 +287,19 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
             unlistenDestroyed = null;
           };
 
-          listen<void>(IPC_EVENTS.ACCOUNT_LOGIN_COMPLETE, () => {
-            cleanup();
-            requestAccountName(accountId, dataDirectory, windowLabel);
-            resolve();
-          })
+          listen<AccountLoginCompletePayload>(
+            IPC_EVENTS.ACCOUNT_LOGIN_COMPLETE,
+            (event) => {
+              cleanup();
+              requestAccountName(
+                accountId,
+                dataDirectory,
+                windowLabel,
+                event.payload.xUserId,
+              );
+              resolve();
+            },
+          )
             .then((fn) => {
               unlistenLogin = fn;
             })
@@ -316,7 +347,9 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
 
   const startReauth = useCallback(
     async (accountId: string) => {
-      if (isReauthingRef.current) return;
+      // バックアップ復元中は再認証を始めない（復元の置換と競合するため）
+      if (isReauthingRef.current || useAppStore.getState().restoreInProgress)
+        return;
       const account = accounts.find((a) => a.id === accountId);
       if (!account) return;
 

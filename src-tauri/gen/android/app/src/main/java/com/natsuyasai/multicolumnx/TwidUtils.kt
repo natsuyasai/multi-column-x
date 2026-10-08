@@ -34,3 +34,10 @@ fun twidUserIdFromCookieString(cookieString: String): String? {
   }
   return null
 }
+
+/**
+ * アカウント追加完了のセンチネルファイル（add_account_login_complete）の本文を作る。
+ * X ユーザー ID が取得できていればその値、なければ空文字列。
+ * Rust 側 `x_user_id_from_sentinel`（src-tauri/src/commands/account.rs）が読み取る。
+ */
+fun addAccountSentinelBody(xUserId: String?): String = xUserId ?: ""

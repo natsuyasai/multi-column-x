@@ -73,6 +73,7 @@ multi-column-x/
         ├── linux_codec_env.rs        # Linux のメディアコーデック（GStreamer 等）環境判定
         ├── video/                    # 動画ダウンロード（hls.rs=HLS/m3u8 処理, http.rs=HTTP I/O）
         ├── commands/
+        │   ├── backup/               # バックアップ／リストア（format / restore / snapshot / file_io と Tauri コマンド）
         │   ├── settings.rs           # 設定の保存・読み込み（tauri-plugin-store）
         │   ├── settings_store.rs     # Rust 側の設定読み出しヘルパー（store 直接参照）
         │   ├── webview/

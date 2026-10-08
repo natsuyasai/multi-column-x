@@ -90,6 +90,7 @@ const App: React.FC = () => {
     recreateAllWebviews,
     recreateColumnWebview,
     loadPresetAndRecreateWebviews,
+    replaceColumnsAndRecreateWebviews,
   } = useColumns();
   const {
     startAddAccount,
@@ -549,6 +550,7 @@ const App: React.FC = () => {
           }}
           onReloadAllWebviews={recreateAllWebviews}
           onLoadPreset={loadPresetAndRecreateWebviews}
+          onReplaceColumnsAndRecreate={replaceColumnsAndRecreateWebviews}
           appVersion={appVersion}
           updateChecking={updater.checking}
           updateManualResult={updater.manualResult}

@@ -2,6 +2,9 @@
   "commands": [
     "load_settings",
     "save_settings",
+    "export_backup",
+    "read_backup",
+    "apply_restore",
     "create_column_webview",
     "remove_column_webview",
     "resize_column_webview",
@@ -17,6 +20,7 @@
     "reauth_account_window",
     "delete_account_data",
     "close_window",
+    "detect_account_user_ids",
     "report_webview_scroll",
     "get_mobile_insets",
     "set_column_cookies",

@@ -640,6 +640,125 @@ describe("useColumns desktop loadPresetAndRecreateWebviews", () => {
   });
 });
 
+describe("useColumns desktop replaceColumnsAndRecreateWebviews（バックアップ復元）", () => {
+  const mockInvoke = vi.mocked(invoke);
+
+  function attachContainer(ref: { current: HTMLDivElement | null }) {
+    const div = document.createElement("div");
+    Object.defineProperty(div, "clientHeight", {
+      value: 900,
+      configurable: true,
+    });
+    ref.current = div;
+  }
+
+  function makeColumn(id: string, gridCol: number): Column {
+    return {
+      id,
+      accountId: "acc-1",
+      pageType: "home",
+      homeTabName: "フォロー中",
+      width: 350,
+      order: gridCol - 1,
+      gridRow: 1,
+      gridCol,
+      heightMode: "auto",
+      settings: { ...DEFAULT_COLUMN_SETTINGS },
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+    mockResolveColumnDataDirectory.mockImplementation(
+      async (column, accounts) =>
+        accounts.find((a) => a.id === column.accountId)?.dataDirectory,
+    );
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-1",
+          label: "Test",
+          dataDirectory: "/data/acc-1",
+          color: "#1d9bf0",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      columns: [makeColumn("old-1", 1), makeColumn("old-2", 2)],
+      globalSettings: { ...DEFAULT_GLOBAL_SETTINGS },
+      isLoaded: true,
+      isMobile: false,
+      topBarExpanded: false,
+    });
+  });
+
+  it("旧カラムの表示を破棄してから置換を適用し、置換後のカラムの表示を作る", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+    const order: string[] = [];
+    mockInvoke.mockImplementation(async (cmd, args) => {
+      if (cmd === "remove_column_webview") {
+        order.push(`remove:${(args as { columnId: string }).columnId}`);
+      }
+      if (cmd === "create_column_webview") {
+        order.push(
+          `create:${(args as { args: { column: Column } }).args.column.id}`,
+        );
+      }
+      return undefined;
+    });
+
+    await act(async () => {
+      await result.current.replaceColumnsAndRecreateWebviews(() => {
+        order.push("apply");
+        useAppStore.getState().applyRestoredSettings({
+          accounts: useAppStore.getState().accounts,
+          columns: [makeColumn("new-1", 1)],
+          globalSettings: { ...DEFAULT_GLOBAL_SETTINGS },
+        });
+      });
+    });
+
+    expect(order.indexOf("remove:old-1")).toBeGreaterThanOrEqual(0);
+    expect(order.indexOf("remove:old-2")).toBeGreaterThanOrEqual(0);
+    expect(order.indexOf("apply")).toBeGreaterThan(
+      order.indexOf("remove:old-1"),
+    );
+    expect(order.indexOf("apply")).toBeGreaterThan(
+      order.indexOf("remove:old-2"),
+    );
+    expect(order.indexOf("create:new-1")).toBeGreaterThan(
+      order.indexOf("apply"),
+    );
+    expect(order).not.toContain("create:old-1");
+  });
+
+  it("置換の適用では設定の保存を発行しない", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+    useAppStore.getState().beginRestore();
+
+    await act(async () => {
+      await result.current.replaceColumnsAndRecreateWebviews(() => {
+        useAppStore.getState().applyRestoredSettings({
+          accounts: useAppStore.getState().accounts,
+          columns: [makeColumn("new-1", 1)],
+          globalSettings: { ...DEFAULT_GLOBAL_SETTINGS },
+        });
+      });
+    });
+    useAppStore.getState().finishRestore();
+
+    expect(
+      mockInvoke.mock.calls.filter((c) => c[0] === "save_settings"),
+    ).toHaveLength(0);
+  });
+});
+
 describe("useColumns desktop hideColumnWebviews", () => {
   const mockInvoke = vi.mocked(invoke);
 

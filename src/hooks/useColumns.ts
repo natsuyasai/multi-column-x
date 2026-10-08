@@ -384,6 +384,18 @@ export function useColumns() {
     [removeWebviewsOf, rebuildWebviews],
   );
 
+  // バックアップ復元: 現在の全カラムの WebView を破棄し、apply でストアを置換（保存はしない）してから
+  // 置換後のカラムの WebView を作り直す。置換前に旧 id の WebView を必ず破棄する（id が変わるため）。
+  const replaceColumnsAndRecreateWebviews = useCallback(
+    async (apply: () => void) => {
+      const { columns: before } = useAppStore.getState();
+      await removeWebviewsOf(before);
+      apply();
+      await rebuildWebviews();
+    },
+    [removeWebviewsOf, rebuildWebviews],
+  );
+
   return {
     columns,
     columnBounds,
@@ -406,5 +418,6 @@ export function useColumns() {
     recreateAllWebviews,
     recreateColumnWebview,
     loadPresetAndRecreateWebviews,
+    replaceColumnsAndRecreateWebviews,
   };
 }

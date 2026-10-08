@@ -401,15 +401,21 @@ fn civil_from_days(days: i64) -> (i64, u32, u32) {
     (y, m, d)
 }
 
-/// 退避ファイル名を生成する（純粋関数）。既存の退避ファイルを上書きしないよう
-/// タイムスタンプ（UTC, YYYYMMDD-HHMMSS）を含める。
-pub(crate) fn backup_file_name(unix_secs: u64) -> String {
+/// UTC の Unix 秒を (年, 月, 日, 時, 分, 秒) に分解する（純粋関数）。
+pub(crate) fn utc_datetime_parts(unix_secs: u64) -> (i64, u32, u32, u64, u64, u64) {
     let days = (unix_secs / 86400) as i64;
     let secs_of_day = unix_secs % 86400;
     let (year, month, day) = civil_from_days(days);
     let hour = secs_of_day / 3600;
     let minute = (secs_of_day % 3600) / 60;
     let second = secs_of_day % 60;
+    (year, month, day, hour, minute, second)
+}
+
+/// 退避ファイル名を生成する（純粋関数）。既存の退避ファイルを上書きしないよう
+/// タイムスタンプ（UTC, YYYYMMDD-HHMMSS）を含める。
+pub(crate) fn backup_file_name(unix_secs: u64) -> String {
+    let (year, month, day, hour, minute, second) = utc_datetime_parts(unix_secs);
     format!("settings.json.{year:04}{month:02}{day:02}-{hour:02}{minute:02}{second:02}.bak")
 }
 

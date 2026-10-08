@@ -5,6 +5,7 @@ import {
   WEBVIEW_LABELS,
   WEBVIEW_SCRIPTS,
 } from "../constants/ipc";
+import { useAppStore } from "../store/useAppStore";
 
 interface UseAutoReloadOptions {
   columnId: string;
@@ -39,11 +40,14 @@ export function useAutoReload({
       const prev = remainingRef.current;
       if (prev === null) return;
       if (prev <= 1) {
+        // バックアップ復元中は WebView の破棄・再生成と競合するため更新しない（カウントは続ける）。
         // 状態更新関数の外で呼ぶ（StrictMode の開発ビルドでは更新関数が 2 回実行されるため）
-        invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
-          label: WEBVIEW_LABELS.column(columnId),
-          script: WEBVIEW_SCRIPTS.TRIGGER_RELOAD,
-        }).catch(() => {});
+        if (!useAppStore.getState().restoreInProgress) {
+          invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
+            label: WEBVIEW_LABELS.column(columnId),
+            script: WEBVIEW_SCRIPTS.TRIGGER_RELOAD,
+          }).catch(() => {});
+        }
         remainingRef.current = intervalSecRef.current;
       } else {
         remainingRef.current = prev - 1;

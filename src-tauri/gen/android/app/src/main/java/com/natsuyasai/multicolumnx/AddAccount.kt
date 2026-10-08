@@ -26,6 +26,10 @@ class AddAccount : AppCompatActivity() {
   private var mode = "add"
   private var expectedUserId: String? = null
   private var reauthProfile: Profile? = null
+
+  // 追加モードで、アカウント専用のプロファイルを WebView に適用できたか。
+  // false のときは共有 CookieManager が使われる（Profile API 非対応端末など）。
+  private var accountProfileApplied = false
   private var reauthTempProfileName: String? = null
 
   // ページ遷移中フラグ（shouldOverrideUrlLoading / onPageStarted で true、onPageFinished で false）
@@ -62,6 +66,7 @@ class AddAccount : AppCompatActivity() {
           } else {
             false
           }
+        accountProfileApplied = profileSet && mode != "reauth"
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
         settings.databaseEnabled = true
@@ -150,15 +155,20 @@ class AddAccount : AppCompatActivity() {
     polling = false
     handler.removeCallbacksAndMessages(null)
 
-    if (success) {
-      saveCookies()
-    }
+    // ログイン済みセッションの twid Cookie から X ユーザー ID を取得し、センチネルの本文で Rust へ渡す。
+    val xUserId =
+      if (success) {
+        saveCookies()
+        readXUserId()
+      } else {
+        null
+      }
 
     val fileName = if (success) "add_account_login_complete" else "add_account_login_cancelled"
     // dataDir = /data/user/0/<package> — Rust の app_data_dir() と一致する
     val sentinelFile = File(dataDir, fileName)
     try {
-      sentinelFile.writeText("")
+      sentinelFile.writeText(addAccountSentinelBody(xUserId))
       Log.d(TAG, "finishWithResult: wrote sentinel ${sentinelFile.absolutePath}")
     } catch (e: Exception) {
       Log.e(TAG, "finishWithResult: failed to write sentinel: $e")
@@ -262,6 +272,21 @@ class AddAccount : AppCompatActivity() {
     Log.d(TAG, "finishReauthWithSentinel: starting MainActivity, fileName=$fileName")
     startActivity(Intent(this, MainActivity::class.java))
     finish()
+  }
+
+  // 追加したアカウントのプロファイルの CookieManager（プロファイル未適用なら共有 CookieManager）から
+  // twid Cookie を読み、X ユーザー ID を返す。取得できなければ null。
+  private fun readXUserId(): String? {
+    // プロファイル適用済みなら、そのプロファイルの CookieManager だけを見る（見つからなければ取得しない）。
+    // 共有 CookieManager は、プロファイルを使っていない（非対応端末など）場合に限り読む。
+    // 適用済みなのに共有側を読むと、他セッションの twid を誤って保存しうるため。
+    val cm =
+      if (accountProfileApplied) {
+        WebViewProfiles.getProfileByName(getCookieProfileName(accountId))?.cookieManager
+      } else {
+        CookieManager.getInstance()
+      }
+    return cm?.let { twidUserIdFromCookieString(it.getCookie("https://x.com") ?: "") }
   }
 
   // ログイン成功後の x.com Cookie をアカウントのデータディレクトリに保存する。

@@ -106,4 +106,15 @@ object AppBridge {
    */
   @JvmStatic
   external fun onSwipeDoubleTap()
+
+  /**
+   * バックアップの SAF 入出力（MainActivity.startBackupExport / startBackupImport）の完了を
+   * Rust 側へ通知する。status は saved / picked / cancelled / tooLarge / error。
+   * detail は error のときの原因（それ以外は空文字列）。
+   */
+  @JvmStatic
+  external fun onBackupFileResult(
+    status: String,
+    detail: String,
+  )
 }

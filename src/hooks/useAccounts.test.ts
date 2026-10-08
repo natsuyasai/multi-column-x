@@ -382,7 +382,7 @@ describe("useAccounts (desktop addAccount)", () => {
     await act(async () => {
       startPromise = result.current.startAddAccount();
       await flushMicrotasks();
-      fireListenEvent(IPC_EVENTS.ACCOUNT_LOGIN_COMPLETE, undefined);
+      fireListenEvent(IPC_EVENTS.ACCOUNT_LOGIN_COMPLETE, { xUserId: null });
       await startPromise;
     });
 
