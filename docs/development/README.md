@@ -10,6 +10,7 @@
 - [release-theme-reauth-notes.md](release-theme-reauth-notes.md) — 全面リファクタリング時の判断、リリース CI / 自動更新、テーマ切替、更新進捗表示、再認証（Cookie 上書き）
 - [api-rate-limit-operations-notes.md](api-rate-limit-operations-notes.md) — API レート制限モニターのヘッダ仕様、severity 判定ロジック、operationName（bucketKey）一覧
 - [topbar-column-reorder-notes.md](topbar-column-reorder-notes.md) — TopBar（desktop）のカラム並び替え（dnd-kit）のドラッグしきい値・click 抑制・Storybook play 上の注意
+- [backup-restore-notes.md](backup-restore-notes.md) — バックアップ／リストア（ファイル形式、ホワイトリスト出力、アカウント紐づけ、復元手順、退避、Android SAF、xUserId 取得）。手動テスト項目は [backup-restore/integration-test.md](backup-restore/integration-test.md)
 - [settings-file-crash-safety-notes.md](settings-file-crash-safety-notes.md) — settings.json のアトミック書き込み、起動時の検査と復旧、`.prev` 世代、読み込み失敗時の保存ガード
 
 ## リファレンス（旧 README から移設）
