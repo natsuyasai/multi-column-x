@@ -336,3 +336,184 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    /// コロン区切りエントリ（1〜8文字のパス風文字列）を 0〜5 個持つ生成戦略。
+    fn path_entries() -> impl Strategy<Value = Vec<String>> {
+        prop::collection::vec("[a-z/]{1,8}", 0..=5)
+    }
+
+    /// `name:RANK` 形式のエントリ。name はユーザー名と HW デコーダ名の両方を混ぜる。
+    fn rank_entry() -> impl Strategy<Value = (String, String)> {
+        let name = prop_oneof![
+            "[a-z0-9_]{1,10}",
+            prop::sample::select(HW_VIDEO_DECODERS.to_vec()).prop_map(str::to_string),
+        ];
+        let rank = prop_oneof![
+            Just("NONE".to_string()),
+            Just("PRIMARY".to_string()),
+            Just("SECONDARY".to_string()),
+            Just("MARGINAL".to_string()),
+            "[0-9]{1,3}",
+        ];
+        (name, rank)
+    }
+
+    fn rank_entries() -> impl Strategy<Value = Vec<(String, String)>> {
+        prop::collection::vec(rank_entry(), 0..=8)
+    }
+
+    fn join_ranks(entries: &[(String, String)]) -> String {
+        entries
+            .iter()
+            .map(|(name, rank)| format!("{name}:{rank}"))
+            .collect::<Vec<_>>()
+            .join(",")
+    }
+
+    fn is_hw_name(name: &str) -> bool {
+        HW_VIDEO_DECODERS.contains(&name)
+    }
+
+    fn split_entries(value: &str) -> Vec<&str> {
+        value.split(',').filter(|e| !e.is_empty()).collect()
+    }
+
+    fn entry_name(entry: &str) -> &str {
+        entry.split(':').next().unwrap_or("")
+    }
+
+    proptest! {
+        /// relaunch で環境変数が継承されても、2回適用した結果は1回適用した結果と同じ。
+        #[test]
+        fn append_plugin_pathは何度適用しても結果が変わらない(
+            existing in path_entries(),
+            dir in "[a-z/]{1,8}",
+        ) {
+            let existing = existing.join(":");
+            let path = Path::new(&dir);
+            let once = append_plugin_path(&existing, path);
+            let twice = append_plugin_path(&once, path);
+            prop_assert_eq!(once, twice);
+        }
+
+        /// 結果のコロン区切りエントリには必ず dir が含まれる。
+        #[test]
+        fn append_plugin_pathの結果には必ずdirがエントリとして含まれる(
+            existing in path_entries(),
+            dir in "[a-z/]{1,8}",
+        ) {
+            let existing = existing.join(":");
+            let result = append_plugin_path(&existing, Path::new(&dir));
+            prop_assert!(result.split(':').any(|entry| entry == dir));
+        }
+
+        /// dir が既存に無ければ、既存のエントリ順を保ったまま末尾に dir だけが追加される。
+        #[test]
+        fn append_plugin_pathはdirが未登録なら既存の順序を保って末尾に追加する(
+            existing in path_entries(),
+            dir in "[a-z/]{1,8}",
+        ) {
+            prop_assume!(!existing.contains(&dir));
+            let joined = existing.join(":");
+            let result = append_plugin_path(&joined, Path::new(&dir));
+            prop_assert!(result.starts_with(&joined));
+            let result_entries: Vec<&str> = result.split(':').collect();
+            let mut expected: Vec<&str> = existing.iter().map(String::as_str).collect();
+            expected.push(&dir);
+            prop_assert_eq!(result_entries, expected);
+        }
+
+        /// 出力（None なら空文字）を同じ enabled で再適用しても同じ結果になる。
+        #[test]
+        fn hw_decode_rank_overrideは同じ設定を再適用しても結果が変わらない(
+            enabled in any::<bool>(),
+            existing in rank_entries(),
+        ) {
+            let existing = join_ranks(&existing);
+            let once = hw_decode_rank_override(enabled, &existing);
+            let twice = hw_decode_rank_override(enabled, once.as_deref().unwrap_or_default());
+            prop_assert_eq!(once, twice);
+        }
+
+        /// 有効なら、結果に HW デコーダ名のエントリは一つも残らない。
+        #[test]
+        fn hw_decode_rank_overrideは有効ならhwデコーダ名のエントリを含まない(
+            existing in rank_entries(),
+        ) {
+            let existing = join_ranks(&existing);
+            let result = hw_decode_rank_override(true, &existing).unwrap_or_default();
+            for entry in split_entries(&result) {
+                prop_assert!(!is_hw_name(entry_name(entry)), "{entry} が残っている");
+            }
+        }
+
+        /// 無効なら、HW デコーダの全名前が `名前:NONE` として結果に含まれる。
+        #[test]
+        fn hw_decode_rank_overrideは無効なら全hwデコーダがnoneで含まれる(
+            existing in rank_entries(),
+        ) {
+            let existing = join_ranks(&existing);
+            let result = hw_decode_rank_override(false, &existing).expect("無効時は値が返る");
+            let entries = split_entries(&result);
+            for name in HW_VIDEO_DECODERS {
+                let expected = format!("{name}:NONE");
+                prop_assert!(entries.contains(&expected.as_str()), "{expected} が無い");
+            }
+        }
+
+        /// HW デコーダ名でないユーザー独自エントリは、enabled によらず順序込みで保持される。
+        #[test]
+        fn hw_decode_rank_overrideはユーザー独自エントリをenabledによらず順序込みで保持する(
+            enabled in any::<bool>(),
+            existing in rank_entries(),
+        ) {
+            let expected: Vec<String> = existing
+                .iter()
+                .filter(|(name, _)| !is_hw_name(name))
+                .map(|(name, rank)| format!("{name}:{rank}"))
+                .collect();
+            let result = hw_decode_rank_override(enabled, &join_ranks(&existing))
+                .unwrap_or_default();
+            let kept: Vec<String> = split_entries(&result)
+                .into_iter()
+                .filter(|entry| !is_hw_name(entry_name(entry)))
+                .map(str::to_string)
+                .collect();
+            prop_assert_eq!(kept, expected);
+        }
+
+        /// 無効化してから有効へ戻した結果は、最初から有効にした結果と同じ。
+        #[test]
+        fn hw_decode_rank_overrideは無効から有効へ戻すと最初から有効にした結果と一致する(
+            existing in rank_entries(),
+        ) {
+            let existing = join_ranks(&existing);
+            let disabled = hw_decode_rank_override(false, &existing).unwrap_or_default();
+            prop_assert_eq!(
+                hw_decode_rank_override(true, &disabled),
+                hw_decode_rank_override(true, &existing)
+            );
+        }
+
+        /// 任意の文字列を与えても panic せず bool を返す。
+        #[test]
+        fn read_hw_decode_enabledは任意の文字列でもpanicしない(input in any::<String>()) {
+            let _: bool = read_hw_decode_enabled(&input);
+        }
+
+        /// 保存した bool がそのまま読み出される（ラウンドトリップ）。
+        #[test]
+        fn read_hw_decode_enabledは保存した値をそのまま読み出す(value in any::<bool>()) {
+            let json = serde_json::json!({
+                "appSettings": { "globalSettings": { "hardwareVideoDecodeEnabled": value } }
+            })
+            .to_string();
+            prop_assert_eq!(read_hw_decode_enabled(&json), value);
+        }
+    }
+}
