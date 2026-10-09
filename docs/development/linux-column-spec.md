@@ -29,4 +29,13 @@ webkit2gtk は wry と同一バージョン（`=2.0.2`, `v2_40`）を `[target.'
 
 同種の不足を deb 版でも防ぐため、`bundle.linux.deb.depends` に `gstreamer1.0-plugins-{base,good,bad}` と `gstreamer1.0-libav` を明記している。
 
-なお、AAC デコーダ（AAC-LC プロファイル限定の `libfdk-aac` + GStreamer `fdkaac` プラグイン）は、AAC-LC のコア特許が失効済みと判断し、CI で `gst-plugins-bad` から `fdkaac` エレメントのみを自前ビルドして AppImage に実際に同梱している。一方 H.264 デコーダ（Cisco OpenH264）は、Cisco の特許ロイヤリティ負担が「Cisco 自身の配布チャネルから直接ダウンロードする」場合にのみ適用されるため AppImage に同梱できず、Cisco 公式サーバーから直接ダウンロードする方式（Firefox/Chromium と同じ方式）の Rust コマンド `download_and_enable_h264` を用意している。欠如検出の `check_media_codec_support` コマンドと `scripts/install.sh` の案内表示も残しているが、アプリ内の案内 UI（起動時チェック・案内ダイアログ）は削除済みで、現在フロントからの呼び出し口は無い。詳細は `docs/development/linux-webview-notes.md`「AppImage の H.264/AAC コーデック対応」を参照。
+同梱が必須の要素（いずれも `tauri.conf.json` の `bundle.linux.appimage.files` で配置）:
+
+- **`videoparsersbad`（`h264parse`）と `codecparsers`**（`libgstvideoparsersbad.so` / `libgstcodecparsers-1.0.so.0`、加えて依存の `libgstcodecs-1.0.so.0`）。X の動画は MP4（`stream-format=avc`）で、`openh264dec` は `byte-stream` しか受け付けないため、変換役の `h264parse` が無いと動画がデコーダに繋がらず再生できない。
+- **AAC デコーダ**: AAC-LC プロファイル限定の `libfdk-aac` + GStreamer `fdkaac` プラグイン。AAC-LC のコア特許が失効済みと判断し、CI で `gst-plugins-bad` から `fdkaac` エレメントのみを自前ビルドして同梱する。
+
+**同梱してはならないもの**: `libopenh264.so.7`。Cisco の特許ロイヤリティ負担は「Cisco 自身の配布チャネルから直接ダウンロードする」場合にのみ適用されるため、Cisco 公式サーバーから直接ダウンロードする方式（Firefox/Chromium と同じ方式）の Rust コマンド `download_and_enable_h264` で取得する。OpenH264 のグルー（`libgstopenh264.so`）と VA-API プラグイン（`libgstva.so` / `libgstva-1.0.so.0`）は `usr/share/multicolumnx/gst-optional/` に置き、linuxdeploy の依存解決の対象外にして `libopenh264` / `libva` が自動同梱されないようにしている（`libva` はホストのものを使う）。
+
+**リリースランナーに `gstreamer1.0-plugins-bad` を入れない**: linuxdeploy-plugin-gstreamer はシステムのプラグインディレクトリ全部を同梱するため、入れると Ubuntu の `openh264` プラグイン経由で `libopenh264` が AppImage に再混入する。この前提は CI の `scripts/verify-appimage-media.sh`（`libopenh264*` / `libva*.so*` を含まないこと等を検査）で担保している。
+
+アプリ内では、`check_media_codec_support` で H.264 の可否を判定し、AppImage で未取得なら起動時の案内ダイアログと設定画面から `download_and_enable_h264` を呼べる。詳細は `docs/development/linux-webview-notes.md`「AppImage の H.264/AAC コーデック対応」を参照。
