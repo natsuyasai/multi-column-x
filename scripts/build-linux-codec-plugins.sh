@@ -60,4 +60,15 @@ for f in "${OUT_DIR}"/optional/lib/*.so.0; do
   patchelf --set-rpath '$ORIGIN/../../../../lib' "$f"
 done
 
+# usr/lib 側に置くファイルの RUNPATH を AppDir 内の最終配置に合わせる。
+# linuxdeploy は usr/lib 配下の既存 ELF の依存を解決するため、meson のビルドツリー相対の
+# RUNPATH（例: $ORIGIN/../codecparsers）のままだと、システムに libgstcodecparsers が無い
+# 環境（CI ランナー）で `Could not find dependency` になり失敗する。
+# 開発機にはシステム版があるため見逃しやすい。
+#   usr/lib/libgstcodecparsers-1.0.so.0 / usr/lib/libgstcodecs-1.0.so.0 → 同じ usr/lib
+#   usr/lib/gstreamer-1.0/libgstvideoparsersbad.so → 1 つ上の usr/lib
+patchelf --set-rpath '$ORIGIN' "${OUT_DIR}/libgstcodecparsers-1.0.so.0"
+patchelf --set-rpath '$ORIGIN' "${OUT_DIR}/libgstcodecs-1.0.so.0"
+patchelf --set-rpath '$ORIGIN/..' "${OUT_DIR}/libgstvideoparsersbad.so"
+
 echo "GStreamer コーデックプラグインを ${OUT_DIR} に配置しました。"
