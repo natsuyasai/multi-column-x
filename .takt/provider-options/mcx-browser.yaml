@@ -1,0 +1,10 @@
+# readonly の許可に加え、実 Chrome 操作（claude-in-chrome）を許可する。
+claude:
+  allowed_tools:
+    - Read
+    - Glob
+    - Grep
+    - Bash
+    - WebSearch
+    - WebFetch
+    - mcp__claude-in-chrome__*

@@ -1,9 +1,24 @@
 name: mcx-default
-description: Multi Column X（Tauri v2 製 X クライアント）の開発規約・実 WebView 調査方針・技術知識を、共通コアの裁定・修正検証付きピアレビュー収束ループと要件の最終確認へ注入する。
-max_steps: 51
-initial_step: develop
+description: Multi Column X（Tauri v2 製 X クライアント）の開発フロー。実環境（Chrome / dev 起動アプリ）での事前調査 → 共通コアの開発 → 実アプリでの動作確認 → コミット・PR 作成までを行う。
+max_steps: 70
+initial_step: investigate
 
 steps:
+  - name: investigate
+    persona: planner
+    edit: false
+    capabilities: mcx-browser
+    policy:
+      - mcx-dev-rules
+      - mcx-real-webview-investigation
+    knowledge: mcx-tauri
+    instruction: mcx-investigate
+    rules:
+      - condition: 調査が完了した（対象外の判定を含む）
+        next: develop
+      - condition: ユーザー確認が必要でこれ以上調査を進められない
+        next: ABORT
+
   - name: develop
     kind: workflow_call
     call: development-core
@@ -11,7 +26,7 @@ steps:
       implementation_pool: coding-facets
       implementation_workflow: development-implement-dynamic
       remediation_workflow: development-remediation-dynamic
-      plan_instruction: scenario-based-plan
+      plan_instruction: mcx-plan
       plan_report_format: scenario-based-plan
       replan_instruction: scenario-based-replan-implementation
       testing_instruction: scenario-based-write-tests-first
@@ -80,6 +95,58 @@ steps:
         - mcx-tauri
     rules:
       - condition: COMPLETE
-        next: COMPLETE
+        next: verify-app
       - condition: ABORT
         next: ABORT
+
+  - name: verify-app
+    persona: coder
+    edit: false
+    capabilities: mcx-browser
+    policy:
+      - mcx-dev-rules
+      - mcx-real-webview-investigation
+    knowledge: mcx-tauri
+    instruction: mcx-verify-app
+    output_contracts:
+      report:
+        - name: verify-app.md
+          format: |
+            # 動作確認結果
+            ## 確認対象の判定（対象外の場合は理由）
+            ## 確認項目（手段 / 操作 / 期待値 / 実測値 / OK・NG・未確認）
+            ## 未確認項目と理由
+    rules:
+      - condition: 実装の不具合を示す NG があり、実装へ差し戻す必要がある
+        next: develop
+      - condition: NG が無い（OK、対象外、理由付きの未確認のみ）
+        next: ship
+      - condition: 環境の問題で確認できず、実装の不具合かどうかも切り分けられない
+        next: ABORT
+
+  - name: ship
+    persona: coder
+    edit: false
+    allow_git_commit: true
+    capabilities: mcx-browser
+    policy: mcx-dev-rules
+    instruction: mcx-ship
+    rules:
+      - condition: コミット・push・develop 向け PR の作成（または既存 PR の確認）が完了した
+        next: COMPLETE
+      - condition: 作業ブランチの前提を満たさない、または push・PR 作成に失敗した
+        next: ABORT
+
+loop_monitors:
+  - cycle: [develop, verify-app]
+    threshold: 3
+    judge:
+      persona: supervisor
+      instruction: |
+        開発と動作確認の差し戻しループに進捗があるか評価してください。
+        同じ NG が繰り返されている場合は進捗なしと判定してください。
+      rules:
+        - condition: 進捗あり
+          next: develop
+        - condition: 進捗なし
+          next: ABORT
