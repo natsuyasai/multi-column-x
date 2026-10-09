@@ -35,7 +35,13 @@ jobs:
       - run: npm ci
       - run: npm run build:inject
       - name: Build AppImage (verbose)
-        run: npx tauri build --verbose --bundles appimage -c '{"bundle":{"createUpdaterArtifacts":false}}' 2>&1 | tee /tmp/tauri-build.log
+        run: |
+          set -o pipefail
+          npx tauri build --verbose --bundles appimage -c '{"bundle":{"createUpdaterArtifacts":false}}' 2>&1 | tee /tmp/tauri-build.log
+      - name: Verify AppImage media bundle
+        run: |
+          sudo apt-get install -y libopenh264-7 gstreamer1.0-tools
+          ./scripts/verify-appimage-media.sh "$(ls src-tauri/target/release/bundle/appimage/*.AppImage | head -n1)" /usr/lib/x86_64-linux-gnu
       - name: Dump AppDir
         if: always()
         run: |
