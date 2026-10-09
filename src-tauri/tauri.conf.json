@@ -56,8 +56,13 @@
         "bundleMediaFramework": true,
         "files": {
           "/usr/lib/gstreamer-1.0/libgstfdkaac.so": "gstreamer-plugins/libgstfdkaac.so",
-          "/usr/lib/gstreamer-1.0/libgstopenh264.so": "gstreamer-plugins/libgstopenh264.so",
-          "/usr/lib/libfdk-aac.so.2": "gstreamer-plugins/libfdk-aac.so.2"
+          "/usr/lib/gstreamer-1.0/libgstvideoparsersbad.so": "gstreamer-plugins/libgstvideoparsersbad.so",
+          "/usr/lib/libfdk-aac.so.2": "gstreamer-plugins/libfdk-aac.so.2",
+          "/usr/lib/libgstcodecparsers-1.0.so.0": "gstreamer-plugins/libgstcodecparsers-1.0.so.0",
+          "/usr/lib/libgstcodecs-1.0.so.0": "gstreamer-plugins/libgstcodecs-1.0.so.0",
+          "/usr/share/multicolumnx/gst-optional/plugins/libgstopenh264.so": "gstreamer-plugins/optional/plugins/libgstopenh264.so",
+          "/usr/share/multicolumnx/gst-optional/plugins/libgstva.so": "gstreamer-plugins/optional/plugins/libgstva.so",
+          "/usr/share/multicolumnx/gst-optional/lib/libgstva-1.0.so.0": "gstreamer-plugins/optional/lib/libgstva-1.0.so.0"
         }
       },
       "deb": {
