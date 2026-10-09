@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { platform } from "@tauri-apps/plugin-os";
 import {
   render,
@@ -703,6 +704,70 @@ describe("App (テーマ適用時のnight_mode Cookie反映)", () => {
     fireEvent.click(screen.getByText("適用"));
 
     expect(getNightModeCalls()).toHaveLength(0);
+  });
+});
+
+describe("App (Linux向け動画再生設定の配線)", () => {
+  const hwDecodeLabel = "ハードウェアデコードを使う（VA-API）";
+  const restartNotice = "再起動後に反映されます";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInvokeWithCurrentSettings();
+    mockPlatform.mockReturnValue("windows");
+    // Linux ではメインウィンドウの移動監視（onMoved）が登録される
+    vi.mocked(getCurrentWindow).mockReturnValue({
+      onMoved: vi.fn().mockResolvedValue(() => {}),
+    } as unknown as ReturnType<typeof getCurrentWindow>);
+    useAppStore.setState({
+      accounts: [account],
+      columns: [],
+      globalSettings: { ...globalSettings, hardwareVideoDecodeEnabled: true },
+      isLoaded: true,
+      isMobile: false,
+      topBarExpanded: false,
+      unreadCounts: {},
+    });
+  });
+
+  const openAppSettings = () =>
+    fireEvent.click(screen.getByTitle("アプリ設定 (Ctrl+,)"));
+
+  it("linux以外ではアプリ設定にハードウェアデコードの項目が表示されない", () => {
+    mockPlatform.mockReturnValue("windows");
+    render(<App />);
+    openAppSettings();
+    expect(screen.queryByRole("checkbox", { name: hwDecodeLabel })).toBeNull();
+  });
+
+  it("linuxではアプリ設定にハードウェアデコードの項目が表示される", () => {
+    mockPlatform.mockReturnValue("linux");
+    render(<App />);
+    openAppSettings();
+    expect(
+      screen.getByRole("checkbox", { name: hwDecodeLabel }),
+    ).toBeInTheDocument();
+  });
+
+  it("ハードウェアデコード設定を切り替えて適用した後も再起動までは再起動の案内が表示され続ける", () => {
+    mockPlatform.mockReturnValue("linux");
+    render(<App />);
+    openAppSettings();
+    expect(screen.queryByText(restartNotice)).toBeNull();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: hwDecodeLabel }));
+    expect(screen.getByText(restartNotice)).toBeInTheDocument();
+    fireEvent.click(screen.getByText("適用"));
+    expect(
+      useAppStore.getState().globalSettings.hardwareVideoDecodeEnabled,
+    ).toBe(false);
+
+    // 保存後に設定画面を開き直しても、起動時の値と異なるため案内が残る
+    openAppSettings();
+    expect(
+      screen.getByRole("checkbox", { name: hwDecodeLabel }),
+    ).not.toBeChecked();
+    expect(screen.getByText(restartNotice)).toBeInTheDocument();
   });
 });
 

@@ -272,3 +272,161 @@ export const ScaleThemeOverrideEnabled: Story = {
     ).toMatch(/scaleBtnActive/);
   },
 };
+
+const linuxH264Base = {
+  downloadApplicable: true,
+  h264Available: false,
+  downloadState: "idle" as const,
+  downloadError: null,
+  onEnable: fn(),
+  onRelaunch: fn(),
+};
+
+export const LinuxAppImageH264NotInstalled: Story = {
+  name: "Linux AppImage・H.264未取得（有効化できる）",
+  args: {
+    isLinux: true,
+    startupHardwareVideoDecodeEnabled: true,
+    h264Setup: { ...linuxH264Base, onEnable: fn() },
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      canvas.getByRole("button", { name: "H.264 を有効化" }),
+    );
+    await expect(args.h264Setup?.onEnable).toHaveBeenCalledTimes(1);
+    const hwCheckbox = canvas.getByRole("checkbox", {
+      name: "ハードウェアデコードを使う（VA-API）",
+    });
+    await expect(
+      canvas.queryByText("再起動後に反映されます"),
+    ).not.toBeInTheDocument();
+    await userEvent.click(hwCheckbox);
+    await expect(
+      canvas.getByText("再起動後に反映されます"),
+    ).toBeInTheDocument();
+  },
+};
+
+export const LinuxAppImageH264Installed: Story = {
+  name: "Linux AppImage・H.264取得済み（有効化済み表示）",
+  args: {
+    isLinux: true,
+    startupHardwareVideoDecodeEnabled: true,
+    h264Setup: { ...linuxH264Base, h264Available: true },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("H.264: 有効化済み")).toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "H.264 を有効化" }),
+    ).not.toBeInTheDocument();
+  },
+};
+
+export const LinuxDeb: Story = {
+  name: "Linux deb版（H.264項目なし・HWデコードのみ）",
+  args: {
+    isLinux: true,
+    startupHardwareVideoDecodeEnabled: true,
+    h264Setup: { ...linuxH264Base, downloadApplicable: false },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.queryByText(/H\.264/)).not.toBeInTheDocument();
+    await expect(
+      canvas.getByRole("checkbox", {
+        name: "ハードウェアデコードを使う（VA-API）",
+      }),
+    ).toBeInTheDocument();
+  },
+};
+
+export const LinuxH264Downloading: Story = {
+  name: "Linux AppImage・H.264ダウンロード中",
+  args: {
+    isLinux: true,
+    startupHardwareVideoDecodeEnabled: true,
+    h264Setup: { ...linuxH264Base, downloadState: "downloading" },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("ダウンロード中…")).toBeInTheDocument();
+    await expect(
+      canvas.getByRole("button", { name: "H.264 を有効化" }),
+    ).toBeDisabled();
+  },
+};
+
+export const LinuxH264Success: Story = {
+  name: "Linux AppImage・H.264取得成功（今すぐ再起動）",
+  args: {
+    isLinux: true,
+    startupHardwareVideoDecodeEnabled: true,
+    h264Setup: {
+      ...linuxH264Base,
+      h264Available: true,
+      downloadState: "success",
+      onRelaunch: fn(),
+    },
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "今すぐ再起動" }));
+    await expect(args.h264Setup?.onRelaunch).toHaveBeenCalledTimes(1);
+  },
+};
+
+export const LinuxH264Error: Story = {
+  name: "Linux AppImage・H.264取得失敗（再試行）",
+  args: {
+    isLinux: true,
+    startupHardwareVideoDecodeEnabled: true,
+    h264Setup: {
+      ...linuxH264Base,
+      downloadState: "error",
+      downloadError: "ネットワークに接続できません",
+      onEnable: fn(),
+    },
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByText("ネットワークに接続できません"),
+    ).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "再試行" }));
+    await expect(args.h264Setup?.onEnable).toHaveBeenCalledTimes(1);
+  },
+};
+
+export const LinuxAppImageDarkTheme: Story = {
+  name: "Linux AppImage・ダークテーマ",
+  args: {
+    isLinux: true,
+    startupHardwareVideoDecodeEnabled: true,
+    h264Setup: linuxH264Base,
+  },
+  decorators: [
+    (Story) => (
+      <ThemeRoot theme="dark">
+        <Story />
+      </ThemeRoot>
+    ),
+  ],
+};
+
+export const LinuxAppImageLightTheme: Story = {
+  name: "Linux AppImage・ライトテーマ",
+  args: {
+    isLinux: true,
+    startupHardwareVideoDecodeEnabled: true,
+    h264Setup: linuxH264Base,
+  },
+  decorators: [
+    (Story) => (
+      <ThemeRoot theme="light">
+        <Story />
+      </ThemeRoot>
+    ),
+  ],
+};

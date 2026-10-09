@@ -60,6 +60,7 @@ describe("toGlobalSettingsPatch", () => {
       defaultColumnCustomCSS: "",
       popupEscCloseEnabled: true,
       videoAutoPlayStopEnabled: true,
+      hardwareVideoDecodeEnabled: true,
       imagePopupEnabled: true,
       videoPopupEnabled: true,
       smallImageEnabled: false,
@@ -76,6 +77,32 @@ describe("toGlobalSettingsPatch", () => {
       ngWords: ["spam"],
       repostHiddenUserIds: ["user_a"],
     });
+  });
+
+  it("hardwareVideoDecodeEnabledが設定からドラフトを経てパッチへ往復する", () => {
+    for (const value of [true, false]) {
+      const draft = createSettingsDraft({
+        ...baseGlobalSettings,
+        hardwareVideoDecodeEnabled: value,
+      });
+      expect(draft.hardwareVideoDecodeEnabled).toBe(value);
+      const patch = toGlobalSettingsPatch(draft, {
+        ngWords: [],
+        repostHiddenUserIds: [],
+      });
+      expect(patch.hardwareVideoDecodeEnabled).toBe(value);
+    }
+  });
+
+  it("h264DownloadPromptDismissedはパッチに含まれない", () => {
+    const patch = toGlobalSettingsPatch(
+      createSettingsDraft({
+        ...baseGlobalSettings,
+        h264DownloadPromptDismissed: true,
+      }),
+      { ngWords: [], repostHiddenUserIds: [] },
+    );
+    expect(patch).not.toHaveProperty("h264DownloadPromptDismissed");
   });
 
   it("columnScaleOverrideEnabledがfalseのときはcolumnScaleを含まない", () => {

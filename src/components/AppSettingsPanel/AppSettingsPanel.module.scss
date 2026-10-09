@@ -232,6 +232,13 @@
   }
 }
 
+.inlineRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .actions {
   display: flex;
   justify-content: flex-end;

@@ -21,6 +21,10 @@ import { ColumnDefaultsSections } from "./ColumnDefaultsSections";
 import { ColumnLayoutTab } from "./ColumnLayoutTab";
 import { DisplaySettingsSection } from "./DisplaySettingsSection";
 import { GeneralSettingsSections } from "./GeneralSettingsSections";
+import {
+  LinuxVideoPlaybackSection,
+  type H264SettingsInfo,
+} from "./LinuxVideoPlaybackSection";
 import { PresetsTab } from "./PresetsTab";
 import {
   createSettingsDraft,
@@ -58,6 +62,12 @@ interface AppSettingsPanelProps {
   onClose: () => void;
   pendingDataDirectoryDeletionCount: number;
   onRetryDataDirectoryDeletion: () => Promise<{ remaining: number }>;
+  /** Linux デスクトップか（動画再生設定セクションの表示条件） */
+  isLinux?: boolean;
+  /** アプリ起動時に読み込んだハードウェアデコード設定。未指定なら settings の値を使う */
+  startupHardwareVideoDecodeEnabled?: boolean;
+  /** H.264 有効化の状態と操作（AppImage のときのみ表示に使われる） */
+  h264Setup?: H264SettingsInfo;
 }
 
 export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
@@ -78,6 +88,9 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   onClose,
   pendingDataDirectoryDeletionCount,
   onRetryDataDirectoryDeletion,
+  isLinux = false,
+  startupHardwareVideoDecodeEnabled,
+  h264Setup,
 }) => {
   const isMobile = useAppStore((s) => s.isMobile);
   const { savePreset, deletePreset } = useAppStore();
@@ -223,6 +236,17 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 isMobile={isMobile}
                 ngWordsError={ngWordsError}
                 repostHiddenUserIdsError={repostHiddenUserIdsError}
+              />
+
+              <LinuxVideoPlaybackSection
+                draft={draft}
+                set={set}
+                isLinux={isLinux}
+                startupHardwareVideoDecodeEnabled={
+                  startupHardwareVideoDecodeEnabled ??
+                  settings.hardwareVideoDecodeEnabled
+                }
+                h264={h264Setup}
               />
 
               <AppInfoSections

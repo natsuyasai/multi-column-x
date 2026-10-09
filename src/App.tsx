@@ -1,4 +1,5 @@
 // src/App.tsx
+import { platform } from "@tauri-apps/plugin-os";
 import React, {
   useEffect,
   useCallback,
@@ -154,6 +155,25 @@ const App: React.FC = () => {
   const updater = useAppUpdater(isMobile, columnsRestored);
   const whatsNew = useWhatsNew(columnsRestored);
   const h264Setup = useH264Setup(columnsRestored);
+  // 設定画面の Linux 向け動画再生セクションの表示条件
+  const isLinux = useMemo(() => {
+    try {
+      return !isMobile && platform() === "linux";
+    } catch {
+      return false;
+    }
+  }, [isMobile]);
+  // 起動時に読み込んだハードウェアデコード設定。設定変更後も再起動までは「再起動後に反映」を出すため保持する
+  const [
+    startupHardwareVideoDecodeEnabled,
+    setStartupHardwareVideoDecodeEnabled,
+  ] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!isLoaded) return;
+    setStartupHardwareVideoDecodeEnabled(
+      (prev) => prev ?? globalSettings.hardwareVideoDecodeEnabled,
+    );
+  }, [isLoaded, globalSettings.hardwareVideoDecodeEnabled]);
   // APIレート制限ポップオーバーの開閉状態（カラムWebView退避判定の anyDialogOpen に含めるため）
   const [apiRateLimitPopoverOpen, setApiRateLimitPopoverOpen] = useState(false);
 
@@ -565,6 +585,18 @@ const App: React.FC = () => {
             globalSettings.pendingDataDirectoryDeletions.length
           }
           onRetryDataDirectoryDeletion={retryPendingDataDirectoryDeletions}
+          isLinux={isLinux}
+          startupHardwareVideoDecodeEnabled={
+            startupHardwareVideoDecodeEnabled ?? undefined
+          }
+          h264Setup={{
+            downloadApplicable: h264Setup.downloadApplicable,
+            h264Available: h264Setup.h264Available,
+            downloadState: h264Setup.downloadState,
+            downloadError: h264Setup.downloadError,
+            onEnable: h264Setup.openFromSettings,
+            onRelaunch: h264Setup.relaunchApp,
+          }}
         />
       )}
 
