@@ -14,6 +14,7 @@ import { AddColumnDialog } from "./components/AddColumnDialog/AddColumnDialog";
 import { AppSettingsPanel } from "./components/AppSettingsPanel/AppSettingsPanel";
 import { ColumnHeader } from "./components/ColumnHeader/ColumnHeader";
 import { ConfirmDialog } from "./components/ConfirmDialog/ConfirmDialog";
+import { H264SetupDialog } from "./components/H264SetupDialog/H264SetupDialog";
 import { LinkPopupDialog } from "./components/LinkPopupDialog/LinkPopupDialog";
 import { MobileTabBar } from "./components/MobileTabBar/MobileTabBar";
 import { SettingsPanel } from "./components/SettingsPanel/SettingsPanel";
@@ -29,6 +30,7 @@ import { useAppUpdater } from "./hooks/useAppUpdater";
 import { useColumnNavigation } from "./hooks/useColumnNavigation";
 import { useColumns } from "./hooks/useColumns";
 import { useDialogState } from "./hooks/useDialogState";
+import { useH264Setup } from "./hooks/useH264Setup";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useMobileSwipeBarSync } from "./hooks/useMobileSwipeBarSync";
 import { usePopupWindowHandlers } from "./hooks/usePopupWindowHandlers";
@@ -151,6 +153,7 @@ const App: React.FC = () => {
   });
   const updater = useAppUpdater(isMobile, columnsRestored);
   const whatsNew = useWhatsNew(columnsRestored);
+  const h264Setup = useH264Setup(columnsRestored);
   // APIレート制限ポップオーバーの開閉状態（カラムWebView退避判定の anyDialogOpen に含めるため）
   const [apiRateLimitPopoverOpen, setApiRateLimitPopoverOpen] = useState(false);
 
@@ -191,6 +194,7 @@ const App: React.FC = () => {
     dialogOpen ||
     !!updater.available ||
     !!whatsNew.notes ||
+    h264Setup.isDialogOpen ||
     !!pendingAccountName ||
     !!pendingRemoval ||
     !!accountNotice ||
@@ -609,6 +613,17 @@ const App: React.FC = () => {
           version={appVersion}
           notes={whatsNew.notes}
           onClose={whatsNew.dismiss}
+        />
+      )}
+
+      {h264Setup.isDialogOpen && (
+        <H264SetupDialog
+          downloadState={h264Setup.downloadState}
+          downloadError={h264Setup.downloadError}
+          onDownload={h264Setup.download}
+          onDismiss={h264Setup.dismiss}
+          onClose={h264Setup.close}
+          onRelaunch={h264Setup.relaunchApp}
         />
       )}
 
