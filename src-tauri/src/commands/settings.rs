@@ -152,6 +152,8 @@ impl Default for GlobalSettingsData {
             ng_words: vec![],
             repost_hidden_user_ids: vec![],
             pending_data_directory_deletions: vec![],
+            hardware_video_decode_enabled: true,
+            h264_download_prompt_dismissed: false,
         }
     }
 }
@@ -281,6 +283,12 @@ pub struct GlobalSettingsData {
     #[serde(rename = "pendingDataDirectoryDeletions")]
     #[serde(default)]
     pub pending_data_directory_deletions: Vec<String>,
+    /// Linux で動画のハードウェアデコード（VA-API）を使うか。端末依存のためバックアップ対象外。
+    #[serde(rename = "hardwareVideoDecodeEnabled")]
+    pub hardware_video_decode_enabled: bool,
+    /// H.264 デコーダ取得の案内を「今後表示しない」と拒否したか。端末依存のためバックアップ対象外。
+    #[serde(rename = "h264DownloadPromptDismissed")]
+    pub h264_download_prompt_dismissed: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -681,6 +689,20 @@ mod tests {
     fn defaultaccountidが無い旧全体設定はデフォルトでnoneになる() {
         let settings: GlobalSettingsData = serde_json::from_value(serde_json::json!({})).unwrap();
         assert_eq!(settings.default_account_id, None);
+    }
+
+    /// 設定ファイルにハードウェアデコードの項目が無いとき、ハードウェアデコードは有効になる。
+    #[test]
+    fn ハードウェアデコード設定の既定値は有効である() {
+        let settings: GlobalSettingsData = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert!(settings.hardware_video_decode_enabled);
+    }
+
+    /// 設定ファイルに H.264 取得案内の拒否状態が無いとき、拒否していない状態になる。
+    #[test]
+    fn h264取得案内の拒否状態の既定値は拒否していない状態である() {
+        let settings: GlobalSettingsData = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert!(!settings.h264_download_prompt_dismissed);
     }
 
     /// カラム設定の showCustomMenu が欠落しているとき、新規インストール時と同じ false（無効）になる。

@@ -99,6 +99,10 @@ export interface GlobalSettings {
   repostHiddenUserIds: string[];
   /** アカウント削除時にデータフォルダの削除へ失敗し、再実行対象として記録された保存先パス一覧 */
   pendingDataDirectoryDeletions: string[];
+  /** Linux で動画のハードウェアデコード（VA-API）を使う（端末依存・バックアップ対象外） */
+  hardwareVideoDecodeEnabled: boolean;
+  /** H.264 デコーダ取得の案内を拒否済み（端末依存・バックアップ対象外） */
+  h264DownloadPromptDismissed: boolean;
 }
 
 export interface ApiRateLimitBucket {
@@ -229,6 +233,8 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   ngWords: [],
   repostHiddenUserIds: [],
   pendingDataDirectoryDeletions: [],
+  hardwareVideoDecodeEnabled: true,
+  h264DownloadPromptDismissed: false,
 };
 
 export const COLUMN_LABEL_MAX_LENGTH = 30;

@@ -58,6 +58,8 @@ const globalSettings: GlobalSettings = {
   ngWords: [],
   repostHiddenUserIds: [],
   pendingDataDirectoryDeletions: [],
+  hardwareVideoDecodeEnabled: true,
+  h264DownloadPromptDismissed: false,
 };
 
 const accounts: Account[] = [

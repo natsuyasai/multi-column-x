@@ -188,6 +188,8 @@ describe("useColumns mobile", () => {
         ngWords: [],
         repostHiddenUserIds: [],
         pendingDataDirectoryDeletions: [],
+        hardwareVideoDecodeEnabled: true,
+        h264DownloadPromptDismissed: false,
       },
       isLoaded: true,
       isMobile: true,

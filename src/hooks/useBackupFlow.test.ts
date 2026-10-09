@@ -42,6 +42,8 @@ function column(id: string, accountId: string): Column {
 const {
   windowBounds: _windowBounds,
   pendingDataDirectoryDeletions: _pending,
+  hardwareVideoDecodeEnabled: _hardwareVideoDecode,
+  h264DownloadPromptDismissed: _h264Dismissed,
   ...portable
 } = DEFAULT_GLOBAL_SETTINGS;
 

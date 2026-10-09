@@ -38,7 +38,9 @@
     "presets": [],
     "ngWords": [],
     "repostHiddenUserIds": [],
-    "pendingDataDirectoryDeletions": []
+    "pendingDataDirectoryDeletions": [],
+    "hardwareVideoDecodeEnabled": true,
+    "h264DownloadPromptDismissed": false
   },
   "columnSettings": {
     "autoReloadEnabled": true,

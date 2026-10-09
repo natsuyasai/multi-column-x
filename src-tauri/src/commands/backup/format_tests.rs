@@ -8,11 +8,13 @@ use super::format::{
 };
 use crate::commands::settings::{AppSettingsData, GlobalSettingsData};
 
-const FORBIDDEN_KEYS: [&str; 4] = [
+const FORBIDDEN_KEYS: [&str; 6] = [
     "dataDirectory",
     "createdAt",
     "windowBounds",
     "pendingDataDirectoryDeletions",
+    "hardwareVideoDecodeEnabled",
+    "h264DownloadPromptDismissed",
 ];
 
 fn column_json(id: &str, account_id: &str) -> Value {
@@ -77,6 +79,8 @@ fn sample_settings() -> AppSettingsData {
             "theme": "dark",
             "windowBounds": { "x": 10.0, "y": 20.0, "width": 800.0, "height": 600.0 },
             "pendingDataDirectoryDeletions": ["/secret/old"],
+            "hardwareVideoDecodeEnabled": false,
+            "h264DownloadPromptDismissed": true,
             "presets": [
                 {
                     "id": "p1", "name": "プリセット",
@@ -249,7 +253,9 @@ fn ファイルに含まれる端末依存項目は取り込まれない() {
     value["globalSettings"] = json!({
         "theme": "dark",
         "windowBounds": { "x": 1.0, "y": 1.0, "width": 1.0, "height": 1.0 },
-        "pendingDataDirectoryDeletions": ["/etc"]
+        "pendingDataDirectoryDeletions": ["/etc"],
+        "hardwareVideoDecodeEnabled": false,
+        "h264DownloadPromptDismissed": true
     });
 
     let out = parse_value(&value).expect("受理される");
@@ -327,6 +333,20 @@ fn エクスポートに端末依存項目とパスが含まれない() {
     }
     assert!(!text.contains("/secret/"));
     assert!(!text.to_lowercase().contains("cookie"));
+}
+
+#[test]
+fn 追加した2つの設定はバックアップに含まれない() {
+    let settings = sample_settings();
+    assert!(!settings.global_settings.hardware_video_decode_enabled);
+    assert!(settings.global_settings.h264_download_prompt_dismissed);
+
+    let file = build_export(&settings, "1.0.0", "2026-01-01T00:00:00Z");
+    let out: Value = serde_json::to_value(&file).unwrap();
+
+    let global = out["globalSettings"].as_object().unwrap();
+    assert!(!global.contains_key("hardwareVideoDecodeEnabled"));
+    assert!(!global.contains_key("h264DownloadPromptDismissed"));
 }
 
 #[test]
