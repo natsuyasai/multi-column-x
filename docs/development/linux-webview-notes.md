@@ -132,6 +132,7 @@ AAC-LC プロファイルのコア特許は失効済み（Fedora が2017年以�
 - 展開ツリー（`--appimage-extract` の `squashfs-root`）で実行する場合は `APPDIR` と `APPIMAGE` を手動で `export` する（AppRun のフックが `${APPDIR}` を使い、未設定だとプラグインパスが空になって検証が無効になる。`APPIMAGE` は AppImage 判定に使う）。実 `.AppImage` で検証してもよい。
 - `GST_REGISTRY_1_0` を一時パスに分離する（`~/.cache/gstreamer-1.0` の共有レジストリを汚さない・古いレジストリに惑わされない）。
 - `LD_LIBRARY_PATH` に**ホストの lib ディレクトリ（`/usr/lib/x86_64-linux-gnu` など）を入れない**。`LD_LIBRARY_PATH` は RUNPATH より優先されるため、ホスト版の `libgstcodecparsers` などに解決されて同梱側の欠落を見逃す。
+- usr/lib 向けにソースビルドした `libgstcodecs` / `libgstcodecparsers` / `libgstvideoparsersbad` は、RUNPATH を AppDir 内の最終配置に合わせて patchelf する（`build-linux-codec-plugins.sh`）。ビルドツリー相対のままだと、システムに `libgstcodecparsers` が無い環境（CI ランナー）で linuxdeploy が `Could not find dependency` で失敗する。開発機にはシステム版があるため見逃しやすい。
 - テスト素材は `format=I420` の High プロファイルにする。`x264enc` の既定（High 4:4:4）は openh264 が非対応で偽陰性になる。
 - 検証用のホストの GStreamer と同梱側のバージョンは一致させる（CI は同一ランナーのため一致する）。
 
