@@ -22,6 +22,7 @@ export interface SettingsDraft {
   defaultColumnCustomCSS: string;
   popupEscCloseEnabled: boolean;
   videoAutoPlayStopEnabled: boolean;
+  hardwareVideoDecodeEnabled: boolean;
   imagePopupEnabled: boolean;
   videoPopupEnabled: boolean;
   smallImageEnabled: boolean;
@@ -70,6 +71,7 @@ export function createSettingsDraft(settings: GlobalSettings): SettingsDraft {
     defaultColumnCustomCSS: settings.defaultColumnCustomCSS,
     popupEscCloseEnabled: settings.popupEscCloseEnabled,
     videoAutoPlayStopEnabled: settings.videoAutoPlayStopEnabled,
+    hardwareVideoDecodeEnabled: settings.hardwareVideoDecodeEnabled,
     imagePopupEnabled: settings.imagePopupEnabled,
     videoPopupEnabled: settings.videoPopupEnabled,
     smallImageEnabled: settings.smallImageEnabled,
@@ -120,6 +122,7 @@ export function toGlobalSettingsPatch(
     defaultColumnCustomCSS: draft.defaultColumnCustomCSS,
     popupEscCloseEnabled: draft.popupEscCloseEnabled,
     videoAutoPlayStopEnabled: draft.videoAutoPlayStopEnabled,
+    hardwareVideoDecodeEnabled: draft.hardwareVideoDecodeEnabled,
     imagePopupEnabled: draft.imagePopupEnabled,
     videoPopupEnabled: draft.videoPopupEnabled,
     smallImageEnabled: draft.smallImageEnabled,

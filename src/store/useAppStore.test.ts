@@ -100,6 +100,8 @@ describe("useAppStore", () => {
         ngWords: [],
         repostHiddenUserIds: [],
         pendingDataDirectoryDeletions: [],
+        hardwareVideoDecodeEnabled: true,
+        h264DownloadPromptDismissed: false,
       },
       isLoaded: false,
       settingsSaveBlocked: false,

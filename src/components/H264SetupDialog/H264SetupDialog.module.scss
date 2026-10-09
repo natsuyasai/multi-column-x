@@ -1,0 +1,88 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--mcx-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dialog {
+  background: var(--mcx-surface);
+  color: var(--mcx-text);
+  border-radius: 8px;
+  padding: 20px;
+  width: min(440px, 90vw);
+  max-height: 80vh;
+  overflow: auto;
+  box-shadow: 0 8px 32px var(--mcx-shadow);
+
+  &:focus {
+    outline: none;
+  }
+}
+
+.title {
+  margin: 0 0 12px;
+  font-size: 1.1rem;
+}
+
+.description {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+}
+
+.note {
+  margin: 0 0 12px;
+  font-size: 0.8rem;
+  color: var(--mcx-text);
+}
+
+.status {
+  margin: 12px 0 0;
+  font-size: 0.9rem;
+}
+
+.error {
+  margin: 12px 0 0;
+  padding: 8px 10px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: var(--mcx-danger);
+  background: var(--mcx-danger-bg);
+  border: 1px solid var(--mcx-danger-border);
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.primaryBtn,
+.secondaryBtn {
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.secondaryBtn {
+  background: transparent;
+  border: 1px solid var(--mcx-border-strong);
+  color: inherit;
+}
+
+.primaryBtn {
+  background: var(--mcx-accent);
+  color: var(--mcx-text-on-accent);
+  border: none;
+}
+
+.primaryBtn:disabled,
+.secondaryBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

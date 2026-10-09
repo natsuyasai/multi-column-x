@@ -6,10 +6,13 @@ import { validateNgWordLines } from "@/lib/ngWordPattern";
 import { validateUserIdLine } from "@/lib/repostHiddenUserId";
 import type { Account, Column, ColumnPreset, GlobalSettings } from "@/types";
 
-/** バックアップに含まれる端末非依存の globalSettings（windowBounds と削除待ち一覧を除く） */
+/** バックアップに含まれる端末非依存の globalSettings（windowBounds・削除待ち一覧・動画デコード関連の端末依存設定を除く） */
 export type BackupGlobalSettings = Omit<
   GlobalSettings,
-  "windowBounds" | "pendingDataDirectoryDeletions"
+  | "windowBounds"
+  | "pendingDataDirectoryDeletions"
+  | "hardwareVideoDecodeEnabled"
+  | "h264DownloadPromptDismissed"
 >;
 
 export interface BackupAccount {

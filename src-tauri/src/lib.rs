@@ -89,6 +89,8 @@ fn opener_js_links_on_click() -> bool {
 pub fn run() {
     #[cfg(all(desktop, target_os = "linux"))]
     linux_codec_env::ensure_openh264_ld_library_path();
+    #[cfg(all(desktop, target_os = "linux"))]
+    linux_codec_env::configure_gstreamer_env();
 
     let builder = tauri::Builder::default()
         .plugin(

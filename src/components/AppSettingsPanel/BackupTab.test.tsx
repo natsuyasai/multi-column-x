@@ -33,6 +33,8 @@ function column(
 const {
   windowBounds: _windowBounds,
   pendingDataDirectoryDeletions: _pending,
+  hardwareVideoDecodeEnabled: _hardwareVideoDecode,
+  h264DownloadPromptDismissed: _h264Dismissed,
   ...PORTABLE_SETTINGS
 } = DEFAULT_GLOBAL_SETTINGS;
 

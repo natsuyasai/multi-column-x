@@ -51,6 +51,8 @@ const baseGlobalSettings: GlobalSettings = {
   ngWords: [],
   repostHiddenUserIds: [],
   pendingDataDirectoryDeletions: [],
+  hardwareVideoDecodeEnabled: true,
+  h264DownloadPromptDismissed: false,
 };
 
 const baseSettings = {
@@ -896,6 +898,7 @@ describe("AppSettingsPanel 設定パッチの全項目反映", () => {
       defaultColumnCustomCSS: ".test{}",
       popupEscCloseEnabled: false,
       videoAutoPlayStopEnabled: false,
+      hardwareVideoDecodeEnabled: true,
       imagePopupEnabled: false,
       videoPopupEnabled: false,
       smallImageEnabled: true,
@@ -1126,5 +1129,206 @@ describe("AppSettingsPanel バックアップタブ", () => {
     expect(
       screen.getByRole("button", { name: "バックアップ" }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("AppSettingsPanel Linux向け動画再生設定", () => {
+  const h264Base = {
+    downloadApplicable: true,
+    h264Available: false,
+    downloadState: "idle" as const,
+    downloadError: null,
+    onEnable: vi.fn(),
+    onRelaunch: vi.fn(),
+  };
+
+  beforeEach(() => {
+    h264Base.onEnable = vi.fn();
+    h264Base.onRelaunch = vi.fn();
+  });
+
+  it("案内を拒否した後でもアプリ設定画面からh264を有効化できる", () => {
+    const settings = {
+      ...baseGlobalSettings,
+      h264DownloadPromptDismissed: true,
+    };
+    const { rerender } = render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={settings}
+        isLinux
+        h264Setup={h264Base}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "H.264 を有効化" }));
+    expect(h264Base.onEnable).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={settings}
+        isLinux
+        h264Setup={{ ...h264Base, downloadState: "downloading" }}
+      />,
+    );
+    expect(screen.getByText("ダウンロード中…")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "H.264 を有効化" }),
+    ).toBeDisabled();
+  });
+
+  it("h264が取得済みのときアプリ設定画面には有効化済みと表示される", () => {
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        isLinux
+        h264Setup={{ ...h264Base, h264Available: true }}
+      />,
+    );
+    expect(screen.getByText("H.264: 有効化済み")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "H.264 を有効化" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("deb版ではアプリ設定画面にh264の項目は表示されずハードウェアデコードの項目は表示される", () => {
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        isLinux
+        h264Setup={{ ...h264Base, downloadApplicable: false }}
+      />,
+    );
+    expect(screen.queryByText(/H\.264/)).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", {
+        name: "ハードウェアデコードを使う（VA-API）",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("linux以外のデスクトップではアプリ設定画面にh264とハードウェアデコードの項目が表示されない", () => {
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        isLinux={false}
+        h264Setup={h264Base}
+      />,
+    );
+    expect(screen.queryByText(/H\.264/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("checkbox", {
+        name: "ハードウェアデコードを使う（VA-API）",
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("モバイルではLinux向け動画再生設定が表示されない", () => {
+    mockStoreState.isMobile = true;
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(
+      screen.queryByRole("checkbox", {
+        name: "ハードウェアデコードを使う（VA-API）",
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("ハードウェアデコード設定を切り替えると再起動が必要である旨が表示される", () => {
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        isLinux
+        startupHardwareVideoDecodeEnabled
+      />,
+    );
+    expect(
+      screen.queryByText("再起動後に反映されます"),
+    ).not.toBeInTheDocument();
+
+    const checkbox = screen.getByRole("checkbox", {
+      name: "ハードウェアデコードを使う（VA-API）",
+    });
+    expect(checkbox).toBeChecked();
+    fireEvent.click(checkbox);
+    expect(screen.getByText("再起動後に反映されます")).toBeInTheDocument();
+
+    // 起動時の値へ戻すと案内は消える
+    fireEvent.click(checkbox);
+    expect(
+      screen.queryByText("再起動後に反映されます"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("保存済みの設定が起動時の値と異なるときは開いた直後から再起動の案内が表示される", () => {
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={{ ...baseGlobalSettings, hardwareVideoDecodeEnabled: false }}
+        isLinux
+        startupHardwareVideoDecodeEnabled
+      />,
+    );
+    expect(screen.getByText("再起動後に反映されます")).toBeInTheDocument();
+  });
+
+  it("ハードウェアデコードを切り替えて適用するとパッチに反映されh264の拒否状態は含まれない", () => {
+    const onApply = vi.fn();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        onApply={onApply}
+        isLinux
+        startupHardwareVideoDecodeEnabled
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: "ハードウェアデコードを使う（VA-API）",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ hardwareVideoDecodeEnabled: false }),
+    );
+    expect(onApply.mock.calls[0][0]).not.toHaveProperty(
+      "h264DownloadPromptDismissed",
+    );
+  });
+
+  it("h264の取得に成功すると再起動の案内と今すぐ再起動ボタンが表示され押すと再起動される", () => {
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        isLinux
+        h264Setup={{
+          ...h264Base,
+          h264Available: true,
+          downloadState: "success",
+        }}
+      />,
+    );
+    expect(screen.getByText(/再起動後に反映されます/)).toBeInTheDocument();
+    expect(screen.queryByText("H.264: 有効化済み")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "今すぐ再起動" }));
+    expect(h264Base.onRelaunch).toHaveBeenCalledTimes(1);
+  });
+
+  it("h264の取得に失敗するとエラー文が表示され再試行できる", () => {
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        isLinux
+        h264Setup={{
+          ...h264Base,
+          downloadState: "error",
+          downloadError: "ネットワークに接続できません",
+        }}
+      />,
+    );
+    expect(
+      screen.getByText("ネットワークに接続できません"),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "再試行" }));
+    expect(h264Base.onEnable).toHaveBeenCalledTimes(1);
   });
 });

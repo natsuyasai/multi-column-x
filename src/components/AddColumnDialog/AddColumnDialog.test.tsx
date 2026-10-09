@@ -47,6 +47,8 @@ const mockGlobalSettings: GlobalSettings = {
   ngWords: [],
   repostHiddenUserIds: [],
   pendingDataDirectoryDeletions: [],
+  hardwareVideoDecodeEnabled: true,
+  h264DownloadPromptDismissed: false,
 };
 
 describe("AddColumnDialog", () => {

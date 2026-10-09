@@ -108,6 +108,42 @@ fn ペイロードにウィンドウ位置や削除待ち一覧があっても�
 }
 
 #[test]
+fn 復元してもハードウェアデコード設定とh264取得案内の拒否状態は端末側の値が保たれる() {
+    let mut current = current_settings();
+    current.global_settings.hardware_video_decode_enabled = false;
+    current.global_settings.h264_download_prompt_dismissed = true;
+
+    let result = compute_new_settings(
+        &current,
+        payload(
+            vec![column("n", "acc-1")],
+            json!({
+                "hardwareVideoDecodeEnabled": true,
+                "h264DownloadPromptDismissed": false
+            }),
+        ),
+    )
+    .unwrap();
+
+    let out = as_json(&result);
+    assert_eq!(out["globalSettings"]["hardwareVideoDecodeEnabled"], false);
+    assert_eq!(out["globalSettings"]["h264DownloadPromptDismissed"], true);
+}
+
+#[test]
+fn 復元ペイロードに2つの設定が無くても端末側の既定値のままである() {
+    let result = compute_new_settings(
+        &current_settings(),
+        payload(vec![column("n", "acc-1")], json!({})),
+    )
+    .unwrap();
+
+    let out = as_json(&result);
+    assert_eq!(out["globalSettings"]["hardwareVideoDecodeEnabled"], true);
+    assert_eq!(out["globalSettings"]["h264DownloadPromptDismissed"], false);
+}
+
+#[test]
 fn 現在のアカウントに存在しないaccountidを持つカラムは拒否される() {
     let result = compute_new_settings(
         &current_settings(),

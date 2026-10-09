@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { platform } from "@tauri-apps/plugin-os";
 import {
   render,
@@ -384,6 +385,78 @@ describe("App (desktop)", () => {
     expect(screen.getByText("外部: example.com")).toBeInTheDocument();
   });
 
+  describe("H.264取得案内", () => {
+    function mockCodecStatus(h264DownloadApplicable: boolean) {
+      mockInvoke.mockImplementation(async (cmd: string) => {
+        if (cmd === "check_media_codec_support") {
+          return {
+            h264Available: false,
+            aacAvailable: true,
+            h264DownloadApplicable,
+          };
+        }
+        if (cmd !== "load_settings") return undefined;
+        const { accounts, columns, globalSettings } = useAppStore.getState();
+        return {
+          settings: { accounts, columns, globalSettings },
+          loadFailed: false,
+          backupPath: null,
+        };
+      });
+    }
+
+    it("H.264が未取得でダウンロード対象の環境では起動時に案内ダイアログが表示される", async () => {
+      mockCodecStatus(true);
+      render(<App />);
+      expect(
+        await screen.findByRole("dialog", { name: /追加コンポーネント/ }),
+      ).toBeInTheDocument();
+    });
+
+    it("案内ダイアログの表示中は全カラムWebViewが画面外へ退避される", async () => {
+      mockCodecStatus(true);
+      useAppStore.setState({ columns: [column] });
+      render(<App />);
+      await screen.findByRole("dialog", { name: /追加コンポーネント/ });
+
+      await waitFor(() => {
+        const offscreen = mockInvoke.mock.calls.filter(
+          (c) =>
+            c[0] === "resize_column_webview" &&
+            (c[1] as any).bounds.columnId === "col-1" &&
+            (c[1] as any).bounds.x === -9999,
+        );
+        expect(offscreen.length).toBeGreaterThan(0);
+      });
+    });
+
+    it("案内で「今はしない」を選ぶとダイアログが閉じ拒否が保存される", async () => {
+      mockCodecStatus(true);
+      render(<App />);
+      fireEvent.click(
+        await screen.findByRole("button", { name: "今はしない" }),
+      );
+
+      expect(
+        screen.queryByRole("dialog", { name: /追加コンポーネント/ }),
+      ).toBeNull();
+      expect(
+        useAppStore.getState().globalSettings.h264DownloadPromptDismissed,
+      ).toBe(true);
+    });
+
+    it("ダウンロード対象でない環境では案内ダイアログは表示されない", async () => {
+      mockCodecStatus(false);
+      render(<App />);
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("check_media_codec_support");
+      });
+      expect(
+        screen.queryByRole("dialog", { name: /追加コンポーネント/ }),
+      ).toBeNull();
+    });
+  });
+
   it("設定読み込み失敗の通知があるとダイアログが表示され、OKを押すと消える", () => {
     useAppStore.setState({
       settingsLoadNotice:
@@ -631,6 +704,70 @@ describe("App (テーマ適用時のnight_mode Cookie反映)", () => {
     fireEvent.click(screen.getByText("適用"));
 
     expect(getNightModeCalls()).toHaveLength(0);
+  });
+});
+
+describe("App (Linux向け動画再生設定の配線)", () => {
+  const hwDecodeLabel = "ハードウェアデコードを使う（VA-API）";
+  const restartNotice = "再起動後に反映されます";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInvokeWithCurrentSettings();
+    mockPlatform.mockReturnValue("windows");
+    // Linux ではメインウィンドウの移動監視（onMoved）が登録される
+    vi.mocked(getCurrentWindow).mockReturnValue({
+      onMoved: vi.fn().mockResolvedValue(() => {}),
+    } as unknown as ReturnType<typeof getCurrentWindow>);
+    useAppStore.setState({
+      accounts: [account],
+      columns: [],
+      globalSettings: { ...globalSettings, hardwareVideoDecodeEnabled: true },
+      isLoaded: true,
+      isMobile: false,
+      topBarExpanded: false,
+      unreadCounts: {},
+    });
+  });
+
+  const openAppSettings = () =>
+    fireEvent.click(screen.getByTitle("アプリ設定 (Ctrl+,)"));
+
+  it("linux以外ではアプリ設定にハードウェアデコードの項目が表示されない", () => {
+    mockPlatform.mockReturnValue("windows");
+    render(<App />);
+    openAppSettings();
+    expect(screen.queryByRole("checkbox", { name: hwDecodeLabel })).toBeNull();
+  });
+
+  it("linuxではアプリ設定にハードウェアデコードの項目が表示される", () => {
+    mockPlatform.mockReturnValue("linux");
+    render(<App />);
+    openAppSettings();
+    expect(
+      screen.getByRole("checkbox", { name: hwDecodeLabel }),
+    ).toBeInTheDocument();
+  });
+
+  it("ハードウェアデコード設定を切り替えて適用した後も再起動までは再起動の案内が表示され続ける", () => {
+    mockPlatform.mockReturnValue("linux");
+    render(<App />);
+    openAppSettings();
+    expect(screen.queryByText(restartNotice)).toBeNull();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: hwDecodeLabel }));
+    expect(screen.getByText(restartNotice)).toBeInTheDocument();
+    fireEvent.click(screen.getByText("適用"));
+    expect(
+      useAppStore.getState().globalSettings.hardwareVideoDecodeEnabled,
+    ).toBe(false);
+
+    // 保存後に設定画面を開き直しても、起動時の値と異なるため案内が残る
+    openAppSettings();
+    expect(
+      screen.getByRole("checkbox", { name: hwDecodeLabel }),
+    ).not.toBeChecked();
+    expect(screen.getByText(restartNotice)).toBeInTheDocument();
   });
 });
 

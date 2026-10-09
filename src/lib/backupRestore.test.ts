@@ -40,7 +40,12 @@ function makeExternal(id: string, gridCol: number): Column {
 }
 
 function makeContent(overrides: Partial<BackupContent> = {}): BackupContent {
-  const deviceDependent = ["windowBounds", "pendingDataDirectoryDeletions"];
+  const deviceDependent = [
+    "windowBounds",
+    "pendingDataDirectoryDeletions",
+    "hardwareVideoDecodeEnabled",
+    "h264DownloadPromptDismissed",
+  ];
   const portable = Object.fromEntries(
     Object.entries(DEFAULT_GLOBAL_SETTINGS).filter(
       ([key]) => !deviceDependent.includes(key),
@@ -328,6 +333,19 @@ describe("buildRestorePayload（紐づけに従う差し替え）", () => {
 
     expect(globalSettings).not.toHaveProperty("windowBounds");
     expect(globalSettings).not.toHaveProperty("pendingDataDirectoryDeletions");
+  });
+
+  it("追加した2つの設定はバックアップに含まれない", () => {
+    const content = makeContent({ columns: baseColumns });
+
+    const { globalSettings } = buildRestorePayload(
+      content,
+      { A: "X", B: null },
+      sequentialIds(),
+    );
+
+    expect(globalSettings).not.toHaveProperty("hardwareVideoDecodeEnabled");
+    expect(globalSettings).not.toHaveProperty("h264DownloadPromptDismissed");
   });
 
   it("入力のバックアップ内容を変更しない", () => {

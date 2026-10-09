@@ -1,4 +1,5 @@
 // src/App.tsx
+import { platform } from "@tauri-apps/plugin-os";
 import React, {
   useEffect,
   useCallback,
@@ -14,6 +15,7 @@ import { AddColumnDialog } from "./components/AddColumnDialog/AddColumnDialog";
 import { AppSettingsPanel } from "./components/AppSettingsPanel/AppSettingsPanel";
 import { ColumnHeader } from "./components/ColumnHeader/ColumnHeader";
 import { ConfirmDialog } from "./components/ConfirmDialog/ConfirmDialog";
+import { H264SetupDialog } from "./components/H264SetupDialog/H264SetupDialog";
 import { LinkPopupDialog } from "./components/LinkPopupDialog/LinkPopupDialog";
 import { MobileTabBar } from "./components/MobileTabBar/MobileTabBar";
 import { SettingsPanel } from "./components/SettingsPanel/SettingsPanel";
@@ -29,6 +31,7 @@ import { useAppUpdater } from "./hooks/useAppUpdater";
 import { useColumnNavigation } from "./hooks/useColumnNavigation";
 import { useColumns } from "./hooks/useColumns";
 import { useDialogState } from "./hooks/useDialogState";
+import { useH264Setup } from "./hooks/useH264Setup";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useMobileSwipeBarSync } from "./hooks/useMobileSwipeBarSync";
 import { usePopupWindowHandlers } from "./hooks/usePopupWindowHandlers";
@@ -151,6 +154,26 @@ const App: React.FC = () => {
   });
   const updater = useAppUpdater(isMobile, columnsRestored);
   const whatsNew = useWhatsNew(columnsRestored);
+  const h264Setup = useH264Setup(columnsRestored);
+  // 設定画面の Linux 向け動画再生セクションの表示条件
+  const isLinux = useMemo(() => {
+    try {
+      return !isMobile && platform() === "linux";
+    } catch {
+      return false;
+    }
+  }, [isMobile]);
+  // 起動時に読み込んだハードウェアデコード設定。設定変更後も再起動までは「再起動後に反映」を出すため保持する
+  const [
+    startupHardwareVideoDecodeEnabled,
+    setStartupHardwareVideoDecodeEnabled,
+  ] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!isLoaded) return;
+    setStartupHardwareVideoDecodeEnabled(
+      (prev) => prev ?? globalSettings.hardwareVideoDecodeEnabled,
+    );
+  }, [isLoaded, globalSettings.hardwareVideoDecodeEnabled]);
   // APIレート制限ポップオーバーの開閉状態（カラムWebView退避判定の anyDialogOpen に含めるため）
   const [apiRateLimitPopoverOpen, setApiRateLimitPopoverOpen] = useState(false);
 
@@ -191,6 +214,7 @@ const App: React.FC = () => {
     dialogOpen ||
     !!updater.available ||
     !!whatsNew.notes ||
+    h264Setup.isDialogOpen ||
     !!pendingAccountName ||
     !!pendingRemoval ||
     !!accountNotice ||
@@ -561,6 +585,18 @@ const App: React.FC = () => {
             globalSettings.pendingDataDirectoryDeletions.length
           }
           onRetryDataDirectoryDeletion={retryPendingDataDirectoryDeletions}
+          isLinux={isLinux}
+          startupHardwareVideoDecodeEnabled={
+            startupHardwareVideoDecodeEnabled ?? undefined
+          }
+          h264Setup={{
+            downloadApplicable: h264Setup.downloadApplicable,
+            h264Available: h264Setup.h264Available,
+            downloadState: h264Setup.downloadState,
+            downloadError: h264Setup.downloadError,
+            onEnable: h264Setup.openFromSettings,
+            onRelaunch: h264Setup.relaunchApp,
+          }}
         />
       )}
 
@@ -609,6 +645,17 @@ const App: React.FC = () => {
           version={appVersion}
           notes={whatsNew.notes}
           onClose={whatsNew.dismiss}
+        />
+      )}
+
+      {h264Setup.isDialogOpen && (
+        <H264SetupDialog
+          downloadState={h264Setup.downloadState}
+          downloadError={h264Setup.downloadError}
+          onDownload={h264Setup.download}
+          onDismiss={h264Setup.dismiss}
+          onClose={h264Setup.close}
+          onRelaunch={h264Setup.relaunchApp}
         />
       )}
 
