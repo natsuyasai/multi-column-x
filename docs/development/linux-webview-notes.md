@@ -109,7 +109,12 @@ AAC-LC プロファイルのコア特許は失効済み（Fedora が2017年以�
 - **C（デコード）**: 同梱環境のみで `scripts/fixtures/h264-high-aac.mp4`（High / I420 + AAC）を `decodebin3` で再生し、30 秒以内に `Got EOS` に到達する（`vah264dec` はランク NONE にして openh264 を使う）。progressive 経路のみの担保で、MSE 経路は手動確認が必要。
 - **D（rpath）**: `gst-optional` 配下と `libgstvideoparsersbad.so` を `ldd` し、`libgst*` がすべて AppImage 内（`usr/`）に解決され、`not found` が無い（`libva*` はホスト依存のため許容）。C は `usr/lib` をパスに含むため rpath 自体は検証できず、D が `$ORIGIN/../../../../lib` を担保する。
 
-`release.yml` では tauri-action の**後**（ubuntu のみ）に実行する。そのため検査が失敗しても AppImage のアップロードは先に済んでいる（検査失敗は CI を赤くするが、アップロード済みの成果物は止められない）。既知の制約。
+`release.yml` の `desktop` ジョブ（ubuntu のみ）では、検査を 2 回実行する。
+
+- **事前ゲート（`Build and verify AppImage media bundle`）**: tauri-action の**前**に、`createUpdaterArtifacts:false` で AppImage をビルドして検査する。失敗するとジョブがそこで止まり、tauri-action に到達しないため AppImage はアップロードされない。署名鍵は渡さない。
+- **出荷物の再検査（`Re-verify uploaded AppImage media bundle`）**: tauri-action の**後**に、アップロード済みの AppImage（`src-tauri/target/release/bundle/appimage/`）を再度検査する。
+
+既知の制約: tauri-action は別途再バンドルするため、事前に検査した AppImage と出荷物はバイト一致しない可能性がある。そのため事後の再検査も行う。事後検査が失敗した場合、アップロードは済んでいるが、リリースは draft のままで（`publish-release` も自動公開はせず `draft: true` で更新するだけ）、ジョブが赤くなるため、メンテナが公開前に気づける。
 
 ### ローカルでのフルビルド
 

@@ -220,6 +220,14 @@ jobs:
         if: matrix.platform == 'ubuntu-latest'
         run: ./scripts/build-linux-codec-plugins.sh
       - run: npm ci
+      # アップロード前の関門。失敗すると後続の tauri-action に到達せず、AppImage はアップロードされない。
+      # 署名鍵は渡さない（createUpdaterArtifacts:false のため不要）。
+      - name: Build and verify AppImage media bundle
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo apt-get install -y libopenh264-7 gstreamer1.0-tools
+          npm run build:inject && npx tauri build --bundles appimage -c '{"bundle":{"createUpdaterArtifacts":false}}'
+          ./scripts/verify-appimage-media.sh "$(ls src-tauri/target/release/bundle/appimage/*.AppImage | head -n1)" /usr/lib/x86_64-linux-gnu
       - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -227,10 +235,12 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           releaseId: ${{ needs.create-release.outputs.release_id }}
-      - name: Verify AppImage media bundle
+      # 出荷物の再検査。tauri-action は別途再バンドルするため、事前に検査した AppImage と
+      # 出荷物がバイト一致する保証がない。失敗するとジョブが赤くなる（リリースは draft のままなので、公開前に気づける）。
+      # apt install は事前ステップで済んでいる。
+      - name: Re-verify uploaded AppImage media bundle
         if: matrix.platform == 'ubuntu-latest'
         run: |
-          sudo apt-get install -y libopenh264-7 gstreamer1.0-tools
           ./scripts/verify-appimage-media.sh "$(ls src-tauri/target/release/bundle/appimage/*.AppImage | head -n1)" /usr/lib/x86_64-linux-gnu
       - name: Upload CI artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
