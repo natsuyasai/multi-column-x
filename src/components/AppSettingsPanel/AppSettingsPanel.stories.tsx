@@ -1,8 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ReactNode } from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 import { AppSettingsPanel } from "@/components/AppSettingsPanel/AppSettingsPanel";
+import { useAppStore } from "@/store/useAppStore";
 import type { Account, Column, GlobalSettings } from "@/types";
 
 const columnSettings = {
@@ -103,6 +104,20 @@ function ThemeRoot({
       else el.setAttribute("data-theme", prev);
     };
   }, [theme]);
+  return <>{children}</>;
+}
+
+// isMobile は useAppStore から読まれるため、描画前にストアを書き換え、アンマウント時に元へ戻す
+function MobileRoot({ children }: { children: ReactNode }) {
+  const [prev] = useState(() => {
+    const before = useAppStore.getState().isMobile;
+    useAppStore.setState({ isMobile: true });
+    return before;
+  });
+  useEffect(() => {
+    useAppStore.setState({ isMobile: true });
+    return () => useAppStore.setState({ isMobile: prev });
+  }, [prev]);
   return <>{children}</>;
 }
 
@@ -427,6 +442,44 @@ export const LinuxAppImageLightTheme: Story = {
       <ThemeRoot theme="light">
         <Story />
       </ThemeRoot>
+    ),
+  ],
+};
+
+export const MobileGroups: Story = {
+  name: "モバイル（Android専用グループ表示・ポップアップ項目なし）",
+  decorators: [
+    (Story) => (
+      <MobileRoot>
+        <ThemeRoot theme="dark">
+          <Story />
+        </ThemeRoot>
+      </MobileRoot>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole("heading", { name: "Android専用" }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByRole("heading", { name: "メディア" }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("checkbox", { name: /ポップアップ/ }),
+    ).not.toBeInTheDocument();
+  },
+};
+
+export const MobileGroupsLightTheme: Story = {
+  name: "モバイル・ライトテーマ",
+  decorators: [
+    (Story) => (
+      <MobileRoot>
+        <ThemeRoot theme="light">
+          <Story />
+        </ThemeRoot>
+      </MobileRoot>
     ),
   ],
 };

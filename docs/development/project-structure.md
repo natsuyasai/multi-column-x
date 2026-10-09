@@ -50,6 +50,7 @@ multi-column-x/
 │       ├── ApiRateLimitIndicator/    # API レート制限モニターのツールバー表示
 │       ├── SettingsPanel/            # カラム個別設定パネル
 │       ├── AppSettingsPanel/         # アプリ全体設定
+│       │   ├── SettingsGroup.tsx     # 一般タブのグループ見出し（空なら非表示）
 │       │   ├── ColumnLayoutTab.tsx   # グリッドレイアウト設定タブ
 │       │   └── PresetsTab.tsx        # カラムプリセット管理タブ
 │       ├── TopBar/                   # 横方向ツールバー（デスクトップ）
@@ -138,3 +139,21 @@ src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/
 ├── VideoDownloadForegroundService.kt / VideoDownloadRequestBridge.kt  # 動画ダウンロード（フォアグラウンドサービス）
 └── WebViewProfiles.kt               # WebView Profile API のサポート判定・適用
 ```
+
+## 設定画面（AppSettingsPanel）の一般タブ構成
+
+一般タブは `SettingsGroup`（`h2` 見出し + 子要素）で次の 6 グループに分かれる。順序は上から下。
+
+| #   | グループ             | 中身                                                                          | 出し分け                                                                                                          |
+| --- | -------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| 1   | 表示                 | 表示サイズ・テーマ                                                            | 全環境                                                                                                            |
+| 2   | 新規カラムの既定値   | 自動更新・ヘッダー非表示等の既定値と一括適用                                  | 全環境                                                                                                            |
+| 3   | 閲覧・フィルタ       | NG ワード・リポスト非表示ユーザー・広告・API残量モニター                      | 全環境                                                                                                            |
+| 4   | メディア             | 動画設定 / ポップアップウィンドウ / 動画再生(Linux)                           | ポップアップ = desktop のみ、動画再生(Linux) = Linux デスクトップのみ（`isLinux && !isMobile`）、動画設定は全環境 |
+| 5   | Android専用          | ツイート（X アプリ起動）・スワイプ切替・2カラム表示                           | mobile のみ                                                                                                       |
+| 6   | アプリ・メンテナンス | バージョン・更新確認・X 公式設定・全 WebView 再生成・データフォルダ削除再実行 | 全環境                                                                                                            |
+
+- 子要素が 0 件のグループは `SettingsGroup` が見出しごと描画しない（環境によって中身が空になっても見出しだけ残らない）。
+- `isMobile` は `useAppStore`、`isLinux` は `App.tsx` が `platform()` から導出して props で渡す。
+- Windows / macOS 専用項目は現状無いため `isWindows` / `isMac` 判定は追加していない。追加するときは `App.tsx` の `isLinux` と同様に `platform()` で導出して props に渡す。
+- Storybook の `MobileGroups` 系 Story はストアの `isMobile` を一時的に true にしてモバイル構成を確認できる。
