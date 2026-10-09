@@ -80,6 +80,18 @@
   gap: 6px;
 }
 
+.group {
+  display: block;
+}
+
+.groupTitle {
+  margin: 0;
+  padding: 12px 20px 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mcx-text);
+}
+
 .checkLabel {
   display: flex;
   align-items: center;

@@ -20,7 +20,12 @@ import { BackupTab } from "./BackupTab";
 import { ColumnDefaultsSections } from "./ColumnDefaultsSections";
 import { ColumnLayoutTab } from "./ColumnLayoutTab";
 import { DisplaySettingsSection } from "./DisplaySettingsSection";
-import { GeneralSettingsSections } from "./GeneralSettingsSections";
+import {
+  AndroidSettingsSections,
+  FilterSettingsSections,
+  PopupSettingsSection,
+  VideoSettingsSection,
+} from "./GeneralSettingsSections";
 import {
   LinuxVideoPlaybackSection,
   type H264SettingsInfo,
@@ -32,6 +37,7 @@ import {
   toGlobalSettingsPatch,
   type SettingsDraft,
 } from "./settingsDraft";
+import { SettingsGroup } from "./SettingsGroup";
 
 interface AppSettingsPanelProps {
   settings: GlobalSettings;
@@ -222,55 +228,74 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
               onSubmit={handleSubmit}
               className={styles.form}
             >
-              <DisplaySettingsSection draft={draft} set={set} />
+              <SettingsGroup title="表示">
+                <DisplaySettingsSection draft={draft} set={set} />
+              </SettingsGroup>
 
-              <ColumnDefaultsSections
-                draft={draft}
-                set={set}
-                onApplyToAllColumns={handleApplyColumnDefaults}
-              />
+              <SettingsGroup title="新規カラムの既定値">
+                <ColumnDefaultsSections
+                  draft={draft}
+                  set={set}
+                  onApplyToAllColumns={handleApplyColumnDefaults}
+                />
+              </SettingsGroup>
 
-              <GeneralSettingsSections
-                draft={draft}
-                set={set}
-                isMobile={isMobile}
-                ngWordsError={ngWordsError}
-                repostHiddenUserIdsError={repostHiddenUserIdsError}
-              />
+              <SettingsGroup title="閲覧・フィルタ">
+                <FilterSettingsSections
+                  draft={draft}
+                  set={set}
+                  ngWordsError={ngWordsError}
+                  repostHiddenUserIdsError={repostHiddenUserIdsError}
+                />
+              </SettingsGroup>
 
-              <LinuxVideoPlaybackSection
-                draft={draft}
-                set={set}
-                isLinux={isLinux}
-                startupHardwareVideoDecodeEnabled={
-                  startupHardwareVideoDecodeEnabled ??
-                  settings.hardwareVideoDecodeEnabled
-                }
-                h264={h264Setup}
-              />
+              <SettingsGroup title="メディア">
+                <VideoSettingsSection draft={draft} set={set} />
+                {!isMobile && <PopupSettingsSection draft={draft} set={set} />}
+                <LinuxVideoPlaybackSection
+                  draft={draft}
+                  set={set}
+                  isLinux={isLinux && !isMobile}
+                  startupHardwareVideoDecodeEnabled={
+                    startupHardwareVideoDecodeEnabled ??
+                    settings.hardwareVideoDecodeEnabled
+                  }
+                  h264={h264Setup}
+                />
+              </SettingsGroup>
 
-              <AppInfoSections
-                onOpenOfficialSettings={onOpenOfficialSettings}
-                onReloadAllWebviews={() => {
-                  onReloadAllWebviews();
-                  onClose();
-                }}
-                appVersion={appVersion}
-                updateChecking={updateChecking}
-                updateManualResult={updateManualResult}
-                onCheckUpdate={onCheckUpdate}
-                pendingDataDirectoryDeletionCount={
-                  pendingDataDirectoryDeletionCount
-                }
-                retryingDataDirectoryDeletion={retryingDataDirectoryDeletion}
-                dataDirectoryDeletionRetryResult={
-                  dataDirectoryDeletionRetryResult
-                }
-                dataDirectoryDeletionRemainingCount={
-                  dataDirectoryDeletionRemainingCount
-                }
-                onRetryDataDirectoryDeletion={handleRetryDataDirectoryDeletion}
-              />
+              {isMobile && (
+                <SettingsGroup title="Android専用">
+                  <AndroidSettingsSections draft={draft} set={set} />
+                </SettingsGroup>
+              )}
+
+              <SettingsGroup title="アプリ・メンテナンス">
+                <AppInfoSections
+                  onOpenOfficialSettings={onOpenOfficialSettings}
+                  onReloadAllWebviews={() => {
+                    onReloadAllWebviews();
+                    onClose();
+                  }}
+                  appVersion={appVersion}
+                  updateChecking={updateChecking}
+                  updateManualResult={updateManualResult}
+                  onCheckUpdate={onCheckUpdate}
+                  pendingDataDirectoryDeletionCount={
+                    pendingDataDirectoryDeletionCount
+                  }
+                  retryingDataDirectoryDeletion={retryingDataDirectoryDeletion}
+                  dataDirectoryDeletionRetryResult={
+                    dataDirectoryDeletionRetryResult
+                  }
+                  dataDirectoryDeletionRemainingCount={
+                    dataDirectoryDeletionRemainingCount
+                  }
+                  onRetryDataDirectoryDeletion={
+                    handleRetryDataDirectoryDeletion
+                  }
+                />
+              </SettingsGroup>
             </form>
           )}
 

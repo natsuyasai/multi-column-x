@@ -1,4 +1,10 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { GlobalSettings, Column, Account } from "../../types";
@@ -1330,5 +1336,209 @@ describe("AppSettingsPanel Linux向け動画再生設定", () => {
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "再試行" }));
     expect(h264Base.onEnable).toHaveBeenCalledTimes(1);
+  });
+});
+
+const グループ見出し一覧 = () =>
+  screen
+    .getAllByRole("heading", { level: 2 })
+    .map((h) => h.textContent)
+    .filter((t) => t !== "アプリ設定");
+
+const グループ要素 = (title: string) => {
+  const heading = screen.getByRole("heading", { level: 2, name: title });
+  return heading.parentElement as HTMLElement;
+};
+
+describe("AppSettingsPanel 一般タブのグループ構成", () => {
+  it("一般タブのグループが依存関係順に並ぶ（デスクトップ）", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(グループ見出し一覧()).toEqual([
+      "表示",
+      "新規カラムの既定値",
+      "閲覧・フィルタ",
+      "メディア",
+      "アプリ・メンテナンス",
+    ]);
+  });
+
+  it("一般タブのグループが依存関係順に並び、モバイルではメディアとアプリ・メンテナンスの間にAndroid専用が入る", () => {
+    mockStoreState.isMobile = true;
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(グループ見出し一覧()).toEqual([
+      "表示",
+      "新規カラムの既定値",
+      "閲覧・フィルタ",
+      "メディア",
+      "Android専用",
+      "アプリ・メンテナンス",
+    ]);
+  });
+
+  it("閲覧・フィルタグループにNGワード・リポスト非表示ユーザー・広告・API残量モニターが含まれる", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    const group = グループ要素("閲覧・フィルタ");
+    for (const name of [
+      /グローバルNGワード/,
+      /リポストを非表示にするユーザー/,
+      /広告/,
+      /API残量モニター/,
+    ]) {
+      expect(
+        within(group).getByRole("heading", { level: 3, name }),
+      ).toBeInTheDocument();
+    }
+  });
+
+  it("デスクトップではポップアップ設定がメディアグループに表示される", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    const group = グループ要素("メディア");
+    for (const name of [
+      "Escキーで閉じる",
+      "画像をポップアップウィンドウで開く",
+      "動画をポップアップウィンドウで開く",
+    ]) {
+      expect(within(group).getByRole("checkbox", { name })).toBeInTheDocument();
+    }
+  });
+
+  it("モバイルではポップアップ設定が表示されない", () => {
+    mockStoreState.isMobile = true;
+    render(<AppSettingsPanel {...defaultProps} />);
+    for (const name of [
+      "Escキーで閉じる",
+      "画像をポップアップウィンドウで開く",
+      "動画をポップアップウィンドウで開く",
+    ]) {
+      expect(screen.queryByRole("checkbox", { name })).not.toBeInTheDocument();
+    }
+  });
+
+  it("Linuxデスクトップでは動画再生（Linux）がメディアグループに表示される", () => {
+    render(<AppSettingsPanel {...defaultProps} isLinux />);
+    const group = グループ要素("メディア");
+    expect(
+      within(group).getByRole("checkbox", {
+        name: "ハードウェアデコードを使う（VA-API）",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it.each(["Windows", "macOS"])(
+    "Linux以外のデスクトップ（%s）では動画再生（Linux）が表示されない",
+    () => {
+      render(<AppSettingsPanel {...defaultProps} isLinux={false} />);
+      expect(screen.queryByText(/動画再生（Linux）/)).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("checkbox", {
+          name: "ハードウェアデコードを使う（VA-API）",
+        }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it("モバイルでは動画再生（Linux）が表示されない", () => {
+    mockStoreState.isMobile = true;
+    render(<AppSettingsPanel {...defaultProps} isLinux />);
+    expect(screen.queryByText(/動画再生（Linux）/)).not.toBeInTheDocument();
+  });
+
+  it("モバイルではAndroid専用グループにツイート（Android）とスワイプ切替が表示される", () => {
+    mockStoreState.isMobile = true;
+    render(<AppSettingsPanel {...defaultProps} />);
+    const group = グループ要素("Android専用");
+    expect(
+      within(group).getByRole("heading", {
+        level: 3,
+        name: /ツイート（Android）/,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(group).getByRole("heading", { level: 3, name: /スワイプ切替/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(group).getByRole("checkbox", {
+        name: "広い画面で2カラム表示（タブレット・横向き）",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("デスクトップではAndroid専用グループが見出しごと表示されない", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(
+      screen.queryByRole("heading", { name: "Android専用" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/ツイート（Android）/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/スワイプ切替/)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["デスクトップ", false],
+    ["モバイル", true],
+  ])(
+    "全環境（%s）で動画の自動再生停止・表示・新規カラムの既定値が表示される",
+    (_name, isMobile) => {
+      mockStoreState.isMobile = isMobile;
+      render(<AppSettingsPanel {...defaultProps} />);
+      expect(
+        within(グループ要素("メディア")).getByRole("checkbox", {
+          name: "動画の自動再生を停止する",
+        }),
+      ).toBeInTheDocument();
+      expect(
+        within(グループ要素("表示")).getByRole("heading", { level: 3 }),
+      ).toBeInTheDocument();
+      expect(
+        within(グループ要素("新規カラムの既定値")).getAllByRole("heading", {
+          level: 3,
+        }).length,
+      ).toBeGreaterThan(0);
+    },
+  );
+
+  it.each([
+    ["デスクトップ", false],
+    ["モバイル", true],
+  ])(
+    "全環境（%s）でアプリ・メンテナンスに公式設定・WebView・アプリ情報が表示される",
+    (_name, isMobile) => {
+      mockStoreState.isMobile = isMobile;
+      render(<AppSettingsPanel {...defaultProps} />);
+      const group = グループ要素("アプリ・メンテナンス");
+      expect(
+        within(group).getByRole("button", { name: "公式設定を開く" }),
+      ).toBeInTheDocument();
+      expect(
+        within(group).getByRole("heading", { level: 3, name: "WebView" }),
+      ).toBeInTheDocument();
+      expect(
+        within(group).getByRole("heading", { level: 3, name: "アプリ情報" }),
+      ).toBeInTheDocument();
+    },
+  );
+
+  it("モバイルで非表示のポップアップ関連設定値も適用時のpatchに保存内容のまま含まれる", () => {
+    mockStoreState.isMobile = true;
+    const onApply = vi.fn();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={{
+          ...baseGlobalSettings,
+          popupEscCloseEnabled: false,
+          imagePopupEnabled: false,
+          videoPopupEnabled: false,
+        }}
+        onApply={onApply}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        popupEscCloseEnabled: false,
+        imagePopupEnabled: false,
+        videoPopupEnabled: false,
+      }),
+    );
   });
 });
