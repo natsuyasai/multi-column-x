@@ -632,6 +632,23 @@ mod tests {
     }
 
     #[test]
+    fn 動画自動再生停止が有効のときvideo_controlが注入結果に含まれる() {
+        let mut params = default_params();
+        params.video_auto_play_stop_enabled = true;
+        let script = build_init_script(&params);
+        // video_control.ts 内の一意な識別子
+        assert!(script.contains("firstPlayDone"));
+    }
+
+    #[test]
+    fn 動画自動再生停止が無効のときvideo_controlが注入結果に含まれない() {
+        let mut params = default_params();
+        params.video_auto_play_stop_enabled = false;
+        let script = build_init_script(&params);
+        assert!(!script.contains("firstPlayDone"));
+    }
+
+    #[test]
     fn build_popup_init_scriptに動画自動再生スクリプトが含まれる() {
         let script =
             build_popup_init_script("[]", "acc1", "https://x.com/user/status/123/video/1", true);
