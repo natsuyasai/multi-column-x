@@ -17,10 +17,6 @@ interface FilterSettingsSectionsProps extends SectionProps {
   repostHiddenUserIdsError?: string | null;
 }
 
-interface GeneralSettingsSectionsProps extends FilterSettingsSectionsProps {
-  isMobile: boolean;
-}
-
 /** ポップアップウィンドウ設定セクション */
 export const PopupSettingsSection: React.FC<SectionProps> = ({
   draft,
@@ -242,27 +238,5 @@ export const AndroidSettingsSections: React.FC<SectionProps> = ({
         広い画面で2カラム表示（タブレット・横向き）
       </label>
     </section>
-  </>
-);
-
-/**
- * 互換ラッパー（従来の並びを維持）。AppSettingsPanel の書き換え時に削除する。
- * ポップアップ → 動画 → 広告 → API残量 →（モバイル時）Android → NGワード → リポスト非表示
- */
-export const GeneralSettingsSections: React.FC<
-  GeneralSettingsSectionsProps
-> = ({ draft, set, isMobile, ngWordsError, repostHiddenUserIdsError }) => (
-  <>
-    <PopupSettingsSection draft={draft} set={set} />
-    <VideoSettingsSection draft={draft} set={set} />
-    <AdSettingsSection draft={draft} set={set} />
-    <ApiRateLimitSettingsSection draft={draft} set={set} />
-    {isMobile && <AndroidSettingsSections draft={draft} set={set} />}
-    <NgWordsSection draft={draft} set={set} error={ngWordsError} />
-    <RepostHiddenUsersSection
-      draft={draft}
-      set={set}
-      error={repostHiddenUserIdsError}
-    />
   </>
 );
