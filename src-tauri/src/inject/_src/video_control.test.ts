@@ -44,18 +44,55 @@ describe("inject/video_control 動画自動再生ブロック", () => {
     await import("./video_control");
   }
 
+  const methodNames = ["play", "pause"] as const;
+  type SavedDescriptors = Record<
+    (typeof methodNames)[number],
+    PropertyDescriptor | undefined
+  >;
+  let savedMedia: SavedDescriptors;
+  let savedVideo: SavedDescriptors;
+
+  function saveDescriptors(proto: object): SavedDescriptors {
+    return {
+      play: Object.getOwnPropertyDescriptor(proto, "play"),
+      pause: Object.getOwnPropertyDescriptor(proto, "pause"),
+    };
+  }
+
+  function restoreDescriptors(proto: object, saved: SavedDescriptors): void {
+    for (const name of methodNames) {
+      const descriptor = saved[name];
+      if (descriptor) {
+        Object.defineProperty(proto, name, descriptor);
+      } else {
+        delete (proto as Record<string, unknown>)[name];
+      }
+    }
+  }
+
   beforeEach(() => {
     document.body.innerHTML = "";
     playMock = vi.fn().mockResolvedValue(undefined);
     pauseMock = vi.fn();
+    savedMedia = saveDescriptors(HTMLMediaElement.prototype);
+    savedVideo = saveDescriptors(HTMLVideoElement.prototype);
+    // 実装は HTMLMediaElement.prototype.play を差し替えるため、モックも同じ階層に置く。
+    // HTMLVideoElement.prototype 側に own プロパティが残ると差し替えがバイパスされる。
     // jsdom は play/pause を実装しないため必須
-    HTMLVideoElement.prototype.play =
+    delete (HTMLVideoElement.prototype as unknown as Record<string, unknown>)
+      .play;
+    delete (HTMLVideoElement.prototype as unknown as Record<string, unknown>)
+      .pause;
+    HTMLMediaElement.prototype.play =
       playMock as unknown as () => Promise<void>;
-    HTMLVideoElement.prototype.pause = pauseMock as unknown as () => void;
+    HTMLMediaElement.prototype.pause = pauseMock as unknown as () => void;
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    // import 毎に play が wrap されるため、元の記述子へ戻して多重に積まれないようにする
+    restoreDescriptors(HTMLMediaElement.prototype, savedMedia);
+    restoreDescriptors(HTMLVideoElement.prototype, savedVideo);
   });
 
   it("DOM追加直後は動画のplayがブロックされpauseが呼ばれること", async () => {
