@@ -9,6 +9,9 @@ use crate::commands::openh264_http_client::{
 };
 
 const OPENH264_VERSION: &str = "2.4.1";
+/// ダウンロードして配置する OpenH264 共有ライブラリのファイル名。
+/// 配置済みかの判定（`media_codec`）と書き込み先で必ず同じ名前を使う。
+pub(crate) const OPENH264_LIB_FILENAME: &str = "libopenh264.so.7";
 // x86_64 (amd64) 用の実測値。ダウンロードして一致確認済み。
 const OPENH264_SHA256_AMD64: &str =
     "ca413853d99d960ebcd5ae5b4c65a85bb2b5598e9042e64700a9f4b737ca3a3f";
@@ -104,7 +107,7 @@ pub async fn download_and_enable_h264(caller: tauri::Webview) -> Result<(), Stri
 
     let dir = crate::linux_codec_env::openh264_lib_dir();
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let dest = dir.join("libopenh264.so.7");
+    let dest = dir.join(OPENH264_LIB_FILENAME);
     std::fs::write(&dest, &decompressed).map_err(|e| e.to_string())?;
 
     invalidate_gstreamer_registry_cache();
