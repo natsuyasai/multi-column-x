@@ -12,6 +12,10 @@ Android 対応（アカウント追加、モバイルタブバー、APK 自己�
 
 app モジュールの variant は universal フレーバー付きのため、`./gradlew.bat testDebugUnitTest` では **app のテストは実行されない**。`cd src-tauri/gen/android && ./gradlew.bat :app:testUniversalDebugUnitTest` を使うこと。
 
+### 新しい git worktree での生成ファイル
+
+gitignore 対象の Android 生成ファイル（`src-tauri/gen/android/tauri.settings.gradle`、`src-tauri/gen/android/app/tauri.build.gradle.kts`、`src-tauri/gen/android/app/tauri.properties`）は新しい git worktree には存在せず、`npm run format` の Kotlin 部や Android 単体テストが失敗する。元のリポジトリから同じパスへコピーすること。
+
 ## Android ProGuard keep ルールの同期
 
 `android_bridge.rs` が `env.call_method()` で文字列指定して呼び出す `MainActivity` のメソッドは、リリースビルドで R8 に難読化されると `NoSuchMethodException` が発生して WebView が作成されない。

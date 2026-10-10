@@ -22,6 +22,10 @@
 - モバイル UI の白半透明色は、トークン化すると半透明の質感が失われるが「本体テーマとの統一を優先する」という明示的なトレードオフ判断をしている。
 - Android の `themes.xml` はテーマ切替の対象外。
 - カラム内 WebView（X 本体ページ）は、当初はテーマ切替の対象外だったが、その後 `src/App.tsx` の `handleApplyGlobalSettings` に配線され、アプリ設定パネルでテーマを変更して適用した瞬間に解決済みテーマ（dark/light、system は OS 配色の解決値）を全カラムの X 公式ページの `night_mode` Cookie（`WEBVIEW_SCRIPTS.applyNightModeCookie`）へ反映してリロードするようになっている。値が変化した場合のみリロードする。
+- 配色は WCAG コントラスト基準（文字・アイコン 4.5:1、`border-strong` の輪郭 3:1）で設計しており、`src/lib/themeContrast.contract.test.ts` が全トークン×背景の組み合わせを検証する（`src/lib/contrast.ts` の `contrastRatio` を使用）。`text-disabled` と装飾の区切り線（`border` / `border-subtle`）は対象外。
+- accent は文字・アイコン・枠用（`--mcx-accent`、ダークは明るい青 / ライトは濃い青）と、白文字を載せる塗り用（`--mcx-accent-fill`。`--mcx-accent-hover` はその hover 色）に分離している。白文字を載せる背景は `accent-fill` を使うこと（`accent` を背景にすると白文字が読めない）。
+- Android `SwipeBarOverlayView.kt` の companion object の色定数は `index.css` のコピーで、`src/lib/swipeBarColors.contract.test.ts` が一致を検証する。トークンを変えたら Kotlin 側も更新すること。
+- 活性状態の文字・アイコンを `opacity` で薄めると実効コントラストが下がるため、階調は `text-secondary` / `text-tertiary` / `text-muted` のトークンで表現する（無効状態・アニメーション・ドラッグ演出は除く）。
 
 ## 更新進捗表示
 
