@@ -144,6 +144,21 @@ export function resolveSwipeAreaHeight(s: SwipeAreaSettings): number {
 /** 2カラム表示に切り替える最小ビューポート幅（CSS px ≒ dp。Android sw600dp タブレット基準） */
 export const MOBILE_TWO_COLUMN_MIN_WIDTH = 600;
 
+/** 複数カラム表示時の 1 列あたりの最小幅（dp）。これを下回る列数は自動で減らす */
+export const MOBILE_MIN_COLUMN_WIDTH = 300;
+export const MOBILE_COLUMN_COUNT_MIN = 2;
+export const MOBILE_COLUMN_COUNT_MAX = 6;
+
+/** 列数設定を 2〜6 の整数へ丸める（非整数/NaN は 2、小数は切り捨て） */
+export function clampMobileColumnCount(n: number): number {
+  if (typeof n !== "number" || !Number.isFinite(n))
+    return MOBILE_COLUMN_COUNT_MIN;
+  return Math.min(
+    MOBILE_COLUMN_COUNT_MAX,
+    Math.max(MOBILE_COLUMN_COUNT_MIN, Math.floor(n)),
+  );
+}
+
 interface MobileColumnLayoutInput {
   /** order 順ソート不要（関数内でソートする） */
   columns: Pick<Column, "id" | "order">[];
@@ -151,6 +166,8 @@ interface MobileColumnLayoutInput {
   activeColumnId: string | null;
   /** 設定 ON && Profile API 対応 を呼び出し側で合成して渡す */
   twoColumnEnabled: boolean;
+  /** 複数カラム表示の列数設定（2〜6 に丸められる。未設定は 2 扱い） */
+  columnCount: number;
   viewportWidth: number;
   viewportHeight: number;
 }
@@ -166,6 +183,7 @@ export function mobileColumnLayout(
     columns,
     activeColumnId,
     twoColumnEnabled,
+    columnCount,
     viewportWidth,
     viewportHeight,
   } = input;
@@ -194,12 +212,18 @@ export function mobileColumnLayout(
     return result;
   }
 
-  const twoColumnActive =
+  // 有効列数: 設定値・1列最小幅に収まる列数・登録カラム数の最小値
+  const visibleCount = Math.min(
+    clampMobileColumnCount(columnCount),
+    Math.floor(viewportWidth / MOBILE_MIN_COLUMN_WIDTH),
+    sorted.length,
+  );
+  const multiColumnActive =
     twoColumnEnabled &&
     viewportWidth >= MOBILE_TWO_COLUMN_MIN_WIDTH &&
-    sorted.length >= 2;
+    visibleCount >= 2;
 
-  if (!twoColumnActive) {
+  if (!multiColumnActive) {
     result[activeColumnId] = {
       x: 0,
       y: 0,
@@ -209,16 +233,18 @@ export function mobileColumnLayout(
     return result;
   }
 
-  // ペア窓の先頭 index を決める。末尾要素がアクティブならクランプして左隣とペアにする。
-  const pairStartIdx = Math.min(activeIdx, sorted.length - 2);
-  const leftWidth = Math.floor(viewportWidth / 2);
-  const rightWidth = viewportWidth - leftWidth;
-
-  const leftCol = sorted[pairStartIdx];
-  const rightCol = sorted[pairStartIdx + 1];
-
-  result[leftCol.id] = { x: 0, y: 0, width: leftWidth, height };
-  result[rightCol.id] = { x: leftWidth, y: 0, width: rightWidth, height };
+  // 窓の先頭 index を決める。末尾付近がアクティブなら左へずらして N 列を保つ。
+  const startIdx = Math.min(activeIdx, sorted.length - visibleCount);
+  const baseWidth = Math.floor(viewportWidth / visibleCount);
+  for (let i = 0; i < visibleCount; i++) {
+    const isLast = i === visibleCount - 1;
+    result[sorted[startIdx + i].id] = {
+      x: i * baseWidth,
+      y: 0,
+      width: isLast ? viewportWidth - baseWidth * i : baseWidth,
+      height,
+    };
+  }
 
   return result;
 }

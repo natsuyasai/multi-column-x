@@ -286,6 +286,48 @@ describe("useMobileColumns", () => {
     });
   });
 
+  it("起動時の復元でも設定した列数で表示される", async () => {
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 1200,
+    });
+    try {
+      const column3 = { ...column1, id: "col-3", order: 2, gridCol: 3 };
+      const column4 = { ...column1, id: "col-4", order: 3, gridCol: 4 };
+      useAppStore.setState({
+        profileApiSupported: true,
+        columns: [column1, column2, column3, column4],
+        globalSettings: {
+          ...useAppStore.getState().globalSettings,
+          mobileTwoColumnEnabled: true,
+          mobileColumnCount: 3,
+        },
+      });
+      const { result } = renderMobileColumns();
+
+      await act(async () => {
+        await result.current.restoreMobileColumns(
+          useAppStore.getState().columns,
+          useAppStore.getState().accounts,
+        );
+      });
+
+      const { order, byId } = resizeCallsByColumn();
+      expect(order.slice().sort()).toEqual(["col-1", "col-2", "col-3"]);
+      expect(order[order.length - 1]).toBe("col-1");
+      expect(byId["col-1"].x).toBeGreaterThanOrEqual(0);
+      expect(byId["col-2"].x).toBeGreaterThanOrEqual(0);
+      expect(byId["col-3"].x).toBeGreaterThanOrEqual(0);
+      expect(byId["col-4"]).toBeUndefined();
+    } finally {
+      Object.defineProperty(window, "innerWidth", {
+        configurable: true,
+        value: originalWidth,
+      });
+    }
+  });
+
   it("restoreMobileColumnsはexternalカラムをアカウントなしでもcreateColumnWebviewを呼び出す", async () => {
     const externalColumn = {
       ...column1,

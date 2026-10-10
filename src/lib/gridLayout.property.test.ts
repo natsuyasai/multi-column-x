@@ -97,6 +97,7 @@ const mobileScenarioArb = ordersArb.chain((orders) => {
     columns: fc.constant(columns),
     activeColumnId: activeColumnIdArb(columns),
     twoColumnEnabled: fc.boolean(),
+    columnCount: fc.constant(2),
     viewportWidth: fc.integer({ min: 0, max: 2000 }),
     viewportHeight: fc.integer({ min: 0, max: 2000 }),
   });
@@ -111,6 +112,7 @@ const mobileExistingActiveScenarioArb = ordersArb
       columns: fc.constant(columns),
       activeColumnId: fc.constantFrom(...columns.map((c) => c.id)),
       twoColumnEnabled: fc.boolean(),
+      columnCount: fc.constant(2),
       viewportWidth: fc.integer({ min: 0, max: 2000 }),
       viewportHeight: fc.integer({ min: 0, max: 2000 }),
     });
@@ -124,6 +126,7 @@ const mobileTwoColumnScenarioArb = ordersArb
     const columns = toMobileColumns(orders);
     return fc.record({
       columns: fc.constant(columns),
+      columnCount: fc.constant(2),
       activeColumnId: fc.constantFrom(...columns.map((c) => c.id)),
       viewportWidth: fc.integer({
         min: MOBILE_TWO_COLUMN_MIN_WIDTH,
