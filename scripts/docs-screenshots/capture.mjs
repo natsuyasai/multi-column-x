@@ -1,4 +1,4 @@
-// storybook-static を静的配信し、playwright(chromium) で各ストーリーを docs/images に撮影する。
+// storybook-static を静的配信し、playwright(chromium) で各ストーリーを docs/guide/images に撮影する。
 // 使い方: npm run docs:screenshots（storybook build を前段実行）
 import { createServer } from "node:http";
 import { mkdir, readFile, stat } from "node:fs/promises";
@@ -10,7 +10,7 @@ import { targets } from "./targets.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const staticDir = join(root, "storybook-static");
-const outDir = join(root, "docs", "images");
+const outDir = join(root, "docs", "guide", "images");
 // Storybook の preview はアプリのグローバル CSS（テーマ変数・リセット）を読み込まないため、
 // 撮影時に src/index.css を注入して実アプリと同じ見た目にする。
 const appCssPath = join(root, "src", "index.css");

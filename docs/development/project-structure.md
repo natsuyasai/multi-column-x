@@ -145,17 +145,22 @@ src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/
 
 ## ユーザーガイドサイト（docs/.vitepress）
 
-`docs/USER_GUIDE.md` と `docs/images/` を VitePress で GitHub Pages に公開する。
+`docs/guide/`（章ごとのページ）を VitePress で GitHub Pages に公開する。ガイドの正本は `docs/guide/` 配下。
 
 ```
 docs/
-├── .vitepress/config.mts   # サイト設定（base・日本語UI・日本語検索トークナイザ・srcExclude）
-├── USER_GUIDE.md           # トップページ（rewrites で index.md として配信）
-├── images/                 # ガイドのスクリーンショット
-└── development/ 等         # 開発者向け資料。srcExclude で公開対象外
+├── .vitepress/config.mts   # サイト設定（srcDir・base・日本語UI・日本語検索トークナイザ・サイドバー・editLink）
+├── guide/                  # 公開対象（srcDir）。ガイド本文の正本
+│   ├── index.md            # はじめに（クイックスタート・概要）
+│   ├── install.md / screen.md / accounts.md / columns.md / settings.md
+│   ├── popup-shortcuts.md / android.md / update.md / faq.md
+│   └── images/             # ガイドのスクリーンショット（npm run docs:screenshots の出力先）
+└── development/ 等         # 開発者向け資料。srcDir の外なので公開されない
 ```
 
-- 公開範囲は `USER_GUIDE.md` と画像のみ。`development/` `specs/` `superpowers/` は `srcExclude` で除外している
+- 公開範囲は `config.mts` の `srcDir: "guide"` 配下のみ。`development/` `specs/` `superpowers/` は srcDir の外なので公開されない
+- サイドバーは `config.mts` の `themeConfig.sidebar` で管理している。**ページを追加・改名・削除したらサイドバーも更新すること**
+- 章間リンクは相対リンク（例 `./install`、節指定は `./columns#カラム個別設定`）で書く。デッドリンクはビルドで検出される
 - `npm run docs:build` はデッドリンクがあると失敗する（CI の `frontend` ジョブでも実行）。生成物 `docs/.vitepress/dist` / `cache` は git・prettier の対象外
 - デプロイは `.github/workflows/pages.yml`（`main` への push で `docs/**` 等が変わったとき、または手動実行）
 
