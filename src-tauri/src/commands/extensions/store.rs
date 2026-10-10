@@ -67,7 +67,9 @@ mod tests {
 
     use serde_json::json;
 
-    use super::super::model::{AppliedExtension, ExtensionEntry, ExtensionSource, ProfileSync};
+    use super::super::model::{
+        AppliedExtension, Browser, ExtensionEntry, ExtensionSource, ProfileSync,
+    };
     use super::*;
 
     fn 複数種類の状態() -> ExtensionsState {
@@ -98,6 +100,7 @@ mod tests {
                     source: ExtensionSource::Chrome {
                         chrome_id: "abcdefghijklmnopabcdefghijklmnop".to_string(),
                         profile: "Default".to_string(),
+                        browser: Browser::Chrome,
                     },
                     enabled: false,
                     has_popup: false,

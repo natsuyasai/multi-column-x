@@ -1,11 +1,12 @@
 //! Chrome にインストール済みの拡張機能の検出（OS 非依存の純粋ロジック）。
-//! 実環境のパス取得（`LOCALAPPDATA`）だけを `chrome_extensions_root_from_env` に分離している。
+//! 実環境のパス取得（`LOCALAPPDATA`）だけを `browser_roots_from_env` に分離している。
 
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use super::manifest::read_manifest_info;
+use super::model::Browser;
 
 /// 対象とする Chrome プロファイル（現状は Default のみ）。
 pub const DEFAULT_PROFILE: &str = "Default";
@@ -25,12 +26,15 @@ pub struct DetectedExtension {
     pub has_options: bool,
     /// 既にアプリへ追加済みか。
     pub added: bool,
+    /// 検出元のブラウザ。
+    pub browser: Browser,
 }
 
 /// 検出結果。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DetectOutcome {
-    pub chrome_found: bool,
+    /// 検出元のルートが存在するか。
+    pub browser_found: bool,
     pub items: Vec<DetectedExtension>,
 }
 
@@ -44,10 +48,47 @@ pub fn chrome_extensions_root(local_app_data: &Path, profile: &str) -> PathBuf {
         .join("Extensions")
 }
 
+/// `<local_app_data>\Microsoft\Edge\User Data\<profile>\Extensions`
+pub fn edge_extensions_root(local_app_data: &Path, profile: &str) -> PathBuf {
+    local_app_data
+        .join("Microsoft")
+        .join("Edge")
+        .join("User Data")
+        .join(profile)
+        .join("Extensions")
+}
+
+/// ブラウザごとの Extensions ルート。`LOCALAPPDATA` が取れないときは両方 None。
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct BrowserRoots {
+    pub chrome: Option<PathBuf>,
+    pub edge: Option<PathBuf>,
+}
+
+impl BrowserRoots {
+    /// 指定ブラウザのルート。
+    pub fn root_for(&self, browser: Browser) -> Option<&Path> {
+        match browser {
+            Browser::Chrome => self.chrome.as_deref(),
+            Browser::Edge => self.edge.as_deref(),
+        }
+    }
+}
+
+/// `LOCALAPPDATA` を基点に Default プロファイルの両ブラウザのルートを求める。
+pub fn browser_roots(local_app_data: &Path) -> BrowserRoots {
+    BrowserRoots {
+        chrome: Some(chrome_extensions_root(local_app_data, DEFAULT_PROFILE)),
+        edge: Some(edge_extensions_root(local_app_data, DEFAULT_PROFILE)),
+    }
+}
+
 /// 環境変数 `LOCALAPPDATA` から Default プロファイルの Extensions ルートを求める。
-pub fn chrome_extensions_root_from_env() -> Option<PathBuf> {
-    let base = std::env::var_os("LOCALAPPDATA").filter(|v| !v.is_empty())?;
-    Some(chrome_extensions_root(Path::new(&base), DEFAULT_PROFILE))
+pub fn browser_roots_from_env() -> BrowserRoots {
+    match std::env::var_os("LOCALAPPDATA").filter(|v| !v.is_empty()) {
+        Some(base) => browser_roots(Path::new(&base)),
+        None => BrowserRoots::default(),
+    }
 }
 
 /// 拡張機能 ID のディレクトリ内にあるバージョンフォルダ名の一覧。
@@ -116,15 +157,16 @@ pub fn resolve_chrome_extension_path(root: &Path, chrome_id: &str) -> Option<Pat
     latest_version_dir(&root.join(chrome_id))
 }
 
-/// Chrome の Extensions ルートから拡張機能を検出する。
+/// 指定ブラウザの Extensions ルートから拡張機能を検出する。
 pub fn detect_extensions(
     root: &Path,
     preferred_locale: &str,
     added_chrome_ids: &HashSet<String>,
+    browser: Browser,
 ) -> DetectOutcome {
     if !root.is_dir() {
         return DetectOutcome {
-            chrome_found: false,
+            browser_found: false,
             items: Vec::new(),
         };
     }
@@ -151,6 +193,7 @@ pub fn detect_extensions(
                     path: dir.to_string_lossy().into_owned(),
                     has_popup: info.has_popup,
                     has_options: info.has_options,
+                    browser,
                 }),
                 Err(e) => log::warn!(
                     "[extensions] Chrome 拡張機能を読み込めないため除外: id={chrome_id} dir={} err={e}",
@@ -165,8 +208,50 @@ pub fn detect_extensions(
             .then_with(|| a.chrome_id.cmp(&b.chrome_id))
     });
     DetectOutcome {
-        chrome_found: true,
+        browser_found: true,
         items,
+    }
+}
+
+/// Chrome 側と Edge 側の検出結果を 1 つにまとめる。
+/// 同じ拡張機能 ID は Chrome 側を残し、名前 → ID の順に整列する。
+pub fn merge_detected(
+    chrome: Vec<DetectedExtension>,
+    edge: Vec<DetectedExtension>,
+) -> Vec<DetectedExtension> {
+    let mut seen: HashSet<String> = chrome.iter().map(|d| d.chrome_id.clone()).collect();
+    let mut items = chrome;
+    for d in edge {
+        if seen.insert(d.chrome_id.clone()) {
+            items.push(d);
+        }
+    }
+    items.sort_by(|a, b| {
+        a.name
+            .cmp(&b.name)
+            .then_with(|| a.chrome_id.cmp(&b.chrome_id))
+    });
+    items
+}
+
+/// 両ブラウザのルートを検出して統合する。`browser_found` はどちらかのルートが存在するか。
+pub fn detect_all(
+    roots: &BrowserRoots,
+    preferred_locale: &str,
+    added_chrome_ids: &HashSet<String>,
+) -> DetectOutcome {
+    let run = |root: &Option<PathBuf>, browser| match root {
+        Some(r) => detect_extensions(r, preferred_locale, added_chrome_ids, browser),
+        None => DetectOutcome {
+            browser_found: false,
+            items: Vec::new(),
+        },
+    };
+    let chrome = run(&roots.chrome, Browser::Chrome);
+    let edge = run(&roots.edge, Browser::Edge);
+    DetectOutcome {
+        browser_found: chrome.browser_found || edge.browser_found,
+        items: merge_detected(chrome.items, edge.items),
     }
 }
 
@@ -211,9 +296,9 @@ mod tests {
         // 拡張機能 ID ではないフォルダは無視される
         fs::create_dir_all(root.join("Temp")).unwrap();
 
-        let out = detect_extensions(root, "ja", &空の集合());
+        let out = detect_extensions(root, "ja", &空の集合(), Browser::Chrome);
 
-        assert!(out.chrome_found);
+        assert!(out.browser_found);
         assert_eq!(out.items.len(), 2);
         assert_eq!(out.items[0].name, "Alpha");
         assert_eq!(out.items[0].chrome_id, ID_A);
@@ -232,9 +317,9 @@ mod tests {
         拡張機能を置く(root, ID_A, "1.0_0", r#"{"name":"Alpha"}"#);
         fs::create_dir_all(root.join(ID_B).join("1.0_0")).unwrap();
 
-        let out = detect_extensions(root, "ja", &空の集合());
+        let out = detect_extensions(root, "ja", &空の集合(), Browser::Chrome);
 
-        assert!(out.chrome_found);
+        assert!(out.browser_found);
         assert_eq!(out.items.len(), 1);
         assert_eq!(out.items[0].chrome_id, ID_A);
     }
@@ -259,8 +344,8 @@ mod tests {
             .unwrap();
         }
 
-        let ja = detect_extensions(root, "ja", &空の集合());
-        let en = detect_extensions(root, "en-US", &空の集合());
+        let ja = detect_extensions(root, "ja", &空の集合(), Browser::Chrome);
+        let en = detect_extensions(root, "en-US", &空の集合(), Browser::Chrome);
 
         assert_eq!(ja.items[0].name, "日本語の名前");
         assert_eq!(en.items[0].name, "English name");
@@ -273,7 +358,7 @@ mod tests {
         拡張機能を置く(root, ID_A, "1.9_0", r#"{"name":"Old"}"#);
         let latest = 拡張機能を置く(root, ID_A, "1.10_0", r#"{"name":"New"}"#);
 
-        let out = detect_extensions(root, "ja", &空の集合());
+        let out = detect_extensions(root, "ja", &空の集合(), Browser::Chrome);
 
         assert_eq!(out.items.len(), 1);
         assert_eq!(out.items[0].name, "New");
@@ -285,9 +370,9 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("存在しない").join("Extensions");
 
-        let out = detect_extensions(&root, "ja", &空の集合());
+        let out = detect_extensions(&root, "ja", &空の集合(), Browser::Chrome);
 
-        assert!(!out.chrome_found);
+        assert!(!out.browser_found);
         assert!(out.items.is_empty());
     }
 
@@ -299,7 +384,7 @@ mod tests {
         拡張機能を置く(root, ID_B, "1.0_0", r#"{"name":"Beta"}"#);
         let added: HashSet<String> = [ID_A.to_string()].into_iter().collect();
 
-        let out = detect_extensions(root, "ja", &added);
+        let out = detect_extensions(root, "ja", &added, Browser::Chrome);
 
         assert!(
             out.items
@@ -320,9 +405,132 @@ mod tests {
     #[test]
     fn extensionsフォルダが空のときはchromeはあるが候補は空になる() {
         let tmp = tempfile::tempdir().unwrap();
-        let out = detect_extensions(tmp.path(), "ja", &空の集合());
-        assert!(out.chrome_found);
+        let out = detect_extensions(tmp.path(), "ja", &空の集合(), Browser::Chrome);
+        assert!(out.browser_found);
         assert!(out.items.is_empty());
+    }
+
+    fn 検出(id: &str, name: &str, browser: Browser) -> DetectedExtension {
+        DetectedExtension {
+            chrome_id: id.to_string(),
+            profile: "Default".to_string(),
+            name: name.to_string(),
+            path: String::new(),
+            has_popup: false,
+            has_options: false,
+            added: false,
+            browser,
+        }
+    }
+
+    fn 両ブラウザのルート(local: &Path) -> BrowserRoots {
+        browser_roots(local)
+    }
+
+    #[test]
+    fn edgeだけに拡張機能があるときedge由来の候補として検出される() {
+        let tmp = tempfile::tempdir().unwrap();
+        let roots = 両ブラウザのルート(tmp.path());
+        fs::create_dir_all(roots.chrome.as_ref().unwrap()).unwrap();
+        拡張機能を置く(
+            roots.edge.as_ref().unwrap(),
+            ID_A,
+            "1.0_0",
+            r#"{"name":"Alpha"}"#,
+        );
+
+        let out = detect_all(&roots, "ja", &空の集合());
+
+        assert!(out.browser_found);
+        assert_eq!(out.items.len(), 1);
+        assert_eq!(out.items[0].chrome_id, ID_A);
+        assert_eq!(out.items[0].browser, Browser::Edge);
+    }
+
+    #[test]
+    fn chromeだけに拡張機能があるときchrome由来の候補として検出される() {
+        let tmp = tempfile::tempdir().unwrap();
+        // Edge のルートは存在しない
+        let roots = 両ブラウザのルート(tmp.path());
+        拡張機能を置く(
+            roots.chrome.as_ref().unwrap(),
+            ID_A,
+            "1.0_0",
+            r#"{"name":"Alpha"}"#,
+        );
+
+        let out = detect_all(&roots, "ja", &空の集合());
+
+        assert!(out.browser_found);
+        assert_eq!(out.items.len(), 1);
+        assert_eq!(out.items[0].browser, Browser::Chrome);
+    }
+
+    #[test]
+    fn 同じ拡張機能idがchromeとedgeの両方にあるとき1件にまとめてchrome由来にする() {
+        let merged = merge_detected(
+            vec![検出(ID_A, "Alpha", Browser::Chrome)],
+            vec![
+                検出(ID_A, "Alpha", Browser::Edge),
+                検出(ID_B, "Beta", Browser::Edge),
+            ],
+        );
+
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[0].chrome_id, ID_A);
+        assert_eq!(merged[0].browser, Browser::Chrome);
+        assert_eq!(merged[1].chrome_id, ID_B);
+        assert_eq!(merged[1].browser, Browser::Edge);
+    }
+
+    #[test]
+    fn 実際のフォルダ構成で同じidが両方にあるときchrome由来の1件になる() {
+        let tmp = tempfile::tempdir().unwrap();
+        let roots = 両ブラウザのルート(tmp.path());
+        for root in [roots.chrome.as_ref().unwrap(), roots.edge.as_ref().unwrap()] {
+            拡張機能を置く(root, ID_A, "1.0_0", r#"{"name":"Alpha"}"#);
+        }
+
+        let out = detect_all(&roots, "ja", &空の集合());
+
+        assert_eq!(out.items.len(), 1);
+        assert_eq!(out.items[0].browser, Browser::Chrome);
+    }
+
+    #[test]
+    fn chromeにもedgeにも見つからないときはブラウザが見つからない結果になる() {
+        let tmp = tempfile::tempdir().unwrap();
+        // どちらのルートも作らない
+        let roots = 両ブラウザのルート(tmp.path());
+
+        let out = detect_all(&roots, "ja", &空の集合());
+
+        assert!(!out.browser_found);
+        assert!(out.items.is_empty());
+
+        // LOCALAPPDATA が取れない場合も同様
+        let out = detect_all(&BrowserRoots::default(), "ja", &空の集合());
+        assert!(!out.browser_found);
+    }
+
+    #[test]
+    fn edgeのextensionsルートはlocalappdata配下のmicrosoftのdefaultプロファイルになる() {
+        let root = edge_extensions_root(Path::new("C:/Users/u/AppData/Local"), "Default");
+        let expected = Path::new("C:/Users/u/AppData/Local")
+            .join("Microsoft")
+            .join("Edge")
+            .join("User Data")
+            .join("Default")
+            .join("Extensions");
+        assert_eq!(root, expected);
+    }
+
+    #[test]
+    fn 検出候補のブラウザはcamelcaseの文字列で出力される() {
+        let v = serde_json::to_value(検出(ID_A, "A", Browser::Edge)).unwrap();
+        assert_eq!(v["browser"], "edge");
+        let v = serde_json::to_value(検出(ID_A, "A", Browser::Chrome)).unwrap();
+        assert_eq!(v["browser"], "chrome");
     }
 
     // ---- 解決（見つかりません判定） ----
@@ -436,6 +644,38 @@ mod tests {
     mod properties {
         use super::*;
         use proptest::prelude::*;
+
+        fn 検出リスト(browser: Browser) -> impl Strategy<Value = Vec<DetectedExtension>> {
+            // 1 つのルート内では ID が一意。ID を 4 種類に絞ってルート間の重複を頻繁に作る。
+            prop::collection::btree_map(0usize..4, "[A-Za-z]{0,3}", 0..4).prop_map(move |m| {
+                m.into_iter()
+                    .map(|(i, name)| {
+                        let id = "abcd".chars().nth(i).unwrap().to_string().repeat(32);
+                        検出(&id, &name, browser)
+                    })
+                    .collect()
+            })
+        }
+
+        proptest! {
+            #[test]
+            fn 統合結果のidは一意で入力のid全てを含みchrome側の項目が優先される(
+                chrome in 検出リスト(Browser::Chrome),
+                edge in 検出リスト(Browser::Edge)
+            ) {
+                let merged = merge_detected(chrome.clone(), edge.clone());
+                let ids: Vec<&String> = merged.iter().map(|d| &d.chrome_id).collect();
+                let unique: HashSet<&String> = ids.iter().copied().collect();
+                prop_assert_eq!(ids.len(), unique.len());
+                for d in chrome.iter().chain(edge.iter()) {
+                    prop_assert!(unique.contains(&d.chrome_id));
+                }
+                for d in &chrome {
+                    let m = merged.iter().find(|m| m.chrome_id == d.chrome_id).unwrap();
+                    prop_assert_eq!(m.browser, Browser::Chrome);
+                }
+            }
+        }
 
         /// `a.b.c_n` 形式（数値セグメントのみ）のバージョンフォルダ名。
         fn バージョン名() -> impl Strategy<Value = String> {

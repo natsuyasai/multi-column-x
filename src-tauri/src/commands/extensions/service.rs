@@ -13,7 +13,7 @@ use std::sync::OnceLock;
 use tauri::{AppHandle, Manager};
 use tokio::sync::{Mutex, MutexGuard};
 
-use super::chrome::{chrome_extensions_root_from_env, DetectedExtension};
+use super::chrome::{browser_roots_from_env, DetectedExtension};
 use super::executor::{apply_actions_with, ProfileOps};
 use super::manifest::{read_manifest_info, ManifestInfo};
 use super::model::{ExtensionEntry, ExtensionSource, ExtensionsState};
@@ -115,6 +115,7 @@ pub fn add_chrome_entry(
         source: ExtensionSource::Chrome {
             chrome_id: detected.chrome_id.clone(),
             profile: detected.profile.clone(),
+            browser: detected.browser,
         },
         enabled: true,
         has_popup: detected.has_popup,
@@ -226,17 +227,12 @@ pub async fn resolve_all(
     entries: &[ExtensionEntry],
 ) -> Result<HashMap<String, ResolvedEntry>, String> {
     let copy_root = copy_root(app)?;
-    let chrome_root = chrome_extensions_root_from_env();
+    let roots = browser_roots_from_env();
     let entries = entries.to_vec();
     tokio::task::spawn_blocking(move || {
         entries
             .iter()
-            .map(|e| {
-                (
-                    e.id.clone(),
-                    resolve_entry(e, chrome_root.as_deref(), &copy_root),
-                )
-            })
+            .map(|e| (e.id.clone(), resolve_entry(e, &roots, &copy_root)))
             .collect()
     })
     .await
@@ -538,7 +534,7 @@ mod tests {
 
     use tempfile::TempDir;
 
-    use super::super::model::{AppliedExtension, ProfileSync};
+    use super::super::model::{AppliedExtension, Browser, ProfileSync};
     use super::super::reconcile_plan::InstalledExt;
     use super::*;
 
@@ -563,6 +559,7 @@ mod tests {
             has_popup: false,
             has_options: true,
             added: false,
+            browser: Browser::Chrome,
         }
     }
 
@@ -787,6 +784,25 @@ mod tests {
     }
 
     #[test]
+    fn edge由来の拡張機能を追加するとedgeのブラウザ情報が保存される() {
+        let mut state = ExtensionsState::default();
+        let detected = DetectedExtension {
+            browser: Browser::Edge,
+            ..検出結果()
+        };
+        let added = add_chrome_entry(&mut state, &detected, "id-e".to_string()).unwrap();
+        assert_eq!(
+            added.source,
+            ExtensionSource::Chrome {
+                chrome_id: CHROME_ID.to_string(),
+                profile: "Default".to_string(),
+                browser: Browser::Edge
+            }
+        );
+        assert_eq!(state.entries[0].source, added.source);
+    }
+
+    #[test]
     fn 候補から選んだ拡張機能が全アカウントに追加される() {
         let mut state = ExtensionsState::default();
         let added = add_chrome_entry(&mut state, &検出結果(), "id-c".to_string()).unwrap();
@@ -794,7 +810,8 @@ mod tests {
             added.source,
             ExtensionSource::Chrome {
                 chrome_id: CHROME_ID.to_string(),
-                profile: "Default".to_string()
+                profile: "Default".to_string(),
+                browser: Browser::Chrome
             }
         );
         assert!(added.enabled && !added.has_popup && added.has_options);
