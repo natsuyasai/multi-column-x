@@ -3,4 +3,4 @@
 # （規約は facets/policies/mcx-dev-rules.md の「ブランチ・PR 運用」を参照）
 # 注: auto_fetch（クローン前の fetch）はグローバル専用キーのため ~/.takt/config.yaml 側で設定する
 base_branch: develop # クローン作成のベースブランチ（PR のベースも develop）
-auto_pr: true # worktree 実行後に PR を自動作成
+auto_pr: false # PR 作成は workflow の ship step が行う（mcx-default）
