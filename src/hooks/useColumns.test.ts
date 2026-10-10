@@ -179,6 +179,7 @@ describe("useColumns mobile", () => {
         hideAdEnabled: false,
         apiRateLimitMonitorEnabled: true,
         columnScale: "default",
+        uiScale: "auto",
         useXAppForCompose: false,
         mobileSwipeAreaEnabled: true,
         mobileSwipeAreaHeight: 28,

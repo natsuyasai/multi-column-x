@@ -131,6 +131,21 @@ fn 復元してもハードウェアデコード設定とh264取得案内の拒�
 }
 
 #[test]
+fn 復元してもアプリuiの表示サイズは端末側の値が保たれる() {
+    let mut current = current_settings();
+    current.global_settings.ui_scale = "large".to_string();
+
+    let result = compute_new_settings(
+        &current,
+        payload(vec![column("n", "acc-1")], json!({ "uiScale": "small" })),
+    )
+    .unwrap();
+
+    let out = as_json(&result);
+    assert_eq!(out["globalSettings"]["uiScale"], "large");
+}
+
+#[test]
 fn 復元ペイロードに2つの設定が無くても端末側の既定値のままである() {
     let result = compute_new_settings(
         &current_settings(),

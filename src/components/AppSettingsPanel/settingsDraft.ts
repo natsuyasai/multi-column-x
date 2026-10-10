@@ -1,4 +1,9 @@
-import type { ColumnScale, ColumnSettings, GlobalSettings } from "../../types";
+import type {
+  ColumnScale,
+  ColumnSettings,
+  GlobalSettings,
+  UiScale,
+} from "../../types";
 
 export const SWIPE_AREA_MIN_HEIGHT = 16;
 export const SWIPE_AREA_MAX_HEIGHT = 56;
@@ -32,6 +37,7 @@ export interface SettingsDraft {
   hideAdEnabled: boolean;
   apiRateLimitMonitorEnabled: boolean;
   columnScale: ColumnScale;
+  uiScale: UiScale;
   useXAppForCompose: boolean;
   mobileSwipeAreaEnabled: boolean;
   /** number入力欄への入力中文字列をそのまま保持するため string で持つ */
@@ -45,6 +51,7 @@ export interface SettingsDraft {
   globalRepostHiddenUserIdsText: string;
   /** 「表示サイズ」欄の変更を有効化するチェックボックスの状態（GlobalSettingsには保存しないフォーム専用フラグ） */
   columnScaleOverrideEnabled: boolean;
+  uiScaleOverrideEnabled: boolean;
   /** 「テーマ」欄の変更を有効化するチェックボックスの状態（同上） */
   themeOverrideEnabled: boolean;
 }
@@ -81,6 +88,7 @@ export function createSettingsDraft(settings: GlobalSettings): SettingsDraft {
     hideAdEnabled: settings.hideAdEnabled,
     apiRateLimitMonitorEnabled: settings.apiRateLimitMonitorEnabled ?? true,
     columnScale: settings.columnScale ?? "default",
+    uiScale: settings.uiScale ?? "auto",
     useXAppForCompose: settings.useXAppForCompose ?? false,
     mobileSwipeAreaEnabled: settings.mobileSwipeAreaEnabled,
     mobileSwipeAreaHeight: String(settings.mobileSwipeAreaHeight),
@@ -91,6 +99,7 @@ export function createSettingsDraft(settings: GlobalSettings): SettingsDraft {
       "\n",
     ),
     columnScaleOverrideEnabled: false,
+    uiScaleOverrideEnabled: false,
     themeOverrideEnabled: false,
   };
 }
@@ -141,6 +150,9 @@ export function toGlobalSettingsPatch(
   };
   if (draft.columnScaleOverrideEnabled) {
     patch.columnScale = draft.columnScale;
+  }
+  if (draft.uiScaleOverrideEnabled) {
+    patch.uiScale = draft.uiScale;
   }
   if (draft.themeOverrideEnabled) {
     patch.theme = draft.theme;

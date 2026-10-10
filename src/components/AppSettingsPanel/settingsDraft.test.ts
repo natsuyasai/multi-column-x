@@ -29,6 +29,7 @@ const baseGlobalSettings: GlobalSettings = {
   hideAdEnabled: true,
   apiRateLimitMonitorEnabled: true,
   columnScale: "default",
+  uiScale: "auto",
   useXAppForCompose: false,
   mobileSwipeAreaEnabled: true,
   mobileSwipeAreaHeight: 28,
@@ -103,6 +104,48 @@ describe("toGlobalSettingsPatch", () => {
       { ngWords: [], repostHiddenUserIds: [] },
     );
     expect(patch).not.toHaveProperty("h264DownloadPromptDismissed");
+  });
+
+  it("uiScaleOverrideEnabledがfalseのときはuiScaleを含まない", () => {
+    const draft = {
+      ...createSettingsDraft(baseGlobalSettings),
+      uiScale: "large" as const,
+    };
+    const patch = toGlobalSettingsPatch(draft, {
+      ngWords: [],
+      repostHiddenUserIds: [],
+    });
+    expect(patch).not.toHaveProperty("uiScale");
+  });
+
+  it("uiScaleOverrideEnabledがtrueのときはdraft.uiScaleを含みcolumnScaleは含まない", () => {
+    const draft = {
+      ...createSettingsDraft(baseGlobalSettings),
+      uiScaleOverrideEnabled: true,
+      uiScale: "xLarge" as const,
+    };
+    const patch = toGlobalSettingsPatch(draft, {
+      ngWords: [],
+      repostHiddenUserIds: [],
+    });
+    expect(patch).toHaveProperty("uiScale", "xLarge");
+    expect(patch).not.toHaveProperty("columnScale");
+  });
+
+  it("ドラフトの初期値は保存済みのuiScaleで上書きチェックはOFFである", () => {
+    const draft = createSettingsDraft({
+      ...baseGlobalSettings,
+      uiScale: "small",
+    });
+    expect(draft.uiScale).toBe("small");
+    expect(draft.uiScaleOverrideEnabled).toBe(false);
+  });
+
+  it("uiScaleが無い設定からドラフトを作るとautoになる", () => {
+    const { uiScale: _omitted, ...legacy } = baseGlobalSettings;
+    void _omitted;
+    const draft = createSettingsDraft(legacy as GlobalSettings);
+    expect(draft.uiScale).toBe("auto");
   });
 
   it("columnScaleOverrideEnabledがfalseのときはcolumnScaleを含まない", () => {

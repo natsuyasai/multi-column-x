@@ -7,6 +7,7 @@ export type PageType =
   | "external"
   | "compose";
 export type ColumnScale = "small" | "default" | "normal" | "large" | "xLarge";
+export type UiScale = "auto" | "small" | "standard" | "large" | "xLarge";
 
 export interface Account {
   id: string;
@@ -86,6 +87,8 @@ export interface GlobalSettings {
   hideAdEnabled: boolean;
   apiRateLimitMonitorEnabled: boolean;
   columnScale: ColumnScale;
+  /** アプリ自身のUIの表示サイズ（auto は端末の設定に追従） */
+  uiScale: UiScale;
   useXAppForCompose: boolean;
   mobileSwipeAreaEnabled: boolean;
   mobileSwipeAreaHeight: number;
@@ -224,6 +227,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   hideAdEnabled: true,
   apiRateLimitMonitorEnabled: true,
   columnScale: "default",
+  uiScale: "auto",
   useXAppForCompose: false,
   mobileSwipeAreaEnabled: true,
   mobileSwipeAreaHeight: 28,

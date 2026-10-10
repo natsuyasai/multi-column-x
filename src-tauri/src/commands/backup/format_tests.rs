@@ -350,6 +350,18 @@ fn 追加した2つの設定はバックアップに含まれない() {
 }
 
 #[test]
+fn アプリuiの表示サイズはバックアップに含まれない() {
+    let mut settings = sample_settings();
+    settings.global_settings.ui_scale = "xLarge".to_string();
+
+    let file = build_export(&settings, "1.0.0", "2026-01-01T00:00:00Z");
+    let out: Value = serde_json::to_value(&file).unwrap();
+
+    let global = out["globalSettings"].as_object().unwrap();
+    assert!(!global.contains_key("uiScale"));
+}
+
+#[test]
 fn エクスポートのglobalsettingsキーは既定値のキー集合から除外リストを引いたものと一致する() {
     let default_keys: std::collections::BTreeSet<String> =
         serde_json::to_value(GlobalSettingsData::default())
