@@ -14,6 +14,8 @@ const STORAGE_PATH_GUIDE_LINES = [
   "例: Chrome は %LOCALAPPDATA%\\Google\\Chrome\\User Data\\Default\\Extensions、Edge は %LOCALAPPDATA%\\Microsoft\\Edge\\User Data\\Default\\Extensions です。",
   "Chrome と Edge は「ブラウザから検出」で自動的に探します。Brave など他のブラウザは、上記の形式のバージョンフォルダを「フォルダを指定して追加」で指定してください。ユーザーデータの場所を変更している場合は、その場所の User Data\\Default\\Extensions 配下を指定してください。",
 ];
+export const UNSUPPORTED_NOTICE =
+  "拡張機能によっては正しく動作しないものがあります。特に、開いているページの内容を検出してツールバーのボタンから操作する種類の拡張機能は、ポップアップを別ウィンドウで開く仕様のため、動作しない場合があります。";
 export const RELOAD_NOTICE =
   "追加・削除・有効無効を変更すると、全カラムが自動で再読込されます。";
 
@@ -192,6 +194,7 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
         <p className={styles.note} role="note">
           {TRUST_NOTICE}
         </p>
+        <p className={styles.note}>{UNSUPPORTED_NOTICE}</p>
         <p className={styles.note}>{RELOAD_NOTICE}</p>
         <div className={styles.buttonRow}>
           <button

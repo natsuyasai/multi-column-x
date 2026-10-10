@@ -7,6 +7,7 @@ import {
   BROWSER_NOT_FOUND_NOTICE,
   ExtensionsTab,
   MISSING_BADGE_TEXT,
+  UNSUPPORTED_NOTICE,
 } from "@/components/AppSettingsPanel/ExtensionsTab";
 import type { DetectResult, ExtensionEntry } from "@/types";
 
@@ -60,6 +61,12 @@ describe("ExtensionsTab", () => {
         "追加した拡張機能は、すべてのアカウントの X ページを読み書きできる場合があります。信頼できるものだけを追加してください。",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("一部の拡張機能が正しく動作しない場合がある旨の注意が表示される", () => {
+    setup();
+
+    expect(screen.getByText(UNSUPPORTED_NOTICE)).toBeInTheDocument();
   });
 
   it("展開済みの拡張機能フォルダを指定すると全アカウントに追加される", async () => {
