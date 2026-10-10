@@ -1,6 +1,6 @@
 //! 拡張機能の同期計画（reconcile）の純粋ロジック（OS 非依存・I/O 注入）。
 //! WebView2 の呼び出しは一切含めず、「何を Add / Remove / SetEnabled すべきか」だけを決める。
-// `prune_profiles` は全アカウントの data_directory 一覧が必要なため、まだ呼び出し元が無い。
+// 一部の関数は Windows 限定の経路からだけ呼ばれるため、他 OS では未使用になる。
 #![allow(dead_code)]
 
 use std::collections::{HashMap, HashSet};

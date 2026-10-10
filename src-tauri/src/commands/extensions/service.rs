@@ -18,8 +18,8 @@ use super::executor::{apply_actions_with, ProfileOps};
 use super::manifest::{read_manifest_info, ManifestInfo};
 use super::model::{ExtensionEntry, ExtensionSource, ExtensionsState};
 use super::reconcile_plan::{
-    apply_add_result, apply_remove_result, plan_profile, profile_for_mut, refresh_metadata,
-    refresh_missing, resolve_entry, ResolvedEntry,
+    apply_add_result, apply_remove_result, plan_profile, profile_for_mut, prune_profiles,
+    refresh_metadata, refresh_missing, resolve_entry, ResolvedEntry,
 };
 use super::sanitize::remove_sanitized_copy;
 use super::store;
@@ -59,6 +59,18 @@ pub async fn modify_state<T>(
 // 状態操作（純粋関数）
 // ---------------------------------------------------------------------------
 
+/// 2 つのフォルダパスを同一視してよいか（区切り文字・末尾区切り・大文字小文字の違いを無視）。
+/// Windows のパスは大文字小文字を区別しないため、OS に依らず常に同じ基準で比べる。
+pub fn is_same_folder_path(a: &str, b: &str) -> bool {
+    fn normalize(path: &str) -> String {
+        strip_verbatim_prefix(path)
+            .replace('/', "\\")
+            .trim_end_matches('\\')
+            .to_lowercase()
+    }
+    normalize(a) == normalize(b)
+}
+
 /// フォルダ指定の拡張機能を追加する。同じパスが既にあればエラー。
 pub fn add_folder_entry(
     state: &mut ExtensionsState,
@@ -66,6 +78,12 @@ pub fn add_folder_entry(
     path: String,
     new_id: String,
 ) -> Result<ExtensionEntry, String> {
+    let already = state.entries.iter().any(|e| {
+        matches!(&e.source, ExtensionSource::Folder { path: existing } if is_same_folder_path(existing, &path))
+    });
+    if already {
+        return Err(ALREADY_ADDED_MESSAGE.to_string());
+    }
     let entry = ExtensionEntry {
         id: new_id,
         name: info.name,
@@ -238,6 +256,32 @@ pub async fn list_refreshed(app: &AppHandle) -> Result<Vec<ExtensionEntry>, Stri
 // reconcile
 // ---------------------------------------------------------------------------
 
+/// 全アカウントの data_directory が取れたときだけ、存在しないアカウントの `ProfileSync` を掃除する。
+/// `None`（アカウント一覧が取れない）のときは何も消さない。
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn prune_state_profiles(state: &mut ExtensionsState, account_dirs: Option<&HashSet<String>>) {
+    if let Some(dirs) = account_dirs {
+        prune_profiles(&mut state.profiles, dirs);
+    }
+}
+
+/// 稼働中プロファイルのうち、アカウントの data_directory だけに絞る
+/// （external カラムなどアカウント非依存の保存先には拡張機能を同期しない）。
+/// アカウント一覧が取れないときは絞り込まない。
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn retain_account_targets(
+    targets: Vec<(String, String)>,
+    account_dirs: Option<&HashSet<String>>,
+) -> Vec<(String, String)> {
+    match account_dirs {
+        Some(dirs) => targets
+            .into_iter()
+            .filter(|(dir, _)| dirs.contains(dir))
+            .collect(),
+        None => targets,
+    }
+}
+
 /// 1 プロファイル分の reconcile。状態の `ProfileSync` を更新し、WebView2 側が変化したかを返す。
 /// 一部の操作だけ失敗した場合はログに残して `Ok(changed)` を返し、
 /// 何も変化せずエラーだけだった場合は `Err`（連結したメッセージ）を返す。
@@ -290,6 +334,9 @@ pub async fn reconcile_webview(
 
     let result =
         reconcile_profile(&WebviewOps(webview), &mut state, &resolved, data_directory).await;
+    // 削除済みアカウントの適用記録を掃除する（アカウント一覧が取れなければ掃除しない）。
+    let account_dirs = crate::commands::settings_store::load_account_data_directories(app);
+    prune_state_profiles(&mut state, account_dirs.as_ref());
     // 途中で失敗しても、適用できた分の記録は残す。
     if state != original {
         store::save(app, &state)?;
@@ -310,7 +357,8 @@ pub async fn reconcile_webview(
 /// 個別プロファイルの失敗はログに残して続行する（次回の reconcile で再試行される）。
 #[cfg(windows)]
 pub async fn reconcile_all_live(app: &AppHandle) -> Result<bool, String> {
-    let targets = live_profile_targets(app);
+    let account_dirs = crate::commands::settings_store::load_account_data_directories(app);
+    let targets = retain_account_targets(live_profile_targets(app), account_dirs.as_ref());
     let mut changed = false;
     for (data_directory, label) in targets {
         let Some(webview) = app.get_webview(&label) else {
@@ -517,6 +565,69 @@ mod tests {
     }
 
     // ---- 追加 ----
+
+    #[test]
+    fn アカウント一覧が取れないときはプロファイルを掃除しない() {
+        let profile = |d: &str| ProfileSync {
+            data_directory: d.to_string(),
+            ..Default::default()
+        };
+        let mut state = ExtensionsState {
+            profiles: vec![profile("/d/a"), profile("/d/gone")],
+            ..Default::default()
+        };
+        prune_state_profiles(&mut state, None);
+        assert_eq!(state.profiles.len(), 2);
+
+        let dirs: HashSet<String> = ["/d/a".to_string()].into();
+        prune_state_profiles(&mut state, Some(&dirs));
+        assert_eq!(state.profiles, vec![profile("/d/a")]);
+    }
+
+    #[test]
+    fn 同期対象はアカウントのdatadirectoryだけに絞られる() {
+        let targets = vec![
+            ("/d/a".to_string(), "column-1".to_string()),
+            ("/d/external".to_string(), "column-2".to_string()),
+        ];
+        let dirs: HashSet<String> = ["/d/a".to_string()].into();
+        assert_eq!(
+            retain_account_targets(targets.clone(), Some(&dirs)),
+            vec![("/d/a".to_string(), "column-1".to_string())]
+        );
+        assert_eq!(retain_account_targets(targets.clone(), None), targets);
+    }
+
+    #[test]
+    fn 大文字小文字や区切り文字が違うだけのフォルダパスは同一視される() {
+        assert!(is_same_folder_path(r"C:\Ext\A", r"c:\ext\a"));
+        assert!(is_same_folder_path(r"C:\ext\a\", r"C:\ext\a"));
+        assert!(is_same_folder_path("C:/ext/a", r"C:\ext\a"));
+        assert!(is_same_folder_path(r"\\?\C:\ext\a", r"C:\ext\a"));
+        assert!(!is_same_folder_path(r"C:\ext\a", r"C:\ext\b"));
+        assert!(!is_same_folder_path(r"C:\ext\a", r"C:\ext\a2"));
+    }
+
+    #[test]
+    fn 同じフォルダを二重に追加するとすでに追加されていますエラーになる() {
+        let mut state = ExtensionsState::default();
+        add_folder_entry(
+            &mut state,
+            情報("拡張"),
+            r"C:\Ext\A".to_string(),
+            "id-1".to_string(),
+        )
+        .unwrap();
+        let err = add_folder_entry(
+            &mut state,
+            情報("拡張"),
+            r"c:\ext\a".to_string(),
+            "id-2".to_string(),
+        )
+        .unwrap_err();
+        assert_eq!(err, ALREADY_ADDED_MESSAGE);
+        assert_eq!(state.entries.len(), 1);
+    }
 
     #[test]
     fn 展開済みの拡張機能フォルダを指定すると全アカウントに追加される() {

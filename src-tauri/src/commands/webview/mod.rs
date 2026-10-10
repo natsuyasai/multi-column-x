@@ -514,4 +514,80 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn アカウントのdatadirectoryを使う全builderにwindows限定の拡張機能フラグが付いている() {
+        // column.rs の Linux 側 WebviewWindowBuilder は対象外（子 WebView の builder のみ）。
+        let sources = [
+            (
+                "column.rs",
+                include_str!("column.rs"),
+                "WebviewBuilder::new",
+            ),
+            (
+                "popup.rs",
+                include_str!("popup.rs"),
+                "WebviewWindowBuilder::new",
+            ),
+            (
+                "compose.rs",
+                include_str!("compose.rs"),
+                "WebviewWindowBuilder::new",
+            ),
+        ];
+        for (name, source, builder_marker) in sources {
+            let code = production_code(source);
+            let builders = code.matches(builder_marker).count();
+            let lines: Vec<&str> = code.lines().map(str::trim).collect();
+            let flags: Vec<usize> = lines
+                .iter()
+                .enumerate()
+                .filter(|(_, l)| **l == "let builder = builder.browser_extensions_enabled(true);")
+                .map(|(i, _)| i)
+                .collect();
+            assert!(builders > 0, "{name}: builder が見つからない");
+            assert_eq!(
+                builders,
+                flags.len(),
+                "{name}: builder の数と拡張機能フラグの数が一致しない"
+            );
+            for i in flags {
+                assert_eq!(
+                    lines[i - 1],
+                    "#[cfg(windows)]",
+                    "{name}: 拡張機能フラグが Windows 限定になっていない"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn カラム作成のwindows経路で拡張機能を同期し変更があったときだけ再読込する() {
+        let code = production_code(include_str!("column.rs"));
+        let desktop_fn = code
+            .split("pub async fn create_column_webview")
+            .nth(1)
+            .and_then(|rest| rest.split("#[cfg(mobile)]").next())
+            .expect("デスクトップ版 create_column_webview が見つからない");
+        let sync_start = desktop_fn
+            .find("reconcile_webview(")
+            .expect("reconcile_webview の呼び出しが無い");
+        let before = &desktop_fn[..sync_start];
+        let register = before
+            .rfind("registry.register(")
+            .expect("レジストリ登録が無い");
+        let guard = before
+            .rfind("#[cfg(windows)]")
+            .expect("cfg(windows) が無い");
+        assert!(
+            guard > register,
+            "reconcile 呼び出しがレジストリ登録の後で cfg(windows) に守られていない"
+        );
+        assert!(desktop_fn.contains("tauri::async_runtime::spawn"));
+        let after = &desktop_fn[sync_start..];
+        let ok_true = after.find("Ok(true)").expect("Ok(true) 分岐が無い");
+        let reload = after.find(".reload()").expect("再読込が無い");
+        assert!(ok_true < reload);
+        assert!(after.contains("Ok(false) => {}"));
+    }
 }
