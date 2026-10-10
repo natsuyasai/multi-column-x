@@ -1,13 +1,17 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect } from "vitest";
 import { OFFSCREEN } from "../constants/ipc";
 import type { Column } from "../types";
 import {
   calculateGridBounds,
-  MOBILE_TAB_BAR_HEIGHT,
+  getHeaderHeight,
+  getMobileTabBarHeight,
+  getScrollbarHeight,
+  getTopBarHeight,
   MOBILE_TWO_COLUMN_MIN_WIDTH,
   mobileColumnLayout,
   resolveSwipeAreaHeight,
 } from "./gridLayout";
+import { setRootFontPx } from "./uiScale";
 
 const baseSettings = {
   autoReloadEnabled: true,
@@ -150,9 +154,38 @@ describe("calculateGridBounds", () => {
   });
 });
 
-describe("MOBILE_TAB_BAR_HEIGHT", () => {
-  it("56 px で定義されている", () => {
-    expect(MOBILE_TAB_BAR_HEIGHT).toBe(56);
+describe("レイアウト高さ（rem 定数を px 化する関数）", () => {
+  afterEach(() => {
+    setRootFontPx(16);
+  });
+
+  it("倍率1.0（root 16px）では従来の px 値と一致する", () => {
+    expect(getHeaderHeight()).toBe(36);
+    expect(getScrollbarHeight()).toBe(12);
+    expect(getMobileTabBarHeight()).toBe(56);
+    expect(getTopBarHeight(false)).toBe(32);
+    expect(getTopBarHeight(true)).toBe(64);
+  });
+
+  it("倍率1.25（root 20px）では全ての高さが1.25倍になる", () => {
+    setRootFontPx(20);
+    expect(getHeaderHeight()).toBe(45);
+    expect(getScrollbarHeight()).toBe(15);
+    expect(getMobileTabBarHeight()).toBe(70);
+    expect(getTopBarHeight(false)).toBe(40);
+    expect(getTopBarHeight(true)).toBe(80);
+  });
+
+  it("倍率1.25のときモバイルのカラム高さはタブバー高さ（70px）を引いた値になる", () => {
+    setRootFontPx(20);
+    const layout = mobileColumnLayout({
+      columns: [makeCol({ id: "a", gridCol: 0, gridRow: 0 })],
+      activeColumnId: "a",
+      twoColumnEnabled: false,
+      viewportWidth: 400,
+      viewportHeight: 800,
+    });
+    expect(layout.a.height).toBe(730);
   });
 });
 

@@ -47,7 +47,7 @@ import {
   useWebviewScrollRelay,
 } from "./hooks/useWebviewEvents";
 import { useWhatsNew } from "./hooks/useWhatsNew";
-import { HEADER_HEIGHT, getTopBarHeight } from "./lib/gridLayout";
+import { getHeaderHeight, getTopBarHeight } from "./lib/gridLayout";
 import { evalInColumn } from "./services/columnWebview";
 import { useAppStore } from "./store/useAppStore";
 
@@ -414,7 +414,7 @@ const App: React.FC = () => {
               className={styles.columnHeaderWrapper}
               style={{
                 left: bounds.x,
-                top: bounds.y - HEADER_HEIGHT - topBarHeight,
+                top: bounds.y - getHeaderHeight() - topBarHeight,
                 width: bounds.width,
               }}
             >

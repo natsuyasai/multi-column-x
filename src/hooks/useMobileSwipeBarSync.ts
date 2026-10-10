@@ -4,7 +4,7 @@
 // 返す syncMobileSwipeBar を呼び出す形で行うため、ここには含めない。
 import { useCallback, useEffect, useRef } from "react";
 import {
-  MOBILE_TAB_BAR_HEIGHT,
+  getMobileTabBarHeight,
   resolveSwipeAreaHeight,
 } from "@/lib/gridLayout";
 import { logError } from "@/lib/log";
@@ -42,7 +42,7 @@ export function useMobileSwipeBarSync({
       globalSettings.mobileSwipeAreaEnabled &&
       globalSettings.mobileSwipeAreaOpacity > 0 &&
       !anyDialogOpen;
-    const y = window.innerHeight - MOBILE_TAB_BAR_HEIGHT - swipeAreaHeight;
+    const y = window.innerHeight - getMobileTabBarHeight() - swipeAreaHeight;
     updateMobileSwipeBar(
       visible,
       y,

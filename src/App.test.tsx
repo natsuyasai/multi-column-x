@@ -11,7 +11,7 @@ import {
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import App from "./App";
 import { WEBVIEW_SCRIPTS } from "./constants/ipc";
-import { HEADER_HEIGHT, getTopBarHeight } from "./lib/gridLayout";
+import { getHeaderHeight, getTopBarHeight } from "./lib/gridLayout";
 import { useAppStore } from "./store/useAppStore";
 import type { Column, GlobalSettings } from "./types";
 import { DEFAULT_GLOBAL_SETTINGS, DEFAULT_COLUMN_SETTINGS } from "./types";
@@ -196,7 +196,7 @@ describe("App (desktop)", () => {
 
     fireEvent.click(screen.getByTitle("ツールバーを展開 (Ctrl+B)"));
 
-    const expectedY = getTopBarHeight(true) + HEADER_HEIGHT;
+    const expectedY = getTopBarHeight(true) + getHeaderHeight();
     await waitFor(
       () => {
         const resizeCalls = mockInvoke.mock.calls.filter(
@@ -225,7 +225,7 @@ describe("App (desktop)", () => {
 
     fireEvent.click(screen.getByTitle("ツールバーを折りたたむ (Ctrl+B)"));
 
-    const expectedY = getTopBarHeight(false) + HEADER_HEIGHT;
+    const expectedY = getTopBarHeight(false) + getHeaderHeight();
     await waitFor(
       () => {
         const resizeCalls = mockInvoke.mock.calls.filter(
@@ -254,7 +254,7 @@ describe("App (desktop)", () => {
 
     fireEvent.keyDown(window, { key: "b", ctrlKey: true });
 
-    const expectedY = getTopBarHeight(true) + HEADER_HEIGHT;
+    const expectedY = getTopBarHeight(true) + getHeaderHeight();
     await waitFor(
       () => {
         const resizeCalls = mockInvoke.mock.calls.filter(
@@ -298,7 +298,7 @@ describe("App (desktop)", () => {
     const resizeCallsDuringDialog = mockInvoke.mock.calls.filter(
       (c) => c[0] === "resize_column_webview",
     );
-    const expectedExpandedY = getTopBarHeight(true) + HEADER_HEIGHT;
+    const expectedExpandedY = getTopBarHeight(true) + getHeaderHeight();
     expect(
       resizeCallsDuringDialog.some(
         (c) => (c[1] as any).bounds?.y === expectedExpandedY,

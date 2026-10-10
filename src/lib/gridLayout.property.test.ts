@@ -4,7 +4,7 @@ import { OFFSCREEN } from "../constants/ipc";
 import type { Column } from "../types";
 import {
   calculateGridBounds,
-  MOBILE_TAB_BAR_HEIGHT,
+  getMobileTabBarHeight,
   MOBILE_TWO_COLUMN_MIN_WIDTH,
   mobileColumnLayout,
 } from "./gridLayout";
@@ -204,11 +204,11 @@ describe("mobileColumnLayout プロパティ", () => {
     );
   });
 
-  it("全カラムのheightは同一で、viewportHeight - MOBILE_TAB_BAR_HEIGHTと一致する", () => {
+  it("全カラムのheightは同一で、viewportHeight - getMobileTabBarHeight()と一致する", () => {
     fc.assert(
       fc.property(mobileScenarioArb, (input) => {
         const result = mobileColumnLayout(input);
-        const expectedHeight = input.viewportHeight - MOBILE_TAB_BAR_HEIGHT;
+        const expectedHeight = input.viewportHeight - getMobileTabBarHeight();
         for (const b of Object.values(result)) {
           expect(b.height).toBe(expectedHeight);
         }

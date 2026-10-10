@@ -4,11 +4,12 @@ import { platform } from "@tauri-apps/plugin-os";
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { IPC_COMMANDS } from "../constants/ipc";
+import { setRootFontPx } from "../lib/uiScale";
 import { resolveColumnDataDirectory } from "../services/externalColumn";
 import { useAppStore } from "../store/useAppStore";
 import type { Account, Column } from "../types";
 import { DEFAULT_COLUMN_SETTINGS, DEFAULT_GLOBAL_SETTINGS } from "../types";
-import { useDesktopColumns } from "./useDesktopColumns";
+import { desktopGridBounds, useDesktopColumns } from "./useDesktopColumns";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -416,5 +417,34 @@ describe("useDesktopColumns（Linux: メインウィンドウ移動監視）", (
     });
 
     expect(unlistenFn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("desktopGridBounds（UI倍率の反映）", () => {
+  afterEach(() => {
+    setRootFontPx(16);
+  });
+
+  const viewport = {
+    containerHeight: 800,
+    scrollLeft: 0,
+    topBarHeight: 32,
+  };
+
+  it("倍率1.0ではヘッダー高さ36pxぶん下げた位置にカラムが配置される", () => {
+    const bounds = desktopGridBounds(
+      [makeColumn({ id: "c1", gridCol: 1 })],
+      viewport,
+    );
+    expect(bounds.c1.y).toBe(32 + 36);
+  });
+
+  it("倍率1.25ではヘッダー高さ45pxぶん下げた位置にカラムが配置される", () => {
+    setRootFontPx(20);
+    const bounds = desktopGridBounds([makeColumn({ id: "c1", gridCol: 1 })], {
+      ...viewport,
+      topBarHeight: 40,
+    });
+    expect(bounds.c1.y).toBe(40 + 45);
   });
 });

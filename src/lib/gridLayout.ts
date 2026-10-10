@@ -2,15 +2,32 @@
 // カラムのグリッド配置に関する純粋な座標計算（Tauri 非依存）
 import { OFFSCREEN } from "../constants/ipc";
 import type { Column } from "../types";
+import { remToPx } from "./uiScale";
 
-export const HEADER_HEIGHT = 36; // ColumnHeader の高さ（px）
-export const SCROLLBAR_HEIGHT = 12; // 下部スクロールバーの高さ（px）
-export const MOBILE_TAB_BAR_HEIGHT = 56; // モバイルタブバーの高さ（px）
-export const TOPBAR_COLLAPSED_HEIGHT = 32; // TopBar 折りたたみ時の高さ（px）
-export const TOPBAR_EXPANDED_HEIGHT = 64; // TopBar 展開時の高さ（px、2行レイアウト）
+// レイアウト高さは rem 値で持つ（SCSS 側の同名寸法と同じ rem 値に保つこと）。
+// ネイティブ WebView の bounds へ渡す px は get*Height() が remToPx 経由で返す。
+export const HEADER_HEIGHT_REM = 2.25; // ColumnHeader の高さ
+export const SCROLLBAR_HEIGHT_REM = 0.75; // 下部スクロールバーの高さ
+export const MOBILE_TAB_BAR_HEIGHT_REM = 3.5; // モバイルタブバーの高さ
+export const TOPBAR_COLLAPSED_HEIGHT_REM = 2; // TopBar 折りたたみ時の高さ
+export const TOPBAR_EXPANDED_HEIGHT_REM = 4; // TopBar 展開時の高さ（2行レイアウト）
+
+export function getHeaderHeight(): number {
+  return remToPx(HEADER_HEIGHT_REM);
+}
+
+export function getScrollbarHeight(): number {
+  return remToPx(SCROLLBAR_HEIGHT_REM);
+}
+
+export function getMobileTabBarHeight(): number {
+  return remToPx(MOBILE_TAB_BAR_HEIGHT_REM);
+}
 
 export function getTopBarHeight(topBarExpanded: boolean): number {
-  return topBarExpanded ? TOPBAR_EXPANDED_HEIGHT : TOPBAR_COLLAPSED_HEIGHT;
+  return remToPx(
+    topBarExpanded ? TOPBAR_EXPANDED_HEIGHT_REM : TOPBAR_COLLAPSED_HEIGHT_REM,
+  );
 }
 
 export interface ColumnBounds {
@@ -153,7 +170,7 @@ export function mobileColumnLayout(
     viewportHeight,
   } = input;
 
-  const height = viewportHeight - MOBILE_TAB_BAR_HEIGHT;
+  const height = viewportHeight - getMobileTabBarHeight();
   const offscreenBounds = (): ColumnBounds => ({
     x: OFFSCREEN.MOBILE_X,
     y: 0,
