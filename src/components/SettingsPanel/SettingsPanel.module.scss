@@ -1,3 +1,5 @@
+@use "../../styles/dialog-fullscreen" as fs;
+
 .overlay {
   position: fixed;
   top: 0;
@@ -12,6 +14,8 @@
   padding: 1rem;
   box-sizing: border-box;
   overflow-y: auto;
+
+  @include fs.android-fullscreen-overlay;
 }
 
 .panel {
@@ -23,6 +27,8 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+
+  @include fs.android-fullscreen-panel;
 }
 
 .header {

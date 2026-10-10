@@ -1,3 +1,5 @@
+@use "../../styles/dialog-fullscreen" as fs;
+
 .overlay {
   position: fixed;
   top: 0;
@@ -12,6 +14,8 @@
   padding: 1rem;
   box-sizing: border-box;
   overflow-y: auto;
+
+  @include fs.android-fullscreen-overlay;
 }
 
 .panel {
@@ -23,6 +27,8 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+
+  @include fs.android-fullscreen-panel;
 }
 
 .header {
@@ -257,6 +263,7 @@
   gap: 0.5rem;
   padding: 1rem 1.25rem;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .cancelBtn {
@@ -293,6 +300,12 @@
   border-bottom: 1px solid var(--mcx-border-subtle);
   flex-shrink: 0;
   padding: 0 0.25rem;
+
+  // 大きな表示サイズでもタブが画面外へはみ出さないよう横スクロールにする
+  :global([data-platform="android"]) & {
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
 }
 
 .tab {
@@ -308,6 +321,13 @@
 
   &:hover {
     color: var(--mcx-text-tertiary);
+  }
+
+  // 横スクロールするタブ列内で潰れず折り返さない（overflow-y: hidden による下端の切れも避ける）
+  :global([data-platform="android"]) & {
+    flex-shrink: 0;
+    white-space: nowrap;
+    margin-bottom: 0;
   }
 }
 
