@@ -182,6 +182,33 @@ describe("App (desktop)", () => {
     });
   });
 
+  it("アプリUIの表示サイズを変更するとカラムの表示位置が新しい倍率のTopBarとヘッダーの直下に移動する", async () => {
+    useAppStore.setState({ columns: [column], topBarExpanded: false });
+    render(<App />);
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "create_column_webview",
+        expect.anything(),
+      );
+    });
+    // 復元完了（columnsRestored）の反映を待つ
+    await act(async () => {});
+    mockInvoke.mockClear();
+
+    act(() => {
+      useAppStore.getState().updateGlobalSettings({ uiScale: "xLarge" });
+    });
+
+    // xLarge は 20px 基準: TopBar 2rem(40px) + ヘッダー 2.25rem(45px)
+    await waitFor(() => {
+      const resizeCalls = mockInvoke.mock.calls.filter(
+        (c) => c[0] === "resize_column_webview",
+      );
+      expect(resizeCalls.length).toBeGreaterThan(0);
+      expect((resizeCalls[resizeCalls.length - 1][1] as any).bounds.y).toBe(85);
+    });
+  });
+
   it("TopBarを展開するとカラムの表示位置が待ち時間なしで展開後のTopBarの直下に移動する", async () => {
     useAppStore.setState({ columns: [column], topBarExpanded: false });
     render(<App />);
