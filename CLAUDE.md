@@ -79,6 +79,10 @@ Rust コードは `#[cfg(desktop)]` / `#[cfg(mobile)]` で分岐する。同一�
 
 Tauri v2 の子 WebView は OS ネイティブウィンドウのため、CSS `z-index` が機能しない。`src/App.tsx` を変更する場合の詳細は `docs/development/column-layout-notes.md` を参照。
 
+### UI の寸法は rem で書く（アプリUI表示サイズ）
+
+アプリ UI の倍率は `<html>` の font-size で変えるため、UI の寸法は `rem` で書く（`px` 禁止。1px 以下のヘアラインと media query を除く）。ネイティブ bounds に使う高さ定数は `src/lib/gridLayout.ts` の rem 定数 + `remToPx` を使い、SCSS の同値と一致させる（`gridLayout.contract.test.ts` が検証する）。詳細は `docs/development/ui-scale-notes.md` を参照。
+
 ### serde のフィールド命名
 
 Tauri v2 は JS→Rust のケース変換を行わない。JS 側 camelCase フィールドには `#[serde(rename = "...")]` が必要。
