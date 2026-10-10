@@ -12,6 +12,7 @@
 - [topbar-column-reorder-notes.md](topbar-column-reorder-notes.md) — TopBar（desktop）のカラム並び替え（dnd-kit）のドラッグしきい値・click 抑制・Storybook play 上の注意
 - [backup-restore-notes.md](backup-restore-notes.md) — バックアップ／リストア（ファイル形式、ホワイトリスト出力、アカウント紐づけ、復元手順、退避、Android SAF、xUserId 取得）。手動テスト項目は [backup-restore/integration-test.md](backup-restore/integration-test.md)
 - [settings-file-crash-safety-notes.md](settings-file-crash-safety-notes.md) — settings.json のアトミック書き込み、起動時の検査と復旧、`.prev` 世代、読み込み失敗時の保存ガード
+- [browser-extensions-notes.md](browser-extensions-notes.md) — ブラウザ拡張機能（Windows のみ）：永続化（`browserExtensions` キー）、reconcile、WebView2 の PoC で確認した事実、不採用案、落とし穴、macOS / Linux を見送った調査結果
 
 ## リファレンス（旧 README から移設）
 

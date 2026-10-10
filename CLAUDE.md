@@ -133,6 +133,10 @@ X内部APIのレート制限ヘッダをツールバーのポップオーバー�
 
 `src-tauri/src/commands/backup/`、`src/lib/backupRestore.ts`、`src/services/backup.ts`、`src/hooks/useBackupFlow.ts`、`src/components/AppSettingsPanel/BackupTab.tsx`、`MainActivity.kt` の `startBackupExport` / `startBackupImport` / `detectXUserId` を変更する場合は `docs/development/backup-restore-notes.md` を参照。出力は `BackupGlobalSettings` のホワイトリスト（`GlobalSettingsData` に項目を足すとキー集合テストが失敗し、取捨の判断を強制する）。復元は `apply_restore`（退避 → 置換 → `save_store_atomically` 1 回）で、復元中は `restoreInProgress` が自動保存・自動更新・アカウント追加／再認証を止める。手動テスト項目は `docs/development/backup-restore/integration-test.md`。
 
+### ブラウザ拡張機能（Windows のみ）
+
+Windows の WebView2 に Chrome 拡張を読み込む機能。`src-tauri/src/commands/extensions/`、`src/components/AppSettingsPanel/ExtensionsTab.tsx`、`src/lib/extensionsSupport.ts`、`commands/webview/{column,compose,popup}.rs` を変更する場合は `docs/development/browser-extensions-notes.md` を参照（macOS / Linux を見送った理由もそこ）。**アカウントの data_directory を使う全 WebView builder に `#[cfg(windows)]` で `.browser_extensions_enabled(true)` が必須**（食い違うと `ERROR_INVALID_STATE`。契約テストが検査する）。コマンドの追加・削除は `build.rs` / `default.json` / `lib.rs` の `generate_handler!` の 3 点同時更新（上節の ACL）で、`column-webview.json` には足さない。状態は `settings.json` の `browserExtensions` キー（`appSettings` とは別。バックアップ対象外）に持ち、保存は `save_store_atomically` を使う。
+
 ### フロントエンドの品質ツール（ESLint / Storybook / プロパティテスト）
 
 - **ESLint**（flat config: `eslint.config.js`）はフロント `src` の TS/TSX のみを対象にする。`import-x/order` で import 順を統一し、`@/` は internal グループ。`npm run lint` / 自動整列は `npm run lint:fix`。

@@ -78,6 +78,7 @@ multi-column-x/
         ├── video/                    # 動画ダウンロード（hls.rs=HLS/m3u8 処理, http.rs=HTTP I/O）
         ├── commands/
         │   ├── backup/               # バックアップ／リストア（format / restore / snapshot / file_io と Tauri コマンド）
+        │   ├── extensions/           # ブラウザ拡張機能（Windows のみ。model / store / manifest / chrome / sanitize / reconcile_plan / executor / hresult / service と WebView2 ブリッジ webview2.rs）
         │   ├── settings.rs           # 設定の保存・読み込み（tauri-plugin-store）
         │   ├── settings_store.rs     # Rust 側の設定読み出しヘルパー（store 直接参照）
         │   ├── webview/
