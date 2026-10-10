@@ -1,5 +1,7 @@
 import React, { useState, useRef } from "react";
 import { isAutoReloadSupported } from "@/lib/autoReloadTarget";
+import ChevronLeftIcon from "../../assets/icons/chevron-left.svg?react";
+import ChevronRightIcon from "../../assets/icons/chevron-right.svg?react";
 import LinkIcon from "../../assets/icons/link.svg?react";
 import PencilIcon from "../../assets/icons/pencil.svg?react";
 import PersonIcon from "../../assets/icons/person.svg?react";
@@ -245,7 +247,19 @@ export const MobileTabBar: React.FC<Props> = ({
           onClick={() => setExpanded((prev) => !prev)}
           title="メニュー表示の切り替え"
         >
-          {expanded ? "»" : "«"}
+          {expanded ? (
+            <ChevronRightIcon
+              width={18}
+              height={18}
+              data-testid="icon-chevron-right"
+            />
+          ) : (
+            <ChevronLeftIcon
+              width={18}
+              height={18}
+              data-testid="icon-chevron-left"
+            />
+          )}
         </button>
         {expanded && (
           <div className={styles.actions}>
