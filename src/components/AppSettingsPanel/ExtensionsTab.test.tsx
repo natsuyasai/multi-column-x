@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ACCOUNT_REQUIRED_TITLE,
   ADDED_BADGE_TEXT,
-  CHROME_NOT_FOUND_NOTICE,
+  BROWSER_NOT_FOUND_NOTICE,
   ExtensionsTab,
   MISSING_BADGE_TEXT,
 } from "@/components/AppSettingsPanel/ExtensionsTab";
@@ -33,7 +33,7 @@ function setup(overrides: Partial<Props> = {}, initial: ExtensionEntry[] = []) {
     onExtensionsChanged: vi.fn(),
     listExtensions: vi.fn(async () => current),
     detectChromeExtensions: vi.fn(
-      async (): Promise<DetectResult> => ({ chromeFound: true, items: [] }),
+      async (): Promise<DetectResult> => ({ browserFound: true, items: [] }),
     ),
     pickFolder: vi.fn(async () => "C:\\ext\\new"),
     addFromFolder: vi.fn(async () => {
@@ -107,14 +107,15 @@ describe("ExtensionsTab", () => {
     expect(screen.queryByText("新しい拡張")).not.toBeInTheDocument();
   });
 
-  it("Chromeにインストール済みの拡張機能が候補として一覧表示される", async () => {
+  it("ChromeまたはEdgeにインストール済みの拡張機能が候補として一覧表示される", async () => {
     const { user } = setup({
       detectChromeExtensions: vi.fn(async () => ({
-        chromeFound: true,
+        browserFound: true,
         items: [
           {
             chromeId: "aaa",
             profile: "Default",
+            browser: "chrome" as const,
             name: "候補1",
             path: "C:\\chrome\\aaa",
             hasPopup: true,
@@ -124,6 +125,7 @@ describe("ExtensionsTab", () => {
           {
             chromeId: "bbb",
             profile: "Default",
+            browser: "chrome" as const,
             name: "候補2",
             path: "C:\\chrome\\bbb",
             hasPopup: false,
@@ -134,20 +136,21 @@ describe("ExtensionsTab", () => {
       })),
     });
 
-    await user.click(screen.getByRole("button", { name: "Chrome から検出" }));
+    await user.click(screen.getByRole("button", { name: "ブラウザから検出" }));
 
     expect(await screen.findByText("候補1")).toBeInTheDocument();
     expect(screen.getByText("候補2")).toBeInTheDocument();
   });
 
-  it("Chromeが見つからないときは検出できない旨が表示される", async () => {
+  it("ChromeもEdgeも見つからないときは検出できない旨が表示される", async () => {
     const { user } = setup({
       detectChromeExtensions: vi.fn(async () => ({
-        chromeFound: false,
+        browserFound: false,
         items: [
           {
             chromeId: "aaa",
             profile: "Default",
+            browser: "chrome" as const,
             name: "出てはいけない候補",
             path: "p",
             hasPopup: false,
@@ -158,22 +161,114 @@ describe("ExtensionsTab", () => {
       })),
     });
 
-    await user.click(screen.getByRole("button", { name: "Chrome から検出" }));
+    await user.click(screen.getByRole("button", { name: "ブラウザから検出" }));
 
     expect(
-      await screen.findByText(CHROME_NOT_FOUND_NOTICE),
+      await screen.findByText(BROWSER_NOT_FOUND_NOTICE),
     ).toBeInTheDocument();
     expect(screen.queryByText("出てはいけない候補")).not.toBeInTheDocument();
+  });
+
+  it("検出ボタンで検出した候補にプロファイルとともに由来ブラウザ名が表示される", async () => {
+    const { user } = setup({
+      detectChromeExtensions: vi.fn(
+        async (): Promise<DetectResult> => ({
+          browserFound: true,
+          items: [
+            {
+              chromeId: "aaa",
+              profile: "Default",
+              browser: "edge",
+              name: "Edge候補",
+              path: "p",
+              hasPopup: false,
+              hasOptions: false,
+              added: false,
+            },
+            {
+              chromeId: "bbb",
+              profile: "Default",
+              browser: "chrome",
+              name: "Chrome候補",
+              path: "p",
+              hasPopup: false,
+              hasOptions: false,
+              added: false,
+            },
+          ],
+        }),
+      ),
+    });
+
+    await user.click(screen.getByRole("button", { name: "ブラウザから検出" }));
+
+    const edgeRow = (await screen.findByText("Edge候補")).closest("li");
+    const chromeRow = screen.getByText("Chrome候補").closest("li");
+    expect(edgeRow).toHaveTextContent("Edge");
+    expect(edgeRow).toHaveTextContent("Default");
+    expect(edgeRow).not.toHaveTextContent("Chrome");
+    expect(chromeRow).toHaveTextContent("Chrome");
+    expect(chromeRow).toHaveTextContent("Default");
+    expect(chromeRow).not.toHaveTextContent("Edge");
+  });
+
+  it("Edge由来で追加済みの拡張機能は取得元にEdgeと表示される", async () => {
+    setup({}, [
+      entry({
+        source: {
+          kind: "chrome",
+          chromeId: "aaa",
+          profile: "Default",
+          browser: "edge",
+        },
+      }),
+    ]);
+
+    expect(
+      await screen.findByText("Edge（プロファイル: Default）"),
+    ).toBeInTheDocument();
+  });
+
+  it("ブラウザ未指定の旧データで追加済みの拡張機能は取得元にChromeと表示される", async () => {
+    setup({}, [
+      entry({
+        source: { kind: "chrome", chromeId: "aaa", profile: "Default" },
+      }),
+    ]);
+
+    expect(
+      await screen.findByText("Chrome（プロファイル: Default）"),
+    ).toBeInTheDocument();
+  });
+
+  it("追加セクションにユーザーデータの保存先パスの案内が表示される", () => {
+    setup();
+
+    const text = document.body.textContent ?? "";
+    expect(text).toContain(
+      "%LOCALAPPDATA%\\{組織名}\\{ブラウザ名}\\User Data\\Default\\Extensions\\<拡張ID>\\<バージョン>",
+    );
+    expect(text).toContain("組織名のフォルダが無いブラウザもあります");
+    expect(text).toContain(
+      "%LOCALAPPDATA%\\Google\\Chrome\\User Data\\Default\\Extensions",
+    );
+    expect(text).toContain(
+      "%LOCALAPPDATA%\\Microsoft\\Edge\\User Data\\Default\\Extensions",
+    );
+    expect(text).toContain("Brave など他のブラウザ");
+    expect(text).toContain("「フォルダを指定して追加」で指定してください");
+    expect(text).toContain("ユーザーデータの場所を変更している場合");
   });
 
   it("候補から選んだ拡張機能が全アカウントに追加される", async () => {
     const { props, user } = setup({
       detectChromeExtensions: vi.fn(async () => ({
-        chromeFound: true,
+        browserFound: true,
         items: [
           {
             chromeId: "aaa",
             profile: "Default",
+            browser: "chrome" as const,
             name: "候補1",
             path: "p",
             hasPopup: false,
@@ -183,7 +278,7 @@ describe("ExtensionsTab", () => {
         ],
       })),
     });
-    await user.click(screen.getByRole("button", { name: "Chrome から検出" }));
+    await user.click(screen.getByRole("button", { name: "ブラウザから検出" }));
 
     await user.click(
       await screen.findByRole("button", { name: "候補1 を追加" }),
@@ -197,11 +292,12 @@ describe("ExtensionsTab", () => {
   it("すでに追加済みの拡張機能は候補に追加済みとして表示される", async () => {
     const { user } = setup({
       detectChromeExtensions: vi.fn(async () => ({
-        chromeFound: true,
+        browserFound: true,
         items: [
           {
             chromeId: "aaa",
             profile: "Default",
+            browser: "chrome" as const,
             name: "候補1",
             path: "p",
             hasPopup: false,
@@ -212,7 +308,7 @@ describe("ExtensionsTab", () => {
       })),
     });
 
-    await user.click(screen.getByRole("button", { name: "Chrome から検出" }));
+    await user.click(screen.getByRole("button", { name: "ブラウザから検出" }));
 
     expect(await screen.findByText(ADDED_BADGE_TEXT)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "候補1 を追加" })).toBeDisabled();

@@ -1,14 +1,19 @@
 import React, { useCallback, useEffect, useState } from "react";
 import type { ExtensionPageKind } from "@/services/extensions";
-import type { DetectResult, ExtensionEntry } from "@/types";
+import type { DetectResult, ExtensionBrowser, ExtensionEntry } from "@/types";
 import styles from "./ExtensionsTab.module.scss";
 
 export const ACCOUNT_REQUIRED_TITLE = "アカウントを選択してください";
-export const CHROME_NOT_FOUND_NOTICE = "Chrome が見つかりません";
+export const BROWSER_NOT_FOUND_NOTICE = "Chrome / Edge が見つかりません";
 export const MISSING_BADGE_TEXT = "見つかりません";
 export const ADDED_BADGE_TEXT = "追加済み";
 export const TRUST_NOTICE =
   "追加した拡張機能は、すべてのアカウントの X ページを読み書きできる場合があります。信頼できるものだけを追加してください。";
+const STORAGE_PATH_GUIDE_LINES = [
+  "Chromium 系ブラウザの拡張機能は、通常 %LOCALAPPDATA%\\{組織名}\\{ブラウザ名}\\User Data\\Default\\Extensions\\<拡張ID>\\<バージョン> にあります（組織名のフォルダが無いブラウザもあります）。",
+  "例: Chrome は %LOCALAPPDATA%\\Google\\Chrome\\User Data\\Default\\Extensions、Edge は %LOCALAPPDATA%\\Microsoft\\Edge\\User Data\\Default\\Extensions です。",
+  "Chrome と Edge は「ブラウザから検出」で自動的に探します。Brave など他のブラウザは、上記の形式のバージョンフォルダを「フォルダを指定して追加」で指定してください。ユーザーデータの場所を変更している場合は、その場所の User Data\\Default\\Extensions 配下を指定してください。",
+];
 export const RELOAD_NOTICE =
   "追加・削除・有効無効を変更すると、全カラムが自動で再読込されます。";
 
@@ -40,10 +45,15 @@ function toMessage(error: unknown): string {
   return String(error);
 }
 
+const BROWSER_LABELS: Record<ExtensionBrowser, string> = {
+  chrome: "Chrome",
+  edge: "Edge",
+};
+
 function describeSource(entry: ExtensionEntry): string {
-  return entry.source.kind === "folder"
-    ? entry.source.path
-    : `Chrome（プロファイル: ${entry.source.profile}）`;
+  if (entry.source.kind === "folder") return entry.source.path;
+  const label = BROWSER_LABELS[entry.source.browser ?? "chrome"];
+  return `${label}（プロファイル: ${entry.source.profile}）`;
 }
 
 export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
@@ -169,9 +179,16 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>拡張機能を追加</h3>
         <p className={styles.note}>
-          展開済みの拡張機能フォルダを指定するか、Chrome
+          展開済みの拡張機能フォルダを指定するか、Chrome / Edge
           にインストール済みの拡張機能から選んで、全アカウントに追加します。
         </p>
+        <div className={styles.guide}>
+          {STORAGE_PATH_GUIDE_LINES.map((line) => (
+            <p key={line} className={styles.note}>
+              {line}
+            </p>
+          ))}
+        </div>
         <p className={styles.note} role="note">
           {TRUST_NOTICE}
         </p>
@@ -183,9 +200,9 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
             onClick={() => void handleDetect()}
             disabled={busy}
             aria-busy={busyKey === DETECT_KEY}
-            aria-label="Chrome から検出"
+            aria-label="ブラウザから検出"
           >
-            Chrome から検出
+            ブラウザから検出
           </button>
           <button
             type="button"
@@ -203,13 +220,13 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
             {error}
           </p>
         )}
-        {detected && !detected.chromeFound && (
+        {detected && !detected.browserFound && (
           <p role="status" className={`${styles.message} ${styles.warning}`}>
-            {CHROME_NOT_FOUND_NOTICE}
+            {BROWSER_NOT_FOUND_NOTICE}
           </p>
         )}
-        {detected?.chromeFound && (
-          <ul className={styles.list} aria-label="Chrome の拡張機能の候補">
+        {detected?.browserFound && (
+          <ul className={styles.list} aria-label="ブラウザの拡張機能の候補">
             {detected.items.length === 0 && (
               <li className={styles.note}>候補はありません</li>
             )}
@@ -217,7 +234,7 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
               <li key={item.chromeId} className={styles.row}>
                 <span className={styles.name}>{item.name}</span>
                 <span className={styles.meta}>
-                  プロファイル: {item.profile}
+                  {`ブラウザ: ${BROWSER_LABELS[item.browser]}・プロファイル: ${item.profile}`}
                 </span>
                 {item.added && (
                   <span className={styles.badge}>{ADDED_BADGE_TEXT}</span>

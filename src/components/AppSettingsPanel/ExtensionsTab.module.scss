@@ -28,6 +28,14 @@
   margin: 0;
 }
 
+.guide {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .summary {
   font-size: 0.875rem;
   font-weight: 600;
