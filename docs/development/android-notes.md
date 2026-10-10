@@ -130,6 +130,14 @@ adb shell am start -n com.natsuyasai.multicolumnx/.MainActivity
 - `adb shell run-as <pkg> sh -c '...'` は、複数コマンドを一度に文字列連結して渡す場合、シェル呼び出しの引数分割でクォートが失われ空白を含むパス（`Service Worker` 等）が壊れることがある。**コマンド全体を1つのダブルクォート文字列として `adb shell` に渡す**（`adb shell "run-as pkg sh -c '...'"`）と正しく解釈される。
 - **既知の制約（今回の検証では自動確認不可）**: 実際の Google アカウントクラウドバックアップおよび実機間 D2D（Quick Switch / ケーブル移行）が `BackupAgent.onFullBackup()` を同一経路で通るかは、ローカルトランスポートでの検証だけでは完全には裏付けられていない（Android バージョンにより挙動差の可能性が残る）。`fullBackupOnly` 修正後の検証は100MBダミーファイル・空マーカーファイルによる合成データのみで行っており、**実際にログイン済みの複数アカウントを持つ状態でのバックアップ→復元ラウンドトリップは未実施**（メカニズム自体は `Cookies` DBも除外対象外の通常ファイルとして同じ経路で扱われるため理論上は問題ないはずだが、実データでの確認ではない）。リリース前に実機2台での端末移行フローを手動確認する際、この実データラウンドトリップ確認も併せて実施すること。
 
+## 複数カラム表示（列数設定）
+
+- 実装: `src/lib/gridLayout.ts` の `mobileColumnLayout` / `clampMobileColumnCount`、`src/hooks/useMobileColumns.ts` の `mobileLayoutForViewport`。
+- 有効列数 = `min(設定値, floor(幅dp / 300), 登録数)`。設定値は 2〜6 にクランプ。幅 600dp 未満は常に 1 列。
+- 数値の決定: 1 列あたり最小幅 300dp、列数の上限 6、600dp 未満は 1 列（従来の 2 カラム表示の下限 `MOBILE_TWO_COLUMN_MIN_WIDTH` を維持）は Issue #218 の仕様検討で決めた値。変更する場合は `gridLayout.ts` の定数と本節を合わせて更新する。
+- 窓の規則: アクティブ位置から連続 N 列を表示。末尾付近では窓が左へずれ、最後のカラムが右端に来る。n=2 は従来の固定 2 カラム配置と一致する（回帰させないこと）。
+- 設定変更の反映: 設定を購読せず、設定パネルを閉じたときの `recalculateAllBounds` → `setActiveColumn` 経由で再配置される（ストア更新 → ダイアログを閉じる、の順序に依存）。
+
 ## デバッグビルドでは検出できない不具合
 
 - デバッグビルドは R8（難読化・最適化）が無効なため、ProGuard keep ルール漏れなどの不具合はリリースビルドでしか再現しない。Android 実機確認が必要なタスク（JNI 呼び出し・ProGuard 絡みの変更）は、必ずリリースビルドで最終確認すること。
