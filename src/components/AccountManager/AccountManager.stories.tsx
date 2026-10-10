@@ -210,7 +210,7 @@ export const AndroidHeaderFixedBodyScrolls: Story = {
     ),
   ],
   play: async ({ canvasElement }) => {
-    const restoreViewport = await narrowViewport(360, 400);
+    const restoreViewport = await narrowViewport(360, 260);
     try {
       const canvas = within(canvasElement);
       const panel = queryPanel(canvasElement);
@@ -262,6 +262,51 @@ export const AndroidHeaderDoesNotOverlapBody: Story = {
       await expect(
         firstBody.getBoundingClientRect().top,
       ).toBeGreaterThanOrEqual(header.getBoundingClientRect().bottom);
+    } finally {
+      await restoreViewport();
+    }
+  },
+};
+
+export const NarrowTwoRowItems: Story = {
+  name: "狭い幅や大きな表示サイズでもアカウント行が横にはみ出さず名前と星が1段目にボタンが2段目に並ぶ",
+  decorators: [
+    (Story) => (
+      <AndroidRoot fontSize="24px">
+        <Story />
+      </AndroidRoot>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const restoreViewport = await narrowViewport(360, 700);
+    try {
+      const canvas = within(canvasElement);
+      const panel = queryPanel(canvasElement);
+      const name = canvas.getAllByText(accounts[0].label)[0];
+      const item = name.closest('[class*="item"]') as HTMLElement;
+      const star = item.querySelector(
+        '[data-testid^="icon-star"]',
+      ) as HTMLElement;
+      const editBtn = canvas.getAllByRole("button", { name: /を編集/ })[0];
+      const removeBtn = canvas.getAllByRole("button", { name: /を削除/ })[0];
+
+      // 1段目: 名前と星が同じ高さ、2段目: ボタンはその下
+      await expect(
+        Math.abs(
+          name.getBoundingClientRect().top - star.getBoundingClientRect().top,
+        ),
+      ).toBeLessThan(name.getBoundingClientRect().height);
+      await expect(editBtn.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+        name.getBoundingClientRect().bottom,
+      );
+      // 横にはみ出さない
+      await expect(panel.scrollWidth).toBeLessThanOrEqual(panel.clientWidth);
+      await expect(removeBtn.getBoundingClientRect().right).toBeLessThanOrEqual(
+        item.getBoundingClientRect().right,
+      );
+      await expect(star.getBoundingClientRect().right).toBeLessThanOrEqual(
+        item.getBoundingClientRect().right,
+      );
     } finally {
       await restoreViewport();
     }
