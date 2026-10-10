@@ -18,6 +18,7 @@ jobs:
       - run: npx prettier --check .
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm run docs:build
       - run: npm run build:inject
       - run: npm test
       # Storybook の play function は vitest ブラウザモード(chromium)で実行するため

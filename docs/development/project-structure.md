@@ -143,6 +143,22 @@ src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/
 └── WebViewProfiles.kt               # WebView Profile API のサポート判定・適用
 ```
 
+## ユーザーガイドサイト（docs/.vitepress）
+
+`docs/USER_GUIDE.md` と `docs/images/` を VitePress で GitHub Pages に公開する。
+
+```
+docs/
+├── .vitepress/config.mts   # サイト設定（base・日本語UI・日本語検索トークナイザ・srcExclude）
+├── USER_GUIDE.md           # トップページ（rewrites で index.md として配信）
+├── images/                 # ガイドのスクリーンショット
+└── development/ 等         # 開発者向け資料。srcExclude で公開対象外
+```
+
+- 公開範囲は `USER_GUIDE.md` と画像のみ。`development/` `specs/` `superpowers/` は `srcExclude` で除外している
+- `npm run docs:build` はデッドリンクがあると失敗する（CI の `frontend` ジョブでも実行）。生成物 `docs/.vitepress/dist` / `cache` は git・prettier の対象外
+- デプロイは `.github/workflows/pages.yml`（`main` への push で `docs/**` 等が変わったとき、または手動実行）
+
 ## 設定画面（AppSettingsPanel）の一般タブ構成
 
 一般タブは `SettingsGroup`（`h2` 見出し + 子要素）で次の 6 グループに分かれる。順序は上から下。
