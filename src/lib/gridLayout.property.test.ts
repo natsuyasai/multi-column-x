@@ -136,6 +136,169 @@ const mobileTwoColumnScenarioArb = ordersArb
     });
   });
 
+// --- N列対応の mobileColumnLayout 用 arbitrary ---
+
+// 列数設定は範囲外（負数・0・上限超過）も含めて広く生成する
+const wideColumnCountArb = fc.integer({ min: 0, max: 10 });
+
+const mobileMultiScenarioArb = ordersArb.chain((orders) => {
+  const columns = toMobileColumns(orders);
+  return fc.record({
+    columns: fc.constant(columns),
+    activeColumnId: activeColumnIdArb(columns),
+    twoColumnEnabled: fc.boolean(),
+    columnCount: wideColumnCountArb,
+    viewportWidth: fc.integer({ min: 0, max: 2000 }),
+    viewportHeight: fc.integer({ min: 0, max: 2000 }),
+  });
+});
+
+// activeColumnId が必ず columns に存在するシナリオ
+const mobileMultiExistingActiveArb = ordersArb
+  .filter((orders) => orders.length > 0)
+  .chain((orders) => {
+    const columns = toMobileColumns(orders);
+    return fc.record({
+      columns: fc.constant(columns),
+      activeColumnId: fc.constantFrom(...columns.map((c) => c.id)),
+      twoColumnEnabled: fc.boolean(),
+      columnCount: wideColumnCountArb,
+      viewportWidth: fc.integer({ min: 0, max: 2000 }),
+      viewportHeight: fc.integer({ min: 0, max: 2000 }),
+    });
+  });
+
+type MultiInput = {
+  columns: MobileColumnSpec[];
+  columnCount: number;
+  twoColumnEnabled: boolean;
+  viewportWidth: number;
+};
+
+/** 仕様上の上限列数: 設定値(2〜6に丸め)・1列300dp・登録数の最小値 */
+function expectedMaxColumns(input: MultiInput): number {
+  const clamped = Math.min(6, Math.max(2, input.columnCount));
+  return Math.min(
+    clamped,
+    Math.floor(input.viewportWidth / 300),
+    input.columns.length,
+  );
+}
+
+function visibleSorted(
+  input: MultiInput,
+  result: ReturnType<typeof mobileColumnLayout>,
+) {
+  return input.columns
+    .map((c) => ({ c, b: result[c.id] }))
+    .filter(({ b }) => b.x >= 0)
+    .sort((a, b) => a.b.x - b.b.x);
+}
+
+describe("mobileColumnLayout 列数設定 プロパティ", () => {
+  it("表示カラム数は設定列数・幅/300・登録数の最小値以下で、複数列条件を満たさなければちょうど1になる", () => {
+    fc.assert(
+      fc.property(mobileMultiExistingActiveArb, (input) => {
+        const result = mobileColumnLayout(input);
+        const count = visibleSorted(input, result).length;
+        const max = expectedMaxColumns(input);
+        const multi =
+          input.twoColumnEnabled && input.viewportWidth >= 600 && max >= 2;
+        if (multi) {
+          expect(count).toBeGreaterThanOrEqual(2);
+          expect(count).toBeLessThanOrEqual(max);
+        } else {
+          expect(count).toBe(1);
+        }
+      }),
+    );
+  });
+
+  it("表示カラムはx昇順に隙間なく連続し、先頭のxは0で幅の合計はviewportWidthと一致する", () => {
+    fc.assert(
+      fc.property(mobileMultiExistingActiveArb, (input) => {
+        const result = mobileColumnLayout(input);
+        const shown = visibleSorted(input, result);
+        expect(shown[0].b.x).toBe(0);
+        for (let i = 1; i < shown.length; i++) {
+          expect(shown[i].b.x).toBe(shown[i - 1].b.x + shown[i - 1].b.width);
+        }
+        const total = shown.reduce((sum, s) => sum + s.b.width, 0);
+        expect(total).toBe(input.viewportWidth);
+      }),
+    );
+  });
+
+  it("アクティブカラムは列数設定に関わらず常に表示される", () => {
+    fc.assert(
+      fc.property(mobileMultiExistingActiveArb, (input) => {
+        const result = mobileColumnLayout(input);
+        expect(result[input.activeColumnId].x).toBeGreaterThanOrEqual(0);
+      }),
+    );
+  });
+
+  it("表示カラムはorderソート順で連続した窓になる", () => {
+    fc.assert(
+      fc.property(mobileMultiExistingActiveArb, (input) => {
+        const result = mobileColumnLayout(input);
+        const sorted = [...input.columns].sort((a, b) => a.order - b.order);
+        const positions = input.columns
+          .filter((c) => result[c.id].x >= 0)
+          .map((c) => sorted.findIndex((s) => s.id === c.id))
+          .sort((a, b) => a - b);
+        for (let i = 1; i < positions.length; i++) {
+          expect(positions[i]).toBe(positions[i - 1] + 1);
+        }
+      }),
+    );
+  });
+
+  it("activeColumnIdがnullなら列数設定に関わらず全カラムが非表示になる", () => {
+    fc.assert(
+      fc.property(mobileMultiScenarioArb, (scenario) => {
+        const result = mobileColumnLayout({
+          ...scenario,
+          activeColumnId: null,
+        });
+        for (const b of Object.values(result)) {
+          expect(b.x).toBe(OFFSCREEN.MOBILE_X);
+        }
+      }),
+    );
+  });
+
+  it("列数2のとき、従来の2カラム配置（左=幅の半分切り捨て・右=残り・末尾アクティブは左隣とペア）と一致する", () => {
+    fc.assert(
+      fc.property(mobileTwoColumnScenarioArb, (input) => {
+        const result = mobileColumnLayout({
+          ...input,
+          columnCount: 2,
+          twoColumnEnabled: true,
+        });
+        const sorted = [...input.columns].sort((a, b) => a.order - b.order);
+        const activeIdx = sorted.findIndex(
+          (c) => c.id === input.activeColumnId,
+        );
+        const leftIdx = Math.min(activeIdx, sorted.length - 2);
+        const leftWidth = Math.floor(input.viewportWidth / 2);
+        for (let i = 0; i < sorted.length; i++) {
+          const b = result[sorted[i].id];
+          if (i === leftIdx) {
+            expect(b.x).toBe(0);
+            expect(b.width).toBe(leftWidth);
+          } else if (i === leftIdx + 1) {
+            expect(b.x).toBe(leftWidth);
+            expect(b.width).toBe(input.viewportWidth - leftWidth);
+          } else {
+            expect(b.x).toBe(OFFSCREEN.MOBILE_X);
+          }
+        }
+      }),
+    );
+  });
+});
+
 describe("mobileColumnLayout プロパティ", () => {
   it("表示カラム数（x>=0のカラム数）は0・1・2のいずれかになる", () => {
     fc.assert(
