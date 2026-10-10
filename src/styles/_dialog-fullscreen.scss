@@ -27,3 +27,18 @@
     padding-bottom: calc(#{$padding} + env(safe-area-inset-bottom, 0px));
   }
 }
+
+// panel 全体がスクロールする構造のダイアログ用: ヘッダー要素を上端に固定する。
+// panel の padding（$padding + セーフエリア）は負マージンで打ち消してヘッダー自身の padding に移し、
+// 固定時に上端やノッチの下へ本文が透けないようにする。$padding は panel の上下左右 padding と同じ値を渡す。
+@mixin android-fullscreen-sticky-header($padding: 0) {
+  :global([data-platform="android"]) & {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--mcx-surface);
+    margin: calc(-1 * (#{$padding} + env(safe-area-inset-top, 0px)))
+      calc(-1 * #{$padding}) 0;
+    padding: calc(#{$padding} + env(safe-area-inset-top, 0px)) $padding 0.5rem;
+  }
+}
