@@ -46,7 +46,7 @@ pub(super) fn create_compose_window(
     const COMPOSE_WIDTH: f64 = 600.0;
     const COMPOSE_WINDOW_HEIGHT: f64 = 580.0; // コンテンツ 540px + ツールバー 40px
 
-    let mut builder = tauri::WebviewWindowBuilder::new(
+    let builder = tauri::WebviewWindowBuilder::new(
         app,
         &compose_label,
         WebviewUrl::External(parse_url(COMPOSE_URL)?),
@@ -56,6 +56,9 @@ pub(super) fn create_compose_window(
     .initialization_script(&popup_init)
     .on_new_window(external_link::new_window_handler(app.clone()))
     .data_directory(data_dir);
+    #[cfg(windows)]
+    let builder = builder.browser_extensions_enabled(true);
+    let mut builder = builder;
 
     if let Some(window) = app.get_window(labels::MAIN) {
         if let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) {
@@ -210,16 +213,17 @@ pub async fn open_compose_window(
     #[cfg(not(target_os = "android"))]
     {
         let data_dir = std::path::PathBuf::from(&dataDirectory);
-        tauri::WebviewWindowBuilder::new(
+        let builder = tauri::WebviewWindowBuilder::new(
             &app,
             &compose_label,
             WebviewUrl::External(parse_url("https://x.com/compose/post")?),
         )
         .initialization_script(&popup_init)
         .on_new_window(external_link::new_window_handler(app.clone()))
-        .data_directory(data_dir)
-        .build()
-        .map_err(|e| e.to_string())?;
+        .data_directory(data_dir);
+        #[cfg(windows)]
+        let builder = builder.browser_extensions_enabled(true);
+        builder.build().map_err(|e| e.to_string())?;
         Ok(())
     }
 }

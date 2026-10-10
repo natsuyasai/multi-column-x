@@ -57,6 +57,9 @@ pub mod labels {
     pub const COMPOSE_PREFIX: &str = "compose-";
     /// アカウント追加ウィンドウラベルプレフィックス（例: "add-account-<uuid8>"）
     pub const ADD_ACCOUNT_PREFIX: &str = "add-account-";
+    /// 拡張機能のポップアップ / オプションページ用ウィンドウのラベルプレフィックス（例: "extension-<uuid8>"）。
+    /// capability の `windows` には含めない（リモートコンテンツに IPC を与えない）。
+    pub const EXTENSION_PREFIX: &str = "extension-";
 }
 
 /// inject スクリプトが参照する window グローバル変数名

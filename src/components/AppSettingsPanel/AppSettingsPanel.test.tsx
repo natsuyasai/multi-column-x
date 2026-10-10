@@ -7,8 +7,26 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import * as extensionsService from "@/services/extensions";
 import type { GlobalSettings, Column, Account } from "../../types";
 import { AppSettingsPanel } from "./AppSettingsPanel";
+
+const mockPlatform = vi.hoisted(() => vi.fn(() => "windows"));
+
+vi.mock("@tauri-apps/plugin-os", () => ({
+  platform: mockPlatform,
+}));
+
+vi.mock("@/services/extensions", () => ({
+  listExtensions: vi.fn(async () => []),
+  detectChromeExtensions: vi.fn(),
+  pickExtensionFolder: vi.fn(),
+  addExtensionFromFolder: vi.fn(),
+  addChromeExtension: vi.fn(),
+  setExtensionEnabled: vi.fn(),
+  removeExtension: vi.fn(),
+  openExtensionPage: vi.fn(),
+}));
 
 const mockStoreState = {
   isMobile: false,
@@ -118,6 +136,8 @@ const defaultProps = {
   onReloadAllWebviews: vi.fn(),
   onLoadPreset: vi.fn().mockResolvedValue(undefined),
   onReplaceColumnsAndRecreate: vi.fn().mockResolvedValue(undefined),
+  onExtensionsChanged: vi.fn(),
+  extensionPageAccountId: "acc-1" as string | null,
   appVersion: "0.1.1",
   updateChecking: false,
   updateManualResult: "idle" as const,
@@ -130,6 +150,7 @@ const defaultProps = {
 
 beforeEach(() => {
   mockStoreState.isMobile = false;
+  mockPlatform.mockReturnValue("windows");
 });
 
 describe("AppSettingsPanel", () => {
@@ -1658,5 +1679,60 @@ describe("AppSettingsPanel 一般タブのグループ構成", () => {
         videoPopupEnabled: false,
       }),
     );
+  });
+});
+
+describe("AppSettingsPanel 拡張機能タブ", () => {
+  it("Windowsでは設定画面に拡張機能の管理が表示される", async () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "拡張機能" }));
+
+    expect(
+      await screen.findByRole("button", { name: "フォルダを指定して追加" }),
+    ).toBeInTheDocument();
+    expect(extensionsService.listExtensions).toHaveBeenCalled();
+  });
+
+  it.each([
+    ["Linux", "linux", false],
+    ["macOS", "macos", false],
+    ["Android（モバイル）", "android", true],
+    ["Windowsのモバイル扱い", "windows", true],
+  ])(
+    "Windows以外とモバイルでは拡張機能の管理が表示されない（%s）",
+    (_name, platformName, isMobile) => {
+      mockPlatform.mockReturnValue(platformName);
+      mockStoreState.isMobile = isMobile;
+
+      render(<AppSettingsPanel {...defaultProps} />);
+
+      expect(
+        screen.queryByRole("button", { name: "拡張機能" }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it("拡張機能タブの変更成功がonExtensionsChangedで通知される", async () => {
+    const onExtensionsChanged = vi.fn();
+    vi.mocked(extensionsService.pickExtensionFolder).mockResolvedValue(
+      "C:/ext",
+    );
+    vi.mocked(extensionsService.addExtensionFromFolder).mockResolvedValue(
+      {} as never,
+    );
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        onExtensionsChanged={onExtensionsChanged}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "拡張機能" }));
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "フォルダを指定して追加" }),
+    );
+
+    await waitFor(() => expect(onExtensionsChanged).toHaveBeenCalledTimes(1));
   });
 });

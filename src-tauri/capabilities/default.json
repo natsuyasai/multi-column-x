@@ -33,6 +33,14 @@
     "allow-open-compose-window",
     "allow-install-apk-update",
     "allow-check-media-codec-support",
-    "allow-download-and-enable-h264"
+    "allow-download-and-enable-h264",
+    "allow-list-extensions",
+    "allow-detect-chrome-extensions",
+    "allow-pick-extension-folder",
+    "allow-add-extension-from-folder",
+    "allow-add-chrome-extension",
+    "allow-set-extension-enabled",
+    "allow-remove-extension",
+    "allow-open-extension-page"
   ]
 }

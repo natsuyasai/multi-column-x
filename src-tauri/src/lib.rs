@@ -272,6 +272,14 @@ pub fn run() {
             commands::openh264_fetch::download_and_enable_h264,
             #[cfg(desktop)]
             commands::video_download::download_video,
+            commands::extensions::list_extensions,
+            commands::extensions::detect_chrome_extensions,
+            commands::extensions::pick_extension_folder,
+            commands::extensions::add_extension_from_folder,
+            commands::extensions::add_chrome_extension,
+            commands::extensions::set_extension_enabled,
+            commands::extensions::remove_extension,
+            commands::extensions::open_extension_page,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

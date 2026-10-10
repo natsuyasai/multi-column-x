@@ -185,6 +185,8 @@ const meta: Meta<typeof AppSettingsPanel> = {
     onReloadAllWebviews: fn(),
     onLoadPreset: fn().mockResolvedValue(undefined),
     onReplaceColumnsAndRecreate: fn().mockResolvedValue(undefined),
+    onExtensionsChanged: fn(),
+    extensionPageAccountId: "acc-1",
     onCheckUpdate: fn(),
     onOpenOfficialSettings: fn(),
     onClose: fn(),

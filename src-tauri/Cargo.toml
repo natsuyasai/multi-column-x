@@ -58,6 +58,8 @@ bzip2 = "0.4"
 # と同一バージョンの webview2-com を直接参照する（型を一致させるためバージョンをピン留め）。
 [target.'cfg(windows)'.dependencies]
 webview2-com = "=0.38.2"
+# 拡張機能 API ブリッジ（HSTRING / Interface::cast / BOOL）用。webview2-com 0.38.2 と同一バージョン系。
+windows-core = "0.61"
 
 # 自動更新はデスクトップのみ。Android は APK 自己更新を別実装する。
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]

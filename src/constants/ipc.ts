@@ -69,6 +69,16 @@ export const IPC_COMMANDS = {
   // メディアコーデック（Linux）
   CHECK_MEDIA_CODEC_SUPPORT: "check_media_codec_support",
   DOWNLOAD_AND_ENABLE_H264: "download_and_enable_h264",
+
+  // ブラウザ拡張機能（Windows のみ）
+  LIST_EXTENSIONS: "list_extensions",
+  DETECT_CHROME_EXTENSIONS: "detect_chrome_extensions",
+  PICK_EXTENSION_FOLDER: "pick_extension_folder",
+  ADD_EXTENSION_FROM_FOLDER: "add_extension_from_folder",
+  ADD_CHROME_EXTENSION: "add_chrome_extension",
+  SET_EXTENSION_ENABLED: "set_extension_enabled",
+  REMOVE_EXTENSION: "remove_extension",
+  OPEN_EXTENSION_PAGE: "open_extension_page",
 } as const;
 
 /** Tauri イベント名 */

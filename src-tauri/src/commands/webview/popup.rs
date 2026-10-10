@@ -286,15 +286,20 @@ pub async fn open_popup_window(
     } = build_popup_init(&app, labels::POPUP_PREFIX, &current_account_id, &url);
     let (pos, size) = get_popup_bounds(&app);
 
-    tauri::WebviewWindowBuilder::new(&app, &popup_label, WebviewUrl::External(parse_url(&url)?))
-        .title("X - メディア")
-        .inner_size(size.width, size.height)
-        .position(pos.x, pos.y)
-        .initialization_script(&popup_init)
-        .on_new_window(external_link::new_window_handler(app.clone()))
-        .data_directory(data_dir)
-        .build()
-        .map_err(|e| e.to_string())?;
+    let builder = tauri::WebviewWindowBuilder::new(
+        &app,
+        &popup_label,
+        WebviewUrl::External(parse_url(&url)?),
+    )
+    .title("X - メディア")
+    .inner_size(size.width, size.height)
+    .position(pos.x, pos.y)
+    .initialization_script(&popup_init)
+    .on_new_window(external_link::new_window_handler(app.clone()))
+    .data_directory(data_dir);
+    #[cfg(windows)]
+    let builder = builder.browser_extensions_enabled(true);
+    builder.build().map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -341,16 +346,17 @@ pub async fn open_popup_window(
                 .map(PathBuf::from)
                 .unwrap_or_default()
         };
-        tauri::WebviewWindowBuilder::new(
+        let builder = tauri::WebviewWindowBuilder::new(
             &app,
             &popup_label,
             WebviewUrl::External(parse_url(&url)?),
         )
         .initialization_script(&popup_init)
         .on_new_window(external_link::new_window_handler(app.clone()))
-        .data_directory(data_dir)
-        .build()
-        .map_err(|e| e.to_string())?;
+        .data_directory(data_dir);
+        #[cfg(windows)]
+        let builder = builder.browser_extensions_enabled(true);
+        builder.build().map_err(|e| e.to_string())?;
         Ok(())
     }
 }
@@ -395,6 +401,8 @@ pub async fn open_link_popup_window(
     .initialization_script(&popup_init)
     .on_new_window(external_link::new_window_handler(app.clone()))
     .data_directory(data_dir);
+    #[cfg(windows)]
+    let builder = builder.browser_extensions_enabled(true);
 
     builder.build().map_err(|e| e.to_string())?;
     track_official_settings_popup_if_matches(&app, &popup_label, &url);
@@ -450,16 +458,17 @@ pub async fn open_link_popup_window(
                 popup_session_for_caller(&registry, label).0
             }
         };
-        tauri::WebviewWindowBuilder::new(
+        let builder = tauri::WebviewWindowBuilder::new(
             &app,
             &popup_label,
             WebviewUrl::External(parse_url(&url)?),
         )
         .initialization_script(&popup_init)
         .on_new_window(external_link::new_window_handler(app.clone()))
-        .data_directory(data_dir)
-        .build()
-        .map_err(|e| e.to_string())?;
+        .data_directory(data_dir);
+        #[cfg(windows)]
+        let builder = builder.browser_extensions_enabled(true);
+        builder.build().map_err(|e| e.to_string())?;
         track_official_settings_popup_if_matches(&app, &popup_label, &url);
         Ok(())
     }
@@ -600,12 +609,15 @@ async fn switch_popup_session_window(
 
     let data_dir = PathBuf::from(&data_dir_str);
 
-    let mut builder =
+    let builder =
         tauri::WebviewWindowBuilder::new(&app, &new_label, WebviewUrl::External(parse_url(&url)?))
             .title("X - メディア")
             .initialization_script(&popup_init)
             .on_new_window(external_link::new_window_handler(app.clone()))
             .data_directory(data_dir);
+    #[cfg(windows)]
+    let builder = builder.browser_extensions_enabled(true);
+    let mut builder = builder;
 
     if let (Some(p), Some(s)) = (pos, size) {
         let scale = app

@@ -288,16 +288,23 @@ pub async fn create_column_webview(
     }
 
     #[cfg(not(target_os = "linux"))]
-    let child_webview = window
-        .add_child(
-            WebviewBuilder::new(&label, WebviewUrl::External(parse_url(&url)?))
-                .initialization_script(&init_script)
-                .on_new_window(external_link::new_window_handler(app.clone()))
-                .data_directory(data_dir),
-            LogicalPosition::new(args.x, args.y),
-            LogicalSize::new(args.width, args.height),
-        )
-        .map_err(|e| e.to_string())?;
+    let child_webview = {
+        let builder = WebviewBuilder::new(&label, WebviewUrl::External(parse_url(&url)?))
+            .initialization_script(&init_script)
+            .on_new_window(external_link::new_window_handler(app.clone()))
+            .data_directory(data_dir);
+        // 同一 data_directory の WebView2 環境はフラグが食い違うと生成に失敗するため、
+        // アカウントの data_directory を使う全 builder で Windows 限定で有効にする。
+        #[cfg(windows)]
+        let builder = builder.browser_extensions_enabled(true);
+        window
+            .add_child(
+                builder,
+                LogicalPosition::new(args.x, args.y),
+                LogicalSize::new(args.width, args.height),
+            )
+            .map_err(|e| e.to_string())?
+    };
 
     // Windows: カラム WebView が OS フォーカスを得たら column-webview-focused を emit する。
     // TS 側はこれを listen して、フォーカスが当たったカラムの未読バッジを自動的に消す。
@@ -327,6 +334,35 @@ pub async fn create_column_webview(
         args.column.account_id.clone(),
         args.data_directory.clone(),
     );
+    drop(registry);
+
+    // Windows: 拡張機能をこのカラムのプロファイルへ同期する。カラム作成のレスポンスを遅らせないよう
+    // 別タスクで実行し、WebView2 側に Add / Remove があったときだけ再読込する。
+    // 同一 data_directory のカラムが同時に作られても、service 側の直列化 Mutex により
+    // 2 回目以降は差分ゼロで即終了する。external カラムはアカウントではないため同期しない。
+    #[cfg(windows)]
+    if args.column.page_type != "external" {
+        let sync_app = app.clone();
+        let sync_webview = child_webview.clone();
+        let sync_data_directory = args.data_directory.clone();
+        tauri::async_runtime::spawn(async move {
+            match crate::commands::extensions::service::reconcile_webview(
+                &sync_app,
+                &sync_webview,
+                &sync_data_directory,
+            )
+            .await
+            {
+                Ok(true) => {
+                    if let Err(e) = sync_webview.reload() {
+                        log::warn!("[extensions] カラムの再読込に失敗: {e}");
+                    }
+                }
+                Ok(false) => {}
+                Err(e) => log::warn!("[extensions] カラム作成時の同期に失敗: {e}"),
+            }
+        });
+    }
 
     Ok(())
 }
