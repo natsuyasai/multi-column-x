@@ -128,6 +128,13 @@ async function main() {
         await page.waitForTimeout(300);
       }
       await normalizePage(page);
+      if (t.scrollToHeading) {
+        await page
+          .getByRole("heading", { name: t.scrollToHeading })
+          .first()
+          .evaluate((el) => el.scrollIntoView({ block: "start" }));
+        await page.waitForTimeout(200);
+      }
       const path = join(outDir, `${t.file}.png`);
       const clip = await resolveClip(page, t.clip);
       await page.screenshot(clip ? { path, clip } : { path });

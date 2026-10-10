@@ -13,6 +13,7 @@ const MOBILE = { width: 390, height: 844 };
  *   theme?: "light" | "dark",
  *   clip?: "dialog" | { x: number, y: number, width: number, height: number },
  *   clickButtons?: string[],
+ *   scrollToHeading?: string,
  * }} Target
  */
 
@@ -104,6 +105,27 @@ export const targets = [
     clip: { x: 0, y: 0, width: 1280, height: 260 },
   },
   {
+    file: "extensions-tab",
+    storyId: "components-appsettingspanel-extensionstab--chrome-candidates",
+    viewport: DESKTOP,
+    theme: "light",
+    clip: { x: 0, y: 0, width: 1280, height: 515 },
+  },
+  {
+    file: "backup-tab",
+    storyId: "components-appsettingspanel-backuptab--default",
+    viewport: DESKTOP,
+    theme: "light",
+    clip: { x: 0, y: 0, width: 1280, height: 360 },
+  },
+  {
+    file: "backup-mapping",
+    storyId: "components-appsettingspanel-backuptab--mapping-auto-suggested",
+    viewport: DESKTOP,
+    theme: "light",
+    clip: { x: 0, y: 0, width: 1280, height: 290 },
+  },
+  {
     file: "link-popup-dialog",
     storyId: "components-linkpopupdialog--default",
     viewport: DESKTOP,
@@ -152,5 +174,13 @@ export const targets = [
     viewport: MOBILE,
     theme: "light",
     clip: { x: 0, y: 0, width: 390, height: 280 },
+  },
+  {
+    file: "android-app-settings-android",
+    storyId:
+      "components-appsettingspanel--android-fullscreen-with-mobile-groups",
+    viewport: MOBILE,
+    theme: "light",
+    scrollToHeading: "Android専用",
   },
 ];
