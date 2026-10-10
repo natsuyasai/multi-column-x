@@ -12,11 +12,8 @@ export default defineConfig({
   lang: "ja-JP",
   base: "/multi-column-x/",
   cleanUrls: true,
-  // 開発者向け資料は公開しない（公開対象は USER_GUIDE.md と images/ のみ）
-  srcExclude: ["development/**", "specs/**", "superpowers/**"],
-  rewrites: { "USER_GUIDE.md": "index.md" },
-  // TODO(PR2で解消予定): USER_GUIDE.md 内の ../README.md リンクを GitHub URL に差し替えたら削除する
-  ignoreDeadLinks: [/^\.\/\.\.\/README(\.md)?$/],
+  // 公開対象は docs/guide/ 配下のみ（開発者向け資料は srcDir の外にあるため公開されない）
+  srcDir: "guide",
   themeConfig: {
     search: {
       provider: "local",
@@ -49,6 +46,28 @@ export default defineConfig({
         },
       },
     },
+    sidebar: [
+      {
+        text: "ガイド",
+        items: [
+          { text: "はじめに", link: "/" },
+          { text: "インストール", link: "/install" },
+          { text: "初回起動と画面構成", link: "/screen" },
+          { text: "アカウント", link: "/accounts" },
+          { text: "カラム", link: "/columns" },
+          { text: "設定", link: "/settings" },
+          { text: "ポップアップとショートカット", link: "/popup-shortcuts" },
+          { text: "Android", link: "/android" },
+          { text: "アプリの更新", link: "/update" },
+          { text: "よくある質問", link: "/faq" },
+        ],
+      },
+    ],
+    editLink: {
+      pattern:
+        "https://github.com/natsuyasai/multi-column-x/edit/main/docs/guide/:path",
+      text: "このページを編集",
+    },
     outline: { level: [2, 3], label: "目次" },
     docFooter: { prev: "前のページ", next: "次のページ" },
     returnToTopLabel: "ページ上部へ",
@@ -56,7 +75,6 @@ export default defineConfig({
     darkModeSwitchLabel: "外観",
     lightModeSwitchTitle: "ライトテーマに切り替え",
     darkModeSwitchTitle: "ダークテーマに切り替え",
-    lastUpdated: { text: "最終更新" },
     socialLinks: [
       { icon: "github", link: "https://github.com/natsuyasai/multi-column-x" },
     ],
