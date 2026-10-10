@@ -280,4 +280,93 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         assert!(remove_sanitized_copy(&tmp.path().join("none"), "id-1").is_ok());
     }
+
+    mod properties {
+        use std::collections::BTreeSet;
+
+        use super::*;
+        use proptest::prelude::*;
+
+        /// 直下のエントリ（名前, ディレクトリか）。名前は小文字のみで衝突・Windows 予約名を避ける。
+        /// `_` 始まり（許容名 `_locales` `_metadata` を含む）と非 `_` 始まりを混ぜる。
+        fn 直下のエントリ() -> impl Strategy<Value = Vec<(String, bool)>> {
+            let name = prop_oneof![
+                "[a-z0-9_-]{0,8}".prop_map(|s| format!("_{s}")),
+                "[a-z0-9_-]{0,8}".prop_map(|s| format!("f{s}")),
+                Just("_locales".to_string()),
+                Just("_metadata".to_string()),
+            ];
+            prop::collection::vec((name, any::<bool>()), 0..8).prop_map(|v| {
+                let mut seen = BTreeSet::new();
+                v.into_iter()
+                    .filter(|(n, _)| seen.insert(n.clone()))
+                    .collect()
+            })
+        }
+
+        fn 偽フォルダを作る(entries: &[(String, bool)]) -> (TempDir, PathBuf, PathBuf) {
+            let tmp = TempDir::new().unwrap();
+            let source = tmp.path().join("src_ext");
+            fs::create_dir_all(&source).unwrap();
+            for (name, is_dir) in entries {
+                if *is_dir {
+                    write(&source.join(name).join("_inner.txt"), name);
+                } else {
+                    write(&source.join(name), name);
+                }
+            }
+            let copy_root = tmp.path().join("extensions");
+            (tmp, source, copy_root)
+        }
+
+        fn 予約名か(name: &str) -> bool {
+            name.starts_with('_') && name != "_locales" && name != "_metadata"
+        }
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(32))]
+
+            #[test]
+            fn 元フォルダの内容は処理の前後で変わらない(entries in 直下のエントリ()) {
+                let (_tmp, source, copy_root) = 偽フォルダを作る(&entries);
+                let before = snapshot(&source);
+
+                prepare_extension_dir(&source, &copy_root, "id-1").unwrap();
+
+                prop_assert_eq!(snapshot(&source), before);
+            }
+
+            #[test]
+            fn コピーの直下には予約名が残らず予約名以外は全て残る(entries in 直下のエントリ()) {
+                let (_tmp, source, copy_root) = 偽フォルダを作る(&entries);
+
+                let prepared = prepare_extension_dir(&source, &copy_root, "id-1").unwrap();
+
+                if prepared.copied {
+                    let names: Vec<String> = fs::read_dir(&prepared.path)
+                        .unwrap()
+                        .map(|e| e.unwrap().file_name().into_string().unwrap())
+                        .collect();
+                    prop_assert!(names.iter().all(|n| !予約名か(n)), "予約名が残っている: {:?}", names);
+                    for (name, _) in entries.iter().filter(|(n, _)| !予約名か(n)) {
+                        prop_assert!(names.contains(name), "{} が失われた", name);
+                    }
+                }
+            }
+
+            #[test]
+            fn 予約名が無いときだけコピーが作られ有るときは必ず作られる(entries in 直下のエントリ()) {
+                let (_tmp, source, copy_root) = 偽フォルダを作る(&entries);
+                let reserved = find_reserved_entries(&source).unwrap();
+
+                let prepared = prepare_extension_dir(&source, &copy_root, "id-1").unwrap();
+
+                prop_assert_eq!(prepared.copied, !reserved.is_empty());
+                if reserved.is_empty() {
+                    prop_assert_eq!(prepared.path, source);
+                    prop_assert!(!copy_root.exists());
+                }
+            }
+        }
+    }
 }

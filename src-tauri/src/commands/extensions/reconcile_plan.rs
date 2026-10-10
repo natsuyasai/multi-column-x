@@ -772,4 +772,279 @@ mod tests {
         assert!(!refresh_metadata(&mut folder, tmp.path(), "ja"));
         assert_eq!(folder.name, "Old");
     }
+
+    mod properties {
+        use std::collections::{HashMap, HashSet};
+
+        use proptest::prelude::*;
+
+        use super::super::*;
+
+        /// 生成する世界: アプリのエントリ・解決結果・適用済み・WebView2 側のインストール状況。
+        #[derive(Debug, Clone)]
+        struct 世界 {
+            entries: Vec<ExtensionEntry>,
+            resolved: HashMap<String, ResolvedEntry>,
+            applied: HashMap<String, AppliedExtension>,
+            installed: Vec<InstalledExt>,
+        }
+
+        fn エントリ(index: usize, enabled: bool) -> ExtensionEntry {
+            ExtensionEntry {
+                id: format!("e{index}"),
+                name: format!("name{index}"),
+                source: ExtensionSource::Folder {
+                    path: format!("/src/{index}"),
+                },
+                enabled,
+                has_popup: false,
+                has_options: false,
+                missing: false,
+            }
+        }
+
+        fn 解決結果() -> impl Strategy<Value = Option<ResolvedEntry>> {
+            prop_oneof![
+                Just(None),
+                Just(Some(ResolvedEntry::Missing)),
+                Just(Some(ResolvedEntry::Error("err".to_string()))),
+                (0u8..3).prop_map(|p| Some(ResolvedEntry::Path(format!("/p{p}")))),
+            ]
+        }
+
+        /// 適用済み記録: (適用パス, webview_id の種別 0=空 1=`w<index>`)
+        fn 適用済み() -> impl Strategy<Value = Option<(u8, u8)>> {
+            prop::option::of((0u8..3, 0u8..2))
+        }
+
+        fn 世界を作る() -> impl Strategy<Value = 世界> {
+            (
+                // エントリ e0..e5 の (enabled, 解決結果)
+                prop::collection::vec((any::<bool>(), 解決結果()), 0..6),
+                // 適用済み e0..e7（エントリに無いものも含む）
+                prop::collection::vec(適用済み(), 8),
+                // インストール済み w0..w7 の有無と有効状態
+                prop::collection::vec(prop::option::of(any::<bool>()), 8),
+                // アプリが把握していない既定拡張
+                prop::collection::vec(any::<bool>(), 0..3),
+            )
+                .prop_map(|(ents, apps, insts, unknown)| {
+                    let mut entries = Vec::new();
+                    let mut resolved = HashMap::new();
+                    for (i, (enabled, res)) in ents.into_iter().enumerate() {
+                        entries.push(エントリ(i, enabled));
+                        if let Some(r) = res {
+                            resolved.insert(format!("e{i}"), r);
+                        }
+                    }
+                    let mut applied = HashMap::new();
+                    for (i, app) in apps.into_iter().enumerate() {
+                        if let Some((path, kind)) = app {
+                            applied.insert(
+                                format!("e{i}"),
+                                AppliedExtension {
+                                    applied_path: format!("/p{path}"),
+                                    webview_id: if kind == 0 {
+                                        String::new()
+                                    } else {
+                                        format!("w{i}")
+                                    },
+                                },
+                            );
+                        }
+                    }
+                    let mut installed: Vec<InstalledExt> = insts
+                        .into_iter()
+                        .enumerate()
+                        .filter_map(|(i, e)| {
+                            e.map(|enabled| InstalledExt {
+                                id: format!("w{i}"),
+                                enabled,
+                            })
+                        })
+                        .collect();
+                    for (i, enabled) in unknown.into_iter().enumerate() {
+                        installed.push(InstalledExt {
+                            id: format!("ms{i}"),
+                            enabled,
+                        });
+                    }
+                    世界 {
+                        entries,
+                        resolved,
+                        applied,
+                        installed,
+                    }
+                })
+        }
+
+        /// 計画を実行側と同じ意味で適用する小さなシミュレータ。
+        fn 適用する(world: &mut 世界, actions: &[Action]) {
+            let mut counter = 0;
+            for action in actions {
+                match action {
+                    Action::Add {
+                        entry_id,
+                        path,
+                        replaces,
+                        desired_enabled,
+                    } => {
+                        if let Some(old) = replaces {
+                            world.installed.retain(|i| &i.id != old);
+                        }
+                        counter += 1;
+                        let new_id = format!("new{counter}");
+                        world.installed.push(InstalledExt {
+                            id: new_id.clone(),
+                            enabled: *desired_enabled,
+                        });
+                        world.applied.insert(
+                            entry_id.clone(),
+                            AppliedExtension {
+                                applied_path: path.clone(),
+                                webview_id: new_id,
+                            },
+                        );
+                    }
+                    Action::Remove { webview_id } => {
+                        world.installed.retain(|i| &i.id != webview_id);
+                        world.applied.retain(|_, a| &a.webview_id != webview_id);
+                    }
+                    Action::SetEnabled {
+                        webview_id,
+                        enabled,
+                    } => {
+                        for i in world.installed.iter_mut().filter(|i| &i.id == webview_id) {
+                            i.enabled = *enabled;
+                        }
+                    }
+                }
+            }
+        }
+
+        fn 計画する(world: &世界) -> Vec<Action> {
+            plan_profile(
+                &world.entries,
+                &world.resolved,
+                &world.applied,
+                &world.installed,
+            )
+        }
+
+        fn touched_installed(action: &Action, world: &世界) -> bool {
+            let installed: HashSet<&str> = world.installed.iter().map(|i| i.id.as_str()).collect();
+            match action {
+                Action::Add { replaces, .. } => replaces
+                    .as_ref()
+                    .is_none_or(|id| installed.contains(id.as_str())),
+                Action::Remove { webview_id } | Action::SetEnabled { webview_id, .. } => {
+                    installed.contains(webview_id.as_str())
+                }
+            }
+        }
+
+        proptest! {
+            #[test]
+            fn 計画を適用した後の再計画は空になる(world in 世界を作る()) {
+                let mut world = world;
+                let first = 計画する(&world);
+                適用する(&mut world, &first);
+                let second = 計画する(&world);
+                prop_assert!(second.is_empty(), "再計画が空でない: {:?} (初回 {:?})", second, first);
+            }
+
+            #[test]
+            fn 計画を適用すると望ましい状態に収束する(world in 世界を作る()) {
+                let before = world.clone();
+                let mut world = world;
+                let actions = 計画する(&world);
+                適用する(&mut world, &actions);
+
+                let installed: HashMap<&str, bool> = world
+                    .installed
+                    .iter()
+                    .map(|i| (i.id.as_str(), i.enabled))
+                    .collect();
+                let entry_ids: HashSet<&str> =
+                    before.entries.iter().map(|e| e.id.as_str()).collect();
+
+                for entry in &before.entries {
+                    let applied_now = world.applied.get(&entry.id);
+                    match before.resolved.get(&entry.id) {
+                        // 読み込めるフォルダがあるなら、そのパスで入っていて有効状態も一致する。
+                        Some(ResolvedEntry::Path(path)) => {
+                            let a = applied_now.expect("適用済みになるはず");
+                            prop_assert_eq!(&a.applied_path, path);
+                            prop_assert_eq!(installed.get(a.webview_id.as_str()), Some(&entry.enabled));
+                        }
+                        // 見つからないなら、入っていても有効のままにならない。
+                        Some(ResolvedEntry::Missing) => {
+                            if let Some(a) = applied_now {
+                                prop_assert_ne!(installed.get(a.webview_id.as_str()), Some(&true));
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                // エントリから消えたものは、インストール済みのまま残らない。
+                for (id, a) in before.applied.iter().filter(|(id, _)| !entry_ids.contains(id.as_str())) {
+                    prop_assert!(a.webview_id.is_empty() || !installed.contains_key(a.webview_id.as_str()), "{} が残っている", id);
+                }
+                // 付け替えた旧拡張機能は、現在の適用記録でなければ残らない。
+                let current: HashSet<&str> =
+                    world.applied.values().map(|a| a.webview_id.as_str()).collect();
+                for (id, a) in &before.applied {
+                    if !a.webview_id.is_empty()
+                        && before.installed.iter().any(|i| i.id == a.webview_id)
+                        && !current.contains(a.webview_id.as_str())
+                    {
+                        prop_assert!(!installed.contains_key(a.webview_id.as_str()), "{} の旧 ID が残っている", id);
+                    }
+                }
+            }
+
+            #[test]
+            fn アプリが把握していない拡張機能には操作が出ない(world in 世界を作る()) {
+                let known: HashSet<&str> = world
+                    .applied
+                    .values()
+                    .map(|a| a.webview_id.as_str())
+                    .collect();
+                for action in 計画する(&world) {
+                    let touched: Vec<&String> = match &action {
+                        Action::Add { replaces, .. } => replaces.iter().collect(),
+                        Action::Remove { webview_id } | Action::SetEnabled { webview_id, .. } => {
+                            vec![webview_id]
+                        }
+                    };
+                    for id in touched {
+                        prop_assert!(known.contains(id.as_str()), "未把握の ID に操作: {:?}", action);
+                    }
+                    prop_assert!(
+                        touched_installed(&action, &world),
+                        "インストールされていない ID に操作: {:?}",
+                        action
+                    );
+                }
+            }
+
+            #[test]
+            fn 削除はエントリから消えた適用済みのidだけに出る(world in 世界を作る()) {
+                let entry_ids: HashSet<&str> =
+                    world.entries.iter().map(|e| e.id.as_str()).collect();
+                let removable: HashSet<&str> = world
+                    .applied
+                    .iter()
+                    .filter(|(id, _)| !entry_ids.contains(id.as_str()))
+                    .map(|(_, a)| a.webview_id.as_str())
+                    .collect();
+                for action in 計画する(&world) {
+                    if let Action::Remove { webview_id } = &action {
+                        prop_assert!(removable.contains(webview_id.as_str()), "不正な削除: {:?}", action);
+                    }
+                }
+            }
+        }
+    }
 }

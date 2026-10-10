@@ -434,4 +434,65 @@ mod tests {
             Some("a.html?x=1")
         );
     }
+
+    mod properties {
+        use proptest::prelude::*;
+
+        use super::super::normalize_relative_path;
+
+        fn 通常の文字列() -> impl Strategy<Value = String> {
+            // 制御文字や空白を含む任意の文字列。
+            any::<String>()
+        }
+
+        proptest! {
+            #[test]
+            fn 危険なトークンを含む文字列は常にnoneになる(
+                head in 通常の文字列(),
+                tail in 通常の文字列(),
+                token in prop::sample::select(vec!["..", ":", "\\"])
+            ) {
+                let raw = format!("{head}{token}{tail}");
+                prop_assert_eq!(normalize_relative_path(&raw), None, "{:?}", raw);
+            }
+
+            #[test]
+            fn 先頭のスラッシュが二つ以上あると常にnoneになる(tail in 通常の文字列()) {
+                let raw = format!("//{tail}");
+                prop_assert_eq!(normalize_relative_path(&raw), None, "{:?}", raw);
+            }
+
+            #[test]
+            fn エンコードされたドットとスラッシュと区切りを含む文字列は常にnoneになる(
+                head in 通常の文字列(),
+                tail in 通常の文字列(),
+                token in prop::sample::select(vec!["%2e", "%2E", "%2f", "%2F", "%5c", "%5C"])
+            ) {
+                let raw = format!("{head}{token}{tail}");
+                prop_assert_eq!(normalize_relative_path(&raw), None, "{:?}", raw);
+            }
+
+            #[test]
+            fn 正規化に成功した結果は相対パスとして安全である(raw in 通常の文字列()) {
+                if let Some(path) = normalize_relative_path(&raw) {
+                    prop_assert!(!path.is_empty());
+                    prop_assert!(!path.starts_with('/'));
+                    prop_assert!(!path.contains(".."));
+                    prop_assert!(!path.contains(':'));
+                    prop_assert!(!path.contains('\\'));
+                    prop_assert!(!path.chars().any(char::is_control));
+                }
+            }
+
+            #[test]
+            fn 安全な相対パスは正規化しても変わらない(
+                segments in prop::collection::vec("[a-zA-Z0-9_-]{1,8}([.][a-z]{1,4})?", 1..4)
+            ) {
+                let path = segments.join("/");
+                prop_assert_eq!(normalize_relative_path(&path), Some(path.clone()));
+                prop_assert_eq!(normalize_relative_path(&format!("/{path}")), Some(path.clone()));
+                prop_assert_eq!(normalize_relative_path(&format!("./{path}")), Some(path));
+            }
+        }
+    }
 }

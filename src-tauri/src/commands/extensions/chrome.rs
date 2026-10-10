@@ -432,4 +432,140 @@ mod tests {
         assert_eq!(a, b);
         assert_eq!(a.as_deref(), Some("10.0_0"));
     }
+
+    mod properties {
+        use super::*;
+        use proptest::prelude::*;
+
+        /// `a.b.c_n` 形式（数値セグメントのみ）のバージョンフォルダ名。
+        fn バージョン名() -> impl Strategy<Value = String> {
+            // 値を小さく保ち、`1.0_0` と `1.0.0_0` や `01.0_0` のような同順位を頻繁に作る。
+            (
+                prop::collection::vec(0u32..4, 1..4),
+                0usize..3,
+                any::<bool>(),
+                0u32..3,
+            )
+                .prop_map(|(mut segs, trailing_zeros, padded, suffix)| {
+                    segs.extend(std::iter::repeat_n(0, trailing_zeros));
+                    let joined = segs
+                        .iter()
+                        .map(|n| {
+                            if padded {
+                                format!("{n:02}")
+                            } else {
+                                n.to_string()
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                        .join(".");
+                    format!("{joined}_{suffix}")
+                })
+        }
+
+        fn 選ぶ(candidates: &[&String]) -> Option<String> {
+            let owned: Vec<String> = candidates.iter().map(|s| (*s).clone()).collect();
+            pick_latest_version(&owned)
+        }
+
+        proptest! {
+            #[test]
+            fn 入力の並べ替えに結果が依存しない(
+                items in prop::collection::vec(バージョン名(), 0..8)
+                    .prop_flat_map(|v| (Just(v.clone()), Just(v).prop_shuffle()))
+            ) {
+                let (original, shuffled) = items;
+                prop_assert_eq!(pick_latest_version(&original), pick_latest_version(&shuffled));
+            }
+
+            #[test]
+            fn 結果は入力に含まれ空のときだけnoneになる(
+                items in prop::collection::vec(バージョン名(), 0..8)
+            ) {
+                let picked = pick_latest_version(&items);
+                if items.is_empty() {
+                    prop_assert_eq!(picked, None);
+                } else {
+                    let picked = picked.expect("非空なら Some");
+                    prop_assert!(items.contains(&picked));
+                }
+            }
+
+            #[test]
+            fn 選ばれた版は他のどの版にも負けない(
+                items in prop::collection::vec(バージョン名(), 1..8)
+            ) {
+                let picked = pick_latest_version(&items).expect("非空なら Some");
+                for other in &items {
+                    prop_assert_eq!(
+                        ペア勝者(&picked, other),
+                        Some(picked.clone()),
+                        "{} が {} に負けている", picked, other
+                    );
+                }
+            }
+
+            #[test]
+            fn 二つの版の勝者は並べ替えても変わらない(
+                x in バージョン名(),
+                y in バージョン名()
+            ) {
+                prop_assert_eq!(選ぶ(&[&x, &y]), 選ぶ(&[&y, &x]));
+            }
+
+            #[test]
+            fn 勝敗は推移的である(
+                a in バージョン名(),
+                b in バージョン名(),
+                c in バージョン名()
+            ) {
+                // a が b に勝ち、b が c に勝つなら、a は c に勝つ。
+                if 選ぶ(&[&a, &b]).as_ref() == Some(&a) && 選ぶ(&[&b, &c]).as_ref() == Some(&b) {
+                    prop_assert_eq!(選ぶ(&[&a, &c]), Some(a.clone()));
+                }
+            }
+
+            #[test]
+            fn セグメントやsuffixを一つ増やした版は元の版より新しい(
+                segs in prop::collection::vec(0u32..30, 1..5),
+                suffix in 0u32..6,
+                index in 0usize..5
+            ) {
+                let render = |segs: &[u32], suffix: u32| {
+                    let joined = segs.iter().map(u32::to_string).collect::<Vec<_>>().join(".");
+                    format!("{joined}_{suffix}")
+                };
+                let original = render(&segs, suffix);
+
+                // いずれか一つの数値セグメントを +1 する。
+                let mut bumped_segs = segs.clone();
+                let bump_at = index % bumped_segs.len();
+                bumped_segs[bump_at] += 1;
+                let bumped = render(&bumped_segs, suffix);
+                prop_assert_eq!(選ぶ(&[&original, &bumped]), Some(bumped.clone()));
+                prop_assert_eq!(選ぶ(&[&bumped, &original]), Some(bumped));
+
+                // suffix を +1 する。
+                let newer_suffix = render(&segs, suffix + 1);
+                prop_assert_eq!(選ぶ(&[&original, &newer_suffix]), Some(newer_suffix.clone()));
+                prop_assert_eq!(選ぶ(&[&newer_suffix, &original]), Some(newer_suffix));
+            }
+
+            #[test]
+            fn 勝者は反対称で自分自身が相手なら自分が選ばれる(
+                x in バージョン名(),
+                y in バージョン名()
+            ) {
+                let winner = 選ぶ(&[&x, &y]).expect("非空なら Some");
+                let loser = if winner == x { &y } else { &x };
+                // 負けた側を勝者と比べ直しても勝者は変わらない（逆転しない）。
+                prop_assert_eq!(選ぶ(&[loser, &winner]), Some(winner.clone()));
+                prop_assert_eq!(選ぶ(&[&x, &x]), Some(x.clone()));
+            }
+        }
+
+        fn ペア勝者(a: &str, b: &str) -> Option<String> {
+            pick_latest_version(&[a.to_string(), b.to_string()])
+        }
+    }
 }

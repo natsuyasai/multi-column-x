@@ -1183,4 +1183,132 @@ mod tests {
             .unwrap()
             .block_on(f)
     }
+
+    mod properties {
+        use proptest::prelude::*;
+
+        use super::super::{build_extension_url, is_same_folder_path};
+
+        fn 拡張機能id() -> impl Strategy<Value = String> {
+            "[a-z0-9]{1,32}"
+        }
+
+        fn 安全なセグメント() -> impl Strategy<Value = String> {
+            "[a-zA-Z0-9_.-]{1,8}".prop_filter("親ディレクトリ参照は除く", |s| s != "..")
+        }
+
+        fn 安全な相対パス() -> impl Strategy<Value = String> {
+            prop::collection::vec(安全なセグメント(), 1..4).prop_map(|v| v.join("/"))
+        }
+
+        fn 危険なトークン() -> impl Strategy<Value = &'static str> {
+            prop_oneof![
+                Just(".."),
+                Just("%2e%2e"),
+                Just("%2E%2E"),
+                Just(".%2e"),
+                Just("%2E."),
+            ]
+        }
+
+        proptest! {
+            #[test]
+            fn 組み立てに成功したurlは拡張機能のオリジンで始まる(
+                id in 拡張機能id(),
+                path in any::<String>()
+            ) {
+                if let Ok(url) = build_extension_url(&id, &path) {
+                    let prefix = format!("chrome-extension://{id}/");
+                    prop_assert!(url.starts_with(&prefix), "{}", url);
+                    let rest = &url[prefix.len()..];
+                    prop_assert!(!rest.is_empty());
+                    prop_assert!(!rest.starts_with('/'));
+                    prop_assert!(!rest.contains('\\'));
+                    prop_assert!(!rest.contains("://"));
+                    prop_assert!(!rest.split('/').any(|s| s == ".."));
+                }
+            }
+
+            #[test]
+            fn 安全な相対パスは必ず組み立てられる(
+                id in 拡張機能id(),
+                path in 安全な相対パス()
+            ) {
+                let url = build_extension_url(&id, &path).unwrap();
+                prop_assert_eq!(url, format!("chrome-extension://{id}/{path}"));
+            }
+
+            #[test]
+            fn 親ディレクトリ参照のセグメントを含む入力は常に拒否される(
+                id in 拡張機能id(),
+                before in prop::collection::vec(安全なセグメント(), 0..3),
+                token in 危険なトークン(),
+                after in prop::collection::vec(安全なセグメント(), 0..3)
+            ) {
+                let mut segments = before;
+                segments.push(token.to_string());
+                segments.extend(after);
+                prop_assert!(build_extension_url(&id, &segments.join("/")).is_err());
+            }
+
+            #[test]
+            fn スキーム区切りを含む入力は常に拒否される(
+                id in 拡張機能id(),
+                head in "[a-zA-Z0-9_./-]{0,8}",
+                tail in "[a-zA-Z0-9_./-]{0,8}"
+            ) {
+                let path = format!("{head}://{tail}");
+                prop_assert!(build_extension_url(&id, &path).is_err());
+            }
+
+            #[test]
+            fn バックスラッシュを含む入力は常に拒否される(
+                id in 拡張機能id(),
+                head in "[a-zA-Z0-9_./-]{0,8}",
+                tail in "[a-zA-Z0-9_./-]{0,8}"
+            ) {
+                let path = format!("{head}\\{tail}");
+                prop_assert!(build_extension_url(&id, &path).is_err());
+            }
+
+            #[test]
+            fn フォルダパスの同一視は反射的で対称的である(
+                a in any::<String>(),
+                b in any::<String>()
+            ) {
+                prop_assert!(is_same_folder_path(&a, &a));
+                prop_assert_eq!(is_same_folder_path(&a, &b), is_same_folder_path(&b, &a));
+            }
+
+            #[test]
+            fn 大文字小文字と区切りと末尾区切りと接頭辞だけが違うパスは同一視される(
+                drive in "[A-Za-z]",
+                segments in prop::collection::vec("[a-zA-Z0-9_.-]{1,8}", 1..4),
+                separator_a in prop::sample::select(vec!["\\", "/"]),
+                separator_b in prop::sample::select(vec!["\\", "/"]),
+                upper in any::<bool>(),
+                trailing in prop::collection::vec(prop::sample::select(vec!["\\", "/"]), 0..3),
+                verbatim in any::<bool>()
+            ) {
+                let base_a = format!("{drive}:{separator_a}{}", segments.join(separator_a));
+                let mut base_b = format!("{drive}:{separator_b}{}", segments.join(separator_b));
+                base_b = if upper { base_b.to_uppercase() } else { base_b.to_lowercase() };
+                base_b.push_str(&trailing.concat());
+                if verbatim {
+                    base_b = format!(r"\\?\{base_b}");
+                }
+                prop_assert!(is_same_folder_path(&base_a, &base_b), "{} と {}", base_a, base_b);
+            }
+
+            #[test]
+            fn 末尾以外の区切りが違うパスは同一視されない(
+                segments in prop::collection::vec("[a-z0-9]{1,8}", 2..4),
+                extra in "[a-z0-9]{1,8}"
+            ) {
+                let a = format!("C:\\{}", segments.join("\\"));
+                let b = format!("{a}\\{extra}");
+                prop_assert!(!is_same_folder_path(&a, &b));
+            }
+        }
+    }
 }
