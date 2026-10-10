@@ -2,8 +2,6 @@
 //!
 //! 完了ハンドラは UI スレッドで呼ばれるため、ハンドラや `with_webview` のクロージャ内では
 //! 同期待ちをしない。結果は `oneshot` で async 側へ返し、各呼び出しにタイムアウトを付ける。
-// 後続ステップ（コマンド・reconcile 実行）で使用するまで未使用の項目がある。
-#![allow(dead_code)]
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -19,11 +17,9 @@ use webview2_com::{
 };
 use windows_core::{Interface, BOOL, HSTRING, PWSTR};
 
-use super::executor::{apply_actions_with, ProfileOps};
+use super::executor::ProfileOps;
 use super::hresult::describe_add_error;
-use super::reconcile_plan::{Action, InstalledExt};
-
-pub use super::executor::ApplyOutcome;
+use super::reconcile_plan::InstalledExt;
 
 /// 各 WebView2 呼び出しのタイムアウト。
 const CALL_TIMEOUT: Duration = Duration::from_secs(10);
@@ -227,7 +223,7 @@ pub async fn set_enabled(
 }
 
 /// `ProfileOps` の WebView2 実装。
-struct WebviewOps<'a>(&'a tauri::Webview);
+pub struct WebviewOps<'a>(pub &'a tauri::Webview);
 
 impl ProfileOps for WebviewOps<'_> {
     async fn list(&self) -> Result<Vec<InstalledExt>, String> {
@@ -242,9 +238,4 @@ impl ProfileOps for WebviewOps<'_> {
     async fn set_enabled(&self, webview_id: &str, enabled: bool) -> Result<(), String> {
         set_enabled(self.0, webview_id, enabled).await
     }
-}
-
-/// 同期計画を Add → Remove → SetEnabled の順に実行する。
-pub async fn apply_actions(webview: &tauri::Webview, actions: &[Action]) -> ApplyOutcome {
-    apply_actions_with(&WebviewOps(webview), actions).await
 }

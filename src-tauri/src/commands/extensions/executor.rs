@@ -1,8 +1,6 @@
 //! 同期計画（`Action`）の実行器（OS 非依存）。
 //! WebView2 への実呼び出しは `ProfileOps` 越しに行い、並べ替え・replaces の判定・
 //! エラー集約を単体テストできるようにする。
-// 後続ステップ（reconcile 実行）で使用するまで未使用の項目がある。
-#![allow(dead_code)]
 
 use super::reconcile_plan::{Action, InstalledExt};
 

@@ -1,7 +1,5 @@
 //! 拡張機能の状態を `settings.json` の `browserExtensions` キーへ読み書きする。
 //! `appSettings` とは独立したキーで、端末固有のパスを含むためバックアップ対象外。
-// 後続ステップ（コマンド・reconcile）で使用するまで未使用。
-#![allow(dead_code)]
 
 use serde_json::Value;
 use tauri::AppHandle;

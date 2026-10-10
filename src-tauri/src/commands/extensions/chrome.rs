@@ -1,7 +1,5 @@
 //! Chrome にインストール済みの拡張機能の検出（OS 非依存の純粋ロジック）。
 //! 実環境のパス取得（`LOCALAPPDATA`）だけを `chrome_extensions_root_from_env` に分離している。
-// 後続ステップ（コマンド・reconcile）で使用するまで未使用の項目がある。
-#![allow(dead_code)]
 
 use std::cmp::Ordering;
 use std::collections::HashSet;
@@ -13,14 +11,17 @@ use super::manifest::read_manifest_info;
 pub const DEFAULT_PROFILE: &str = "Default";
 
 /// 検出された拡張機能 1 件。
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct DetectedExtension {
+    #[serde(rename = "chromeId")]
     pub chrome_id: String,
     pub profile: String,
     pub name: String,
     /// 最新バージョンのフォルダ（実パス）。
     pub path: String,
+    #[serde(rename = "hasPopup")]
     pub has_popup: bool,
+    #[serde(rename = "hasOptions")]
     pub has_options: bool,
     /// 既にアプリへ追加済みか。
     pub added: bool,

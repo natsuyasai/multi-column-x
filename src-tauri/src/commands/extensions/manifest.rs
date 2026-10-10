@@ -1,7 +1,5 @@
 //! 拡張機能の `manifest.json` 解析（OS 非依存の純粋ロジック）。
 //! ファイル I/O は引数注入（`locale_loader`）か `read_manifest_info` に閉じ込める。
-// 後続ステップ（コマンド・reconcile）で使用するまで未使用の項目がある。
-#![allow(dead_code)]
 
 use std::fmt;
 use std::path::Path;

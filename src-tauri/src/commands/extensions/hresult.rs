@@ -1,5 +1,5 @@
 //! WebView2 の拡張機能 Add 失敗時の HRESULT をユーザー向け文言に変換する（OS 非依存）。
-// 後続ステップ（コマンド実装）で使用するまで未使用の項目がある。
+// Windows 専用の `webview2` からのみ使うため、Windows 以外ではデッドコードになる。
 #![allow(dead_code)]
 
 /// Add 失敗時の HRESULT をユーザー向けのエラー文言にする。

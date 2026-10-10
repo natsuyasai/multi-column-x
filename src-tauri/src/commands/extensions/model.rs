@@ -1,6 +1,4 @@
 //! ブラウザ拡張機能のデータモデル。JS から読むため camelCase で直列化する。
-// 後続ステップ（manifest 解析・reconcile・コマンド）で使用するまで未使用の項目がある。
-#![allow(dead_code)]
 
 use std::collections::HashMap;
 

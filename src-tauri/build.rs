@@ -41,6 +41,14 @@ fn main() {
             "check_media_codec_support",
             "download_and_enable_h264",
             "download_video",
+            "list_extensions",
+            "detect_chrome_extensions",
+            "pick_extension_folder",
+            "add_extension_from_folder",
+            "add_chrome_extension",
+            "set_extension_enabled",
+            "remove_extension",
+            "open_extension_page",
         ]),
     ))
     .expect("failed to run tauri-build");
