@@ -20,12 +20,12 @@
 
 <p align="center">
   <a href="https://github.com/natsuyasai/multi-column-x/releases/latest">ダウンロード</a> ·
-  <a href="docs/USER_GUIDE.md">利用ガイド</a> ·
+  <a href="https://natsuyasai.github.io/multi-column-x/">利用ガイド</a> ·
   <a href="docs/development/README.md">開発ノート</a>
 </p>
 
 <p align="center">
-  <img src="docs/images/columns-overview.png" alt="カラム表示の例" width="800">
+  <img src="docs/guide/images/columns-overview.png" alt="カラム表示の例" width="800">
 </p>
 
 ## 特長
@@ -67,7 +67,7 @@
 | Linux   | AppImage / deb |
 | Android | APK            |
 
-インストール手順や初回セットアップの詳細は [利用ガイド](docs/USER_GUIDE.md) を参照してください。インストール後は、アプリ内の自動アップデートで最新版に更新できます。
+インストール手順や初回セットアップの詳細は [利用ガイド](https://natsuyasai.github.io/multi-column-x/install) を参照してください。インストール後は、アプリ内の自動アップデートで最新版に更新できます。
 
 ## 使い方
 
@@ -75,7 +75,7 @@
 2. カラムを追加する（ツールバーの「カラム追加」でアカウントとページタイプを選択）
 3. グリッド配置・自動更新・NG ワードなどを必要に応じて設定する
 
-画面の見方・設定項目・ショートカット・Android での操作・FAQ は [利用ガイド](docs/USER_GUIDE.md) にまとめています。
+画面の見方・設定項目・ショートカット・Android での操作・FAQ は [利用ガイド](https://natsuyasai.github.io/multi-column-x/) にまとめています。
 
 ## 技術スタック
 
@@ -129,7 +129,7 @@ cd src-tauri && cargo test   # Rust 単体テスト
 
 | ドキュメント                                                          | 内容                                                         |
 | --------------------------------------------------------------------- | ------------------------------------------------------------ |
-| [利用ガイド](docs/USER_GUIDE.md)                                      | アプリの使い方（利用者向け）                                 |
+| [利用ガイド](https://natsuyasai.github.io/multi-column-x/)            | アプリの使い方（利用者向け）                                 |
 | [開発ノート一覧](docs/development/README.md)                          | 設計判断・落とし穴・仕様の背景（開発者向け）                 |
 | [プロジェクト構成](docs/development/project-structure.md)             | `src/` / `src-tauri/` / Android Kotlin 層のファイル構成      |
 | [Tauri コマンド一覧](docs/development/tauri-commands.md)              | アプリ独自コマンドと ACL 更新ルール                          |
