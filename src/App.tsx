@@ -34,6 +34,7 @@ import { useDialogState } from "./hooks/useDialogState";
 import { useH264Setup } from "./hooks/useH264Setup";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useMobileSwipeBarSync } from "./hooks/useMobileSwipeBarSync";
+import { usePlatformAttribute } from "./hooks/usePlatformAttribute";
 import { usePopupWindowHandlers } from "./hooks/usePopupWindowHandlers";
 import { useSettingsApplyHandlers } from "./hooks/useSettingsApplyHandlers";
 import { useTheme } from "./hooks/useTheme";
@@ -147,6 +148,8 @@ const App: React.FC = () => {
   // useAppBootstrap の復元 effect より前に置き、復元時点で rootFontPx が確定済みであるようにする。
   // isMobile は初回 effect で確定済みの state を受け取り、変わったら再評価される。
   const uiScaleFactor = useUiScale(globalSettings.uiScale ?? "auto", isMobile);
+  // CSS のプラットフォーム別スタイル用に <html> へ data-platform を付与する。
+  usePlatformAttribute(isMobile);
 
   const { columnsRestored, appVersion } = useAppBootstrap({
     setIsMobile,
