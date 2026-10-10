@@ -285,3 +285,37 @@ export function getPageTypeLabel(input: GetPageTypeLabelInput): string {
 export function getColumnLabel(column: Column): string {
   return column.label || getPageTypeLabel(column);
 }
+
+/** 拡張機能の取得元（フォルダ指定 / Chrome から検出） */
+export type ExtensionSource =
+  | { kind: "folder"; path: string }
+  | { kind: "chrome"; chromeId: string; profile: string };
+
+/** 登録済みの拡張機能 */
+export interface ExtensionEntry {
+  id: string;
+  name: string;
+  source: ExtensionSource;
+  enabled: boolean;
+  hasPopup: boolean;
+  hasOptions: boolean;
+  /** 取得元（Chrome 側など）が見つからない */
+  missing: boolean;
+}
+
+/** Chrome から検出した拡張機能の候補 */
+export interface DetectedExtension {
+  chromeId: string;
+  profile: string;
+  name: string;
+  path: string;
+  hasPopup: boolean;
+  hasOptions: boolean;
+  /** すでに追加済み */
+  added: boolean;
+}
+
+export interface DetectResult {
+  chromeFound: boolean;
+  items: DetectedExtension[];
+}

@@ -1,10 +1,24 @@
 import React, { useState } from "react";
 import {
+  currentPlatformName,
+  isExtensionsSupported,
+} from "@/lib/extensionsSupport";
+import {
   parseAndValidateUserIdLines,
   parseAndValidateWordLines,
 } from "@/lib/lineListValidation";
 import { nextDraftOnSmallImageChange } from "@/lib/scrollRestoreSetting";
 import type { ReplaceColumnsAndRecreate } from "@/services/backup";
+import {
+  addChromeExtension,
+  addExtensionFromFolder,
+  detectChromeExtensions,
+  listExtensions,
+  openExtensionPage,
+  pickExtensionFolder,
+  removeExtension,
+  setExtensionEnabled,
+} from "@/services/extensions";
 import { useBackupFlow } from "../../hooks/useBackupFlow";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useAppStore } from "../../store/useAppStore";
@@ -20,6 +34,7 @@ import { BackupTab } from "./BackupTab";
 import { ColumnDefaultsSections } from "./ColumnDefaultsSections";
 import { ColumnLayoutTab } from "./ColumnLayoutTab";
 import { DisplaySettingsSection } from "./DisplaySettingsSection";
+import { ExtensionsTab } from "./ExtensionsTab";
 import {
   AndroidSettingsSections,
   FilterSettingsSections,
@@ -60,6 +75,10 @@ interface AppSettingsPanelProps {
   onLoadPreset: (id: string) => Promise<void>;
   /** バックアップ復元: 旧カラムの WebView 破棄 → ストア置換 → WebView 再生成 */
   onReplaceColumnsAndRecreate: ReplaceColumnsAndRecreate;
+  /** 拡張機能の追加・削除・有効無効の変更に成功したとき（全カラムの再読込に使う） */
+  onExtensionsChanged: () => void;
+  /** 拡張機能のポップアップ / オプションを開くアカウント。決まらなければ null */
+  extensionPageAccountId: string | null;
   appVersion: string;
   updateChecking: boolean;
   updateManualResult: "idle" | "none" | "error";
@@ -86,6 +105,8 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   onReloadAllWebviews,
   onLoadPreset,
   onReplaceColumnsAndRecreate,
+  onExtensionsChanged,
+  extensionPageAccountId,
   appVersion,
   updateChecking,
   updateManualResult,
@@ -102,8 +123,12 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   const { savePreset, deletePreset } = useAppStore();
   useEscapeKey(onClose);
   const [activeTab, setActiveTab] = useState<
-    "general" | "layout" | "presets" | "backup"
+    "general" | "layout" | "presets" | "extensions" | "backup"
   >("general");
+  const extensionsSupported = isExtensionsSupported(
+    currentPlatformName(),
+    isMobile,
+  );
   const backup = useBackupFlow(onReplaceColumnsAndRecreate, onClose);
 
   const [draft, setDraft] = useState<SettingsDraft>(() =>
@@ -211,6 +236,14 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
               onClick={() => setActiveTab("presets")}
             >
               プリセット
+            </button>
+          )}
+          {extensionsSupported && (
+            <button
+              className={`${styles.tab} ${activeTab === "extensions" ? styles.tabActive : ""}`}
+              onClick={() => setActiveTab("extensions")}
+            >
+              拡張機能
             </button>
           )}
           <button
@@ -324,6 +357,21 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 void onLoadPreset(id).then(() => onClose());
               }}
               onDelete={(id) => deletePreset(id)}
+            />
+          )}
+
+          {extensionsSupported && activeTab === "extensions" && (
+            <ExtensionsTab
+              accountId={extensionPageAccountId}
+              onExtensionsChanged={onExtensionsChanged}
+              listExtensions={listExtensions}
+              detectChromeExtensions={detectChromeExtensions}
+              pickFolder={pickExtensionFolder}
+              addFromFolder={addExtensionFromFolder}
+              addChrome={addChromeExtension}
+              setEnabled={setExtensionEnabled}
+              remove={removeExtension}
+              openPage={openExtensionPage}
             />
           )}
 

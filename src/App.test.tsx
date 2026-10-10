@@ -1022,3 +1022,65 @@ describe("App (フック抽出前の特性テスト)", () => {
     );
   });
 });
+
+describe("App (拡張機能の変更後の全カラム再読込)", () => {
+  const secondColumn: Column = { ...column, id: "col-2", order: 1, gridCol: 2 };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPlatform.mockReturnValue("windows");
+    useAppStore.setState({
+      accounts: [account],
+      columns: [column, secondColumn],
+      globalSettings,
+      isLoaded: true,
+      isMobile: false,
+      topBarExpanded: false,
+      unreadCounts: {},
+    });
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      switch (cmd) {
+        case "load_settings": {
+          const { accounts, columns, globalSettings } = useAppStore.getState();
+          return {
+            settings: { accounts, columns, globalSettings },
+            loadFailed: false,
+            backupPath: null,
+          };
+        }
+        case "list_extensions":
+          return [];
+        case "pick_extension_folder":
+          return "C:/ext";
+        default:
+          return undefined;
+      }
+    });
+  });
+
+  const getReloadTargets = () =>
+    mockInvoke.mock.calls
+      .filter(
+        (c) =>
+          c[0] === "eval_in_webview" &&
+          (c[1] as { script?: string })?.script === "location.reload();",
+      )
+      .map((c) => (c[1] as { label: string }).label);
+
+  it("拡張機能を追加すると全カラムのページが再読込される", async () => {
+    render(<App />);
+    fireEvent.click(screen.getByTitle("アプリ設定 (Ctrl+,)"));
+    fireEvent.click(screen.getByRole("button", { name: "拡張機能" }));
+    mockInvoke.mockClear();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "フォルダを指定して追加" }),
+    );
+
+    await waitFor(() => expect(getReloadTargets()).toHaveLength(2));
+    expect(getReloadTargets()).toEqual([
+      expect.stringContaining("col-1"),
+      expect.stringContaining("col-2"),
+    ]);
+  });
+});

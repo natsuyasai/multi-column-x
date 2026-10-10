@@ -50,6 +50,7 @@ import {
   useWebviewScrollRelay,
 } from "./hooks/useWebviewEvents";
 import { useWhatsNew } from "./hooks/useWhatsNew";
+import { resolveExtensionPageAccountId } from "./lib/extensionsSupport";
 import { getHeaderHeight, getTopBarHeight } from "./lib/gridLayout";
 import { evalInColumn } from "./services/columnWebview";
 import { useAppStore } from "./store/useAppStore";
@@ -331,6 +332,39 @@ const App: React.FC = () => {
     [recreateColumnWebview],
   );
 
+  // 拡張機能の追加・削除・有効無効の変更後に全カラムを再読込する。
+  // 拡張機能は次のナビゲーションから効くため、スクロール先頭＋更新ではなくページ自体を再読込する。
+  // 再読込の送信中に重ねて呼ばれても二重には送らない。
+  const extensionsReloadingRef = useRef(false);
+  const handleExtensionsChanged = useCallback(async () => {
+    if (extensionsReloadingRef.current) return;
+    extensionsReloadingRef.current = true;
+    try {
+      const { columns: currentColumns } = useAppStore.getState();
+      await Promise.all(
+        currentColumns.map((col) =>
+          evalInColumn(col.id, WEBVIEW_SCRIPTS.RELOAD_PAGE),
+        ),
+      );
+    } finally {
+      extensionsReloadingRef.current = false;
+    }
+  }, []);
+
+  // 拡張機能のポップアップ / オプションを開くアカウント（アクティブカラム → 先頭カラム）
+  const extensionPageAccountId = useMemo(() => {
+    const knownAccountIds = new Set(accounts.map((a) => a.id));
+    const sortedColumns = [...columns]
+      .sort((a, b) => a.order - b.order)
+      .filter((col) => knownAccountIds.has(col.accountId));
+    const activeAccountId =
+      sortedColumns.find((col) => col.id === activeColumnId)?.accountId ?? null;
+    return resolveExtensionPageAccountId(
+      activeAccountId,
+      sortedColumns.map((col) => col.accountId),
+    );
+  }, [accounts, columns, activeColumnId]);
+
   // カラム個別設定・全体設定の「適用」処理をまとめたフック。
   const { handleApplySettings, handleApplyGlobalSettings } =
     useSettingsApplyHandlers({
@@ -594,6 +628,8 @@ const App: React.FC = () => {
           onReloadAllWebviews={recreateAllWebviews}
           onLoadPreset={loadPresetAndRecreateWebviews}
           onReplaceColumnsAndRecreate={replaceColumnsAndRecreateWebviews}
+          onExtensionsChanged={() => void handleExtensionsChanged()}
+          extensionPageAccountId={extensionPageAccountId}
           appVersion={appVersion}
           updateChecking={updater.checking}
           updateManualResult={updater.manualResult}
