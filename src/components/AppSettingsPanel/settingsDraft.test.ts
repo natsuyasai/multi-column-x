@@ -35,6 +35,7 @@ const baseGlobalSettings: GlobalSettings = {
   mobileSwipeAreaHeight: 28,
   mobileSwipeAreaOpacity: 50,
   mobileTwoColumnEnabled: true,
+  mobileColumnCount: 2,
   presets: [],
   ngWords: [],
   repostHiddenUserIds: [],
@@ -75,6 +76,7 @@ describe("toGlobalSettingsPatch", () => {
       mobileSwipeAreaHeight: 28,
       mobileSwipeAreaOpacity: 50,
       mobileTwoColumnEnabled: true,
+      mobileColumnCount: 2,
       ngWords: ["spam"],
       repostHiddenUserIds: ["user_a"],
     });
@@ -202,6 +204,34 @@ describe("toGlobalSettingsPatch", () => {
       repostHiddenUserIds: [],
     });
     expect(patch.mobileSwipeAreaHeight).toBe(56);
+  });
+
+  it("範囲外の列数は2〜6に丸められる", () => {
+    const cases: Array<[number, number]> = [
+      [1, 2],
+      [7, 6],
+      [0, 2],
+      [3, 3],
+    ];
+    for (const [input, expected] of cases) {
+      const draft = createSettingsDraft({
+        ...baseGlobalSettings,
+        mobileColumnCount: input,
+      });
+      expect(draft.mobileColumnCount).toBe(expected);
+      const patch = toGlobalSettingsPatch(
+        { ...draft, mobileColumnCount: input },
+        { ngWords: [], repostHiddenUserIds: [] },
+      );
+      expect(patch.mobileColumnCount).toBe(expected);
+    }
+  });
+
+  it("列数が無い旧設定からドラフトを作ると2になる", () => {
+    const { mobileColumnCount: _omitted, ...legacy } = baseGlobalSettings;
+    void _omitted;
+    const draft = createSettingsDraft(legacy as GlobalSettings);
+    expect(draft.mobileColumnCount).toBe(2);
   });
 });
 

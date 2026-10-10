@@ -39,6 +39,7 @@ export function mobileLayoutForViewport(
     columns,
     activeColumnId,
     twoColumnEnabled: resolveTwoColumnEnabled(),
+    columnCount: useAppStore.getState().globalSettings.mobileColumnCount,
     viewportWidth: window.innerWidth,
     viewportHeight: window.innerHeight,
   });

@@ -27,7 +27,7 @@
 | `report_keyboard_shortcut`           | inject から検出したキーボードショートカットを中継                                                                            |
 | `get_mobile_insets`                  | Android システム UI のインセット（ノッチ等）を取得                                                                           |
 | `set_column_cookies`                 | カラム WebView に Cookie を設定（Android）                                                                                   |
-| `is_webview_profile_supported`       | Android の WebView Profile API 対応可否を判定（2 カラム同時表示の可否判定に使用）                                            |
+| `is_webview_profile_supported`       | Android の WebView Profile API 対応可否を判定（複数カラム同時表示の可否判定に使用）                                          |
 | `update_mobile_swipe_bar`            | モバイルのスワイプ切替バー設定（高さ・透過度等）を反映                                                                       |
 | `flash_mobile_swipe_bar`             | モバイルのスワイプ切替バーを一時的に表示                                                                                     |
 | `open_add_account_window`            | アカウント追加ウィンドウを開く（ログイン検出付き）                                                                           |

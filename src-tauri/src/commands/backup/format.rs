@@ -269,6 +269,8 @@ pub struct BackupGlobalSettings {
     pub mobile_swipe_area_opacity: u8,
     #[serde(rename = "mobileTwoColumnEnabled")]
     pub mobile_two_column_enabled: bool,
+    #[serde(rename = "mobileColumnCount")]
+    pub mobile_column_count: u8,
     pub presets: Vec<BackupPreset>,
     #[serde(rename = "ngWords")]
     pub ng_words: Vec<String>,
@@ -312,6 +314,7 @@ impl From<&GlobalSettingsData> for BackupGlobalSettings {
             mobile_swipe_area_height: g.mobile_swipe_area_height,
             mobile_swipe_area_opacity: g.mobile_swipe_area_opacity,
             mobile_two_column_enabled: g.mobile_two_column_enabled,
+            mobile_column_count: g.mobile_column_count,
             presets: g
                 .presets
                 .iter()
@@ -361,6 +364,7 @@ impl BackupGlobalSettings {
             mobile_swipe_area_height: self.mobile_swipe_area_height,
             mobile_swipe_area_opacity: self.mobile_swipe_area_opacity,
             mobile_two_column_enabled: self.mobile_two_column_enabled,
+            mobile_column_count: self.mobile_column_count,
             presets: self
                 .presets
                 .into_iter()

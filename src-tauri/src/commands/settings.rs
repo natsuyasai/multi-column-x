@@ -152,6 +152,7 @@ impl Default for GlobalSettingsData {
             mobile_swipe_area_height: 28,
             mobile_swipe_area_opacity: 50,
             mobile_two_column_enabled: true,
+            mobile_column_count: 2,
             presets: vec![],
             ng_words: vec![],
             repost_hidden_user_ids: vec![],
@@ -279,6 +280,8 @@ pub struct GlobalSettingsData {
     pub mobile_swipe_area_opacity: u8,
     #[serde(rename = "mobileTwoColumnEnabled")]
     pub mobile_two_column_enabled: bool,
+    #[serde(rename = "mobileColumnCount")]
+    pub mobile_column_count: u8,
     pub presets: Vec<ColumnPresetData>,
     #[serde(rename = "ngWords")]
     pub ng_words: Vec<String>,
@@ -646,6 +649,26 @@ mod tests {
         });
         let settings: GlobalSettingsData = serde_json::from_value(json).unwrap();
         assert!(settings.mobile_two_column_enabled);
+    }
+
+    #[test]
+    fn global_settings_default_mobile_column_count() {
+        let gs = GlobalSettingsData::default();
+        assert_eq!(gs.mobile_column_count, 2);
+    }
+
+    /// 列数を含まない既存の設定ファイルを読み込むと列数は2になる。
+    #[test]
+    fn mobile_column_countが無い旧設定はデフォルトで2になる() {
+        let json = serde_json::json!({
+            "theme": "dark",
+            "customCSS": "",
+            "windowBounds": { "x": 0.0, "y": 0.0, "width": 1400.0, "height": 900.0 },
+            "defaultAccountId": null,
+            "mobileTwoColumnEnabled": true,
+        });
+        let settings: GlobalSettingsData = serde_json::from_value(json).unwrap();
+        assert_eq!(settings.mobile_column_count, 2);
     }
 
     #[test]

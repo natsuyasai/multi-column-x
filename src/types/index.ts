@@ -96,6 +96,8 @@ export interface GlobalSettings {
   mobileSwipeAreaOpacity: number;
   /** 広い画面（>=600px）で2カラム同時表示する（Android のみ・Profile API 対応端末のみ有効） */
   mobileTwoColumnEnabled: boolean;
+  /** 複数カラム表示時の同時表示列数（2〜6、Android のみ。1列の最小幅に収まらない場合は自動で減る） */
+  mobileColumnCount: number;
   presets: ColumnPreset[];
   ngWords: string[];
   /** リポストを非表示にするユーザーID（全カラム共通） */
@@ -233,6 +235,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   mobileSwipeAreaHeight: 28,
   mobileSwipeAreaOpacity: 50,
   mobileTwoColumnEnabled: true,
+  mobileColumnCount: 2,
   presets: [],
   ngWords: [],
   repostHiddenUserIds: [],

@@ -1,3 +1,4 @@
+import { clampMobileColumnCount } from "@/lib/gridLayout";
 import type {
   ColumnScale,
   ColumnSettings,
@@ -45,6 +46,8 @@ export interface SettingsDraft {
   /** range inputのドラッグ操作のみで確定するため文字列保持は不要 */
   mobileSwipeAreaOpacity: number;
   mobileTwoColumnEnabled: boolean;
+  /** select の選択肢（2〜6）から選ぶため number で持つ */
+  mobileColumnCount: number;
   /** textarea への入力中文字列をそのまま保持するため string で持つ */
   globalNgWordsText: string;
   /** textarea への入力中文字列（1行1ユーザーID）をそのまま保持するため string で持つ */
@@ -94,6 +97,7 @@ export function createSettingsDraft(settings: GlobalSettings): SettingsDraft {
     mobileSwipeAreaHeight: String(settings.mobileSwipeAreaHeight),
     mobileSwipeAreaOpacity: settings.mobileSwipeAreaOpacity ?? 50,
     mobileTwoColumnEnabled: settings.mobileTwoColumnEnabled,
+    mobileColumnCount: clampMobileColumnCount(settings.mobileColumnCount ?? 2),
     globalNgWordsText: (settings.ngWords ?? []).join("\n"),
     globalRepostHiddenUserIdsText: (settings.repostHiddenUserIds ?? []).join(
       "\n",
@@ -145,6 +149,7 @@ export function toGlobalSettingsPatch(
     mobileSwipeAreaHeight: clampSwipeAreaHeight(draft.mobileSwipeAreaHeight),
     mobileSwipeAreaOpacity: draft.mobileSwipeAreaOpacity,
     mobileTwoColumnEnabled: draft.mobileTwoColumnEnabled,
+    mobileColumnCount: clampMobileColumnCount(draft.mobileColumnCount),
     ngWords: lists.ngWords,
     repostHiddenUserIds: lists.repostHiddenUserIds,
   };
