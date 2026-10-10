@@ -8,7 +8,7 @@
   - `model.rs` — `ExtensionEntry` / `ExtensionSource` / `ProfileSync` / `AppliedExtension` / `ExtensionsState`
   - `store.rs` — `settings.json` の `browserExtensions` キーの読み書き（`load` / `save`）
   - `manifest.rs` — `manifest.json` の解析（名前の多言語解決、ポップアップ / オプションの有無とパス）
-  - `chrome.rs` — Chrome の `Extensions` ルート解決、バージョンフォルダの最新選択、検出（`detect_extensions`）
+  - `chrome.rs` — Chrome / Edge の `Extensions` ルート解決（`chrome_extensions_root` / `edge_extensions_root`。両方を `BrowserRoots { chrome, edge }` に束ね、`browser_roots_from_env` が `LOCALAPPDATA` から作る）、バージョンフォルダの最新選択、1 ルートの検出（`detect_extensions`。候補に `browser` を付与）、Chrome 優先で ID 重複を 1 件にまとめる `merge_detected`、両ルートをまとめて検出する `detect_all`
   - `sanitize.rs` — 拡張フォルダ直下の予約名エントリ検出と除外コピー（`prepare_extension_dir`）
   - `reconcile_plan.rs` — desired state と現状から `Action`（`Add` / `Remove` / `SetEnabled`）を決める純粋ロジック（`plan_profile`）
   - `executor.rs` — `ProfileOps` trait と `apply_actions_with`（Add → Remove → SetEnabled の順に実行、失敗は集約して続行）
@@ -28,7 +28,7 @@
 ## 概要と対象 OS
 
 - 拡張機能は **全アカウント共通**。WebView2 は data_directory（= アカウントのプロファイル）ごとに拡張を持つので、アプリが各アカウントのプロファイルへ追加する。
-- 導入方法は 2 つ: 展開済みフォルダの指定（`add_extension_from_folder`）と、Chrome の Default プロファイル（`%LOCALAPPDATA%\Google\Chrome\User Data\Default\Extensions\<ID>\<version>\`）からの検出（`detect_chrome_extensions` → `add_chrome_extension`）。
+- 導入方法は 2 つ: 展開済みフォルダの指定（`add_extension_from_folder`）と、Chrome / Edge の Default プロファイルからの検出（`detect_chrome_extensions` → `add_chrome_extension`）。検出元は `%LOCALAPPDATA%\Google\Chrome\User Data\Default\Extensions\<ID>\<version>\`（Chrome）と `%LOCALAPPDATA%\Microsoft\Edge\User Data\Default\Extensions\<ID>\<version>\`（Edge）。Default 以外のプロファイルや Brave / Vivaldi などの自動検出は対象外（フォルダ指定で追加する）。UI のボタンは「ブラウザから検出」の 1 つで、候補と追加済み一覧に由来ブラウザ名（Chrome / Edge）を表示し、追加セクションに保存先パスの案内文を表示する。
 - 管理操作は追加・削除・有効/無効・ポップアップ / オプションページを別ウィンドウで開く。変更後はフロントが全カラムを再読込する。
 - **Windows 以外では UI を出さず、コマンドは「この環境では拡張機能に対応していません」を返すスタブ**（`mod.rs` の `ensure_supported`）。コマンド自体は全 OS の `generate_handler!` に登録されている（ACL 契約テストとの整合のため。`lib.rs` で cfg を付けていない）。
 
@@ -63,6 +63,15 @@
   3. `open_extension_page` で対象プロファイルに未適用のとき、その data_directory のカラム WebView で先に reconcile する。
 - **直列化**: 状態の読み書きと reconcile は 1 つの `tokio::sync::Mutex`（`service::lock_state`）で直列化する。reconcile が古い状態を読んで、直前の追加・削除を上書きで失う競合を防ぐ。同一 data_directory の複数カラムが同時に作られても、2 回目以降は差分ゼロで即終了する。ロック保持中にブロッキング処理をしない（ファイル I/O は `spawn_blocking`）。
 - **reload は変更時のみ**: カラム作成時の初回ナビゲーションが拡張追加より先に走るため、Add / Remove があったときだけ再読込する。変更コマンド後の全カラム再読込はフロント側（後述）。
+
+### Chrome / Edge 検出とブラウザ別の解決
+
+- `ExtensionSource::Chrome` に `browser`（`chrome` | `edge`、`#[serde(default)]` で既定 `Chrome`）を足し、`kind: "chrome"` はそのまま。**新 kind `edge` は作らなかった**: 旧版へ戻したときに `settings.json` の `browserExtensions` が読めなくなり、`match` の分岐も増えるため。`browser` 無しの旧保存データは Chrome 由来として読む（移行不要。書き戻しで `browser: "chrome"` が付くだけ）。
+- **IPC コマンド名（`detect_chrome_extensions` / `add_chrome_extension`）と引数名 `chromeId`、TS の `chromeId` フィールドは据え置いた**。名前が実態（Chrome / Edge 両対応）とずれるが、変えると ACL 3 点セット（`build.rs` / `capabilities/default.json` / `lib.rs`）と `contracts/ipc-constants.json` / `src/constants/ipc.ts` の同時変更が要るため。`add_chrome_extension` にブラウザ指定は無い（ID は重複排除済みなので `chromeId` だけで一意）。
+- **戻り値**: `DetectResult.chromeFound` は `browserFound`（`#[serde(rename = "browserFound")]`。Chrome / Edge のどちらかの `Extensions` ルートが存在）に改名した。`DetectedExtension` に `browser` を追加。どちらも無いときは UI が「Chrome / Edge が見つかりません」（`BROWSER_NOT_FOUND_NOTICE`）を出し、片方だけ見つかる場合は見つかった方の候補を通知なしで出す。
+- **ID 重複は Chrome 優先で 1 件**（`merge_detected`）。Edge にしか無い ID は Edge 由来。結果は名前 → ID 順。Edge で追加済みの ID は Chrome 側の候補にも「追加済み」と出る（重複判定は ID のみでブラウザ非依存）。
+- **パス解決**: `resolve_entry`（`reconcile_plan.rs`）は `BrowserRoots` から `ExtensionSource::Chrome { browser, .. }` の `browser` に対応するルートだけで最新バージョンを解決する。**Edge 由来が Chrome 側へフォールバックすることは無い**（Edge のフォルダが消えたら、Chrome に同じ ID があっても `Missing`）。バージョン追従・「見つかりません」判定はブラウザ別に従来どおり動く。
+- `add_chrome_extension` は `spawn_blocking` 内で両ルートを検出して `chromeId` を探す（ルートが両方無いと「Chrome / Edge が見つかりません」、ID が無いと「ブラウザに該当する拡張機能が見つかりません」）。
 
 ### ポップアップ / オプションページ
 
@@ -143,11 +152,11 @@
 - **構造検査テスト**: 上記の `include_str!` 契約テスト。実 WebView2 を起動せずに、全 builder のフラグ・ハンドラ・capability・reconcile の位置が崩れていないことを守る。
 - **TS**: `ExtensionsTab.test.tsx`（サービス呼び出しを Props で注入）、`extensionsSupport` の単体テスト、`AppSettingsPanel.test.tsx` のタブ表示、`App` 側の再読込配線。Storybook（`ExtensionsTab.stories.tsx`）。
 - **実機 PoC 手順**（Windows 実機。webview2.rs と reconcile の実動作は自動テストで担保できない）:
-  1. `npm run tauri:dev` で起動し、設定画面の「拡張機能」タブからフォルダ指定または Chrome 検出で追加する。
+  1. `npm run tauri:dev` で起動し、設定画面の「拡張機能」タブからフォルダ指定または「ブラウザから検出」（Chrome / Edge）で追加する。
   2. 追加後に全カラムが再読込され、content script が x.com のカラム上で動くことを確認する。
   3. 無効化 / 削除 / 再有効化を行い、全アカウントのカラムに反映されることを確認する。
   4. 「ポップアップを開く」「オプションを開く」で別ウィンドウが開き、選択中アカウントのデータで動作することを確認する。
-  5. アプリを再起動して拡張一覧が維持されること、Chrome 側の拡張を更新 / 削除した後の再起動で追従する（または「見つかりません」表示になる）ことを確認する。
+  5. アプリを再起動して拡張一覧が維持されること、Chrome / Edge 側の拡張を更新 / 削除した後の再起動で追従する（または「見つかりません」表示になる）ことを確認する。
   6. 複数アカウントで共通に適用されること、新規アカウント追加直後のカラムで拡張が使えることを確認する。
 - CDP でカラム WebView の状態を観察する方法は [external-link-new-window-notes.md](external-link-new-window-notes.md) の「実機での検証方法」を流用できる。
 
@@ -155,6 +164,8 @@
 
 - **同一 ID の二重 Add（未検証）**: WebView2 に同じ拡張を 2 回 Add したときの挙動は未確認。アプリ側は Chrome ID / フォルダの実パス（大文字小文字・区切り・末尾区切り・`\\?\` を無視して比較）で二重追加を拒否している。
 - **稼働中の拡張フォルダ削除（未検証）**: Add 済みのフォルダが稼働中に消えた場合の WebView2 の挙動は未確認。静的には「次回起動で一覧から消える」ことまで確認済みで、アプリ側は `resolve_entry` が `Missing` を返し無効扱いにする。
+- **Edge の検出範囲**: Edge に組み込みの拡張機能（PDF ビューアなど）は Program Files 側にあり、`%LOCALAPPDATA%` の `Extensions` には無いため検出対象外。
+- **ユーザーデータの場所を変えた場合は検出できない**: Chrome / Edge の `--user-data-dir` 起動オプションや `UserDataDir` ポリシーで保存先を変えていると、固定の `%LOCALAPPDATA%\…\User Data\Default\Extensions` を見る検出では見つからない。その場合は UI の案内文のとおり、その場所の `User Data\Default\Extensions` 配下のバージョンフォルダを「フォルダを指定して追加」で指定する。なおブラウザ本体をシステム全体（Program Files）にインストールしていても、ユーザーデータは `%LOCALAPPDATA%` 配下に作られるので検出できる。
 - **Chrome 固有 API 依存の拡張**: WebView2 の拡張機能サポートは Chrome の API の一部のみ。Chrome 固有 API に依存する拡張が正しく動くかは拡張ごとに異なり、落ちないことも含めて未検証（手動テスト項目）。
 - **ロケール解決**: 候補は「希望ロケール（`ja`）→ `default_locale` → `en` / `en_US` / `en_GB`」の順（`ja-JP` のように地域付きを希望した場合のみ `ja_JP` → `ja` に展開する）。希望が `ja` で `_locales` に `ja_JP` しか無い拡張は、`ja_JP` が試されず `default_locale` / `en` 側の名前になる（許容。`ja` を `ja_JP` へ広げる処理は未実装）。
 - **ネットワークドライブ（`Z:` へのマップ）は検出しない**: UNC 表記のパスだけを拒否する。マップ済みドライブのフォルダは追加できてしまう。
