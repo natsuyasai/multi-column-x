@@ -40,6 +40,26 @@
 - `topBarHeight` は描画時に計算されるため、倍率適用前の値になり得る。復元時は `restoreColumns(getTopBarHeight(topBarExpanded))` のように呼び出し時に取り直す。
 - 倍率変更時の全カラム bounds 再計算（`recalculateAllBounds()`、モバイルは `syncMobileSwipeBar()` も）は、`dialogOpen` effect とは**別の effect**にしている。`dialogOpen` effect は `anyDialogOpen` のみで発火し他の依存では再実行しない設計のため、依存を足して壊さないこと。別 effect は前回値との比較で初回を除外し、復元前とダイアログ表示中（閉じたときの復元に任せる）は何もしない。
 
+## Android のパネル型ダイアログ全画面化
+
+Android では画面が狭く、表示サイズを大きくすると中央カード型のダイアログが見切れる。そのため大きいパネル型ダイアログは Android のみ画面全体に表示する。デスクトップの見た目は変えない。
+
+- **プラットフォーム判定**: `<html data-platform="android"|"desktop">` を `usePlatformAttribute`（`src/hooks/usePlatformAttribute.ts`）が付与する。`App.tsx` でストアの `isMobile` に連動して設定する。SCSS 側は CSS Modules 内で `:global([data-platform="android"]) &` により参照する。
+- **共有ミキシン** `src/styles/_dialog-fullscreen.scss`
+  - `android-fullscreen-overlay`: overlay の padding を 0 にし、パネルを画面いっぱいに広げ、`overflow-y: hidden` にする（スクロールは panel/本文の 1 箇所だけ）。
+  - `android-fullscreen-panel($padding)`: 幅・高さ 100%、角丸・枠線なし。`$padding` に panel 元々の上下 padding を渡すと、そこへ `env(safe-area-inset-top/bottom)` を加算する（ノッチ・ナビゲーションバー対策）。
+  - `android-fullscreen-sticky-header($padding)`: panel 全体がスクロールする構造用にヘッダー要素を固定する（下記）。
+  - デスクトップの既存宣言は変更せず、Android 用の上書きだけをミキシンに集約する。
+- **対象 6 ダイアログ**: アプリ設定（`AppSettingsPanel`）・カラム設定（`SettingsPanel`）・アカウント管理（`AccountManager`）・カラム追加（`AddColumnDialog`）・ショートカット一覧（`ShortcutHelpDialog`）・更新内容（`WhatsNewDialog`）。
+- **ヘッダー固定**
+  - `AppSettingsPanel` / `SettingsPanel` は panel が flex column で本文のみスクロールする構造のため、そのまま固定される。
+  - 他の 4 つは panel 全体がスクロールするため、ヘッダー（`AddColumnDialog` などは先頭見出し）に sticky ミキシンを使う。単純な `top: 0` では panel の padding 分の隙間ができ、そこへ本文が透けるうえ、ノッチ下の余白もずれる。そこで panel の padding を負マージンで打ち消してヘッダー自身の padding に移し、背景色を付ける方式にした。
+  - `WhatsNewDialog` の `.notes` は Android で内側スクロールを無効にし、二重スクロールを避けている。
+- **新しくパネル型ダイアログを追加するときは必ず上記ミキシンを `@include` すること**（`overlay` と panel、panel 全体スクロールなら sticky ヘッダーも）。
+- **小さなダイアログ（全画面化しない）**: `ConfirmDialog` / `AccountNameDialog` / `TabActionDialog` / `UpdateDialog` / `LinkPopupDialog` / `H264SetupDialog` は中央表示のまま、次を満たす。幅は画面内に収まり、縦に収まらないときは内部スクロールで末尾のボタンへ到達できる。監査の結果、満たしていなかったのは `TabActionDialog`（ボトムシートに `max-height` と縦スクロールが無く、特大では上端がはみ出した）だけで、`.sheet` に `max-height: 100%` と `overflow-y: auto` を追加した。
+- **Storybook 検証の注意**: Storybook は `index.css` を読み込まないため、`--mcx-border` などのテーマ変数が未定義になり、`border` が無効値になって枠線幅が常に 0 になる。枠線の有無を検証する Story では panel に `--mcx-border` を手動で設定している。狭い画面は `vitest/browser` の `page.viewport` で再現し、終了時に元へ戻す。`data-platform` と `font-size` もアンマウント時に戻す。
+- **手動確認項目（実機）**: ノッチやナビゲーションバーにヘッダー・本文末尾が隠れないこと、フォントサイズ最大での見え方、全画面ダイアログを閉じたときにカラム WebView が元の位置へ復元されること。
+
 ## 既知の割り切り
 
 - 設定ロード前は既定の `auto` で描画されるため、Android で保存値と端末倍率が異なる場合、起動直後に一瞬チラつく可能性がある。
