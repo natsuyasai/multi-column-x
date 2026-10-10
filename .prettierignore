@@ -2,3 +2,7 @@
 src-tauri/gen/android/**/.gradle
 src-tauri/gen/android/**/build
 src-tauri/gen/android/.idea
+
+# VitePress（ユーザーガイド）の生成物
+docs/.vitepress/cache
+docs/.vitepress/dist
