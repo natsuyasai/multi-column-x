@@ -1,25 +1,25 @@
 .header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
+  gap: 0.375rem;
+  padding: 0.375rem 0.5rem;
   background: var(--mcx-surface-sunken);
-  border-top: 2px solid transparent;
+  border-top: 0.125rem solid transparent;
   border-bottom: 1px solid var(--mcx-border-subtle);
-  height: 36px;
+  height: 2.25rem;
   flex-shrink: 0;
   user-select: none;
 }
 
 .dot {
-  width: 8px;
-  height: 8px;
+  width: 0.5rem;
+  height: 0.5rem;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
 .label {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--mcx-text-tertiary);
   flex: 1;
   overflow: hidden;
@@ -28,16 +28,16 @@
 }
 
 .countdown {
-  font-size: 10px;
+  font-size: 0.625rem;
   color: var(--mcx-text-muted);
   flex-shrink: 0;
-  min-width: 28px;
+  min-width: 1.75rem;
   text-align: right;
 }
 
 .actions {
   display: flex;
-  gap: 2px;
+  gap: 0.125rem;
 }
 
 .actionBtn {
@@ -45,9 +45,9 @@
   border: none;
   color: var(--mcx-text-muted);
   cursor: pointer;
-  font-size: 14px;
-  padding: 2px 4px;
-  border-radius: 3px;
+  font-size: 0.875rem;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.1875rem;
   line-height: 1;
 
   &:hover {
@@ -57,8 +57,8 @@
 }
 
 .unreadBadge {
-  width: 8px;
-  height: 8px;
+  width: 0.5rem;
+  height: 0.5rem;
   border-radius: 50%;
   background: var(--mcx-accent);
   border: none;

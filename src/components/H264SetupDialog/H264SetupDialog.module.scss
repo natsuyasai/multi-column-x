@@ -11,12 +11,12 @@
 .dialog {
   background: var(--mcx-surface);
   color: var(--mcx-text);
-  border-radius: 8px;
-  padding: 20px;
-  width: min(440px, 90vw);
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  width: min(27.5rem, 90vw);
   max-height: 80vh;
   overflow: auto;
-  box-shadow: 0 8px 32px var(--mcx-shadow);
+  box-shadow: 0 0.5rem 2rem var(--mcx-shadow);
 
   &:focus {
     outline: none;
@@ -24,30 +24,30 @@
 }
 
 .title {
-  margin: 0 0 12px;
+  margin: 0 0 0.75rem;
   font-size: 1.1rem;
 }
 
 .description {
-  margin: 0 0 8px;
+  margin: 0 0 0.5rem;
   font-size: 0.9rem;
 }
 
 .note {
-  margin: 0 0 12px;
+  margin: 0 0 0.75rem;
   font-size: 0.8rem;
   color: var(--mcx-text);
 }
 
 .status {
-  margin: 12px 0 0;
+  margin: 0.75rem 0 0;
   font-size: 0.9rem;
 }
 
 .error {
-  margin: 12px 0 0;
-  padding: 8px 10px;
-  border-radius: 4px;
+  margin: 0.75rem 0 0;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.25rem;
   font-size: 0.85rem;
   color: var(--mcx-danger);
   background: var(--mcx-danger-bg);
@@ -58,14 +58,14 @@
 .actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 16px;
+  gap: 0.5rem;
+  margin-top: 1rem;
 }
 
 .primaryBtn,
 .secondaryBtn {
-  padding: 8px 16px;
-  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
   cursor: pointer;
 }
 

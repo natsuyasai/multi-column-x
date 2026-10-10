@@ -9,7 +9,7 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 16px;
+  padding: 1rem;
   box-sizing: border-box;
   overflow-y: auto;
 }
@@ -17,18 +17,18 @@
 .dialog {
   background: var(--mcx-surface);
   border: 1px solid var(--mcx-border);
-  border-radius: 8px;
-  padding: 24px;
-  width: min(420px, 100%);
-  max-height: calc(100% - 32px);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  width: min(26.25rem, 100%);
+  max-height: calc(100% - 2rem);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 1rem;
 }
 
 .title {
-  font-size: 16px;
+  font-size: 1rem;
   color: var(--mcx-text);
   margin: 0;
 }
@@ -39,46 +39,46 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0.5rem;
 }
 
 .item {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 0.75rem;
 }
 
 .keys {
   flex: 0 0 auto;
-  min-width: 96px;
+  min-width: 6rem;
   background: var(--mcx-surface-muted);
   border: 1px solid var(--mcx-border-strong);
-  border-radius: 4px;
+  border-radius: 0.25rem;
   color: var(--mcx-text);
   font-family: inherit;
-  font-size: 12px;
-  padding: 4px 8px;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
   text-align: center;
 }
 
 .description {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--mcx-text-secondary);
 }
 
 .actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
 }
 
 .closeBtn {
   background: var(--mcx-surface-muted);
   border: 1px solid var(--mcx-border-strong);
-  border-radius: 4px;
+  border-radius: 0.25rem;
   color: var(--mcx-text-tertiary);
   cursor: pointer;
-  font-size: 13px;
-  padding: 8px 16px;
+  font-size: 0.8125rem;
+  padding: 0.5rem 1rem;
 }

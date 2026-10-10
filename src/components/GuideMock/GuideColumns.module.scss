@@ -1,8 +1,8 @@
 .board {
   display: flex;
-  gap: 8px;
+  gap: 0.5rem;
   height: 100vh;
-  padding: 8px;
+  padding: 0.5rem;
   box-sizing: border-box;
   background: var(--mcx-app-bg);
   color: var(--mcx-text);
@@ -16,7 +16,7 @@
   flex-direction: column;
   background: var(--mcx-surface);
   border: 1px solid var(--mcx-border);
-  border-radius: 4px;
+  border-radius: 0.25rem;
   overflow: hidden;
 }
 
@@ -27,14 +27,14 @@
 
 .post {
   display: flex;
-  gap: 10px;
-  padding: 12px;
+  gap: 0.625rem;
+  padding: 0.75rem;
   border-bottom: 1px solid var(--mcx-border-subtle);
 }
 
 .avatar {
-  width: 40px;
-  height: 40px;
+  width: 2.5rem;
+  height: 2.5rem;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -44,21 +44,21 @@
 }
 
 .name {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   color: var(--mcx-text);
 }
 
 .handle {
-  margin-left: 6px;
-  font-size: 13px;
+  margin-left: 0.375rem;
+  font-size: 0.8125rem;
   font-weight: 400;
   color: var(--mcx-text-tertiary);
 }
 
 .text {
-  margin-top: 4px;
-  font-size: 14px;
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
   line-height: 1.5;
   color: var(--mcx-text-secondary);
 }
