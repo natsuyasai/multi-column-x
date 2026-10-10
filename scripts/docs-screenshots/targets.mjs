@@ -13,6 +13,7 @@ const MOBILE = { width: 390, height: 844 };
  *   theme?: "light" | "dark",
  *   clip?: "dialog" | { x: number, y: number, width: number, height: number },
  *   clickButtons?: string[],
+ *   scrollToHeading?: string,
  * }} Target
  */
 
@@ -173,5 +174,13 @@ export const targets = [
     viewport: MOBILE,
     theme: "light",
     clip: { x: 0, y: 0, width: 390, height: 280 },
+  },
+  {
+    file: "android-app-settings-android",
+    storyId:
+      "components-appsettingspanel--android-fullscreen-with-mobile-groups",
+    viewport: MOBILE,
+    theme: "light",
+    scrollToHeading: "Android専用",
   },
 ];

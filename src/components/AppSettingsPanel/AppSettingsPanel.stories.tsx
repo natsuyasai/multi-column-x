@@ -594,6 +594,27 @@ export const MobileGroupsLightTheme: Story = {
   ],
 };
 
+export const AndroidFullscreenWithMobileGroups: Story = {
+  name: "Android実機相当（全画面・Android専用グループ表示）",
+  decorators: [
+    (Story) => (
+      <MobileRoot>
+        <ThemeRoot theme="light">
+          <AndroidRoot>
+            <Story />
+          </AndroidRoot>
+        </ThemeRoot>
+      </MobileRoot>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole("heading", { name: "Android専用" }),
+    ).toBeInTheDocument();
+  },
+};
+
 const fullscreenExpected = () => ({
   left: 0,
   top: 0,
