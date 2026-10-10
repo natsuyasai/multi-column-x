@@ -172,15 +172,31 @@ pub fn strip_verbatim_prefix(path: &str) -> String {
     path.to_string()
 }
 
+/// ネットワークフォルダ（UNC）は不可。`\\?\UNC\` 形式も `\\server\share` と同じく拒否する。
+/// 共有の切断や遅延で WebView2 の読み込みが不安定になるため。
+pub fn ensure_local_folder_path(path: &str) -> Result<(), String> {
+    let normalized = strip_verbatim_prefix(path);
+    if normalized.starts_with(r"\\") || normalized.starts_with("//") {
+        return Err(
+            "ネットワークフォルダは追加できません。ローカルフォルダを指定してください".to_string(),
+        );
+    }
+    Ok(())
+}
+
 /// 指定フォルダを実パス化し、manifest を検証する。manifest が無い／壊れている場合はエラー。
 pub fn prepare_folder_for_add(path: &str) -> Result<(String, ManifestInfo), String> {
+    // 共有への接続待ちを避けるため、実パス化の前にも判定する。
+    ensure_local_folder_path(path)?;
     let canonical = std::fs::canonicalize(path)
         .map_err(|_| "指定されたフォルダが見つかりません".to_string())?;
     if !canonical.is_dir() {
         return Err("フォルダを指定してください".to_string());
     }
-    let info = read_manifest_info(&canonical, LOCALE).map_err(|e| e.to_string())?;
     let stored = strip_verbatim_prefix(&canonical.to_string_lossy());
+    // シンボリックリンク等で UNC に解決されるケースも拒否する。
+    ensure_local_folder_path(&stored)?;
+    let info = read_manifest_info(&canonical, LOCALE).map_err(|e| e.to_string())?;
     Ok((stored, info))
 }
 
@@ -666,6 +682,43 @@ mod tests {
                 Some(new_id.to_string())
             );
         }
+    }
+
+    #[test]
+    fn ローカルパスはネットワークフォルダ判定を通る() {
+        for ok in [
+            r"C:\ext",
+            r"C:\",
+            r"\\?\C:\ext",
+            "/home/u/ext",
+            r"D:\a b\ext",
+        ] {
+            assert!(ensure_local_folder_path(ok).is_ok(), "{ok}");
+        }
+    }
+
+    #[test]
+    fn uncパスはネットワークフォルダとして拒否される() {
+        for ng in [
+            r"\\server\share\ext",
+            r"\\?\UNC\server\share\ext",
+            "//server/share/ext",
+        ] {
+            let err = ensure_local_folder_path(ng).unwrap_err();
+            assert_eq!(
+                err, "ネットワークフォルダは追加できません。ローカルフォルダを指定してください",
+                "{ng}"
+            );
+        }
+    }
+
+    #[test]
+    fn ネットワークフォルダを指定するとフォルダ検証の前に拒否される() {
+        let err = prepare_folder_for_add(r"\\server\share\ext").unwrap_err();
+        assert!(
+            err.contains("ネットワークフォルダは追加できません"),
+            "{err}"
+        );
     }
 
     #[test]

@@ -7,6 +7,7 @@ import {
   CHROME_NOT_FOUND_NOTICE,
   ExtensionsTab,
   MISSING_BADGE_TEXT,
+  TRUST_NOTICE,
 } from "@/components/AppSettingsPanel/ExtensionsTab";
 import type { DetectResult, ExtensionEntry } from "@/types";
 
@@ -150,6 +151,8 @@ export const Default: Story = {
       await canvas.findByText("フォルダから追加した拡張"),
     ).toBeInTheDocument();
     await expect(canvas.getByText(MISSING_BADGE_TEXT)).toBeInTheDocument();
+    // 追加時の信頼に関する注意が表示される
+    await expect(canvas.getByRole("note")).toHaveTextContent(TRUST_NOTICE);
     // ポップアップを持たない拡張には「ポップアップを開く」が出ない
     await expect(
       canvas.queryByRole("button", {

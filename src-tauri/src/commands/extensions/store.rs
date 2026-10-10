@@ -11,15 +11,28 @@ use super::model::ExtensionsState;
 pub const STORE_KEY: &str = "browserExtensions";
 const STORE_FILE: &str = "settings.json";
 
-/// 保存値を状態へ変換する。キー無し・壊れた値は空状態にフォールバックする。
-pub fn state_from_value(value: Option<Value>) -> ExtensionsState {
+/// 破損した `browserExtensions` を退避するキー名（1 世代のみ保持し、次の破損で上書きする）。
+pub const BROKEN_KEY: &str = "browserExtensionsBroken";
+
+/// 保存値を状態へ変換し、破損していた場合はその元の値も返す（退避用）。
+/// キー無し・`null` は破損ではない。壊れた値は空状態にフォールバックする。
+pub fn split_stored_value(value: Option<Value>) -> (ExtensionsState, Option<Value>) {
     match value {
-        None => ExtensionsState::default(),
-        Some(v) => serde_json::from_value(v).unwrap_or_else(|e| {
-            log::warn!("拡張機能の設定の読み込みに失敗したため空状態で続行します: {e}");
-            ExtensionsState::default()
-        }),
+        None | Some(Value::Null) => (ExtensionsState::default(), None),
+        Some(v) => match serde_json::from_value(v.clone()) {
+            Ok(state) => (state, None),
+            Err(e) => {
+                log::warn!("拡張機能の設定の読み込みに失敗したため空状態で続行します: {e}");
+                (ExtensionsState::default(), Some(v))
+            }
+        },
     }
+}
+
+/// 保存値を状態へ変換する（退避値を捨てる版。テストで使う）。
+#[cfg(test)]
+pub fn state_from_value(value: Option<Value>) -> ExtensionsState {
+    split_stored_value(value).0
 }
 
 /// 状態を保存用の値へ変換する。
@@ -30,7 +43,15 @@ pub fn state_to_value(state: &ExtensionsState) -> Result<Value, String> {
 /// 保存済みの拡張機能の状態を読み込む。
 pub fn load(app: &AppHandle) -> Result<ExtensionsState, String> {
     let store = app.store(STORE_FILE).map_err(|e| e.to_string())?;
-    Ok(state_from_value(store.get(STORE_KEY)))
+    let (state, broken) = split_stored_value(store.get(STORE_KEY));
+    if let Some(broken) = broken {
+        // 次の保存で破損値が上書きされて失われないよう、別キーへ退避する（1 世代）。
+        store.set(BROKEN_KEY, broken);
+        if let Err(e) = crate::commands::settings_file::save_store_atomically(app, &store) {
+            log::warn!("破損した拡張機能の設定の退避保存に失敗しました: {e}");
+        }
+    }
+    Ok(state)
 }
 
 /// 拡張機能の状態を保存する（`Store::save` ではなくアトミック保存を使う）。
@@ -138,6 +159,40 @@ mod tests {
         ] {
             assert_eq!(state_from_value(Some(broken)), ExtensionsState::default());
         }
+    }
+
+    #[test]
+    fn 破損した保存値は空状態と退避すべき元の値に分けられる() {
+        for broken in [
+            json!("文字列"),
+            json!(42),
+            json!({"entries": "壊れ"}),
+            json!([1, 2]),
+        ] {
+            let (state, escrow) = split_stored_value(Some(broken.clone()));
+            assert_eq!(state, ExtensionsState::default());
+            assert_eq!(escrow, Some(broken));
+        }
+    }
+
+    #[test]
+    fn キー無しとnullと正常な値では退避しない() {
+        assert_eq!(split_stored_value(None), (ExtensionsState::default(), None));
+        assert_eq!(
+            split_stored_value(Some(json!(null))),
+            (ExtensionsState::default(), None)
+        );
+        let normal = state_to_value(&複数種類の状態()).unwrap();
+        let (state, escrow) = split_stored_value(Some(normal));
+        assert_eq!(state, 複数種類の状態());
+        assert_eq!(escrow, None);
+    }
+
+    #[test]
+    fn 退避キーは他のキーと別である() {
+        assert_eq!(BROKEN_KEY, "browserExtensionsBroken");
+        assert_ne!(BROKEN_KEY, STORE_KEY);
+        assert_ne!(BROKEN_KEY, "appSettings");
     }
 
     #[test]

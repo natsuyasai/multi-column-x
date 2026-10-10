@@ -7,6 +7,8 @@ export const ACCOUNT_REQUIRED_TITLE = "アカウントを選択してくださ�
 export const CHROME_NOT_FOUND_NOTICE = "Chrome が見つかりません";
 export const MISSING_BADGE_TEXT = "見つかりません";
 export const ADDED_BADGE_TEXT = "追加済み";
+export const TRUST_NOTICE =
+  "追加した拡張機能は、すべてのアカウントの X ページを読み書きできる場合があります。信頼できるものだけを追加してください。";
 export const RELOAD_NOTICE =
   "追加・削除・有効無効を変更すると、全カラムが自動で再読込されます。";
 
@@ -169,6 +171,9 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
         <p className={styles.note}>
           展開済みの拡張機能フォルダを指定するか、Chrome
           にインストール済みの拡張機能から選んで、全アカウントに追加します。
+        </p>
+        <p className={styles.note} role="note">
+          {TRUST_NOTICE}
         </p>
         <p className={styles.note}>{RELOAD_NOTICE}</p>
         <div className={styles.buttonRow}>

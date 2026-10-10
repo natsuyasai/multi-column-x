@@ -52,6 +52,16 @@ function setup(overrides: Partial<Props> = {}, initial: ExtensionEntry[] = []) {
 }
 
 describe("ExtensionsTab", () => {
+  it("追加セクションに信頼できる拡張機能だけを追加する旨の注意が表示される", () => {
+    setup();
+
+    expect(
+      screen.getByText(
+        "追加した拡張機能は、すべてのアカウントの X ページを読み書きできる場合があります。信頼できるものだけを追加してください。",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("展開済みの拡張機能フォルダを指定すると全アカウントに追加される", async () => {
     const { props, user } = setup();
 

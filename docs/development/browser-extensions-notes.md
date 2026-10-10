@@ -45,7 +45,7 @@
 - 正本（desired state）は `settings.json`（tauri-plugin-store）の**別キー `browserExtensions`**（`store::STORE_KEY`）。中身は `ExtensionsState { entries, profiles }`。
 - **`appSettings` は変更しない**。理由: (1) 拡張機能のパスは端末固有でバックアップに含めたくない（`BackupGlobalSettings` は `GlobalSettingsData` のホワイトリスト出力で、別キーなら影響しない。`apply_restore` も `appSettings` のみ触る）。(2) `GlobalSettingsData` に入れると既定値の 3 箇所同期（Rust / TS / `contracts/default-settings.json`）とバックアップ取捨の判断が発生する。
 - 保存は `store.set(...)` → `settings_file::save_store_atomically`（`Store::save` 直呼び禁止）。
-- 読み込み時にキーが無い / 壊れた値は空状態にフォールバックする（`state_from_value`）。**壊れた値は退避されず、次回の save で上書きされる**。
+- 読み込み時にキーが無い / 壊れた値は空状態にフォールバックする（`state_from_value`）。**壊れた値（キーは在るのにパースできない）は、空状態を返す前に `settings.json` の別キー `browserExtensionsBroken`（`store::BROKEN_KEY`、1 世代のみ・次の破損で上書き）へ退避する**（純粋部分は `split_stored_value`。キー無し・`null`・正常値では退避しない）。
 
 ### reconcile（desired state を各プロファイルへ反映）
 
@@ -111,6 +111,9 @@
 - **外部（`external`）カラムは同期対象外**: アカウントではなく、アカウント非依存の保存先を使うため。ただし builder には（同一 data_directory の環境不一致を避けるため）フラグを付けている。
 - Chrome 由来の更新追従は「`Extensions\<ID>` 配下の最新バージョンフォルダを毎回解決し、パスが変われば Add + 旧 ID の Remove」。Chrome 側のファイルは変更しない。
 - 予約名を含むフォルダは、元フォルダを変更せず `app_data_dir/extensions/<entryId>/` に除外コピーして読み込む。削除時はコピーだけ消し、元フォルダは残す。シンボリックリンクはコピーせずスキップする。
+- 除外コピーは毎回作り直さない。コピー先の外（`copy_root/<entryId>.fingerprint`）に指紋（コピー元の絶対パス + 再帰的な（相対パス, サイズ, 更新時刻）を FNV-1a 64bit で要約した文字列。予約名エントリ・シンボリックリンクは対象外）を保存し、コピー先が在って指紋が一致する間は再コピーしない（WebView2 が読み込み中のフォルダを消さない・巨大フォルダで遅くならない）。不一致または無いときだけ指紋 → コピー先の順に消して作り直し、コピー完了後に指紋を書く。走査時に合計 20,000 ファイル・500MB・深さ 32 を超えると「拡張機能のフォルダが大きすぎます」エラー（`ScanLimits`）。
+- フォルダ指定の追加はネットワークフォルダ（UNC。`\\server\share\…`、`\\?\UNC\…`）を拒否する（`service::ensure_local_folder_path`。実パス化の前と後の両方で判定）。
+- 追加セクションに「すべてのアカウントの X ページを読み書きできる場合があります。信頼できるものだけを追加してください。」の注意を静的に表示する（`TRUST_NOTICE`）。
 
 ## 落とし穴
 
@@ -130,7 +133,7 @@
   関数名・文字列・行構成を変えるとテストが落ちる。リファクタ時はテスト側の検査対象文字列も追従させる（文字列の完全一致なので、フォーマッタによる整形変化にも注意）。
 
 - 拡張ページ用ウィンドウにも `.on_new_window(external_link::new_window_handler(app.clone()))` が必要（詳細は [external-link-new-window-notes.md](external-link-new-window-notes.md)）。
-- `copy_root`（除外コピーの置き場）が拡張フォルダの内側だと再帰コピーになる。呼び出し側は必ず `app_data_dir` 配下を渡す（`service::copy_root`）。
+- `copy_root`（除外コピーの置き場）が拡張フォルダの内側だと再帰コピーになる。`prepare_extension_dir` は `copy_root` が `source` の内側（正規化後の小文字比較）ならエラーにするが、呼び出し側も `app_data_dir` 配下を渡すこと（`service::copy_root`）。
 - 表示名などの解決ロケールは `"ja"` 固定（`service::LOCALE`）。
 
 ## テスト方針
@@ -154,7 +157,8 @@
 - **稼働中の拡張フォルダ削除（未検証）**: Add 済みのフォルダが稼働中に消えた場合の WebView2 の挙動は未確認。静的には「次回起動で一覧から消える」ことまで確認済みで、アプリ側は `resolve_entry` が `Missing` を返し無効扱いにする。
 - **Chrome 固有 API 依存の拡張**: WebView2 の拡張機能サポートは Chrome の API の一部のみ。Chrome 固有 API に依存する拡張が正しく動くかは拡張ごとに異なり、落ちないことも含めて未検証（手動テスト項目）。
 - **ロケール解決**: 候補は「希望ロケール（`ja`）→ `default_locale` → `en` / `en_US` / `en_GB`」の順（`ja-JP` のように地域付きを希望した場合のみ `ja_JP` → `ja` に展開する）。希望が `ja` で `_locales` に `ja_JP` しか無い拡張は、`ja_JP` が試されず `default_locale` / `en` 側の名前になる（許容。`ja` を `ja_JP` へ広げる処理は未実装）。
-- **壊れた `browserExtensions`**: 空状態で続行し、次回の save で上書きされる（退避は未実装）。この場合、適用記録が失われるため次回の reconcile で全拡張が再 Add される（WebView2 側が同じ拡張の二重 Add をどう扱うかは上記のとおり未検証）。
+- **ネットワークドライブ（`Z:` へのマップ）は検出しない**: UNC 表記のパスだけを拒否する。マップ済みドライブのフォルダは追加できてしまう。
+- **壊れた `browserExtensions`**: 元の値を `browserExtensionsBroken` に退避してから空状態で続行する（`load` の配線自体は `AppHandle` が要るため自動テスト対象外。純粋部分 `split_stored_value` をテスト）。この場合、適用記録が失われるため次回の reconcile で全拡張が再 Add される（WebView2 側が同じ拡張の二重 Add をどう扱うかは上記のとおり未検証）。
 - **未配線**: reconcile の失敗は `log::warn!` のみで UI には出さない（カラム作成自体は成功させる）。
 - **拡張ページ用ウィンドウの孤児化（未検証）**: メインウィンドウ終了時に `extension-` ウィンドウが残らないかは実機で未確認（`prevent_close` を使わない通常ウィンドウなので `destroy()` は足していない）。
 - ポップアップ / オプションは、対象アカウントのカラムが 1 つも表示されていない（レジストリに無い）と、未適用時に開けない（「このアカウントのカラムを先に表示してください」）。
