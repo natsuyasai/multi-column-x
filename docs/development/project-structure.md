@@ -12,6 +12,8 @@ multi-column-x/
 │   ├── store/useAppStore.ts          # Zustand ストア（設定読み書き・状態管理）
 │   ├── lib/
 │   │   ├── gridLayout.ts             # グリッド座標計算（純粋関数・calculateGridBounds）
+│   │   ├── gridLayout.contract.test.ts  # SCSS の寸法と gridLayout の rem 定数の一致を検証する契約テスト
+│   │   ├── uiScale.ts                # アプリUI倍率の決定ロジック・rem→px 変換（詳細: ui-scale-notes.md）
 │   │   ├── log.ts                    # 文脈名付きエラーロガー（plugin-log 連携）
 │   │   ├── theme.ts                  # テーマ解決（ダーク/ライト/システム）
 │   │   ├── reauthIdentity.ts         # 既存アカウント再認証時の同一アカウント判定
@@ -38,6 +40,7 @@ multi-column-x/
 │   │   ├── useAppUpdater.ts          # 自動アップデートの確認・進捗表示
 │   │   ├── useWhatsNew.ts            # 更新後の What's New 表示
 │   │   ├── useTheme.ts               # テーマ（ダーク/ライト/システム）切替
+│   │   ├── useUiScale.ts             # アプリUI倍率を <html> の font-size へ反映（端末倍率の測定含む）
 │   │   ├── useDialogState.ts         # ダイアログ開閉状態管理
 │   │   ├── useEscapeKey.ts           # Esc キーでのダイアログ/ポップアップ閉じる処理
 │   │   ├── useOutsideClick.ts        # 要素外クリック検出
@@ -146,7 +149,7 @@ src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/
 
 | #   | グループ             | 中身                                                                          | 出し分け                                                                                                          |
 | --- | -------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| 1   | 表示                 | 表示サイズ・テーマ                                                            | 全環境                                                                                                            |
+| 1   | 表示                 | アプリUIの表示サイズ・カラム内の表示サイズ・テーマ                            | 全環境                                                                                                            |
 | 2   | 新規カラムの既定値   | 自動更新・ヘッダー非表示等の既定値と一括適用                                  | 全環境                                                                                                            |
 | 3   | 閲覧・フィルタ       | NG ワード・リポスト非表示ユーザー・広告・API残量モニター                      | 全環境                                                                                                            |
 | 4   | メディア             | 動画設定 / ポップアップウィンドウ / 動画再生(Linux)                           | ポップアップ = desktop のみ、動画再生(Linux) = Linux デスクトップのみ（`isLinux && !isMobile`）、動画設定は全環境 |

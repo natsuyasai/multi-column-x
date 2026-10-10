@@ -102,6 +102,9 @@ fn default_height_mode() -> String {
 fn default_column_scale() -> String {
     "default".to_string()
 }
+fn default_ui_scale() -> String {
+    "auto".to_string()
+}
 
 impl Default for WindowBounds {
     fn default() -> Self {
@@ -143,6 +146,7 @@ impl Default for GlobalSettingsData {
             hide_ad_enabled: true,
             api_rate_limit_monitor_enabled: true,
             column_scale: default_column_scale(),
+            ui_scale: default_ui_scale(),
             use_x_app_for_compose: false,
             mobile_swipe_area_enabled: true,
             mobile_swipe_area_height: 28,
@@ -263,6 +267,8 @@ pub struct GlobalSettingsData {
     pub api_rate_limit_monitor_enabled: bool,
     #[serde(rename = "columnScale")]
     pub column_scale: String,
+    #[serde(rename = "uiScale")]
+    pub ui_scale: String,
     #[serde(rename = "useXAppForCompose")]
     pub use_x_app_for_compose: bool,
     #[serde(rename = "mobileSwipeAreaEnabled")]
@@ -570,6 +576,30 @@ mod tests {
     fn global_settings_default_column_scale_is_default() {
         let gs = GlobalSettingsData::default();
         assert_eq!(gs.column_scale, "default");
+    }
+
+    #[test]
+    fn 既定ではアプリuiの表示サイズは端末に合わせるが選ばれている() {
+        let gs = GlobalSettingsData::default();
+        assert_eq!(gs.ui_scale, "auto");
+    }
+
+    #[test]
+    fn 旧バージョンの設定jsonを読み込んでもアプリuiの表示サイズはautoになる() {
+        let json = serde_json::json!({ "columnScale": "large" });
+        let gs: GlobalSettingsData = serde_json::from_value(json).unwrap();
+        assert_eq!(gs.ui_scale, "auto");
+        assert_eq!(gs.column_scale, "large");
+    }
+
+    #[test]
+    fn 選んだアプリuiの表示サイズは保存と読み込みの往復で保たれる() {
+        let mut settings = AppSettingsData::default();
+        settings.global_settings.ui_scale = "xLarge".to_string();
+        let json = serde_json::to_value(&settings).unwrap();
+        assert_eq!(json["globalSettings"]["uiScale"], "xLarge");
+        let restored: AppSettingsData = serde_json::from_value(json).unwrap();
+        assert_eq!(restored.global_settings.ui_scale, "xLarge");
     }
 
     #[test]

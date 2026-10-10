@@ -179,6 +179,7 @@ describe("useColumns mobile", () => {
         hideAdEnabled: false,
         apiRateLimitMonitorEnabled: true,
         columnScale: "default",
+        uiScale: "auto",
         useXAppForCompose: false,
         mobileSwipeAreaEnabled: true,
         mobileSwipeAreaHeight: 28,
@@ -1034,7 +1035,7 @@ describe("useColumns handleAddColumn", () => {
       (c) => c[0] === "create_column_webview",
     );
     expect(createCall).toBeDefined();
-    // topBarExpanded: true のとき y は TOPBAR_EXPANDED_HEIGHT(64) + HEADER_HEIGHT(36) = 100
+    // topBarExpanded: true のとき y は TopBar 展開高さ(64) + ヘッダー高さ(36) = 100
     expect((createCall?.[1] as { args: { y: number } }).args.y).toBe(100);
   });
 });
@@ -1252,7 +1253,7 @@ describe("useColumns desktop recreateColumnWebview", () => {
         (c[1] as { args: { column: Column } }).args.column.id === "col-1",
     );
     expect(createCall).toBeDefined();
-    // topBarExpanded: true のとき y は TOPBAR_EXPANDED_HEIGHT(64) + HEADER_HEIGHT(36) = 100
+    // topBarExpanded: true のとき y は TopBar 展開高さ(64) + ヘッダー高さ(36) = 100
     expect((createCall?.[1] as { args: { y: number } }).args.y).toBe(100);
   });
 

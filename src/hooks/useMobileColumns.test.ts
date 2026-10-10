@@ -8,11 +8,12 @@ import {
   STORAGE_KEYS,
   WEBVIEW_SCRIPTS,
 } from "../constants/ipc";
+import { setRootFontPx } from "../lib/uiScale";
 import { resolveColumnDataDirectory } from "../services/externalColumn";
 import { useAppStore } from "../store/useAppStore";
 import type { Account, Column } from "../types";
 import { DEFAULT_COLUMN_SETTINGS, DEFAULT_GLOBAL_SETTINGS } from "../types";
-import { useMobileColumns } from "./useMobileColumns";
+import { mobileLayoutForViewport, useMobileColumns } from "./useMobileColumns";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -606,5 +607,38 @@ describe("useMobileColumns", () => {
       IPC_COMMANDS.EVAL_IN_WEBVIEW,
       expect.anything(),
     );
+  });
+});
+
+describe("mobileLayoutForViewport（UI倍率の反映）", () => {
+  afterEach(() => {
+    setRootFontPx(16);
+    vi.unstubAllGlobals();
+  });
+
+  const columns: Column[] = [
+    {
+      id: "c1",
+      accountId: "acc-1",
+      pageType: "home",
+      homeTabName: "フォロー中",
+      width: 350,
+      order: 0,
+      gridCol: 1,
+      gridRow: 1,
+      heightMode: "auto",
+      settings: { ...DEFAULT_COLUMN_SETTINGS },
+    },
+  ];
+
+  it("倍率1.0ではタブバー高さ56pxを引いた高さになる", () => {
+    vi.stubGlobal("innerHeight", 800);
+    expect(mobileLayoutForViewport(columns, "c1").c1.height).toBe(744);
+  });
+
+  it("倍率1.25ではタブバー高さ70pxを引いた高さになる", () => {
+    vi.stubGlobal("innerHeight", 800);
+    setRootFontPx(20);
+    expect(mobileLayoutForViewport(columns, "c1").c1.height).toBe(730);
   });
 });

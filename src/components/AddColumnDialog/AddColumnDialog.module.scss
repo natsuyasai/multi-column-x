@@ -9,7 +9,7 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 16px;
+  padding: 1rem;
   box-sizing: border-box;
   overflow-y: auto;
 }
@@ -17,18 +17,18 @@
 .dialog {
   background: var(--mcx-surface);
   border: 1px solid var(--mcx-border);
-  border-radius: 8px;
-  padding: 24px;
-  width: min(400px, 100%);
-  max-height: calc(100% - 32px);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  width: min(25rem, 100%);
+  max-height: calc(100% - 2rem);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 1rem;
 }
 
 .title {
-  font-size: 16px;
+  font-size: 1rem;
   color: var(--mcx-text);
   margin: 0;
 }
@@ -36,16 +36,16 @@
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0.375rem;
 }
 
 .label {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--mcx-text-tertiary);
 }
 
 .hint {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--mcx-text-tertiary);
   margin: 0;
 }
@@ -54,10 +54,10 @@
 .input {
   background: var(--mcx-surface-sunken);
   border: 1px solid var(--mcx-border);
-  border-radius: 4px;
+  border-radius: 0.25rem;
   color: var(--mcx-text);
-  font-size: 13px;
-  padding: 8px;
+  font-size: 0.8125rem;
+  padding: 0.5rem;
   width: 100%;
   box-sizing: border-box;
 }
@@ -69,8 +69,8 @@
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 8px center;
-  padding-right: 28px;
+  background-position: right 0.5rem center;
+  padding-right: 1.75rem;
 }
 
 .select option {
@@ -81,29 +81,29 @@
 .actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
 }
 
 .cancelBtn {
   background: var(--mcx-surface-muted);
   border: 1px solid var(--mcx-border-strong);
-  border-radius: 4px;
+  border-radius: 0.25rem;
   color: var(--mcx-text-tertiary);
   cursor: pointer;
-  font-size: 13px;
-  padding: 8px 16px;
+  font-size: 0.8125rem;
+  padding: 0.5rem 1rem;
 }
 
 .submitBtn {
   background: var(--mcx-accent);
   border: none;
-  border-radius: 4px;
+  border-radius: 0.25rem;
   color: var(--mcx-text-on-accent);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: bold;
-  padding: 8px 16px;
+  padding: 0.5rem 1rem;
 
   &:disabled {
     background: var(--mcx-surface-muted);

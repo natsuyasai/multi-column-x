@@ -4,8 +4,8 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { platform } from "@tauri-apps/plugin-os";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  HEADER_HEIGHT,
-  SCROLLBAR_HEIGHT,
+  getHeaderHeight,
+  getScrollbarHeight,
   getTopBarHeight,
   calculateGridBounds,
   type ColumnBounds,
@@ -38,7 +38,7 @@ interface DesktopViewport {
 
 /**
  * デスクトップの全カラム WebView 配置を計算する。
- * HEADER_HEIGHT / SCROLLBAR_HEIGHT の取得元を一本化するためのラッパー。
+ * getHeaderHeight / getScrollbarHeight の取得元を一本化するためのラッパー。
  */
 export function desktopGridBounds(
   columns: Column[],
@@ -47,8 +47,8 @@ export function desktopGridBounds(
   return calculateGridBounds(columns, {
     containerHeight: viewport.containerHeight,
     scrollLeft: viewport.scrollLeft,
-    headerHeight: HEADER_HEIGHT,
-    scrollbarHeight: SCROLLBAR_HEIGHT,
+    headerHeight: getHeaderHeight(),
+    scrollbarHeight: getScrollbarHeight(),
     topBarHeight: viewport.topBarHeight,
   });
 }

@@ -48,6 +48,7 @@ const baseGlobalSettings: GlobalSettings = {
   hideAdEnabled: true,
   apiRateLimitMonitorEnabled: true,
   columnScale: "default",
+  uiScale: "auto",
   useXAppForCompose: false,
   mobileSwipeAreaEnabled: true,
   mobileSwipeAreaHeight: 28,
@@ -762,6 +763,17 @@ describe("AppSettingsPanel テーマ選択", () => {
   });
 });
 
+const カラム内ボタン = (name: string) =>
+  within(screen.getByRole("group", { name: "カラム内の表示サイズ" })).getByRole(
+    "button",
+    { name },
+  );
+const アプリUIボタン = (name: string) =>
+  within(screen.getByRole("group", { name: "アプリUIの表示サイズ" })).getByRole(
+    "button",
+    { name },
+  );
+
 describe("AppSettingsPanel 表示サイズ・テーマの変更チェックボックス", () => {
   it("チェックボックスがいずれもOFFのまま適用すると、patchにcolumnScale/themeキーが含まれない", () => {
     const onApply = vi.fn();
@@ -777,9 +789,9 @@ describe("AppSettingsPanel 表示サイズ・テーマの変更チェックボ�
     const onApply = vi.fn();
     render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
     fireEvent.click(
-      screen.getByRole("checkbox", { name: "表示サイズを変更する" }),
+      screen.getByRole("checkbox", { name: "カラム内の表示サイズを変更する" }),
     );
-    fireEvent.click(screen.getByRole("button", { name: "大" }));
+    fireEvent.click(カラム内ボタン("大"));
     fireEvent.click(screen.getByRole("button", { name: "適用" }));
     const patch = onApply.mock.calls[0][0] as Record<string, unknown>;
     expect(patch).toHaveProperty("columnScale", "large");
@@ -799,18 +811,19 @@ describe("AppSettingsPanel 表示サイズ・テーマの変更チェックボ�
 
   it("表示サイズ・テーマのボタンはチェックボックスがOFFの間は操作できない", () => {
     render(<AppSettingsPanel {...defaultProps} />);
-    expect(screen.getByRole("button", { name: "大" })).toBeDisabled();
+    expect(カラム内ボタン("大")).toBeDisabled();
+    expect(アプリUIボタン("大")).toBeDisabled();
     expect(screen.getByRole("button", { name: "ライト" })).toBeDisabled();
   });
 
   it("パネルを開き直す（再マウント）と、チェックボックスは常にOFF状態で表示される", () => {
     const { unmount } = render(<AppSettingsPanel {...defaultProps} />);
     fireEvent.click(
-      screen.getByRole("checkbox", { name: "表示サイズを変更する" }),
+      screen.getByRole("checkbox", { name: "カラム内の表示サイズを変更する" }),
     );
     fireEvent.click(screen.getByRole("checkbox", { name: "テーマを変更する" }));
     expect(
-      screen.getByRole("checkbox", { name: "表示サイズを変更する" }),
+      screen.getByRole("checkbox", { name: "カラム内の表示サイズを変更する" }),
     ).toBeChecked();
     expect(
       screen.getByRole("checkbox", { name: "テーマを変更する" }),
@@ -819,11 +832,81 @@ describe("AppSettingsPanel 表示サイズ・テーマの変更チェックボ�
 
     render(<AppSettingsPanel {...defaultProps} />);
     expect(
-      screen.getByRole("checkbox", { name: "表示サイズを変更する" }),
+      screen.getByRole("checkbox", { name: "カラム内の表示サイズを変更する" }),
     ).not.toBeChecked();
     expect(
       screen.getByRole("checkbox", { name: "テーマを変更する" }),
     ).not.toBeChecked();
+  });
+});
+
+describe("AppSettingsPanel アプリUIの表示サイズ", () => {
+  it("カラム内の表示サイズとアプリUIの表示サイズは別項目として区別できる", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(screen.getByText("カラム内の表示サイズ")).toBeInTheDocument();
+    expect(screen.getByText("アプリUIの表示サイズ")).toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", { name: "カラム内の表示サイズを変更する" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", { name: "アプリUIの表示サイズを変更する" }),
+    ).toBeInTheDocument();
+  });
+
+  it("アプリUIの表示サイズを大にして適用すると、patchにuiScaleが含まれ、columnScaleは含まれない", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "アプリUIの表示サイズを変更する" }),
+    );
+    fireEvent.click(アプリUIボタン("大"));
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    const patch = onApply.mock.calls[0][0] as Record<string, unknown>;
+    expect(patch).toHaveProperty("uiScale", "large");
+    expect(patch).not.toHaveProperty("columnScale");
+  });
+
+  it("アプリUIの表示サイズの変更チェックをOFFのまま適用すると、patchにuiScaleが含まれない", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    const patch = onApply.mock.calls[0][0] as Record<string, unknown>;
+    expect(patch).not.toHaveProperty("uiScale");
+  });
+
+  it("端末に合わせるを選んで適用すると、patchのuiScaleがautoになる", () => {
+    const onApply = vi.fn();
+    const settings = { ...baseGlobalSettings, uiScale: "xLarge" as const };
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={settings}
+        onApply={onApply}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "アプリUIの表示サイズを変更する" }),
+    );
+    fireEvent.click(アプリUIボタン("端末に合わせる"));
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    const patch = onApply.mock.calls[0][0] as Record<string, unknown>;
+    expect(patch).toHaveProperty("uiScale", "auto");
+  });
+
+  it("アプリUIの表示サイズのボタン群はaria-pressedで選択状態を表す", () => {
+    const settings = { ...baseGlobalSettings, uiScale: "small" as const };
+    render(<AppSettingsPanel {...defaultProps} settings={settings} />);
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "アプリUIの表示サイズを変更する" }),
+    );
+    expect(アプリUIボタン("小")).toHaveAttribute("aria-pressed", "true");
+    expect(アプリUIボタン("端末に合わせる")).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    fireEvent.click(アプリUIボタン("特大"));
+    expect(アプリUIボタン("特大")).toHaveAttribute("aria-pressed", "true");
+    expect(アプリUIボタン("小")).toHaveAttribute("aria-pressed", "false");
   });
 });
 

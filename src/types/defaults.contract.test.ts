@@ -18,6 +18,11 @@ describe("TS/Rust デフォルト設定の契約", () => {
     expect(DEFAULT_GLOBAL_SETTINGS.imagePopupEnabled).toBe(true);
   });
 
+  it("既定ではアプリUIの表示サイズは端末に合わせるが選ばれている", () => {
+    expect(DEFAULT_GLOBAL_SETTINGS.uiScale).toBe("auto");
+    expect(fixture.globalSettings.uiScale).toBe("auto");
+  });
+
   it("動画ポップアップ既定値がtrueである", () => {
     expect(DEFAULT_GLOBAL_SETTINGS.videoPopupEnabled).toBe(true);
   });

@@ -37,6 +37,7 @@ import { useMobileSwipeBarSync } from "./hooks/useMobileSwipeBarSync";
 import { usePopupWindowHandlers } from "./hooks/usePopupWindowHandlers";
 import { useSettingsApplyHandlers } from "./hooks/useSettingsApplyHandlers";
 import { useTheme } from "./hooks/useTheme";
+import { useUiScale } from "./hooks/useUiScale";
 import {
   useApiRateLimitReports,
   useColumnCrashRecovery,
@@ -47,7 +48,7 @@ import {
   useWebviewScrollRelay,
 } from "./hooks/useWebviewEvents";
 import { useWhatsNew } from "./hooks/useWhatsNew";
-import { HEADER_HEIGHT, getTopBarHeight } from "./lib/gridLayout";
+import { getHeaderHeight, getTopBarHeight } from "./lib/gridLayout";
 import { evalInColumn } from "./services/columnWebview";
 import { useAppStore } from "./store/useAppStore";
 
@@ -142,12 +143,18 @@ const App: React.FC = () => {
   // 起動時初期化（プラットフォーム検出→設定ロード→バージョン取得→カラム復元→
   // 表示サイズ適用）をまとめたフック。columnsRestored は起動時の更新チェックを
   // 復元完了後にゲートするために使う（UpdateDialog がカラムの裏に隠れるのを防ぐ）。
+  // アプリUI倍率（<html> の font-size と rootFontPx）を適用する。effect は宣言順に実行されるため、
+  // useAppBootstrap の復元 effect より前に置き、復元時点で rootFontPx が確定済みであるようにする。
+  // isMobile は初回 effect で確定済みの state を受け取り、変わったら再評価される。
+  const uiScaleFactor = useUiScale(globalSettings.uiScale ?? "auto", isMobile);
+
   const { columnsRestored, appVersion } = useAppBootstrap({
     setIsMobile,
     setProfileApiSupported,
     loadSettings,
     isLoaded,
-    restoreColumns,
+    // topBarHeight は描画時に計算されるため、倍率適用前の値になり得る。復元時に取り直す。
+    restoreColumns: () => restoreColumns(getTopBarHeight(topBarExpanded)),
     topBarHeight,
     columns,
     columnScale: globalSettings.columnScale,
@@ -257,6 +264,19 @@ const App: React.FC = () => {
     // anyDialogOpen 変化時のみ退避/復元する（他の依存で再実行させない）
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anyDialogOpen]);
+
+  // アプリUI倍率が変わったら、rem 由来の高さ（TopBar 等）が変わるので全カラムの bounds を取り直す。
+  // 初回（前回値と同じ）・復元前・ダイアログ表示中（閉じたときの復元に任せる）は何もしない。
+  const prevUiScaleFactorRef = useRef(uiScaleFactor);
+  useEffect(() => {
+    if (prevUiScaleFactorRef.current === uiScaleFactor) return;
+    prevUiScaleFactorRef.current = uiScaleFactor;
+    if (!columnsRestored || anyDialogOpen) return;
+    recalculateAllBounds();
+    syncMobileSwipeBar();
+    // 倍率変化時のみ実行する（他の依存で再実行させない）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uiScaleFactor]);
 
   const handleToggleTopBar = useCallback(() => {
     setTopBarExpanded(!topBarExpanded);
@@ -414,7 +434,7 @@ const App: React.FC = () => {
               className={styles.columnHeaderWrapper}
               style={{
                 left: bounds.x,
-                top: bounds.y - HEADER_HEIGHT - topBarHeight,
+                top: bounds.y - getHeaderHeight() - topBarHeight,
                 width: bounds.width,
               }}
             >

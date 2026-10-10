@@ -31,11 +31,12 @@ pub const MAX_LIST_ITEM_CHARS: usize = 500;
 /// ポータブルでないため、バックアップに含めない `globalSettings` のキー。
 /// `GlobalSettingsData` のキー集合 ＝ 出力キー ∪ この一覧、をテストで保証する（テスト専用の定義）。
 #[cfg(test)]
-pub const EXCLUDED_GLOBAL_SETTINGS_KEYS: [&str; 4] = [
+pub const EXCLUDED_GLOBAL_SETTINGS_KEYS: [&str; 5] = [
     "windowBounds",
     "pendingDataDirectoryDeletions",
     "hardwareVideoDecodeEnabled",
     "h264DownloadPromptDismissed",
+    "uiScale",
 ];
 
 const ALLOWED_THEMES: [&str; 3] = ["dark", "light", "system"];
@@ -211,7 +212,7 @@ pub struct BackupPreset {
 
 /// バックアップに含める `globalSettings`（ホワイトリスト）。
 /// `windowBounds`・`pendingDataDirectoryDeletions`・`hardwareVideoDecodeEnabled`・
-/// `h264DownloadPromptDismissed` は端末依存のため意図的に持たない。
+/// `h264DownloadPromptDismissed`・`uiScale` は端末依存のため意図的に持たない。
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default)]
 pub struct BackupGlobalSettings {
@@ -372,6 +373,7 @@ impl BackupGlobalSettings {
             ng_words: self.ng_words,
             repost_hidden_user_ids: self.repost_hidden_user_ids,
             pending_data_directory_deletions: base.pending_data_directory_deletions.clone(),
+            ui_scale: base.ui_scale.clone(),
             hardware_video_decode_enabled: base.hardware_video_decode_enabled,
             h264_download_prompt_dismissed: base.h264_download_prompt_dismissed,
         }

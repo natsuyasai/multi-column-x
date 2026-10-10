@@ -3,7 +3,7 @@
 import { useCallback, useRef } from "react";
 import { OFFSCREEN } from "../constants/ipc";
 import { moveGroup } from "../lib/columnOrder";
-import { HEADER_HEIGHT, getTopBarHeight } from "../lib/gridLayout";
+import { getHeaderHeight, getTopBarHeight } from "../lib/gridLayout";
 import { logError } from "../lib/log";
 import {
   createColumnWebview,
@@ -22,11 +22,9 @@ import { mobileLayoutForViewport, useMobileColumns } from "./useMobileColumns";
 
 // グリッド座標計算は src/lib/gridLayout.ts へ移動した。既存 import 互換のため re-export する。
 export {
-  HEADER_HEIGHT,
-  SCROLLBAR_HEIGHT,
-  MOBILE_TAB_BAR_HEIGHT,
-  TOPBAR_COLLAPSED_HEIGHT,
-  TOPBAR_EXPANDED_HEIGHT,
+  getHeaderHeight,
+  getScrollbarHeight,
+  getMobileTabBarHeight,
   getTopBarHeight,
   calculateGridBounds,
 } from "../lib/gridLayout";
@@ -170,7 +168,7 @@ export function useColumns() {
                 x: OFFSCREEN.DESKTOP_X,
                 y:
                   getTopBarHeight(useAppStore.getState().topBarExpanded) +
-                  HEADER_HEIGHT,
+                  getHeaderHeight(),
                 width: col.width,
                 // height を極小値（1px 等）に圧縮すると、退避先が画面外(x=-9999)でも
                 // X.com 側の仮想リストが復元後に再描画されなくなる副作用があるため、

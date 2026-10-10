@@ -91,6 +91,7 @@ describe("useAppStore", () => {
         hideAdEnabled: false,
         apiRateLimitMonitorEnabled: true,
         columnScale: "default",
+        uiScale: "auto",
         useXAppForCompose: false,
         mobileSwipeAreaEnabled: true,
         mobileSwipeAreaHeight: 28,
@@ -497,6 +498,55 @@ describe("useAppStore", () => {
     expect(result.current.globalSettings.repostHiddenUserIds).toEqual([
       "alice",
     ]);
+  });
+
+  it("旧バージョンの設定ファイルを読み込んでもアプリUIの表示サイズは端末に合わせるになる", async () => {
+    const { uiScale: _omitted, ...legacyGlobal } = DEFAULT_GLOBAL_SETTINGS;
+    void _omitted;
+    mockInvoke.mockResolvedValueOnce({
+      settings: {
+        accounts: [],
+        columns: [],
+        globalSettings: { ...legacyGlobal, columnScale: "large" },
+      },
+      loadFailed: false,
+      backupPath: null,
+    });
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    expect(result.current.globalSettings.uiScale).toBe("auto");
+    expect(result.current.globalSettings.columnScale).toBe("large");
+  });
+
+  it("選んだ表示サイズは保存され次回起動時にも保たれる", async () => {
+    mockInvoke.mockClear();
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      result.current.updateGlobalSettings({ uiScale: "xLarge" });
+      await result.current.saveSettings();
+    });
+    const saveCall = mockInvoke.mock.calls.find(
+      ([cmd]) => cmd === "save_settings",
+    );
+    expect(saveCall).toBeDefined();
+    const saved = (saveCall![1] as { settings: { globalSettings: unknown } })
+      .settings;
+
+    // 保存した内容を次回起動時の読み込み結果として返す
+    mockInvoke.mockResolvedValueOnce({
+      settings: { accounts: [], columns: [], ...saved },
+      loadFailed: false,
+      backupPath: null,
+    });
+    act(() => {
+      useAppStore.setState({ globalSettings: DEFAULT_GLOBAL_SETTINGS });
+    });
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    expect(result.current.globalSettings.uiScale).toBe("xLarge");
   });
 
   it("保存が連続したときは要求した順に1件ずつ保存される", async () => {

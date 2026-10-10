@@ -11,48 +11,48 @@
 .dialog {
   background: var(--mcx-surface);
   color: var(--mcx-text);
-  border-radius: 8px;
-  padding: 20px;
-  width: min(420px, 90vw);
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  width: min(26.25rem, 90vw);
   max-height: 80vh;
   overflow: auto;
-  box-shadow: 0 8px 32px var(--mcx-shadow);
+  box-shadow: 0 0.5rem 2rem var(--mcx-shadow);
 }
 
 .title {
-  margin: 0 0 12px;
+  margin: 0 0 0.75rem;
   font-size: 1.1rem;
 }
 
 .version {
-  margin: 0 0 8px;
+  margin: 0 0 0.5rem;
   font-weight: bold;
 }
 
 .notes {
   white-space: pre-wrap;
   background: var(--mcx-surface-muted);
-  padding: 8px;
-  border-radius: 4px;
+  padding: 0.5rem;
+  border-radius: 0.25rem;
   max-height: 40vh;
   overflow: auto;
   font-family: inherit;
 }
 
 .progress {
-  margin-top: 12px;
+  margin-top: 0.75rem;
 }
 
 .progressLabel {
-  margin: 0 0 6px;
+  margin: 0 0 0.375rem;
   font-size: 0.85rem;
   color: var(--mcx-text);
 }
 
 .progressTrack {
   position: relative;
-  height: 8px;
-  border-radius: 4px;
+  height: 0.5rem;
+  border-radius: 0.25rem;
   background: var(--mcx-surface-muted);
   overflow: hidden;
 }
@@ -60,7 +60,7 @@
 .progressFill {
   height: 100%;
   background: var(--mcx-accent);
-  border-radius: 4px;
+  border-radius: 0.25rem;
   transition: width 0.2s ease;
 }
 
@@ -71,7 +71,7 @@
   height: 100%;
   width: 40%;
   background: var(--mcx-accent);
-  border-radius: 4px;
+  border-radius: 0.25rem;
   animation: mcx-update-indeterminate 1.2s ease-in-out infinite;
 }
 
@@ -85,9 +85,9 @@
 }
 
 .error {
-  margin: 12px 0 0;
-  padding: 8px 10px;
-  border-radius: 4px;
+  margin: 0.75rem 0 0;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.25rem;
   font-size: 0.85rem;
   color: var(--mcx-danger);
   background: var(--mcx-danger-bg);
@@ -97,14 +97,14 @@
 .actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 16px;
+  gap: 0.5rem;
+  margin-top: 1rem;
 }
 
 .laterBtn,
 .installBtn {
-  padding: 8px 16px;
-  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
   cursor: pointer;
 }
 

@@ -50,6 +50,7 @@ const globalSettings: GlobalSettings = {
   hideAdEnabled: true,
   apiRateLimitMonitorEnabled: true,
   columnScale: "default",
+  uiScale: "auto",
   useXAppForCompose: false,
   mobileSwipeAreaEnabled: true,
   mobileSwipeAreaHeight: 28,
@@ -251,14 +252,18 @@ export const ScaleThemeOverrideDisabled: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const scaleCheckbox = canvas.getByRole("checkbox", {
-      name: "表示サイズを変更する",
+      name: "カラム内の表示サイズを変更する",
     });
     const themeCheckbox = canvas.getByRole("checkbox", {
       name: "テーマを変更する",
     });
     await expect(scaleCheckbox).not.toBeChecked();
     await expect(themeCheckbox).not.toBeChecked();
-    await expect(canvas.getByRole("button", { name: "大" })).toBeDisabled();
+    await expect(
+      within(
+        canvas.getByRole("group", { name: "カラム内の表示サイズ" }),
+      ).getByRole("button", { name: "大" }),
+    ).toBeDisabled();
     await expect(canvas.getByRole("button", { name: "ライト" })).toBeDisabled();
   },
 };
@@ -268,23 +273,80 @@ export const ScaleThemeOverrideEnabled: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(
-      canvas.getByRole("checkbox", { name: "表示サイズを変更する" }),
+      canvas.getByRole("checkbox", { name: "カラム内の表示サイズを変更する" }),
     );
     await userEvent.click(
       canvas.getByRole("checkbox", { name: "テーマを変更する" }),
     );
-    await expect(canvas.getByRole("button", { name: "大" })).not.toBeDisabled();
+    const columnScaleLarge = within(
+      canvas.getByRole("group", { name: "カラム内の表示サイズ" }),
+    ).getByRole("button", { name: "大" });
+    await expect(columnScaleLarge).not.toBeDisabled();
     await expect(
       canvas.getByRole("button", { name: "ライト" }),
     ).not.toBeDisabled();
-    await userEvent.click(canvas.getByRole("button", { name: "大" }));
+    await userEvent.click(columnScaleLarge);
     await userEvent.click(canvas.getByRole("button", { name: "ライト" }));
-    await expect(canvas.getByRole("button", { name: "大" }).className).toMatch(
-      /scaleBtnActive/,
-    );
+    await expect(columnScaleLarge.className).toMatch(/scaleBtnActive/);
     await expect(
       canvas.getByRole("button", { name: "ライト" }).className,
     ).toMatch(/scaleBtnActive/);
+  },
+};
+
+export const UiScaleXLargeSelected: Story = {
+  name: "アプリUI表示サイズ: 特大選択中",
+  args: {
+    settings: { ...globalSettings, uiScale: "xLarge" },
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("カラム内の表示サイズ")).toBeInTheDocument();
+    const group = within(
+      canvas.getByRole("group", { name: "アプリUIの表示サイズ" }),
+    );
+    await expect(group.getByRole("button", { name: "特大" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(
+      group.getByRole("button", { name: "端末に合わせる" }),
+    ).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(
+      canvas.getByRole("checkbox", { name: "アプリUIの表示サイズを変更する" }),
+    );
+    await userEvent.click(group.getByRole("button", { name: "大" }));
+    await userEvent.click(canvas.getByRole("button", { name: "適用" }));
+    await expect(args.onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ uiScale: "large" }),
+    );
+    await expect(args.onApply).not.toHaveBeenCalledWith(
+      expect.objectContaining({ columnScale: expect.anything() }),
+    );
+  },
+};
+
+export const UiScaleMobile: Story = {
+  name: "アプリUI表示サイズ: モバイル幅",
+  args: {
+    settings: { ...globalSettings, uiScale: "xLarge" },
+  },
+  decorators: [
+    (Story) => (
+      <MobileRoot>
+        <ThemeRoot theme="dark">
+          <div style={{ width: "22.5rem", height: "100vh" }}>
+            <Story />
+          </div>
+        </ThemeRoot>
+      </MobileRoot>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole("group", { name: "アプリUIの表示サイズ" }),
+    ).toBeInTheDocument();
   },
 };
 

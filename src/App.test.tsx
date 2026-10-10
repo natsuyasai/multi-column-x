@@ -11,7 +11,7 @@ import {
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import App from "./App";
 import { WEBVIEW_SCRIPTS } from "./constants/ipc";
-import { HEADER_HEIGHT, getTopBarHeight } from "./lib/gridLayout";
+import { getHeaderHeight, getTopBarHeight } from "./lib/gridLayout";
 import { useAppStore } from "./store/useAppStore";
 import type { Column, GlobalSettings } from "./types";
 import { DEFAULT_GLOBAL_SETTINGS, DEFAULT_COLUMN_SETTINGS } from "./types";
@@ -182,6 +182,33 @@ describe("App (desktop)", () => {
     });
   });
 
+  it("アプリUIの表示サイズを変更するとカラムの表示位置が新しい倍率のTopBarとヘッダーの直下に移動する", async () => {
+    useAppStore.setState({ columns: [column], topBarExpanded: false });
+    render(<App />);
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "create_column_webview",
+        expect.anything(),
+      );
+    });
+    // 復元完了（columnsRestored）の反映を待つ
+    await act(async () => {});
+    mockInvoke.mockClear();
+
+    act(() => {
+      useAppStore.getState().updateGlobalSettings({ uiScale: "xLarge" });
+    });
+
+    // xLarge は 20px 基準: TopBar 2rem(40px) + ヘッダー 2.25rem(45px)
+    await waitFor(() => {
+      const resizeCalls = mockInvoke.mock.calls.filter(
+        (c) => c[0] === "resize_column_webview",
+      );
+      expect(resizeCalls.length).toBeGreaterThan(0);
+      expect((resizeCalls[resizeCalls.length - 1][1] as any).bounds.y).toBe(85);
+    });
+  });
+
   it("TopBarを展開するとカラムの表示位置が待ち時間なしで展開後のTopBarの直下に移動する", async () => {
     useAppStore.setState({ columns: [column], topBarExpanded: false });
     render(<App />);
@@ -196,7 +223,7 @@ describe("App (desktop)", () => {
 
     fireEvent.click(screen.getByTitle("ツールバーを展開 (Ctrl+B)"));
 
-    const expectedY = getTopBarHeight(true) + HEADER_HEIGHT;
+    const expectedY = getTopBarHeight(true) + getHeaderHeight();
     await waitFor(
       () => {
         const resizeCalls = mockInvoke.mock.calls.filter(
@@ -225,7 +252,7 @@ describe("App (desktop)", () => {
 
     fireEvent.click(screen.getByTitle("ツールバーを折りたたむ (Ctrl+B)"));
 
-    const expectedY = getTopBarHeight(false) + HEADER_HEIGHT;
+    const expectedY = getTopBarHeight(false) + getHeaderHeight();
     await waitFor(
       () => {
         const resizeCalls = mockInvoke.mock.calls.filter(
@@ -254,7 +281,7 @@ describe("App (desktop)", () => {
 
     fireEvent.keyDown(window, { key: "b", ctrlKey: true });
 
-    const expectedY = getTopBarHeight(true) + HEADER_HEIGHT;
+    const expectedY = getTopBarHeight(true) + getHeaderHeight();
     await waitFor(
       () => {
         const resizeCalls = mockInvoke.mock.calls.filter(
@@ -298,7 +325,7 @@ describe("App (desktop)", () => {
     const resizeCallsDuringDialog = mockInvoke.mock.calls.filter(
       (c) => c[0] === "resize_column_webview",
     );
-    const expectedExpandedY = getTopBarHeight(true) + HEADER_HEIGHT;
+    const expectedExpandedY = getTopBarHeight(true) + getHeaderHeight();
     expect(
       resizeCallsDuringDialog.some(
         (c) => (c[1] as any).bounds?.y === expectedExpandedY,
