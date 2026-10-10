@@ -154,6 +154,8 @@ npm run tauri:android:build # Android ビルド
 npm run format             # フォーマット（TS/Rust/Kotlin。TS のみは format:ts）
 npm run typecheck          # 型チェック（tsc --noEmit）
 npm run lint               # ESLint（src の TS/TSX）/ npm run lint:fix で自動修正
+npm run docs:dev           # ユーザーガイド（VitePress）の開発サーバー
+npm run docs:build         # ユーザーガイド（VitePress）のビルド。リンク切れ検出を兼ねる
 npm run lint:rust          # Rust 静的解析（cargo clippy --all-targets -- -D warnings）
 npm test                   # Vitest 単体テスト（unit プロジェクト）
 npm run test:story         # Storybook play function（chromium ブラウザ実行）
