@@ -52,7 +52,7 @@ class SwipeBarOverlayView(
 
   private var surfaceHoverColor = DARK_SURFACE_HOVER
   private var textTertiaryColor = DARK_TEXT_TERTIARY
-  private val accentColor = ACCENT
+  private var accentColor = DARK_ACCENT
 
   private val argbEvaluator = ArgbEvaluator()
   private var flashAnimator: ValueAnimator? = null
@@ -138,6 +138,7 @@ class SwipeBarOverlayView(
   fun setDarkTheme(dark: Boolean) {
     surfaceHoverColor = if (dark) DARK_SURFACE_HOVER else LIGHT_SURFACE_HOVER
     textTertiaryColor = if (dark) DARK_TEXT_TERTIARY else LIGHT_TEXT_TERTIARY
+    accentColor = if (dark) DARK_ACCENT else LIGHT_ACCENT
     val borderColor = if (dark) DARK_BORDER_SUBTLE else LIGHT_BORDER_SUBTLE
 
     setBackgroundColor(surfaceHoverColor)
@@ -208,14 +209,13 @@ class SwipeBarOverlayView(
     // src/index.css の :root[data-theme="dark"] から採取。
     private val DARK_SURFACE_HOVER = Color.parseColor("#333333")
     private val DARK_BORDER_SUBTLE = Color.parseColor("#222222")
-    private val DARK_TEXT_TERTIARY = Color.parseColor("#999999")
+    private val DARK_TEXT_TERTIARY = Color.parseColor("#B3B3B3")
+    private val DARK_ACCENT = Color.parseColor("#4DB3F5")
 
     // src/index.css の :root[data-theme="light"] から採取。
     private val LIGHT_SURFACE_HOVER = Color.parseColor("#E1E8ED")
     private val LIGHT_BORDER_SUBTLE = Color.parseColor("#EFF3F4")
-    private val LIGHT_TEXT_TERTIARY = Color.parseColor("#8899A6")
-
-    // --mcx-accent はライト/ダーク共通。
-    private val ACCENT = Color.parseColor("#1D9BF0")
+    private val LIGHT_TEXT_TERTIARY = Color.parseColor("#4F5D69")
+    private val LIGHT_ACCENT = Color.parseColor("#0A69AB")
   }
 }
