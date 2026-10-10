@@ -115,6 +115,16 @@ fn 未知フィールドと欠落フィールドを含む_bom_付きファイル
 }
 
 #[test]
+fn 列数を含まない旧バックアップを読み込むと列数は2になる() {
+    let mut value = envelope(vec![column_json("c1", "A")]);
+    value["globalSettings"] = json!({ "mobileTwoColumnEnabled": true });
+
+    let parsed = parse_value(&value).expect("検証に成功する");
+
+    assert_eq!(parsed["globalSettings"]["mobileColumnCount"], 2);
+}
+
+#[test]
 fn 壊れたjsonは破損として拒否される() {
     let result = parse_backup(b"{ not json");
 

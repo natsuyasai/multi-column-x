@@ -97,6 +97,7 @@ describe("useAppStore", () => {
         mobileSwipeAreaHeight: 28,
         mobileSwipeAreaOpacity: 50,
         mobileTwoColumnEnabled: true,
+        mobileColumnCount: 2,
         presets: [],
         ngWords: [],
         repostHiddenUserIds: [],
