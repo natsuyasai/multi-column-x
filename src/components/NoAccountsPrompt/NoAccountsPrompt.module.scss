@@ -1,0 +1,28 @@
+.prompt {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  // 位置を 50% 基準で決めると幅が画面の半分までに制限されるため、幅は画面幅から明示する
+  width: min(25rem, calc(100% - 2rem));
+  max-height: calc(100% - 2rem);
+  overflow-y: auto;
+  box-sizing: border-box;
+  background: var(--mcx-surface);
+  border: 1px solid var(--mcx-border);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--mcx-text-tertiary);
+
+  button {
+    margin-top: 0.75rem;
+    background: var(--mcx-accent);
+    border: none;
+    border-radius: 0.25rem;
+    color: var(--mcx-text-on-accent);
+    cursor: pointer;
+    font-size: 0.8125rem;
+    padding: 0.5rem 1rem;
+  }
+}

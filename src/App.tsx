@@ -18,6 +18,7 @@ import { ConfirmDialog } from "./components/ConfirmDialog/ConfirmDialog";
 import { H264SetupDialog } from "./components/H264SetupDialog/H264SetupDialog";
 import { LinkPopupDialog } from "./components/LinkPopupDialog/LinkPopupDialog";
 import { MobileTabBar } from "./components/MobileTabBar/MobileTabBar";
+import { NoAccountsPrompt } from "./components/NoAccountsPrompt/NoAccountsPrompt";
 import { SettingsPanel } from "./components/SettingsPanel/SettingsPanel";
 import { ShortcutHelpDialog } from "./components/ShortcutHelpDialog/ShortcutHelpDialog";
 import { TabActionDialog } from "./components/TabActionDialog/TabActionDialog";
@@ -510,17 +511,12 @@ const App: React.FC = () => {
       )}
 
       {showAddColumn && accounts.length === 0 && (
-        <div className={styles.noAccountsPrompt}>
-          <p>先にアカウントを追加してください</p>
-          <button
-            onClick={() => {
-              setShowAddColumn(false);
-              setShowAccountManager(true);
-            }}
-          >
-            アカウント管理を開く
-          </button>
-        </div>
+        <NoAccountsPrompt
+          onOpenAccountManager={() => {
+            setShowAddColumn(false);
+            setShowAccountManager(true);
+          }}
+        />
       )}
 
       {showAccountManager && (

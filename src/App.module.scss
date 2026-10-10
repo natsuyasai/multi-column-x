@@ -62,27 +62,3 @@
 .bottomScrollbarInner {
   height: 1px;
 }
-
-.noAccountsPrompt {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: var(--mcx-surface);
-  border: 1px solid var(--mcx-border);
-  border-radius: 0.5rem;
-  padding: 1.5rem;
-  text-align: center;
-  color: var(--mcx-text-tertiary);
-
-  button {
-    margin-top: 0.75rem;
-    background: var(--mcx-accent);
-    border: none;
-    border-radius: 0.25rem;
-    color: var(--mcx-text-on-accent);
-    cursor: pointer;
-    font-size: 0.8125rem;
-    padding: 0.5rem 1rem;
-  }
-}
