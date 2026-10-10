@@ -142,6 +142,21 @@
   }
 }
 
+.selectInput {
+  background: var(--mcx-surface-sunken);
+  border: 1px solid var(--mcx-border);
+  border-radius: 0.25rem;
+  color: var(--mcx-text);
+  font-size: 0.8125rem;
+  padding: 0.4375rem 0.5rem;
+  width: 5rem;
+
+  &:focus {
+    outline: none;
+    border-color: var(--mcx-accent);
+  }
+}
+
 .textInput {
   background: var(--mcx-surface-sunken);
   border: 1px solid var(--mcx-border);

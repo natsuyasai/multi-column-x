@@ -1,4 +1,8 @@
 import React from "react";
+import {
+  MOBILE_COLUMN_COUNT_MAX,
+  MOBILE_COLUMN_COUNT_MIN,
+} from "@/lib/gridLayout";
 import { HelpPopover } from "../HelpPopover/HelpPopover";
 import styles from "./AppSettingsPanel.module.scss";
 import {
@@ -6,6 +10,11 @@ import {
   type SettingsDraft,
   type SetSettingsDraft,
 } from "./settingsDraft";
+
+const MOBILE_COLUMN_COUNT_OPTIONS = Array.from(
+  { length: MOBILE_COLUMN_COUNT_MAX - MOBILE_COLUMN_COUNT_MIN + 1 },
+  (_, i) => MOBILE_COLUMN_COUNT_MIN + i,
+);
 
 interface SectionProps {
   draft: SettingsDraft;
@@ -235,8 +244,24 @@ export const AndroidSettingsSections: React.FC<SectionProps> = ({
           checked={draft.mobileTwoColumnEnabled}
           onChange={(e) => set("mobileTwoColumnEnabled", e.target.checked)}
         />
-        広い画面で2カラム表示（タブレット・横向き）
+        広い画面で複数カラム表示（タブレット・横向き）
       </label>
+      {draft.mobileTwoColumnEnabled && (
+        <label className={styles.fieldLabel}>
+          同時表示する列数
+          <select
+            className={styles.selectInput}
+            value={draft.mobileColumnCount}
+            onChange={(e) => set("mobileColumnCount", Number(e.target.value))}
+          >
+            {MOBILE_COLUMN_COUNT_OPTIONS.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
     </section>
   </>
 );

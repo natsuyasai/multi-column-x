@@ -427,16 +427,48 @@ describe("AppSettingsPanel スワイプ切替設定", () => {
     );
   });
 
-  it("広い画面で2カラム表示トグルを切り替えるとonApplyに反映される", () => {
+  it("広い画面で複数カラム表示トグルを切り替えるとonApplyに反映される", () => {
     const onApply = vi.fn();
     render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
     const checkbox = screen.getByRole("checkbox", {
-      name: "広い画面で2カラム表示（タブレット・横向き）",
+      name: "広い画面で複数カラム表示（タブレット・横向き）",
     });
     fireEvent.click(checkbox);
     fireEvent.click(screen.getByRole("button", { name: "適用" }));
     expect(onApply).toHaveBeenCalledWith(
       expect.objectContaining({ mobileTwoColumnEnabled: false }),
+    );
+  });
+
+  it("設定画面で複数カラム表示がONのときだけ列数を選べる", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    const select = screen.getByRole("combobox", { name: "同時表示する列数" });
+    expect(
+      Array.from((select as HTMLSelectElement).options).map((o) => o.value),
+    ).toEqual(["2", "3", "4", "5", "6"]);
+
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: "広い画面で複数カラム表示（タブレット・横向き）",
+      }),
+    );
+    expect(
+      screen.queryByRole("combobox", { name: "同時表示する列数" }),
+    ).toBeNull();
+  });
+
+  it("設定画面で列数を変更すると設定として保存される", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "同時表示する列数" }),
+      {
+        target: { value: "4" },
+      },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ mobileColumnCount: 4 }),
     );
   });
 
@@ -962,6 +994,7 @@ describe("AppSettingsPanel 設定パッチの全項目反映", () => {
     mobileSwipeAreaHeight: 30,
     mobileSwipeAreaOpacity: 80,
     mobileTwoColumnEnabled: false,
+    mobileColumnCount: 4,
     ngWords: ["spam", "bot"],
     repostHiddenUserIds: ["user_a", "user_b"],
   };
@@ -1002,6 +1035,7 @@ describe("AppSettingsPanel 設定パッチの全項目反映", () => {
       mobileSwipeAreaHeight: 30,
       mobileSwipeAreaOpacity: 80,
       mobileTwoColumnEnabled: false,
+      mobileColumnCount: 4,
       ngWords: ["spam", "bot"],
       repostHiddenUserIds: ["user_a", "user_b"],
     });
@@ -1542,7 +1576,7 @@ describe("AppSettingsPanel 一般タブのグループ構成", () => {
     ).toBeInTheDocument();
     expect(
       within(group).getByRole("checkbox", {
-        name: "広い画面で2カラム表示（タブレット・横向き）",
+        name: "広い画面で複数カラム表示（タブレット・横向き）",
       }),
     ).toBeInTheDocument();
   });
