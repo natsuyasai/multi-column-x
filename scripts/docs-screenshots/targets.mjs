@@ -104,6 +104,27 @@ export const targets = [
     clip: { x: 0, y: 0, width: 1280, height: 260 },
   },
   {
+    file: "extensions-tab",
+    storyId: "components-appsettingspanel-extensionstab--chrome-candidates",
+    viewport: DESKTOP,
+    theme: "light",
+    clip: { x: 0, y: 0, width: 1280, height: 515 },
+  },
+  {
+    file: "backup-tab",
+    storyId: "components-appsettingspanel-backuptab--default",
+    viewport: DESKTOP,
+    theme: "light",
+    clip: { x: 0, y: 0, width: 1280, height: 360 },
+  },
+  {
+    file: "backup-mapping",
+    storyId: "components-appsettingspanel-backuptab--mapping-auto-suggested",
+    viewport: DESKTOP,
+    theme: "light",
+    clip: { x: 0, y: 0, width: 1280, height: 290 },
+  },
+  {
     file: "link-popup-dialog",
     storyId: "components-linkpopupdialog--default",
     viewport: DESKTOP,
