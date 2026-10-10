@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ReactNode } from "react";
 import { useEffect, useLayoutEffect } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
-import { AccountNameDialog } from "@/components/AccountNameDialog/AccountNameDialog";
+import { NoAccountsPrompt } from "@/components/NoAccountsPrompt/NoAccountsPrompt";
 
 // アプリは documentElement の data-theme でテーマを切り替えるため、Story でもそれに合わせる
 function ThemeRoot({
@@ -62,67 +62,27 @@ async function narrowViewport(width: number, height: number) {
   }
 }
 
-function queryDialog(canvasElement: HTMLElement): HTMLElement {
-  const dialog = canvasElement.querySelector<HTMLElement>('[class*="dialog"]');
-  if (!dialog) throw new Error("ダイアログ要素が見つかりません");
-  return dialog;
-}
-
-// 幅・高さが画面内に収まり、縦に溢れるときは内部スクロールで末尾のボタンへ到達できる
-async function expectFitsAndScrollable(dialog: HTMLElement) {
-  const rect = dialog.getBoundingClientRect();
-  await expect(rect.left).toBeGreaterThanOrEqual(0);
-  await expect(rect.right).toBeLessThanOrEqual(window.innerWidth);
-  await expect(rect.top).toBeGreaterThanOrEqual(0);
-  await expect(rect.bottom).toBeLessThanOrEqual(window.innerHeight);
-  if (dialog.scrollHeight > dialog.clientHeight) {
-    await expect(getComputedStyle(dialog).overflowY).toMatch(/auto|scroll/);
-  }
-  const buttons = dialog.querySelectorAll<HTMLElement>("button");
-  const last = buttons[buttons.length - 1];
-  last.scrollIntoView({ block: "end" });
-  const lastRect = last.getBoundingClientRect();
-  await expect(lastRect.top).toBeGreaterThanOrEqual(0);
-  await expect(lastRect.bottom).toBeLessThanOrEqual(window.innerHeight);
-  await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(
-    document.documentElement.clientWidth,
-  );
-}
-
-const meta: Meta<typeof AccountNameDialog> = {
-  title: "Components/AccountNameDialog",
-  component: AccountNameDialog,
+const meta: Meta<typeof NoAccountsPrompt> = {
+  title: "Components/NoAccountsPrompt",
+  component: NoAccountsPrompt,
   parameters: { layout: "fullscreen" },
-  args: {
-    defaultValue: "アカウント 1",
-    title: "アカウント名を入力",
-    onSubmit: fn(),
-    onCancel: fn(),
-  },
+  args: { onOpenAccountManager: fn() },
 };
 
 export default meta;
-type Story = StoryObj<typeof AccountNameDialog>;
+type Story = StoryObj<typeof NoAccountsPrompt>;
 
 export const Default: Story = {
   name: "デフォルト",
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
-    const input = canvas.getByLabelText("アカウント名");
-    await expect(input).toHaveValue("アカウント 1");
-    await userEvent.clear(input);
-    await userEvent.type(input, "推し垢");
-    await userEvent.click(canvas.getByText("OK"));
-    await expect(args.onSubmit).toHaveBeenCalledWith("推し垢");
-  },
-};
-
-export const CancelByButton: Story = {
-  name: "キャンセルボタン",
-  play: async ({ canvasElement, args }) => {
-    const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByText("キャンセル"));
-    await expect(args.onCancel).toHaveBeenCalled();
+    await expect(
+      canvas.getByText("先にアカウントを追加してください"),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      canvas.getByRole("button", { name: "アカウント管理を開く" }),
+    );
+    await expect(args.onOpenAccountManager).toHaveBeenCalledTimes(1);
   },
 };
 
@@ -148,8 +108,8 @@ export const DarkTheme: Story = {
   ],
 };
 
-export const AndroidFitsLargeScale: Story = {
-  name: "Android・大きな表示サイズでもアカウント名入力ダイアログが画面内に収まりスクロールできる",
+export const AndroidLargeScaleWidens: Story = {
+  name: "アカウント未登録の案内ダイアログは文字が大きくても画面幅に応じて広がる",
   decorators: [
     (Story) => (
       <AndroidRoot fontSize="20px">
@@ -158,10 +118,44 @@ export const AndroidFitsLargeScale: Story = {
     ),
   ],
   play: async ({ canvasElement }) => {
-    const restoreViewport = await narrowViewport(300, 260);
+    const restoreViewport = await narrowViewport(360, 640);
     try {
-      const dialog = queryDialog(canvasElement);
-      await expectFitsAndScrollable(dialog);
+      const canvas = within(canvasElement);
+      const prompt = canvasElement.querySelector<HTMLElement>(
+        '[class*="prompt"]',
+      ) as HTMLElement;
+      const rect = prompt.getBoundingClientRect();
+      // 画面の半分で頭打ちにならず、画面幅は超えない
+      await expect(rect.width).toBeGreaterThan(window.innerWidth / 2);
+      await expect(rect.left).toBeGreaterThanOrEqual(0);
+      await expect(rect.right).toBeLessThanOrEqual(window.innerWidth);
+      const button = canvas.getByRole("button", {
+        name: "アカウント管理を開く",
+      });
+      const b = button.getBoundingClientRect();
+      await expect(b.left).toBeGreaterThanOrEqual(0);
+      await expect(b.right).toBeLessThanOrEqual(window.innerWidth);
+      await expect(b.bottom).toBeLessThanOrEqual(window.innerHeight);
+    } finally {
+      await restoreViewport();
+    }
+  },
+};
+
+export const NormalScaleWideViewport: Story = {
+  name: "アカウント未登録の案内ダイアログは通常サイズでは25rem以下に収まる",
+  play: async ({ canvasElement }) => {
+    const restoreViewport = await narrowViewport(1000, 700);
+    try {
+      const prompt = canvasElement.querySelector<HTMLElement>(
+        '[class*="prompt"]',
+      ) as HTMLElement;
+      const rootFontPx = parseFloat(
+        getComputedStyle(document.documentElement).fontSize,
+      );
+      await expect(prompt.getBoundingClientRect().width).toBeLessThanOrEqual(
+        rootFontPx * 25 + 1,
+      );
     } finally {
       await restoreViewport();
     }

@@ -130,48 +130,56 @@ export const AccountManager: React.FC<AccountManagerProps> = ({
 
             return (
               <div key={account.id} className={styles.item}>
-                <span
-                  className={styles.dot}
-                  style={{ backgroundColor: account.color }}
-                />
-                <span className={styles.label}>{account.label}</span>
-                <button
-                  className={styles.editBtn}
-                  onClick={() => startEditing(account)}
-                  aria-label={`${account.label} を編集`}
-                >
-                  編集
-                </button>
-                <button
-                  className={styles.editBtn}
-                  onClick={() => onReauthAccount(account.id)}
-                  aria-label={`${account.label} を再認証`}
-                >
-                  再認証
-                </button>
-                <button
-                  className={`${styles.defaultBtn}${isDefault ? ` ${styles.defaultBtnActive}` : ""}`}
-                  onClick={() => onSetDefault(account.id)}
-                  title="ツイート時のデフォルトアカウントに設定"
-                  aria-label={`${account.label} をデフォルトに設定`}
-                >
-                  {isDefault ? (
-                    <StarIcon width={16} height={16} data-testid="icon-star" />
-                  ) : (
-                    <StarOutlineIcon
-                      width={16}
-                      height={16}
-                      data-testid="icon-star-outline"
-                    />
-                  )}
-                </button>
-                <button
-                  className={styles.removeBtn}
-                  onClick={() => onRemoveAccount(account.id)}
-                  aria-label={`${account.label} を削除`}
-                >
-                  削除
-                </button>
+                <div className={styles.summary}>
+                  <span
+                    className={styles.dot}
+                    style={{ backgroundColor: account.color }}
+                  />
+                  <span className={styles.label}>{account.label}</span>
+                  <button
+                    className={`${styles.defaultBtn}${isDefault ? ` ${styles.defaultBtnActive}` : ""}`}
+                    onClick={() => onSetDefault(account.id)}
+                    title="ツイート時のデフォルトアカウントに設定"
+                    aria-label={`${account.label} をデフォルトに設定`}
+                  >
+                    {isDefault ? (
+                      <StarIcon
+                        width={16}
+                        height={16}
+                        data-testid="icon-star"
+                      />
+                    ) : (
+                      <StarOutlineIcon
+                        width={16}
+                        height={16}
+                        data-testid="icon-star-outline"
+                      />
+                    )}
+                  </button>
+                </div>
+                <div className={styles.actions}>
+                  <button
+                    className={styles.editBtn}
+                    onClick={() => startEditing(account)}
+                    aria-label={`${account.label} を編集`}
+                  >
+                    編集
+                  </button>
+                  <button
+                    className={styles.editBtn}
+                    onClick={() => onReauthAccount(account.id)}
+                    aria-label={`${account.label} を再認証`}
+                  >
+                    再認証
+                  </button>
+                  <button
+                    className={styles.removeBtn}
+                    onClick={() => onRemoveAccount(account.id)}
+                    aria-label={`${account.label} を削除`}
+                  >
+                    削除
+                  </button>
+                </div>
               </div>
             );
           })}

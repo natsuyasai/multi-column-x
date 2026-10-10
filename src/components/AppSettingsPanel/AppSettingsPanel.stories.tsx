@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 import { AppSettingsPanel } from "@/components/AppSettingsPanel/AppSettingsPanel";
 import { useAppStore } from "@/store/useAppStore";
@@ -120,6 +120,51 @@ function MobileRoot({ children }: { children: ReactNode }) {
     return () => useAppStore.setState({ isMobile: prev });
   }, [prev]);
   return <>{children}</>;
+}
+
+// Android 向けスタイルは documentElement の data-platform で切り替わるため、Story でもそれに合わせる。
+// fontSize を渡すと html の font-size を上書きし（アプリUIの表示サイズ拡大の再現）、アンマウント時に元へ戻す
+function AndroidRoot({
+  fontSize,
+  children,
+}: {
+  fontSize?: string;
+  children: ReactNode;
+}) {
+  useLayoutEffect(() => {
+    const el = document.documentElement;
+    const prevPlatform = el.getAttribute("data-platform");
+    const prevFontSize = el.style.fontSize;
+    el.setAttribute("data-platform", "android");
+    if (fontSize !== undefined) el.style.fontSize = fontSize;
+    return () => {
+      if (prevPlatform === null) el.removeAttribute("data-platform");
+      else el.setAttribute("data-platform", prevPlatform);
+      el.style.fontSize = prevFontSize;
+    };
+  }, [fontSize]);
+  return <>{children}</>;
+}
+
+function queryPanel(canvasElement: HTMLElement): HTMLElement {
+  const panel = canvasElement.querySelector<HTMLElement>('[class*="panel"]');
+  if (!panel) throw new Error("panel 要素が見つかりません");
+  // Storybook ではテーマ変数の CSS が読み込まれず border が無効値になるため、枠線の有無を判定できるよう色を与える
+  panel.style.setProperty("--mcx-border", "#333333");
+  return panel;
+}
+
+function expectFullscreenPanel(panel: HTMLElement) {
+  const rect = panel.getBoundingClientRect();
+  const style = getComputedStyle(panel);
+  return expect({
+    left: rect.left,
+    top: rect.top,
+    width: rect.width,
+    height: rect.height,
+    borderRadius: style.borderTopLeftRadius,
+    borderWidth: style.borderTopWidth,
+  });
 }
 
 const meta: Meta<typeof AppSettingsPanel> = {
@@ -544,4 +589,169 @@ export const MobileGroupsLightTheme: Story = {
       </MobileRoot>
     ),
   ],
+};
+
+const fullscreenExpected = () => ({
+  left: 0,
+  top: 0,
+  width: window.innerWidth,
+  height: window.innerHeight,
+  borderRadius: "0px",
+  borderWidth: "0px",
+});
+
+export const AndroidFullscreen: Story = {
+  name: "Androidではアプリ設定が画面全体を覆って表示される",
+  decorators: [
+    (Story) => (
+      <ThemeRoot theme="dark">
+        <AndroidRoot>
+          <Story />
+        </AndroidRoot>
+      </ThemeRoot>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const panel = queryPanel(canvasElement);
+    await expectFullscreenPanel(panel).toEqual(fullscreenExpected());
+  },
+};
+
+export const DesktopPanelUnchanged: Story = {
+  name: "デスクトップではアプリ設定の見た目は従来どおり画面全体にならない",
+  decorators: [
+    (Story) => (
+      <ThemeRoot theme="dark">
+        <Story />
+      </ThemeRoot>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const panel = queryPanel(canvasElement);
+    const rect = panel.getBoundingClientRect();
+    await expect(rect.width).toBeLessThan(window.innerWidth);
+    await expect(rect.height).toBeLessThan(window.innerHeight);
+    await expect(
+      parseFloat(getComputedStyle(panel).borderTopLeftRadius),
+    ).toBeGreaterThan(0);
+    await expect(
+      parseFloat(getComputedStyle(panel).borderTopWidth),
+    ).toBeGreaterThan(0);
+  },
+};
+
+// 狭い画面（スマホ幅）を再現するため、vitest の browser 実行時だけ viewport を絞る。戻す関数を返す。
+// Storybook の画面上で開いた場合は viewport を変えられないので何もしない
+async function narrowViewport(width: number, height: number) {
+  const originalWidth = window.innerWidth;
+  const originalHeight = window.innerHeight;
+  try {
+    const { page } = await import("vitest/browser");
+    await page.viewport(width, height);
+    return () => page.viewport(originalWidth, originalHeight);
+  } catch {
+    return async () => {};
+  }
+}
+
+function findScroller(panel: HTMLElement): HTMLElement {
+  const scroller = Array.from(panel.querySelectorAll<HTMLElement>("*")).find(
+    (el) => {
+      const overflowY = getComputedStyle(el).overflowY;
+      return (
+        (overflowY === "auto" || overflowY === "scroll") &&
+        el.scrollHeight > el.clientHeight
+      );
+    },
+  );
+  if (!scroller) throw new Error("スクロールする本文が見つかりません");
+  return scroller;
+}
+
+export const AndroidHeaderFixedBodyScrolls: Story = {
+  name: "Android全画面ではヘッダーが固定され本文だけがスクロールする",
+  decorators: [
+    (Story) => (
+      <ThemeRoot theme="dark">
+        <AndroidRoot fontSize="20px">
+          <Story />
+        </AndroidRoot>
+      </ThemeRoot>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const restoreViewport = await narrowViewport(360, 640);
+    try {
+      const canvas = within(canvasElement);
+      const panel = queryPanel(canvasElement);
+      const header = canvas.getByText("アプリ設定")
+        .parentElement as HTMLElement;
+      const scroller = findScroller(panel);
+      const headerTopBefore = header.getBoundingClientRect().top;
+
+      scroller.scrollTop = scroller.scrollHeight;
+
+      await expect(scroller.scrollTop).toBeGreaterThan(0);
+      await expect(header.getBoundingClientRect().top).toBe(headerTopBefore);
+      // ページ全体はスクロールしない（二重スクロールにならない）
+      await expect(document.documentElement.scrollHeight).toBeLessThanOrEqual(
+        document.documentElement.clientHeight,
+      );
+      // 本文の最後の項目までスクロールして到達できる
+      const lastItem = scroller.lastElementChild as HTMLElement;
+      await expect(lastItem.getBoundingClientRect().bottom).toBeLessThanOrEqual(
+        scroller.getBoundingClientRect().bottom + 1,
+      );
+    } finally {
+      await restoreViewport();
+    }
+  },
+};
+
+export const AndroidLargeScaleNoOverflow: Story = {
+  name: "Android・大きな表示サイズでも設定のタブとボタン行が画面外へはみ出さない",
+  decorators: [
+    (Story) => (
+      <ThemeRoot theme="dark">
+        <AndroidRoot fontSize="20px">
+          <Story />
+        </AndroidRoot>
+      </ThemeRoot>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const restoreViewport = await narrowViewport(360, 640);
+    try {
+      const canvas = within(canvasElement);
+      const root = document.documentElement;
+      await expect(root.scrollWidth).toBeLessThanOrEqual(root.clientWidth);
+
+      // フッターボタンが画面内に収まっている
+      for (const name of ["キャンセル", "適用"]) {
+        const rect = canvas
+          .getByRole("button", { name })
+          .getBoundingClientRect();
+        await expect(rect.left).toBeGreaterThanOrEqual(0);
+        await expect(rect.right).toBeLessThanOrEqual(window.innerWidth);
+        await expect(rect.bottom).toBeLessThanOrEqual(window.innerHeight);
+      }
+
+      // 最後のタブまでスクロールして到達でき、選択できる
+      const tabs = canvasElement.querySelector<HTMLElement>('[class*="tabs"]');
+      if (!tabs) throw new Error("tabs 要素が見つかりません");
+      // 溢れるタブ列はユーザーが横スクロールできる
+      await expect(tabs.scrollWidth).toBeGreaterThan(tabs.clientWidth);
+      await expect(getComputedStyle(tabs).overflowX).toBe("auto");
+      const lastTab = tabs.lastElementChild as HTMLElement;
+      lastTab.scrollIntoView({ inline: "end" });
+      const tabRect = lastTab.getBoundingClientRect();
+      await expect(tabRect.left).toBeGreaterThanOrEqual(0);
+      await expect(tabRect.right).toBeLessThanOrEqual(window.innerWidth + 1);
+      await userEvent.click(lastTab);
+      await expect(lastTab.className).toMatch(/tabActive/);
+      await expect(root.scrollWidth).toBeLessThanOrEqual(root.clientWidth);
+    } finally {
+      await restoreViewport();
+    }
+  },
 };

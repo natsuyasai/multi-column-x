@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ReactNode } from "react";
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 import { SettingsPanel } from "@/components/SettingsPanel/SettingsPanel";
 import type { Column } from "@/types";
@@ -56,6 +56,51 @@ function ThemeRoot({
     };
   }, [theme]);
   return <>{children}</>;
+}
+
+// Android 向けスタイルは documentElement の data-platform で切り替わるため、Story でもそれに合わせる。
+// fontSize を渡すと html の font-size を上書きし（アプリUIの表示サイズ拡大の再現）、アンマウント時に元へ戻す
+function AndroidRoot({
+  fontSize,
+  children,
+}: {
+  fontSize?: string;
+  children: ReactNode;
+}) {
+  useLayoutEffect(() => {
+    const el = document.documentElement;
+    const prevPlatform = el.getAttribute("data-platform");
+    const prevFontSize = el.style.fontSize;
+    el.setAttribute("data-platform", "android");
+    if (fontSize !== undefined) el.style.fontSize = fontSize;
+    return () => {
+      if (prevPlatform === null) el.removeAttribute("data-platform");
+      else el.setAttribute("data-platform", prevPlatform);
+      el.style.fontSize = prevFontSize;
+    };
+  }, [fontSize]);
+  return <>{children}</>;
+}
+
+function queryPanel(canvasElement: HTMLElement): HTMLElement {
+  const panel = canvasElement.querySelector<HTMLElement>('[class*="panel"]');
+  if (!panel) throw new Error("panel 要素が見つかりません");
+  // Storybook ではテーマ変数の CSS が読み込まれず border が無効値になるため、枠線の有無を判定できるよう色を与える
+  panel.style.setProperty("--mcx-border", "#333333");
+  return panel;
+}
+
+function expectFullscreenPanel(panel: HTMLElement) {
+  const rect = panel.getBoundingClientRect();
+  const style = getComputedStyle(panel);
+  return expect({
+    left: rect.left,
+    top: rect.top,
+    width: rect.width,
+    height: rect.height,
+    borderRadius: style.borderTopLeftRadius,
+    borderWidth: style.borderTopWidth,
+  });
 }
 
 const meta: Meta<typeof SettingsPanel> = {
@@ -281,4 +326,28 @@ export const DarkTheme: Story = {
       </ThemeRoot>
     ),
   ],
+};
+
+export const AndroidFullscreen: Story = {
+  name: "Androidではカラム設定が画面全体を覆って表示される",
+  decorators: [
+    (Story) => (
+      <ThemeRoot theme="dark">
+        <AndroidRoot>
+          <Story />
+        </AndroidRoot>
+      </ThemeRoot>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const panel = queryPanel(canvasElement);
+    await expectFullscreenPanel(panel).toEqual({
+      left: 0,
+      top: 0,
+      width: window.innerWidth,
+      height: window.innerHeight,
+      borderRadius: "0px",
+      borderWidth: "0px",
+    });
+  },
 };

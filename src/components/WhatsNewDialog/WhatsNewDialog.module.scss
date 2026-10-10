@@ -1,3 +1,5 @@
+@use "../../styles/dialog-fullscreen" as fs;
+
 .overlay {
   position: fixed;
   inset: 0;
@@ -6,6 +8,8 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
+
+  @include fs.android-fullscreen-overlay;
 }
 
 .dialog {
@@ -17,11 +21,16 @@
   max-height: 80vh;
   overflow: auto;
   box-shadow: 0 0.5rem 2rem var(--mcx-shadow);
+
+  @include fs.android-fullscreen-panel(1.25rem, true);
 }
 
 .title {
   margin: 0 0 0.5rem;
   font-size: 1.1rem;
+
+  // 全画面時は panel 全体がスクロールするので、ヘッダーを上に固定して本文だけを流す
+  @include fs.android-fullscreen-sticky-header(1.25rem);
 }
 
 .version {
@@ -37,6 +46,12 @@
   border-radius: 0.25rem;
   max-height: 45vh;
   overflow: auto;
+
+  // 全画面時は dialog 側だけをスクロールさせ、二重スクロールにしない
+  :global([data-platform="android"]) & {
+    max-height: none;
+    overflow: visible;
+  }
 
   h3 {
     margin: 0.75rem 0 0.375rem;

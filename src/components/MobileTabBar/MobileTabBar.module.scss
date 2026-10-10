@@ -57,6 +57,8 @@
 
 .tabs {
   flex: 1;
+  // 大きな表示サイズでもメニュー列に押し潰されず、タブが一部は常に見えるようにする
+  min-width: 6.25rem;
   display: flex;
   overflow-x: auto;
   overflow-y: hidden;
@@ -132,6 +134,21 @@
   flex-shrink: 0;
 }
 
+// ツイート作成・展開トグル・展開時のアクション群。大きな表示サイズで収まらないときは横スクロールにする
+.menu {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 .actions {
   flex-shrink: 0;
   display: flex;
@@ -150,6 +167,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 
   &:hover,
   &:active {
