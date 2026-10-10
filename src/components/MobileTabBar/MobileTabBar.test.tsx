@@ -363,6 +363,39 @@ describe("MobileTabBar", () => {
     });
   });
 
+  describe("開閉ボタンの SVG アイコン", () => {
+    it("折りたたみ時は開閉ボタンに chevron-left SVG が表示され chevron-right は無い", () => {
+      render(<MobileTabBar {...defaultProps} columns={[]} />);
+      const toggle = screen.getByTitle("メニュー表示の切り替え");
+      expect(
+        toggle.querySelector('[data-testid="icon-chevron-left"]'),
+      ).toBeInTheDocument();
+      expect(
+        toggle.querySelector('[data-testid="icon-chevron-right"]'),
+      ).not.toBeInTheDocument();
+    });
+
+    it("開閉ボタンをクリックすると chevron-right SVG に切り替わり chevron-left は無くなる", async () => {
+      render(<MobileTabBar {...defaultProps} columns={[]} />);
+      await userEvent.click(screen.getByTitle("メニュー表示の切り替え"));
+      const toggle = screen.getByTitle("メニュー表示の切り替え");
+      expect(
+        toggle.querySelector('[data-testid="icon-chevron-right"]'),
+      ).toBeInTheDocument();
+      expect(
+        toggle.querySelector('[data-testid="icon-chevron-left"]'),
+      ).not.toBeInTheDocument();
+    });
+
+    it("開閉ボタンに文字の « » が含まれない", async () => {
+      render(<MobileTabBar {...defaultProps} columns={[]} />);
+      const toggle = screen.getByTitle("メニュー表示の切り替え");
+      expect(toggle).not.toHaveTextContent(/[«»]/);
+      await userEvent.click(toggle);
+      expect(toggle).not.toHaveTextContent(/[«»]/);
+    });
+  });
+
   describe("タブのダブルタップ検出", () => {
     afterEach(() => {
       vi.useRealTimers();

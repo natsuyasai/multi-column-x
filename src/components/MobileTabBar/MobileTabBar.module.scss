@@ -129,7 +129,7 @@
 
 .countdown {
   font-size: 0.6875rem;
-  opacity: 0.55;
+  color: var(--mcx-text-muted);
   margin-left: 0.25rem;
   flex-shrink: 0;
 }
@@ -197,7 +197,7 @@
 .loginCompleteBtn {
   flex-shrink: 0;
   padding: 0.5rem 1rem;
-  background: var(--mcx-accent);
+  background: var(--mcx-accent-fill);
   color: var(--mcx-text-on-accent);
   border: none;
   border-radius: 1.25rem;
@@ -275,9 +275,7 @@
   width: 2.5rem;
   height: 100%;
   border-left: 1px solid var(--mcx-border-subtle);
-  margin-top: 0.125rem;
   color: var(--mcx-text);
-  font-size: 1.25rem;
 
   &:hover {
     color: var(--mcx-text);
