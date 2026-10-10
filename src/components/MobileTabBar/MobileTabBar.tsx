@@ -230,66 +230,72 @@ export const MobileTabBar: React.FC<Props> = ({
           );
         })}
       </div>
-      <button
-        className={styles.actionBtn}
-        aria-label="ツイートを作成"
-        title="ツイートを作成"
-        onClick={onComposeTweet}
-      >
-        <PencilIcon width={18} height={18} data-testid="icon-pencil" />
-      </button>
+      <div className={styles.menu}>
+        <button
+          className={styles.actionBtn}
+          aria-label="ツイートを作成"
+          title="ツイートを作成"
+          onClick={onComposeTweet}
+        >
+          <PencilIcon width={18} height={18} data-testid="icon-pencil" />
+        </button>
 
-      <button
-        className={styles.toggleBtn}
-        onClick={() => setExpanded((prev) => !prev)}
-        title="メニュー表示の切り替え"
-      >
-        {expanded ? "»" : "«"}
-      </button>
-      {expanded && (
-        <div className={styles.actions}>
-          <button
-            className={styles.actionBtn}
-            aria-label="URLをポップアップで開く"
-            title="URLをポップアップで開く"
-            onClick={onOpenLinkPopup}
-          >
-            <LinkIcon width={18} height={18} data-testid="icon-link" />
-          </button>
-          <button
-            className={styles.actionBtn}
-            aria-label="アプリ設定"
-            title="アプリ設定"
-            onClick={onAppSettings}
-          >
-            <SettingsIcon width={18} height={18} data-testid="icon-settings" />
-          </button>
-          <button
-            className={styles.actionBtn}
-            aria-label="アカウント管理"
-            title="アカウント管理"
-            onClick={onAccountManager}
-          >
-            <PersonIcon width={18} height={18} data-testid="icon-person" />
-          </button>
-          <button
-            className={styles.actionBtn}
-            aria-label="カラムを追加"
-            title="カラムを追加"
-            onClick={onAddColumn}
-          >
-            <PlusIcon width={18} height={18} data-testid="icon-plus" />
-          </button>
-          {apiRateLimitMonitorEnabled && (
-            <ApiRateLimitIndicator
-              accounts={accounts}
-              apiRateLimits={apiRateLimits}
-              onOpenChange={onApiRateLimitPopoverOpenChange}
-              isMobile
-            />
-          )}
-        </div>
-      )}
+        <button
+          className={styles.toggleBtn}
+          onClick={() => setExpanded((prev) => !prev)}
+          title="メニュー表示の切り替え"
+        >
+          {expanded ? "»" : "«"}
+        </button>
+        {expanded && (
+          <div className={styles.actions}>
+            <button
+              className={styles.actionBtn}
+              aria-label="URLをポップアップで開く"
+              title="URLをポップアップで開く"
+              onClick={onOpenLinkPopup}
+            >
+              <LinkIcon width={18} height={18} data-testid="icon-link" />
+            </button>
+            <button
+              className={styles.actionBtn}
+              aria-label="アプリ設定"
+              title="アプリ設定"
+              onClick={onAppSettings}
+            >
+              <SettingsIcon
+                width={18}
+                height={18}
+                data-testid="icon-settings"
+              />
+            </button>
+            <button
+              className={styles.actionBtn}
+              aria-label="アカウント管理"
+              title="アカウント管理"
+              onClick={onAccountManager}
+            >
+              <PersonIcon width={18} height={18} data-testid="icon-person" />
+            </button>
+            <button
+              className={styles.actionBtn}
+              aria-label="カラムを追加"
+              title="カラムを追加"
+              onClick={onAddColumn}
+            >
+              <PlusIcon width={18} height={18} data-testid="icon-plus" />
+            </button>
+            {apiRateLimitMonitorEnabled && (
+              <ApiRateLimitIndicator
+                accounts={accounts}
+                apiRateLimits={apiRateLimits}
+                onOpenChange={onApiRateLimitPopoverOpenChange}
+                isMobile
+              />
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
