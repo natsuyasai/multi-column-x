@@ -1,6 +1,6 @@
 # ブラウザ拡張機能（Chrome 拡張）ノート
 
-カラム WebView（WebView2）に Chrome 拡張機能を読み込み・管理する機能に関する設計判断・不採用案・落とし穴を記録する。**対象は Windows デスクトップのみ。** 手動テスト項目は別途 `docs/development/browser-extensions/integration-test.md` に出力する予定（未作成）。
+カラム WebView（WebView2）に Chrome 拡張機能を読み込み・管理する機能に関する設計判断・不採用案・落とし穴を記録する。**対象は Windows デスクトップのみ。** 手動テスト項目は `docs/development/browser-extensions/integration-test.md`。
 
 ## 対象ファイル
 

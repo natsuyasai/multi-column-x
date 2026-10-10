@@ -135,7 +135,7 @@ X内部APIのレート制限ヘッダをツールバーのポップオーバー�
 
 ### ブラウザ拡張機能（Windows のみ）
 
-Windows の WebView2 に Chrome 拡張を読み込む機能。`src-tauri/src/commands/extensions/`、`src/components/AppSettingsPanel/ExtensionsTab.tsx`、`src/lib/extensionsSupport.ts`、`commands/webview/{column,compose,popup}.rs` を変更する場合は `docs/development/browser-extensions-notes.md` を参照（macOS / Linux を見送った理由もそこ）。**アカウントの data_directory を使う全 WebView builder に `#[cfg(windows)]` で `.browser_extensions_enabled(true)` が必須**（食い違うと `ERROR_INVALID_STATE`。契約テストが検査する）。コマンドの追加・削除は `build.rs` / `default.json` / `lib.rs` の `generate_handler!` の 3 点同時更新（上節の ACL）で、`column-webview.json` には足さない。状態は `settings.json` の `browserExtensions` キー（`appSettings` とは別。バックアップ対象外）に持ち、保存は `save_store_atomically` を使う。
+Windows の WebView2 に Chrome 拡張を読み込む機能。`src-tauri/src/commands/extensions/`、`src/components/AppSettingsPanel/ExtensionsTab.tsx`、`src/lib/extensionsSupport.ts`、`commands/webview/{column,compose,popup}.rs` を変更する場合は `docs/development/browser-extensions-notes.md` を参照（macOS / Linux を見送った理由もそこ）。**アカウントの data_directory を使う全 WebView builder に `#[cfg(windows)]` で `.browser_extensions_enabled(true)` が必須**（食い違うと `ERROR_INVALID_STATE`。契約テストが検査する）。コマンドの追加・削除は `build.rs` / `default.json` / `lib.rs` の `generate_handler!` の 3 点同時更新（上節の ACL）で、`column-webview.json` には足さない。状態は `settings.json` の `browserExtensions` キー（`appSettings` とは別。バックアップ対象外）に持ち、保存は `save_store_atomically` を使う。手動テスト項目は `docs/development/browser-extensions/integration-test.md`。
 
 ### フロントエンドの品質ツール（ESLint / Storybook / プロパティテスト）
 
