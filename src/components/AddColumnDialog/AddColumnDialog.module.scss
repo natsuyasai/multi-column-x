@@ -30,7 +30,7 @@
   flex-direction: column;
   gap: 1rem;
 
-  @include fs.android-fullscreen-panel(1.5rem);
+  @include fs.android-fullscreen-panel(1.5rem, true);
 }
 
 .title {

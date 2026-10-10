@@ -14,7 +14,8 @@
 
 // panel 用: 角丸・枠線なしで画面全体を覆い、ノッチ/ナビゲーションバー分のセーフエリアを足す。
 // $padding は panel が元から持つ上下 padding（無ければ 0）。セーフエリアはそこへ加算する。
-@mixin android-fullscreen-panel($padding: 0) {
+// $sticky-header が true のとき上端の padding は 0 にする（sticky ヘッダー側が持つ。下記参照）。
+@mixin android-fullscreen-panel($padding: 0, $sticky-header: false) {
   :global([data-platform="android"]) & {
     width: 100%;
     height: 100%;
@@ -23,22 +24,27 @@
     border: none;
     border-radius: 0;
     box-sizing: border-box;
-    padding-top: calc(#{$padding} + env(safe-area-inset-top, 0px));
+    @if $sticky-header {
+      padding-top: 0;
+    } @else {
+      padding-top: calc(#{$padding} + env(safe-area-inset-top, 0px));
+    }
     padding-bottom: calc(#{$padding} + env(safe-area-inset-bottom, 0px));
   }
 }
 
 // panel 全体がスクロールする構造のダイアログ用: ヘッダー要素を上端に固定する。
-// panel の padding（$padding + セーフエリア）は負マージンで打ち消してヘッダー自身の padding に移し、
-// 固定時に上端やノッチの下へ本文が透けないようにする。$padding は panel の上下左右 padding と同じ値を渡す。
+// panel 側の上端 padding は 0 にし（android-fullscreen-panel の $sticky-header: true）、
+// その分（$padding + セーフエリア）をヘッダー自身の padding に持たせる。上端を負マージンで打ち消す方式は、
+// sticky が包含ブロック（panel の content box）内へ押し下げるためヘッダーが下へずれ本文に重なる。
+// 左右は負マージンで panel の padding を打ち消す。$padding は panel の左右 padding と同じ値を渡す。
 @mixin android-fullscreen-sticky-header($padding: 0) {
   :global([data-platform="android"]) & {
     position: sticky;
     top: 0;
     z-index: 1;
     background: var(--mcx-surface);
-    margin: calc(-1 * (#{$padding} + env(safe-area-inset-top, 0px)))
-      calc(-1 * #{$padding}) 0;
+    margin: 0 calc(-1 * #{$padding});
     padding: calc(#{$padding} + env(safe-area-inset-top, 0px)) $padding 0.5rem;
   }
 }

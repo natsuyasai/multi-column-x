@@ -53,7 +53,7 @@ Android では画面が狭く、表示サイズを大きくすると中央カー
 - **対象 6 ダイアログ**: アプリ設定（`AppSettingsPanel`）・カラム設定（`SettingsPanel`）・アカウント管理（`AccountManager`）・カラム追加（`AddColumnDialog`）・ショートカット一覧（`ShortcutHelpDialog`）・更新内容（`WhatsNewDialog`）。
 - **ヘッダー固定**
   - `AppSettingsPanel` / `SettingsPanel` は panel が flex column で本文のみスクロールする構造のため、そのまま固定される。
-  - 他の 4 つは panel 全体がスクロールするため、ヘッダー（`AddColumnDialog` などは先頭見出し）に sticky ミキシンを使う。単純な `top: 0` では panel の padding 分の隙間ができ、そこへ本文が透けるうえ、ノッチ下の余白もずれる。そこで panel の padding を負マージンで打ち消してヘッダー自身の padding に移し、背景色を付ける方式にした。
+  - 他の 4 つは panel 全体がスクロールするため、ヘッダー（`AddColumnDialog` などは先頭見出し）に sticky ミキシンを使う。単純な `top: 0` では panel の padding 分の隙間ができ、そこへ本文が透けるうえ、ノッチ下の余白もずれる。そこで panel の上端 padding を 0 にし（`android-fullscreen-panel` の第2引数 `true`）、その分（padding + セーフエリア）をヘッダー自身の padding に持たせ、背景色を付ける方式にした。**上端を負マージンで打ち消す方式は不可**: sticky は包含ブロック（panel の content box）内へ押し下げられるため、ヘッダーが padding 分下へずれて本文に重なり、先頭の項目が見切れる（実機で発生。`AndroidHeaderDoesNotOverlapBody` Story が再現・検証する）。
   - `WhatsNewDialog` の `.notes` は Android で内側スクロールを無効にし、二重スクロールを避けている。
 - **新しくパネル型ダイアログを追加するときは必ず上記ミキシンを `@include` すること**（`overlay` と panel、panel 全体スクロールなら sticky ヘッダーも）。
 - **小さなダイアログ（全画面化しない）**: `ConfirmDialog` / `AccountNameDialog` / `TabActionDialog` / `UpdateDialog` / `LinkPopupDialog` / `H264SetupDialog` は中央表示のまま、次を満たす。幅は画面内に収まり、縦に収まらないときは内部スクロールで末尾のボタンへ到達できる。監査の結果、満たしていなかったのは `TabActionDialog`（ボトムシートに `max-height` と縦スクロールが無く、特大では上端がはみ出した）だけで、`.sheet` に `max-height: 100%` と `overflow-y: auto` を追加した。

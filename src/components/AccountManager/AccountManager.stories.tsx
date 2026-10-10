@@ -237,3 +237,33 @@ export const AndroidHeaderFixedBodyScrolls: Story = {
     }
   },
 };
+
+export const AndroidHeaderDoesNotOverlapBody: Story = {
+  name: "Android全画面のアカウント管理では先頭でヘッダーが本文に重ならず上端に表示される",
+  decorators: [
+    (Story) => (
+      <AndroidRoot fontSize="20px">
+        <Story />
+      </AndroidRoot>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const restoreViewport = await narrowViewport(360, 400);
+    try {
+      const canvas = within(canvasElement);
+      const panel = queryPanel(canvasElement);
+      const header = canvas.getByText("アカウント管理")
+        .parentElement as HTMLElement;
+      const firstBody = header.nextElementSibling as HTMLElement;
+      await expect(panel.scrollTop).toBe(0);
+      // ヘッダーは画面上端から始まる（panel の padding 分だけ下へずれない）
+      await expect(header.getBoundingClientRect().top).toBe(0);
+      // 本文の先頭がヘッダーの下に隠れない
+      await expect(
+        firstBody.getBoundingClientRect().top,
+      ).toBeGreaterThanOrEqual(header.getBoundingClientRect().bottom);
+    } finally {
+      await restoreViewport();
+    }
+  },
+};
