@@ -109,7 +109,7 @@ export const targets = [
     storyId: "components-appsettingspanel-extensionstab--chrome-candidates",
     viewport: DESKTOP,
     theme: "light",
-    clip: { x: 0, y: 0, width: 1280, height: 515 },
+    clip: { x: 0, y: 0, width: 1280, height: 600 },
   },
   {
     file: "backup-tab",

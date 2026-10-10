@@ -31,7 +31,7 @@ describe("extensions サービス", () => {
   });
 
   it("detectChromeExtensions は detect_chrome_extensions を呼び結果を返す", async () => {
-    const result = { chromeFound: false, items: [] };
+    const result = { browserFound: false, items: [] };
     mockInvoke.mockResolvedValue(result);
     await expect(detectChromeExtensions()).resolves.toEqual(result);
     expect(mockInvoke).toHaveBeenCalledWith(

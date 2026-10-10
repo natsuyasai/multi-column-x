@@ -6,7 +6,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-use super::chrome::resolve_chrome_extension_path;
+use super::chrome::{resolve_chrome_extension_path, BrowserRoots};
 use super::manifest::read_manifest_info;
 use super::model::{
     AppliedExtension, ExtensionEntry, ExtensionSource, ExtensionsState, ProfileSync,
@@ -18,7 +18,7 @@ use super::sanitize::prepare_extension_dir;
 pub enum ResolvedEntry {
     /// 読み込むべきフォルダ（予約名があればサニタイズコピー先）。
     Path(String),
-    /// 見つからない（Chrome から消えた / 元フォルダか manifest.json が無い / Chrome 未検出）。
+    /// 見つからない（ブラウザから消えた / 元フォルダか manifest.json が無い / ブラウザ未検出）。
     Missing,
     /// 解決中のエラー（コピー失敗など）。
     Error(String),
@@ -54,7 +54,7 @@ pub enum Action {
 /// エントリの読み込み元フォルダを解決する。
 pub fn resolve_entry(
     entry: &ExtensionEntry,
-    chrome_root: Option<&Path>,
+    roots: &BrowserRoots,
     copy_root: &Path,
 ) -> ResolvedEntry {
     let source_dir = match &entry.source {
@@ -65,8 +65,10 @@ pub fn resolve_entry(
             }
             dir.to_path_buf()
         }
-        ExtensionSource::Chrome { chrome_id, .. } => {
-            let Some(root) = chrome_root else {
+        ExtensionSource::Chrome {
+            chrome_id, browser, ..
+        } => {
+            let Some(root) = roots.root_for(*browser) else {
                 return ResolvedEntry::Missing;
             };
             match resolve_chrome_extension_path(root, chrome_id) {
@@ -245,6 +247,7 @@ pub fn refresh_metadata(
 }
 #[cfg(test)]
 mod tests {
+    use super::super::model::Browser;
     use super::*;
     use std::fs;
     use std::path::PathBuf;
@@ -271,6 +274,7 @@ mod tests {
             source: ExtensionSource::Chrome {
                 chrome_id: chrome_id.to_string(),
                 profile: "Default".to_string(),
+                browser: Browser::Chrome,
             },
             ..フォルダ拡張(id, "", enabled)
         }
@@ -309,6 +313,24 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join("manifest.json"), r#"{"name":"X"}"#).unwrap();
         dir
+    }
+
+    fn edge拡張(id: &str, chrome_id: &str, enabled: bool) -> ExtensionEntry {
+        ExtensionEntry {
+            source: ExtensionSource::Chrome {
+                chrome_id: chrome_id.to_string(),
+                profile: "Default".to_string(),
+                browser: Browser::Edge,
+            },
+            ..フォルダ拡張(id, "", enabled)
+        }
+    }
+
+    fn chromeのみ(root: &Path) -> BrowserRoots {
+        BrowserRoots {
+            chrome: Some(root.to_path_buf()),
+            edge: None,
+        }
     }
 
     fn パス文字列(p: &Path) -> String {
@@ -372,7 +394,7 @@ mod tests {
 
         // Chrome が更新されて新しいバージョンフォルダができた。
         let new = chromeに置く(&root, ID_A, "1.1_0");
-        let r = resolve_entry(&entry, Some(&root), &copy_root);
+        let r = resolve_entry(&entry, &chromeのみ(&root), &copy_root);
         assert_eq!(r, ResolvedEntry::Path(パス文字列(&new)));
 
         let plan = plan_profile(
@@ -413,7 +435,7 @@ mod tests {
         fs::create_dir_all(&root).unwrap();
         let mut entries = vec![chrome拡張("e1", ID_A, true)];
 
-        let r = resolve_entry(&entries[0], Some(&root), &tmp.path().join("copies"));
+        let r = resolve_entry(&entries[0], &chromeのみ(&root), &tmp.path().join("copies"));
         assert_eq!(r, ResolvedEntry::Missing);
         let resolved = 解決(&[("e1", r)]);
 
@@ -631,17 +653,17 @@ mod tests {
         let dir = tmp.path().join("ext");
         let entry = フォルダ拡張("e1", &パス文字列(&dir), true);
         assert_eq!(
-            resolve_entry(&entry, None, &copy_root),
+            resolve_entry(&entry, &BrowserRoots::default(), &copy_root),
             ResolvedEntry::Missing
         );
         fs::create_dir_all(&dir).unwrap();
         assert_eq!(
-            resolve_entry(&entry, None, &copy_root),
+            resolve_entry(&entry, &BrowserRoots::default(), &copy_root),
             ResolvedEntry::Missing
         );
         fs::write(dir.join("manifest.json"), "{}").unwrap();
         assert_eq!(
-            resolve_entry(&entry, None, &copy_root),
+            resolve_entry(&entry, &BrowserRoots::default(), &copy_root),
             ResolvedEntry::Path(パス文字列(&dir))
         );
     }
@@ -651,8 +673,84 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let entry = chrome拡張("e1", ID_A, true);
         assert_eq!(
-            resolve_entry(&entry, None, tmp.path()),
+            resolve_entry(&entry, &BrowserRoots::default(), tmp.path()),
             ResolvedEntry::Missing
+        );
+    }
+
+    #[test]
+    fn edge由来の拡張機能を追加するとedgeのフォルダの最新バージョンから読み込まれる() {
+        let tmp = TempDir::new().unwrap();
+        let chrome_root = tmp.path().join("chrome");
+        let edge_root = tmp.path().join("edge");
+        chromeに置く(&edge_root, ID_A, "1.0_0");
+        let latest = chromeに置く(&edge_root, ID_A, "1.1_0");
+        // Chrome 側にも同じ ID があるが、Edge 由来は Edge のフォルダだけを見る
+        chromeに置く(&chrome_root, ID_A, "9.0_0");
+        let roots = BrowserRoots {
+            chrome: Some(chrome_root),
+            edge: Some(edge_root),
+        };
+
+        let r = resolve_entry(
+            &edge拡張("e1", ID_A, true),
+            &roots,
+            &tmp.path().join("copies"),
+        );
+
+        assert_eq!(r, ResolvedEntry::Path(パス文字列(&latest)));
+    }
+
+    #[test]
+    fn edge由来の拡張機能のフォルダが無くなると見つからない扱いになる() {
+        let tmp = TempDir::new().unwrap();
+        let chrome_root = tmp.path().join("chrome");
+        let edge_root = tmp.path().join("edge");
+        fs::create_dir_all(&edge_root).unwrap();
+        // Chrome 側に同じ ID があっても Edge 由来は見つからない扱い
+        chromeに置く(&chrome_root, ID_A, "1.0_0");
+        let roots = BrowserRoots {
+            chrome: Some(chrome_root),
+            edge: Some(edge_root),
+        };
+
+        let r = resolve_entry(
+            &edge拡張("e1", ID_A, true),
+            &roots,
+            &tmp.path().join("copies"),
+        );
+
+        assert_eq!(r, ResolvedEntry::Missing);
+    }
+
+    #[test]
+    fn ブラウザ情報が無い従来の保存データはchrome由来として読み込まれる() {
+        let json = format!(r#"{{"kind":"chrome","chromeId":"{ID_A}","profile":"Default"}}"#);
+        let source: ExtensionSource = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            source,
+            ExtensionSource::Chrome {
+                chrome_id: ID_A.to_string(),
+                profile: "Default".to_string(),
+                browser: Browser::Chrome,
+            }
+        );
+
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path().join("Extensions");
+        let dir = chromeに置く(&root, ID_A, "1.0_0");
+        let entry = ExtensionEntry {
+            source,
+            ..フォルダ拡張("e1", "", true)
+        };
+        // Edge のルートがあっても Chrome のルートで解決される
+        let roots = BrowserRoots {
+            chrome: Some(root),
+            edge: Some(tmp.path().join("edge")),
+        };
+        assert_eq!(
+            resolve_entry(&entry, &roots, &tmp.path().join("copies")),
+            ResolvedEntry::Path(パス文字列(&dir))
         );
     }
 
@@ -666,7 +764,7 @@ mod tests {
         let copy_root = tmp.path().join("copies");
         let entry = フォルダ拡張("e1", &パス文字列(&dir), true);
         assert_eq!(
-            resolve_entry(&entry, None, &copy_root),
+            resolve_entry(&entry, &BrowserRoots::default(), &copy_root),
             ResolvedEntry::Path(パス文字列(&copy_root.join("e1")))
         );
     }
@@ -679,7 +777,7 @@ mod tests {
         fs::write(dir.join("manifest.json"), "{}").unwrap();
         let entry = フォルダ拡張("../bad", &パス文字列(&dir), true);
         assert!(matches!(
-            resolve_entry(&entry, None, tmp.path()),
+            resolve_entry(&entry, &BrowserRoots::default(), tmp.path()),
             ResolvedEntry::Error(_)
         ));
     }

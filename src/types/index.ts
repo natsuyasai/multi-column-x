@@ -286,10 +286,19 @@ export function getColumnLabel(column: Column): string {
   return column.label || getPageTypeLabel(column);
 }
 
-/** 拡張機能の取得元（フォルダ指定 / Chrome から検出） */
+/** 拡張機能の検出元ブラウザ */
+export type ExtensionBrowser = "chrome" | "edge";
+
+/** 拡張機能の取得元（フォルダ指定 / Chrome・Edge から検出） */
 export type ExtensionSource =
   | { kind: "folder"; path: string }
-  | { kind: "chrome"; chromeId: string; profile: string };
+  | {
+      kind: "chrome";
+      chromeId: string;
+      profile: string;
+      /** 旧データ互換のため省略可。未指定は chrome とみなす */
+      browser?: ExtensionBrowser;
+    };
 
 /** 登録済みの拡張機能 */
 export interface ExtensionEntry {
@@ -303,10 +312,11 @@ export interface ExtensionEntry {
   missing: boolean;
 }
 
-/** Chrome から検出した拡張機能の候補 */
+/** Chrome / Edge から検出した拡張機能の候補 */
 export interface DetectedExtension {
   chromeId: string;
   profile: string;
+  browser: ExtensionBrowser;
   name: string;
   path: string;
   hasPopup: boolean;
@@ -316,6 +326,6 @@ export interface DetectedExtension {
 }
 
 export interface DetectResult {
-  chromeFound: boolean;
+  browserFound: boolean;
   items: DetectedExtension[];
 }

@@ -4,6 +4,15 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
+/// Chromium 系ブラウザの種別（検出元）。保存データに無いときは Chrome。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Browser {
+    #[default]
+    Chrome,
+    Edge,
+}
+
 /// 拡張機能の取得元。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
@@ -16,6 +25,9 @@ pub enum ExtensionSource {
         chrome_id: String,
         /// 例: "Default"
         profile: String,
+        /// 検出元のブラウザ。旧データ（キー無し）は Chrome。
+        #[serde(default)]
+        browser: Browser,
     },
 }
 

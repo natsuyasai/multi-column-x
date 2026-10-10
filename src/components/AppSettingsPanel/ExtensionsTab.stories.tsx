@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 import {
   ADDED_BADGE_TEXT,
-  CHROME_NOT_FOUND_NOTICE,
+  BROWSER_NOT_FOUND_NOTICE,
   ExtensionsTab,
   MISSING_BADGE_TEXT,
   TRUST_NOTICE,
@@ -31,6 +31,21 @@ const chromeExtension: ExtensionEntry = {
   missing: false,
 };
 
+const edgeExtension: ExtensionEntry = {
+  id: "e4",
+  name: "Edge由来の拡張",
+  source: {
+    kind: "chrome",
+    chromeId: "edgeedgeedgeedge",
+    profile: "Default",
+    browser: "edge",
+  },
+  enabled: true,
+  hasPopup: true,
+  hasOptions: false,
+  missing: false,
+};
+
 const missingExtension: ExtensionEntry = {
   id: "e3",
   name: "Chromeから消えた拡張",
@@ -42,11 +57,12 @@ const missingExtension: ExtensionEntry = {
 };
 
 const detectResult: DetectResult = {
-  chromeFound: true,
+  browserFound: true,
   items: [
     {
       chromeId: "aaaaaaaaaaaaaaaa",
       profile: "Default",
+      browser: "chrome",
       name: "未追加の候補",
       path: "C:\\chrome\\aaaa",
       hasPopup: true,
@@ -56,11 +72,22 @@ const detectResult: DetectResult = {
     {
       chromeId: "abcdefghijklmnop",
       profile: "Default",
+      browser: "chrome",
       name: "Chrome由来の拡張",
       path: "C:\\chrome\\abcd",
       hasPopup: false,
       hasOptions: true,
       added: true,
+    },
+    {
+      chromeId: "edgeedgeedgeedge",
+      profile: "Default",
+      browser: "edge",
+      name: "Edge由来の候補",
+      path: "C:\\edge\\edge",
+      hasPopup: false,
+      hasOptions: false,
+      added: false,
     },
   ],
 };
@@ -174,14 +201,18 @@ export const Empty: Story = {
 };
 
 export const ChromeCandidates: Story = {
-  name: "Chromeの候補が表示される",
+  name: "Chrome / Edgeの候補が表示される",
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     await userEvent.click(
-      canvas.getByRole("button", { name: "Chrome から検出" }),
+      canvas.getByRole("button", { name: "ブラウザから検出" }),
     );
     await expect(await canvas.findByText("未追加の候補")).toBeInTheDocument();
     await expect(canvas.getByText(ADDED_BADGE_TEXT)).toBeInTheDocument();
+    // 候補に由来ブラウザ名が表示される
+    await expect(
+      canvas.getByText("Edge由来の候補").closest("li"),
+    ).toHaveTextContent("Edge");
     await expect(
       canvas.getByRole("button", { name: "Chrome由来の拡張 を追加" }),
     ).toBeDisabled();
@@ -195,18 +226,46 @@ export const ChromeCandidates: Story = {
   },
 };
 
+export const EdgeExtensionAdded: Story = {
+  name: "Edge由来の追加済み拡張に取得元としてEdgeが表示される",
+  args: { listExtensions: fn(async () => [chromeExtension, edgeExtension]) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByText("Edge（プロファイル: Default）"),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByText("Chrome（プロファイル: Default）"),
+    ).toBeInTheDocument();
+  },
+};
+
+export const StoragePathGuide: Story = {
+  name: "ユーザーデータの保存先パスの案内が表示される",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByText(/Brave など他のブラウザ/),
+    ).toBeInTheDocument();
+    await expect(canvas.getByText(/組織名/)).toBeInTheDocument();
+  },
+};
+
 export const ChromeNotFound: Story = {
-  name: "Chromeが見つからない",
+  name: "Chrome / Edgeが見つからない",
   args: {
-    detectChromeExtensions: fn(async () => ({ chromeFound: false, items: [] })),
+    detectChromeExtensions: fn(async () => ({
+      browserFound: false,
+      items: [],
+    })),
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(
-      canvas.getByRole("button", { name: "Chrome から検出" }),
+      canvas.getByRole("button", { name: "ブラウザから検出" }),
     );
     await expect(
-      await canvas.findByText(CHROME_NOT_FOUND_NOTICE),
+      await canvas.findByText(BROWSER_NOT_FOUND_NOTICE),
     ).toBeInTheDocument();
   },
 };

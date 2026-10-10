@@ -19,7 +19,7 @@ pub mod webview2;
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
-use self::chrome::{chrome_extensions_root_from_env, detect_extensions, DetectedExtension};
+use self::chrome::{browser_roots_from_env, detect_all, DetectOutcome, DetectedExtension};
 use self::model::ExtensionEntry;
 use self::reconcile_plan::ResolvedEntry;
 use self::service::{
@@ -43,9 +43,21 @@ fn ensure_supported() -> Result<(), String> {
 /// `detect_chrome_extensions` の戻り値。
 #[derive(Debug, Clone, Serialize)]
 pub struct DetectResult {
-    #[serde(rename = "chromeFound")]
-    pub chrome_found: bool,
+    #[serde(rename = "browserFound")]
+    pub browser_found: bool,
     pub items: Vec<DetectedExtension>,
+}
+
+/// 検出結果から指定 ID の拡張機能を選ぶ。ブラウザが無い／ID が無いときは文言付きのエラー。
+fn pick_detected(outcome: DetectOutcome, chrome_id: &str) -> Result<DetectedExtension, String> {
+    if !outcome.browser_found {
+        return Err("Chrome / Edge が見つかりません".to_string());
+    }
+    outcome
+        .items
+        .into_iter()
+        .find(|d| d.chrome_id == chrome_id)
+        .ok_or_else(|| "ブラウザに該当する拡張機能が見つかりません".to_string())
 }
 
 /// 保存済みの拡張機能の一覧（`missing` を最新化して返す）。
@@ -59,7 +71,7 @@ pub async fn list_extensions(
     service::list_refreshed(&app).await
 }
 
-/// Chrome（Default プロファイル）にインストール済みの拡張機能を検出する。
+/// Chrome / Edge（Default プロファイル）にインストール済みの拡張機能を検出する。
 #[tauri::command]
 pub async fn detect_chrome_extensions(
     caller: tauri::Webview,
@@ -69,17 +81,12 @@ pub async fn detect_chrome_extensions(
     ensure_supported()?;
     let state = store::load(&app)?;
     let added = service::added_chrome_ids(&state);
-    let Some(root) = chrome_extensions_root_from_env() else {
-        return Ok(DetectResult {
-            chrome_found: false,
-            items: Vec::new(),
-        });
-    };
-    let outcome = tokio::task::spawn_blocking(move || detect_extensions(&root, LOCALE, &added))
+    let roots = browser_roots_from_env();
+    let outcome = tokio::task::spawn_blocking(move || detect_all(&roots, LOCALE, &added))
         .await
         .map_err(|e| e.to_string())?;
     Ok(DetectResult {
-        chrome_found: outcome.chrome_found,
+        browser_found: outcome.browser_found,
         items: outcome.items,
     })
 }
@@ -147,16 +154,12 @@ pub async fn add_chrome_extension(
 ) -> Result<ExtensionEntry, String> {
     require_main_caller(&caller)?;
     ensure_supported()?;
-    let root = chrome_extensions_root_from_env().ok_or("Chrome が見つかりません")?;
-    let detected = tokio::task::spawn_blocking(move || {
-        detect_extensions(&root, LOCALE, &Default::default())
-            .items
-            .into_iter()
-            .find(|d| d.chrome_id == chromeId)
-    })
-    .await
-    .map_err(|e| e.to_string())?
-    .ok_or("Chrome に該当する拡張機能が見つかりません")?;
+    let roots = browser_roots_from_env();
+    let outcome =
+        tokio::task::spawn_blocking(move || detect_all(&roots, LOCALE, &Default::default()))
+            .await
+            .map_err(|e| e.to_string())?;
+    let detected = pick_detected(outcome, &chromeId)?;
     let new_id = uuid::Uuid::new_v4().to_string();
     let entry = modify_state(&app, |state| add_chrome_entry(state, &detected, new_id)).await?;
     reconcile_all_live(&app).await?;
@@ -300,6 +303,44 @@ fn open_page_window(
 
 #[cfg(test)]
 mod tests {
+    use super::chrome::{DetectOutcome, DetectedExtension};
+    use super::model::Browser;
+    use super::pick_detected;
+
+    #[test]
+    fn 追加時にブラウザが無いときとidが無いときで別の文言のエラーになる() {
+        let none = DetectOutcome {
+            browser_found: false,
+            items: Vec::new(),
+        };
+        assert_eq!(
+            pick_detected(none, "x").unwrap_err(),
+            "Chrome / Edge が見つかりません"
+        );
+        let empty = DetectOutcome {
+            browser_found: true,
+            items: Vec::new(),
+        };
+        assert_eq!(
+            pick_detected(empty, "x").unwrap_err(),
+            "ブラウザに該当する拡張機能が見つかりません"
+        );
+        let hit = DetectOutcome {
+            browser_found: true,
+            items: vec![DetectedExtension {
+                chrome_id: "x".to_string(),
+                profile: "Default".to_string(),
+                name: "X".to_string(),
+                path: String::new(),
+                has_popup: false,
+                has_options: false,
+                added: false,
+                browser: Browser::Edge,
+            }],
+        };
+        assert_eq!(pick_detected(hit, "x").unwrap().browser, Browser::Edge);
+    }
+
     #[test]
     fn 拡張機能ページのウィンドウにも新規ウィンドウハンドラが付いている() {
         let source = include_str!("mod.rs").split("#[cfg(test)]").next().unwrap();
