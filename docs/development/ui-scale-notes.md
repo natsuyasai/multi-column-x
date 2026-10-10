@@ -60,6 +60,15 @@ Android では画面が狭く、表示サイズを大きくすると中央カー
 - **Storybook 検証の注意**: Storybook は `index.css` を読み込まないため、`--mcx-border` などのテーマ変数が未定義になり、`border` が無効値になって枠線幅が常に 0 になる。枠線の有無を検証する Story では panel に `--mcx-border` を手動で設定している。狭い画面は `vitest/browser` の `page.viewport` で再現し、終了時に元へ戻す。`data-platform` と `font-size` もアンマウント時に戻す。
 - **手動確認項目（実機）**: ノッチやナビゲーションバーにヘッダー・本文末尾が隠れないこと、フォントサイズ最大での見え方、全画面ダイアログを閉じたときにカラム WebView が元の位置へ復元されること。
 
+## 大きな表示サイズでのボトムバーと案内ダイアログ
+
+- **ボトムバー（`MobileTabBar`）**
+  - ツイート作成ボタン・展開トグル・展開時のアクション群を `.menu`（`flex: 0 1 auto; min-width: 0; overflow-x: auto`）で包み、収まらないときは横スクロールにする。スクロールバーは非表示。`.tabs` には `min-width: 6.25rem`（タブ1つ分）を付け、メニュー列に押し潰されないようにした。
+  - バー高さ `3.5rem`（`MOBILE_TAB_BAR_HEIGHT_REM`）は `gridLayout.contract.test.ts` が SCSS を読んで検証し、カラム WebView の bounds にも使うため増やさない。高さを増やす（メニューを2段にする）案は gridLayout の定数変更が必要になるため不採用。
+  - API レート制限インジケーターのモバイル用ポップオーバーは `position: fixed` で、祖先に `transform` などが無いため、`.menu` の `overflow` ではクリップされない。
+  - 通常サイズでも幅 360px・メニュー展開時は、メニューが約 344px になりタブ最小幅と合わせて収まらず横スクロールになる（以前はタブ領域がほぼ潰れていた）。実機での確認が必要。
+- **`position: fixed; left: 50%; transform: translate(-50%, -50%)` の要素**は、`left: 50%` の基準により shrink-to-fit 幅が画面の半分までに制限され、文字が大きいと窮屈に折り返す。幅は `width: min(○rem, calc(100% - 2rem))` のように明示し、縦も `max-height: calc(100% - 2rem); overflow-y: auto` で収める（アカウント未登録の案内 `NoAccountsPrompt` の事例）。
+
 ## 既知の割り切り
 
 - 設定ロード前は既定の `auto` で描画されるため、Android で保存値と端末倍率が異なる場合、起動直後に一瞬チラつく可能性がある。
