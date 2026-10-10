@@ -191,7 +191,7 @@
 }
 
 .scaleBtnActive {
-  background: var(--mcx-accent);
+  background: var(--mcx-accent-fill);
   border-color: var(--mcx-accent);
   color: var(--mcx-text-on-accent);
 }
@@ -281,7 +281,7 @@
 }
 
 .applyBtn {
-  background: var(--mcx-accent);
+  background: var(--mcx-accent-fill);
   border: none;
   border-radius: 0.25rem;
   color: var(--mcx-text-on-accent);
