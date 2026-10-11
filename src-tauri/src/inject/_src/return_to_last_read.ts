@@ -124,11 +124,11 @@ import {
   }
 
   function buttonStyle(): string {
-    return `background:#1d9bf0; color:#fff; border:none; border-radius:9999px; padding:8px 16px; font:bold 14px/1.2 system-ui, sans-serif; box-shadow:0 2px 8px rgba(0,0,0,.3); cursor:pointer;`;
+    return `background:#1d9bf0; color:#fff; border:none; border-radius:9999px; min-height:48px; padding:12px 24px; font:bold 16px/1.2 system-ui, sans-serif; box-shadow:0 2px 8px rgba(0,0,0,.3); cursor:pointer;`;
   }
 
   function closeButtonStyle(): string {
-    return `width:32px; height:32px; border-radius:9999px; background:rgba(0,0,0,.6); color:#fff; border:none; font:bold 16px/1 system-ui, sans-serif; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; line-height:1;`;
+    return `width:48px; height:48px; border-radius:9999px; background:rgba(0,0,0,.6); color:#fff; border:none; font:bold 24px/1 system-ui, sans-serif; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; line-height:1;`;
   }
 
   function toastStyle(): string {
