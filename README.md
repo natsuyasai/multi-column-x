@@ -25,7 +25,8 @@
 </p>
 
 <p align="center">
-  <img src="docs/guide/images/columns-overview.png" alt="カラム表示の例" width="800">
+  <img src="docs/guide/images/windows-app-screen.png" alt="Windows でのアプリ画面" height="480">
+  <img src="docs/guide/images/android-app-screen.png" alt="Android でのアプリ画面" height="480">
 </p>
 
 ## 特長
