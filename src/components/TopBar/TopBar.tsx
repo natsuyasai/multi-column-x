@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import LinkIcon from "../../assets/icons/link.svg?react";
 import PencilIcon from "../../assets/icons/pencil.svg?react";
 import PersonIcon from "../../assets/icons/person.svg?react";
@@ -78,6 +79,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   apiRateLimits,
   onApiRateLimitPopoverOpenChange,
 }) => {
+  const { t } = useTranslation();
   return (
     <div className={`${styles.topbar}${expanded ? ` ${styles.expanded}` : ""}`}>
       <div className={styles.row1}>
@@ -86,46 +88,46 @@ export const TopBar: React.FC<TopBarProps> = ({
             baseClassName={styles.composeBtn}
             expanded={expanded}
             onClick={onComposeTweet}
-            title="ツイートを作成 (Ctrl+T)"
+            title={t("topbar:compose.title")}
             Icon={PencilIcon}
             iconTestId="icon-pencil"
-            label="ツイート"
+            label={t("topbar:compose.label")}
           />
           <ToolbarButton
             baseClassName={styles.btn}
             expanded={expanded}
             onClick={onOpenLinkPopup}
-            title="URLをポップアップで開く (Ctrl+L)"
+            title={t("topbar:linkPopup.title")}
             Icon={LinkIcon}
             iconTestId="icon-link"
-            label="URLを開く"
+            label={t("topbar:linkPopup.label")}
           />
           <ToolbarButton
             baseClassName={styles.btn}
             expanded={expanded}
             onClick={onAddColumn}
-            title="カラムを追加 (Ctrl+N)"
+            title={t("topbar:addColumn.title")}
             Icon={PlusIcon}
             iconTestId="icon-plus"
-            label="カラム追加"
+            label={t("topbar:addColumn.label")}
           />
           <ToolbarButton
             baseClassName={styles.btn}
             expanded={expanded}
             onClick={onAccountManager}
-            title="アカウント管理 (Ctrl+Shift+A)"
+            title={t("topbar:accounts.title")}
             Icon={PersonIcon}
             iconTestId="icon-person"
-            label="アカウント"
+            label={t("topbar:accounts.label")}
           />
           <ToolbarButton
             baseClassName={styles.btn}
             expanded={expanded}
             onClick={onAppSettings}
-            title="アプリ設定 (Ctrl+,)"
+            title={t("topbar:settings.title")}
             Icon={SettingsIcon}
             iconTestId="icon-settings"
-            label="設定"
+            label={t("topbar:settings.label")}
           />
           {apiRateLimitMonitorEnabled && (
             <ApiRateLimitIndicator
@@ -157,11 +159,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         <button
           className={styles.toggleBtn}
           onClick={onToggleExpand}
-          title={
-            expanded
-              ? "ツールバーを折りたたむ (Ctrl+B)"
-              : "ツールバーを展開 (Ctrl+B)"
-          }
+          title={expanded ? t("topbar:collapse") : t("topbar:expand")}
         >
           {expanded ? "▲" : "▼"}
         </button>

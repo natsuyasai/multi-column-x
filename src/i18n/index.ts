@@ -15,6 +15,8 @@ void i18n.use(initReactI18next).init({
     "columns",
     "dialogs",
     "messages",
+    "mobile",
+    "topbar",
     "rateLimit",
   ],
   interpolation: { escapeValue: false },

@@ -31,5 +31,15 @@
     "labelPlaceholder": "e.g. Work",
     "cancel": "Cancel",
     "submit": "Add"
+  },
+  "header": {
+    "clearUnread": "Clear unread",
+    "unread": "Has unread posts",
+    "nextReload": "Until next auto-reload",
+    "scrollTop": "Scroll to top",
+    "reload": "Refresh",
+    "reloadPage": "Reload page",
+    "settings": "Settings",
+    "close": "Close column"
   }
 }
