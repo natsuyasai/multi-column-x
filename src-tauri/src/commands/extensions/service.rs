@@ -319,7 +319,7 @@ pub async fn reconcile_profile<O: ProfileOps>(
         apply_remove_result(profile, removed);
     }
     for error in &outcome.errors {
-        log::warn!("[extensions] reconcile でエラー: {error}");
+        log::warn!("[extensions] error during reconcile: {error}");
     }
     if !outcome.changed && !outcome.errors.is_empty() {
         // 複数あっても呼び出し元へ返すのは最初の 1 件（全件は上のログに残している）。
@@ -380,7 +380,7 @@ pub async fn reconcile_all_live(app: &AppHandle) -> Result<bool, AppError> {
         };
         match reconcile_webview(app, &webview, &data_directory).await {
             Ok(c) => changed |= c,
-            Err(e) => log::warn!("[extensions] プロファイルの同期に失敗: label={label} err={e}"),
+            Err(e) => log::warn!("[extensions] failed to sync the profile: label={label} err={e}"),
         }
     }
     Ok(changed)

@@ -555,7 +555,7 @@ where
             }
         }
     }
-    Err(last_err.expect("attempts.max(1) により最低1回は試行される"))
+    Err(last_err.expect("at least one attempt is made because of attempts.max(1)"))
 }
 
 #[tauri::command]

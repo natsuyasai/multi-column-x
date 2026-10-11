@@ -41,7 +41,7 @@ pub(crate) fn new_window_handler<R: Runtime>(
     move |url, _features| {
         handle_new_window::<R>(&url, |u| {
             if let Err(e) = app.opener().open_url(u, None::<&str>) {
-                log::warn!("外部ブラウザの起動に失敗しました: {e}");
+                log::warn!("failed to launch the external browser: {e}");
             }
         })
     }

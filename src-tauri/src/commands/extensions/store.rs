@@ -23,7 +23,7 @@ pub fn split_stored_value(value: Option<Value>) -> (ExtensionsState, Option<Valu
         Some(v) => match serde_json::from_value(v.clone()) {
             Ok(state) => (state, None),
             Err(e) => {
-                log::warn!("拡張機能の設定の読み込みに失敗したため空状態で続行します: {e}");
+                log::warn!("failed to load extension settings, using empty state: {e}");
                 (ExtensionsState::default(), Some(v))
             }
         },
@@ -49,7 +49,7 @@ pub fn load(app: &AppHandle) -> Result<ExtensionsState, AppError> {
         // 次の保存で破損値が上書きされて失われないよう、別キーへ退避する（1 世代）。
         store.set(BROKEN_KEY, broken);
         if let Err(e) = crate::commands::settings_file::save_store_atomically(app, &store) {
-            log::warn!("破損した拡張機能の設定の退避保存に失敗しました: {e}");
+            log::warn!("failed to save the corrupted extension settings aside: {e}");
         }
     }
     Ok(state)

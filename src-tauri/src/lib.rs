@@ -6,6 +6,8 @@ mod inject;
 mod ipc_constants;
 #[cfg(all(desktop, target_os = "linux"))]
 mod linux_codec_env;
+#[cfg(test)]
+mod log_language_contract;
 mod state;
 mod video;
 

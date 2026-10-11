@@ -138,7 +138,7 @@ pub(crate) fn ensure_openh264_ld_library_path() {
     let dir = openh264_lib_dir();
     if let Err(e) = std::fs::create_dir_all(&dir) {
         warn_before_logger_ready(&format!(
-            "openh264ライブラリディレクトリの作成に失敗しました: {e}"
+            "failed to create the openh264 library directory: {e}"
         ));
         return;
     }
@@ -148,7 +148,7 @@ pub(crate) fn ensure_openh264_ld_library_path() {
     let current_exe = match std::env::current_exe() {
         Ok(p) => p,
         Err(e) => {
-            warn_before_logger_ready(&format!("current_exeの取得に失敗しました: {e}"));
+            warn_before_logger_ready(&format!("failed to get current_exe: {e}"));
             return;
         }
     };
@@ -161,7 +161,7 @@ pub(crate) fn ensure_openh264_ld_library_path() {
         .env("LD_LIBRARY_PATH", new_value)
         .exec(); // 成功時はプロセスが置き換わりここには戻らない
     warn_before_logger_ready(&format!(
-        "自己再実行に失敗しました。H.264ダウンロード機能が動作しない可能性があります: {err}"
+        "failed to re-exec itself; the H.264 download feature may not work: {err}"
     ));
 }
 

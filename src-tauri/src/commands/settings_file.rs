@@ -51,7 +51,7 @@ where
 #[cfg(unix)]
 fn sync_parent_dir(parent: &Path) {
     if let Err(e) = fs::File::open(parent).and_then(|dir| dir.sync_all()) {
-        log::warn!("設定ディレクトリの fsync に失敗しました: {e}");
+        log::warn!("failed to fsync the settings directory: {e}");
     }
 }
 
@@ -68,7 +68,7 @@ pub(crate) fn write_settings_atomically(dir: &Path, bytes: &[u8]) -> io::Result<
     let main = dir.join(SETTINGS_FILE);
     if fs::read(&main).is_ok_and(|b| is_valid_settings_bytes(&b)) {
         if let Err(e) = fs::copy(&main, dir.join(PREV_FILE)) {
-            log::warn!("設定の直前世代の保存に失敗しました: {e}");
+            log::warn!("failed to save the previous generation of the settings: {e}");
         }
     }
     atomic_write(&main, bytes)
@@ -97,7 +97,7 @@ pub(crate) fn recover_settings_file(dir: &Path, unix_secs: u64) -> SettingsRecov
         Ok(b) => b,
         Err(e) if e.kind() == io::ErrorKind::NotFound => return SettingsRecovery::Healthy,
         Err(e) => {
-            log::error!("設定ファイルの読み込みに失敗しました: {e}");
+            log::error!("failed to read the settings file: {e}");
             Vec::new()
         }
     };
@@ -111,7 +111,9 @@ pub(crate) fn recover_settings_file(dir: &Path, unix_secs: u64) -> SettingsRecov
     if prev_valid {
         match fs::copy(&prev, &main) {
             Ok(_) => return SettingsRecovery::Restored,
-            Err(e) => log::error!("直前世代からの設定の復元に失敗しました: {e}"),
+            Err(e) => {
+                log::error!("failed to restore the settings from the previous generation: {e}")
+            }
         }
     }
     SettingsRecovery::Unrecoverable { backup_path }
@@ -123,7 +125,7 @@ fn backup_broken_file(dir: &Path, main: &Path, unix_secs: u64) -> Option<String>
     match fs::copy(main, &backup) {
         Ok(_) => Some(backup.to_string_lossy().to_string()),
         Err(e) => {
-            log::error!("壊れた設定ファイルの退避に失敗しました: {e}");
+            log::error!("failed to move the corrupted settings file aside: {e}");
             None
         }
     }

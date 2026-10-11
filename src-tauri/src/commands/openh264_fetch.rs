@@ -72,7 +72,7 @@ fn invalidate_gstreamer_registry_cache() {
     );
     if dir.exists() {
         if let Err(e) = std::fs::remove_dir_all(&dir) {
-            log::warn!("GStreamerレジストリキャッシュの削除に失敗しました: {e}");
+            log::warn!("failed to delete the GStreamer registry cache: {e}");
         }
     }
 }

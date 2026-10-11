@@ -355,11 +355,11 @@ pub async fn create_column_webview(
             {
                 Ok(true) => {
                     if let Err(e) = sync_webview.reload() {
-                        log::warn!("[extensions] カラムの再読込に失敗: {e}");
+                        log::warn!("[extensions] failed to reload the column: {e}");
                     }
                 }
                 Ok(false) => {}
-                Err(e) => log::warn!("[extensions] カラム作成時の同期に失敗: {e}"),
+                Err(e) => log::warn!("[extensions] failed to sync when creating the column: {e}"),
             }
         });
     }

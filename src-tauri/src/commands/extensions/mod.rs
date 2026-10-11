@@ -198,7 +198,7 @@ pub async fn remove_extension(
         .await
         .map_err(AppError::internal)?
     {
-        log::warn!("[extensions] サニタイズコピーの削除に失敗: {e}");
+        log::warn!("[extensions] failed to delete the sanitized copy: {e}");
     }
     Ok(())
 }
