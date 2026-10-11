@@ -8,7 +8,7 @@ void i18n.use(initReactI18next).init({
   lng: resolveLanguage("auto", getOsLocale()),
   fallbackLng: "ja",
   defaultNS: "common",
-  ns: ["common", "settings"],
+  ns: ["common", "settings", "columns", "messages", "rateLimit"],
   interpolation: { escapeValue: false },
   returnNull: false,
   initAsync: false,

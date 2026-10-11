@@ -116,7 +116,11 @@ const column: Column = {
   settings: { ...DEFAULT_COLUMN_SETTINGS },
 };
 
-const globalSettings: GlobalSettings = { ...DEFAULT_GLOBAL_SETTINGS };
+// 既存テストは日本語表示を前提にするため、OS ロケールに依存しないよう言語を固定する
+const globalSettings: GlobalSettings = {
+  ...DEFAULT_GLOBAL_SETTINGS,
+  language: "ja",
+};
 
 // App のマウント時に走る load_settings が、テストで setState した状態をそのまま返すようにする。
 // （load_settings が失敗すると保存ブロック＋通知ダイアログが出て、カラム位置の検証に影響するため）

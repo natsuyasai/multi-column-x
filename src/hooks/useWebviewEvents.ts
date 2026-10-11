@@ -7,6 +7,7 @@ import {
   sendNotification,
 } from "@tauri-apps/plugin-notification";
 import { useEffect, useRef } from "react";
+import i18n from "@/i18n";
 import {
   IPC_EVENTS,
   OFFICIAL_SETTINGS_WHITELIST_KEYS,
@@ -181,7 +182,7 @@ export function useNewPostsNotification(
         setUnreadCount(columnId, count);
 
         if (col.settings.autoReloadEnabled && count > 0) {
-          const columnName = getColumnLabel(col);
+          const columnName = getColumnLabel(col, i18n.t);
           void notifyNewPosts(columnName);
         }
       },

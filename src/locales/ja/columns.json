@@ -1,0 +1,13 @@
+{
+  "pageType": {
+    "home": "ホーム",
+    "notifications": "通知",
+    "search": "検索",
+    "searchWithQuery": "検索: {{query}}",
+    "list": "リスト",
+    "custom": "カスタム",
+    "external": "外部サイト",
+    "externalWithHost": "外部: {{host}}",
+    "compose": "投稿"
+  }
+}

@@ -1,6 +1,7 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import * as apiRateLimitLabels from "@/constants/apiRateLimitLabels";
+import i18n from "@/i18n";
 import type { Account, ApiRateLimitBucket } from "@/types";
 import { ApiRateLimitIndicator } from "./ApiRateLimitIndicator";
 import styles from "./ApiRateLimitIndicator.module.scss";
@@ -501,5 +502,44 @@ describe("ApiRateLimitIndicator", () => {
 
       expect(screen.getByRole("dialog")).toBeInTheDocument();
     });
+  });
+});
+
+describe("ApiRateLimitIndicator の表示言語", () => {
+  afterEach(async () => {
+    await i18n.changeLanguage("ja");
+  });
+
+  it("英語表示ではバケット名と説明文が英語で表示される", async () => {
+    await act(() => i18n.changeLanguage("en"));
+    render(
+      <ApiRateLimitIndicator
+        accounts={accounts.slice(0, 1)}
+        apiRateLimits={normalRateLimits}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "APIレート制限" }));
+
+    expect(screen.getByText("Home timeline")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "API that fetches the timeline of posts from followed users in algorithmic order.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("ポップオーバーを開いたまま言語を切り替えるとバケット名が切り替わる", async () => {
+    render(
+      <ApiRateLimitIndicator
+        accounts={accounts.slice(0, 1)}
+        apiRateLimits={normalRateLimits}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "APIレート制限" }));
+    expect(screen.getByText("ホームタイムライン")).toBeInTheDocument();
+
+    await act(() => i18n.changeLanguage("en"));
+
+    expect(screen.getByText("Home timeline")).toBeInTheDocument();
   });
 });

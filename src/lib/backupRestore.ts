@@ -1,6 +1,7 @@
 // src/lib/backupRestore.ts
 // バックアップの復元ロジック（Tauri / React 非依存の純粋関数）。
 // 紐づけの初期候補・実行可否・件数集計・accountId の差し替え・id 再採番・グリッド正規化・エラー文言を扱う。
+import type { AppTFunction } from "@/i18n/types";
 import { normalizeOrder } from "@/lib/columnOrder";
 import { validateNgWordLines } from "@/lib/ngWordPattern";
 import { validateUserIdLine } from "@/lib/repostHiddenUserId";
@@ -239,34 +240,39 @@ export interface BackupErrorInfo {
   size?: number;
 }
 
-const withDetail = (base: string, detail?: string) =>
-  detail ? `${base}（${detail}）` : base;
+const withDetail = (t: AppTFunction, base: string, detail?: string) =>
+  detail ? t("messages:backup.error.withDetail", { base, detail }) : base;
 
 /** エラー種別から利用者向け文言を作る。将来バージョンだけ「アプリを更新してください」を案内する */
-export function describeBackupError(error: BackupErrorInfo): string {
+export function describeBackupError(
+  error: BackupErrorInfo,
+  t: AppTFunction,
+): string {
   switch (error.kind) {
     case "futureVersion":
-      return "このバックアップは新しいバージョンのアプリで作成されています。アプリを更新してください。";
+      return t("messages:backup.error.futureVersion");
     case "brokenJson":
-      return "ファイルが壊れているか、JSON として読み取れません。";
+      return t("messages:backup.error.brokenJson");
     case "formatMismatch":
-      return "Multi Column X のバックアップファイルではありません。";
+      return t("messages:backup.error.formatMismatch");
     case "tooLarge":
-      return "ファイルサイズが大きすぎるため読み込めません。";
+      return t("messages:backup.error.tooLarge");
     case "limitExceeded":
       return withDetail(
-        "バックアップの件数または文字数が上限を超えています",
+        t,
+        t("messages:backup.error.limitExceeded"),
         error.field,
       );
     case "invalidField":
       return withDetail(
-        "バックアップに不正な値が含まれています",
+        t,
+        t("messages:backup.error.invalidField"),
         [error.field, error.reason].filter(Boolean).join(": "),
       );
     case "io":
-      return withDetail("ファイルの読み書きに失敗しました", error.message);
+      return withDetail(t, t("messages:backup.error.io"), error.message);
     case "settingsUnreadable":
-      return "現在の設定を読み込めていないため、復元できません。アプリを再起動してください。";
+      return t("messages:backup.error.settingsUnreadable");
   }
 }
 

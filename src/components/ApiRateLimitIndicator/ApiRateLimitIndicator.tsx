@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   getApiRateLimitDescription,
   getApiRateLimitLabel,
@@ -52,6 +53,7 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
   onOpenChange,
   isMobile = false,
 }) => {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -111,6 +113,7 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
                 if (!item.observed) {
                   const description = getApiRateLimitDescription(
                     item.bucketKey,
+                    t,
                   );
                   const unobservedNote = "（まだ使用されていないため未計測）";
 
@@ -118,7 +121,7 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
                     <li key={item.bucketKey} className={styles.bucketRow}>
                       <div className={styles.bucketMain}>
                         <span className={styles.bucketLabel}>
-                          {getApiRateLimitLabel(item.bucketKey)}
+                          {getApiRateLimitLabel(item.bucketKey, t)}
                         </span>
                         <span className={styles.bucketRemaining}>-/-</span>
                         <span className={styles.bucketReset}>-</span>
@@ -144,13 +147,14 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
                 );
                 const description = getApiRateLimitDescription(
                   bucket.bucketKey,
+                  t,
                 );
 
                 return (
                   <li key={bucket.bucketKey} className={rowClassName}>
                     <div className={styles.bucketMain}>
                       <span className={styles.bucketLabel}>
-                        {getApiRateLimitLabel(bucket.bucketKey)}
+                        {getApiRateLimitLabel(bucket.bucketKey, t)}
                       </span>
                       <span className={styles.bucketRemaining}>
                         {bucket.remaining}/{bucket.limit}

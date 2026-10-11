@@ -1,0 +1,15 @@
+{
+  "backup": {
+    "error": {
+      "withDetail": "{{base}}（{{detail}}）",
+      "futureVersion": "このバックアップは新しいバージョンのアプリで作成されています。アプリを更新してください。",
+      "brokenJson": "ファイルが壊れているか、JSON として読み取れません。",
+      "formatMismatch": "Multi Column X のバックアップファイルではありません。",
+      "tooLarge": "ファイルサイズが大きすぎるため読み込めません。",
+      "limitExceeded": "バックアップの件数または文字数が上限を超えています",
+      "invalidField": "バックアップに不正な値が含まれています",
+      "io": "ファイルの読み書きに失敗しました",
+      "settingsUnreadable": "現在の設定を読み込めていないため、復元できません。アプリを再起動してください。"
+    }
+  }
+}

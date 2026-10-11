@@ -1,5 +1,7 @@
 import type { DragEndEvent } from "@dnd-kit/core";
 import React, { useState, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
+import type { AppTFunction } from "@/i18n/types";
 import {
   buildGroups,
   moveGroup,
@@ -33,10 +35,15 @@ interface ColumnLayoutTabProps {
   isMobile?: boolean;
 }
 
-function getColumnLabel(col: Column, accounts: Account[]): string {
+function getColumnLabel(
+  col: Column,
+  accounts: Account[],
+  t: AppTFunction,
+): string {
   const account = accounts.find((a) => a.id === col.accountId);
   return (
-    col.label || `${account?.label ?? col.accountId} - ${getPageTypeLabel(col)}`
+    col.label ||
+    `${account?.label ?? col.accountId} - ${getPageTypeLabel(col, t)}`
   );
 }
 
@@ -47,6 +54,7 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
   onCancel,
   isMobile = false,
 }) => {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState<Column[]>(() =>
     normalizeOrder(columns.map((c) => ({ ...c }))),
   );
@@ -135,7 +143,7 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
     [updateDraft],
   );
 
-  const getLabel = (col: Column) => getColumnLabel(col, accounts);
+  const getLabel = (col: Column) => getColumnLabel(col, accounts, t);
   const getGroupLabel = (group: ColumnGroup) =>
     group.columns.map((c) => getLabel(c)).join(" / ");
 

@@ -1,5 +1,6 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import i18n from "@/i18n";
 import { IPC_EVENTS, WEBVIEW_SCRIPTS } from "../constants/ipc";
 import { useAppStore } from "../store/useAppStore";
 import { DEFAULT_COLUMN_SETTINGS, getColumnLabel } from "../types";
@@ -301,7 +302,7 @@ describe("useNewPostsNotification", () => {
     await act(async () => {
       emitNewPosts("column-col-1", 1);
     });
-    const expectedColumnName = getColumnLabel(col);
+    const expectedColumnName = getColumnLabel(col, i18n.t);
     expect(sendNotificationMock).toHaveBeenCalledWith(
       expect.objectContaining({
         title: "新着通知",
@@ -330,7 +331,7 @@ describe("useNewPostsNotification", () => {
       emitNewPosts("column-col-1", 1);
     });
     expect(requestPermissionMock).toHaveBeenCalled();
-    const expectedColumnName = getColumnLabel(col);
+    const expectedColumnName = getColumnLabel(col, i18n.t);
     expect(sendNotificationMock).toHaveBeenCalledWith(
       expect.objectContaining({
         title: "新着通知",
@@ -407,7 +408,7 @@ describe("useNewPostsNotification", () => {
     await act(async () => {
       emitNewPosts("column-col-1", 1);
     });
-    const expectedColumnName = getColumnLabel(col);
+    const expectedColumnName = getColumnLabel(col, i18n.t);
     expect(sendNotificationMock).toHaveBeenCalledWith(
       expect.objectContaining({
         title: "新着通知",
@@ -474,7 +475,7 @@ describe("useNewPostsNotification", () => {
     await act(async () => {
       emitNewPosts("column-col-1", 1);
     });
-    const expectedColumnName = getColumnLabel(col);
+    const expectedColumnName = getColumnLabel(col, i18n.t);
     expect(sendNotificationMock).toHaveBeenCalledWith(
       expect.objectContaining({
         title: "新着通知",

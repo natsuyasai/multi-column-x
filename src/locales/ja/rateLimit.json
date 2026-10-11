@@ -1,0 +1,64 @@
+{
+  "buckets": {
+    "userTweets": {
+      "label": "ユーザーのツイート取得",
+      "description": "指定ユーザーのツイート一覧を取得するAPI。"
+    },
+    "userByScreenName": {
+      "label": "ユーザー情報取得",
+      "description": "screen_name（@ID）からユーザープロフィール（rest_id・bio・フォロワー数・認証状態等）を取得するAPI。"
+    },
+    "profileSpotlightsQuery": {
+      "label": "プロフィールスポットライト",
+      "description": "プロフィールページの補助情報を取得するAPIと推測されるが、詳細仕様は非公開で未確認。"
+    },
+    "voButtonEligibility": {
+      "label": "VoButton表示判定",
+      "description": "特定ボタン（Vo Button）の表示可否を判定するAPIと推測されるが、詳細仕様は非公開で未確認。"
+    },
+    "flowViewer": {
+      "label": "ログインフロー",
+      "description": "ログイン処理シーケンス（flow）の進行状況を扱うAPI。"
+    },
+    "viewerContext": {
+      "label": "ビューワーコンテキスト",
+      "description": "ログイン中ユーザーのコンテキスト情報を取得するAPI。"
+    },
+    "homeTimeline": {
+      "label": "ホームタイムライン",
+      "description": "フォロー中ユーザーのツイートをアルゴリズム順で並べたタイムラインを取得するAPI。"
+    },
+    "homeLatestTimeline": {
+      "label": "ホームタイムライン（最新）",
+      "description": "フォロー中ユーザーのツイートを投稿日時順（最新順）で並べたタイムラインを取得するAPI。"
+    },
+    "searchTimeline": {
+      "label": "検索",
+      "description": "検索クエリに一致するツイート・ユーザー等の検索結果を取得するAPI。"
+    },
+    "followers": {
+      "label": "フォロワー一覧",
+      "description": "指定ユーザーのフォロワー一覧を取得するAPI。"
+    },
+    "following": {
+      "label": "フォロー中一覧",
+      "description": "指定ユーザーのフォロー中一覧を取得するAPI。"
+    },
+    "likes": {
+      "label": "いいね一覧",
+      "description": "指定ユーザーがいいねしたツイート一覧を取得するAPI。"
+    },
+    "createTweet": {
+      "label": "ツイート投稿",
+      "description": "新規ツイートを投稿するAPI。"
+    },
+    "deleteTweet": {
+      "label": "ツイート削除",
+      "description": "既存ツイートを削除するAPI。"
+    },
+    "notificationsTimeline": {
+      "label": "通知",
+      "description": "通知一覧を取得するAPI。"
+    }
+  }
+}

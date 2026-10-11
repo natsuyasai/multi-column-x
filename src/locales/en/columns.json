@@ -1,0 +1,13 @@
+{
+  "pageType": {
+    "home": "Home",
+    "notifications": "Notifications",
+    "search": "Search",
+    "searchWithQuery": "Search: {{query}}",
+    "list": "Lists",
+    "custom": "Custom",
+    "external": "External site",
+    "externalWithHost": "External: {{host}}",
+    "compose": "Compose"
+  }
+}

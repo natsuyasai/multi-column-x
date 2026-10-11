@@ -2,6 +2,7 @@
 // バックアップタブの操作の流れ（書き出し／ファイル選択→紐づけ→確認→復元）を管理するフック。
 // 検証・退避・置換は services/backup と Rust 側が担い、ここは画面状態と結果メッセージを扱う。
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   describeBackupError,
   suggestMapping,
@@ -34,6 +35,7 @@ export function useBackupFlow(
   replaceColumnsAndRecreate: ReplaceColumnsAndRecreate,
   onRestored: () => void,
 ) {
+  const { t } = useTranslation();
   const accounts = useAppStore((s) => s.accounts);
   const saveBlocked = useAppStore((s) => s.settingsSaveBlocked);
   const [step, setStep] = useState<BackupStep>("idle");
@@ -58,12 +60,12 @@ export function useBackupFlow(
     } catch (e) {
       setMessage({
         kind: "error",
-        text: describeBackupError(toBackupErrorInfo(e)),
+        text: describeBackupError(toBackupErrorInfo(e), t),
       });
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [t]);
 
   const pickFile = useCallback(async () => {
     setBusy(true);
@@ -81,12 +83,12 @@ export function useBackupFlow(
     } catch (e) {
       setMessage({
         kind: "error",
-        text: `${describeBackupError(toBackupErrorInfo(e))}${NOT_CHANGED_SUFFIX}`,
+        text: `${describeBackupError(toBackupErrorInfo(e), t)}${NOT_CHANGED_SUFFIX}`,
       });
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [t]);
 
   const changeMapping = useCallback(
     (backupAccountId: string, targetAccountId: string | null) => {
@@ -128,7 +130,7 @@ export function useBackupFlow(
         case "rejected":
           setMessage({
             kind: "error",
-            text: `${describeBackupError(outcome.error)}${NOT_CHANGED_SUFFIX}`,
+            text: `${describeBackupError(outcome.error, t)}${NOT_CHANGED_SUFFIX}`,
           });
           break;
         case "recreateFailed":
@@ -139,7 +141,7 @@ export function useBackupFlow(
     } finally {
       setBusy(false);
     }
-  }, [content, mapping, replaceColumnsAndRecreate, reset, onRestored]);
+  }, [content, mapping, replaceColumnsAndRecreate, reset, onRestored, t]);
 
   return {
     accounts,

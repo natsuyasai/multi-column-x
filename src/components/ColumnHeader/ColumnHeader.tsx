@@ -1,4 +1,6 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
+import type { AppTFunction } from "@/i18n/types";
 import { isAutoReloadSupported } from "@/lib/autoReloadTarget";
 import ChevronsUpIcon from "../../assets/icons/chevrons-up.svg?react";
 import CloseIcon from "../../assets/icons/close.svg?react";
@@ -11,12 +13,13 @@ import styles from "./ColumnHeader.module.scss";
 function resolveHeaderLabel(
   column: Column,
   account: Account | undefined,
+  t: AppTFunction,
 ): string {
   return (
     column.label ||
     (account
-      ? `${account.label} - ${getPageTypeLabel(column)}`
-      : getPageTypeLabel(column))
+      ? `${account.label} - ${getPageTypeLabel(column, t)}`
+      : getPageTypeLabel(column, t))
   );
 }
 
@@ -43,8 +46,9 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
   unreadCount = 0,
   onClearUnread,
 }) => {
+  const { t } = useTranslation();
   const isExternal = column.pageType === "external";
-  const label = resolveHeaderLabel(column, account);
+  const label = resolveHeaderLabel(column, account, t);
   const { remaining, reset } = useAutoReload({
     columnId: column.id,
     enabled: column.settings.autoReloadEnabled && isAutoReloadSupported(column),

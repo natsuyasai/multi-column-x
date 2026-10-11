@@ -1,0 +1,15 @@
+{
+  "backup": {
+    "error": {
+      "withDetail": "{{base}} ({{detail}})",
+      "futureVersion": "This backup was created by a newer version of the app. Please update the app.",
+      "brokenJson": "The file is corrupted or cannot be read as JSON.",
+      "formatMismatch": "This is not a Multi Column X backup file.",
+      "tooLarge": "The file is too large to load.",
+      "limitExceeded": "The number or length of items in the backup exceeds the limit",
+      "invalidField": "The backup contains an invalid value",
+      "io": "Failed to read or write the file",
+      "settingsUnreadable": "Current settings could not be loaded, so the backup cannot be restored. Please restart the app."
+    }
+  }
+}
