@@ -92,6 +92,7 @@ describe("useAppStore", () => {
         apiRateLimitMonitorEnabled: true,
         columnScale: "default",
         uiScale: "auto",
+        language: "auto",
         useXAppForCompose: false,
         mobileSwipeAreaEnabled: true,
         mobileSwipeAreaHeight: 28,

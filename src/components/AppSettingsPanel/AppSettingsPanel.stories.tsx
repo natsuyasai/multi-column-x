@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useEffect, useLayoutEffect, useState } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 import { AppSettingsPanel } from "@/components/AppSettingsPanel/AppSettingsPanel";
+import i18n from "@/i18n";
 import { useAppStore } from "@/store/useAppStore";
 import type { Account, Column, GlobalSettings } from "@/types";
 
@@ -51,6 +52,7 @@ const globalSettings: GlobalSettings = {
   apiRateLimitMonitorEnabled: true,
   columnScale: "default",
   uiScale: "auto",
+  language: "auto",
   useXAppForCompose: false,
   mobileSwipeAreaEnabled: true,
   mobileSwipeAreaHeight: 28,
@@ -339,6 +341,25 @@ export const ScaleThemeOverrideEnabled: Story = {
     await expect(
       canvas.getByRole("button", { name: "ライト" }).className,
     ).toMatch(/scaleBtnActive/);
+  },
+};
+
+export const EnglishLanguage: Story = {
+  name: "表示言語: 英語表示で言語選択肢が各言語の表記で並ぶ",
+  decorators: [
+    (Story) => {
+      // グローバル decorator が適用する locale より後に評価されるため、ここで英語を強制する
+      void i18n.changeLanguage("en");
+      return <Story />;
+    },
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const group = canvas.getByRole("group", { name: "Language" });
+    const labels = within(group)
+      .getAllByRole("button")
+      .map((b) => b.textContent);
+    await expect(labels).toEqual(["Auto", "日本語", "English"]);
   },
 };
 

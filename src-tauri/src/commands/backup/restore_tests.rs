@@ -72,6 +72,31 @@ fn 復元後はカラムと設定がバックアップの内容に置き換わ�
 }
 
 #[test]
+fn 言語設定を含むバックアップを復元すると言語設定が復元される() {
+    let result = compute_new_settings(
+        &current_settings(),
+        payload(vec![column("n", "acc-1")], json!({ "language": "en" })),
+    )
+    .unwrap();
+
+    assert_eq!(as_json(&result)["globalSettings"]["language"], "en");
+}
+
+#[test]
+fn 言語設定を含まない古いバックアップを復元すると言語設定は自動になる() {
+    let mut current = current_settings();
+    current.global_settings.language = "en".to_string();
+
+    let result = compute_new_settings(
+        &current,
+        payload(vec![column("n", "acc-1")], json!({ "theme": "dark" })),
+    )
+    .unwrap();
+
+    assert_eq!(as_json(&result)["globalSettings"]["language"], "auto");
+}
+
+#[test]
 fn 復元してもアカウントは置き換わらない() {
     let before = as_json(&current_settings());
 

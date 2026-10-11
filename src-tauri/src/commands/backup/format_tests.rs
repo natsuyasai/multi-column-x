@@ -403,6 +403,17 @@ fn エクスポートのglobalsettingsキーは既定値のキー集合から除
 }
 
 #[test]
+fn バックアップに言語設定が含まれる() {
+    let mut settings = sample_settings();
+    settings.global_settings.language = "en".to_string();
+
+    let file = build_export(&settings, "1.0.0", "2026-01-01T00:00:00Z");
+    let out: Value = serde_json::to_value(&file).unwrap();
+
+    assert_eq!(out["globalSettings"]["language"], "en");
+}
+
+#[test]
 fn エクスポートしたファイルはそのまま読み込める() {
     let file = build_export(&sample_settings(), "1.0.0", "2026-01-01T00:00:00Z");
     let bytes = serde_json::to_vec_pretty(&file).unwrap();

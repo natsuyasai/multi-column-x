@@ -28,6 +28,7 @@ import { WhatsNewDialog } from "./components/WhatsNewDialog/WhatsNewDialog";
 import { WEBVIEW_SCRIPTS } from "./constants/ipc";
 import { useAccounts } from "./hooks/useAccounts";
 import { useAppBootstrap } from "./hooks/useAppBootstrap";
+import { useAppLanguage } from "./hooks/useAppLanguage";
 import { useAppUpdater } from "./hooks/useAppUpdater";
 import { useColumnNavigation } from "./hooks/useColumnNavigation";
 import { useColumns } from "./hooks/useColumns";
@@ -192,6 +193,7 @@ const App: React.FC = () => {
   // 本体UIのテーマを data-theme 属性へ反映する。戻り値（解決済みテーマ）は
   // モバイルスワイプバーのネイティブオーバーレイ同期にも再利用する（matchMedia 購読の重複を避ける）。
   const resolvedTheme = useTheme(globalSettings.theme);
+  useAppLanguage(globalSettings.language);
 
   // WebView 内の横ホイール → スクロールバー追従、新着カウント → バッジ・デスクトップ通知
   useApiRateLimitReports(setApiRateLimit);

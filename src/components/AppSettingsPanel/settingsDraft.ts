@@ -1,4 +1,5 @@
 import { clampMobileColumnCount } from "@/lib/gridLayout";
+import { normalizeLanguageSetting, type LanguageSetting } from "@/lib/language";
 import type {
   ColumnScale,
   ColumnSettings,
@@ -39,6 +40,7 @@ export interface SettingsDraft {
   apiRateLimitMonitorEnabled: boolean;
   columnScale: ColumnScale;
   uiScale: UiScale;
+  language: LanguageSetting;
   useXAppForCompose: boolean;
   mobileSwipeAreaEnabled: boolean;
   /** number入力欄への入力中文字列をそのまま保持するため string で持つ */
@@ -92,6 +94,7 @@ export function createSettingsDraft(settings: GlobalSettings): SettingsDraft {
     apiRateLimitMonitorEnabled: settings.apiRateLimitMonitorEnabled ?? true,
     columnScale: settings.columnScale ?? "default",
     uiScale: settings.uiScale ?? "auto",
+    language: normalizeLanguageSetting(settings.language),
     useXAppForCompose: settings.useXAppForCompose ?? false,
     mobileSwipeAreaEnabled: settings.mobileSwipeAreaEnabled,
     mobileSwipeAreaHeight: String(settings.mobileSwipeAreaHeight),
@@ -144,6 +147,7 @@ export function toGlobalSettingsPatch(
     blurImageAmount: draft.blurImageAmount,
     hideAdEnabled: draft.hideAdEnabled,
     apiRateLimitMonitorEnabled: draft.apiRateLimitMonitorEnabled,
+    language: draft.language,
     useXAppForCompose: draft.useXAppForCompose,
     mobileSwipeAreaEnabled: draft.mobileSwipeAreaEnabled,
     mobileSwipeAreaHeight: clampSwipeAreaHeight(draft.mobileSwipeAreaHeight),
