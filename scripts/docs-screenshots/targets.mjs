@@ -21,12 +21,6 @@ const MOBILE = { width: 390, height: 844 };
 export const targets = [
   // デスクトップ
   {
-    file: "columns-overview",
-    storyId: "components-guidemock-guidecolumns--default",
-    viewport: DESKTOP,
-    theme: "light",
-  },
-  {
     file: "topbar-overview",
     storyId: "components-topbar--default",
     viewport: DESKTOP,

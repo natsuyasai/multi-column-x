@@ -25,7 +25,8 @@
 </p>
 
 <p align="center">
-  <img src="docs/guide/images/columns-overview.png" alt="カラム表示の例" width="800">
+  <img src="docs/guide/images/windows-app-screen.png" alt="Windows でのアプリ画面" height="480">
+  <img src="docs/guide/images/android-app-screen.png" alt="Android でのアプリ画面" height="480">
 </p>
 
 ## 特長
@@ -53,13 +54,13 @@
 - **テーマ切替** — ダーク / ライト / システム連動
 - **プリセット** — カラム構成の保存・切り替え（デスクトップ）
 - **TopBar ナビゲーション** — 横方向ツールバーでカラム追加・アカウント管理・設定を操作、ドラッグ＆ドロップでカラムを列単位に並び替え（デスクトップ）
-- **自動アップデート** — GitHub Releases からの更新確認・適用と What's New 表示（デスクトップ / Android APK）
+- **自動アップデート** — GitHub Releases からの更新確認・適用と What's New 表示（Windows / Linux AppImage / Android APK。Linux の deb 版は手動更新）
 - **クラッシュ自動復旧** — Linux の WebProcess クラッシュを検知してカラム WebView を自動再生成
 - **Android 対応** — モバイルタブバー UI・スワイプバーでカラムを切り替え表示、広い画面（タブレット・横向き）では複数カラム同時表示（2〜6 列）にも対応
 
 ## ダウンロード・インストール
 
-[Releases](https://github.com/natsuyasai/multi-column-x/releases/latest) から OS に合ったファイルをダウンロードして実行してください。
+[最新リリースのページ](https://github.com/natsuyasai/multi-column-x/releases/latest) の **Assets** から、OS に合ったファイル（Windows は `.exe`、Linux は `.AppImage`、Android は `.apk`）をダウンロードして実行してください。
 
 | OS      | 配布物         |
 | ------- | -------------- |
