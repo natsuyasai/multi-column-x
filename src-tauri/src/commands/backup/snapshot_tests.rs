@@ -2,7 +2,7 @@
 //! `backup/mod.rs` に `#[cfg(test)] mod snapshot_tests;` として配線する。
 use std::fs;
 
-use super::snapshot::{write_snapshot, SNAPSHOT_KEEP};
+use super::snapshot::{write_snapshot, SNAPSHOT_KEEP, SNAPSHOT_NAMES_EXHAUSTED};
 
 fn file_names(dir: &std::path::Path) -> Vec<String> {
     let mut names: Vec<String> = fs::read_dir(dir)
@@ -94,4 +94,19 @@ fn 退避先がファイルで塞がれている場合はエラーを返す() {
     fs::write(&blocked, b"file").unwrap();
 
     assert!(write_snapshot(&blocked, 1_000, b"x").is_err());
+}
+
+#[test]
+fn 同一秒の退避名が使い切られるとコードだけを持つエラーになる() {
+    let tmp = tempfile::tempdir().unwrap();
+    let first = write_snapshot(tmp.path(), 7_000, b"x").unwrap();
+    let stem = first.file_stem().unwrap().to_string_lossy().into_owned();
+    for n in 1..1000 {
+        fs::write(tmp.path().join(format!("{stem}-{n}.json")), b"x").unwrap();
+    }
+
+    let error = write_snapshot(tmp.path(), 7_000, b"y").expect_err("使い切ると失敗する");
+
+    assert_eq!(error.to_string(), SNAPSHOT_NAMES_EXHAUSTED);
+    assert!(error.to_string().is_ascii());
 }

@@ -11,13 +11,13 @@
 use std::io::Read;
 use std::path::Path;
 
+#[cfg(mobile)]
+use super::format::io_coded;
 use super::format::{BackupError, MAX_FILE_BYTES};
-
-#[cfg(desktop)]
-const DIALOG_FILTER_NAME: &str = "Multi Column X バックアップ";
 
 fn io_error(e: impl std::fmt::Display) -> BackupError {
     BackupError::Io {
+        code: None,
         message: e.to_string(),
     }
 }
@@ -48,6 +48,13 @@ pub(crate) fn read_limited(path: &Path) -> Result<Vec<u8>, BackupError> {
 // desktop（Windows / macOS / Linux）
 // ---------------------------------------------------------------------------
 
+/// ファイル選択ダイアログのフィルタ名（表示言語に合わせる）。
+#[cfg(desktop)]
+fn backup_filter_name(app: &tauri::AppHandle) -> &'static str {
+    use crate::commands::ui_language::{current_ui_lang, ui_text, UiText};
+    ui_text(UiText::BackupFileFilter, current_ui_lang(app))
+}
+
 #[cfg(desktop)]
 pub(crate) async fn save_backup_file(
     app: &tauri::AppHandle,
@@ -61,7 +68,7 @@ pub(crate) async fn save_backup_file(
     app.dialog()
         .file()
         .set_file_name(file_name)
-        .add_filter(DIALOG_FILTER_NAME, &["json"])
+        .add_filter(backup_filter_name(app), &["json"])
         .save_file(move |path| {
             let _ = tx.send(path);
         });
@@ -82,7 +89,7 @@ pub(crate) async fn pick_backup_file(
     let (tx, rx) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()
-        .add_filter(DIALOG_FILTER_NAME, &["json"])
+        .add_filter(backup_filter_name(app), &["json"])
         .pick_file(move |path| {
             let _ = tx.send(path);
         });
@@ -165,8 +172,8 @@ async fn await_bridge_result(
 ) -> Result<BridgeResult, BackupError> {
     match tokio::time::timeout(BRIDGE_TIMEOUT, rx).await {
         Ok(Ok(result)) => Ok(result),
-        Ok(Err(_)) => Err(io_error("ファイル選択が中断されました")),
-        Err(_) => Err(io_error("ファイル選択がタイムアウトしました")),
+        Ok(Err(_)) => Err(io_coded("selectionCancelled", "")),
+        Err(_) => Err(io_coded("selectionTimeout", "")),
     }
 }
 
@@ -199,7 +206,7 @@ pub(crate) async fn save_backup_file(
         BridgeResult::Saved => Ok(true),
         BridgeResult::Cancelled => Ok(false),
         BridgeResult::Failed(message) => Err(io_error(message)),
-        other => Err(io_error(format!("想定外の応答: {other:?}"))),
+        other => Err(io_coded("unexpectedReply", format!("{other:?}"))),
     }
 }
 
@@ -226,7 +233,7 @@ pub(crate) async fn pick_backup_file(
             limit: MAX_FILE_BYTES as u64,
         }),
         Ok(BridgeResult::Failed(message)) => Err(io_error(message)),
-        Ok(other) => Err(io_error(format!("想定外の応答: {other:?}"))),
+        Ok(other) => Err(io_coded("unexpectedReply", format!("{other:?}"))),
         Err(e) => Err(e),
     };
     let _ = std::fs::remove_file(&temp);

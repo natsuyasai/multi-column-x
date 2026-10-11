@@ -119,3 +119,146 @@ describe("describeBackupError（表示言語による切り替え）", () => {
     }
   });
 });
+
+const REASON_CODES: Record<string, [string, string]> = {
+  urlSchemeUnsupported: [
+    "http または https の URL のみ指定できます",
+    "Only http or https URLs are allowed",
+  ],
+  themeUnsupported: ["未対応のテーマです", "Unsupported theme"],
+  columnScaleUnsupported: ["未対応の倍率です", "Unsupported scale"],
+  schemaVersionTooOld: [
+    "移行できない古いバージョンです",
+    "Version is too old to migrate",
+  ],
+  schemaVersionInvalid: [
+    "1 以上の整数で指定してください",
+    "Must be an integer of 1 or more",
+  ],
+  idUnsafe: ["カラム id が安全ではありません", "Column id is not safe"],
+  idConflictsWithExisting: [
+    "復元先の既存カラム id と重複しています",
+    "Conflicts with an existing column id at the restore target",
+  ],
+  idDuplicate: ["カラム id が重複しています", "Column id is duplicated"],
+  externalAccountIdMismatch: [
+    "外部カラムの accountId はカラム自身の id と一致する必要があります",
+    "An external column's accountId must match the column's own id",
+  ],
+  accountMissing: [
+    "復元先に存在しないアカウントを参照しています",
+    "References an account that does not exist at the restore target",
+  ],
+};
+
+const IO_CODES: Record<string, [string, string, string]> = {
+  selectionCancelled: [
+    "",
+    "ファイル選択が中断されました",
+    "File selection was interrupted",
+  ],
+  selectionTimeout: [
+    "",
+    "ファイル選択がタイムアウトしました",
+    "File selection timed out",
+  ],
+  unexpectedReply: [
+    "Saved",
+    "想定外の応答: Saved",
+    "Unexpected response: Saved",
+  ],
+  snapshotNamesExhausted: [
+    "",
+    "同一秒内の退避ファイル名が使い切られました",
+    "Backup file names for the same second have run out",
+  ],
+};
+
+describe("describeBackupError（理由コード・入出力コードの翻訳）", () => {
+  afterEach(async () => {
+    await i18n.changeLanguage("ja");
+  });
+
+  it.each(Object.entries(REASON_CODES))(
+    "理由コード %s は日本語では従来の文言のまま表示される",
+    (reason, [ja]) => {
+      expect(
+        describeBackupError(
+          { kind: "invalidField", field: "columns.id", reason },
+          i18n.t,
+        ),
+      ).toBe(`バックアップに不正な値が含まれています（columns.id: ${ja}）`);
+    },
+  );
+
+  it.each(Object.entries(REASON_CODES))(
+    "理由コード %s は英語では日本語を含まない文言になる",
+    async (reason, [, en]) => {
+      await i18n.changeLanguage("en");
+
+      const message = describeBackupError(
+        { kind: "invalidField", field: "columns.id", reason },
+        i18n.t,
+      );
+
+      expect(message).toBe(
+        `The backup contains an invalid value (columns.id: ${en})`,
+      );
+      expect(containsJapanese(message)).toBe(false);
+    },
+  );
+
+  it.each(Object.entries(IO_CODES))(
+    "入出力コード %s は日本語では従来の文言のまま表示される",
+    (code, [detail, ja]) => {
+      expect(
+        describeBackupError({ kind: "io", code, message: detail }, i18n.t),
+      ).toBe(`ファイルの読み書きに失敗しました（${ja}）`);
+    },
+  );
+
+  it.each(Object.entries(IO_CODES))(
+    "入出力コード %s は英語では日本語を含まない文言になる",
+    async (code, [detail, , en]) => {
+      await i18n.changeLanguage("en");
+
+      const message = describeBackupError(
+        { kind: "io", code, message: detail },
+        i18n.t,
+      );
+
+      expect(message).toBe(`Failed to read or write the file (${en})`);
+      expect(containsJapanese(message)).toBe(false);
+    },
+  );
+
+  it("未知の理由コードや解析エラーの生の文字列はそのまま表示する", () => {
+    expect(
+      describeBackupError(
+        {
+          kind: "invalidField",
+          field: "file",
+          reason: "missing field `id` at line 1",
+        },
+        i18n.t,
+      ),
+    ).toBe(
+      "バックアップに不正な値が含まれています（file: missing field `id` at line 1）",
+    );
+    expect(
+      describeBackupError(
+        { kind: "invalidField", field: "x", reason: "futureReason" },
+        i18n.t,
+      ),
+    ).toBe("バックアップに不正な値が含まれています（x: futureReason）");
+  });
+
+  it("未知の入出力コードは生のエラー文字列を表示する", () => {
+    expect(
+      describeBackupError(
+        { kind: "io", code: "futureCode", message: "disk full" },
+        i18n.t,
+      ),
+    ).toBe("ファイルの読み書きに失敗しました（disk full）");
+  });
+});

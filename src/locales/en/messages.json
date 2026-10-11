@@ -13,7 +13,25 @@
     },
     "exportDone": "Backup exported.",
     "notChangedSuffix": " Your existing columns and settings were not changed.",
-    "recreateFailed": "Settings were restored, but the columns could not be recreated. Restart the app and check the display. The settings from just before the restore were saved in the restore_snapshots folder inside the app data folder (appsettings-<date and time>.json)."
+    "recreateFailed": "Settings were restored, but the columns could not be recreated. Restart the app and check the display. The settings from just before the restore were saved in the restore_snapshots folder inside the app data folder (appsettings-<date and time>.json).",
+    "reason": {
+      "urlSchemeUnsupported": "Only http or https URLs are allowed",
+      "themeUnsupported": "Unsupported theme",
+      "columnScaleUnsupported": "Unsupported scale",
+      "schemaVersionTooOld": "Version is too old to migrate",
+      "schemaVersionInvalid": "Must be an integer of 1 or more",
+      "idUnsafe": "Column id is not safe",
+      "idConflictsWithExisting": "Conflicts with an existing column id at the restore target",
+      "idDuplicate": "Column id is duplicated",
+      "externalAccountIdMismatch": "An external column's accountId must match the column's own id",
+      "accountMissing": "References an account that does not exist at the restore target"
+    },
+    "ioCode": {
+      "selectionCancelled": "File selection was interrupted",
+      "selectionTimeout": "File selection timed out",
+      "unexpectedReply": "Unexpected response: {{detail}}",
+      "snapshotNamesExhausted": "Backup file names for the same second have run out"
+    }
   },
   "app": {
     "loading": "Loading...",

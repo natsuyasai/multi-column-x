@@ -13,7 +13,25 @@
     },
     "exportDone": "バックアップを書き出しました。",
     "notChangedSuffix": "既存のカラムと設定は変更されていません。",
-    "recreateFailed": "設定の復元は完了しましたが、カラムの表示を作り直せませんでした。アプリを再起動して表示を確認してください。復元直前の設定は、アプリのデータフォルダ内の restore_snapshots フォルダ（appsettings-日時.json）に退避してあります。"
+    "recreateFailed": "設定の復元は完了しましたが、カラムの表示を作り直せませんでした。アプリを再起動して表示を確認してください。復元直前の設定は、アプリのデータフォルダ内の restore_snapshots フォルダ（appsettings-日時.json）に退避してあります。",
+    "reason": {
+      "urlSchemeUnsupported": "http または https の URL のみ指定できます",
+      "themeUnsupported": "未対応のテーマです",
+      "columnScaleUnsupported": "未対応の倍率です",
+      "schemaVersionTooOld": "移行できない古いバージョンです",
+      "schemaVersionInvalid": "1 以上の整数で指定してください",
+      "idUnsafe": "カラム id が安全ではありません",
+      "idConflictsWithExisting": "復元先の既存カラム id と重複しています",
+      "idDuplicate": "カラム id が重複しています",
+      "externalAccountIdMismatch": "外部カラムの accountId はカラム自身の id と一致する必要があります",
+      "accountMissing": "復元先に存在しないアカウントを参照しています"
+    },
+    "ioCode": {
+      "selectionCancelled": "ファイル選択が中断されました",
+      "selectionTimeout": "ファイル選択がタイムアウトしました",
+      "unexpectedReply": "想定外の応答: {{detail}}",
+      "snapshotNamesExhausted": "同一秒内の退避ファイル名が使い切られました"
+    }
   },
   "app": {
     "loading": "読み込み中...",

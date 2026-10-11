@@ -36,6 +36,7 @@ const SNAPSHOT_DIR_NAME: &str = "restore_snapshots";
 
 fn io_error(e: impl std::fmt::Display) -> BackupError {
     BackupError::Io {
+        code: None,
         message: e.to_string(),
     }
 }

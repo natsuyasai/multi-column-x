@@ -8,6 +8,21 @@ use super::format::BackupError;
 use super::restore::{apply_with_snapshot, compute_new_settings, RestorePayload};
 use crate::commands::settings::AppSettingsData;
 
+/// 検証エラーのフィールド名と理由コードを取り出す。
+fn invalid_reason<T: std::fmt::Debug>(result: &Result<T, BackupError>) -> (String, String) {
+    match result {
+        Err(BackupError::InvalidField { field, reason }) => (field.clone(), reason.clone()),
+        other => panic!("InvalidField を期待: {other:?}"),
+    }
+}
+
+fn assert_invalid<T: std::fmt::Debug>(result: &Result<T, BackupError>, field: &str, reason: &str) {
+    assert_eq!(
+        invalid_reason(result),
+        (field.to_string(), reason.to_string())
+    );
+}
+
 fn current_settings() -> AppSettingsData {
     serde_json::from_value(json!({
         "accounts": [
@@ -190,7 +205,7 @@ fn 現在のアカウントに存在しないaccountidを持つカラムは拒�
         payload(vec![column("n", "unknown-account")], json!({})),
     );
 
-    assert!(matches!(result, Err(BackupError::InvalidField { .. })));
+    assert_invalid(&result, "columns.accountId", "accountMissing");
 }
 
 #[test]
@@ -200,7 +215,7 @@ fn 外部カラムのaccountidが自身のidと異なると拒否される() {
 
     let result = compute_new_settings(&current_settings(), payload(vec![ext], json!({})));
 
-    assert!(matches!(result, Err(BackupError::InvalidField { .. })));
+    assert_invalid(&result, "columns.accountId", "externalAccountIdMismatch");
 }
 
 #[test]
@@ -210,7 +225,7 @@ fn 外部カラムのhttp_https以外のurlは拒否される() {
         payload(vec![external("e1", "javascript:alert(1)")], json!({})),
     );
 
-    assert!(matches!(result, Err(BackupError::InvalidField { .. })));
+    assert_invalid(&result, "columns.customUrl", "urlSchemeUnsupported");
 }
 
 #[test]
@@ -221,10 +236,7 @@ fn パス区切りや親ディレクトリ参照を含むカラムidは拒否さ
             payload(vec![column(bad, "acc-1")], json!({})),
         );
 
-        assert!(
-            matches!(result, Err(BackupError::InvalidField { .. })),
-            "id={bad:?} は拒否される: {result:?}"
-        );
+        assert_invalid(&result, "columns.id", "idUnsafe");
     }
 }
 
@@ -238,7 +250,7 @@ fn ペイロード内で重複するカラムidは拒否される() {
         ),
     );
 
-    assert!(matches!(result, Err(BackupError::InvalidField { .. })));
+    assert_invalid(&result, "columns.id", "idDuplicate");
 }
 
 #[test]
@@ -312,7 +324,7 @@ fn 復元先の既存カラムと同じidを持つカラムは拒否される() 
         payload(vec![column("old-1", "acc-1")], json!({})),
     );
 
-    assert!(matches!(result, Err(BackupError::InvalidField { .. })));
+    assert_invalid(&result, "columns.id", "idConflictsWithExisting");
 }
 
 #[test]
@@ -331,17 +343,14 @@ fn プリセット内カラムにも安全でないidや重複idは許されな�
             &current_settings(),
             payload(vec![column("n", "acc-1")], preset(bad)),
         );
-        assert!(
-            matches!(result, Err(BackupError::InvalidField { .. })),
-            "プリセット内 id={bad:?} は拒否される: {result:?}"
-        );
+        assert_invalid(&result, "columns.id", "idUnsafe");
     }
     // 本体のカラムと同じ id も拒否される（読み込み時に同じ id になるため）
     let duplicated = compute_new_settings(
         &current_settings(),
         payload(vec![column("n", "acc-1")], preset("n")),
     );
-    assert!(matches!(duplicated, Err(BackupError::InvalidField { .. })));
+    assert_invalid(&duplicated, "columns.id", "idDuplicate");
 }
 
 #[test]
@@ -359,7 +368,7 @@ fn プリセット内カラムも現在のアカウントに存在しない参�
         ),
     );
 
-    assert!(matches!(result, Err(BackupError::InvalidField { .. })));
+    assert_invalid(&result, "columns.accountId", "accountMissing");
 }
 
 #[test]
@@ -368,7 +377,11 @@ fn 既定アカウントは現在のアカウントに存在するものだけ�
         &current_settings(),
         payload(vec![], json!({ "defaultAccountId": "unknown-account" })),
     );
-    assert!(matches!(unknown, Err(BackupError::InvalidField { .. })));
+    assert_invalid(
+        &unknown,
+        "globalSettings.defaultAccountId",
+        "accountMissing",
+    );
 
     let known = compute_new_settings(
         &current_settings(),
@@ -406,4 +419,20 @@ fn プリセットを含む設定が復元される() {
         out["globalSettings"]["presets"][0]["columns"][0]["id"],
         "pc"
     );
+}
+
+#[test]
+fn 検証エラーのjsonは理由コードとフィールドだけで文章を含まない() {
+    let result = compute_new_settings(
+        &current_settings(),
+        payload(vec![column("../x", "acc-1")], json!({})),
+    );
+
+    let serialized = serde_json::to_value(result.unwrap_err()).unwrap();
+
+    assert_eq!(
+        serialized,
+        json!({"kind": "invalidField", "field": "columns.id", "reason": "idUnsafe"})
+    );
+    assert!(serialized.to_string().is_ascii());
 }

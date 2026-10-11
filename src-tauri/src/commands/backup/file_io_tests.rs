@@ -2,7 +2,7 @@
 use std::fs;
 
 use super::file_io::{deliver_bridge_result, read_limited, register_bridge_waiter, BridgeResult};
-use super::format::{export_file_name, rfc3339_utc, BackupError, MAX_FILE_BYTES};
+use super::format::{export_file_name, io_coded, rfc3339_utc, BackupError, MAX_FILE_BYTES};
 
 #[test]
 fn 上限ちょうどのファイルは読み込める() {
@@ -91,4 +91,32 @@ fn 既定のファイル名は日付と拡張子を持つ() {
         export_file_name(1_700_000_000),
         "multi-column-x-20231114.mcxbackup.json"
     );
+}
+
+#[test]
+fn ファイル選択の失敗は種別コードで返り生の詳細は別項目に残る() {
+    let cancelled = serde_json::to_value(io_coded("selectionCancelled", "")).unwrap();
+    assert_eq!(
+        cancelled,
+        serde_json::json!({"kind": "io", "code": "selectionCancelled", "message": ""})
+    );
+
+    let unexpected = serde_json::to_value(io_coded("unexpectedReply", "Saved")).unwrap();
+    assert_eq!(unexpected["code"], "unexpectedReply");
+    assert_eq!(unexpected["message"], "Saved");
+}
+
+#[test]
+fn 存在しないファイルの入出力エラーはコードを持たず生のメッセージだけを持つ() {
+    let tmp = tempfile::tempdir().unwrap();
+
+    let result = read_limited(&tmp.path().join("none.json"));
+
+    match result {
+        Err(BackupError::Io { code, message }) => {
+            assert_eq!(code, None);
+            assert!(!message.is_empty());
+        }
+        other => panic!("Io を期待: {other:?}"),
+    }
 }
