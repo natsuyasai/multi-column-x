@@ -31,7 +31,8 @@ pub const MAX_LIST_ITEM_CHARS: usize = 500;
 /// ポータブルでないため、バックアップに含めない `globalSettings` のキー。
 /// `GlobalSettingsData` のキー集合 ＝ 出力キー ∪ この一覧、をテストで保証する（テスト専用の定義）。
 #[cfg(test)]
-pub const EXCLUDED_GLOBAL_SETTINGS_KEYS: [&str; 5] = [
+pub const EXCLUDED_GLOBAL_SETTINGS_KEYS: [&str; 6] = [
+    "language",
     "windowBounds",
     "pendingDataDirectoryDeletions",
     "hardwareVideoDecodeEnabled",
@@ -337,6 +338,7 @@ impl BackupGlobalSettings {
     pub fn apply_onto(self, base: &GlobalSettingsData) -> GlobalSettingsData {
         GlobalSettingsData {
             theme: self.theme,
+            language: base.language.clone(),
             custom_css: self.custom_css,
             window_bounds: base.window_bounds.clone(),
             default_account_id: self.default_account_id,

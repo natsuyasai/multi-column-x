@@ -105,6 +105,9 @@ fn default_column_scale() -> String {
 fn default_ui_scale() -> String {
     "auto".to_string()
 }
+fn default_language() -> String {
+    "auto".to_string()
+}
 
 impl Default for WindowBounds {
     fn default() -> Self {
@@ -147,6 +150,7 @@ impl Default for GlobalSettingsData {
             api_rate_limit_monitor_enabled: true,
             column_scale: default_column_scale(),
             ui_scale: default_ui_scale(),
+            language: default_language(),
             use_x_app_for_compose: false,
             mobile_swipe_area_enabled: true,
             mobile_swipe_area_height: 28,
@@ -270,6 +274,7 @@ pub struct GlobalSettingsData {
     pub column_scale: String,
     #[serde(rename = "uiScale")]
     pub ui_scale: String,
+    pub language: String,
     #[serde(rename = "useXAppForCompose")]
     pub use_x_app_for_compose: bool,
     #[serde(rename = "mobileSwipeAreaEnabled")]
@@ -603,6 +608,30 @@ mod tests {
         assert_eq!(json["globalSettings"]["uiScale"], "xLarge");
         let restored: AppSettingsData = serde_json::from_value(json).unwrap();
         assert_eq!(restored.global_settings.ui_scale, "xLarge");
+    }
+
+    #[test]
+    fn 初回起動時の言語設定は自動である() {
+        let gs = GlobalSettingsData::default();
+        assert_eq!(gs.language, "auto");
+    }
+
+    #[test]
+    fn 言語設定が保存されていない旧設定jsonを読み込んでも言語設定は自動になる() {
+        let json = serde_json::json!({ "columnScale": "large" });
+        let gs: GlobalSettingsData = serde_json::from_value(json).unwrap();
+        assert_eq!(gs.language, "auto");
+        assert_eq!(gs.column_scale, "large");
+    }
+
+    #[test]
+    fn 言語設定を変更すると保存と読み込みの往復で引き継がれる() {
+        let mut settings = AppSettingsData::default();
+        settings.global_settings.language = "en".to_string();
+        let json = serde_json::to_value(&settings).unwrap();
+        assert_eq!(json["globalSettings"]["language"], "en");
+        let restored: AppSettingsData = serde_json::from_value(json).unwrap();
+        assert_eq!(restored.global_settings.language, "en");
     }
 
     #[test]

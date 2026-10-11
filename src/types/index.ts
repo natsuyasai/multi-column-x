@@ -1,3 +1,5 @@
+import type { LanguageSetting } from "@/lib/language";
+
 export type PageType =
   | "home"
   | "notifications"
@@ -89,6 +91,8 @@ export interface GlobalSettings {
   columnScale: ColumnScale;
   /** アプリ自身のUIの表示サイズ（auto は端末の設定に追従） */
   uiScale: UiScale;
+  /** アプリの表示言語（auto は端末の言語に追従） */
+  language: LanguageSetting;
   useXAppForCompose: boolean;
   mobileSwipeAreaEnabled: boolean;
   mobileSwipeAreaHeight: number;
@@ -230,6 +234,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   apiRateLimitMonitorEnabled: true,
   columnScale: "default",
   uiScale: "auto",
+  language: "auto",
   useXAppForCompose: false,
   mobileSwipeAreaEnabled: true,
   mobileSwipeAreaHeight: 28,
