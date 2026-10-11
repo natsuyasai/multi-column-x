@@ -43,5 +43,9 @@
   "validation": {
     "regexInvalid": "Invalid regular expression: {{raw}}",
     "userIdInvalid": "`{{id}}` is not a valid X username (1–15 letters, numbers, or underscores)"
+  },
+  "rustError": {
+    "unknown": "An unexpected error occurred",
+    "unknownWithDetail": "An unexpected error occurred ({{detail}})"
   }
 }

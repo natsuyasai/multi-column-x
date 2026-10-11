@@ -43,5 +43,9 @@
   "validation": {
     "regexInvalid": "正規表現が不正です: {{raw}}",
     "userIdInvalid": "`{{id}}` はXのユーザーIDとして正しくありません（英数字とアンダースコアの1〜15文字）"
+  },
+  "rustError": {
+    "unknown": "予期しないエラーが発生しました",
+    "unknownWithDetail": "予期しないエラーが発生しました（{{detail}}）"
   }
 }
