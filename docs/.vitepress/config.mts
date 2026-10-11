@@ -57,6 +57,7 @@ export default defineConfig({
           { text: "カラム", link: "/columns" },
           { text: "設定", link: "/settings" },
           { text: "ポップアップとショートカット", link: "/popup-shortcuts" },
+          { text: "対応環境と機能一覧", link: "/environments" },
           { text: "Android", link: "/android" },
           { text: "アプリの更新", link: "/update" },
           { text: "よくある質問", link: "/faq" },

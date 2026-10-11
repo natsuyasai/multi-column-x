@@ -2,7 +2,7 @@
 
 Multi Column X（マルチカラム X）は、TweetDeck スタイルで Twitter/X を閲覧できるアプリです。
 複数のアカウントと複数のカラム（タイムライン）を同時に並べて表示できます。
-Windows / Linux のデスクトップと Android に対応しています。
+Windows / Linux のデスクトップと Android に対応しています（環境ごとの機能は [対応環境と機能一覧](./environments) を参照）。
 
 > このガイドは「アプリを使う人」向けです。ソースコードのビルドや開発については [README.md](https://github.com/natsuyasai/multi-column-x/blob/main/README.md) を参照してください。
 
