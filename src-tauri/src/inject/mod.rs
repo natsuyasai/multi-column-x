@@ -39,12 +39,24 @@ pub struct InitScriptParams<'a> {
     pub return_to_last_read_included: bool,
     pub return_to_last_read_enabled: bool,
     pub mobile_swipe_area_offset: u32,
+    /// inject の自前 UI の表示言語（"ja" | "en"）。`window.__mcxLang` として埋め込む。
+    pub language: &'a str,
 }
 
 // document.body の childList+subtree 監視を共有する単一 MutationObserver ハブ。
 // 他のどのスクリプトよりも先に連結し、後続スクリプトが window.__mcxDomObserver を
 // 参照できるようにする（詳細は dom_observer.ts のコメント参照）。
 const DOM_OBSERVER_HUB: &str = include_str!("dom_observer.js");
+
+// inject の自前 UI 文言を ja/en で切り替える共有ハブ（window.__mcxI18n）。
+// DOM_OBSERVER_HUB の直後・他のどのスクリプトよりも前に連結する。
+// 初期言語は直前に出力する window.__mcxLang から読む。
+const I18N_HUB: &str = include_str!("i18n.js");
+
+/// 表示言語を `window.__mcxLang = "ja";` として埋め込む断片を返す。
+fn language_script(language: &str) -> String {
+    format!("window.{} = {};", globals::MCX_LANG, js_string(language))
+}
 
 /// カスタムCSSが空でなければ `applyCustomCSS` 呼び出し断片を返す。
 /// 空なら何も注入しない（`None`）。
@@ -218,7 +230,14 @@ pub fn build_init_script(params: &InitScriptParams) -> String {
     let config = config_script(params);
     let parts = script_parts(params);
 
-    let mut script = format!("{}\n{}\n{}", DOM_OBSERVER_HUB, config, parts.concat());
+    let mut script = format!(
+        "{}\n{}\n{}\n{}\n{}",
+        DOM_OBSERVER_HUB,
+        language_script(params.language),
+        I18N_HUB,
+        config,
+        parts.concat()
+    );
 
     if let Some(call) = custom_css_call(params.custom_css) {
         script.push_str(&call);
@@ -232,12 +251,15 @@ pub fn build_popup_init_script(
     current_account_id: &str,
     target_href: &str,
     esc_close_enabled: bool,
+    language: &str,
 ) -> String {
     let popup_toolbar = include_str!("popup_toolbar.js");
     let popup_video_autoplay = include_str!("popup_video_autoplay.js");
     format!(
-        "{}\nwindow.{}={};window.{}={};window.{}={};window.{}={};\n{}\n{}",
+        "{}\n{}\n{}\nwindow.{}={};window.{}={};window.{}={};window.{}={};\n{}\n{}",
         DOM_OBSERVER_HUB,
+        language_script(language),
+        I18N_HUB,
         globals::MCX_ACCOUNTS,
         accounts_json,
         globals::MCX_CURRENT_ACCOUNT_ID,
@@ -284,6 +306,7 @@ mod tests {
             return_to_last_read_included: false,
             return_to_last_read_enabled: false,
             mobile_swipe_area_offset: 0,
+            language: "ja",
         }
     }
 
@@ -505,7 +528,7 @@ mod tests {
     fn build_popup_init_scriptで引用符やバックスラッシュや改行を含む値もjsの文字列として正しく埋め込まれる(
     ) {
         let value = "a\"b\\c\nd";
-        let script = build_popup_init_script("[]", value, "https://x.com", true);
+        let script = build_popup_init_script("[]", value, "https://x.com", true, "ja");
 
         let marker = format!("window.{}=", globals::MCX_CURRENT_ACCOUNT_ID);
         let start = script
@@ -622,6 +645,7 @@ mod tests {
             "acc1",
             "https://x.com/something",
             true,
+            "ja",
         );
         assert!(script.contains("__mcxAccounts"));
         assert!(script.contains(r#"[{"id":"acc1"}]"#));
@@ -650,8 +674,13 @@ mod tests {
 
     #[test]
     fn build_popup_init_scriptに動画自動再生スクリプトが含まれる() {
-        let script =
-            build_popup_init_script("[]", "acc1", "https://x.com/user/status/123/video/1", true);
+        let script = build_popup_init_script(
+            "[]",
+            "acc1",
+            "https://x.com/user/status/123/video/1",
+            true,
+            "ja",
+        );
         // popup_video_autoplay.ts 内の一意なマーカーコメント
         assert!(script.contains("mcx-video-autoplay"));
         assert!(script.contains("shouldAutoplay"));
@@ -665,6 +694,7 @@ mod tests {
             "550e8400-e29b-41d4-a716-446655440000",
             "https://x.com/user/status/123",
             true,
+            "ja",
         );
         assert!(script.contains(r#"__mcxCurrentAccountId="550e8400-e29b-41d4-a716-446655440000""#));
         assert!(script.contains(r#"__mcxTargetHref="https://x.com/user/status/123""#));
@@ -672,7 +702,7 @@ mod tests {
 
     #[test]
     fn build_popup_init_script_esc_close_disabled() {
-        let script = build_popup_init_script("[]", "acc1", "", false);
+        let script = build_popup_init_script("[]", "acc1", "", false, "ja");
         assert!(script.contains("false"));
     }
 
@@ -747,7 +777,7 @@ mod tests {
 
     #[test]
     fn build_popup_init_scriptに共有domobserverハブが含まれる() {
-        let script = build_popup_init_script("[]", "acc1", "", true);
+        let script = build_popup_init_script("[]", "acc1", "", true, "ja");
         assert!(script.contains("__mcxDomObserver"));
     }
 
@@ -850,7 +880,7 @@ mod tests {
 
     #[test]
     fn build_popup_init_scriptで共有domobserverハブがpopup_toolbarよりも先頭に連結される() {
-        let script = build_popup_init_script("[]", "acc1", "", true);
+        let script = build_popup_init_script("[]", "acc1", "", true, "ja");
         let hub_pos = script
             .find("__mcxDomObserver")
             .expect("dom observer hub marker not found");
@@ -858,5 +888,85 @@ mod tests {
             .find("tv-popup-toolbar")
             .expect("popup toolbar marker not found");
         assert!(hub_pos < toolbar_pos);
+    }
+
+    #[test]
+    fn カラムの注入スクリプトに日本語の表示言語が埋め込まれる() {
+        let script = build_init_script(&default_params());
+        assert!(script.contains(r#"window.__mcxLang = "ja";"#));
+    }
+
+    #[test]
+    fn カラムの注入スクリプトに英語の表示言語が埋め込まれる() {
+        let mut params = default_params();
+        params.language = "en";
+        let script = build_init_script(&params);
+        assert!(script.contains(r#"window.__mcxLang = "en";"#));
+        assert!(!script.contains(r#"window.__mcxLang = "ja";"#));
+    }
+
+    #[test]
+    fn カラムの注入スクリプトでi18nハブはdomobserverの直後かつ他のスクリプトより前に連結される() {
+        let script = build_init_script(&default_params());
+        let observer_pos = script
+            .find("window.__mcxDomObserver = { subscribe }")
+            .expect("dom observer hub marker not found");
+        let lang_pos = script
+            .find("window.__mcxLang = ")
+            .expect("language marker not found");
+        let i18n_pos = script
+            .find("window.__mcxI18n = api")
+            .expect("i18n hub marker not found");
+        let config_pos = script
+            .find("window.__multiColumnXConfig = ")
+            .expect("config marker not found");
+        let tab_selector_pos = script
+            .find(include_str!("tab_selector.js"))
+            .expect("tab selector not found");
+        assert!(observer_pos < lang_pos);
+        assert!(lang_pos < i18n_pos);
+        assert!(i18n_pos < config_pos);
+        assert!(config_pos < tab_selector_pos);
+    }
+
+    #[test]
+    fn minimal_injectionのときは表示言語もi18nハブも含まれない() {
+        let mut params = default_params();
+        params.minimal_injection = true;
+        let script = build_init_script(&params);
+        assert!(!script.contains("__mcxLang"));
+        assert!(!script.contains("__mcxI18n"));
+    }
+
+    #[test]
+    fn ポップアップの注入スクリプトに表示言語が埋め込まれる() {
+        let ja = build_popup_init_script("[]", "acc1", "", true, "ja");
+        assert!(ja.contains(r#"window.__mcxLang = "ja";"#));
+        let en = build_popup_init_script("[]", "acc1", "", true, "en");
+        assert!(en.contains(r#"window.__mcxLang = "en";"#));
+    }
+
+    #[test]
+    fn ポップアップの注入スクリプトでi18nハブはdomobserverの直後かつツールバーより前に連結される() {
+        let script = build_popup_init_script("[]", "acc1", "", true, "ja");
+        let observer_pos = script
+            .find("window.__mcxDomObserver = { subscribe }")
+            .expect("dom observer hub marker not found");
+        let lang_pos = script
+            .find("window.__mcxLang = ")
+            .expect("language marker not found");
+        let i18n_pos = script
+            .find("window.__mcxI18n = api")
+            .expect("i18n hub marker not found");
+        let accounts_pos = script
+            .find("window.__mcxAccounts=")
+            .expect("accounts marker not found");
+        let toolbar_pos = script
+            .find("tv-popup-toolbar")
+            .expect("popup toolbar marker not found");
+        assert!(observer_pos < lang_pos);
+        assert!(lang_pos < i18n_pos);
+        assert!(i18n_pos < accounts_pos);
+        assert!(accounts_pos < toolbar_pos);
     }
 }

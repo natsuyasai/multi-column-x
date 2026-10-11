@@ -77,6 +77,10 @@ pub mod globals {
     pub const MCX_TARGET_HREF: &str = "__mcxTargetHref";
     /// ポップアップ WebView に注入される Esc 閉じる設定
     pub const MCX_ESC_CLOSE_ENABLED: &str = "__mcxEscCloseEnabled";
+    /// カラム／ポップアップ WebView に注入される表示言語（"ja" | "en"）
+    pub const MCX_LANG: &str = "__mcxLang";
+    /// inject の文言を切り替える共有ハブ（i18n.ts が公開する）
+    pub const MCX_I18N: &str = "__mcxI18n";
 }
 
 /// TS 側（src/constants/ipc.contract.test.ts）と同じ fixture を参照する契約テスト。
@@ -154,6 +158,8 @@ mod tests {
             ("MCX_CURRENT_ACCOUNT_ID", globals::MCX_CURRENT_ACCOUNT_ID),
             ("MCX_TARGET_HREF", globals::MCX_TARGET_HREF),
             ("MCX_ESC_CLOSE_ENABLED", globals::MCX_ESC_CLOSE_ENABLED),
+            ("MCX_LANG", globals::MCX_LANG),
+            ("MCX_I18N", globals::MCX_I18N),
         ];
         assert_eq!(expected.as_object().unwrap().len(), actual.len());
         for (key, value) in actual {
