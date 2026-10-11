@@ -31,8 +31,7 @@ pub const MAX_LIST_ITEM_CHARS: usize = 500;
 /// ポータブルでないため、バックアップに含めない `globalSettings` のキー。
 /// `GlobalSettingsData` のキー集合 ＝ 出力キー ∪ この一覧、をテストで保証する（テスト専用の定義）。
 #[cfg(test)]
-pub const EXCLUDED_GLOBAL_SETTINGS_KEYS: [&str; 6] = [
-    "language",
+pub const EXCLUDED_GLOBAL_SETTINGS_KEYS: [&str; 5] = [
     "windowBounds",
     "pendingDataDirectoryDeletions",
     "hardwareVideoDecodeEnabled",
@@ -218,6 +217,7 @@ pub struct BackupPreset {
 #[serde(default)]
 pub struct BackupGlobalSettings {
     pub theme: String,
+    pub language: String,
     #[serde(rename = "customCSS")]
     pub custom_css: String,
     #[serde(rename = "defaultAccountId")]
@@ -289,6 +289,7 @@ impl From<&GlobalSettingsData> for BackupGlobalSettings {
     fn from(g: &GlobalSettingsData) -> Self {
         Self {
             theme: g.theme.clone(),
+            language: g.language.clone(),
             custom_css: g.custom_css.clone(),
             default_account_id: g.default_account_id.clone(),
             default_auto_reload_enabled: g.default_auto_reload_enabled,
@@ -338,7 +339,7 @@ impl BackupGlobalSettings {
     pub fn apply_onto(self, base: &GlobalSettingsData) -> GlobalSettingsData {
         GlobalSettingsData {
             theme: self.theme,
-            language: base.language.clone(),
+            language: self.language,
             custom_css: self.custom_css,
             window_bounds: base.window_bounds.clone(),
             default_account_id: self.default_account_id,
