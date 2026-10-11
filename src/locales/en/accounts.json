@@ -1,0 +1,29 @@
+{
+  "manager": {
+    "title": "Manage accounts",
+    "close": "Close",
+    "empty": "No accounts",
+    "nameLabel": "Account name",
+    "changeColor": "Change color to {{color}}",
+    "cancel": "Cancel",
+    "save": "Save",
+    "setDefaultTitle": "Set as the default account for posting",
+    "setDefault": "Set {{label}} as default",
+    "edit": "Edit",
+    "editAria": "Edit {{label}}",
+    "reauth": "Re-authenticate",
+    "reauthAria": "Re-authenticate {{label}}",
+    "remove": "Delete",
+    "removeAria": "Delete {{label}}",
+    "add": "+ Add account"
+  },
+  "nameDialog": {
+    "nameLabel": "Account name",
+    "cancel": "Cancel",
+    "ok": "OK"
+  },
+  "noAccounts": {
+    "message": "Add an account first",
+    "openManager": "Open account manager"
+  }
+}

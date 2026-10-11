@@ -1,0 +1,29 @@
+{
+  "manager": {
+    "title": "アカウント管理",
+    "close": "閉じる",
+    "empty": "アカウントがありません",
+    "nameLabel": "アカウント名",
+    "changeColor": "色を {{color}} に変更",
+    "cancel": "キャンセル",
+    "save": "保存",
+    "setDefaultTitle": "ツイート時のデフォルトアカウントに設定",
+    "setDefault": "{{label}} をデフォルトに設定",
+    "edit": "編集",
+    "editAria": "{{label}} を編集",
+    "reauth": "再認証",
+    "reauthAria": "{{label}} を再認証",
+    "remove": "削除",
+    "removeAria": "{{label}} を削除",
+    "add": "+ アカウントを追加"
+  },
+  "nameDialog": {
+    "nameLabel": "アカウント名",
+    "cancel": "キャンセル",
+    "ok": "OK"
+  },
+  "noAccounts": {
+    "message": "先にアカウントを追加してください",
+    "openManager": "アカウント管理を開く"
+  }
+}

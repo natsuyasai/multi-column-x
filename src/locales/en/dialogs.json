@@ -10,5 +10,9 @@
     "urlPlaceholder": "https://x.com/...",
     "cancel": "Cancel",
     "open": "Open"
+  },
+  "confirm": {
+    "ok": "OK",
+    "cancel": "Cancel"
   }
 }

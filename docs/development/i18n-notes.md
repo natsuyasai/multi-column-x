@@ -66,6 +66,8 @@
 | アカウントの紐づけ                         | Link accounts                                |
 | 復元しない                                 | Don't restore                                |
 | 公式設定                                   | Official settings                            |
+| 再認証                                     | Re-authenticate                              |
+| アカウント管理                             | Manage accounts                              |
 | ページタイプ                               | Page type                                    |
 | 表示名                                     | Display name                                 |
 | 再読み込み                                 | Reload                                       |

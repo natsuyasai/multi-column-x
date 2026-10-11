@@ -10,5 +10,9 @@
     "urlPlaceholder": "https://x.com/...",
     "cancel": "キャンセル",
     "open": "開く"
+  },
+  "confirm": {
+    "ok": "OK",
+    "cancel": "キャンセル"
   }
 }
