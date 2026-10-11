@@ -38,6 +38,11 @@ pub fn current_ui_lang(app: &AppHandle) -> UiLang {
     resolve_ui_lang(setting, sys_locale::get_locale().as_deref())
 }
 
+/// 現在の表示言語で `key` の文言を返す（ウィンドウ生成時に呼ぶ。生成済みのウィンドウには影響しない）。
+pub fn current_ui_text(app: &AppHandle, key: UiText) -> &'static str {
+    ui_text(key, current_ui_lang(app))
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UiText {
     WindowTitleMedia,
@@ -50,6 +55,8 @@ pub enum UiText {
 }
 
 impl UiText {
+    /// 全項目（網羅テスト用）。
+    #[cfg(test)]
     pub const ALL: [UiText; 7] = [
         UiText::WindowTitleMedia,
         UiText::WindowTitleLink,

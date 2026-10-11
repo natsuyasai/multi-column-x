@@ -108,6 +108,11 @@
       "webviewAccess": "WebView へアクセスできません: {{detail}}",
       "noReply": "WebView2 から応答がありませんでした",
       "timeout": "WebView2 の応答がタイムアウトしました"
+    },
+    "h264": {
+      "unsupportedArch": "この環境（{{detail}}）には対応していません。H.264 コーデックの自動取得は x86_64 のみ対応です",
+      "extractFailed": "bzip2展開に失敗しました: {{detail}}",
+      "downloadTimeout": "ダウンロードがタイムアウトしました: {{detail}}"
     }
   }
 }

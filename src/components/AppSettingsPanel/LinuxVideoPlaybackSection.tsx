@@ -1,6 +1,10 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import type { H264DownloadState } from "@/hooks/useH264Setup";
+import type {
+  H264DownloadError,
+  H264DownloadState,
+} from "@/hooks/useH264Setup";
+import { describeAppError } from "@/lib/appError";
 import styles from "./AppSettingsPanel.module.scss";
 import type { SettingsDraft, SetSettingsDraft } from "./settingsDraft";
 
@@ -10,7 +14,7 @@ export interface H264SettingsInfo {
   downloadApplicable: boolean;
   h264Available: boolean;
   downloadState: H264DownloadState;
-  downloadError: string | null;
+  downloadError: H264DownloadError | null;
   onEnable: () => void;
   onRelaunch: () => void;
 }
@@ -67,7 +71,9 @@ const H264Row: React.FC<{ h264: H264SettingsInfo }> = ({ h264 }) => {
     return (
       <>
         <p className={styles.errorText} role="alert">
-          {h264.downloadError ?? t("settings:linuxVideo.fetchFailed")}
+          {h264.downloadError
+            ? describeAppError(h264.downloadError, t)
+            : t("settings:linuxVideo.fetchFailed")}
         </p>
         <div className={styles.inlineRow}>
           <button

@@ -47,6 +47,11 @@ pub mod codes {
     pub const EXTENSION_WEBVIEW_ACCESS: &str = "extension.webviewAccess";
     pub const EXTENSION_NO_REPLY: &str = "extension.noReply";
     pub const EXTENSION_TIMEOUT: &str = "extension.timeout";
+    pub const H264_UNSUPPORTED_ARCH: &str = "h264.unsupportedArch";
+    // 使用箇所（openh264_fetch）は Linux desktop 限定のため、他環境では未使用警告を抑止する。
+    #[cfg_attr(not(all(desktop, target_os = "linux")), allow(dead_code))]
+    pub const H264_EXTRACT_FAILED: &str = "h264.extractFailed";
+    pub const H264_DOWNLOAD_TIMEOUT: &str = "h264.downloadTimeout";
 }
 
 #[derive(Serialize, Debug, Clone, PartialEq, Eq)]

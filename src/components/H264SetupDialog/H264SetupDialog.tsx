@@ -1,12 +1,16 @@
 import React, { useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useEscapeKey } from "@/hooks/useEscapeKey";
-import type { H264DownloadState } from "@/hooks/useH264Setup";
+import type {
+  H264DownloadError,
+  H264DownloadState,
+} from "@/hooks/useH264Setup";
+import { describeAppError } from "@/lib/appError";
 import styles from "./H264SetupDialog.module.scss";
 
 interface Props {
   downloadState: H264DownloadState;
-  downloadError: string | null;
+  downloadError: H264DownloadError | null;
   onDownload: () => void;
   /** 「今はしない」: 案内の拒否を保存して閉じる */
   onDismiss: () => void;
@@ -116,7 +120,9 @@ export const H264SetupDialog: React.FC<Props> = ({
         {downloadState === "error" && (
           <>
             <p className={styles.error} role="alert">
-              {downloadError ?? t("dialogs:h264.fallbackError")}
+              {downloadError
+                ? describeAppError(downloadError, t)
+                : t("dialogs:h264.fallbackError")}
             </p>
             <div className={styles.actions}>
               <button

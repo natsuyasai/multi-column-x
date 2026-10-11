@@ -10,7 +10,6 @@ pub mod openh264_http_client;
 pub mod settings;
 pub mod settings_file;
 pub mod settings_store;
-#[allow(dead_code)]
 pub mod ui_language;
 pub mod update;
 pub mod video_download;

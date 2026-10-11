@@ -108,6 +108,11 @@
       "webviewAccess": "Can't access the WebView: {{detail}}",
       "noReply": "No response from WebView2",
       "timeout": "WebView2 timed out"
+    },
+    "h264": {
+      "unsupportedArch": "This environment ({{detail}}) is not supported. Automatic H.264 codec download is only available on x86_64",
+      "extractFailed": "Failed to decompress the bzip2 archive: {{detail}}",
+      "downloadTimeout": "The download timed out: {{detail}}"
     }
   }
 }

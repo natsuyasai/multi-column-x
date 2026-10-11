@@ -1481,6 +1481,38 @@ describe("AppSettingsPanel Linux向け動画再生設定", () => {
     fireEvent.click(screen.getByRole("button", { name: "再試行" }));
     expect(h264Base.onEnable).toHaveBeenCalledTimes(1);
   });
+
+  it("h264の取得失敗がAppErrorのとき表示言語に応じた文言になり言語切替に追従する", async () => {
+    const { container } = render(
+      <AppSettingsPanel
+        {...defaultProps}
+        isLinux
+        h264Setup={{
+          ...h264Base,
+          downloadState: "error",
+          downloadError: { code: "h264.unsupportedArch", detail: "aarch64" },
+        }}
+      />,
+    );
+    expect(
+      screen.getByText(
+        "この環境（aarch64）には対応していません。H.264 コーデックの自動取得は x86_64 のみ対応です",
+      ),
+    ).toBeInTheDocument();
+
+    await act(() => i18n.changeLanguage("en"));
+    try {
+      expect(
+        screen.getByText(
+          "This environment (aarch64) is not supported. Automatic H.264 codec download is only available on x86_64",
+        ),
+      ).toBeInTheDocument();
+      const alert = container.querySelector('[role="alert"]');
+      expectNoJapanese(alert as HTMLElement);
+    } finally {
+      await act(() => i18n.changeLanguage("ja"));
+    }
+  });
 });
 
 const グループ見出し一覧 = () =>
