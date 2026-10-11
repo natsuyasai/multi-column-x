@@ -4,8 +4,8 @@
 
 ## 現状の対応範囲
 
-- React UI（`src` 配下の画面文言）が対象。基盤と設定（PR1）、画面文言の辞書化（PR2）で対応済み。
-- **Rust／inject／Android 由来の文言は今後の PR で対応予定で、当面は日本語のまま**。Rust が返して UI に出る文字列（バックアップの `error.field` / `error.reason`、拡張機能の結果文言など）も同様。移行対象外なので触らない。
+- React UI（`src` 配下の画面文言）が対象。基盤と設定（PR1）、画面文言の辞書化（PR2）、Rust 由来の文言（PR3。下記「Rust 由来の文言」）で対応済み。
+- **inject／Android 由来の文言は今後の PR で対応予定で、当面は日本語のまま**。
 - 対象外: ユーザーガイド、WhatsNew の更新履歴本文。
 
 ## 規約
@@ -117,3 +117,27 @@ expectNoJapanese(container);
 ```
 
 テスト後は `i18n.changeLanguage("ja")` で言語を戻すこと。
+
+## Rust 由来の文言（PR3）
+
+Rust は**日本語・英語の文章を返さない**。ユーザーに見えるものは次の3通りで扱う。
+
+### 1. エラー: `AppError`（種別コード＋詳細）
+
+- Tauri コマンドの失敗は `src-tauri/src/commands/app_error.rs` の `AppError { code, detail }` で返す（JSON は `{ "code": "extension.notFound", "detail": "…" }`。`detail` は無ければ省略）。
+- コードは `pub mod codes` に `pub const X: &str = "area.name";` の形で**集約**する。**2階層の ASCII（`area.camelCase`）のみ**（TS の契約テストの正規表現の制約）。
+- OS／WebView／reqwest などの生のエラー文字列、HRESULT の16進、パス、アーキテクチャ名は `detail` に入れる。固定文に混ぜない。分類できない失敗は `AppError::internal(detail)`（`common.internal`）。
+- バックアップの `BackupError` は従来どおり `kind` で返し、`InvalidField.reason` と `Io.code` も**コード**（文章ではない）。
+- TS は `describeAppError(error, t)`（`src/lib/appError.ts`）で `messages:rustError.<code>` を引く。未知コードは `rustError.unknown(WithDetail)`。バックアップは `describeBackupError`（`messages:backup.reason.*` / `backup.ioCode.*`）。
+- **新しいエラーを足す手順**: ① `codes` に定数を追加 ② `src/locales/{ja,en}/messages.json` の `rustError.<area>.<name>` に ja・en を追加（`detail` を使うなら `{{detail}}`）③ Rust のテストで `err.code` を検査。`src/lib/appError.contract.test.ts` が「Rust の全コード＝ja/en の辞書キー」を検査する。
+- 失敗値を画面に保持する場合は文字列に変換せず `AppError` オブジェクトのまま保持し、**描画時に** `describeAppError` する（言語切替に追従するため）。
+
+### 2. Rust が直接使う文言: `ui_text`
+
+- ネイティブウィンドウのタイトルやファイルダイアログのフィルタ名は `src-tauri/src/commands/ui_language.rs` の `UiText` ＋ `ui_text(key, lang)`（ja／en の表。`match` で網羅）。
+- 表示言語は Rust 側で `resolve_ui_lang(設定 language, OS ロケール)`（TS の `resolveLanguage` と同じ規則）。`current_ui_text(app, key)` を使う。**ウィンドウを開くときに解決する**ため、既に開いているウィンドウのタイトルは言語切替では変わらない。
+- 新しい文言を足す: `UiText` にバリアントと ja／en を追加 → 既存のテスト（全バリアント×両言語）が検査する。
+
+### 3. 開発者向けログ
+
+- `log::*!`・`eprintln!`・`warn_before_logger_ready`・`expect`・`panic!` のメッセージは**固定の英語**（言語切替には追従しない）。Rust の契約テスト `src-tauri/src/log_language_contract.rs` が日本語を含むログを検出する。コメントは日本語のままでよい。
