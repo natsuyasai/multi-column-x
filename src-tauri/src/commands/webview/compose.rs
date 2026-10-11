@@ -58,6 +58,7 @@ pub(super) fn create_compose_window(
     .inner_size(COMPOSE_WIDTH, COMPOSE_WINDOW_HEIGHT)
     .initialization_script(&popup_init)
     .on_new_window(external_link::new_window_handler(app.clone()))
+    .disable_drag_drop_handler()
     .data_directory(data_dir);
     #[cfg(windows)]
     let builder = builder.browser_extensions_enabled(true);
@@ -223,6 +224,7 @@ pub async fn open_compose_window(
         )
         .initialization_script(&popup_init)
         .on_new_window(external_link::new_window_handler(app.clone()))
+        .disable_drag_drop_handler()
         .data_directory(data_dir);
         #[cfg(windows)]
         let builder = builder.browser_extensions_enabled(true);

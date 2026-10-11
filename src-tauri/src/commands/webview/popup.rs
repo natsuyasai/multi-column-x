@@ -300,6 +300,7 @@ pub async fn open_popup_window(
     .position(pos.x, pos.y)
     .initialization_script(&popup_init)
     .on_new_window(external_link::new_window_handler(app.clone()))
+    .disable_drag_drop_handler()
     .data_directory(data_dir);
     #[cfg(windows)]
     let builder = builder.browser_extensions_enabled(true);
@@ -357,6 +358,7 @@ pub async fn open_popup_window(
         )
         .initialization_script(&popup_init)
         .on_new_window(external_link::new_window_handler(app.clone()))
+        .disable_drag_drop_handler()
         .data_directory(data_dir);
         #[cfg(windows)]
         let builder = builder.browser_extensions_enabled(true);
@@ -407,6 +409,7 @@ pub async fn open_link_popup_window(
     .position(pos.x, pos.y)
     .initialization_script(&popup_init)
     .on_new_window(external_link::new_window_handler(app.clone()))
+    .disable_drag_drop_handler()
     .data_directory(data_dir);
     #[cfg(windows)]
     let builder = builder.browser_extensions_enabled(true);
@@ -472,6 +475,7 @@ pub async fn open_link_popup_window(
         )
         .initialization_script(&popup_init)
         .on_new_window(external_link::new_window_handler(app.clone()))
+        .disable_drag_drop_handler()
         .data_directory(data_dir);
         #[cfg(windows)]
         let builder = builder.browser_extensions_enabled(true);
@@ -624,6 +628,7 @@ async fn switch_popup_session_window(
             ))
             .initialization_script(&popup_init)
             .on_new_window(external_link::new_window_handler(app.clone()))
+            .disable_drag_drop_handler()
             .data_directory(data_dir);
     #[cfg(windows)]
     let builder = builder.browser_extensions_enabled(true);

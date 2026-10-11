@@ -102,7 +102,7 @@ Linux ではカラムが独立 `WebviewWindow`（親クリップが効かない�
 
 ### 外部リンクの新規ウィンドウ処理（`on_new_window`）
 
-デスクトップでは新規ウィンドウ要求を `on_new_window`（`src-tauri/src/commands/webview/external_link.rs`）で受け、http/https/mailto/tel だけ既定ブラウザで開いて常に Deny する（opener の自動クリックスクリプトはデスクトップでは無効）。**カラム / ポップアップ / コンポーズの WebView builder を新設・変更したら、必ず `.on_new_window(external_link::new_window_handler(app.clone()))` を付けること**（契約テストが検査する）。理由・実機 CDP 検証手順は `docs/development/external-link-new-window-notes.md` を参照。
+デスクトップでは新規ウィンドウ要求を `on_new_window`（`src-tauri/src/commands/webview/external_link.rs`）で受け、http/https/mailto/tel だけ既定ブラウザで開いて常に Deny する（opener の自動クリックスクリプトはデスクトップでは無効）。**カラム / ポップアップ / コンポーズの WebView builder を新設・変更したら、必ず `.on_new_window(external_link::new_window_handler(app.clone()))` を付けること**（契約テストが検査する）。理由・実機 CDP 検証手順は `docs/development/external-link-new-window-notes.md` を参照。**WebView builder を新設・変更したら `.disable_drag_drop_handler()` も付けること**（Windows で Tauri 既定のファイルドロップ処理が X ページの HTML5 DnD を横取りするため。契約テストが検査する）。
 
 ### Tauri コマンドの追加・削除（ACL）
 

@@ -255,6 +255,7 @@ pub async fn create_column_webview(
             tauri::WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(parse_url(&url)?))
                 .initialization_script(&init_script)
                 .on_new_window(external_link::new_window_handler(app.clone()))
+                .disable_drag_drop_handler()
                 .data_directory(data_dir)
                 .decorations(false)
                 .skip_taskbar(true)
@@ -293,6 +294,7 @@ pub async fn create_column_webview(
         let builder = WebviewBuilder::new(&label, WebviewUrl::External(parse_url(&url)?))
             .initialization_script(&init_script)
             .on_new_window(external_link::new_window_handler(app.clone()))
+            .disable_drag_drop_handler()
             .data_directory(data_dir);
         // 同一 data_directory の WebView2 環境はフラグが食い違うと生成に失敗するため、
         // アカウントの data_directory を使う全 builder で Windows 限定で有効にする。
