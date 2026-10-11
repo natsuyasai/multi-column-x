@@ -1,0 +1,14 @@
+{
+  "tabAction": {
+    "reload": "Reload",
+    "settings": "Settings",
+    "remove": "Delete",
+    "cancel": "Cancel"
+  },
+  "linkPopup": {
+    "defaultTitle": "Open URL in a popup window",
+    "urlPlaceholder": "https://x.com/...",
+    "cancel": "Cancel",
+    "open": "Open"
+  }
+}

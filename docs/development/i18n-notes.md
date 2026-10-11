@@ -64,8 +64,11 @@
 | ホワイトリスト                             | Allowlist                                    |
 | 投稿欄                                     | Post box                                     |
 | アカウントの紐づけ                         | Link accounts                                |
-| 復元しない                                 | Don't restore                               |
+| 復元しない                                 | Don't restore                                |
 | 公式設定                                   | Official settings                            |
+| ページタイプ                               | Page type                                    |
+| 表示名                                     | Display name                                 |
+| 再読み込み                                 | Reload                                       |
 
 用語集にない語を訳したら、ここに追記して統一する。
 

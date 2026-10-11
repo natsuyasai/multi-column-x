@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import type { Account, Column, GlobalSettings, PageType } from "../../types";
 import {
@@ -23,6 +24,7 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
   onAdd,
   onCancel,
 }) => {
+  const { t } = useTranslation();
   useEscapeKey(onCancel);
 
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
@@ -86,12 +88,12 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
   return (
     <div className={styles.overlay}>
       <form className={styles.dialog} onSubmit={handleSubmit}>
-        <h2 className={styles.title}>カラムを追加</h2>
+        <h2 className={styles.title}>{t("columns:addDialog.title")}</h2>
 
         {!isExternal && (
           <div className={styles.field}>
             <label className={styles.label} htmlFor="account-select">
-              アカウント
+              {t("columns:addDialog.account")}
             </label>
             <select
               id="account-select"
@@ -110,7 +112,7 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
 
         <div className={styles.field}>
           <label className={styles.label} htmlFor="page-type-select">
-            ページタイプ
+            {t("columns:addDialog.pageType")}
           </label>
           <select
             id="page-type-select"
@@ -118,13 +120,19 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
             value={pageType}
             onChange={(e) => setPageType(e.target.value as PageType)}
           >
-            <option value="home">ホーム</option>
-            <option value="notifications">通知</option>
-            <option value="search">検索</option>
-            <option value="list">リスト</option>
-            <option value="custom">カスタムURL</option>
-            <option value="external">外部URL（アカウント非依存）</option>
-            <option value="compose">投稿</option>
+            <option value="home">{t("columns:pageType.home")}</option>
+            <option value="notifications">
+              {t("columns:pageType.notifications")}
+            </option>
+            <option value="search">{t("columns:pageType.search")}</option>
+            <option value="list">{t("columns:pageType.list")}</option>
+            <option value="custom">
+              {t("columns:addDialog.pageTypeOption.custom")}
+            </option>
+            <option value="external">
+              {t("columns:addDialog.pageTypeOption.external")}
+            </option>
+            <option value="compose">{t("columns:pageType.compose")}</option>
           </select>
         </div>
 
@@ -133,17 +141,17 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
             <label
               className={styles.label}
               htmlFor="tab-name"
-              aria-label="タブ名（任意）"
+              aria-label={t("columns:addDialog.homeTabName")}
             >
-              タブ名（任意）
+              {t("columns:addDialog.homeTabName")}
             </label>
             <input
               id="tab-name"
-              aria-label="タブ名（任意）"
+              aria-label={t("columns:addDialog.homeTabName")}
               className={styles.input}
               value={homeTabName}
               onChange={(e) => setHomeTabName(e.target.value)}
-              placeholder="例: フォロー中"
+              placeholder={t("columns:addDialog.homeTabNamePlaceholder")}
             />
           </div>
         )}
@@ -151,14 +159,14 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
         {pageType === "search" && (
           <div className={styles.field}>
             <label className={styles.label} htmlFor="search-query">
-              検索クエリ
+              {t("columns:addDialog.searchQuery")}
             </label>
             <input
               id="search-query"
               className={styles.input}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="例: tauri"
+              placeholder={t("columns:addDialog.searchQueryPlaceholder")}
               required
             />
           </div>
@@ -167,14 +175,14 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
         {pageType === "list" && (
           <div className={styles.field}>
             <label className={styles.label} htmlFor="list-id">
-              リストID
+              {t("columns:addDialog.listId")}
             </label>
             <input
               id="list-id"
               className={styles.input}
               value={listId}
               onChange={(e) => setListId(e.target.value)}
-              placeholder="例: 1234567890"
+              placeholder={t("columns:addDialog.listIdPlaceholder")}
               required
             />
           </div>
@@ -183,19 +191,19 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
         {(pageType === "custom" || isExternal) && (
           <div className={styles.field}>
             <label className={styles.label} htmlFor="custom-url">
-              URL
+              {t("columns:addDialog.url")}
             </label>
             <input
               id="custom-url"
               className={styles.input}
               value={customUrl}
               onChange={(e) => setCustomUrl(e.target.value)}
-              placeholder="https://x.com/..."
+              placeholder={t("columns:addDialog.urlPlaceholder")}
               required
             />
             {isExternal && (
               <p className={styles.hint}>
-                アカウントに依存しない専用セッションで開きます。カスタムCSS以外の設定は無効になります。
+                {t("columns:addDialog.externalHint")}
               </p>
             )}
           </div>
@@ -203,29 +211,29 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
 
         <div className={styles.field}>
           <label className={styles.label} htmlFor="column-label">
-            表示名（任意）
+            {t("columns:addDialog.label")}
           </label>
           <input
             id="column-label"
-            aria-label="表示名（任意）"
+            aria-label={t("columns:addDialog.label")}
             className={styles.input}
             value={label}
             onChange={(e) => setLabel(e.target.value)}
-            placeholder="例: 仕事用"
+            placeholder={t("columns:addDialog.labelPlaceholder")}
             maxLength={COLUMN_LABEL_MAX_LENGTH}
           />
         </div>
 
         <div className={styles.actions}>
           <button type="button" className={styles.cancelBtn} onClick={onCancel}>
-            キャンセル
+            {t("columns:addDialog.cancel")}
           </button>
           <button
             type="submit"
             className={styles.submitBtn}
             disabled={pageType !== "external" && accounts.length === 0}
           >
-            追加
+            {t("columns:addDialog.submit")}
           </button>
         </div>
       </form>

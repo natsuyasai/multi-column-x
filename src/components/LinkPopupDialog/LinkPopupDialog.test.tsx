@@ -1,5 +1,7 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
+import i18n from "@/i18n";
+import { expectNoJapanese } from "@/test-utils/japanese";
 import type { Account } from "../../types";
 import { LinkPopupDialog } from "./LinkPopupDialog";
 
@@ -208,5 +210,40 @@ describe("LinkPopupDialog", () => {
     expect(
       screen.getByText("URLをポップアップウィンドウで開く"),
     ).toBeInTheDocument();
+  });
+});
+
+describe("LinkPopupDialog の表示言語", () => {
+  const englishAccounts: Account[] = [
+    { ...mockAccounts[0], label: "Account A" },
+    { ...mockAccounts[1], label: "Account B" },
+  ];
+
+  it("表示言語が英語のときリンクポップアップに日本語の文言が表示されない", async () => {
+    await i18n.changeLanguage("en");
+    const { container, rerender } = render(
+      <LinkPopupDialog
+        accounts={englishAccounts}
+        defaultAccountId="acc-1"
+        onSubmit={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    expectNoJapanese(container);
+    expect(screen.getByText("Open URL in a popup window")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+
+    // URL入力欄を隠す指定（固定URL）でも日本語が出ない
+    rerender(
+      <LinkPopupDialog
+        accounts={englishAccounts}
+        defaultAccountId="acc-1"
+        fixedUrl="https://x.com/settings"
+        onSubmit={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    expectNoJapanese(container);
   });
 });

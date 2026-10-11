@@ -9,5 +9,27 @@
     "external": "External site",
     "externalWithHost": "External: {{host}}",
     "compose": "Compose"
+  },
+  "addDialog": {
+    "title": "Add column",
+    "account": "Account",
+    "pageType": "Page type",
+    "pageTypeOption": {
+      "custom": "Custom URL",
+      "external": "External URL (not tied to an account)"
+    },
+    "homeTabName": "Tab name (optional)",
+    "homeTabNamePlaceholder": "e.g. Following",
+    "searchQuery": "Search query",
+    "searchQueryPlaceholder": "e.g. tauri",
+    "listId": "List ID",
+    "listIdPlaceholder": "e.g. 1234567890",
+    "url": "URL",
+    "urlPlaceholder": "https://x.com/...",
+    "externalHint": "Opens in a dedicated session that is independent of any account. Settings other than custom CSS are disabled.",
+    "label": "Display name (optional)",
+    "labelPlaceholder": "e.g. Work",
+    "cancel": "Cancel",
+    "submit": "Add"
   }
 }

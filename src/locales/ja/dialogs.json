@@ -1,0 +1,14 @@
+{
+  "tabAction": {
+    "reload": "再読み込み",
+    "settings": "設定",
+    "remove": "削除",
+    "cancel": "キャンセル"
+  },
+  "linkPopup": {
+    "defaultTitle": "URLをポップアップウィンドウで開く",
+    "urlPlaceholder": "https://x.com/...",
+    "cancel": "キャンセル",
+    "open": "開く"
+  }
+}

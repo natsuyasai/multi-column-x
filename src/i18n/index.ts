@@ -13,6 +13,7 @@ void i18n.use(initReactI18next).init({
     "settings",
     "columnSettings",
     "columns",
+    "dialogs",
     "messages",
     "rateLimit",
   ],
