@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   currentPlatformName,
   isExtensionsSupported,
@@ -119,6 +120,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   startupHardwareVideoDecodeEnabled,
   h264Setup,
 }) => {
+  const { t } = useTranslation();
   const isMobile = useAppStore((s) => s.isMobile);
   const { savePreset, deletePreset } = useAppStore();
   useEscapeKey(onClose);
@@ -207,11 +209,11 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
     <div className={styles.overlay}>
       <div className={styles.panel}>
         <div className={styles.header}>
-          <h2 className={styles.title}>アプリ設定</h2>
+          <h2 className={styles.title}>{t("settings:panel.title")}</h2>
           <button
             className={styles.closeBtn}
             onClick={onClose}
-            aria-label="閉じる"
+            aria-label={t("settings:panel.close")}
           >
             ✕
           </button>
@@ -222,20 +224,20 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
             className={`${styles.tab} ${activeTab === "general" ? styles.tabActive : ""}`}
             onClick={() => setActiveTab("general")}
           >
-            一般
+            {t("settings:panel.tabs.general")}
           </button>
           <button
             className={`${styles.tab} ${activeTab === "layout" ? styles.tabActive : ""}`}
             onClick={() => setActiveTab("layout")}
           >
-            カラム配置
+            {t("settings:panel.tabs.layout")}
           </button>
           {!isMobile && (
             <button
               className={`${styles.tab} ${activeTab === "presets" ? styles.tabActive : ""}`}
               onClick={() => setActiveTab("presets")}
             >
-              プリセット
+              {t("settings:panel.tabs.presets")}
             </button>
           )}
           {extensionsSupported && (
@@ -243,14 +245,14 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
               className={`${styles.tab} ${activeTab === "extensions" ? styles.tabActive : ""}`}
               onClick={() => setActiveTab("extensions")}
             >
-              拡張機能
+              {t("settings:panel.tabs.extensions")}
             </button>
           )}
           <button
             className={`${styles.tab} ${activeTab === "backup" ? styles.tabActive : ""}`}
             onClick={() => setActiveTab("backup")}
           >
-            バックアップ
+            {t("settings:panel.tabs.backup")}
           </button>
         </div>
 
@@ -261,11 +263,11 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
               onSubmit={handleSubmit}
               className={styles.form}
             >
-              <SettingsGroup title="表示">
+              <SettingsGroup title={t("settings:panel.groups.display")}>
                 <DisplaySettingsSection draft={draft} set={set} />
               </SettingsGroup>
 
-              <SettingsGroup title="新規カラムの既定値">
+              <SettingsGroup title={t("settings:panel.groups.columnDefaults")}>
                 <ColumnDefaultsSections
                   draft={draft}
                   set={set}
@@ -273,7 +275,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 />
               </SettingsGroup>
 
-              <SettingsGroup title="閲覧・フィルタ">
+              <SettingsGroup title={t("settings:panel.groups.filter")}>
                 <FilterSettingsSections
                   draft={draft}
                   set={set}
@@ -282,7 +284,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
                 />
               </SettingsGroup>
 
-              <SettingsGroup title="メディア">
+              <SettingsGroup title={t("settings:panel.groups.media")}>
                 <VideoSettingsSection draft={draft} set={set} />
                 {!isMobile && <PopupSettingsSection draft={draft} set={set} />}
                 <LinuxVideoPlaybackSection
@@ -298,12 +300,12 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
               </SettingsGroup>
 
               {isMobile && (
-                <SettingsGroup title="Android専用">
+                <SettingsGroup title={t("settings:panel.groups.android")}>
                   <AndroidSettingsSections draft={draft} set={set} />
                 </SettingsGroup>
               )}
 
-              <SettingsGroup title="アプリ・メンテナンス">
+              <SettingsGroup title={t("settings:panel.groups.maintenance")}>
                 <AppInfoSections
                   onOpenOfficialSettings={onOpenOfficialSettings}
                   onReloadAllWebviews={() => {
@@ -402,14 +404,14 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
               className={styles.cancelBtn}
               onClick={onClose}
             >
-              キャンセル
+              {t("settings:panel.actions.cancel")}
             </button>
             <button
               type="submit"
               form="app-settings-form"
               className={styles.applyBtn}
             >
-              適用
+              {t("settings:panel.actions.apply")}
             </button>
           </div>
         )}

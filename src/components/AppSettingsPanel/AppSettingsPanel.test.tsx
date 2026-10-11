@@ -1,4 +1,5 @@
 import {
+  act,
   render,
   screen,
   fireEvent,
@@ -9,6 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import i18n from "@/i18n";
 import * as extensionsService from "@/services/extensions";
+import { expectNoJapanese } from "@/test-utils/japanese";
 import type { GlobalSettings, Column, Account } from "../../types";
 import { AppSettingsPanel } from "./AppSettingsPanel";
 
@@ -1792,5 +1794,231 @@ describe("AppSettingsPanel 表示言語", () => {
     expect(onApply).toHaveBeenCalledWith(
       expect.objectContaining({ language: "ja" }),
     );
+  });
+});
+
+/** 言語選択肢の「日本語」は各言語の自国語表記で出すため、検査対象から外して日本語が残っていないか確認する */
+function expectNoJapaneseOutsideLanguagePicker() {
+  const clone = document.body.cloneNode(true) as HTMLElement;
+  clone.querySelector('[role="group"][aria-label="Language"]')?.remove();
+  expectNoJapanese(clone);
+}
+
+describe("AppSettingsPanel 英語表示", () => {
+  const englishAccount: Account = {
+    id: "acc-en",
+    label: "Main",
+    dataDirectory: "/data-en",
+    color: "#1d9bf0",
+    createdAt: "2026-05-03T00:00:00Z",
+  };
+  const layoutColumns: Column[] = [
+    {
+      ...mockColumns[0],
+      id: "e1",
+      accountId: "acc-en",
+      gridRow: 1,
+      gridCol: 1,
+      heightMode: "fixed",
+      heightValue: 300,
+      heightUnit: "px",
+      order: 0,
+    },
+    {
+      ...mockColumns[0],
+      id: "e2",
+      accountId: "acc-en",
+      pageType: "notifications",
+      gridRow: 0,
+      gridCol: 0,
+      order: 1,
+    },
+  ];
+  const h264Idle = {
+    downloadApplicable: true,
+    h264Available: false,
+    downloadState: "idle" as const,
+    downloadError: null,
+    onEnable: vi.fn(),
+    onRelaunch: vi.fn(),
+  };
+
+  beforeEach(async () => {
+    await i18n.changeLanguage("en");
+  });
+
+  it("表示言語が英語のとき一般タブに日本語の文言が表示されない", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <AppSettingsPanel
+        {...defaultProps}
+        accounts={[englishAccount]}
+        pendingDataDirectoryDeletionCount={2}
+        updateManualResult="error"
+        isLinux
+        h264Setup={h264Idle}
+        settings={{ ...baseGlobalSettings, hardwareVideoDecodeEnabled: false }}
+        startupHardwareVideoDecodeEnabled
+      />,
+    );
+    await user.click(
+      screen.getByRole("button", { name: "How to write muted words" }),
+    );
+    await user.click(screen.getByRole("checkbox", { name: /VA-API/ }));
+    await user.click(
+      screen.getByRole("checkbox", {
+        name: "Change the app UI display size",
+      }),
+    );
+    expectNoJapaneseOutsideLanguagePicker();
+    expect(screen.getByText("App settings")).toBeInTheDocument();
+    expect(screen.getByText("Global muted words")).toBeInTheDocument();
+
+    // 状態の違う文言も確認する
+    for (const props of [
+      { updateManualResult: "none" as const, updateChecking: true },
+      { pendingDataDirectoryDeletionCount: 1 },
+    ]) {
+      rerender(
+        <AppSettingsPanel
+          {...defaultProps}
+          accounts={[englishAccount]}
+          isLinux
+          h264Setup={{ ...h264Idle, downloadState: "success" }}
+          {...props}
+        />,
+      );
+      expectNoJapaneseOutsideLanguagePicker();
+    }
+    for (const h264 of [
+      { ...h264Idle, downloadState: "downloading" as const },
+      { ...h264Idle, downloadState: "error" as const },
+      { ...h264Idle, h264Available: true },
+    ]) {
+      rerender(<AppSettingsPanel {...defaultProps} isLinux h264Setup={h264} />);
+      expectNoJapaneseOutsideLanguagePicker();
+    }
+  });
+
+  it("表示言語が英語のとき削除保留データフォルダの件数が単数形と複数形で表示される", async () => {
+    const user = userEvent.setup();
+    const onRetry = vi.fn().mockResolvedValue({ remaining: 1 });
+    const { rerender } = render(
+      <AppSettingsPanel
+        {...defaultProps}
+        pendingDataDirectoryDeletionCount={1}
+        onRetryDataDirectoryDeletion={onRetry}
+      />,
+    );
+    expect(
+      screen.getByText("1 data folder could not be deleted"),
+    ).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: "Retry deleting data folders" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getAllByText("1 data folder could not be deleted"),
+      ).toHaveLength(2),
+    );
+    rerender(
+      <AppSettingsPanel
+        {...defaultProps}
+        pendingDataDirectoryDeletionCount={3}
+        onRetryDataDirectoryDeletion={onRetry}
+      />,
+    );
+    expect(
+      screen.getByText("3 data folders could not be deleted"),
+    ).toBeInTheDocument();
+  });
+
+  it("表示言語が英語のときモバイルの一般タブとカラム配置タブに日本語の文言が表示されない", async () => {
+    mockStoreState.isMobile = true;
+    const user = userEvent.setup();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        accounts={[englishAccount]}
+        columns={layoutColumns}
+      />,
+    );
+    expect(screen.getByText("Android only")).toBeInTheDocument();
+    expectNoJapaneseOutsideLanguagePicker();
+    await user.click(screen.getByRole("button", { name: "Column layout" }));
+    expect(screen.getByText("Display order")).toBeInTheDocument();
+    expectNoJapaneseOutsideLanguagePicker();
+  });
+
+  it("表示言語が英語のときカラム配置タブに日本語の文言が表示されない", async () => {
+    const user = userEvent.setup();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        accounts={[englishAccount]}
+        columns={layoutColumns}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Column layout" }));
+    expectNoJapaneseOutsideLanguagePicker();
+
+    // 空きセルを選ぶと配置待ちの案内が出る
+    fireEvent.change(screen.getByRole("spinbutton"), {
+      target: { value: "2" },
+    });
+    await user.click(screen.getAllByRole("button", { name: "+ Add row" })[0]);
+    expect(screen.getByText("← Place here")).toBeInTheDocument();
+    expect(
+      screen.getByText("Click to place at column 1, row 2"),
+    ).toBeInTheDocument();
+    expectNoJapaneseOutsideLanguagePicker();
+
+    // 割り当て済みセルを選ぶと高さ設定が出る
+    await user.click(
+      screen.getByRole("button", { name: "Cell at column 1, row 1" }),
+    );
+    expect(screen.getByText(/Height settings/)).toBeInTheDocument();
+    expectNoJapaneseOutsideLanguagePicker();
+  });
+
+  it("表示言語が英語のときプリセットタブに日本語の文言が表示されない", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<AppSettingsPanel {...defaultProps} />);
+    await user.click(screen.getByRole("button", { name: "Presets" }));
+    expect(screen.getByText("No saved presets")).toBeInTheDocument();
+    expectNoJapaneseOutsideLanguagePicker();
+
+    rerender(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={{
+          ...baseGlobalSettings,
+          presets: [{ id: "p1", name: "Work", columns: [] }],
+        }}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Load" })).toBeInTheDocument();
+    expectNoJapaneseOutsideLanguagePicker();
+  });
+});
+
+describe("AppSettingsPanel 表示言語の動的な切り替え", () => {
+  it("画面を開いたまま言語を適用すると開いている画面の文言が切り替わる", async () => {
+    const user = userEvent.setup();
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(screen.getByText("アプリ設定")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "適用" })).toBeInTheDocument();
+
+    await act(async () => {
+      await i18n.changeLanguage("en");
+    });
+
+    expect(screen.getByText("App settings")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apply" })).toBeInTheDocument();
+    expect(screen.queryByText("アプリ設定")).not.toBeInTheDocument();
+
+    // 開いたまま別タブへ移動しても英語のまま
+    await user.click(screen.getByRole("button", { name: "Presets" }));
+    expect(screen.getByText("No saved presets")).toBeInTheDocument();
   });
 });

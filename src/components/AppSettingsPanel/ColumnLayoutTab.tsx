@@ -152,7 +152,7 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
       {!isMobile && (
         <>
           <div className={styles.gridSizeRow}>
-            <span>列数:</span>
+            <span>{t("settings:layout.gridCols")}</span>
             <input
               type="number"
               className={styles.numberInput}
@@ -217,10 +217,10 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
 
       <div className={styles.actions}>
         <button className={styles.cancelBtn} onClick={onCancel}>
-          キャンセル
+          {t("settings:panel.actions.cancel")}
         </button>
         <button className={styles.applyBtn} onClick={() => onApply(draft)}>
-          適用
+          {t("settings:panel.actions.apply")}
         </button>
       </div>
     </div>

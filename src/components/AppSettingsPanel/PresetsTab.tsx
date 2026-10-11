@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { ColumnPreset } from "../../types";
 import styles from "./PresetsTab.module.scss";
 
@@ -15,6 +16,7 @@ export const PresetsTab: React.FC<PresetsTabProps> = ({
   onLoad,
   onDelete,
 }) => {
+  const { t } = useTranslation();
   const [presetName, setPresetName] = useState("");
 
   const handleSave = () => {
@@ -27,12 +29,14 @@ export const PresetsTab: React.FC<PresetsTabProps> = ({
   return (
     <div className={styles.container}>
       <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>現在のレイアウトを保存</h3>
+        <h3 className={styles.sectionTitle}>
+          {t("settings:presets.saveTitle")}
+        </h3>
         <div className={styles.saveRow}>
           <input
             type="text"
             className={styles.nameInput}
-            placeholder="プリセット名を入力"
+            placeholder={t("settings:presets.namePlaceholder")}
             value={presetName}
             onChange={(e) => setPresetName(e.target.value)}
           />
@@ -41,15 +45,17 @@ export const PresetsTab: React.FC<PresetsTabProps> = ({
             onClick={handleSave}
             disabled={!presetName.trim()}
           >
-            現在のレイアウトを保存
+            {t("settings:presets.saveButton")}
           </button>
         </div>
       </section>
 
       <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>保存済みプリセット</h3>
+        <h3 className={styles.sectionTitle}>
+          {t("settings:presets.savedTitle")}
+        </h3>
         {presets.length === 0 ? (
-          <p className={styles.empty}>保存済みプリセットはありません</p>
+          <p className={styles.empty}>{t("settings:presets.empty")}</p>
         ) : (
           <ul className={styles.presetList}>
             {presets.map((preset) => (
@@ -60,13 +66,13 @@ export const PresetsTab: React.FC<PresetsTabProps> = ({
                     className={styles.loadBtn}
                     onClick={() => onLoad(preset.id)}
                   >
-                    読み込む
+                    {t("settings:presets.load")}
                   </button>
                   <button
                     className={styles.deleteBtn}
                     onClick={() => onDelete(preset.id)}
                   >
-                    削除
+                    {t("settings:presets.delete")}
                   </button>
                 </div>
               </li>

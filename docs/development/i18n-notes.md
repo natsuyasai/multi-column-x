@@ -16,7 +16,7 @@
 4. **JSX 内に要素を含む文**（`<strong>` やリンク等）は `<Trans i18nKey="ns:key" components={{ ... }} />`。
 5. **属性**（`title` / `aria-label` / `placeholder` / `alt`）も辞書化する。画面外の `aria-label` も対象。
 6. **React 外**（store・非 hook 関数・通知コールバック）は `import i18n from "@/i18n"` して**呼び出し時に** `i18n.t("ns:key")`。モジュール直下の定数に翻訳結果を入れない（言語切替に追従しなくなる）。メッセージ定数は関数にする。
-7. **純粋関数・constants**: 関数は `t: TFunction`（`import type { TFunction } from "i18next"`）を引数に追加して返す（例: `getPageTypeLabel(input, t)`）。ラベル表は日本語文字列ではなくキーを持つ形にする。テストでは `i18n.t`（ja 固定）を渡す。
+7. **純粋関数・constants**: 関数は `t: AppTFunction`（`import type { AppTFunction } from "@/i18n/types"`）を引数に追加して返す（例: `getPageTypeLabel(input, t)`）。ラベル表は日本語文字列ではなくキーを持つ形にする。テストでは `i18n.t`（ja 固定）を渡す。
 8. **永続化される既定名**（`アカウント N` など保存される値）は、作成時の言語で `i18n.t` して保存する。表示時に導出される文言は表示時に翻訳する。
 9. **翻訳しない**: 製品名「Multi Column X」、`X` / `@ID` / URL / ファイル名、ショートカットキー表記。X の DOM から読み取る・X へ送る文字列。
 10. **日本語文言は一字一句変えない**（日本語表示の回帰ゼロ）。コメント内の日本語は触らない。
@@ -90,8 +90,8 @@ import i18n from "@/i18n";
 const message = () => i18n.t("messages:settingsLoadFailed");
 
 // 純粋関数は t を引数で受ける
-import type { TFunction } from "i18next";
-export function getLabel(type: PageType, t: TFunction): string {
+import type { AppTFunction } from "@/i18n/types";
+export function getLabel(type: PageType, t: AppTFunction): string {
   return t(`columns:pageType.${type}`);
 }
 ```
