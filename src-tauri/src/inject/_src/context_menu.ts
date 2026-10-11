@@ -45,7 +45,11 @@ const OPEN_LINK_POPUP_WINDOW = "open_link_popup_window";
     ].join(";");
 
     const item = document.createElement("div");
-    item.textContent = "ポップアップウィンドウで開く";
+    if (window.__mcxI18n) {
+      window.__mcxI18n.apply(item, "contextMenu.openInPopup");
+    } else {
+      item.textContent = "contextMenu.openInPopup";
+    }
     item.style.cssText = [
       "padding: 8px 16px",
       "cursor: pointer",

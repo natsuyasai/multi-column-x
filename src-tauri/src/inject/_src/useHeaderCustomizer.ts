@@ -27,6 +27,11 @@ function subscribeDomChanges(
   return () => observer.disconnect();
 }
 
+// 画面文言は共有ハブ window.__mcxI18n（i18n.ts）経由で取得する。ハブ未ロード時はキー文字列を返す。
+function tr(key: string): string {
+  return window.__mcxI18n?.t(key) ?? key;
+}
+
 export function useHeaderCustomizer() {
   // visibleLinks は window.__multiColumnXConfig から取得（空配列 = 全リンク表示）
   const visibleLinks: string[] =
@@ -206,7 +211,10 @@ export function useHeaderCustomizer() {
         const svg = composeButtonRef.current.querySelector("svg");
         if (svg) {
           svg.innerHTML = `<path d="${COMPOSE_ICON_PATH}"></path>`;
-          composeButtonRef.current.setAttribute("aria-label", "ポストする");
+          composeButtonRef.current.setAttribute(
+            "aria-label",
+            tr("header.compose"),
+          );
         }
       }
     } else {
@@ -216,7 +224,10 @@ export function useHeaderCustomizer() {
         const svg = composeButtonRef.current.querySelector("svg");
         if (svg) {
           svg.innerHTML = `<path d="${CLOSE_ICON_PATH}"></path>`;
-          composeButtonRef.current.setAttribute("aria-label", "閉じる");
+          composeButtonRef.current.setAttribute(
+            "aria-label",
+            tr("header.close"),
+          );
         }
       }
     }

@@ -3,6 +3,8 @@
 // アカウント一覧の取り扱いは popup_toolbar.test.ts（jsdom URL は https://x.com/ 固定）で
 // 検証済みのため、このファイルでは「X 以外のホストでのツールバー表示」に絞る。
 import { describe, it, expect, vi, beforeEach } from "vitest";
+// 画面文言の共有ハブ（window.__mcxI18n）を読み込む（日本語固定の既定言語で従来の文言を検証する）
+import "./i18n";
 
 const accounts: TvAccountInfo[] = [
   { id: "acc1", label: "アカウント1", color: "#fff", dataDirectory: "dir1" },

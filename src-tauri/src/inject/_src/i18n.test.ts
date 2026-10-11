@@ -112,6 +112,8 @@ describe("inject/i18n", () => {
     };
     for (const key of Object.keys(JA_EXPECTED)) {
       expect(hubEn.t(key)).not.toBe(key);
+      // 英語の辞書に無いキーは ja 辞書へフォールバックするため、日本語のままになっていないことも確認する
+      expect(hubEn.t(key)).not.toBe(JA_EXPECTED[key]);
       expect(probe(hubEn, key)).toEqual(probe(hubJa, key));
     }
   });
