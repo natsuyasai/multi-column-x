@@ -10,7 +10,7 @@ Windows / Linux のデスクトップと Android に対応しています（環�
 
 初めて使うときは、次の順で進めると 5 分ほどで使い始められます。
 
-1. **インストールする** — [Releases](https://github.com/natsuyasai/multi-column-x/releases) から OS に合ったファイルをダウンロードして実行します。Windows で SmartScreen の警告が出た場合は「詳細情報」→「実行」で続行できます。→ [インストール](./install)
+1. **インストールする** — [最新リリースのページ](https://github.com/natsuyasai/multi-column-x/releases/latest) の **Assets** から、OS に合ったファイル（Windows は `.exe`、Linux は `.AppImage`、Android は `.apk`）をダウンロードして実行します。Windows で SmartScreen の警告が出た場合は「詳細情報」→「実行」で続行できます。→ [インストール](./install)
 2. **アカウントを追加する** — ツールバーの「アカウント」ボタン（`Ctrl+Shift+A`）→「＋ アカウントを追加」を押し、開いたウィンドウで X にログインします。→ [アカウントを追加する](./accounts)
 3. **カラムを追加する** — ツールバーの「カラム追加」ボタン（`Ctrl+N`）で、アカウントとページタイプ（ホーム・通知・検索など）を選んで「追加」を押します。→ [カラムを使う](./columns#カラムを使う)
 4. **自動更新と設定を確認する** — 各カラムは既定で自動更新されます。カラムヘッダーの歯車ボタンで更新間隔や表示を、アプリ設定（`Ctrl+,`）で全体の設定を変えられます。→ [カラム個別設定](./columns#カラム個別設定)、[アプリ全体設定](./settings#アプリ全体設定)

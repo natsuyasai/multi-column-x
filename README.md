@@ -60,7 +60,7 @@
 
 ## ダウンロード・インストール
 
-[Releases](https://github.com/natsuyasai/multi-column-x/releases/latest) から OS に合ったファイルをダウンロードして実行してください。
+[最新リリースのページ](https://github.com/natsuyasai/multi-column-x/releases/latest) の **Assets** から、OS に合ったファイル（Windows は `.exe`、Linux は `.AppImage`、Android は `.apk`）をダウンロードして実行してください。
 
 | OS      | 配布物         |
 | ------- | -------------- |
