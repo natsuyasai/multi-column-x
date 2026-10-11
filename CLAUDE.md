@@ -141,7 +141,7 @@ Windows の WebView2 に Chrome 拡張を読み込む機能。`src-tauri/src/com
 
 - 画面文言は `src/locales/{ja,en}/<名前空間>.json` に集約し、`t("ns:key")` の名前空間付き完全キーで参照する（`useTranslation()` は引数なし）。React 外は `i18n.t` を呼び出し時に評価、純粋関数は `t` を引数で受ける。
 - ja と en のキー集合・補間変数は契約テストで一致を保証。辞書の未使用キーも `unusedKeys.contract.test.ts` が失敗にする。
-- 画面コードへの日本語直書きは ESLint で検出する。Rust／inject／Android 由来の文言は PR3 以降で対応中のため当面日本語のまま。
+- 画面コードへの日本語直書きは ESLint（`no-restricted-syntax`）の **error** で検出する（`eslint-disable` を使う場合は理由必須）。PR1/PR2 で React UI（`src`）の文言を辞書化済み。Rust／inject／Android 由来の文言は今後の PR で対応予定で、当面は日本語のまま。
 - 設定 `language`（auto/ja/en）の既定値は Rust `impl Default`・TS・`contracts/default-settings.json` の3点同期（上記の既定値ルールに従う）。
 - 規約・名前空間・用語集・追加手順の詳細は `docs/development/i18n-notes.md` を参照。
 

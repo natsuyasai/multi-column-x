@@ -4,8 +4,8 @@
 
 ## 現状の対応範囲
 
-- React UI（`src` 配下の画面文言）が対象。
-- **Rust／inject／Android 由来の文言は PR3 以降で対応中で、当面は日本語のまま**。Rust が返して UI に出る文字列（バックアップの `error.field` / `error.reason`、拡張機能の結果文言など）も同様。移行対象外なので触らない。
+- React UI（`src` 配下の画面文言）が対象。基盤と設定（PR1）、画面文言の辞書化（PR2）で対応済み。
+- **Rust／inject／Android 由来の文言は今後の PR で対応予定で、当面は日本語のまま**。Rust が返して UI に出る文字列（バックアップの `error.field` / `error.reason`、拡張機能の結果文言など）も同様。移行対象外なので触らない。
 - 対象外: ユーザーガイド、WhatsNew の更新履歴本文。
 
 ## 規約
@@ -22,7 +22,7 @@
 10. **日本語文言は一字一句変えない**（日本語表示の回帰ゼロ）。コメント内の日本語は触らない。
 11. UI 寸法は rem（px 禁止）。
 
-画面コードへの日本語の直書きは ESLint（`no-restricted-syntax`）で検出される。
+画面コードへの日本語の直書きは ESLint（`no-restricted-syntax`）の **error** で検出される（対象は `src` の TS/TSX。テスト・Story・`src/locales`・`src/i18n` は除外）。翻訳対象でない純データなどで `eslint-disable-next-line no-restricted-syntax -- <理由>` を使う場合は、理由を `--` の後ろに必ず書く（原則使わない）。`src/lib/i18nLint.contract.test.ts` が検出とプロジェクト全体の残存 0 件を検査する。
 
 ## 名前空間
 
