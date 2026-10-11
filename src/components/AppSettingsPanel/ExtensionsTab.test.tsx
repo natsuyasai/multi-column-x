@@ -1,14 +1,9 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
-import {
-  ACCOUNT_REQUIRED_TITLE,
-  ADDED_BADGE_TEXT,
-  BROWSER_NOT_FOUND_NOTICE,
-  ExtensionsTab,
-  MISSING_BADGE_TEXT,
-  UNSUPPORTED_NOTICE,
-} from "@/components/AppSettingsPanel/ExtensionsTab";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ExtensionsTab } from "@/components/AppSettingsPanel/ExtensionsTab";
+import i18n from "@/i18n";
+import { expectNoJapanese } from "@/test-utils/japanese";
 import type { DetectResult, ExtensionEntry } from "@/types";
 
 function entry(overrides: Partial<ExtensionEntry> = {}): ExtensionEntry {
@@ -66,7 +61,9 @@ describe("ExtensionsTab", () => {
   it("一部の拡張機能が正しく動作しない場合がある旨の注意が表示される", () => {
     setup();
 
-    expect(screen.getByText(UNSUPPORTED_NOTICE)).toBeInTheDocument();
+    expect(
+      screen.getByText(i18n.t("settings:extensions.unsupportedNotice")),
+    ).toBeInTheDocument();
   });
 
   it("展開済みの拡張機能フォルダを指定すると全アカウントに追加される", async () => {
@@ -171,7 +168,7 @@ describe("ExtensionsTab", () => {
     await user.click(screen.getByRole("button", { name: "ブラウザから検出" }));
 
     expect(
-      await screen.findByText(BROWSER_NOT_FOUND_NOTICE),
+      await screen.findByText(i18n.t("settings:extensions.browserNotFound")),
     ).toBeInTheDocument();
     expect(screen.queryByText("出てはいけない候補")).not.toBeInTheDocument();
   });
@@ -317,7 +314,9 @@ describe("ExtensionsTab", () => {
 
     await user.click(screen.getByRole("button", { name: "ブラウザから検出" }));
 
-    expect(await screen.findByText(ADDED_BADGE_TEXT)).toBeInTheDocument();
+    expect(
+      await screen.findByText(i18n.t("settings:extensions.added")),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "候補1 を追加" })).toBeDisabled();
   });
 
@@ -330,7 +329,9 @@ describe("ExtensionsTab", () => {
       }),
     ]);
 
-    expect(await screen.findByText(MISSING_BADGE_TEXT)).toBeInTheDocument();
+    expect(
+      await screen.findByText(i18n.t("settings:extensions.missing")),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "拡張A のポップアップを開く" }),
     ).toBeDisabled();
@@ -483,9 +484,15 @@ describe("ExtensionsTab", () => {
       name: "拡張A のオプションを開く",
     });
     expect(popup).toBeDisabled();
-    expect(popup).toHaveAttribute("title", ACCOUNT_REQUIRED_TITLE);
+    expect(popup).toHaveAttribute(
+      "title",
+      i18n.t("settings:extensions.accountRequired"),
+    );
     expect(options).toBeDisabled();
-    expect(options).toHaveAttribute("title", ACCOUNT_REQUIRED_TITLE);
+    expect(options).toHaveAttribute(
+      "title",
+      i18n.t("settings:extensions.accountRequired"),
+    );
   });
 
   it("処理中は操作ボタンが無効になり aria-busy が付く", async () => {
@@ -515,5 +522,222 @@ describe("ExtensionsTab", () => {
 
     resolveRemove();
     await waitFor(() => expect(removeBtn).not.toBeDisabled());
+  });
+});
+
+describe("ExtensionsTab 日本語表示の文言", () => {
+  it("追加セクションの説明文と案内が従来と同じ日本語で表示される", () => {
+    setup();
+
+    expect(screen.getByText("拡張機能を追加")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "展開済みの拡張機能フォルダを指定するか、Chrome / Edge にインストール済みの拡張機能から選んで、全アカウントに追加します。",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Chromium 系ブラウザの拡張機能は、通常 %LOCALAPPDATA%\\{組織名}\\{ブラウザ名}\\User Data\\Default\\Extensions\\<拡張ID>\\<バージョン> にあります（組織名のフォルダが無いブラウザもあります）。",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "拡張機能によっては正しく動作しないものがあります。特に、開いているページの内容を検出してツールバーのボタンから操作する種類の拡張機能は、ポップアップを別ウィンドウで開く仕様のため、動作しない場合があります。",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "追加・削除・有効無効を変更すると、全カラムが自動で再読込されます。",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("追加済みの拡張機能はありません"),
+    ).toBeInTheDocument();
+  });
+
+  it("Chrome 由来の拡張機能の由来表示が従来と同じ日本語で表示される", async () => {
+    setup({}, [
+      entry({
+        source: {
+          kind: "chrome",
+          browser: "edge",
+          profile: "Default",
+          chromeId: "abc",
+        },
+      }),
+    ]);
+
+    expect(
+      await screen.findByText("Edge（プロファイル: Default）"),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("ExtensionsTab 英語表示", () => {
+  afterEach(async () => {
+    await act(async () => {
+      await i18n.changeLanguage("ja");
+    });
+  });
+
+  async function useEnglish() {
+    await act(async () => {
+      await i18n.changeLanguage("en");
+    });
+  }
+
+  it("表示言語が英語のとき拡張機能が無い状態に日本語の文言が表示されない", async () => {
+    await useEnglish();
+    setup();
+
+    expect(await screen.findByText("No extensions added")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Detect from browser" }),
+    ).toBeInTheDocument();
+    expectNoJapanese(document.body);
+  });
+
+  it("表示言語が英語のとき追加済みの一覧とボタンの属性に日本語の文言が表示されない", async () => {
+    await useEnglish();
+    setup({}, [
+      entry({ id: "e1", name: "Ext A" }),
+      entry({
+        id: "e2",
+        name: "Ext B",
+        missing: true,
+        source: {
+          kind: "chrome",
+          browser: "edge",
+          profile: "Default",
+          chromeId: "abc",
+        },
+      }),
+    ]);
+
+    expect(await screen.findByText("Ext A")).toBeInTheDocument();
+    expect(screen.getByText("Edge (profile: Default)")).toBeInTheDocument();
+    expect(screen.getByText("Not found")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Open popup of Ext A" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Open options of Ext A" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Delete Ext A" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Enable Ext A")).toBeInTheDocument();
+    expectNoJapanese(document.body);
+  });
+
+  it("表示言語が英語のときアカウント未選択のボタンの title に日本語が表示されない", async () => {
+    await useEnglish();
+    setup({ accountId: null }, [entry({ name: "Ext A" })]);
+
+    const popup = await screen.findByRole("button", {
+      name: "Open popup of Ext A",
+    });
+    expect(popup).toHaveAttribute("title", "Select an account");
+    expectNoJapanese(document.body);
+  });
+
+  it("表示言語が英語のとき検出した候補に日本語の文言が表示されない", async () => {
+    await useEnglish();
+    const { user } = setup({
+      detectChromeExtensions: vi.fn(
+        async (): Promise<DetectResult> => ({
+          browserFound: true,
+          items: [
+            {
+              chromeId: "aaa",
+              profile: "Default",
+              browser: "edge",
+              name: "Candidate A",
+              path: "p",
+              hasPopup: false,
+              hasOptions: false,
+              added: true,
+            },
+            {
+              chromeId: "bbb",
+              profile: "Default",
+              browser: "chrome",
+              name: "Candidate B",
+              path: "p",
+              hasPopup: false,
+              hasOptions: false,
+              added: false,
+            },
+          ],
+        }),
+      ),
+    });
+
+    await user.click(
+      screen.getByRole("button", { name: "Detect from browser" }),
+    );
+
+    expect(
+      await screen.findByText("Browser: Edge · Profile: Default"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Added")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Add Candidate B" }),
+    ).toBeInTheDocument();
+    expectNoJapanese(document.body);
+  });
+
+  it("表示言語が英語のとき候補が無い・ブラウザが見つからない状態に日本語の文言が表示されない", async () => {
+    await useEnglish();
+    const detect = vi
+      .fn<() => Promise<DetectResult>>()
+      .mockResolvedValueOnce({ browserFound: true, items: [] })
+      .mockResolvedValueOnce({ browserFound: false, items: [] });
+    const { user } = setup({ detectChromeExtensions: detect });
+
+    await user.click(
+      screen.getByRole("button", { name: "Detect from browser" }),
+    );
+    expect(await screen.findByText("No candidates")).toBeInTheDocument();
+    expectNoJapanese(document.body);
+
+    await user.click(
+      screen.getByRole("button", { name: "Detect from browser" }),
+    );
+    expect(
+      await screen.findByText("Chrome / Edge not found"),
+    ).toBeInTheDocument();
+    expectNoJapanese(document.body);
+  });
+
+  it("表示言語が英語のとき一覧の取得に失敗した状態でも固定の文言に日本語が表示されない", async () => {
+    await useEnglish();
+    // エラー本文は呼び出し元（ここでは英語のテストデータ）が決めるため、固定の文言だけを検査する
+    setup({
+      listExtensions: vi.fn(async () => {
+        throw new Error("Failed to list extensions");
+      }),
+    });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Failed to list extensions",
+    );
+    expectNoJapanese(document.body);
+  });
+
+  it("画面を開いたまま言語を切り替えると拡張機能タブの文言も切り替わる", async () => {
+    setup({}, [entry({ name: "Ext A" })]);
+    expect(
+      await screen.findByRole("button", { name: "Ext A を削除" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("追加済みの拡張機能")).toBeInTheDocument();
+
+    await useEnglish();
+
+    expect(
+      screen.getByRole("button", { name: "Delete Ext A" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Added extensions")).toBeInTheDocument();
+    expect(screen.queryByText("追加済みの拡張機能")).not.toBeInTheDocument();
   });
 });

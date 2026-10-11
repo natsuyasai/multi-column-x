@@ -2,13 +2,8 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
-import {
-  BackupTab,
-  EXPORT_PRIVACY_NOTICE,
-  NO_CREDENTIALS_NOTICE,
-  REAUTH_HINT,
-  REPLACE_WARNING,
-} from "@/components/AppSettingsPanel/BackupTab";
+import { BackupTab } from "@/components/AppSettingsPanel/BackupTab";
+import i18n from "@/i18n";
 import type { BackupContent, RestoreMapping } from "@/lib/backupRestore";
 import { DEFAULT_COLUMN_SETTINGS, DEFAULT_GLOBAL_SETTINGS } from "@/types";
 import type { Account, Column } from "@/types";
@@ -145,9 +140,11 @@ export const Default: Story = {
   name: "初期表示",
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByText(EXPORT_PRIVACY_NOTICE)).toBeInTheDocument();
     await expect(
-      canvas.getAllByText(NO_CREDENTIALS_NOTICE).length,
+      canvas.getByText(i18n.t("settings:backup.exportPrivacy")),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getAllByText(i18n.t("settings:backup.noCredentials")).length,
     ).toBeGreaterThan(0);
     await userEvent.click(
       canvas.getByRole("button", { name: "バックアップを書き出す" }),
@@ -183,7 +180,9 @@ export const MappingNothingSelected: Story = {
       canvas.getByRole("button", { name: "確認へ進む" }),
     ).toBeEnabled();
     // 端末のアカウント2はXユーザー IDが未取得のため、再認証のヒントが出る
-    await expect(canvas.getByText(REAUTH_HINT)).toBeInTheDocument();
+    await expect(
+      canvas.getByText(i18n.t("settings:backup.reauthHint")),
+    ).toBeInTheDocument();
   },
 };
 
@@ -234,8 +233,12 @@ export const Confirm: Story = {
     await expect(
       canvas.getByText("復元されるカラム 3 件 / スキップ 1 件"),
     ).toBeInTheDocument();
-    await expect(canvas.getByText(REPLACE_WARNING)).toBeInTheDocument();
-    await expect(canvas.getByText(NO_CREDENTIALS_NOTICE)).toBeInTheDocument();
+    await expect(
+      canvas.getByText(i18n.t("settings:backup.replaceWarning")),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByText(i18n.t("settings:backup.noCredentials")),
+    ).toBeInTheDocument();
     await userEvent.click(
       canvas.getByRole("button", { name: "置き換えて復元" }),
     );

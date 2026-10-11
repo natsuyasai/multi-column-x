@@ -1,23 +1,9 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { AppTFunction } from "@/i18n/types";
 import type { ExtensionPageKind } from "@/services/extensions";
 import type { DetectResult, ExtensionBrowser, ExtensionEntry } from "@/types";
 import styles from "./ExtensionsTab.module.scss";
-
-export const ACCOUNT_REQUIRED_TITLE = "アカウントを選択してください";
-export const BROWSER_NOT_FOUND_NOTICE = "Chrome / Edge が見つかりません";
-export const MISSING_BADGE_TEXT = "見つかりません";
-export const ADDED_BADGE_TEXT = "追加済み";
-export const TRUST_NOTICE =
-  "追加した拡張機能は、すべてのアカウントの X ページを読み書きできる場合があります。信頼できるものだけを追加してください。";
-const STORAGE_PATH_GUIDE_LINES = [
-  "Chromium 系ブラウザの拡張機能は、通常 %LOCALAPPDATA%\\{組織名}\\{ブラウザ名}\\User Data\\Default\\Extensions\\<拡張ID>\\<バージョン> にあります（組織名のフォルダが無いブラウザもあります）。",
-  "例: Chrome は %LOCALAPPDATA%\\Google\\Chrome\\User Data\\Default\\Extensions、Edge は %LOCALAPPDATA%\\Microsoft\\Edge\\User Data\\Default\\Extensions です。",
-  "Chrome と Edge は「ブラウザから検出」で自動的に探します。Brave など他のブラウザは、上記の形式のバージョンフォルダを「フォルダを指定して追加」で指定してください。ユーザーデータの場所を変更している場合は、その場所の User Data\\Default\\Extensions 配下を指定してください。",
-];
-export const UNSUPPORTED_NOTICE =
-  "拡張機能によっては正しく動作しないものがあります。特に、開いているページの内容を検出してツールバーのボタンから操作する種類の拡張機能は、ポップアップを別ウィンドウで開く仕様のため、動作しない場合があります。";
-export const RELOAD_NOTICE =
-  "追加・削除・有効無効を変更すると、全カラムが自動で再読込されます。";
 
 interface ExtensionsTabProps {
   /** ポップアップ / オプションを開くアカウント。決まらなければ null */
@@ -52,10 +38,13 @@ const BROWSER_LABELS: Record<ExtensionBrowser, string> = {
   edge: "Edge",
 };
 
-function describeSource(entry: ExtensionEntry): string {
+function describeSource(entry: ExtensionEntry, t: AppTFunction): string {
   if (entry.source.kind === "folder") return entry.source.path;
-  const label = BROWSER_LABELS[entry.source.browser ?? "chrome"];
-  return `${label}（プロファイル: ${entry.source.profile}）`;
+  const browser = BROWSER_LABELS[entry.source.browser ?? "chrome"];
+  return t("settings:extensions.sourceProfile", {
+    browser,
+    profile: entry.source.profile,
+  });
 }
 
 export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
@@ -70,6 +59,7 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
   remove,
   openPage,
 }) => {
+  const { t } = useTranslation();
   const [entries, setEntries] = useState<ExtensionEntry[]>([]);
   const [detected, setDetected] = useState<DetectResult | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -95,6 +85,11 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
   }, [listExtensions]);
 
   const busy = busyKey !== null;
+  const storagePathGuideLines = [
+    t("settings:extensions.storagePath.location"),
+    t("settings:extensions.storagePath.example"),
+    t("settings:extensions.storagePath.others"),
+  ];
 
   /** 処理中表示とエラー表示を共通化する。変更系は成功時のみ再読込を通知する */
   const run = async (
@@ -179,23 +174,24 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
   return (
     <div className={styles.container} aria-busy={busy}>
       <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>拡張機能を追加</h3>
-        <p className={styles.note}>
-          展開済みの拡張機能フォルダを指定するか、Chrome / Edge
-          にインストール済みの拡張機能から選んで、全アカウントに追加します。
-        </p>
+        <h3 className={styles.sectionTitle}>
+          {t("settings:extensions.addTitle")}
+        </h3>
+        <p className={styles.note}>{t("settings:extensions.addNote")}</p>
         <div className={styles.guide}>
-          {STORAGE_PATH_GUIDE_LINES.map((line) => (
+          {storagePathGuideLines.map((line) => (
             <p key={line} className={styles.note}>
               {line}
             </p>
           ))}
         </div>
         <p className={styles.note} role="note">
-          {TRUST_NOTICE}
+          {t("settings:extensions.trustNotice")}
         </p>
-        <p className={styles.note}>{UNSUPPORTED_NOTICE}</p>
-        <p className={styles.note}>{RELOAD_NOTICE}</p>
+        <p className={styles.note}>
+          {t("settings:extensions.unsupportedNotice")}
+        </p>
+        <p className={styles.note}>{t("settings:extensions.reloadNotice")}</p>
         <div className={styles.buttonRow}>
           <button
             type="button"
@@ -203,9 +199,9 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
             onClick={() => void handleDetect()}
             disabled={busy}
             aria-busy={busyKey === DETECT_KEY}
-            aria-label="ブラウザから検出"
+            aria-label={t("settings:extensions.detect")}
           >
-            ブラウザから検出
+            {t("settings:extensions.detect")}
           </button>
           <button
             type="button"
@@ -213,9 +209,9 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
             onClick={() => void handleAddFromFolder()}
             disabled={busy}
             aria-busy={busyKey === PICK_KEY}
-            aria-label="フォルダを指定して追加"
+            aria-label={t("settings:extensions.addFromFolder")}
           >
-            フォルダを指定して追加
+            {t("settings:extensions.addFromFolder")}
           </button>
         </div>
         {error && (
@@ -225,22 +221,32 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
         )}
         {detected && !detected.browserFound && (
           <p role="status" className={`${styles.message} ${styles.warning}`}>
-            {BROWSER_NOT_FOUND_NOTICE}
+            {t("settings:extensions.browserNotFound")}
           </p>
         )}
         {detected?.browserFound && (
-          <ul className={styles.list} aria-label="ブラウザの拡張機能の候補">
+          <ul
+            className={styles.list}
+            aria-label={t("settings:extensions.candidatesLabel")}
+          >
             {detected.items.length === 0 && (
-              <li className={styles.note}>候補はありません</li>
+              <li className={styles.note}>
+                {t("settings:extensions.noCandidates")}
+              </li>
             )}
             {detected.items.map((item) => (
               <li key={item.chromeId} className={styles.row}>
                 <span className={styles.name}>{item.name}</span>
                 <span className={styles.meta}>
-                  {`ブラウザ: ${BROWSER_LABELS[item.browser]}・プロファイル: ${item.profile}`}
+                  {t("settings:extensions.candidateMeta", {
+                    browser: BROWSER_LABELS[item.browser],
+                    profile: item.profile,
+                  })}
                 </span>
                 {item.added && (
-                  <span className={styles.badge}>{ADDED_BADGE_TEXT}</span>
+                  <span className={styles.badge}>
+                    {t("settings:extensions.added")}
+                  </span>
                 )}
                 <button
                   type="button"
@@ -248,9 +254,11 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
                   onClick={() => void handleAddChrome(item.chromeId)}
                   disabled={busy || item.added}
                   aria-busy={busyKey === `chrome:${item.chromeId}`}
-                  aria-label={`${item.name} を追加`}
+                  aria-label={t("settings:extensions.addLabel", {
+                    name: item.name,
+                  })}
                 >
-                  追加
+                  {t("settings:extensions.add")}
                 </button>
               </li>
             ))}
@@ -259,25 +267,36 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
       </section>
 
       <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>追加済みの拡張機能</h3>
+        <h3 className={styles.sectionTitle}>
+          {t("settings:extensions.installedTitle")}
+        </h3>
         {entries.length === 0 ? (
-          <p className={styles.note}>追加済みの拡張機能はありません</p>
+          <p className={styles.note}>
+            {t("settings:extensions.installedEmpty")}
+          </p>
         ) : (
-          <ul className={styles.list} aria-label="追加済みの拡張機能">
+          <ul
+            className={styles.list}
+            aria-label={t("settings:extensions.installedTitle")}
+          >
             {entries.map((entry) => {
               const pageDisabled =
                 busy || !entry.enabled || entry.missing || accountId === null;
               const pageTitle =
-                accountId === null ? ACCOUNT_REQUIRED_TITLE : undefined;
+                accountId === null
+                  ? t("settings:extensions.accountRequired")
+                  : undefined;
               return (
                 <li key={entry.id} className={styles.row}>
                   <div className={styles.nameBlock}>
                     <span className={styles.name}>{entry.name}</span>
-                    <span className={styles.meta}>{describeSource(entry)}</span>
+                    <span className={styles.meta}>
+                      {describeSource(entry, t)}
+                    </span>
                   </div>
                   {entry.missing && (
                     <span className={`${styles.badge} ${styles.badgeWarn}`}>
-                      {MISSING_BADGE_TEXT}
+                      {t("settings:extensions.missing")}
                     </span>
                   )}
                   <label className={styles.toggle}>
@@ -288,9 +307,11 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
                         void handleToggle(entry, e.target.checked)
                       }
                       disabled={busy || entry.missing}
-                      aria-label={`${entry.name} を有効にする`}
+                      aria-label={t("settings:extensions.enableLabel", {
+                        name: entry.name,
+                      })}
                     />
-                    有効
+                    {t("settings:extensions.enabled")}
                   </label>
                   {entry.hasPopup && (
                     <button
@@ -299,9 +320,11 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
                       onClick={() => void handleOpen(entry, "popup")}
                       disabled={pageDisabled}
                       title={pageTitle}
-                      aria-label={`${entry.name} のポップアップを開く`}
+                      aria-label={t("settings:extensions.openPopupLabel", {
+                        name: entry.name,
+                      })}
                     >
-                      ポップアップを開く
+                      {t("settings:extensions.openPopup")}
                     </button>
                   )}
                   {entry.hasOptions && (
@@ -311,9 +334,11 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
                       onClick={() => void handleOpen(entry, "options")}
                       disabled={pageDisabled}
                       title={pageTitle}
-                      aria-label={`${entry.name} のオプションを開く`}
+                      aria-label={t("settings:extensions.openOptionsLabel", {
+                        name: entry.name,
+                      })}
                     >
-                      オプションを開く
+                      {t("settings:extensions.openOptions")}
                     </button>
                   )}
                   <button
@@ -322,9 +347,11 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
                     onClick={() => void handleRemove(entry)}
                     disabled={busy}
                     aria-busy={busyKey === `remove:${entry.id}`}
-                    aria-label={`${entry.name} を削除`}
+                    aria-label={t("settings:extensions.removeLabel", {
+                      name: entry.name,
+                    })}
                   >
-                    削除
+                    {t("settings:extensions.remove")}
                   </button>
                 </li>
               );

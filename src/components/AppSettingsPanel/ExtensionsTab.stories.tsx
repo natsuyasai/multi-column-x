@@ -2,14 +2,8 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { expect, fn, userEvent, waitFor, within } from "storybook/test";
-import {
-  ADDED_BADGE_TEXT,
-  BROWSER_NOT_FOUND_NOTICE,
-  ExtensionsTab,
-  MISSING_BADGE_TEXT,
-  TRUST_NOTICE,
-  UNSUPPORTED_NOTICE,
-} from "@/components/AppSettingsPanel/ExtensionsTab";
+import { ExtensionsTab } from "@/components/AppSettingsPanel/ExtensionsTab";
+import i18n from "@/i18n";
 import type { DetectResult, ExtensionEntry } from "@/types";
 
 const folderExtension: ExtensionEntry = {
@@ -178,11 +172,17 @@ export const Default: Story = {
     await expect(
       await canvas.findByText("フォルダから追加した拡張"),
     ).toBeInTheDocument();
-    await expect(canvas.getByText(MISSING_BADGE_TEXT)).toBeInTheDocument();
+    await expect(
+      canvas.getByText(i18n.t("settings:extensions.missing")),
+    ).toBeInTheDocument();
     // 追加時の信頼に関する注意が表示される
-    await expect(canvas.getByRole("note")).toHaveTextContent(TRUST_NOTICE);
+    await expect(canvas.getByRole("note")).toHaveTextContent(
+      i18n.t("settings:extensions.trustNotice"),
+    );
     // 一部の拡張機能が動作しない旨の注意が表示される
-    await expect(canvas.getByText(UNSUPPORTED_NOTICE)).toBeInTheDocument();
+    await expect(
+      canvas.getByText(i18n.t("settings:extensions.unsupportedNotice")),
+    ).toBeInTheDocument();
     // ポップアップを持たない拡張には「ポップアップを開く」が出ない
     await expect(
       canvas.queryByRole("button", {
@@ -211,7 +211,9 @@ export const ChromeCandidates: Story = {
       canvas.getByRole("button", { name: "ブラウザから検出" }),
     );
     await expect(await canvas.findByText("未追加の候補")).toBeInTheDocument();
-    await expect(canvas.getByText(ADDED_BADGE_TEXT)).toBeInTheDocument();
+    await expect(
+      canvas.getByText(i18n.t("settings:extensions.added")),
+    ).toBeInTheDocument();
     // 候補に由来ブラウザ名が表示される
     await expect(
       canvas.getByText("Edge由来の候補").closest("li"),
@@ -268,7 +270,7 @@ export const ChromeNotFound: Story = {
       canvas.getByRole("button", { name: "ブラウザから検出" }),
     );
     await expect(
-      await canvas.findByText(BROWSER_NOT_FOUND_NOTICE),
+      await canvas.findByText(i18n.t("settings:extensions.browserNotFound")),
     ).toBeInTheDocument();
   },
 };
@@ -298,7 +300,7 @@ export const MissingBadge: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(
-      await canvas.findByText(MISSING_BADGE_TEXT),
+      await canvas.findByText(i18n.t("settings:extensions.missing")),
     ).toBeInTheDocument();
     await expect(
       canvas.getByRole("button", {

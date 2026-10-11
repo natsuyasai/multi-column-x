@@ -205,5 +205,74 @@
     "enabled": "H.264: 有効化済み",
     "enableHint": "動画の再生に必要なデコーダを取得します",
     "hardwareDecode": "ハードウェアデコードを使う（VA-API）"
+  },
+  "extensions": {
+    "addTitle": "拡張機能を追加",
+    "addNote": "展開済みの拡張機能フォルダを指定するか、Chrome / Edge にインストール済みの拡張機能から選んで、全アカウントに追加します。",
+    "storagePath": {
+      "location": "Chromium 系ブラウザの拡張機能は、通常 %LOCALAPPDATA%\\{組織名}\\{ブラウザ名}\\User Data\\Default\\Extensions\\<拡張ID>\\<バージョン> にあります（組織名のフォルダが無いブラウザもあります）。",
+      "example": "例: Chrome は %LOCALAPPDATA%\\Google\\Chrome\\User Data\\Default\\Extensions、Edge は %LOCALAPPDATA%\\Microsoft\\Edge\\User Data\\Default\\Extensions です。",
+      "others": "Chrome と Edge は「ブラウザから検出」で自動的に探します。Brave など他のブラウザは、上記の形式のバージョンフォルダを「フォルダを指定して追加」で指定してください。ユーザーデータの場所を変更している場合は、その場所の User Data\\Default\\Extensions 配下を指定してください。"
+    },
+    "trustNotice": "追加した拡張機能は、すべてのアカウントの X ページを読み書きできる場合があります。信頼できるものだけを追加してください。",
+    "unsupportedNotice": "拡張機能によっては正しく動作しないものがあります。特に、開いているページの内容を検出してツールバーのボタンから操作する種類の拡張機能は、ポップアップを別ウィンドウで開く仕様のため、動作しない場合があります。",
+    "reloadNotice": "追加・削除・有効無効を変更すると、全カラムが自動で再読込されます。",
+    "detect": "ブラウザから検出",
+    "addFromFolder": "フォルダを指定して追加",
+    "browserNotFound": "Chrome / Edge が見つかりません",
+    "candidatesLabel": "ブラウザの拡張機能の候補",
+    "noCandidates": "候補はありません",
+    "candidateMeta": "ブラウザ: {{browser}}・プロファイル: {{profile}}",
+    "added": "追加済み",
+    "add": "追加",
+    "addLabel": "{{name}} を追加",
+    "installedTitle": "追加済みの拡張機能",
+    "installedEmpty": "追加済みの拡張機能はありません",
+    "sourceProfile": "{{browser}}（プロファイル: {{profile}}）",
+    "missing": "見つかりません",
+    "enabled": "有効",
+    "enableLabel": "{{name}} を有効にする",
+    "openPopup": "ポップアップを開く",
+    "openPopupLabel": "{{name}} のポップアップを開く",
+    "openOptions": "オプションを開く",
+    "openOptionsLabel": "{{name}} のオプションを開く",
+    "accountRequired": "アカウントを選択してください",
+    "remove": "削除",
+    "removeLabel": "{{name}} を削除"
+  },
+  "backup": {
+    "noCredentials": "このバックアップにはログイン情報は含まれません。復元先で事前にログインしてください",
+    "exportPrivacy": "バックアップファイルにはアカウント名・NGワード・リポスト非表示ユーザーなどの個人情報が含まれます。共有・保管するときは取り扱いに注意してください。",
+    "reauthHint": "Xユーザー IDが未取得のアカウントは自動で候補を選べません。該当アカウントを再認証すると自動候補が効くようになります。",
+    "saveBlocked": "設定を読み込めていないため、バックアップの読み込みと復元はできません。アプリを再起動してください。",
+    "replaceWarning": "現在のカラムと設定（ウィンドウ位置を除く）はすべてバックアップの内容に置き換わります。アカウントは置き換わりません。復元直前の設定は自動で退避されます。",
+    "confirm": {
+      "title": "復元の確認",
+      "summary": "復元されるカラム {{restore}} 件 / スキップ {{skip}} 件",
+      "back": "戻る",
+      "execute": "置き換えて復元"
+    },
+    "export": {
+      "title": "バックアップを作成",
+      "note": "アカウント情報（名前・色）・カラム構成・設定を1つのファイルに書き出します。",
+      "button": "バックアップを書き出す"
+    },
+    "restore": {
+      "title": "バックアップから復元",
+      "pickFile": "バックアップファイルを選択"
+    },
+    "mapping": {
+      "title": "アカウントの紐づけ",
+      "note": "バックアップ内のアカウントごとに、復元先のログイン済みアカウントを選んでください。 「復元しない」を選んだアカウントのカラムは復元されません。",
+      "noTargets": "復元先にログイン済みのアカウントがありません。先にアカウントを追加してください。",
+      "columnCount_one": "カラム {{count}} 件",
+      "columnCount_other": "カラム {{count}} 件",
+      "targetLabel": "{{name}} の復元先",
+      "skipOption": "復元しない",
+      "shared": "同じ復元先に複数のバックアップ内アカウントが割り当てられています（{{names}}）。意図した紐づけか確認してください。",
+      "nameSeparator": "、",
+      "none": "紐づけが1件もないため復元できません。復元先を1つ以上選んでください。",
+      "proceed": "確認へ進む"
+    }
   }
 }

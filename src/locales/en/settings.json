@@ -205,5 +205,74 @@
     "enabled": "H.264: Enabled",
     "enableHint": "Gets the decoder needed to play videos.",
     "hardwareDecode": "Use hardware decoding (VA-API)"
+  },
+  "extensions": {
+    "addTitle": "Add extensions",
+    "addNote": "Specify an unpacked extension folder, or pick from extensions already installed in Chrome / Edge, to add them to all accounts.",
+    "storagePath": {
+      "location": "Extensions for Chromium-based browsers are usually located at %LOCALAPPDATA%\\{organization}\\{browser}\\User Data\\Default\\Extensions\\<extension ID>\\<version> (some browsers have no organization folder).",
+      "example": "Example: Chrome is at %LOCALAPPDATA%\\Google\\Chrome\\User Data\\Default\\Extensions, and Edge is at %LOCALAPPDATA%\\Microsoft\\Edge\\User Data\\Default\\Extensions.",
+      "others": "Chrome and Edge are found automatically with \"Detect from browser\". For other browsers such as Brave, specify a version folder in the format above with \"Add from folder\". If you have changed the user data location, specify the User Data\\Default\\Extensions folder under that location."
+    },
+    "trustNotice": "Added extensions may be able to read and modify X pages for all accounts. Only add extensions you trust.",
+    "unsupportedNotice": "Some extensions may not work correctly. In particular, extensions that detect the content of the open page and are used from a toolbar button may not work, because their popups open in a separate window.",
+    "reloadNotice": "Adding, removing, or enabling/disabling extensions automatically reloads all columns.",
+    "detect": "Detect from browser",
+    "addFromFolder": "Add from folder",
+    "browserNotFound": "Chrome / Edge not found",
+    "candidatesLabel": "Browser extension candidates",
+    "noCandidates": "No candidates",
+    "candidateMeta": "Browser: {{browser}} · Profile: {{profile}}",
+    "added": "Added",
+    "add": "Add",
+    "addLabel": "Add {{name}}",
+    "installedTitle": "Added extensions",
+    "installedEmpty": "No extensions added",
+    "sourceProfile": "{{browser}} (profile: {{profile}})",
+    "missing": "Not found",
+    "enabled": "Enabled",
+    "enableLabel": "Enable {{name}}",
+    "openPopup": "Open popup",
+    "openPopupLabel": "Open popup of {{name}}",
+    "openOptions": "Open options",
+    "openOptionsLabel": "Open options of {{name}}",
+    "accountRequired": "Select an account",
+    "remove": "Delete",
+    "removeLabel": "Delete {{name}}"
+  },
+  "backup": {
+    "noCredentials": "This backup does not include login information. Log in on the destination beforehand.",
+    "exportPrivacy": "Backup files contain personal information such as account names, muted words, and users whose reposts are hidden. Be careful when sharing or storing them.",
+    "reauthHint": "Accounts without a known X user ID can't be matched automatically. Re-authenticate those accounts to enable automatic suggestions.",
+    "saveBlocked": "Settings could not be loaded, so loading and restoring backups is unavailable. Please restart the app.",
+    "replaceWarning": "All current columns and settings (except window position) will be replaced with the backup contents. Accounts are not replaced. Your settings just before restoring are backed up automatically.",
+    "confirm": {
+      "title": "Confirm restore",
+      "summary": "Columns to restore: {{restore}} / Skipped: {{skip}}",
+      "back": "Back",
+      "execute": "Replace and restore"
+    },
+    "export": {
+      "title": "Create a backup",
+      "note": "Exports account info (names and colors), column layout, and settings to a single file.",
+      "button": "Export backup"
+    },
+    "restore": {
+      "title": "Restore from backup",
+      "pickFile": "Select backup file"
+    },
+    "mapping": {
+      "title": "Link accounts",
+      "note": "For each account in the backup, choose a logged-in account to restore to. Columns of accounts set to \"Don't restore\" will not be restored.",
+      "noTargets": "There are no logged-in accounts to restore to. Add an account first.",
+      "columnCount_one": "{{count}} column",
+      "columnCount_other": "{{count}} columns",
+      "targetLabel": "Restore destination for {{name}}",
+      "skipOption": "Don't restore",
+      "shared": "Multiple accounts in the backup are assigned to the same destination ({{names}}). Check that this is intended.",
+      "nameSeparator": ", ",
+      "none": "Nothing is linked, so nothing can be restored. Choose at least one destination.",
+      "proceed": "Continue to confirmation"
+    }
   }
 }
