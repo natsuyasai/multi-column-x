@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { isAutoReloadSupported } from "@/lib/autoReloadTarget";
 import { nextColumnSettingsOnSmallImageChange } from "@/lib/scrollRestoreSetting";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
@@ -47,6 +48,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   onReload,
   isMobile,
 }) => {
+  const { t } = useTranslation();
   useEscapeKey(onClose);
 
   const isExternal = column.pageType === "external";
@@ -97,11 +99,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     <div className={styles.overlay}>
       <div className={styles.panel}>
         <div className={styles.header}>
-          <h2 className={styles.title}>カラム設定</h2>
+          <h2 className={styles.title}>{t("columnSettings:title")}</h2>
           <button
             className={styles.closeBtn}
             onClick={onClose}
-            aria-label="閉じる"
+            aria-label={t("columnSettings:close")}
           >
             ✕
           </button>
@@ -109,21 +111,23 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
         <form onSubmit={handleSubmit} className={styles.form}>
           <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>カラム</h3>
+            <h3 className={styles.sectionTitle}>
+              {t("columnSettings:column.title")}
+            </h3>
             <label className={styles.fieldLabelBlock}>
-              表示名
+              {t("columnSettings:column.label")}
               <input
                 type="text"
                 className={styles.labelInput}
                 value={labelText}
                 onChange={(e) => setLabelText(e.target.value)}
                 maxLength={COLUMN_LABEL_MAX_LENGTH}
-                placeholder="未指定の場合は既定の表示名"
+                placeholder={t("columnSettings:column.labelPlaceholder")}
               />
             </label>
             {!isMobile && (
               <label className={styles.fieldLabel}>
-                幅（px）
+                {t("columnSettings:column.width")}
                 <input
                   type="number"
                   className={styles.numberInput}
@@ -165,15 +169,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 text={lineListTexts.ngWords}
                 error={lineListErrors.ngWords}
                 onChange={(value) =>
-                  setLineListTexts((t) => ({ ...t, ngWords: value }))
+                  setLineListTexts((prev) => ({ ...prev, ngWords: value }))
                 }
               />
               <RepostHiddenUsersSection
                 text={lineListTexts.repostHiddenUserIds}
                 error={lineListErrors.repostHiddenUserIds}
                 onChange={(value) =>
-                  setLineListTexts((t) => ({
-                    ...t,
+                  setLineListTexts((prev) => ({
+                    ...prev,
                     repostHiddenUserIds: value,
                   }))
                 }
@@ -182,7 +186,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 text={lineListTexts.whitelistWords}
                 error={lineListErrors.whitelistWords}
                 onChange={(value) =>
-                  setLineListTexts((t) => ({ ...t, whitelistWords: value }))
+                  setLineListTexts((prev) => ({
+                    ...prev,
+                    whitelistWords: value,
+                  }))
                 }
                 settings={settings}
                 updateSetting={updateSetting}
@@ -202,7 +209,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   onReload(column.id);
                 }}
               >
-                再読み込み
+                {t("columnSettings:actions.reload")}
               </button>
             )}
             <button
@@ -210,10 +217,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               className={styles.cancelBtn}
               onClick={onClose}
             >
-              キャンセル
+              {t("columnSettings:actions.cancel")}
             </button>
             <button type="submit" className={styles.applyBtn}>
-              適用
+              {t("columnSettings:actions.apply")}
             </button>
           </div>
         </form>

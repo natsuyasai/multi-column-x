@@ -1,0 +1,70 @@
+{
+  "title": "Column settings",
+  "close": "Close",
+  "column": {
+    "title": "Column",
+    "label": "Display name",
+    "labelPlaceholder": "Leave blank to use the default name",
+    "width": "Width (px)"
+  },
+  "autoReload": {
+    "title": "Auto-reload",
+    "enable": "Enable auto-reload",
+    "interval": "Reload interval (seconds)",
+    "showCountdown": "Show countdown"
+  },
+  "display": {
+    "title": "Display",
+    "hideHeader": "Hide the header",
+    "hideTweetInput": "Hide the post box",
+    "showCustomMenu": "Show the custom menu button",
+    "scrollPosRestore": "Restore scroll position after viewing photos",
+    "returnToLastRead": "Show a button to return to where you left off after reloading"
+  },
+  "image": {
+    "title": "Images",
+    "small": "Shrink images",
+    "width": "Width (e.g. 50%, 200px)"
+  },
+  "imageBlur": {
+    "title": "Image blur",
+    "enable": "Blur images",
+    "amount": "Blur amount (e.g. 10px)",
+    "hint": "Right-click (desktop) or long-press (mobile) to remove the blur"
+  },
+  "notification": {
+    "title": "Notifications",
+    "desktopNotify": "Show desktop notifications for new posts"
+  },
+  "ngWords": {
+    "title": "Muted words",
+    "helpLabel": "How to write muted words",
+    "helpLine": "Enter one word per line.",
+    "helpRegex": "Entering <code>/pattern/flags</code> treats it as a regular expression (case-insensitive).",
+    "helpExample": "Example: /spam|ads/",
+    "placeholder": "One word per line (/regex/flags is also supported)"
+  },
+  "repostHidden": {
+    "title": "Users whose reposts are hidden",
+    "placeholder": "One user ID per line",
+    "hint": "One user ID per line (the part after @). Reposts by these users are hidden"
+  },
+  "whitelist": {
+    "title": "Allowlist",
+    "helpLabel": "How to write the allowlist",
+    "helpPurpose": "Only posts containing the specified words are shown (the opposite of muted words).",
+    "helpLine": "Enter one word per line.",
+    "helpRegex": "Entering <code>/pattern/flags</code> treats it as a regular expression (case-insensitive).",
+    "enable": "Enable the allowlist",
+    "placeholder": "One word per line (/regex/flags is also supported, allowlist)"
+  },
+  "customCss": {
+    "title": "Custom CSS",
+    "placeholder": "/* Enter custom CSS */"
+  },
+  "actions": {
+    "reload": "Reload",
+    "cancel": "Cancel",
+    "apply": "Apply"
+  }
+}

@@ -61,6 +61,11 @@
 | 表示サイズ                                 | Display size                                 |
 | 端末に合わせる                             | Match device                                 |
 | 小／標準／大／特大                         | Small／Standard／Large／Extra large          |
+| ホワイトリスト                             | Allowlist                                    |
+| 投稿欄                                     | Post box                                     |
+| アカウントの紐づけ                         | Link accounts                                |
+| 復元しない                                 | Don't restore                               |
+| 公式設定                                   | Official settings                            |
 
 用語集にない語を訳したら、ここに追記して統一する。
 
