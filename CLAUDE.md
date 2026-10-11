@@ -137,6 +137,14 @@ X内部APIのレート制限ヘッダをツールバーのポップオーバー�
 
 Windows の WebView2 に Chrome 拡張を読み込む機能。`src-tauri/src/commands/extensions/`、`src/components/AppSettingsPanel/ExtensionsTab.tsx`、`src/lib/extensionsSupport.ts`、`commands/webview/{column,compose,popup}.rs` を変更する場合は `docs/development/browser-extensions-notes.md` を参照（macOS / Linux を見送った理由もそこ）。**アカウントの data_directory を使う全 WebView builder に `#[cfg(windows)]` で `.browser_extensions_enabled(true)` が必須**（食い違うと `ERROR_INVALID_STATE`。契約テストが検査する）。コマンドの追加・削除は `build.rs` / `default.json` / `lib.rs` の `generate_handler!` の 3 点同時更新（上節の ACL）で、`column-webview.json` には足さない。状態は `settings.json` の `browserExtensions` キー（`appSettings` とは別。バックアップ対象外）に持ち、保存は `save_store_atomically` を使う。手動テスト項目は `docs/development/browser-extensions/integration-test.md`。
 
+### 多言語対応（i18n）
+
+- 画面文言は `src/locales/{ja,en}/<名前空間>.json` に集約し、`t("ns:key")` の名前空間付き完全キーで参照する（`useTranslation()` は引数なし）。React 外は `i18n.t` を呼び出し時に評価、純粋関数は `t` を引数で受ける。
+- ja と en のキー集合・補間変数は契約テストで一致を保証。辞書の未使用キーも `unusedKeys.contract.test.ts` が失敗にする。
+- 画面コードへの日本語直書きは ESLint で検出する。Rust／inject／Android 由来の文言は PR3 以降で対応中のため当面日本語のまま。
+- 設定 `language`（auto/ja/en）の既定値は Rust `impl Default`・TS・`contracts/default-settings.json` の3点同期（上記の既定値ルールに従う）。
+- 規約・名前空間・用語集・追加手順の詳細は `docs/development/i18n-notes.md` を参照。
+
 ### フロントエンドの品質ツール（ESLint / Storybook / プロパティテスト）
 
 - **ESLint**（flat config: `eslint.config.js`）はフロント `src` の TS/TSX のみを対象にする。`import-x/order` で import 順を統一し、`@/` は internal グループ。`npm run lint` / 自動整列は `npm run lint:fix`。
