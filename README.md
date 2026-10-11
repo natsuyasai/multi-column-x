@@ -21,7 +21,8 @@
 <p align="center">
   <a href="https://github.com/natsuyasai/multi-column-x/releases/latest">ダウンロード</a> ·
   <a href="https://natsuyasai.github.io/multi-column-x/">利用ガイド</a> ·
-  <a href="docs/development/README.md">開発ノート</a>
+  <a href="docs/development/README.md">開発ノート</a> ·
+  <a href="README.en.md">English</a>
 </p>
 
 <p align="center">
