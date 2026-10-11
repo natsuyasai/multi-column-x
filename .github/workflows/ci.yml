@@ -1,9 +1,9 @@
 name: CI
 
 on:
-  push:
-    branches: [main, develop]
+  # マージ前の pull_request で検証するため、マージ後の push では二重実行しない
   pull_request:
+  workflow_dispatch:
 
 jobs:
   frontend:
