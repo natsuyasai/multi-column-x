@@ -5,7 +5,7 @@
 ## 現状の対応範囲
 
 - React UI（`src` 配下の画面文言）が対象。基盤と設定（PR1）、画面文言の辞書化（PR2）、Rust 由来の文言（PR3。下記「Rust 由来の文言」）、inject の文言（PR4。下記「inject の文言」）で対応済み。
-- inject の文言も対応済み。**Android ネイティブ由来の文言は今後の PR で対応予定で、当面は日本語のまま**。
+- inject の文言も対応済み。Android ネイティブの文言（動画ダウンロード通知）も対応済みで、**アプリ内の `language` 設定ではなく端末の言語に従う**（日本語端末は日本語、それ以外は英語。下記「Android ネイティブの文言」）。
 - 対象外: ユーザーガイド、WhatsNew の更新履歴本文。
 
 ## 規約
@@ -149,3 +149,9 @@ Rust は**日本語・英語の文章を返さない**。ユーザーに見え�
 ### 3. 開発者向けログ
 
 - `log::*!`・`eprintln!`・`warn_before_logger_ready`・`expect`・`panic!` のメッセージは**固定の英語**（言語切替には追従しない）。Rust の契約テスト `src-tauri/src/log_language_contract.rs` が日本語を含むログを検出する。コメントは日本語のままでよい。
+
+## Android ネイティブの文言
+
+- Android ネイティブで利用者に見える文言（動画ダウンロード通知: タイトル・準備中・進捗本文・チャンネル名・チャンネル説明）は Android 標準の文字列リソースで管理する。既定（英語）は `src-tauri/gen/android/app/src/main/res/values/strings.xml`、日本語は `res/values-ja/strings.xml`。
+- 言語は **端末のロケールに従い、アプリ内の `language` 設定とは独立**（通知は Service から OS が解決するため）。コードからは `getString(R.string.…)`、書式付きは位置指定子（`%1$d`）で渡す。
+- 追加手順・テスト（キー集合／書式指定子の一致、既定側に日本語なし、直書き検出）は `docs/development/android-notes.md` の「文字列リソース（多言語）」を参照。
