@@ -87,7 +87,8 @@ jobs:
         run: |
           git fetch --tags --force
           current="${{ steps.create_tag.outputs.tag }}"
-          mapfile -t tags < <(git tag --sort=-version:refname)
+          # 検証用の -temp- タグは比較起点にしない（正式リリースタグ間の差分でノートを作る）
+          mapfile -t tags < <(git tag --sort=-version:refname | grep -v -- '-temp-' || true)
           prev=""
           if printf '%s\n' "${tags[@]}" | grep -qx "$current"; then
             found=0
