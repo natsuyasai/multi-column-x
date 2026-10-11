@@ -519,6 +519,25 @@ describe("inject/return_to_last_read", () => {
       expect(closeBtn?.style.lineHeight).toBe("1");
     });
 
+    it("閉じるボタンと戻るボタンはタップしやすい48px以上の大きさで表示される", async () => {
+      const tablist = addTablist();
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["1", "2", "3", "4", "5"]);
+
+      await importReturnToLastRead({ enabled: true });
+      window.__multiColumnX.triggerReload?.();
+
+      setTimeline(section, ["100", "1", "2", "3", "4"]);
+      window.dispatchEvent(new Event("scroll"));
+
+      const closeBtn = getCloseButton();
+      expect(closeBtn?.style.width).toBe("48px");
+      expect(closeBtn?.style.height).toBe("48px");
+      const btn = document.getElementById("mcx-return-to-last-read");
+      expect(btn?.style.minHeight).toBe("48px");
+    });
+
     it("戻るボタンが表示されているときはその隣に閉じるボタンが表示される", async () => {
       const tablist = addTablist();
       addTab(tablist, "おすすめ", true);
