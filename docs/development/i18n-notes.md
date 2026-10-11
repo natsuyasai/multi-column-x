@@ -4,8 +4,8 @@
 
 ## 現状の対応範囲
 
-- React UI（`src` 配下の画面文言）が対象。基盤と設定（PR1）、画面文言の辞書化（PR2）、Rust 由来の文言（PR3。下記「Rust 由来の文言」）で対応済み。
-- **inject／Android 由来の文言は今後の PR で対応予定で、当面は日本語のまま**。
+- React UI（`src` 配下の画面文言）が対象。基盤と設定（PR1）、画面文言の辞書化（PR2）、Rust 由来の文言（PR3。下記「Rust 由来の文言」）、inject の文言（PR4。下記「inject の文言」）で対応済み。
+- inject の文言も対応済み。**Android ネイティブ由来の文言は今後の PR で対応予定で、当面は日本語のまま**。
 - 対象外: ユーザーガイド、WhatsNew の更新履歴本文。
 
 ## 規約
@@ -117,6 +117,14 @@ expectNoJapanese(container);
 ```
 
 テスト後は `i18n.changeLanguage("ja")` で言語を戻すこと。
+
+## inject の文言（PR4）
+
+カラム／ポップアップ WebView に注入する自前 UI の文言は、i18next ではなく注入側専用のハブ `window.__mcxI18n`（`src-tauri/src/inject/_src/i18n.ts`）で切り替える。詳細・辞書の追加手順は `docs/development/inject-ipc-shortcuts-notes.md` の「多言語（`__mcxI18n`）」を参照。
+
+- 各 inject エントリは `window.__mcxI18n.t("key")` / `apply(...)` で文言を引く（ES import は使わない）。
+- X の画面と照合するための日本語（`広告`、`通知タイムライン` など）は翻訳せず、契約テスト `i18n.contract.test.ts` の許可リストに理由付きで載せる。
+- 表示言語を切り替えると開いているカラムへ即時反映される（`WEBVIEW_SCRIPTS.setInjectLanguage`）。ポップアップは作成時の言語のまま。
 
 ## Rust 由来の文言（PR3）
 

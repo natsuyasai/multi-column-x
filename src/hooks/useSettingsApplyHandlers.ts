@@ -3,6 +3,11 @@
 import { useCallback } from "react";
 import { WEBVIEW_SCRIPTS } from "@/constants/ipc";
 import { getMql } from "@/hooks/useTheme";
+import {
+  getOsLocale,
+  normalizeLanguageSetting,
+  resolveLanguage,
+} from "@/lib/language";
 import { resolveTheme } from "@/lib/theme";
 import {
   applyColumnSettingsScripts,
@@ -75,6 +80,17 @@ export function useSettingsApplyHandlers({
         const { columns: currentColumns } = useAppStore.getState();
         currentColumns.forEach((col) => {
           evalInColumn(col.id, WEBVIEW_SCRIPTS.applyNightModeCookie(nightMode));
+        });
+      }
+      if (patch.language !== undefined) {
+        // 開いているカラムの注入UIの表示言語を即時に切り替える（ポップアップは作成時の言語のまま）
+        const lang = resolveLanguage(
+          normalizeLanguageSetting(patch.language),
+          getOsLocale(),
+        );
+        const { columns: currentColumns } = useAppStore.getState();
+        currentColumns.forEach((col) => {
+          evalInColumn(col.id, WEBVIEW_SCRIPTS.setInjectLanguage(lang));
         });
       }
     },

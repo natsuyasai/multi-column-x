@@ -9,6 +9,8 @@ import {
   buildLongPressVideoUrl,
   buildLongPressIStatusVideoUrl,
 } from "./video_long_press_menu";
+// 画面文言の共有ハブ（window.__mcxI18n）を読み込む（日本語固定の既定言語で従来の文言を検証する）
+import "./i18n";
 
 const postMessageMock = vi.fn();
 const invokeMock = vi.fn((_cmd: string, _args?: Record<string, unknown>) =>
@@ -472,5 +474,60 @@ describe("inject/video_long_press_menu のポップアップメニュー項目",
     expect(invokeMock).toHaveBeenCalledWith("open_popup_window", {
       url: "https://x.com/carol/status/555/video/2",
     });
+  });
+});
+
+/** かな・カタカナ・漢字を1文字でも含むか（英語表示の検証用） */
+function containsJapanese(text: string): boolean {
+  return /[\u3040-\u30ff\u4e00-\u9fff]/.test(text);
+}
+
+describe("inject/video_long_press_menu の表示言語", () => {
+  beforeEach(() => {
+    postMessageMock.mockClear();
+    document
+      .querySelectorAll('[data-testid="videoComponent"]')
+      .forEach((el) => el.remove());
+    getMenu()?.remove();
+    window.__mcxVideoDownloadBridge = { postMessage: postMessageMock };
+    setConfig({ videoPopupEnabled: true });
+  });
+
+  afterEach(() => {
+    delete window.__mcxVideoDownloadBridge;
+    getMenu()?.remove();
+    window.__mcxI18n?.setLang("ja");
+  });
+
+  function itemTexts(): string[] {
+    const menu = getMenu();
+    if (!menu) throw new Error("menu not found");
+    return Array.from(menu.children).map((c) => c.textContent ?? "");
+  }
+
+  it("日本語のときメニュー項目は従来と同じ文言になる", async () => {
+    await importLongPressMenu();
+    const videoEl = createVideoComponent();
+    attachFiber(videoEl, PLAYER_PROPS);
+
+    dispatchContextMenu(videoEl);
+
+    expect(itemTexts()).toEqual([
+      "動画をダウンロード",
+      "動画をポップアップで表示",
+    ]);
+  });
+
+  it("表示言語が英語のときメニュー項目が英語になり日本語を含まない", async () => {
+    window.__mcxI18n?.setLang("en");
+    await importLongPressMenu();
+    const videoEl = createVideoComponent();
+    attachFiber(videoEl, PLAYER_PROPS);
+
+    dispatchContextMenu(videoEl);
+
+    const texts = itemTexts();
+    expect(texts).toEqual(["Download video", "Show video in popup"]);
+    expect(texts.some(containsJapanese)).toBe(false);
   });
 });

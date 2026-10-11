@@ -25,13 +25,17 @@ import {
   type SearchDeps,
 } from "./return_to_last_read_logic";
 
+// 画面文言は共有ハブ window.__mcxI18n（i18n.ts）経由で取得する。ハブ未ロード時はキー文字列を返す。
+function tr(key: string, params?: Record<string, string | number>): string {
+  return window.__mcxI18n?.t(key, params) ?? key;
+}
+
 (function () {
   const CONTAINER_ID = "mcx-return-to-last-read-container";
   const BUTTON_ID = "mcx-return-to-last-read";
   const CLOSE_BUTTON_ID = "mcx-return-to-last-read-close";
   const TOAST_ID = "mcx-return-to-last-read-toast";
   const TOAST_DURATION_MS = 3000;
-  const NOT_FOUND_MESSAGE = "前回の位置が見つかりませんでした";
   const PHOTO_PATH_PATTERN = /^\/[^/]+\/status\/\d+\/photo\/\d+/;
   const SCROLL_KEYS = new Set([
     "PageDown",
@@ -151,7 +155,9 @@ import {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.id = BUTTON_ID;
-    btn.setAttribute("aria-label", "前回の続きへ戻る");
+    if (window.__mcxI18n) {
+      window.__mcxI18n.apply(btn, "lastRead.aria", { attr: "aria-label" });
+    }
     btn.style.cssText = buttonStyle();
     btn.addEventListener("click", () => {
       handleClick().catch((e) => {
@@ -169,7 +175,11 @@ import {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.id = CLOSE_BUTTON_ID;
-    btn.setAttribute("aria-label", "前回の続きへ戻るボタンを閉じる");
+    if (window.__mcxI18n) {
+      window.__mcxI18n.apply(btn, "lastRead.ariaClose", {
+        attr: "aria-label",
+      });
+    }
     btn.textContent = "×";
     btn.style.cssText = closeButtonStyle();
     btn.addEventListener("click", () => {
@@ -206,6 +216,9 @@ import {
     }, TOAST_DURATION_MS);
   }
 
+  // 表示言語が切り替わったら、ボタンの文言（動的に設定している部分）を描画し直す
+  window.__mcxI18n?.onChange(() => render());
+
   function render(): void {
     const visible =
       enabled && isHomePath() && (state.buttonVisible || searching);
@@ -215,7 +228,7 @@ import {
       // （textContent の無条件代入は MutationObserver との無限ループを引き起こす）。
       if (container.style.display !== "flex") container.style.display = "flex";
       const btn = ensureButton();
-      const text = searching ? "探しています…" : "↓ 前回の続きへ";
+      const text = tr(searching ? "lastRead.searching" : "lastRead.label");
       if (btn.textContent !== text) btn.textContent = text;
       if (btn.disabled !== searching) btn.disabled = searching;
       const closeBtn = ensureCloseButton();
@@ -405,7 +418,7 @@ import {
       if (result.kind === "found") {
         dispatch({ type: "returnFinished" });
       } else if (result.kind === "notFound") {
-        showToast(NOT_FOUND_MESSAGE);
+        showToast(tr("lastRead.notFound"));
         dispatch({ type: "returnFinished" });
       }
       // interrupted: 何もしない（ボタンは残す）
@@ -448,7 +461,7 @@ import {
       if (ready !== "ready") return;
       const result = await searchReturnTarget([id], buildSearchDeps());
       if (result.kind === "notFound") {
-        showToast(NOT_FOUND_MESSAGE);
+        showToast(tr("lastRead.notFound"));
       }
     } catch (e) {
       console.error("[return_to_last_read]", e);

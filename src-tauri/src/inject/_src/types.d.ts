@@ -114,6 +114,15 @@ declare global {
     subscribe: (callback: (mutations: MutationRecord[]) => void) => () => void;
   }
 
+  // inject の自前 UI 文言を ja/en で切り替える共有ハブ。i18n.ts が公開する。
+  interface McxI18n {
+    lang: string;
+    t: (key: string, params?: Record<string, string | number>) => string;
+    setLang: (lang: string) => void;
+    apply: (el: Element, key: string, opts?: { attr?: string }) => void;
+    onChange: (cb: (lang: string) => void) => () => void;
+  }
+
   interface Window {
     __multiColumnX: MultiColumnXAPI;
     __multiColumnXConfig?: MultiColumnXConfig;
@@ -130,6 +139,8 @@ declare global {
     __mobileBottomInset?: number;
     __xhrRateLimitPatched?: boolean;
     __mcxDomObserver?: McxDomObserver;
+    __mcxLang?: string;
+    __mcxI18n?: McxI18n;
   }
 }
 

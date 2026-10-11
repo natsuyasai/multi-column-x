@@ -74,6 +74,8 @@
     "MCX_ACCOUNTS": "__mcxAccounts",
     "MCX_CURRENT_ACCOUNT_ID": "__mcxCurrentAccountId",
     "MCX_TARGET_HREF": "__mcxTargetHref",
-    "MCX_ESC_CLOSE_ENABLED": "__mcxEscCloseEnabled"
+    "MCX_ESC_CLOSE_ENABLED": "__mcxEscCloseEnabled",
+    "MCX_LANG": "__mcxLang",
+    "MCX_I18N": "__mcxI18n"
   }
 }

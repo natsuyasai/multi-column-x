@@ -10,6 +10,16 @@ pub enum UiLang {
     En,
 }
 
+impl UiLang {
+    /// inject の `window.__mcxLang` に埋め込む言語コード。
+    pub fn as_code(self) -> &'static str {
+        match self {
+            UiLang::Ja => "ja",
+            UiLang::En => "en",
+        }
+    }
+}
+
 /// 言語設定と OS ロケールから表示言語を決める（純粋関数）。
 /// 設定が `ja` / `en` ならそのまま。それ以外（`auto`・未対応値）は OS ロケールが `ja` で始まれば日本語、
 /// それ以外・取得不能は英語。
@@ -96,6 +106,12 @@ mod tests {
     fn contains_japanese(s: &str) -> bool {
         s.chars()
             .any(|c| matches!(c, '\u{3040}'..='\u{30ff}' | '\u{4e00}'..='\u{9fff}'))
+    }
+
+    #[test]
+    fn 表示言語は注入スクリプト用の言語コードに変換される() {
+        assert_eq!(UiLang::Ja.as_code(), "ja");
+        assert_eq!(UiLang::En.as_code(), "en");
     }
 
     #[test]

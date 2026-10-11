@@ -128,6 +128,7 @@ pub(super) fn build_popup_init(
             current_account_id,
             target_href,
             esc_close_enabled,
+            crate::commands::ui_language::current_ui_lang(app).as_code(),
         ),
     }
 }

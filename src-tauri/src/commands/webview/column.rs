@@ -147,6 +147,7 @@ fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: boo
         return_to_last_read_included: is_return_to_last_read_target(column),
         return_to_last_read_enabled: column.settings.return_to_last_read_enabled,
         mobile_swipe_area_offset: resolve_mobile_swipe_area_offset(is_mobile, &script_settings),
+        language: crate::commands::ui_language::current_ui_lang(app).as_code(),
     })
 }
 

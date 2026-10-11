@@ -8,6 +8,8 @@
 // （mobile_area_hide.test.ts / compose_only.test.ts と同様のパターン）。
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { act } from "@testing-library/react";
+// 画面文言の共有ハブ（window.__mcxI18n）を読み込む（日本語固定の既定言語で従来の文言を検証する）
+import "./i18n";
 
 const CONTAINER_ID = "multi-column-x-header-customizer-root";
 

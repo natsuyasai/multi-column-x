@@ -4,6 +4,8 @@
 // ユーザースクロール検知・探索のDOM接続）のみを検証する。
 // jsdom はレイアウトを持たないため getBoundingClientRect は要素ごとにスタブする。
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+// 画面文言の共有ハブ（window.__mcxI18n）を読み込む（日本語固定の既定言語で従来の文言を検証する）
+import "./i18n";
 
 // --- テスト間の汚染防止 ---
 // return_to_last_read.ts は import 時に window への addEventListener と
@@ -44,6 +46,11 @@ window.addEventListener = ((
 // テスト間でフックが積み重ならないよう afterEach で元の関数に戻す。
 const originalPushState = history.pushState;
 const originalReplaceState = history.replaceState;
+
+/** かな・カタカナ・漢字を1文字でも含むか（英語表示の検証用） */
+function containsJapanese(text: string): boolean {
+  return /[\u3040-\u30ff\u4e00-\u9fff]/.test(text);
+}
 
 // --- DOM構築ヘルパー ---
 
@@ -1419,6 +1426,54 @@ describe("inject/return_to_last_read", () => {
       expect(getButton()?.textContent).toBe("↓ 前回の続きへ");
       expect(getButton()?.getAttribute("aria-label")).toBe("前回の続きへ戻る");
       expect(getContainer()?.style.display).not.toBe("none");
+    });
+
+    it("表示言語を英語にするとボタンの文言とaria-labelが英語になり日本語を含まない", async () => {
+      const { section } = await setupHome();
+      const pill = addPill(section);
+      pill.click();
+      showNewPosts(section);
+      try {
+        window.__mcxI18n?.setLang("en");
+
+        const texts = [
+          getButton()?.textContent ?? "",
+          getButton()?.getAttribute("aria-label") ?? "",
+          getCloseButton()?.getAttribute("aria-label") ?? "",
+        ];
+        expect(texts).toEqual([
+          "↓ Where you left off",
+          "Back to where you left off",
+          "Close the back-to-where-you-left-off button",
+        ]);
+        expect(texts.some(containsJapanese)).toBe(false);
+      } finally {
+        window.__mcxI18n?.setLang("ja");
+      }
+    });
+
+    it("ボタン表示中に表示言語を切り替えると表示済みのボタンの文言も切り替わる", async () => {
+      const { section } = await setupHome();
+      const pill = addPill(section);
+      pill.click();
+      showNewPosts(section);
+      try {
+        expect(getButton()?.textContent).toBe("↓ 前回の続きへ");
+
+        window.__mcxI18n?.setLang("en");
+        expect(getButton()?.textContent).toBe("↓ Where you left off");
+        expect(getButton()?.getAttribute("aria-label")).toBe(
+          "Back to where you left off",
+        );
+
+        window.__mcxI18n?.setLang("ja");
+        expect(getButton()?.textContent).toBe("↓ 前回の続きへ");
+        expect(getButton()?.getAttribute("aria-label")).toBe(
+          "前回の続きへ戻る",
+        );
+      } finally {
+        window.__mcxI18n?.setLang("ja");
+      }
     });
 
     it("選択中のタブを直接クリックして更新すると更新前の先頭が基準として記録される", async () => {
