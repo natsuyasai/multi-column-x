@@ -13,7 +13,25 @@
     },
     "exportDone": "バックアップを書き出しました。",
     "notChangedSuffix": "既存のカラムと設定は変更されていません。",
-    "recreateFailed": "設定の復元は完了しましたが、カラムの表示を作り直せませんでした。アプリを再起動して表示を確認してください。復元直前の設定は、アプリのデータフォルダ内の restore_snapshots フォルダ（appsettings-日時.json）に退避してあります。"
+    "recreateFailed": "設定の復元は完了しましたが、カラムの表示を作り直せませんでした。アプリを再起動して表示を確認してください。復元直前の設定は、アプリのデータフォルダ内の restore_snapshots フォルダ（appsettings-日時.json）に退避してあります。",
+    "reason": {
+      "urlSchemeUnsupported": "http または https の URL のみ指定できます",
+      "themeUnsupported": "未対応のテーマです",
+      "columnScaleUnsupported": "未対応の倍率です",
+      "schemaVersionTooOld": "移行できない古いバージョンです",
+      "schemaVersionInvalid": "1 以上の整数で指定してください",
+      "idUnsafe": "カラム id が安全ではありません",
+      "idConflictsWithExisting": "復元先の既存カラム id と重複しています",
+      "idDuplicate": "カラム id が重複しています",
+      "externalAccountIdMismatch": "外部カラムの accountId はカラム自身の id と一致する必要があります",
+      "accountMissing": "復元先に存在しないアカウントを参照しています"
+    },
+    "ioCode": {
+      "selectionCancelled": "ファイル選択が中断されました",
+      "selectionTimeout": "ファイル選択がタイムアウトしました",
+      "unexpectedReply": "想定外の応答: {{detail}}",
+      "snapshotNamesExhausted": "同一秒内の退避ファイル名が使い切られました"
+    }
   },
   "app": {
     "loading": "読み込み中...",
@@ -43,5 +61,58 @@
   "validation": {
     "regexInvalid": "正規表現が不正です: {{raw}}",
     "userIdInvalid": "`{{id}}` はXのユーザーIDとして正しくありません（英数字とアンダースコアの1〜15文字）"
+  },
+  "rustError": {
+    "unknown": "予期しないエラーが発生しました",
+    "unknownWithDetail": "予期しないエラーが発生しました（{{detail}}）",
+    "common": {
+      "internal": "{{detail}}"
+    },
+    "extension": {
+      "notFound": "拡張機能が見つかりません",
+      "unsupported": "この環境では拡張機能に対応していません",
+      "alreadyAdded": "すでに追加されています",
+      "networkFolder": "ネットワークフォルダは追加できません。ローカルフォルダを指定してください",
+      "folderNotFound": "指定されたフォルダが見つかりません",
+      "folderRequired": "フォルダを指定してください",
+      "folderUnreadable": "拡張機能のフォルダを読み込めません",
+      "folderTooLarge": "拡張機能のフォルダが大きすぎます",
+      "noBrowser": "Chrome / Edge が見つかりません",
+      "notInBrowser": "ブラウザに該当する拡張機能が見つかりません",
+      "noPopup": "この拡張機能にはポップアップがありません",
+      "noOptions": "この拡張機能にはオプションページがありません",
+      "noPage": "開けるページがありません",
+      "disabled": "無効な拡張機能は開けません",
+      "invalidKind": "開くページの種類が不正です",
+      "invalidId": "拡張機能の ID が不正です",
+      "invalidEntryId": "entry_id に使用できない文字が含まれています",
+      "invalidPagePath": "拡張機能のページのパスが不正です",
+      "invalidUrl": "URL が不正です: {{detail}}",
+      "accountRequired": "アカウントを選択してください",
+      "columnRequired": "このアカウントのカラムを先に表示してください",
+      "noTarget": "このアカウントに拡張機能を適用できませんでした",
+      "destInsideSource": "コピー先が拡張機能のフォルダの内側にあります",
+      "manifestMissing": "拡張機能として読み込めません（manifest.json が見つかりません）",
+      "manifestInvalid": "拡張機能として読み込めません（manifest.json の内容が不正です）",
+      "unreadableFiles": "拡張機能に読み込めないファイルが含まれています（名前が「_」で始まるファイルなど）",
+      "loadFailedPath": "拡張機能を読み込めませんでした（パスを確認してください）",
+      "invalidDefinition": "拡張機能の定義が正しくありません",
+      "loadFailed": "拡張機能を読み込めませんでした（エラーコード {{detail}}）",
+      "listFailed": "拡張機能の一覧を取得できません（{{detail}}）",
+      "listCallFailed": "拡張機能の一覧を取得できません: {{detail}}",
+      "removeFailed": "拡張機能を削除できません（{{detail}}）",
+      "removeCallFailed": "拡張機能を削除できません: {{detail}}",
+      "setEnabledFailed": "拡張機能の有効状態を変更できません（{{detail}}）",
+      "setEnabledCallFailed": "拡張機能の有効状態を変更できません: {{detail}}",
+      "profileUnavailable": "プロファイルを取得できません: {{detail}}",
+      "webviewAccess": "WebView へアクセスできません: {{detail}}",
+      "noReply": "WebView2 から応答がありませんでした",
+      "timeout": "WebView2 の応答がタイムアウトしました"
+    },
+    "h264": {
+      "unsupportedArch": "この環境（{{detail}}）には対応していません。H.264 コーデックの自動取得は x86_64 のみ対応です",
+      "extractFailed": "bzip2展開に失敗しました: {{detail}}",
+      "downloadTimeout": "ダウンロードがタイムアウトしました: {{detail}}"
+    }
   }
 }

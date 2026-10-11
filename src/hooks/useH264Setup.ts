@@ -2,10 +2,22 @@ import { invoke } from "@tauri-apps/api/core";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { IPC_COMMANDS } from "@/constants/ipc";
+import { isAppError, type AppErrorInfo } from "@/lib/appError";
 import { logError } from "@/lib/log";
 import { useAppStore } from "@/store/useAppStore";
 
 export type H264DownloadState = "idle" | "downloading" | "success" | "error";
+
+/**
+ * 取得失敗の内容。Rust 由来の AppError はコードのまま保持し、表示時に翻訳する（言語切替に追従するため）。
+ * それ以外（Error・string）は文字列に正規化する。
+ */
+export type H264DownloadError = AppErrorInfo | string;
+
+function toDownloadError(e: unknown): H264DownloadError {
+  if (isAppError(e)) return e;
+  return e instanceof Error ? e.message : String(e);
+}
 
 /** Rust 側 `check_media_codec_support` の戻り値（camelCase） */
 interface MediaCodecStatus {
@@ -44,7 +56,9 @@ export function useH264Setup(ready: boolean) {
   const [downloadApplicable, setDownloadApplicable] = useState(false);
   const [h264Available, setH264Available] = useState(true);
   const [downloadState, setDownloadState] = useState<H264DownloadState>("idle");
-  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<H264DownloadError | null>(
+    null,
+  );
   // 案内ダイアログを閉じた（または設定画面から開始した）後に再表示しないための状態
   const [closed, setClosed] = useState(false);
 
@@ -76,7 +90,7 @@ export function useH264Setup(ready: boolean) {
       setDownloadState("success");
     } catch (e) {
       setDownloadState("error");
-      setDownloadError(e instanceof Error ? e.message : String(e));
+      setDownloadError(toDownloadError(e));
       logError("useH264Setup:download")(e);
     } finally {
       downloadingRef.current = false;

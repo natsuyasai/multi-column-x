@@ -6,8 +6,10 @@ use std::path::Path;
 
 use serde_json::Value;
 
-/// 名前が解決できないときの表示名。
-pub const FALLBACK_NAME: &str = "(名前なし)";
+use crate::commands::app_error::{codes, AppError};
+
+/// 名前が解決できないときの名前。空文字で、表示側（TS）が表示言語に応じた「名前なし」に置き換える。
+pub const FALLBACK_NAME: &str = "";
 
 /// manifest から取り出した、アプリが必要とする情報。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,7 +22,7 @@ pub struct ManifestInfo {
     pub options_path: Option<String>,
 }
 
-/// manifest 読み込みエラー。`Display` はユーザー表示向けの日本語。
+/// manifest 読み込みエラー。ユーザー向けの文言は持たず、`AppError` の種別コードに変換して返す。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ManifestError {
     /// manifest.json が無い（または読めない）。
@@ -32,18 +34,17 @@ pub enum ManifestError {
 impl fmt::Display for ManifestError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ManifestError::NotFound => {
-                write!(
-                    f,
-                    "拡張機能として読み込めません（manifest.json が見つかりません）"
-                )
-            }
-            ManifestError::Invalid => {
-                write!(
-                    f,
-                    "拡張機能として読み込めません（manifest.json の内容が不正です）"
-                )
-            }
+            ManifestError::NotFound => write!(f, "manifest.json not found"),
+            ManifestError::Invalid => write!(f, "manifest.json is invalid"),
+        }
+    }
+}
+
+impl From<ManifestError> for AppError {
+    fn from(error: ManifestError) -> Self {
+        match error {
+            ManifestError::NotFound => AppError::new(codes::EXTENSION_MANIFEST_MISSING),
+            ManifestError::Invalid => AppError::new(codes::EXTENSION_MANIFEST_INVALID),
         }
     }
 }
@@ -254,8 +255,8 @@ mod tests {
         let err = read_manifest_info(dir.path(), "ja").unwrap_err();
         assert_eq!(err, ManifestError::NotFound);
         assert_eq!(
-            err.to_string(),
-            "拡張機能として読み込めません（manifest.json が見つかりません）"
+            AppError::from(err),
+            AppError::new(codes::EXTENSION_MANIFEST_MISSING)
         );
     }
 
@@ -265,7 +266,10 @@ mod tests {
         fs::write(dir.path().join("manifest.json"), "{ not json").unwrap();
         let err = read_manifest_info(dir.path(), "ja").unwrap_err();
         assert_eq!(err, ManifestError::Invalid);
-        assert!(err.to_string().starts_with("拡張機能として読み込めません"));
+        assert_eq!(
+            AppError::from(err),
+            AppError::new(codes::EXTENSION_MANIFEST_INVALID)
+        );
     }
 
     // ---- 名前の解決 ----
@@ -314,7 +318,7 @@ mod tests {
     }
 
     #[test]
-    fn 名前が無いときは名前なしの表示になる() {
+    fn 名前が無いときは空の名前になり表示側が名前なしに置き換える() {
         let info = parse_manifest(r#"{"version":"1"}"#, loader_none, "ja").unwrap();
         assert_eq!(info.name, FALLBACK_NAME);
         let info = parse_manifest(r#"{"name":"  "}"#, loader_none, "ja").unwrap();

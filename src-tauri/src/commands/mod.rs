@@ -1,4 +1,5 @@
 pub mod account;
+pub mod app_error;
 pub mod arch_support;
 pub mod backup;
 pub mod extensions;
@@ -9,6 +10,7 @@ pub mod openh264_http_client;
 pub mod settings;
 pub mod settings_file;
 pub mod settings_store;
+pub mod ui_language;
 pub mod update;
 pub mod video_download;
 pub mod webview;

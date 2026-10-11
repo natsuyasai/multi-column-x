@@ -330,6 +330,24 @@ describe("useH264Setup", () => {
       expect(result.current.downloadError).toBe("ネットワークエラー");
     });
 
+    it("RustのAppErrorで失敗した場合はコードと詳細を保持する", async () => {
+      setupInvoke({}, () =>
+        Promise.reject({ code: "h264.unsupportedArch", detail: "aarch64" }),
+      );
+      const { result } = renderHook(() => useH264Setup(true));
+      await waitFor(() => expect(result.current.isDialogOpen).toBe(true));
+
+      await act(async () => {
+        await result.current.download();
+      });
+
+      expect(result.current.downloadState).toBe("error");
+      expect(result.current.downloadError).toEqual({
+        code: "h264.unsupportedArch",
+        detail: "aarch64",
+      });
+    });
+
     it("失敗後に再試行するとダウンロードがやり直される", async () => {
       let attempt = 0;
       let resolveSecond: () => void = () => {};

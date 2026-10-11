@@ -3,14 +3,15 @@
 //! エラー集約を単体テストできるようにする。
 
 use super::reconcile_plan::{Action, InstalledExt};
+use crate::commands::app_error::AppError;
 
 /// プロファイル（WebView2 の拡張機能 API）に対する操作。
 #[allow(async_fn_in_trait)]
 pub trait ProfileOps {
-    async fn list(&self) -> Result<Vec<InstalledExt>, String>;
-    async fn add(&self, path: &str) -> Result<InstalledExt, String>;
-    async fn remove(&self, webview_id: &str) -> Result<(), String>;
-    async fn set_enabled(&self, webview_id: &str, enabled: bool) -> Result<(), String>;
+    async fn list(&self) -> Result<Vec<InstalledExt>, AppError>;
+    async fn add(&self, path: &str) -> Result<InstalledExt, AppError>;
+    async fn remove(&self, webview_id: &str) -> Result<(), AppError>;
+    async fn set_enabled(&self, webview_id: &str, enabled: bool) -> Result<(), AppError>;
 }
 
 /// `apply_actions` の実行結果。
@@ -22,7 +23,7 @@ pub struct ApplyOutcome {
     pub added: Vec<(String, String, String)>,
     /// 削除成功した webview_id（replaces による旧 ID の削除を含む）。
     pub removed: Vec<String>,
-    pub errors: Vec<String>,
+    pub errors: Vec<AppError>,
 }
 
 /// 計画を Add → Remove → SetEnabled の順に実行する。1 件失敗しても残りを続行する。
@@ -111,6 +112,15 @@ mod tests {
     use std::collections::{HashMap, HashSet};
 
     use super::*;
+    use crate::commands::app_error::codes;
+
+    /// 操作名と対象を `detail` に持つテスト用のエラー。
+    fn 失敗(operation: &str, target: &str) -> AppError {
+        AppError::with_detail(
+            codes::EXTENSION_LOAD_FAILED,
+            format!("{operation}:{target}"),
+        )
+    }
 
     /// 呼び出しを記録するモック。
     #[derive(Default)]
@@ -130,34 +140,34 @@ mod tests {
     }
 
     impl ProfileOps for Mock {
-        async fn list(&self) -> Result<Vec<InstalledExt>, String> {
+        async fn list(&self) -> Result<Vec<InstalledExt>, AppError> {
             self.calls.borrow_mut().push("list".into());
             Ok(self.installed.clone())
         }
-        async fn add(&self, path: &str) -> Result<InstalledExt, String> {
+        async fn add(&self, path: &str) -> Result<InstalledExt, AppError> {
             self.calls.borrow_mut().push(format!("add:{path}"));
             match self.add_ids.get(path) {
                 Some(id) => Ok(InstalledExt {
                     id: id.clone(),
                     enabled: true,
                 }),
-                None => Err(format!("add失敗:{path}")),
+                None => Err(失敗("add", path)),
             }
         }
-        async fn remove(&self, id: &str) -> Result<(), String> {
+        async fn remove(&self, id: &str) -> Result<(), AppError> {
             self.calls.borrow_mut().push(format!("remove:{id}"));
             if self.fail_remove.contains(id) {
-                Err(format!("remove失敗:{id}"))
+                Err(失敗("remove", id))
             } else {
                 Ok(())
             }
         }
-        async fn set_enabled(&self, id: &str, enabled: bool) -> Result<(), String> {
+        async fn set_enabled(&self, id: &str, enabled: bool) -> Result<(), AppError> {
             self.calls
                 .borrow_mut()
                 .push(format!("enable:{id}:{enabled}"));
             if self.fail_set_enabled.contains(id) {
-                Err(format!("enable失敗:{id}"))
+                Err(失敗("enable", id))
             } else {
                 Ok(())
             }
@@ -266,7 +276,7 @@ mod tests {
             },
         ];
         let outcome = apply_actions_with(&ops, &actions).await;
-        assert_eq!(outcome.errors, ["add失敗:/bad", "remove失敗:r1"]);
+        assert_eq!(outcome.errors, [失敗("add", "/bad"), 失敗("remove", "r1")]);
         assert_eq!(outcome.added.len(), 1);
         assert_eq!(outcome.removed, vec!["r2".to_string()]);
         assert!(outcome.changed);
@@ -322,24 +332,24 @@ mod tests {
     async fn 一覧取得に失敗したらエラーを記録して計画は続行する() {
         struct ListFail;
         impl ProfileOps for ListFail {
-            async fn list(&self) -> Result<Vec<InstalledExt>, String> {
-                Err("list失敗".into())
+            async fn list(&self) -> Result<Vec<InstalledExt>, AppError> {
+                Err(失敗("list", ""))
             }
-            async fn add(&self, _: &str) -> Result<InstalledExt, String> {
+            async fn add(&self, _: &str) -> Result<InstalledExt, AppError> {
                 Ok(InstalledExt {
                     id: "n".into(),
                     enabled: true,
                 })
             }
-            async fn remove(&self, _: &str) -> Result<(), String> {
+            async fn remove(&self, _: &str) -> Result<(), AppError> {
                 Ok(())
             }
-            async fn set_enabled(&self, _: &str, _: bool) -> Result<(), String> {
+            async fn set_enabled(&self, _: &str, _: bool) -> Result<(), AppError> {
                 Ok(())
             }
         }
         let outcome = apply_actions_with(&ListFail, &[add("a", "/a", None, true)]).await;
-        assert_eq!(outcome.errors, ["list失敗"]);
+        assert_eq!(outcome.errors, [失敗("list", "")]);
         assert_eq!(outcome.added.len(), 1);
     }
 

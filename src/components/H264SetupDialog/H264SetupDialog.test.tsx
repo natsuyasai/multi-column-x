@@ -1,13 +1,16 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { H264SetupDialog } from "@/components/H264SetupDialog/H264SetupDialog";
-import type { H264DownloadState } from "@/hooks/useH264Setup";
+import type {
+  H264DownloadError,
+  H264DownloadState,
+} from "@/hooks/useH264Setup";
 import i18n from "@/i18n";
 import { expectNoJapanese } from "@/test-utils/japanese";
 
 function renderDialog(
   downloadState: H264DownloadState,
-  overrides: { downloadError?: string | null } = {},
+  overrides: { downloadError?: H264DownloadError | null } = {},
 ) {
   const handlers = {
     onDownload: vi.fn(),
@@ -238,6 +241,56 @@ describe("H264SetupDialog", () => {
       );
       expect(screen.getByRole("alert")).toHaveTextContent("Download failed.");
       expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    });
+
+    it("表示言語が英語のときH.264の取得失敗が英語で表示され日本語を含まない", async () => {
+      await i18n.changeLanguage("en");
+      const { container } = render(
+        <H264SetupDialog
+          downloadState="error"
+          downloadError={{ code: "h264.unsupportedArch", detail: "aarch64" }}
+          onDownload={vi.fn()}
+          onDismiss={vi.fn()}
+          onClose={vi.fn()}
+          onRelaunch={vi.fn()}
+        />,
+      );
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "This environment (aarch64) is not supported. Automatic H.264 codec download is only available on x86_64",
+      );
+      expectNoJapanese(container);
+    });
+
+    it("表示言語が日本語のときH.264の取得失敗が従来と同じ文言で表示される", () => {
+      renderDialog("error", {
+        downloadError: { code: "h264.extractFailed", detail: "bad data" },
+      });
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "bzip2展開に失敗しました: bad data",
+      );
+    });
+
+    it("取得失敗の表示は表示言語の切替に追従する", async () => {
+      const element = (
+        <H264SetupDialog
+          downloadState="error"
+          downloadError={{ code: "h264.downloadTimeout", detail: "timed out" }}
+          onDownload={vi.fn()}
+          onDismiss={vi.fn()}
+          onClose={vi.fn()}
+          onRelaunch={vi.fn()}
+        />
+      );
+      render(element);
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "ダウンロードがタイムアウトしました: timed out",
+      );
+
+      await act(() => i18n.changeLanguage("en"));
+
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "The download timed out: timed out",
+      );
     });
   });
 });

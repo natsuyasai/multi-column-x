@@ -57,9 +57,15 @@ pub enum BackupError {
     /// 件数または文字列長が上限を超えている。
     LimitExceeded { field: String, limit: u64 },
     /// 項目の値が不正（型違い、許可されない URL、安全でない id など）。
+    /// `reason` は理由コード（camelCase）。`file` のみ読み込み時の生の解析エラー文字列（詳細）。
     InvalidField { field: String, reason: String },
-    /// ファイル操作に失敗した。
-    Io { message: String },
+    /// ファイル操作に失敗した。`code` は種別コード（無ければ OS 由来の詳細だけ）、
+    /// `message` は OS 等が返した生のエラー文字列（詳細）。
+    Io {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        code: Option<&'static str>,
+        message: String,
+    },
     /// 現在の設定を読めないため、復元の前提（退避・置換）を満たせない。
     SettingsUnreadable,
 }
@@ -68,6 +74,14 @@ fn invalid(field: &str, reason: &str) -> BackupError {
     BackupError::InvalidField {
         field: field.to_string(),
         reason: reason.to_string(),
+    }
+}
+
+/// 種別コード付きの入出力エラー。`detail` は生のエラー文字列（無ければ空）。
+pub(crate) fn io_coded(code: &'static str, detail: impl std::fmt::Display) -> BackupError {
+    BackupError::Io {
+        code: Some(code),
+        message: detail.to_string(),
     }
 }
 
@@ -438,7 +452,7 @@ fn check_list(field: &str, items: &[String]) -> Result<(), BackupError> {
 pub(crate) fn validate_http_url(field: &str, raw: &str) -> Result<(), BackupError> {
     match url::Url::parse(raw) {
         Ok(u) if matches!(u.scheme(), "http" | "https") && u.has_host() => Ok(()),
-        _ => Err(invalid(field, "http または https の URL のみ指定できます")),
+        _ => Err(invalid(field, "urlSchemeUnsupported")),
     }
 }
 
@@ -495,10 +509,13 @@ pub(crate) fn validate_columns(columns: &[BackupColumn]) -> Result<(), BackupErr
 
 pub(crate) fn validate_global_settings(g: &BackupGlobalSettings) -> Result<(), BackupError> {
     if !ALLOWED_THEMES.contains(&g.theme.as_str()) {
-        return Err(invalid("globalSettings.theme", "未対応のテーマです"));
+        return Err(invalid("globalSettings.theme", "themeUnsupported"));
     }
     if !ALLOWED_COLUMN_SCALES.contains(&g.column_scale.as_str()) {
-        return Err(invalid("globalSettings.columnScale", "未対応の倍率です"));
+        return Err(invalid(
+            "globalSettings.columnScale",
+            "columnScaleUnsupported",
+        ));
     }
     check_chars("globalSettings.customCSS", &g.custom_css, MAX_CSS_CHARS)?;
     check_chars(
@@ -564,7 +581,7 @@ fn validate_accounts(accounts: &[BackupAccount]) -> Result<(), BackupError> {
 pub fn migrate_to_current(value: Value, from_version: u64) -> Result<Value, BackupError> {
     if from_version < u64::from(SCHEMA_VERSION) {
         // 現在は移行元となる古い版が存在しない。
-        return Err(invalid("schemaVersion", "移行できない古いバージョンです"));
+        return Err(invalid("schemaVersion", "schemaVersionTooOld"));
     }
     Ok(value)
 }
@@ -591,7 +608,7 @@ pub fn parse_backup(bytes: &[u8]) -> Result<BackupFile, BackupError> {
 
     let version = match value.get("schemaVersion").and_then(Value::as_u64) {
         Some(v) if v >= 1 => v,
-        _ => return Err(invalid("schemaVersion", "1 以上の整数で指定してください")),
+        _ => return Err(invalid("schemaVersion", "schemaVersionInvalid")),
     };
     let current = u64::from(SCHEMA_VERSION);
     if version > current {

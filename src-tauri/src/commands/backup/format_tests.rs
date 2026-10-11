@@ -3,7 +3,7 @@
 use serde_json::{json, Value};
 
 use super::format::{
-    build_export, migrate_to_current, parse_backup, BackupError, BACKUP_FORMAT,
+    build_export, io_coded, migrate_to_current, parse_backup, BackupError, BACKUP_FORMAT,
     EXCLUDED_GLOBAL_SETTINGS_KEYS, MAX_COLUMNS, MAX_FILE_BYTES, SCHEMA_VERSION,
 };
 use crate::commands::settings::{AppSettingsData, GlobalSettingsData};
@@ -247,10 +247,13 @@ fn 外部カラムとカスタムカラムのhttp_https以外のurlは拒否さ�
 
             let result = parse_value(&envelope(vec![column]));
 
-            assert!(
-                matches!(result, Err(BackupError::InvalidField { .. })),
-                "{page_type} の {url} は拒否される: {result:?}"
-            );
+            match &result {
+                Err(BackupError::InvalidField { field, reason }) => {
+                    assert_eq!(field, "columns.customUrl");
+                    assert_eq!(reason, "urlSchemeUnsupported");
+                }
+                other => panic!("{page_type} の {url} は拒否される: {other:?}"),
+            }
         }
     }
 }
@@ -443,5 +446,74 @@ mod properties {
         fn 任意のバイト列でもパニックしない(bytes in proptest::collection::vec(any::<u8>(), 0..512)) {
             let _ = parse_backup(&bytes);
         }
+    }
+}
+
+#[test]
+fn 未対応のテーマと倍率は理由コードで拒否される() {
+    for (key, value, field, reason) in [
+        ("theme", "neon", "globalSettings.theme", "themeUnsupported"),
+        (
+            "columnScale",
+            "huge",
+            "globalSettings.columnScale",
+            "columnScaleUnsupported",
+        ),
+    ] {
+        let mut v = envelope(vec![]);
+        v["globalSettings"] = json!({ key: value });
+
+        match parse_value(&v) {
+            Err(BackupError::InvalidField {
+                field: f,
+                reason: r,
+            }) => {
+                assert_eq!((f.as_str(), r.as_str()), (field, reason));
+            }
+            other => panic!("InvalidField を期待: {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn 古いスキーマバージョンは理由コードで拒否される() {
+    match migrate_to_current(json!({}), 0) {
+        Err(BackupError::InvalidField { field, reason }) => {
+            assert_eq!(field, "schemaVersion");
+            assert_eq!(reason, "schemaVersionTooOld");
+        }
+        other => panic!("InvalidField を期待: {other:?}"),
+    }
+}
+
+#[test]
+fn 不正なスキーマバージョンの形式エラーは理由コードを持つ() {
+    let text = format!(
+        "{{\"format\":\"{BACKUP_FORMAT}\",\"schemaVersion\":\"1\",\"accounts\":[],\"columns\":[]}}"
+    );
+
+    match parse_backup(text.as_bytes()) {
+        Err(BackupError::InvalidField { field, reason }) => {
+            assert_eq!(field, "schemaVersion");
+            assert_eq!(reason, "schemaVersionInvalid");
+        }
+        other => panic!("InvalidField を期待: {other:?}"),
+    }
+}
+
+#[test]
+fn バックアップのエラーjsonに日本語の文章が含まれない() {
+    let errors = [
+        BackupError::InvalidField {
+            field: "columns.id".to_string(),
+            reason: "idUnsafe".to_string(),
+        },
+        io_coded("selectionCancelled", ""),
+        io_coded("unexpectedReply", "Saved"),
+    ];
+
+    for error in errors {
+        let text = serde_json::to_string(&error).unwrap();
+        assert!(text.is_ascii(), "ASCII のみ: {text}");
     }
 }

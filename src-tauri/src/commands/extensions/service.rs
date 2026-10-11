@@ -23,13 +23,14 @@ use super::reconcile_plan::{
 };
 use super::sanitize::remove_sanitized_copy;
 use super::store;
+use crate::commands::app_error::{codes, AppError};
 
-/// 非対応環境（Windows 以外）で返すエラー文言。
-pub const UNSUPPORTED_MESSAGE: &str = "この環境では拡張機能に対応していません";
+/// 非対応環境（Windows 以外）で返すエラー。
+pub fn unsupported_error() -> AppError {
+    AppError::new(codes::EXTENSION_UNSUPPORTED)
+}
 /// 表示名などの解決に使うロケール（現状は日本語固定）。
 pub const LOCALE: &str = "ja";
-/// 同じ拡張機能を二重に追加しようとしたときのエラー文言。
-pub const ALREADY_ADDED_MESSAGE: &str = "すでに追加されています";
 
 // ---------------------------------------------------------------------------
 // 直列化ロック
@@ -46,8 +47,8 @@ pub async fn lock_state() -> MutexGuard<'static, ()> {
 /// ロックを取って状態を読み込み、`f` で変更し、`f` が成功したときだけ保存する。
 pub async fn modify_state<T>(
     app: &AppHandle,
-    f: impl FnOnce(&mut ExtensionsState) -> Result<T, String>,
-) -> Result<T, String> {
+    f: impl FnOnce(&mut ExtensionsState) -> Result<T, AppError>,
+) -> Result<T, AppError> {
     let _guard = lock_state().await;
     let mut state = store::load(app)?;
     let value = f(&mut state)?;
@@ -77,12 +78,12 @@ pub fn add_folder_entry(
     info: ManifestInfo,
     path: String,
     new_id: String,
-) -> Result<ExtensionEntry, String> {
+) -> Result<ExtensionEntry, AppError> {
     let already = state.entries.iter().any(|e| {
         matches!(&e.source, ExtensionSource::Folder { path: existing } if is_same_folder_path(existing, &path))
     });
     if already {
-        return Err(ALREADY_ADDED_MESSAGE.to_string());
+        return Err(AppError::new(codes::EXTENSION_ALREADY_ADDED));
     }
     let entry = ExtensionEntry {
         id: new_id,
@@ -102,12 +103,12 @@ pub fn add_chrome_entry(
     state: &mut ExtensionsState,
     detected: &DetectedExtension,
     new_id: String,
-) -> Result<ExtensionEntry, String> {
+) -> Result<ExtensionEntry, AppError> {
     let already = state.entries.iter().any(|e| {
         matches!(&e.source, ExtensionSource::Chrome { chrome_id, .. } if *chrome_id == detected.chrome_id)
     });
     if already {
-        return Err(ALREADY_ADDED_MESSAGE.to_string());
+        return Err(AppError::new(codes::EXTENSION_ALREADY_ADDED));
     }
     let entry = ExtensionEntry {
         id: new_id,
@@ -126,8 +127,8 @@ pub fn add_chrome_entry(
     Ok(entry)
 }
 
-fn not_found_error() -> String {
-    "拡張機能が見つかりません".to_string()
+fn not_found_error() -> AppError {
+    AppError::new(codes::EXTENSION_NOT_FOUND)
 }
 
 /// 有効・無効を切り替える。
@@ -135,7 +136,7 @@ pub fn set_enabled_in_state(
     state: &mut ExtensionsState,
     id: &str,
     enabled: bool,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let entry = state
         .entries
         .iter_mut()
@@ -149,7 +150,7 @@ pub fn set_enabled_in_state(
 pub fn remove_entry_from_state(
     state: &mut ExtensionsState,
     id: &str,
-) -> Result<ExtensionEntry, String> {
+) -> Result<ExtensionEntry, AppError> {
     let index = state
         .entries
         .iter()
@@ -175,29 +176,27 @@ pub fn strip_verbatim_prefix(path: &str) -> String {
 
 /// ネットワークフォルダ（UNC）は不可。`\\?\UNC\` 形式も `\\server\share` と同じく拒否する。
 /// 共有の切断や遅延で WebView2 の読み込みが不安定になるため。
-pub fn ensure_local_folder_path(path: &str) -> Result<(), String> {
+pub fn ensure_local_folder_path(path: &str) -> Result<(), AppError> {
     let normalized = strip_verbatim_prefix(path);
     if normalized.starts_with(r"\\") || normalized.starts_with("//") {
-        return Err(
-            "ネットワークフォルダは追加できません。ローカルフォルダを指定してください".to_string(),
-        );
+        return Err(AppError::new(codes::EXTENSION_NETWORK_FOLDER));
     }
     Ok(())
 }
 
 /// 指定フォルダを実パス化し、manifest を検証する。manifest が無い／壊れている場合はエラー。
-pub fn prepare_folder_for_add(path: &str) -> Result<(String, ManifestInfo), String> {
+pub fn prepare_folder_for_add(path: &str) -> Result<(String, ManifestInfo), AppError> {
     // 共有への接続待ちを避けるため、実パス化の前にも判定する。
     ensure_local_folder_path(path)?;
     let canonical = std::fs::canonicalize(path)
-        .map_err(|_| "指定されたフォルダが見つかりません".to_string())?;
+        .map_err(|_| AppError::new(codes::EXTENSION_FOLDER_NOT_FOUND))?;
     if !canonical.is_dir() {
-        return Err("フォルダを指定してください".to_string());
+        return Err(AppError::new(codes::EXTENSION_FOLDER_REQUIRED));
     }
     let stored = strip_verbatim_prefix(&canonical.to_string_lossy());
     // シンボリックリンク等で UNC に解決されるケースも拒否する。
     ensure_local_folder_path(&stored)?;
-    let info = read_manifest_info(&canonical, LOCALE).map_err(|e| e.to_string())?;
+    let info = read_manifest_info(&canonical, LOCALE).map_err(AppError::from)?;
     Ok((stored, info))
 }
 
@@ -211,13 +210,13 @@ pub fn cleanup_after_remove(copy_root: &Path, entry: &ExtensionEntry) -> std::io
 // ---------------------------------------------------------------------------
 
 /// サニタイズコピーの置き場（`app_data_dir/extensions`）。無ければ作る。
-pub fn copy_root(app: &AppHandle) -> Result<PathBuf, String> {
+pub fn copy_root(app: &AppHandle) -> Result<PathBuf, AppError> {
     let root = app
         .path()
         .app_data_dir()
-        .map_err(|e| e.to_string())?
+        .map_err(AppError::internal)?
         .join("extensions");
-    std::fs::create_dir_all(&root).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&root).map_err(AppError::internal)?;
     Ok(root)
 }
 
@@ -225,7 +224,7 @@ pub fn copy_root(app: &AppHandle) -> Result<PathBuf, String> {
 pub async fn resolve_all(
     app: &AppHandle,
     entries: &[ExtensionEntry],
-) -> Result<HashMap<String, ResolvedEntry>, String> {
+) -> Result<HashMap<String, ResolvedEntry>, AppError> {
     let copy_root = copy_root(app)?;
     let roots = browser_roots_from_env();
     let entries = entries.to_vec();
@@ -236,7 +235,7 @@ pub async fn resolve_all(
             .collect()
     })
     .await
-    .map_err(|e| e.to_string())
+    .map_err(AppError::internal)
 }
 
 /// 解決結果に合わせて `missing` と表示用メタデータを更新する。変化があれば true。
@@ -254,7 +253,7 @@ pub fn refresh_entries(
 }
 
 /// ロック済みの状態で保存済みエントリを最新化して返す（`list_extensions` 本体）。
-pub async fn list_refreshed(app: &AppHandle) -> Result<Vec<ExtensionEntry>, String> {
+pub async fn list_refreshed(app: &AppHandle) -> Result<Vec<ExtensionEntry>, AppError> {
     let _guard = lock_state().await;
     let mut state = store::load(app)?;
     let resolved = resolve_all(app, &state.entries).await?;
@@ -303,7 +302,7 @@ pub async fn reconcile_profile<O: ProfileOps>(
     state: &mut ExtensionsState,
     resolved: &HashMap<String, ResolvedEntry>,
     data_directory: &str,
-) -> Result<bool, String> {
+) -> Result<bool, AppError> {
     let installed = ops.list().await?;
     let applied = profile_for_mut(state, data_directory).entries.clone();
     let actions = plan_profile(&state.entries, resolved, &applied, &installed);
@@ -320,10 +319,13 @@ pub async fn reconcile_profile<O: ProfileOps>(
         apply_remove_result(profile, removed);
     }
     for error in &outcome.errors {
-        log::warn!("[extensions] reconcile でエラー: {error}");
+        log::warn!("[extensions] error during reconcile: {error}");
     }
     if !outcome.changed && !outcome.errors.is_empty() {
-        return Err(outcome.errors.join(" / "));
+        // 複数あっても呼び出し元へ返すのは最初の 1 件（全件は上のログに残している）。
+        if let Some(first) = outcome.errors.into_iter().next() {
+            return Err(first);
+        }
     }
     Ok(outcome.changed)
 }
@@ -335,7 +337,7 @@ pub async fn reconcile_webview(
     app: &AppHandle,
     webview: &tauri::Webview,
     data_directory: &str,
-) -> Result<bool, String> {
+) -> Result<bool, AppError> {
     use super::webview2::WebviewOps;
 
     let _guard = lock_state().await;
@@ -361,14 +363,14 @@ pub async fn reconcile_webview(
     _app: &AppHandle,
     _webview: &tauri::Webview,
     _data_directory: &str,
-) -> Result<bool, String> {
+) -> Result<bool, AppError> {
     Ok(false)
 }
 
 /// 稼働中の全プロファイルを reconcile する。WebView が見つからないものはスキップする。
 /// 個別プロファイルの失敗はログに残して続行する（次回の reconcile で再試行される）。
 #[cfg(windows)]
-pub async fn reconcile_all_live(app: &AppHandle) -> Result<bool, String> {
+pub async fn reconcile_all_live(app: &AppHandle) -> Result<bool, AppError> {
     let account_dirs = crate::commands::settings_store::load_account_data_directories(app);
     let targets = retain_account_targets(live_profile_targets(app), account_dirs.as_ref());
     let mut changed = false;
@@ -378,14 +380,14 @@ pub async fn reconcile_all_live(app: &AppHandle) -> Result<bool, String> {
         };
         match reconcile_webview(app, &webview, &data_directory).await {
             Ok(c) => changed |= c,
-            Err(e) => log::warn!("[extensions] プロファイルの同期に失敗: label={label} err={e}"),
+            Err(e) => log::warn!("[extensions] failed to sync the profile: label={label} err={e}"),
         }
     }
     Ok(changed)
 }
 
 #[cfg(not(windows))]
-pub async fn reconcile_all_live(_app: &AppHandle) -> Result<bool, String> {
+pub async fn reconcile_all_live(_app: &AppHandle) -> Result<bool, AppError> {
     Ok(false)
 }
 
@@ -408,11 +410,11 @@ pub enum PageKind {
 }
 
 impl PageKind {
-    pub fn parse(kind: &str) -> Result<Self, String> {
+    pub fn parse(kind: &str) -> Result<Self, AppError> {
         match kind {
             "popup" => Ok(PageKind::Popup),
             "options" => Ok(PageKind::Options),
-            _ => Err("開くページの種類が不正です".to_string()),
+            _ => Err(AppError::new(codes::EXTENSION_INVALID_KIND)),
         }
     }
 }
@@ -430,25 +432,25 @@ pub fn validate_open_page(
     entry: Option<&ExtensionEntry>,
     kind: &str,
     account_id: Option<&str>,
-) -> Result<PageTarget, String> {
+) -> Result<PageTarget, AppError> {
     let entry = entry.ok_or_else(not_found_error)?;
     if !entry.enabled || entry.missing {
-        return Err("無効な拡張機能は開けません".to_string());
+        return Err(AppError::new(codes::EXTENSION_DISABLED));
     }
     let kind = PageKind::parse(kind)?;
     match kind {
         PageKind::Popup if !entry.has_popup => {
-            return Err("この拡張機能にはポップアップがありません".to_string());
+            return Err(AppError::new(codes::EXTENSION_NO_POPUP));
         }
         PageKind::Options if !entry.has_options => {
-            return Err("この拡張機能にはオプションページがありません".to_string());
+            return Err(AppError::new(codes::EXTENSION_NO_OPTIONS));
         }
         _ => {}
     }
     let account_id = account_id
         .map(str::trim)
         .filter(|id| !id.is_empty())
-        .ok_or_else(|| "アカウントを選択してください".to_string())?;
+        .ok_or_else(|| AppError::new(codes::EXTENSION_ACCOUNT_REQUIRED))?;
     Ok(PageTarget {
         kind,
         account_id: account_id.to_string(),
@@ -460,16 +462,16 @@ pub fn validate_open_page(
 pub fn build_extension_url(
     webview_extension_id: &str,
     relative_path: &str,
-) -> Result<String, String> {
+) -> Result<String, AppError> {
     let id_ok = !webview_extension_id.is_empty()
         && webview_extension_id
             .bytes()
             .all(|b| b.is_ascii_alphanumeric());
     if !id_ok {
-        return Err("拡張機能の ID が不正です".to_string());
+        return Err(AppError::new(codes::EXTENSION_INVALID_ID));
     }
     if !is_safe_relative_path(relative_path) {
-        return Err("拡張機能のページのパスが不正です".to_string());
+        return Err(AppError::new(codes::EXTENSION_INVALID_PAGE_PATH));
     }
     Ok(format!(
         "chrome-extension://{webview_extension_id}/{relative_path}"
@@ -638,7 +640,7 @@ mod tests {
             "id-2".to_string(),
         )
         .unwrap_err();
-        assert_eq!(err, ALREADY_ADDED_MESSAGE);
+        assert_eq!(err, AppError::new(codes::EXTENSION_ALREADY_ADDED));
         assert_eq!(state.entries.len(), 1);
     }
 
@@ -702,20 +704,14 @@ mod tests {
             "//server/share/ext",
         ] {
             let err = ensure_local_folder_path(ng).unwrap_err();
-            assert_eq!(
-                err, "ネットワークフォルダは追加できません。ローカルフォルダを指定してください",
-                "{ng}"
-            );
+            assert_eq!(err, AppError::new(codes::EXTENSION_NETWORK_FOLDER), "{ng}");
         }
     }
 
     #[test]
     fn ネットワークフォルダを指定するとフォルダ検証の前に拒否される() {
         let err = prepare_folder_for_add(r"\\server\share\ext").unwrap_err();
-        assert!(
-            err.contains("ネットワークフォルダは追加できません"),
-            "{err}"
-        );
+        assert_eq!(err.code, codes::EXTENSION_NETWORK_FOLDER);
     }
 
     #[test]
@@ -725,16 +721,26 @@ mod tests {
         fs::create_dir_all(&empty).unwrap();
 
         let err = prepare_folder_for_add(empty.to_str().unwrap()).unwrap_err();
-        assert!(err.contains("manifest.json"), "{err}");
+        assert_eq!(err.code, codes::EXTENSION_MANIFEST_MISSING);
 
         // 壊れた manifest も追加できない
         let broken = tmp.path().join("broken");
         fs::create_dir_all(&broken).unwrap();
         fs::write(broken.join("manifest.json"), "{ 壊れ").unwrap();
-        assert!(prepare_folder_for_add(broken.to_str().unwrap()).is_err());
+        assert_eq!(
+            prepare_folder_for_add(broken.to_str().unwrap())
+                .unwrap_err()
+                .code,
+            codes::EXTENSION_MANIFEST_INVALID
+        );
 
         // 存在しないパス
-        assert!(prepare_folder_for_add(tmp.path().join("none").to_str().unwrap()).is_err());
+        assert_eq!(
+            prepare_folder_for_add(tmp.path().join("none").to_str().unwrap())
+                .unwrap_err()
+                .code,
+            codes::EXTENSION_FOLDER_NOT_FOUND
+        );
     }
 
     #[test]
@@ -838,7 +844,7 @@ mod tests {
         let mut state = ExtensionsState::default();
         add_chrome_entry(&mut state, &検出結果(), "id-1".to_string()).unwrap();
         let err = add_chrome_entry(&mut state, &検出結果(), "id-2".to_string()).unwrap_err();
-        assert_eq!(err, "すでに追加されています");
+        assert_eq!(err, AppError::new(codes::EXTENSION_ALREADY_ADDED));
         assert_eq!(state.entries.len(), 1);
     }
 
@@ -921,10 +927,36 @@ mod tests {
     }
 
     #[test]
-    fn 存在しないidの有効無効変更と削除はエラーになる() {
-        let mut state = ExtensionsState::default();
-        assert!(set_enabled_in_state(&mut state, "none", true).is_err());
-        assert!(remove_entry_from_state(&mut state, "none").is_err());
+    fn 適用に失敗して何も変化しなかったときは最初のエラーを返す() {
+        let mut state = ExtensionsState {
+            entries: vec![
+                エントリ("e1", true, false, false),
+                エントリ("e2", true, false, false),
+            ],
+            ..Default::default()
+        };
+        let resolved: HashMap<String, ResolvedEntry> = [
+            (
+                "e1".to_string(),
+                ResolvedEntry::Path(r"C:\ext\e1".to_string()),
+            ),
+            (
+                "e2".to_string(),
+                ResolvedEntry::Path(r"C:\ext\e2".to_string()),
+            ),
+        ]
+        .into();
+        let mock = Mock::new(vec![], []);
+
+        let err = block_on(reconcile_profile(
+            &mock,
+            &mut state,
+            &resolved,
+            r"C:\data\acc1",
+        ))
+        .unwrap_err();
+
+        assert_eq!(err, AppError::internal("add failed"));
     }
 
     // ---- 削除 ----
@@ -1034,30 +1066,39 @@ mod tests {
         let disabled = エントリ("e1", false, true, true);
         for kind in ["popup", "options"] {
             let err = validate_open_page(Some(&disabled), kind, Some("acc1")).unwrap_err();
-            assert_eq!(err, "無効な拡張機能は開けません");
+            assert_eq!(err, AppError::new(codes::EXTENSION_DISABLED));
         }
         // 見つからない（missing）拡張機能も同様
         let mut missing = エントリ("e2", true, true, true);
         missing.missing = true;
         assert_eq!(
             validate_open_page(Some(&missing), "popup", Some("acc1")).unwrap_err(),
-            "無効な拡張機能は開けません"
+            AppError::new(codes::EXTENSION_DISABLED)
         );
         // エントリ自体が無い
-        assert!(validate_open_page(None, "popup", Some("acc1")).is_err());
+        assert_eq!(
+            validate_open_page(None, "popup", Some("acc1")).unwrap_err(),
+            AppError::new(codes::EXTENSION_NOT_FOUND)
+        );
     }
 
     #[test]
     fn ポップアップを持たない拡張機能のポップアップは開けない() {
         let entry = エントリ("e1", true, false, true);
-        assert!(validate_open_page(Some(&entry), "popup", Some("acc1")).is_err());
+        assert_eq!(
+            validate_open_page(Some(&entry), "popup", Some("acc1")).unwrap_err(),
+            AppError::new(codes::EXTENSION_NO_POPUP)
+        );
         assert!(validate_open_page(Some(&entry), "options", Some("acc1")).is_ok());
     }
 
     #[test]
     fn オプションを持たない拡張機能のオプションは開けない() {
         let entry = エントリ("e1", true, true, false);
-        assert!(validate_open_page(Some(&entry), "options", Some("acc1")).is_err());
+        assert_eq!(
+            validate_open_page(Some(&entry), "options", Some("acc1")).unwrap_err(),
+            AppError::new(codes::EXTENSION_NO_OPTIONS)
+        );
         assert!(validate_open_page(Some(&entry), "popup", Some("acc1")).is_ok());
     }
 
@@ -1076,14 +1117,65 @@ mod tests {
         // アカウント未指定・空はエラー
         for account in [None, Some(""), Some("  ")] {
             let err = validate_open_page(Some(&entry), "popup", account).unwrap_err();
-            assert_eq!(err, "アカウントを選択してください");
+            assert_eq!(err, AppError::new(codes::EXTENSION_ACCOUNT_REQUIRED));
         }
     }
 
     #[test]
     fn 種類が不正なページは開けない() {
         let entry = エントリ("e1", true, true, true);
-        assert!(validate_open_page(Some(&entry), "background", Some("acc1")).is_err());
+        assert_eq!(
+            validate_open_page(Some(&entry), "background", Some("acc1")).unwrap_err(),
+            AppError::new(codes::EXTENSION_INVALID_KIND)
+        );
+    }
+
+    #[test]
+    fn 拡張機能idとページパスが不正なときはそれぞれのコードになる() {
+        assert_eq!(
+            build_extension_url("", "popup.html").unwrap_err(),
+            AppError::new(codes::EXTENSION_INVALID_ID)
+        );
+        assert_eq!(
+            build_extension_url(CHROME_ID, "../popup.html").unwrap_err(),
+            AppError::new(codes::EXTENSION_INVALID_PAGE_PATH)
+        );
+    }
+
+    #[test]
+    fn 存在しない拡張機能の操作は見つからないコードになる() {
+        let mut state = ExtensionsState::default();
+        let expected = AppError::new(codes::EXTENSION_NOT_FOUND);
+
+        assert_eq!(
+            set_enabled_in_state(&mut state, "none", true).unwrap_err(),
+            expected
+        );
+        assert_eq!(
+            remove_entry_from_state(&mut state, "none").unwrap_err(),
+            expected
+        );
+    }
+
+    #[test]
+    fn 失敗の応答は種別コードだけをシリアライズし文章を含まない() {
+        let entry = エントリ("e1", true, false, false);
+        let errors = [
+            unsupported_error(),
+            validate_open_page(None, "popup", Some("acc1")).unwrap_err(),
+            validate_open_page(Some(&entry), "popup", Some("acc1")).unwrap_err(),
+            validate_open_page(Some(&entry), "x", Some("acc1")).unwrap_err(),
+            validate_open_page(Some(&entry), "popup", None).unwrap_err(),
+            build_extension_url("", "p.html").unwrap_err(),
+            ensure_local_folder_path(r"\\server\share").unwrap_err(),
+            prepare_folder_for_add("").unwrap_err(),
+        ];
+        for error in errors {
+            let json = serde_json::to_string(&error).unwrap();
+            assert_eq!(json, format!(r#"{{"code":"{}"}}"#, error.code));
+            assert!(json.is_ascii(), "{json}");
+            assert!(!json.contains(' '), "{json}");
+        }
     }
 
     #[test]
@@ -1222,10 +1314,10 @@ mod tests {
     }
 
     impl ProfileOps for Mock {
-        async fn list(&self) -> Result<Vec<InstalledExt>, String> {
+        async fn list(&self) -> Result<Vec<InstalledExt>, AppError> {
             Ok(self.installed.clone())
         }
-        async fn add(&self, path: &str) -> Result<InstalledExt, String> {
+        async fn add(&self, path: &str) -> Result<InstalledExt, AppError> {
             self.calls.borrow_mut().push(format!("add:{path}"));
             self.add_ids
                 .get(path)
@@ -1233,13 +1325,13 @@ mod tests {
                     id: id.clone(),
                     enabled: true,
                 })
-                .ok_or_else(|| "add 失敗".to_string())
+                .ok_or_else(|| AppError::internal("add failed"))
         }
-        async fn remove(&self, webview_id: &str) -> Result<(), String> {
+        async fn remove(&self, webview_id: &str) -> Result<(), AppError> {
             self.calls.borrow_mut().push(format!("remove:{webview_id}"));
             Ok(())
         }
-        async fn set_enabled(&self, webview_id: &str, enabled: bool) -> Result<(), String> {
+        async fn set_enabled(&self, webview_id: &str, enabled: bool) -> Result<(), AppError> {
             self.calls
                 .borrow_mut()
                 .push(format!("set_enabled:{webview_id}:{enabled}"));

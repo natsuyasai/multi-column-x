@@ -6,6 +6,7 @@ use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
 
 use super::model::ExtensionsState;
+use crate::commands::app_error::AppError;
 
 /// ストア内のキー名。
 pub const STORE_KEY: &str = "browserExtensions";
@@ -22,7 +23,7 @@ pub fn split_stored_value(value: Option<Value>) -> (ExtensionsState, Option<Valu
         Some(v) => match serde_json::from_value(v.clone()) {
             Ok(state) => (state, None),
             Err(e) => {
-                log::warn!("拡張機能の設定の読み込みに失敗したため空状態で続行します: {e}");
+                log::warn!("failed to load extension settings, using empty state: {e}");
                 (ExtensionsState::default(), Some(v))
             }
         },
@@ -36,29 +37,29 @@ pub fn state_from_value(value: Option<Value>) -> ExtensionsState {
 }
 
 /// 状態を保存用の値へ変換する。
-pub fn state_to_value(state: &ExtensionsState) -> Result<Value, String> {
-    serde_json::to_value(state).map_err(|e| e.to_string())
+pub fn state_to_value(state: &ExtensionsState) -> Result<Value, AppError> {
+    serde_json::to_value(state).map_err(AppError::internal)
 }
 
 /// 保存済みの拡張機能の状態を読み込む。
-pub fn load(app: &AppHandle) -> Result<ExtensionsState, String> {
-    let store = app.store(STORE_FILE).map_err(|e| e.to_string())?;
+pub fn load(app: &AppHandle) -> Result<ExtensionsState, AppError> {
+    let store = app.store(STORE_FILE).map_err(AppError::internal)?;
     let (state, broken) = split_stored_value(store.get(STORE_KEY));
     if let Some(broken) = broken {
         // 次の保存で破損値が上書きされて失われないよう、別キーへ退避する（1 世代）。
         store.set(BROKEN_KEY, broken);
         if let Err(e) = crate::commands::settings_file::save_store_atomically(app, &store) {
-            log::warn!("破損した拡張機能の設定の退避保存に失敗しました: {e}");
+            log::warn!("failed to save the corrupted extension settings aside: {e}");
         }
     }
     Ok(state)
 }
 
 /// 拡張機能の状態を保存する（`Store::save` ではなくアトミック保存を使う）。
-pub fn save(app: &AppHandle, state: &ExtensionsState) -> Result<(), String> {
-    let store = app.store(STORE_FILE).map_err(|e| e.to_string())?;
+pub fn save(app: &AppHandle, state: &ExtensionsState) -> Result<(), AppError> {
+    let store = app.store(STORE_FILE).map_err(AppError::internal)?;
     store.set(STORE_KEY, state_to_value(state)?);
-    crate::commands::settings_file::save_store_atomically(app, &store)
+    crate::commands::settings_file::save_store_atomically(app, &store).map_err(AppError::internal)
 }
 
 #[cfg(test)]

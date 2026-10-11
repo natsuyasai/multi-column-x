@@ -11,7 +11,8 @@ use super::manifest::read_manifest_info;
 use super::model::{
     AppliedExtension, ExtensionEntry, ExtensionSource, ExtensionsState, ProfileSync,
 };
-use super::sanitize::prepare_extension_dir;
+use super::sanitize::{app_error_of, prepare_extension_dir};
+use crate::commands::app_error::AppError;
 
 /// エントリの読み込み元フォルダの解決結果。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,7 +22,7 @@ pub enum ResolvedEntry {
     /// 見つからない（ブラウザから消えた / 元フォルダか manifest.json が無い / ブラウザ未検出）。
     Missing,
     /// 解決中のエラー（コピー失敗など）。
-    Error(String),
+    Error(AppError),
 }
 
 /// WebView2 に現在インストールされている拡張機能。
@@ -79,7 +80,7 @@ pub fn resolve_entry(
     };
     match prepare_extension_dir(&source_dir, copy_root, &entry.id) {
         Ok(prepared) => ResolvedEntry::Path(prepared.path.to_string_lossy().into_owned()),
-        Err(e) => ResolvedEntry::Error(e.to_string()),
+        Err(e) => ResolvedEntry::Error(app_error_of(&e)),
     }
 }
 
@@ -535,7 +536,7 @@ mod tests {
             ("e1", ResolvedEntry::Path("/new1".into())),
             ("e2", ResolvedEntry::Path("/p2".into())),
             ("e3", ResolvedEntry::Missing),
-            ("e4", ResolvedEntry::Error("x".into())),
+            ("e4", ResolvedEntry::Error(AppError::internal("x"))),
         ]);
         let mut applied = 適用map(&[
             ("e1", 適用済み("/old1", "w1")),
@@ -595,7 +596,10 @@ mod tests {
     #[test]
     fn 解決でエラーになったエントリは何もしない() {
         let entries = vec![フォルダ拡張("e1", "/ext/one", false)];
-        let resolved = 解決(&[("e1", ResolvedEntry::Error("copy failed".into()))]);
+        let resolved = 解決(&[(
+            "e1",
+            ResolvedEntry::Error(AppError::internal("copy failed")),
+        )]);
         let applied = 適用map(&[("e1", 適用済み("/old", "w1"))]);
         let plan = plan_profile(&entries, &resolved, &applied, &[導入済み("w1", true)]);
         assert!(plan.is_empty());
@@ -830,7 +834,7 @@ mod tests {
         let resolved = 解決(&[
             ("e1", ResolvedEntry::Missing),
             ("e2", ResolvedEntry::Path("/q".into())),
-            ("e3", ResolvedEntry::Error("x".into())),
+            ("e3", ResolvedEntry::Error(AppError::internal("x"))),
         ]);
         assert!(refresh_missing(&mut entries, &resolved));
         assert!(entries[0].missing);
@@ -905,7 +909,7 @@ mod tests {
             prop_oneof![
                 Just(None),
                 Just(Some(ResolvedEntry::Missing)),
-                Just(Some(ResolvedEntry::Error("err".to_string()))),
+                Just(Some(ResolvedEntry::Error(AppError::internal("err")))),
                 (0u8..3).prop_map(|p| Some(ResolvedEntry::Path(format!("/p{p}")))),
             ]
         }

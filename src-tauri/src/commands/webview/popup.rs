@@ -291,7 +291,10 @@ pub async fn open_popup_window(
         &popup_label,
         WebviewUrl::External(parse_url(&url)?),
     )
-    .title("X - メディア")
+    .title(crate::commands::ui_language::current_ui_text(
+        &app,
+        crate::commands::ui_language::UiText::WindowTitleMedia,
+    ))
     .inner_size(size.width, size.height)
     .position(pos.x, pos.y)
     .initialization_script(&popup_init)
@@ -395,7 +398,10 @@ pub async fn open_link_popup_window(
         &popup_label,
         WebviewUrl::External(parse_url(&url)?),
     )
-    .title("X - リンク")
+    .title(crate::commands::ui_language::current_ui_text(
+        &app,
+        crate::commands::ui_language::UiText::WindowTitleLink,
+    ))
     .inner_size(size.width, size.height)
     .position(pos.x, pos.y)
     .initialization_script(&popup_init)
@@ -611,7 +617,10 @@ async fn switch_popup_session_window(
 
     let builder =
         tauri::WebviewWindowBuilder::new(&app, &new_label, WebviewUrl::External(parse_url(&url)?))
-            .title("X - メディア")
+            .title(crate::commands::ui_language::current_ui_text(
+                &app,
+                crate::commands::ui_language::UiText::WindowTitleMedia,
+            ))
             .initialization_script(&popup_init)
             .on_new_window(external_link::new_window_handler(app.clone()))
             .data_directory(data_dir);

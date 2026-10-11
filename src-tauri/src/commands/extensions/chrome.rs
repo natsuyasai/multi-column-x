@@ -196,7 +196,7 @@ pub fn detect_extensions(
                     browser,
                 }),
                 Err(e) => log::warn!(
-                    "[extensions] Chrome 拡張機能を読み込めないため除外: id={chrome_id} dir={} err={e}",
+                    "[extensions] excluded because the Chrome extension could not be loaded: id={chrome_id} dir={} err={e}",
                     dir.display()
                 ),
             }

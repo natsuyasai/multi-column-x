@@ -30,7 +30,7 @@
 - 拡張機能は **全アカウント共通**。WebView2 は data_directory（= アカウントのプロファイル）ごとに拡張を持つので、アプリが各アカウントのプロファイルへ追加する。
 - 導入方法は 2 つ: 展開済みフォルダの指定（`add_extension_from_folder`）と、Chrome / Edge の Default プロファイルからの検出（`detect_chrome_extensions` → `add_chrome_extension`）。検出元は `%LOCALAPPDATA%\Google\Chrome\User Data\Default\Extensions\<ID>\<version>\`（Chrome）と `%LOCALAPPDATA%\Microsoft\Edge\User Data\Default\Extensions\<ID>\<version>\`（Edge）。Default 以外のプロファイルや Brave / Vivaldi などの自動検出は対象外（フォルダ指定で追加する）。UI のボタンは「ブラウザから検出」の 1 つで、候補と追加済み一覧に由来ブラウザ名（Chrome / Edge）を表示し、追加セクションに保存先パスの案内文を表示する。
 - 管理操作は追加・削除・有効/無効・ポップアップ / オプションページを別ウィンドウで開く。変更後はフロントが全カラムを再読込する。
-- **Windows 以外では UI を出さず、コマンドは「この環境では拡張機能に対応していません」を返すスタブ**（`mod.rs` の `ensure_supported`）。コマンド自体は全 OS の `generate_handler!` に登録されている（ACL 契約テストとの整合のため。`lib.rs` で cfg を付けていない）。
+- **Windows 以外では UI を出さず、コマンドは種別コード `extension.unsupported`（表示は「この環境では拡張機能に対応していません」）を返すスタブ**（`mod.rs` の `ensure_supported`）。コマンド自体は全 OS の `generate_handler!` に登録されている（ACL 契約テストとの整合のため。`lib.rs` で cfg を付けていない）。
 
 ### macOS・Linux を見送った調査結果と再検討の条件
 

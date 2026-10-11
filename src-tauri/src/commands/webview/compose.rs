@@ -51,7 +51,10 @@ pub(super) fn create_compose_window(
         &compose_label,
         WebviewUrl::External(parse_url(COMPOSE_URL)?),
     )
-    .title("X - ツイート")
+    .title(crate::commands::ui_language::current_ui_text(
+        app,
+        crate::commands::ui_language::UiText::WindowTitleCompose,
+    ))
     .inner_size(COMPOSE_WIDTH, COMPOSE_WINDOW_HEIGHT)
     .initialization_script(&popup_init)
     .on_new_window(external_link::new_window_handler(app.clone()))

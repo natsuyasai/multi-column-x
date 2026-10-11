@@ -27,7 +27,10 @@ pub async fn open_add_account_window(
                 .map_err(|e: url::ParseError| e.to_string())?,
         ),
     )
-    .title("アカウントを追加")
+    .title(crate::commands::ui_language::current_ui_text(
+        &app,
+        crate::commands::ui_language::UiText::WindowTitleAddAccount,
+    ))
     .inner_size(500.0, 700.0)
     .data_directory(data_dir.clone())
     .build()
@@ -353,7 +356,10 @@ pub async fn reauth_account_window(
                 .map_err(|e: url::ParseError| e.to_string())?,
         ),
     )
-    .title("アカウントを再認証")
+    .title(crate::commands::ui_language::current_ui_text(
+        &app,
+        crate::commands::ui_language::UiText::WindowTitleReauth,
+    ))
     .inner_size(500.0, 700.0)
     .data_directory(new_data_dir.clone())
     .build()
@@ -549,7 +555,7 @@ where
             }
         }
     }
-    Err(last_err.expect("attempts.max(1) により最低1回は試行される"))
+    Err(last_err.expect("at least one attempt is made because of attempts.max(1)"))
 }
 
 #[tauri::command]

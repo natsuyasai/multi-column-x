@@ -238,7 +238,8 @@
     "openOptionsLabel": "Open options of {{name}}",
     "accountRequired": "Select an account",
     "remove": "Delete",
-    "removeLabel": "Delete {{name}}"
+    "removeLabel": "Delete {{name}}",
+    "unnamed": "(Unnamed)"
   },
   "backup": {
     "noCredentials": "This backup does not include login information. Log in on the destination beforehand.",

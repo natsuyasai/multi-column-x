@@ -9,11 +9,12 @@ use std::path::Path;
 
 use serde::Deserialize;
 
+use super::format::io_coded;
 use super::format::{
     validate_column, validate_global_settings, BackupColumn, BackupError, BackupGlobalSettings,
     MAX_COLUMNS,
 };
-use super::snapshot::write_snapshot;
+use super::snapshot::{write_snapshot, SNAPSHOT_NAMES_EXHAUSTED};
 use crate::commands::settings::{AppSettingsData, ColumnData};
 
 /// フロントが紐づけ・再採番・グリッド正規化を済ませて送る復元内容。
@@ -45,29 +46,20 @@ fn check_column_reference(
 ) -> Result<(), BackupError> {
     validate_column(column)?;
     if !is_safe_column_id(&column.id) {
-        return Err(invalid("columns.id", "カラム id が安全ではありません"));
+        return Err(invalid("columns.id", "idUnsafe"));
     }
     if forbidden_ids.contains(column.id.as_str()) {
-        return Err(invalid(
-            "columns.id",
-            "復元先の既存カラム id と重複しています",
-        ));
+        return Err(invalid("columns.id", "idConflictsWithExisting"));
     }
     if !seen_ids.insert(column.id.clone()) {
-        return Err(invalid("columns.id", "カラム id が重複しています"));
+        return Err(invalid("columns.id", "idDuplicate"));
     }
     if column.page_type == "external" {
         if column.account_id != column.id {
-            return Err(invalid(
-                "columns.accountId",
-                "外部カラムの accountId はカラム自身の id と一致する必要があります",
-            ));
+            return Err(invalid("columns.accountId", "externalAccountIdMismatch"));
         }
     } else if !account_ids.contains(column.account_id.as_str()) {
-        return Err(invalid(
-            "columns.accountId",
-            "復元先に存在しないアカウントを参照しています",
-        ));
+        return Err(invalid("columns.accountId", "accountMissing"));
     }
     Ok(())
 }
@@ -99,10 +91,7 @@ pub fn compute_new_settings(
     }
     if let Some(default_account) = &payload.global_settings.default_account_id {
         if !account_ids.contains(default_account.as_str()) {
-            return Err(invalid(
-                "globalSettings.defaultAccountId",
-                "復元先に存在しないアカウントを参照しています",
-            ));
+            return Err(invalid("globalSettings.defaultAccountId", "accountMissing"));
         }
     }
 
@@ -121,10 +110,18 @@ pub fn apply_with_snapshot(
 ) -> Result<AppSettingsData, BackupError> {
     let next = compute_new_settings(current, payload)?;
     let current_bytes = serde_json::to_vec_pretty(current).map_err(|e| BackupError::Io {
+        code: None,
         message: e.to_string(),
     })?;
-    write_snapshot(snapshot_dir, unix_secs, &current_bytes).map_err(|e| BackupError::Io {
-        message: e.to_string(),
+    write_snapshot(snapshot_dir, unix_secs, &current_bytes).map_err(|e| {
+        if e.to_string() == SNAPSHOT_NAMES_EXHAUSTED {
+            io_coded("snapshotNamesExhausted", "")
+        } else {
+            BackupError::Io {
+                code: None,
+                message: e.to_string(),
+            }
+        }
     })?;
     Ok(next)
 }

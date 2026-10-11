@@ -447,12 +447,12 @@ fn backup_invalid_settings(app: &AppHandle, raw: &serde_json::Value) -> Option<S
     let dir = match app.path().app_data_dir() {
         Ok(d) => d,
         Err(e) => {
-            log::error!("設定の退避先ディレクトリの取得に失敗しました: {e}");
+            log::error!("failed to get the settings backup directory: {e}");
             return None;
         }
     };
     if let Err(e) = std::fs::create_dir_all(&dir) {
-        log::error!("設定の退避先ディレクトリの作成に失敗しました: {e}");
+        log::error!("failed to create the settings backup directory: {e}");
         return None;
     }
 
@@ -465,7 +465,7 @@ fn backup_invalid_settings(app: &AppHandle, raw: &serde_json::Value) -> Option<S
     let content = match serde_json::to_string_pretty(raw) {
         Ok(c) => c,
         Err(e) => {
-            log::error!("退避データのシリアライズに失敗しました: {e}");
+            log::error!("failed to serialize the backup data: {e}");
             return None;
         }
     };
@@ -473,7 +473,7 @@ fn backup_invalid_settings(app: &AppHandle, raw: &serde_json::Value) -> Option<S
     match std::fs::write(&path, content) {
         Ok(()) => Some(path.to_string_lossy().to_string()),
         Err(e) => {
-            log::error!("設定の退避に失敗しました: {e}");
+            log::error!("failed to back up the settings: {e}");
             None
         }
     }
@@ -500,7 +500,7 @@ fn apply_recovery(recovery: Option<SettingsRecovery>) -> Option<LoadSettingsResu
             backup_path,
         }),
         Some(SettingsRecovery::Restored) => {
-            log::warn!("壊れた設定ファイルを直前の世代から復元しました");
+            log::warn!("restored the corrupted settings file from the previous generation");
             None
         }
         Some(SettingsRecovery::Healthy) | None => None,
@@ -534,7 +534,7 @@ pub async fn load_settings(
             backup_path: None,
         }),
         ParsedSettings::Invalid { raw, error } => {
-            log::error!("設定の読み込みに失敗しました: {error}");
+            log::error!("failed to load the settings: {error}");
             let backup_path = backup_invalid_settings(&app, &raw);
             Ok(LoadSettingsResult {
                 settings: AppSettingsData::default(),

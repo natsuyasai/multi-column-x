@@ -111,6 +111,28 @@ describe("ExtensionsTab", () => {
     expect(screen.queryByText("新しい拡張")).not.toBeInTheDocument();
   });
 
+  it("種別コードで失敗すると日本語表示では従来と同じ文言がエラーとして表示される", async () => {
+    const { user } = setup({
+      addFromFolder: vi.fn(async () => {
+        throw { code: "extension.manifestMissing" };
+      }),
+    });
+
+    await user.click(
+      screen.getByRole("button", { name: "フォルダを指定して追加" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "拡張機能として読み込めません（manifest.json が見つかりません）",
+    );
+  });
+
+  it("名前が空の拡張機能は名前なしと表示される", async () => {
+    setup({}, [entry({ name: "" })]);
+
+    expect(await screen.findByText("(名前なし)")).toBeInTheDocument();
+  });
+
   it("ChromeまたはEdgeにインストール済みの拡張機能が候補として一覧表示される", async () => {
     const { user } = setup({
       detectChromeExtensions: vi.fn(async () => ({
@@ -722,6 +744,63 @@ describe("ExtensionsTab 英語表示", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Failed to list extensions",
     );
+    expectNoJapanese(document.body);
+  });
+
+  it("表示言語が英語のとき拡張機能の追加に失敗するとエラーの種別コードが英語で表示される", async () => {
+    await useEnglish();
+    const { user } = setup({
+      addFromFolder: vi.fn(async () => {
+        throw { code: "extension.manifestMissing" };
+      }),
+    });
+
+    await user.click(screen.getByRole("button", { name: "Add from folder" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Can't load as an extension (manifest.json not found)",
+    );
+    expectNoJapanese(document.body);
+  });
+
+  it("表示言語が英語のとき詳細付きの失敗は詳細が埋め込まれ日本語が表示されない", async () => {
+    await useEnglish();
+    const { user } = setup({
+      addFromFolder: vi.fn(async () => {
+        throw { code: "extension.loadFailed", detail: "0x800700AB" };
+      }),
+    });
+
+    await user.click(screen.getByRole("button", { name: "Add from folder" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Couldn't load the extension (error code 0x800700AB)",
+    );
+    expectNoJapanese(document.body);
+  });
+
+  it("表示言語が英語のとき一覧の取得がコードで失敗しても英語で表示される", async () => {
+    await useEnglish();
+    setup({
+      listExtensions: vi.fn(async () => {
+        throw { code: "extension.unsupported" };
+      }),
+    });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Extensions are not supported in this environment",
+    );
+    expectNoJapanese(document.body);
+  });
+
+  it("表示言語が英語のとき名前が空の拡張機能はUnnamedと表示され日本語が表示されない", async () => {
+    await useEnglish();
+    setup({}, [entry({ name: "" })]);
+
+    expect(await screen.findByText("(Unnamed)")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Delete (Unnamed)" }),
+    ).toBeInTheDocument();
     expectNoJapanese(document.body);
   });
 

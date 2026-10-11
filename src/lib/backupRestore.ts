@@ -234,6 +234,9 @@ export type BackupErrorKind =
 
 export interface BackupErrorInfo {
   kind: BackupErrorKind;
+  /** io の種別コード（selectionCancelled など）。OS 由来の失敗には無い */
+  code?: string;
+  /** 生のエラー文字列（OS 由来などの詳細） */
   message?: string;
   field?: string;
   reason?: string;
@@ -245,6 +248,25 @@ export interface BackupErrorInfo {
 
 const withDetail = (t: AppTFunction, base: string, detail?: string) =>
   detail ? t("messages:backup.error.withDetail", { base, detail }) : base;
+
+/** 理由コードを翻訳する。未知のコード（読み込み時の生の解析エラー文字列など）はそのまま返す */
+function describeReason(reason: string | undefined, t: AppTFunction) {
+  // 理由コードは英数字のみ。それ以外（生の文字列）は辞書を引かない
+  if (!reason || !/^[A-Za-z]+$/.test(reason)) return reason;
+  // 動的キー（コードは Rust 側の理由コード。辞書との対応は backupRestore.error.test.ts が保証する）
+  return t(`messages:backup.reason.${reason}` as never, {
+    defaultValue: reason,
+  });
+}
+
+/** io の種別コードを翻訳する。コードが無い／未知なら生のエラー文字列を使う */
+function describeIoDetail(error: BackupErrorInfo, t: AppTFunction) {
+  if (!error.code || !/^[A-Za-z]+$/.test(error.code)) return error.message;
+  return t(`messages:backup.ioCode.${error.code}` as never, {
+    detail: error.message ?? "",
+    defaultValue: error.message,
+  });
+}
 
 /** エラー種別から利用者向け文言を作る。将来バージョンだけ「アプリを更新してください」を案内する */
 export function describeBackupError(
@@ -270,10 +292,16 @@ export function describeBackupError(
       return withDetail(
         t,
         t("messages:backup.error.invalidField"),
-        [error.field, error.reason].filter(Boolean).join(": "),
+        [error.field, describeReason(error.reason, t)]
+          .filter(Boolean)
+          .join(": "),
       );
     case "io":
-      return withDetail(t, t("messages:backup.error.io"), error.message);
+      return withDetail(
+        t,
+        t("messages:backup.error.io"),
+        describeIoDetail(error, t),
+      );
     case "settingsUnreadable":
       return t("messages:backup.error.settingsUnreadable");
   }

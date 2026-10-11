@@ -3,6 +3,7 @@
 //! Cisco の特許ロイヤリティ負担は「Ciscoの配布チャネルから直接ダウンロードする」
 //! 場合にのみ適用されるため、AppImageには同梱せずこの方式を採る。
 
+use crate::commands::app_error::{codes, AppError};
 use crate::commands::arch_support::validate_arch;
 use crate::commands::openh264_http_client::{
     build_client_with, map_reqwest_error, CONNECT_TIMEOUT, READ_TIMEOUT,
@@ -23,7 +24,7 @@ pub(crate) fn build_download_url(version: &str) -> String {
 
 /// ダウンロードしたバイト列が expected_hex（64桁hex, 大文字小文字問わず）と
 /// 一致するか検証する（純粋関数）。
-pub(crate) fn verify_sha256(data: &[u8], expected_hex: &str) -> Result<(), String> {
+pub(crate) fn verify_sha256(data: &[u8], expected_hex: &str) -> Result<(), AppError> {
     use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
     hasher.update(data);
@@ -32,21 +33,21 @@ pub(crate) fn verify_sha256(data: &[u8], expected_hex: &str) -> Result<(), Strin
     if actual_hex.eq_ignore_ascii_case(expected_hex) {
         Ok(())
     } else {
-        Err(format!(
+        Err(AppError::internal(format!(
             "sha256 mismatch: expected {expected_hex}, got {actual_hex}"
-        ))
+        )))
     }
 }
 
 /// bzip2圧縮されたバイト列を展開する。
-pub(crate) fn decompress_bz2(data: &[u8]) -> Result<Vec<u8>, String> {
+pub(crate) fn decompress_bz2(data: &[u8]) -> Result<Vec<u8>, AppError> {
     use bzip2::read::BzDecoder;
     use std::io::Read;
     let mut decoder = BzDecoder::new(data);
     let mut out = Vec::new();
     decoder
         .read_to_end(&mut out)
-        .map_err(|e| format!("bzip2展開に失敗しました: {e}"))?;
+        .map_err(|e| AppError::with_detail(codes::H264_EXTRACT_FAILED, e))?;
     Ok(out)
 }
 
@@ -71,16 +72,18 @@ fn invalidate_gstreamer_registry_cache() {
     );
     if dir.exists() {
         if let Err(e) = std::fs::remove_dir_all(&dir) {
-            log::warn!("GStreamerレジストリキャッシュの削除に失敗しました: {e}");
+            log::warn!("failed to delete the GStreamer registry cache: {e}");
         }
     }
 }
 
 /// main ウィンドウ以外からの呼び出しを拒否する（column/popup WebView は x.com を
 /// 表示しておりIPCが付与されているため、任意のダウンロードトリガーを防ぐ）。
-pub(crate) fn validate_window_label(window_label: &str) -> Result<(), String> {
+pub(crate) fn validate_window_label(window_label: &str) -> Result<(), AppError> {
     if window_label != crate::ipc_constants::labels::MAIN {
-        Err("download_and_enable_h264 is only allowed from the main window".into())
+        Err(AppError::internal(
+            "download_and_enable_h264 is only allowed from the main window",
+        ))
     } else {
         Ok(())
     }
@@ -91,7 +94,7 @@ pub(crate) fn validate_window_label(window_label: &str) -> Result<(), String> {
 /// レジストリキャッシュを削除する（次回起動時の再スキャンを強制するため）。
 #[cfg(all(desktop, target_os = "linux"))]
 #[tauri::command]
-pub async fn download_and_enable_h264(caller: tauri::Webview) -> Result<(), String> {
+pub async fn download_and_enable_h264(caller: tauri::Webview) -> Result<(), AppError> {
     validate_window_label(caller.label())?;
     validate_arch(std::env::consts::ARCH)?;
 
@@ -99,16 +102,19 @@ pub async fn download_and_enable_h264(caller: tauri::Webview) -> Result<(), Stri
     let client = build_client_with(READ_TIMEOUT, CONNECT_TIMEOUT)?;
     let resp = client.get(&url).send().await.map_err(map_reqwest_error)?;
     if !resp.status().is_success() {
-        return Err(format!("download failed: HTTP {}", resp.status()));
+        return Err(AppError::internal(format!(
+            "download failed: HTTP {}",
+            resp.status()
+        )));
     }
     let bytes = resp.bytes().await.map_err(map_reqwest_error)?;
     verify_sha256(&bytes, OPENH264_SHA256_AMD64)?;
     let decompressed = decompress_bz2(&bytes)?;
 
     let dir = crate::linux_codec_env::openh264_lib_dir();
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(AppError::internal)?;
     let dest = dir.join(OPENH264_LIB_FILENAME);
-    std::fs::write(&dest, &decompressed).map_err(|e| e.to_string())?;
+    std::fs::write(&dest, &decompressed).map_err(AppError::internal)?;
 
     invalidate_gstreamer_registry_cache();
 
@@ -177,7 +183,9 @@ mod tests {
     fn decompress_bz2は不正なバイト列を渡すとerrを返す() {
         let invalid_data = b"this is not bzip2 data";
         let result = decompress_bz2(invalid_data);
-        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.code, codes::H264_EXTRACT_FAILED);
+        assert!(err.detail.is_some());
     }
 
     // ===== compute_gstreamer_registry_cache_dir のテスト =====

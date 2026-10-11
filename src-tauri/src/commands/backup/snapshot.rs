@@ -12,6 +12,8 @@ use crate::commands::settings::utc_datetime_parts;
 /// 退避ファイル名の接頭辞。
 const SNAPSHOT_PREFIX: &str = "appsettings-";
 const SNAPSHOT_EXTENSION: &str = ".json";
+/// 同一秒内の退避ファイル名が使い切られたことを示す `io::Error` の識別子（文章ではなくコード）。
+pub const SNAPSHOT_NAMES_EXHAUSTED: &str = "snapshotNamesExhausted";
 /// 保持する退避の世代数。
 pub const SNAPSHOT_KEEP: usize = 5;
 /// 同一秒の衝突を避けるための連番の最大試行数。
@@ -71,12 +73,8 @@ pub fn write_snapshot(dir: &Path, unix_secs: u64, bytes: &[u8]) -> io::Result<Pa
             Err(e) => return Err(e),
         }
     }
-    let path = written.ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::AlreadyExists,
-            "同一秒内の退避ファイル名が使い切られました",
-        )
-    })?;
+    let path = written
+        .ok_or_else(|| io::Error::new(io::ErrorKind::AlreadyExists, SNAPSHOT_NAMES_EXHAUSTED))?;
 
     prune_snapshots(dir, &path);
     Ok(path)
@@ -103,7 +101,7 @@ fn prune_snapshots(dir: &Path, keep_path: &Path) {
         .take(excess)
     {
         if let Err(e) = fs::remove_file(&path) {
-            log::warn!("古い復元前退避の削除に失敗しました: {e}");
+            log::warn!("failed to delete old pre-restore snapshot: {e}");
         }
     }
 }

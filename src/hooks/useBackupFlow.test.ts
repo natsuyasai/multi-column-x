@@ -293,6 +293,48 @@ describe("useBackupFlow 復元", () => {
       expect(containsJapanese(text)).toBe(false);
     });
 
+    it("検証エラーの理由コードが英語に翻訳され日本語を含まない", async () => {
+      mocked.performRestore.mockResolvedValue({
+        status: "rejected",
+        error: {
+          kind: "invalidField",
+          field: "columns.id",
+          reason: "idConflictsWithExisting",
+        },
+      });
+      const { result } = setup();
+      await toConfirm(result);
+
+      await act(async () => {
+        await result.current.execute();
+      });
+
+      const text = result.current.message?.text ?? "";
+      expect(text).toContain(
+        "The backup contains an invalid value (columns.id: Conflicts with an existing column id at the restore target)",
+      );
+      expect(containsJapanese(text)).toBe(false);
+    });
+
+    it("退避名の枯渇など種別コード付きの入出力エラーが英語に翻訳される", async () => {
+      mocked.performRestore.mockResolvedValue({
+        status: "rejected",
+        error: { kind: "io", code: "snapshotNamesExhausted", message: "" },
+      });
+      const { result } = setup();
+      await toConfirm(result);
+
+      await act(async () => {
+        await result.current.execute();
+      });
+
+      const text = result.current.message?.text ?? "";
+      expect(text).toContain(
+        "Failed to read or write the file (Backup file names for the same second have run out)",
+      );
+      expect(containsJapanese(text)).toBe(false);
+    });
+
     it("WebView の再生成に失敗したときの案内が英語で表示される", async () => {
       mocked.performRestore.mockResolvedValue({ status: "recreateFailed" });
       const { result } = setup();
