@@ -1,8 +1,10 @@
 # Android での使い方
 
+デスクトップ（Windows / Linux）との機能の違いは [対応環境と機能一覧](./environments) を参照してください。
+
 ## 画面構成
 
-![Android のアプリ画面](images/android-app-screen.png)
+<img src="./images/android-app-screen.png" alt="Android のアプリ画面" width="320">
 
 _画面下部のタブバーで、カラム（タブ）の切り替えとメニュー操作を行います（タイムラインの内容はモザイク処理しています）。_
 
