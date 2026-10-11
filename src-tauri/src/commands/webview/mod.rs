@@ -516,6 +516,26 @@ mod tests {
     }
 
     #[test]
+    fn 全てのwebview生成箇所にファイルドロップ無効化が付いている() {
+        let sources = [
+            ("column.rs", include_str!("column.rs")),
+            ("popup.rs", include_str!("popup.rs")),
+            ("compose.rs", include_str!("compose.rs")),
+        ];
+        for (name, source) in sources {
+            let code = production_code(source);
+            let builders = code.matches("WebviewWindowBuilder::new").count()
+                + code.matches("WebviewBuilder::new").count();
+            let disabled = code.matches(".disable_drag_drop_handler()").count();
+            assert!(builders > 0, "{name}: webview 生成箇所が見つからない");
+            assert_eq!(
+                builders, disabled,
+                "{name}: webview 生成箇所の数とファイルドロップ無効化の数が一致しない"
+            );
+        }
+    }
+
+    #[test]
     fn アカウントのdatadirectoryを使う全builderにwindows限定の拡張機能フラグが付いている() {
         // column.rs の Linux 側 WebviewWindowBuilder は対象外（子 WebView の builder のみ）。
         let sources = [
