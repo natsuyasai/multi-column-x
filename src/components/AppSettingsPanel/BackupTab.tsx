@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import type { BackupMessage, BackupStep } from "@/hooks/useBackupFlow";
 import {
   canExecuteRestore,
@@ -10,17 +11,6 @@ import {
 } from "@/lib/backupRestore";
 import type { Account } from "../../types";
 import styles from "./BackupTab.module.scss";
-
-export const NO_CREDENTIALS_NOTICE =
-  "このバックアップにはログイン情報は含まれません。復元先で事前にログインしてください";
-export const EXPORT_PRIVACY_NOTICE =
-  "バックアップファイルにはアカウント名・NGワード・リポスト非表示ユーザーなどの個人情報が含まれます。共有・保管するときは取り扱いに注意してください。";
-export const REAUTH_HINT =
-  "Xユーザー IDが未取得のアカウントは自動で候補を選べません。該当アカウントを再認証すると自動候補が効くようになります。";
-export const SAVE_BLOCKED_NOTICE =
-  "設定を読み込めていないため、バックアップの読み込みと復元はできません。アプリを再起動してください。";
-export const REPLACE_WARNING =
-  "現在のカラムと設定（ウィンドウ位置を除く）はすべてバックアップの内容に置き換わります。アカウントは置き換わりません。復元直前の設定は自動で退避されます。";
 
 interface BackupTabProps {
   /** 復元先（このアプリにログイン済み）のアカウント */
@@ -60,6 +50,7 @@ export const BackupTab: React.FC<BackupTabProps> = ({
   onBackToMapping,
   onExecute,
 }) => {
+  const { t } = useTranslation();
   const messageBox = message && (
     <p
       role={message.kind === "error" ? "alert" : "status"}
@@ -86,14 +77,19 @@ export const BackupTab: React.FC<BackupTabProps> = ({
         )}
         {step === "confirm" && (
           <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>復元の確認</h3>
+            <h3 className={styles.sectionTitle}>
+              {t("settings:backup.confirm.title")}
+            </h3>
             <p className={styles.summary}>
-              復元されるカラム {summary.restore} 件 / スキップ {summary.skip} 件
+              {t("settings:backup.confirm.summary", {
+                restore: summary.restore,
+                skip: summary.skip,
+              })}
             </p>
             <p className={`${styles.message} ${styles.warning}`}>
-              {REPLACE_WARNING}
+              {t("settings:backup.replaceWarning")}
             </p>
-            <p className={styles.note}>{NO_CREDENTIALS_NOTICE}</p>
+            <p className={styles.note}>{t("settings:backup.noCredentials")}</p>
             <div className={styles.buttonRow}>
               <button
                 type="button"
@@ -101,7 +97,7 @@ export const BackupTab: React.FC<BackupTabProps> = ({
                 onClick={onBackToMapping}
                 disabled={busy}
               >
-                戻る
+                {t("settings:backup.confirm.back")}
               </button>
               <button
                 type="button"
@@ -109,7 +105,7 @@ export const BackupTab: React.FC<BackupTabProps> = ({
                 onClick={onExecute}
                 disabled={busy || saveBlocked}
               >
-                置き換えて復元
+                {t("settings:backup.confirm.execute")}
               </button>
             </div>
           </section>
@@ -122,13 +118,13 @@ export const BackupTab: React.FC<BackupTabProps> = ({
   return (
     <div className={styles.container}>
       <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>バックアップを作成</h3>
-        <p className={styles.note}>
-          アカウント情報（名前・色）・カラム構成・設定を1つのファイルに書き出します。
-        </p>
-        <p className={styles.note}>{NO_CREDENTIALS_NOTICE}</p>
+        <h3 className={styles.sectionTitle}>
+          {t("settings:backup.export.title")}
+        </h3>
+        <p className={styles.note}>{t("settings:backup.export.note")}</p>
+        <p className={styles.note}>{t("settings:backup.noCredentials")}</p>
         <p className={`${styles.message} ${styles.warning}`}>
-          {EXPORT_PRIVACY_NOTICE}
+          {t("settings:backup.exportPrivacy")}
         </p>
         <div className={styles.buttonRow}>
           <button
@@ -137,17 +133,19 @@ export const BackupTab: React.FC<BackupTabProps> = ({
             onClick={onExport}
             disabled={busy}
           >
-            バックアップを書き出す
+            {t("settings:backup.export.button")}
           </button>
         </div>
       </section>
 
       <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>バックアップから復元</h3>
-        <p className={styles.note}>{NO_CREDENTIALS_NOTICE}</p>
+        <h3 className={styles.sectionTitle}>
+          {t("settings:backup.restore.title")}
+        </h3>
+        <p className={styles.note}>{t("settings:backup.noCredentials")}</p>
         {saveBlocked && (
           <p role="alert" className={`${styles.message} ${styles.error}`}>
-            {SAVE_BLOCKED_NOTICE}
+            {t("settings:backup.saveBlocked")}
           </p>
         )}
         <div className={styles.buttonRow}>
@@ -157,7 +155,7 @@ export const BackupTab: React.FC<BackupTabProps> = ({
             onClick={onPickFile}
             disabled={busy || saveBlocked}
           >
-            バックアップファイルを選択
+            {t("settings:backup.restore.pickFile")}
           </button>
         </div>
       </section>
@@ -185,6 +183,7 @@ const MappingStep: React.FC<MappingStepProps> = ({
   onCancel,
   onProceed,
 }) => {
+  const { t } = useTranslation();
   const columnCounts = countColumnsByBackupAccount(content.columns);
   const sharedTargets = findSharedTargets(mapping);
   const canExecute = canExecuteRestore(mapping);
@@ -194,15 +193,14 @@ const MappingStep: React.FC<MappingStepProps> = ({
 
   return (
     <section className={styles.section}>
-      <h3 className={styles.sectionTitle}>アカウントの紐づけ</h3>
-      <p className={styles.note}>
-        バックアップ内のアカウントごとに、復元先のログイン済みアカウントを選んでください。
-        「復元しない」を選んだアカウントのカラムは復元されません。
-      </p>
-      <p className={styles.note}>{NO_CREDENTIALS_NOTICE}</p>
+      <h3 className={styles.sectionTitle}>
+        {t("settings:backup.mapping.title")}
+      </h3>
+      <p className={styles.note}>{t("settings:backup.mapping.note")}</p>
+      <p className={styles.note}>{t("settings:backup.noCredentials")}</p>
       {accounts.length === 0 && (
         <p role="alert" className={`${styles.message} ${styles.error}`}>
-          復元先にログイン済みのアカウントがありません。先にアカウントを追加してください。
+          {t("settings:backup.mapping.noTargets")}
         </p>
       )}
       <ul className={styles.mappingList}>
@@ -215,18 +213,24 @@ const MappingStep: React.FC<MappingStepProps> = ({
             />
             <span className={styles.accountLabel}>{backup.label}</span>
             <span className={styles.columnCount}>
-              カラム {columnCounts[backup.backupAccountId] ?? 0} 件
+              {t("settings:backup.mapping.columnCount", {
+                count: columnCounts[backup.backupAccountId] ?? 0,
+              })}
             </span>
             <select
               className={styles.select}
-              aria-label={`${backup.label} の復元先`}
+              aria-label={t("settings:backup.mapping.targetLabel", {
+                name: backup.label,
+              })}
               value={mapping[backup.backupAccountId] ?? ""}
               onChange={(e) =>
                 onChangeMapping(backup.backupAccountId, e.target.value || null)
               }
               disabled={busy}
             >
-              <option value="">復元しない</option>
+              <option value="">
+                {t("settings:backup.mapping.skipOption")}
+              </option>
               {accounts.map((target) => (
                 <option key={target.id} value={target.id}>
                   {target.label}
@@ -238,15 +242,19 @@ const MappingStep: React.FC<MappingStepProps> = ({
       </ul>
       {sharedTargets.length > 0 && (
         <p role="status" className={`${styles.message} ${styles.warning}`}>
-          同じ復元先に複数のバックアップ内アカウントが割り当てられています（
-          {sharedTargets.map(labelOf).join("、")}
-          ）。意図した紐づけか確認してください。
+          {t("settings:backup.mapping.shared", {
+            names: sharedTargets
+              .map(labelOf)
+              .join(t("settings:backup.mapping.nameSeparator")),
+          })}
         </p>
       )}
-      {hasTargetWithoutXUserId && <p className={styles.note}>{REAUTH_HINT}</p>}
+      {hasTargetWithoutXUserId && (
+        <p className={styles.note}>{t("settings:backup.reauthHint")}</p>
+      )}
       {!canExecute && (
         <p role="status" className={`${styles.message} ${styles.warning}`}>
-          紐づけが1件もないため復元できません。復元先を1つ以上選んでください。
+          {t("settings:backup.mapping.none")}
         </p>
       )}
       <div className={styles.buttonRow}>
@@ -256,7 +264,7 @@ const MappingStep: React.FC<MappingStepProps> = ({
           onClick={onCancel}
           disabled={busy}
         >
-          キャンセル
+          {t("settings:panel.actions.cancel")}
         </button>
         <button
           type="button"
@@ -264,7 +272,7 @@ const MappingStep: React.FC<MappingStepProps> = ({
           onClick={onProceed}
           disabled={busy || !canExecute}
         >
-          確認へ進む
+          {t("settings:backup.mapping.proceed")}
         </button>
       </div>
     </section>

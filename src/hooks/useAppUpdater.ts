@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import i18n from "@/i18n";
 import { STORAGE_KEYS } from "../constants/ipc";
 import { logError } from "../lib/log";
 import { shouldAutoPrompt } from "../lib/updatePrompt";
@@ -10,9 +11,6 @@ import {
 } from "../services/updater";
 
 type ManualResult = "idle" | "none" | "error";
-
-const INSTALL_ERROR_MESSAGE =
-  "更新のインストールに失敗しました。時間をおいて再度お試しください。";
 
 function readDismissed(): string | null {
   try {
@@ -91,7 +89,7 @@ export function useAppUpdater(isMobile: boolean, ready: boolean = true) {
       logError("useAppUpdater:install")(e);
       setInstalling(false);
       setProgress(null);
-      setInstallError(INSTALL_ERROR_MESSAGE);
+      setInstallError(i18n.t("messages:update.installFailed"));
     }
   }, [updater]);
 

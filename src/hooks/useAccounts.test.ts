@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import i18n from "@/i18n";
+import { containsJapanese } from "@/test-utils/japanese";
 import { IPC_EVENTS } from "../constants/ipc";
 import { useAppStore } from "../store/useAppStore";
 import { DEFAULT_COLUMN_SETTINGS } from "../types";
@@ -1622,5 +1624,98 @@ describe("useAccounts (mobile reauth)", () => {
       title: "再認証",
       message: "再認証に失敗しました（アカウント識別子を取得できませんでした）",
     });
+  });
+});
+
+describe("useAccounts 表示言語", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(async () => {
+    await i18n.changeLanguage("ja");
+  });
+
+  const addAccountForDefaultName = async () => {
+    useAppStore.setState({ accounts: [], isMobile: true });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "open_add_account_window" ? addAccountResult : undefined,
+    );
+    const { result } = renderHook(() => useAccounts());
+    await act(async () => {
+      await result.current.startAddAccount();
+    });
+    return result.current.pendingAccountName;
+  };
+
+  it("表示言語が日本語のとき既定のアカウント名は従来どおり「アカウント 1」になる", async () => {
+    const pending = await addAccountForDefaultName();
+
+    expect(pending?.defaultValue).toBe("アカウント 1");
+  });
+
+  it("表示言語が英語のとき既定のアカウント名は「Account 1」になり日本語を含まない", async () => {
+    await i18n.changeLanguage("en");
+
+    const pending = await addAccountForDefaultName();
+
+    expect(pending?.defaultValue).toBe("Account 1");
+  });
+
+  it("表示言語が英語のとき再認証のスキップ通知が英語で表示される", async () => {
+    await i18n.changeLanguage("en");
+    useAppStore.setState({ accounts: [makeReauthAccount()], isMobile: false });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "reauth_account_window" ? reauthWindowResult : undefined,
+    );
+    const { result } = renderHook(() => useAccounts(vi.fn()));
+
+    await act(async () => {
+      const reauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: "123",
+        newDataDirectory: NEW_DATA_DIRECTORY,
+      });
+      await reauthPromise;
+    });
+
+    const notice = result.current.accountNotice;
+    expect(notice?.title).toBe("Re-authentication");
+    expect(notice?.message).toBe(
+      "This was the first re-authentication, so the identity check was skipped and the account identifier was recorded.",
+    );
+    expect(containsJapanese(`${notice?.title}${notice?.message}`)).toBe(false);
+  });
+
+  it("表示言語が英語のときアカウントのデータフォルダ削除失敗の通知が英語で表示される", async () => {
+    await i18n.changeLanguage("en");
+    useAppStore.setState({
+      accounts: [makeReauthAccount()],
+      columns: [],
+      isMobile: false,
+    });
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "delete_account_data") {
+        throw new Error("locked");
+      }
+      return undefined;
+    });
+    const { result } = renderHook(() => useAccounts());
+
+    act(() => {
+      result.current.removeAccount("acc-1");
+    });
+    await act(async () => {
+      await result.current.confirmRemoval();
+    });
+
+    const notice = result.current.accountNotice;
+    expect(notice?.title).toBe("Delete account");
+    expect(notice?.message).toBe(
+      "Could not delete the account's data folder. You can delete it later with “Retry deleting data folders” in the app settings.",
+    );
+    expect(containsJapanese(`${notice?.title}${notice?.message}`)).toBe(false);
   });
 });

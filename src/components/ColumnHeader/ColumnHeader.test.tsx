@@ -3,6 +3,8 @@ import { render, screen, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { IPC_COMMANDS, WEBVIEW_LABELS } from "@/constants/ipc";
+import i18n from "@/i18n";
+import { expectNoJapanese } from "@/test-utils/japanese";
 import { useAutoReload } from "../../hooks/useAutoReload";
 import type { Column, Account } from "../../types";
 import { ColumnHeader } from "./ColumnHeader";
@@ -362,5 +364,48 @@ describe("ColumnHeader 更新ボタンのカウントダウンリセット", () 
     expect(screen.getByTitle("次の自動更新まで")).toHaveTextContent("55s");
     fireEvent.click(screen.getByLabelText("ページを再読み込み"));
     expect(screen.getByTitle("次の自動更新まで")).toHaveTextContent("60s");
+  });
+});
+
+describe("ColumnHeader 表示言語", () => {
+  const englishAccount: Account = { ...mockAccount, label: "Main account" };
+
+  it("表示言語が英語のときカラムヘッダーに日本語の文言が表示されない", async () => {
+    await i18n.changeLanguage("en");
+    const column: Column = { ...mockColumn, homeTabName: "Following" };
+    mockUseAutoReload.mockReturnValueOnce({ remaining: 5, reset: vi.fn() });
+    const { container } = render(
+      <ColumnHeader
+        {...defaultProps}
+        column={column}
+        account={englishAccount}
+        unreadCount={3}
+        onClearUnread={vi.fn()}
+      />,
+    );
+    expectNoJapanese(container);
+    expect(screen.getByText("Main account - Following")).toBeInTheDocument();
+    expect(screen.getByTitle("Clear unread")).toBeInTheDocument();
+    expect(screen.getByLabelText("Has unread posts")).toBeInTheDocument();
+    expect(screen.getByTitle("Until next auto-reload")).toBeInTheDocument();
+    expect(screen.getByLabelText("Scroll to top")).toBeInTheDocument();
+    expect(screen.getByLabelText("Refresh")).toBeInTheDocument();
+    expect(screen.getByLabelText("Reload page")).toBeInTheDocument();
+    expect(screen.getByLabelText("Settings")).toBeInTheDocument();
+    expect(screen.getByLabelText("Close column")).toBeInTheDocument();
+  });
+
+  it("表示言語が英語のとき外部カラムのヘッダーに日本語の文言が表示されない", async () => {
+    await i18n.changeLanguage("en");
+    const column: Column = {
+      ...mockColumn,
+      pageType: "external",
+      customUrl: "https://example.com/a",
+    };
+    const { container } = render(
+      <ColumnHeader {...defaultProps} column={column} account={undefined} />,
+    );
+    expectNoJapanese(container);
+    expect(screen.getByText("External: example.com")).toBeInTheDocument();
   });
 });

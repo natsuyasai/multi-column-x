@@ -1,6 +1,8 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { act, render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
+import i18n from "@/i18n";
+import { expectNoJapanese } from "@/test-utils/japanese";
 import type { Account, Column, GlobalSettings } from "../../types";
 import { DEFAULT_COLUMN_SETTINGS } from "../../types";
 import { AddColumnDialog } from "./AddColumnDialog";
@@ -467,5 +469,65 @@ describe("AddColumnDialog", () => {
     );
     const labelInput = screen.getByRole("textbox", { name: /表示名（任意）/ });
     expect(labelInput).toHaveAttribute("maxLength", "30");
+  });
+});
+
+describe("AddColumnDialog の表示言語", () => {
+  const englishAccounts: Account[] = [
+    { ...mockAccounts[0], label: "Account A" },
+  ];
+  const renderDialog = () =>
+    render(
+      <AddColumnDialog
+        accounts={englishAccounts}
+        globalSettings={mockGlobalSettings}
+        existingColumns={[]}
+        onAdd={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+  it("表示言語が英語のときカラム追加ダイアログに日本語の文言が表示されない", async () => {
+    await i18n.changeLanguage("en");
+    const user = userEvent.setup();
+    const { container } = renderDialog();
+    expectNoJapanese(container);
+    expect(screen.getByText("Add column")).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Tab name (optional)" }),
+    ).toBeInTheDocument();
+
+    for (const pageType of [
+      "notifications",
+      "search",
+      "list",
+      "custom",
+      "external",
+      "compose",
+      "home",
+    ]) {
+      await user.selectOptions(screen.getByLabelText("Page type"), pageType);
+      expectNoJapanese(container);
+    }
+    await user.selectOptions(screen.getByLabelText("Page type"), "external");
+    expect(
+      screen.getByText(/Opens in a dedicated session/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+  });
+
+  it("ダイアログを開いたまま表示言語を切り替えると開いている画面の文言も切り替わる", async () => {
+    renderDialog();
+    expect(screen.getByText("カラムを追加")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "追加" })).toBeInTheDocument();
+
+    await act(async () => {
+      await i18n.changeLanguage("en");
+    });
+
+    expect(screen.getByText("Add column")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add" })).toBeInTheDocument();
+    expect(screen.queryByText("カラムを追加")).not.toBeInTheDocument();
   });
 });

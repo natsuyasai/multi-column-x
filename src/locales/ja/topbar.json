@@ -1,0 +1,25 @@
+{
+  "compose": {
+    "title": "ツイートを作成 (Ctrl+T)",
+    "label": "ツイート"
+  },
+  "linkPopup": {
+    "title": "URLをポップアップで開く (Ctrl+L)",
+    "label": "URLを開く"
+  },
+  "addColumn": {
+    "title": "カラムを追加 (Ctrl+N)",
+    "label": "カラム追加"
+  },
+  "accounts": {
+    "title": "アカウント管理 (Ctrl+Shift+A)",
+    "label": "アカウント"
+  },
+  "settings": {
+    "title": "アプリ設定 (Ctrl+,)",
+    "label": "設定"
+  },
+  "collapse": "ツールバーを折りたたむ (Ctrl+B)",
+  "expand": "ツールバーを展開 (Ctrl+B)",
+  "closeColumn": "カラムを閉じる"
+}

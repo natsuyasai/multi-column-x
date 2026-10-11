@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
+import i18n from "@/i18n";
 import { IPC_COMMANDS } from "../constants/ipc";
 import { logError } from "../lib/log";
 import type {
@@ -12,14 +13,6 @@ import type {
   LoadSettingsResult,
 } from "../types";
 import { DEFAULT_GLOBAL_SETTINGS } from "../types";
-
-const SETTINGS_LOAD_FAILED_WITH_BACKUP_MESSAGE = (backupPath: string) =>
-  `設定ファイルを読み込めなかったため、初期設定で起動しました。元の設定は次の場所にバックアップしました: ${backupPath}`;
-const SETTINGS_LOAD_FAILED_WITHOUT_BACKUP_MESSAGE =
-  "設定ファイルを読み込めなかったため、初期設定で起動しました。元の設定のバックアップにも失敗しました。";
-
-const SETTINGS_LOAD_ERROR_MESSAGE =
-  "設定を読み込めなかったため、初期状態で起動しました。保存済みの設定を上書きしないよう、アプリを再起動するまで変更は保存されません。";
 
 export function migrateColumn(
   col: Partial<Column> &
@@ -167,8 +160,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
         settingsSaveBlocked: false,
         settingsLoadNotice: loadFailed
           ? backupPath
-            ? SETTINGS_LOAD_FAILED_WITH_BACKUP_MESSAGE(backupPath)
-            : SETTINGS_LOAD_FAILED_WITHOUT_BACKUP_MESSAGE
+            ? i18n.t("messages:settings.loadFailed.withBackup", { backupPath })
+            : i18n.t("messages:settings.loadFailed.withoutBackup")
           : null,
       });
     } catch {
@@ -176,7 +169,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       set({
         isLoaded: true,
         settingsSaveBlocked: true,
-        settingsLoadNotice: SETTINGS_LOAD_ERROR_MESSAGE,
+        settingsLoadNotice: i18n.t("messages:settings.loadFailed.error"),
       });
     }
   },

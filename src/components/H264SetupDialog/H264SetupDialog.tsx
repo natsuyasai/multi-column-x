@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useEscapeKey } from "@/hooks/useEscapeKey";
 import type { H264DownloadState } from "@/hooks/useH264Setup";
 import styles from "./H264SetupDialog.module.scss";
@@ -14,8 +15,6 @@ interface Props {
   onRelaunch: () => void;
 }
 
-const FALLBACK_ERROR_MESSAGE = "ダウンロードに失敗しました。";
-
 export const H264SetupDialog: React.FC<Props> = ({
   downloadState,
   downloadError,
@@ -24,6 +23,7 @@ export const H264SetupDialog: React.FC<Props> = ({
   onClose,
   onRelaunch,
 }) => {
+  const { t } = useTranslation();
   const dialogRef = useRef<HTMLDivElement>(null);
   const primaryRef = useRef<HTMLButtonElement>(null);
   const downloading = downloadState === "downloading";
@@ -52,22 +52,18 @@ export const H264SetupDialog: React.FC<Props> = ({
         tabIndex={-1}
       >
         <h2 id="h264-setup-title" className={styles.title}>
-          動画を再生するための追加コンポーネント
+          {t("dialogs:h264.title")}
         </h2>
 
         {(downloadState === "idle" || downloading) && (
           <>
             <p className={styles.description}>
-              動画の再生に必要な H.264 デコーダが見つかりません。Cisco
-              の公式配布元から H.264
-              デコーダ（OpenH264）を取得して有効化できます。
+              {t("dialogs:h264.description")}
             </p>
-            <p className={styles.note}>
-              このデコーダは Cisco のライセンスに基づいて提供されます。
-            </p>
+            <p className={styles.note}>{t("dialogs:h264.note")}</p>
             {downloading && (
               <p className={styles.status} role="status">
-                ダウンロード中…
+                {t("dialogs:h264.downloading")}
               </p>
             )}
             <div className={styles.actions}>
@@ -77,7 +73,7 @@ export const H264SetupDialog: React.FC<Props> = ({
                 onClick={onDismiss}
                 disabled={downloading}
               >
-                今はしない
+                {t("dialogs:h264.dismiss")}
               </button>
               <button
                 ref={primaryRef}
@@ -86,7 +82,7 @@ export const H264SetupDialog: React.FC<Props> = ({
                 onClick={onDownload}
                 disabled={downloading}
               >
-                ダウンロードして有効化
+                {t("dialogs:h264.download")}
               </button>
             </div>
           </>
@@ -95,7 +91,7 @@ export const H264SetupDialog: React.FC<Props> = ({
         {downloadState === "success" && (
           <>
             <p className={styles.status} role="status">
-              有効化しました。反映するにはアプリの再起動が必要です。
+              {t("dialogs:h264.success")}
             </p>
             <div className={styles.actions}>
               <button
@@ -103,7 +99,7 @@ export const H264SetupDialog: React.FC<Props> = ({
                 className={styles.secondaryBtn}
                 onClick={onClose}
               >
-                後で
+                {t("dialogs:h264.later")}
               </button>
               <button
                 ref={primaryRef}
@@ -111,7 +107,7 @@ export const H264SetupDialog: React.FC<Props> = ({
                 className={styles.primaryBtn}
                 onClick={onRelaunch}
               >
-                今すぐ再起動
+                {t("dialogs:h264.relaunch")}
               </button>
             </div>
           </>
@@ -120,7 +116,7 @@ export const H264SetupDialog: React.FC<Props> = ({
         {downloadState === "error" && (
           <>
             <p className={styles.error} role="alert">
-              {downloadError ?? FALLBACK_ERROR_MESSAGE}
+              {downloadError ?? t("dialogs:h264.fallbackError")}
             </p>
             <div className={styles.actions}>
               <button
@@ -128,7 +124,7 @@ export const H264SetupDialog: React.FC<Props> = ({
                 className={styles.secondaryBtn}
                 onClick={onClose}
               >
-                閉じる
+                {t("dialogs:h264.close")}
               </button>
               <button
                 ref={primaryRef}
@@ -136,7 +132,7 @@ export const H264SetupDialog: React.FC<Props> = ({
                 className={styles.primaryBtn}
                 onClick={onDownload}
               >
-                再試行
+                {t("dialogs:h264.retry")}
               </button>
             </div>
           </>

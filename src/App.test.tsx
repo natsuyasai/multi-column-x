@@ -9,6 +9,7 @@ import {
   act,
 } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { expectNoJapanese } from "@/test-utils/japanese";
 import App from "./App";
 import { WEBVIEW_SCRIPTS } from "./constants/ipc";
 import { getHeaderHeight, getTopBarHeight } from "./lib/gridLayout";
@@ -116,7 +117,11 @@ const column: Column = {
   settings: { ...DEFAULT_COLUMN_SETTINGS },
 };
 
-const globalSettings: GlobalSettings = { ...DEFAULT_GLOBAL_SETTINGS };
+// 既存テストは日本語表示を前提にするため、OS ロケールに依存しないよう言語を固定する
+const globalSettings: GlobalSettings = {
+  ...DEFAULT_GLOBAL_SETTINGS,
+  language: "ja",
+};
 
 // App のマウント時に走る load_settings が、テストで setState した状態をそのまま返すようにする。
 // （load_settings が失敗すると保存ブロック＋通知ダイアログが出て、カラム位置の検証に影響するため）
@@ -1082,5 +1087,100 @@ describe("App (拡張機能の変更後の全カラム再読込)", () => {
       expect.stringContaining("col-1"),
       expect.stringContaining("col-2"),
     ]);
+  });
+});
+
+describe("App (表示言語)", () => {
+  const englishSettings: GlobalSettings = {
+    ...DEFAULT_GLOBAL_SETTINGS,
+    language: "en",
+  };
+  const englishAccount = { ...account, label: "Main" };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInvokeWithCurrentSettings();
+    mockPlatform.mockReturnValue("windows");
+    useAppStore.setState({
+      accounts: [englishAccount],
+      columns: [],
+      globalSettings: englishSettings,
+      isLoaded: true,
+      isMobile: false,
+      topBarExpanded: false,
+      unreadCounts: {},
+      settingsLoadNotice: null,
+    });
+  });
+
+  afterEach(() => {
+    useAppStore.setState({ settingsLoadNotice: null });
+  });
+
+  it("表示言語が日本語のとき読み込み中の表示は従来どおりの文言になる", () => {
+    useAppStore.setState({ isLoaded: false, globalSettings });
+    render(<App />);
+    expect(screen.getByText("読み込み中...")).toBeInTheDocument();
+  });
+
+  it("表示言語が英語のとき読み込み中の表示が英語になる", async () => {
+    useAppStore.setState({ isLoaded: false });
+    mockInvoke.mockImplementation(() => new Promise(() => {}));
+    render(<App />);
+    expect(await screen.findByText("Loading...")).toBeInTheDocument();
+    expectNoJapanese(document.body);
+  });
+
+  it("表示言語が英語のとき設定読み込み失敗のダイアログに日本語が表示されない", async () => {
+    useAppStore.setState({ isLoaded: false });
+    mockInvoke.mockImplementation(async (cmd: string) =>
+      cmd === "load_settings"
+        ? {
+            settings: {
+              accounts: [englishAccount],
+              columns: [],
+              globalSettings: englishSettings,
+            },
+            loadFailed: true,
+            backupPath: "/data/settings.json.bak",
+          }
+        : undefined,
+    );
+    render(<App />);
+    expect(
+      await screen.findByText("Failed to load settings"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/The original settings were backed up to/),
+    ).toBeInTheDocument();
+    expectNoJapanese(document.body);
+  });
+
+  it("表示言語が英語のときアカウント削除の確認ダイアログに日本語が表示されない", async () => {
+    await act(async () => {
+      render(<App />);
+    });
+    fireEvent.click(screen.getByTitle("Manage accounts (Ctrl+Shift+A)"));
+    fireEvent.click(screen.getByLabelText("Delete Main"));
+
+    expect(
+      screen.getByText("Delete “Main”? Its session data will also be deleted."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Delete account")).toBeInTheDocument();
+    expectNoJapanese(document.body);
+  });
+
+  it("表示言語が英語のとき公式設定ポップアップのタイトルが英語になる", async () => {
+    await act(async () => {
+      render(<App />);
+    });
+    fireEvent.click(screen.getByTitle("App settings (Ctrl+,)"));
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Open official settings" })[0],
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Open official settings" }),
+    ).toBeInTheDocument();
   });
 });

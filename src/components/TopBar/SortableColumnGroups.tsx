@@ -17,6 +17,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import {
   buildGroups,
   resolveGroupMove,
@@ -52,7 +53,8 @@ const ColumnEntry: React.FC<ColumnEntryProps> = ({
   onJumpToColumn,
   onClose,
 }) => {
-  const name = columnDisplayName(column, accounts);
+  const { t } = useTranslation();
+  const name = columnDisplayName(column, accounts, t);
   const title = orderIndex < 9 ? `${name} (Ctrl+${orderIndex + 1})` : name;
 
   if (variant === "collapsed") {
@@ -80,8 +82,8 @@ const ColumnEntry: React.FC<ColumnEntryProps> = ({
       <button
         className={styles.btn}
         onClick={() => onClose(column.id)}
-        aria-label="カラムを閉じる"
-        title="カラムを閉じる"
+        aria-label={t("topbar:closeColumn")}
+        title={t("topbar:closeColumn")}
       >
         <CloseIcon width={14} height={14} data-testid="icon-close" />
       </button>

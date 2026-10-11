@@ -7,6 +7,7 @@ import {
   sendNotification,
 } from "@tauri-apps/plugin-notification";
 import { useEffect, useRef } from "react";
+import i18n from "@/i18n";
 import {
   IPC_EVENTS,
   OFFICIAL_SETTINGS_WHITELIST_KEYS,
@@ -157,8 +158,8 @@ async function notifyNewPosts(columnName: string): Promise<void> {
   const granted = await ensureNotificationPermissionGranted();
   if (!granted) return;
   sendNotification({
-    title: "新着通知",
-    body: `${columnName}に新着があります`,
+    title: i18n.t("messages:notification.newPostsTitle"),
+    body: i18n.t("messages:notification.newPostsBody", { columnName }),
   });
 }
 
@@ -181,7 +182,7 @@ export function useNewPostsNotification(
         setUnreadCount(columnId, count);
 
         if (col.settings.autoReloadEnabled && count > 0) {
-          const columnName = getColumnLabel(col);
+          const columnName = getColumnLabel(col, i18n.t);
           void notifyNewPosts(columnName);
         }
       },

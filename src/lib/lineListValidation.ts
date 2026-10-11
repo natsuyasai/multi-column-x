@@ -2,6 +2,7 @@
 // 行リスト入力（NGワード / ホワイトリスト / リポスト非表示ユーザー）の
 // parse・validate（Tauri 非依存の純粋関数）。
 
+import type { AppTFunction } from "@/i18n/types";
 import { validateNgWordLines } from "./ngWordPattern";
 import { parseUserIdLines, validateUserIdLine } from "./repostHiddenUserId";
 
@@ -17,16 +18,23 @@ function splitLines(text: string): string[] {
 }
 
 /** NGワード / ホワイトリスト形式（1行1ワード・/正規表現/flags 可）の入力を解析・検証する。 */
-export function parseAndValidateWordLines(text: string): LineListParseResult {
+export function parseAndValidateWordLines(
+  text: string,
+  t: AppTFunction,
+): LineListParseResult {
   const values = splitLines(text);
-  const error = validateNgWordLines(values);
+  const error = validateNgWordLines(values, t);
   return error ? { kind: "invalid", error } : { kind: "valid", values };
 }
 
 /** リポスト非表示ユーザー（1行1ID）の入力を解析・検証する。最初の不正行のエラーを返す。 */
-export function parseAndValidateUserIdLines(text: string): LineListParseResult {
+export function parseAndValidateUserIdLines(
+  text: string,
+  t: AppTFunction,
+): LineListParseResult {
   const values = parseUserIdLines(text);
   const error =
-    values.map((id) => validateUserIdLine(id)).find((e) => e !== null) ?? null;
+    values.map((id) => validateUserIdLine(id, t)).find((e) => e !== null) ??
+    null;
   return error ? { kind: "invalid", error } : { kind: "valid", values };
 }

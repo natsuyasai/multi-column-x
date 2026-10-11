@@ -1,3 +1,4 @@
+import type { AppTFunction } from "@/i18n/types";
 import type { LanguageSetting } from "@/lib/language";
 
 export type PageType =
@@ -263,32 +264,39 @@ export function normalizeColumnLabel(input: string): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-export function getPageTypeLabel(input: GetPageTypeLabelInput): string {
+export function getPageTypeLabel(
+  input: GetPageTypeLabelInput,
+  t: AppTFunction,
+): string {
   switch (input.pageType) {
     case "home":
-      return input.homeTabName ?? "ホーム";
+      return input.homeTabName ?? t("columns:pageType.home");
     case "notifications":
-      return "通知";
+      return t("columns:pageType.notifications");
     case "search":
-      return input.searchQuery ? `検索: ${input.searchQuery}` : "検索";
+      return input.searchQuery
+        ? t("columns:pageType.searchWithQuery", { query: input.searchQuery })
+        : t("columns:pageType.search");
     case "list":
-      return "リスト";
+      return t("columns:pageType.list");
     case "custom":
-      return "カスタム";
+      return t("columns:pageType.custom");
     case "external":
-      if (!input.customUrl) return "外部サイト";
+      if (!input.customUrl) return t("columns:pageType.external");
       try {
-        return `外部: ${new URL(input.customUrl).hostname}`;
+        return t("columns:pageType.externalWithHost", {
+          host: new URL(input.customUrl).hostname,
+        });
       } catch {
-        return "外部サイト";
+        return t("columns:pageType.external");
       }
     case "compose":
-      return "投稿";
+      return t("columns:pageType.compose");
   }
 }
 
-export function getColumnLabel(column: Column): string {
-  return column.label || getPageTypeLabel(column);
+export function getColumnLabel(column: Column, t: AppTFunction): string {
+  return column.label || getPageTypeLabel(column, t);
 }
 
 /** 拡張機能の検出元ブラウザ */

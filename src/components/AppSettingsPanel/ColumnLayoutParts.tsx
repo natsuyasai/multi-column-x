@@ -19,6 +19,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { rowCountForCol } from "@/components/AppSettingsPanel/columnLayoutDraft";
 import type { ColumnGroup } from "@/lib/columnOrder";
 import type { Column } from "@/types";
@@ -50,6 +51,7 @@ export const GridPreview: React.FC<GridPreviewProps> = ({
   onCellClick,
   onRemove,
 }) => {
+  const { t } = useTranslation();
   return (
     <div className={styles.gridPreview} data-testid="grid-preview">
       {Array.from({ length: cols }, (_, cIdx) => {
@@ -57,7 +59,9 @@ export const GridPreview: React.FC<GridPreviewProps> = ({
         const rows = rowCountForCol(draft, colNum);
         return (
           <div key={cIdx} className={styles.gridColumn}>
-            <div className={styles.gridColHeader}>列 {colNum}</div>
+            <div className={styles.gridColHeader}>
+              {t("settings:layout.colHeader", { col: colNum })}
+            </div>
             <div className={styles.gridColCells}>
               {Array.from({ length: rows }, (_, rIdx) => {
                 const r = rIdx + 1;
@@ -77,7 +81,10 @@ export const GridPreview: React.FC<GridPreviewProps> = ({
                       className={`${styles.cell} ${styles.cellAssigned} ${isSelected ? styles.cellSelected : ""}`}
                       role="button"
                       tabIndex={0}
-                      aria-label={`列${colNum}行${r}のセル`}
+                      aria-label={t("settings:layout.cellLabel", {
+                        col: colNum,
+                        row: r,
+                      })}
                       onClick={() => onCellClick(r, colNum)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
@@ -92,11 +99,11 @@ export const GridPreview: React.FC<GridPreviewProps> = ({
                       <span className={styles.cellHeight}>
                         {colAtCell.heightMode === "fixed"
                           ? `${colAtCell.heightValue}${colAtCell.heightUnit}`
-                          : "均等"}
+                          : t("settings:layout.heightEven")}
                       </span>
                       <button
                         className={styles.removeBtn}
-                        aria-label="割り当て解除"
+                        aria-label={t("settings:layout.unassign")}
                         onClick={(e) => {
                           e.stopPropagation();
                           onRemove(colAtCell.id);
@@ -113,7 +120,10 @@ export const GridPreview: React.FC<GridPreviewProps> = ({
                     className={`${styles.cell} ${isPending ? styles.cellPending : ""}`}
                     role="button"
                     tabIndex={0}
-                    aria-label={`列${colNum}行${r}のセル`}
+                    aria-label={t("settings:layout.cellLabel", {
+                      col: colNum,
+                      row: r,
+                    })}
                     onClick={() => onCellClick(r, colNum)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
@@ -122,7 +132,7 @@ export const GridPreview: React.FC<GridPreviewProps> = ({
                       }
                     }}
                   >
-                    {pendingCell ? "← ここに配置" : "+"}
+                    {pendingCell ? t("settings:layout.placeHere") : "+"}
                   </div>
                 );
               })}
@@ -130,7 +140,7 @@ export const GridPreview: React.FC<GridPreviewProps> = ({
                 className={styles.addRowBtn}
                 onClick={() => onCellClick(rows + 1, colNum)}
               >
-                + 行を追加
+                {t("settings:layout.addRow")}
               </button>
             </div>
           </div>
@@ -153,9 +163,12 @@ export const UnassignedList: React.FC<UnassignedListProps> = ({
   getLabel,
   onAssign,
 }) => {
+  const { t } = useTranslation();
   return (
     <div className={styles.unassigned}>
-      <div className={styles.unassignedLabel}>未割当</div>
+      <div className={styles.unassignedLabel}>
+        {t("settings:layout.unassigned")}
+      </div>
       {unassigned.map((col) => (
         <button
           key={col.id}
@@ -168,11 +181,14 @@ export const UnassignedList: React.FC<UnassignedListProps> = ({
         </button>
       ))}
       {unassigned.length === 0 && (
-        <div className={styles.emptyNotice}>なし</div>
+        <div className={styles.emptyNotice}>{t("settings:layout.none")}</div>
       )}
       {pendingCell && (
         <div className={styles.pendingHint}>
-          クリックして列 {pendingCell.col} の行 {pendingCell.row} に配置
+          {t("settings:layout.pendingHint", {
+            col: pendingCell.col,
+            row: pendingCell.row,
+          })}
         </div>
       )}
     </div>
@@ -195,10 +211,11 @@ export const HeightSettings: React.FC<HeightSettingsProps> = ({
   getLabel,
   onHeightChange,
 }) => {
+  const { t } = useTranslation();
   return (
     <div className={styles.heightSettings}>
       <div className={styles.heightSettingsTitle}>
-        高さ設定 — {getLabel(column)}
+        {t("settings:layout.heightTitle", { label: getLabel(column) })}
       </div>
       <div className={styles.heightRow}>
         <label className={styles.radioLabel}>
@@ -208,7 +225,7 @@ export const HeightSettings: React.FC<HeightSettingsProps> = ({
             checked={column.heightMode === "auto"}
             onChange={() => onHeightChange(column.id, "auto")}
           />
-          均等（自動）
+          {t("settings:layout.heightAuto")}
         </label>
         <label className={styles.radioLabel}>
           <input
@@ -224,7 +241,7 @@ export const HeightSettings: React.FC<HeightSettingsProps> = ({
               )
             }
           />
-          固定:
+          {t("settings:layout.heightFixed")}
         </label>
         {column.heightMode === "fixed" && (
           <div className={styles.fixedInputGroup}>
@@ -283,6 +300,7 @@ const SortableOrderItem: React.FC<SortableOrderItemProps> = ({
   onMoveUp,
   onMoveDown,
 }) => {
+  const { t } = useTranslation();
   const {
     attributes,
     listeners,
@@ -308,8 +326,8 @@ const SortableOrderItem: React.FC<SortableOrderItemProps> = ({
       <button
         type="button"
         className={`${styles.dragHandle}${isMobile ? ` ${styles.dragHandleMobile}` : ""}`}
-        aria-label="ドラッグして並び替え"
-        title="ドラッグして並び替え"
+        aria-label={t("settings:layout.dragReorder")}
+        title={t("settings:layout.dragReorder")}
         {...attributes}
         {...listeners}
       >
@@ -320,7 +338,7 @@ const SortableOrderItem: React.FC<SortableOrderItemProps> = ({
         <button
           type="button"
           className={btnClass}
-          aria-label="上へ"
+          aria-label={t("settings:layout.moveUp")}
           disabled={isFirst}
           onClick={onMoveUp}
         >
@@ -329,7 +347,7 @@ const SortableOrderItem: React.FC<SortableOrderItemProps> = ({
         <button
           type="button"
           className={btnClass}
-          aria-label="下へ"
+          aria-label={t("settings:layout.moveDown")}
           disabled={isLast}
           onClick={onMoveDown}
         >
@@ -357,6 +375,7 @@ export const ColumnOrderList: React.FC<ColumnOrderListProps> = ({
   onMoveDown,
   onDragEnd,
 }) => {
+  const { t } = useTranslation();
   const sensors = useSensors(
     // 8px 動かすまでドラッグ開始しない → ▲▼ボタンのクリックと競合しない
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -367,7 +386,7 @@ export const ColumnOrderList: React.FC<ColumnOrderListProps> = ({
 
   return (
     <div className={styles.orderSection}>
-      <div className={styles.orderLabel}>表示順序</div>
+      <div className={styles.orderLabel}>{t("settings:layout.orderLabel")}</div>
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}

@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import i18n from "@/i18n";
 import { createUpdater } from "../services/updater";
 import { useAppUpdater } from "./useAppUpdater";
 
@@ -196,6 +197,21 @@ describe("useAppUpdater", () => {
     await act(async () => await result.current.install());
     expect(result.current.installError).toBe(
       "更新のインストールに失敗しました。時間をおいて再度お試しください。",
+    );
+  });
+
+  it("表示言語が英語のときインストール失敗のエラーが英語で設定される", async () => {
+    await i18n.changeLanguage("en");
+    const install = vi.fn().mockRejectedValue(new Error("boom"));
+    vi.mocked(createUpdater).mockReturnValue({
+      check: vi.fn().mockResolvedValue({ version: "1.2.0" }),
+      install,
+    });
+    const { result } = renderHook(() => useAppUpdater(false));
+    await waitFor(() => expect(result.current.available).not.toBeNull());
+    await act(async () => await result.current.install());
+    expect(result.current.installError).toBe(
+      "Failed to install the update. Please try again later.",
     );
   });
 

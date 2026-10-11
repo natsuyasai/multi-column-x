@@ -31,6 +31,23 @@ describe("i18n", () => {
     expect(translate("onlyJa", { ns: TEST_NS })).toBe("日本語だけの文言");
   });
 
+  it("実キーの補間は言語ごとの語順で値が埋め込まれる", async () => {
+    const params = { base: "基本", detail: "値" };
+
+    await i18n.changeLanguage("ja");
+    expect(i18n.t("messages:backup.error.withDetail", params)).toBe(
+      "基本（値）",
+    );
+
+    await i18n.changeLanguage("en");
+    expect(i18n.t("messages:backup.error.withDetail", params)).toBe(
+      "基本 (値)",
+    );
+    expect(i18n.t("columns:pageType.searchWithQuery", { query: "q" })).toBe(
+      "Search: q",
+    );
+  });
+
   it("補間変数を持つ訳文に値を渡すと文中に埋め込まれる", async () => {
     i18n.addResourceBundle(
       "ja",

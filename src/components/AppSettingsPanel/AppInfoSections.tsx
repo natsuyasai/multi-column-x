@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import styles from "./AppSettingsPanel.module.scss";
 
 interface AppInfoSectionsProps {
@@ -28,80 +29,95 @@ export const AppInfoSections: React.FC<AppInfoSectionsProps> = ({
   dataDirectoryDeletionRetryResult,
   dataDirectoryDeletionRemainingCount,
   onRetryDataDirectoryDeletion,
-}) => (
-  <>
-    <section className={styles.section}>
-      <h3 className={styles.sectionTitle}>公式設定</h3>
-      <p className={styles.hint}>
-        X公式の設定画面をポップアップウィンドウで開きます。開いた画面から他アカウントへ設定を適用できます。
-      </p>
-      <button
-        type="button"
-        className={styles.applyAllBtn}
-        onClick={onOpenOfficialSettings}
-      >
-        公式設定を開く
-      </button>
-    </section>
-
-    <section className={styles.section}>
-      <h3 className={styles.sectionTitle}>WebView</h3>
-      <p className={styles.hint}>
-        全カラムのWebViewを順番に再生成します。設定は維持されます。
-      </p>
-      <button
-        type="button"
-        className={styles.applyAllBtn}
-        onClick={onReloadAllWebviews}
-      >
-        全WebViewを再生成
-      </button>
-    </section>
-
-    <section className={styles.section}>
-      <h3 className={styles.sectionTitle}>アプリ情報</h3>
-      <p className={styles.hint}>現在のバージョン: {appVersion}</p>
-      <button
-        type="button"
-        className={styles.applyAllBtn}
-        onClick={onCheckUpdate}
-        disabled={updateChecking}
-      >
-        {updateChecking ? "確認中..." : "更新を確認"}
-      </button>
-      {updateManualResult === "none" && (
-        <p className={styles.hint}>最新のバージョンです</p>
-      )}
-      {updateManualResult === "error" && (
-        <p className={styles.hint}>更新の確認に失敗しました</p>
-      )}
-    </section>
-
-    {pendingDataDirectoryDeletionCount > 0 && (
+}) => {
+  const { t } = useTranslation();
+  return (
+    <>
       <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>データフォルダの削除</h3>
+        <h3 className={styles.sectionTitle}>
+          {t("settings:info.officialSettings.title")}
+        </h3>
         <p className={styles.hint}>
-          {`削除できなかったデータフォルダが${pendingDataDirectoryDeletionCount}件あります`}
+          {t("settings:info.officialSettings.hint")}
         </p>
         <button
           type="button"
           className={styles.applyAllBtn}
-          onClick={onRetryDataDirectoryDeletion}
-          disabled={retryingDataDirectoryDeletion}
+          onClick={onOpenOfficialSettings}
         >
-          {retryingDataDirectoryDeletion
-            ? "削除中..."
-            : "データフォルダの削除を再実行"}
+          {t("settings:info.officialSettings.open")}
         </button>
-        {dataDirectoryDeletionRetryResult === "success" && (
-          <p className={styles.hint}>データフォルダを削除しました</p>
+      </section>
+
+      <section className={styles.section}>
+        <h3 className={styles.sectionTitle}>
+          {t("settings:info.webview.title")}
+        </h3>
+        <p className={styles.hint}>{t("settings:info.webview.hint")}</p>
+        <button
+          type="button"
+          className={styles.applyAllBtn}
+          onClick={onReloadAllWebviews}
+        >
+          {t("settings:info.webview.reload")}
+        </button>
+      </section>
+
+      <section className={styles.section}>
+        <h3 className={styles.sectionTitle}>{t("settings:info.app.title")}</h3>
+        <p className={styles.hint}>
+          {t("settings:info.app.version", { version: appVersion })}
+        </p>
+        <button
+          type="button"
+          className={styles.applyAllBtn}
+          onClick={onCheckUpdate}
+          disabled={updateChecking}
+        >
+          {updateChecking
+            ? t("settings:info.app.checking")
+            : t("settings:info.app.check")}
+        </button>
+        {updateManualResult === "none" && (
+          <p className={styles.hint}>{t("settings:info.app.upToDate")}</p>
         )}
-        {dataDirectoryDeletionRetryResult === "remaining" && (
-          <p className={styles.hint}>
-            {`${dataDirectoryDeletionRemainingCount}件のデータフォルダを削除できませんでした`}
-          </p>
+        {updateManualResult === "error" && (
+          <p className={styles.hint}>{t("settings:info.app.checkFailed")}</p>
         )}
       </section>
-    )}
-  </>
-);
+
+      {pendingDataDirectoryDeletionCount > 0 && (
+        <section className={styles.section}>
+          <h3 className={styles.sectionTitle}>
+            {t("settings:info.dataDir.title")}
+          </h3>
+          <p className={styles.hint}>
+            {t("settings:info.dataDir.pending", {
+              count: pendingDataDirectoryDeletionCount,
+            })}
+          </p>
+          <button
+            type="button"
+            className={styles.applyAllBtn}
+            onClick={onRetryDataDirectoryDeletion}
+            disabled={retryingDataDirectoryDeletion}
+          >
+            {retryingDataDirectoryDeletion
+              ? t("settings:info.dataDir.deleting")
+              : t("settings:info.dataDir.retry")}
+          </button>
+          {dataDirectoryDeletionRetryResult === "success" && (
+            <p className={styles.hint}>{t("settings:info.dataDir.success")}</p>
+          )}
+          {dataDirectoryDeletionRetryResult === "remaining" && (
+            <p className={styles.hint}>
+              {t("settings:info.dataDir.remaining", {
+                count: dataDirectoryDeletionRemainingCount,
+              })}
+            </p>
+          )}
+        </section>
+      )}
+    </>
+  );
+};

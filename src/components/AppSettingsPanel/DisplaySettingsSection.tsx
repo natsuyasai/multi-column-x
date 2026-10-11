@@ -5,6 +5,22 @@ import type { ColumnScale, UiScale } from "../../types";
 import styles from "./AppSettingsPanel.module.scss";
 import type { SettingsDraft, SetSettingsDraft } from "./settingsDraft";
 
+const UI_SCALE_VALUES: UiScale[] = [
+  "auto",
+  "small",
+  "standard",
+  "large",
+  "xLarge",
+];
+const COLUMN_SCALE_VALUES: ColumnScale[] = [
+  "small",
+  "default",
+  "normal",
+  "large",
+  "xLarge",
+];
+const THEME_VALUES = ["dark", "light", "system"] as const;
+
 interface DisplaySettingsSectionProps {
   draft: SettingsDraft;
   set: SetSettingsDraft;
@@ -15,10 +31,10 @@ export const DisplaySettingsSection: React.FC<DisplaySettingsSectionProps> = ({
   draft,
   set,
 }) => {
-  const { t } = useTranslation(["common", "settings"]);
+  const { t } = useTranslation();
   return (
     <section className={styles.section}>
-      <h3 className={styles.sectionTitle}>表示</h3>
+      <h3 className={styles.sectionTitle}>{t("settings:display.title")}</h3>
       <div className={styles.scaleRow}>
         <span className={styles.scaleLabel}>
           {t("settings:language.label")}
@@ -43,7 +59,9 @@ export const DisplaySettingsSection: React.FC<DisplaySettingsSectionProps> = ({
       </div>
       <p className={styles.hint}>{t("settings:language.hint")}</p>
       <div className={styles.scaleRow}>
-        <span className={styles.scaleLabel}>アプリUIの表示サイズ</span>
+        <span className={styles.scaleLabel}>
+          {t("settings:display.uiScale.label")}
+        </span>
         <label
           className={`${styles.checkLabel} ${styles.scaleOverrideCheckbox}`}
         >
@@ -52,22 +70,14 @@ export const DisplaySettingsSection: React.FC<DisplaySettingsSectionProps> = ({
             checked={draft.uiScaleOverrideEnabled}
             onChange={(e) => set("uiScaleOverrideEnabled", e.target.checked)}
           />
-          アプリUIの表示サイズを変更する
+          {t("settings:display.uiScale.override")}
         </label>
         <div
           className={styles.scaleOptions}
           role="group"
-          aria-label="アプリUIの表示サイズ"
+          aria-label={t("settings:display.uiScale.label")}
         >
-          {(
-            [
-              { value: "auto", label: "端末に合わせる" },
-              { value: "small", label: "小" },
-              { value: "standard", label: "標準" },
-              { value: "large", label: "大" },
-              { value: "xLarge", label: "特大" },
-            ] as { value: UiScale; label: string }[]
-          ).map(({ value, label }) => (
+          {UI_SCALE_VALUES.map((value) => (
             <button
               key={value}
               type="button"
@@ -76,16 +86,16 @@ export const DisplaySettingsSection: React.FC<DisplaySettingsSectionProps> = ({
               disabled={!draft.uiScaleOverrideEnabled}
               onClick={() => set("uiScale", value)}
             >
-              {label}
+              {t(`settings:display.uiScale.options.${value}`)}
             </button>
           ))}
         </div>
       </div>
-      <p className={styles.hint}>
-        アプリの画面（ツールバーや設定など）の大きさです。カラムの中身は「カラム内の表示サイズ」で変更します。
-      </p>
+      <p className={styles.hint}>{t("settings:display.uiScale.hint")}</p>
       <div className={styles.scaleRow}>
-        <span className={styles.scaleLabel}>カラム内の表示サイズ</span>
+        <span className={styles.scaleLabel}>
+          {t("settings:display.columnScale.label")}
+        </span>
         <label
           className={`${styles.checkLabel} ${styles.scaleOverrideCheckbox}`}
         >
@@ -96,22 +106,14 @@ export const DisplaySettingsSection: React.FC<DisplaySettingsSectionProps> = ({
               set("columnScaleOverrideEnabled", e.target.checked)
             }
           />
-          カラム内の表示サイズを変更する
+          {t("settings:display.columnScale.override")}
         </label>
         <div
           className={styles.scaleOptions}
           role="group"
-          aria-label="カラム内の表示サイズ"
+          aria-label={t("settings:display.columnScale.label")}
         >
-          {(
-            [
-              { value: "small", label: "小" },
-              { value: "default", label: "標準" },
-              { value: "normal", label: "普通" },
-              { value: "large", label: "大" },
-              { value: "xLarge", label: "特大" },
-            ] as { value: ColumnScale; label: string }[]
-          ).map(({ value, label }) => (
+          {COLUMN_SCALE_VALUES.map((value) => (
             <button
               key={value}
               type="button"
@@ -119,14 +121,16 @@ export const DisplaySettingsSection: React.FC<DisplaySettingsSectionProps> = ({
               disabled={!draft.columnScaleOverrideEnabled}
               onClick={() => set("columnScale", value)}
             >
-              {label}
+              {t(`settings:display.columnScale.options.${value}`)}
             </button>
           ))}
         </div>
       </div>
-      <p className={styles.hint}>カラム内（x.com の表示）の大きさです。</p>
+      <p className={styles.hint}>{t("settings:display.columnScale.hint")}</p>
       <div className={styles.scaleRow}>
-        <span className={styles.scaleLabel}>テーマ</span>
+        <span className={styles.scaleLabel}>
+          {t("settings:display.theme.label")}
+        </span>
         <label
           className={`${styles.checkLabel} ${styles.scaleOverrideCheckbox}`}
         >
@@ -135,19 +139,10 @@ export const DisplaySettingsSection: React.FC<DisplaySettingsSectionProps> = ({
             checked={draft.themeOverrideEnabled}
             onChange={(e) => set("themeOverrideEnabled", e.target.checked)}
           />
-          テーマを変更する
+          {t("settings:display.theme.override")}
         </label>
         <div className={styles.scaleOptions}>
-          {(
-            [
-              { value: "dark", label: "ダーク" },
-              { value: "light", label: "ライト" },
-              { value: "system", label: "システム" },
-            ] as {
-              value: "dark" | "light" | "system";
-              label: string;
-            }[]
-          ).map(({ value, label }) => (
+          {THEME_VALUES.map((value) => (
             <button
               key={value}
               type="button"
@@ -155,7 +150,7 @@ export const DisplaySettingsSection: React.FC<DisplaySettingsSectionProps> = ({
               disabled={!draft.themeOverrideEnabled}
               onClick={() => set("theme", value)}
             >
-              {label}
+              {t(`settings:display.theme.options.${value}`)}
             </button>
           ))}
         </div>

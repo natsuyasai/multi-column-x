@@ -1,0 +1,74 @@
+{
+  "buckets": {
+    "userTweets": {
+      "label": "User posts",
+      "description": "API that fetches the list of posts by a given user."
+    },
+    "userByScreenName": {
+      "label": "User info",
+      "description": "API that fetches a user profile (rest_id, bio, follower count, verification status, etc.) from a screen_name (@ID)."
+    },
+    "profileSpotlightsQuery": {
+      "label": "Profile spotlights",
+      "description": "Believed to fetch supplementary information for the profile page, but the details are not public and unconfirmed."
+    },
+    "voButtonEligibility": {
+      "label": "Vo Button eligibility",
+      "description": "Believed to determine whether a specific button (Vo Button) is shown, but the details are not public and unconfirmed."
+    },
+    "flowViewer": {
+      "label": "Login flow",
+      "description": "API that handles the progress of the login sequence (flow)."
+    },
+    "viewerContext": {
+      "label": "Viewer context",
+      "description": "API that fetches context information for the logged-in user."
+    },
+    "homeTimeline": {
+      "label": "Home timeline",
+      "description": "API that fetches the timeline of posts from followed users in algorithmic order."
+    },
+    "homeLatestTimeline": {
+      "label": "Home timeline (latest)",
+      "description": "API that fetches the timeline of posts from followed users in chronological order (newest first)."
+    },
+    "searchTimeline": {
+      "label": "Search",
+      "description": "API that fetches search results such as posts and users matching a search query."
+    },
+    "followers": {
+      "label": "Followers list",
+      "description": "API that fetches the list of followers of a given user."
+    },
+    "following": {
+      "label": "Following list",
+      "description": "API that fetches the list of accounts a given user follows."
+    },
+    "likes": {
+      "label": "Likes list",
+      "description": "API that fetches the list of posts a given user has liked."
+    },
+    "createTweet": {
+      "label": "Post creation",
+      "description": "API that creates a new post."
+    },
+    "deleteTweet": {
+      "label": "Post deletion",
+      "description": "API that deletes an existing post."
+    },
+    "notificationsTimeline": {
+      "label": "Notifications",
+      "description": "API that fetches the list of notifications."
+    }
+  },
+  "indicator": {
+    "triggerLabel": "API rate limits",
+    "listLabel": "API rate limit list",
+    "noData": "No data",
+    "soon": "Soon",
+    "resetInMinutes_one": "in {{count}} min",
+    "resetInMinutes_other": "in {{count}} min",
+    "unobserved": "(Not measured yet because it hasn't been used)",
+    "unobservedWithDescription": "{{description}} (Not measured yet because it hasn't been used)"
+  }
+}

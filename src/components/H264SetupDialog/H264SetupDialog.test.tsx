@@ -1,7 +1,9 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { H264SetupDialog } from "@/components/H264SetupDialog/H264SetupDialog";
 import type { H264DownloadState } from "@/hooks/useH264Setup";
+import i18n from "@/i18n";
+import { expectNoJapanese } from "@/test-utils/japanese";
 
 function renderDialog(
   downloadState: H264DownloadState,
@@ -156,6 +158,86 @@ describe("H264SetupDialog", () => {
       expect(screen.getByRole("alert")).toHaveTextContent(
         "ダウンロードに失敗しました。",
       );
+    });
+  });
+
+  describe("表示言語", () => {
+    afterEach(async () => {
+      await i18n.changeLanguage("ja");
+    });
+
+    it("表示言語が英語のときH.264設定ダイアログの各状態に日本語の文言が表示されない", async () => {
+      await i18n.changeLanguage("en");
+      const states: H264DownloadState[] = [
+        "idle",
+        "downloading",
+        "success",
+        "error",
+      ];
+      for (const state of states) {
+        const { container, unmount } = render(
+          <H264SetupDialog
+            downloadState={state}
+            downloadError={null}
+            onDownload={vi.fn()}
+            onDismiss={vi.fn()}
+            onClose={vi.fn()}
+            onRelaunch={vi.fn()}
+          />,
+        );
+        expectNoJapanese(container);
+        expect(screen.getByRole("dialog")).toHaveAccessibleName(
+          "Additional component for video playback",
+        );
+        unmount();
+      }
+    });
+
+    it("表示言語が英語のときH.264設定ダイアログの操作ボタンと案内が英語で表示される", async () => {
+      await i18n.changeLanguage("en");
+      const { rerender } = render(
+        <H264SetupDialog
+          downloadState="idle"
+          downloadError={null}
+          onDownload={vi.fn()}
+          onDismiss={vi.fn()}
+          onClose={vi.fn()}
+          onRelaunch={vi.fn()}
+        />,
+      );
+      expect(
+        screen.getByRole("button", { name: "Not now" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Download and enable" }),
+      ).toBeInTheDocument();
+
+      rerender(
+        <H264SetupDialog
+          downloadState="success"
+          downloadError={null}
+          onDownload={vi.fn()}
+          onDismiss={vi.fn()}
+          onClose={vi.fn()}
+          onRelaunch={vi.fn()}
+        />,
+      );
+      expect(
+        screen.getByRole("button", { name: "Restart now" }),
+      ).toBeInTheDocument();
+
+      rerender(
+        <H264SetupDialog
+          downloadState="error"
+          downloadError={null}
+          onDownload={vi.fn()}
+          onDismiss={vi.fn()}
+          onClose={vi.fn()}
+          onRelaunch={vi.fn()}
+        />,
+      );
+      expect(screen.getByRole("alert")).toHaveTextContent("Download failed.");
+      expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
     });
   });
 });

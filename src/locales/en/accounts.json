@@ -1,0 +1,38 @@
+{
+  "manager": {
+    "title": "Manage accounts",
+    "close": "Close",
+    "empty": "No accounts",
+    "nameLabel": "Account name",
+    "changeColor": "Change color to {{color}}",
+    "cancel": "Cancel",
+    "save": "Save",
+    "setDefaultTitle": "Set as the default account for posting",
+    "setDefault": "Set {{label}} as default",
+    "edit": "Edit",
+    "editAria": "Edit {{label}}",
+    "reauth": "Re-authenticate",
+    "reauthAria": "Re-authenticate {{label}}",
+    "remove": "Delete",
+    "removeAria": "Delete {{label}}",
+    "add": "+ Add account"
+  },
+  "nameDialog": {
+    "nameLabel": "Account name",
+    "cancel": "Cancel",
+    "ok": "OK"
+  },
+  "noAccounts": {
+    "message": "Add an account first",
+    "openManager": "Open account manager"
+  },
+  "defaultName": "Account {{n}}",
+  "notice": {
+    "reauthTitle": "Re-authentication",
+    "reauthFailed": "Re-authentication failed (could not get the account identifier).",
+    "reauthMismatch": "You signed in with a different account from the registered one, so the session was not updated.",
+    "reauthSkipped": "This was the first re-authentication, so the identity check was skipped and the account identifier was recorded.",
+    "removeFailedTitle": "Delete account",
+    "removeFailedMessage": "Could not delete the account's data folder. You can delete it later with “Retry deleting data folders” in the app settings."
+  }
+}

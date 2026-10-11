@@ -1,6 +1,7 @@
 // ngWordPattern.ts の純粋関数群に対する fast-check プロパティテスト。
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import i18n from "@/i18n";
 import {
   isRegexNgWord,
   validateNgWordLine,
@@ -18,7 +19,7 @@ describe("isRegexNgWord / validateNgWordLine プロパティ", () => {
     fc.assert(
       fc.property(fc.string(), (s) => {
         expect(() => isRegexNgWord(s)).not.toThrow();
-        expect(() => validateNgWordLine(s)).not.toThrow();
+        expect(() => validateNgWordLine(s, i18n.t)).not.toThrow();
       }),
     );
   });
@@ -29,7 +30,7 @@ describe("isRegexNgWord / validateNgWordLine プロパティ", () => {
         fc.string().filter((s) => !s.includes("/")),
         (s) => {
           expect(isRegexNgWord(s)).toBe(false);
-          expect(validateNgWordLine(s)).toBeNull();
+          expect(validateNgWordLine(s, i18n.t)).toBeNull();
         },
       ),
     );
@@ -39,7 +40,7 @@ describe("isRegexNgWord / validateNgWordLine プロパティ", () => {
     fc.assert(
       fc.property(SAFE_PATTERNS, FLAGS, (pattern, flags) => {
         const line = `/${pattern}/${flags}`;
-        expect(validateNgWordLine(line)).toBeNull();
+        expect(validateNgWordLine(line, i18n.t)).toBeNull();
       }),
     );
   });
@@ -49,9 +50,9 @@ describe("validateNgWordLines プロパティ", () => {
   it("validateNgWordLinesがnullを返すことと、すべての行でvalidateNgWordLineがnullであることは同値である", () => {
     fc.assert(
       fc.property(fc.array(fc.string()), (lines) => {
-        const overallResult = validateNgWordLines(lines);
+        const overallResult = validateNgWordLines(lines, i18n.t);
         const allLinesValid = lines.every(
-          (line) => validateNgWordLine(line) === null,
+          (line) => validateNgWordLine(line, i18n.t) === null,
         );
         expect(overallResult === null).toBe(allLinesValid);
       }),

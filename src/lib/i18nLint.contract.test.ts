@@ -11,7 +11,7 @@ beforeAll(() => {
   eslint = new ESLint({ overrideConfigFile: "eslint.config.js" });
 });
 
-/** 指定パスのコードを lint し、日本語直書き検出ルールの警告だけを返す */
+/** 指定パスのコードを lint し、日本語直書き検出ルールの指摘だけを返す */
 async function lintWarnings(code: string, filePath = SCREEN_FILE) {
   const results = await eslint.lintText(code, { filePath, warnIgnored: false });
   return results
@@ -32,18 +32,31 @@ describe("画面の文言に日本語を直接書いた箇所がlintで検出さ
       `export const A = () => <button aria-label="保存する" />;`,
     ],
   ])(
-    "%s の日本語は警告(severity=1)として報告される",
+    "%s の日本語はエラー(severity=2)として報告される",
     async (_name, code) => {
       const warnings = await lintWarnings(code);
 
       expect(warnings.length).toBeGreaterThanOrEqual(1);
-      expect(warnings.every((m) => m.severity === 1)).toBe(true);
+      expect(warnings.every((m) => m.severity === 2)).toBe(true);
       expect(warnings[0].message).toBe(
         "画面の文言は辞書（t()）を経由してください",
       );
     },
     TIMEOUT,
   );
+});
+
+describe("プロジェクト全体のlint", () => {
+  it("日本語直書きの指摘(エラー・警告)が残っていない", async () => {
+    const results = await eslint.lintFiles(["src/**/*.{ts,tsx}"]);
+    const remaining = results.flatMap((r) =>
+      r.messages
+        .filter((m) => m.ruleId === "no-restricted-syntax")
+        .map((m) => `${r.filePath}:${m.line}`),
+    );
+
+    expect(remaining).toEqual([]);
+  }, 180_000);
 });
 
 describe("辞書を経由して表示する文言はlintで検出されない", () => {

@@ -2,6 +2,7 @@
 // バックアップタブの操作の流れ（書き出し／ファイル選択→紐づけ→確認→復元）を管理するフック。
 // 検証・退避・置換は services/backup と Rust 側が担い、ここは画面状態と結果メッセージを扱う。
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   describeBackupError,
   suggestMapping,
@@ -25,15 +26,11 @@ export interface BackupMessage {
   text: string;
 }
 
-const EXPORT_DONE_MESSAGE = "バックアップを書き出しました。";
-const NOT_CHANGED_SUFFIX = "既存のカラムと設定は変更されていません。";
-const RECREATE_FAILED_MESSAGE =
-  "設定の復元は完了しましたが、カラムの表示を作り直せませんでした。アプリを再起動して表示を確認してください。復元直前の設定は、アプリのデータフォルダ内の restore_snapshots フォルダ（appsettings-日時.json）に退避してあります。";
-
 export function useBackupFlow(
   replaceColumnsAndRecreate: ReplaceColumnsAndRecreate,
   onRestored: () => void,
 ) {
+  const { t } = useTranslation();
   const accounts = useAppStore((s) => s.accounts);
   const saveBlocked = useAppStore((s) => s.settingsSaveBlocked);
   const [step, setStep] = useState<BackupStep>("idle");
@@ -53,17 +50,17 @@ export function useBackupFlow(
     setMessage(null);
     try {
       if (await exportBackup()) {
-        setMessage({ kind: "success", text: EXPORT_DONE_MESSAGE });
+        setMessage({ kind: "success", text: t("messages:backup.exportDone") });
       }
     } catch (e) {
       setMessage({
         kind: "error",
-        text: describeBackupError(toBackupErrorInfo(e)),
+        text: describeBackupError(toBackupErrorInfo(e), t),
       });
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [t]);
 
   const pickFile = useCallback(async () => {
     setBusy(true);
@@ -81,12 +78,12 @@ export function useBackupFlow(
     } catch (e) {
       setMessage({
         kind: "error",
-        text: `${describeBackupError(toBackupErrorInfo(e))}${NOT_CHANGED_SUFFIX}`,
+        text: `${describeBackupError(toBackupErrorInfo(e), t)}${t("messages:backup.notChangedSuffix")}`,
       });
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [t]);
 
   const changeMapping = useCallback(
     (backupAccountId: string, targetAccountId: string | null) => {
@@ -128,18 +125,21 @@ export function useBackupFlow(
         case "rejected":
           setMessage({
             kind: "error",
-            text: `${describeBackupError(outcome.error)}${NOT_CHANGED_SUFFIX}`,
+            text: `${describeBackupError(outcome.error, t)}${t("messages:backup.notChangedSuffix")}`,
           });
           break;
         case "recreateFailed":
           reset();
-          setMessage({ kind: "warning", text: RECREATE_FAILED_MESSAGE });
+          setMessage({
+            kind: "warning",
+            text: t("messages:backup.recreateFailed"),
+          });
           break;
       }
     } finally {
       setBusy(false);
     }
-  }, [content, mapping, replaceColumnsAndRecreate, reset, onRestored]);
+  }, [content, mapping, replaceColumnsAndRecreate, reset, onRestored, t]);
 
   return {
     accounts,

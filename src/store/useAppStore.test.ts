@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { renderHook, act, waitFor } from "@testing-library/react";
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import i18n from "@/i18n";
+import { containsJapanese } from "@/test-utils/japanese";
 import type { Account, Column } from "../types";
 import { DEFAULT_GLOBAL_SETTINGS } from "../types";
 import { useAppStore, migrateColumn } from "./useAppStore";
@@ -954,5 +956,62 @@ describe("migrateColumn", () => {
       searchQuery: "rust",
     };
     expect(migrateColumn(col).searchLiveTab).toBeUndefined();
+  });
+
+  describe("useAppStore 設定読込失敗の通知（表示言語）", () => {
+    beforeEach(async () => {
+      vi.clearAllMocks();
+      await i18n.changeLanguage("en");
+    });
+
+    afterEach(async () => {
+      await i18n.changeLanguage("ja");
+    });
+
+    const failedResult = (backupPath: string | null) => ({
+      settings: {
+        accounts: [],
+        columns: [],
+        globalSettings: DEFAULT_GLOBAL_SETTINGS,
+      },
+      loadFailed: true,
+      backupPath,
+    });
+
+    it("表示言語が英語のとき退避先付きの読み込み失敗通知が英語になる", async () => {
+      mockInvoke.mockResolvedValueOnce(failedResult("/data/settings.json.bak"));
+      const { result } = renderHook(() => useAppStore());
+      await act(async () => {
+        await result.current.loadSettings();
+      });
+
+      expect(result.current.settingsLoadNotice).toBe(
+        "Could not read the settings file, so the app started with default settings. The original settings were backed up to: /data/settings.json.bak",
+      );
+    });
+
+    it("表示言語が英語のとき退避にも失敗した通知が英語になる", async () => {
+      mockInvoke.mockResolvedValueOnce(failedResult(null));
+      const { result } = renderHook(() => useAppStore());
+      await act(async () => {
+        await result.current.loadSettings();
+      });
+
+      const notice = result.current.settingsLoadNotice ?? "";
+      expect(notice).toContain("Backing up the original settings also failed.");
+      expect(containsJapanese(notice)).toBe(false);
+    });
+
+    it("表示言語が英語のとき設定の読み込み自体に失敗した通知が英語になる", async () => {
+      mockInvoke.mockRejectedValueOnce(new Error("ipc failed"));
+      const { result } = renderHook(() => useAppStore());
+      await act(async () => {
+        await result.current.loadSettings();
+      });
+
+      const notice = result.current.settingsLoadNotice ?? "";
+      expect(notice).toContain("Could not load settings");
+      expect(containsJapanese(notice)).toBe(false);
+    });
   });
 });

@@ -1,6 +1,8 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { act, render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import i18n from "@/i18n";
+import { expectNoJapanese } from "@/test-utils/japanese";
 import type { Column } from "../../types";
 import { SettingsPanel } from "./SettingsPanel";
 
@@ -952,5 +954,111 @@ describe("SettingsPanel 写真閲覧後のスクロール位置を復元する�
       350,
       undefined,
     );
+  });
+});
+
+describe("SettingsPanel の表示言語", () => {
+  const allOnSettings = {
+    ...baseSettings,
+    autoReloadEnabled: true,
+    hideHeaderEnabled: true,
+    smallImageEnabled: true,
+    blurImageEnabled: true,
+    whitelistEnabled: true,
+    desktopNotifyEnabled: true,
+  };
+
+  it("表示言語が英語のときカラム設定パネルに日本語の文言が表示されない", async () => {
+    await i18n.changeLanguage("en");
+    const user = userEvent.setup();
+    const { container, rerender } = render(
+      <SettingsPanel
+        {...defaultProps}
+        column={{ ...mockColumn, settings: allOnSettings }}
+        onReload={vi.fn()}
+      />,
+    );
+    await user.click(
+      screen.getByRole("button", { name: "How to write muted words" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "How to write the allowlist" }),
+    );
+    expectNoJapanese(container);
+    expect(screen.getByText("Column settings")).toBeInTheDocument();
+    expect(screen.getByText("Muted words")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apply" })).toBeInTheDocument();
+
+    // 条件分岐で出る文言も確認する（モバイル・外部サイト）
+    rerender(
+      <SettingsPanel
+        {...defaultProps}
+        isMobile
+        column={{ ...mockColumn, settings: baseSettings }}
+      />,
+    );
+    expectNoJapanese(container);
+    rerender(
+      <SettingsPanel
+        {...defaultProps}
+        column={{
+          ...mockColumn,
+          pageType: "external",
+          settings: allOnSettings,
+        }}
+      />,
+    );
+    expectNoJapanese(container);
+  });
+
+  it("ダイアログを開いたまま表示言語を切り替えると開いている画面の文言も切り替わる", async () => {
+    render(<SettingsPanel {...defaultProps} />);
+    expect(screen.getByText("カラム設定")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "適用" })).toBeInTheDocument();
+
+    await act(async () => {
+      await i18n.changeLanguage("en");
+    });
+
+    expect(screen.getByText("Column settings")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apply" })).toBeInTheDocument();
+    expect(screen.queryByText("カラム設定")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Users whose reposts are hidden" }),
+    ).toBeInTheDocument();
+  });
+
+  it("表示言語が英語のとき入力検証のエラーが英語で表示され日本語を含まない", async () => {
+    await i18n.changeLanguage("en");
+    const onApply = vi.fn();
+    const user = userEvent.setup();
+    const { container } = render(
+      <SettingsPanel {...defaultProps} onApply={onApply} />,
+    );
+    const ngWords = screen.getByPlaceholderText(
+      "One word per line (/regex/flags is also supported)",
+    );
+    await user.clear(ngWords);
+    await user.type(ngWords, "/[[/");
+    await user.click(screen.getByRole("button", { name: "Apply" }));
+    expect(
+      screen.getByText("Invalid regular expression: /[/"),
+    ).toBeInTheDocument();
+    expectNoJapanese(container);
+
+    await user.clear(ngWords);
+    const userIds = screen.getByRole("textbox", {
+      name: "Users whose reposts are hidden",
+    });
+    await user.clear(userIds);
+    await user.type(userIds, "bad-id!");
+    await user.click(screen.getByRole("button", { name: "Apply" }));
+    expect(
+      screen.getByText(
+        "`bad-id!` is not a valid X username (1–15 letters, numbers, or underscores)",
+      ),
+    ).toBeInTheDocument();
+    expectNoJapanese(container);
+    expect(onApply).not.toHaveBeenCalled();
   });
 });

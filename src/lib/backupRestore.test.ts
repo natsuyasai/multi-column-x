@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import i18n from "@/i18n";
 import {
   buildRestorePayload,
   canExecuteRestore,
@@ -470,7 +471,7 @@ describe("buildRestorePayload（スキップ後のグリッド正規化）", () 
 
 describe("validateBackupLists（NGワード・ユーザー IDの検証）", () => {
   it("正常な内容は null を返す", () => {
-    expect(validateBackupLists(makeContent())).toBeNull();
+    expect(validateBackupLists(makeContent(), i18n.t)).toBeNull();
   });
 
   it("グローバルの NGワードに不正な正規表現があればエラーを返す", () => {
@@ -479,7 +480,7 @@ describe("validateBackupLists（NGワード・ユーザー IDの検証）", () =
       globalSettings: { ...base.globalSettings, ngWords: ["/(/"] },
     });
 
-    expect(validateBackupLists(content)).not.toBeNull();
+    expect(validateBackupLists(content, i18n.t)).not.toBeNull();
   });
 
   it("カラム設定の NGワードに不正な正規表現があればエラーを返す", () => {
@@ -492,7 +493,7 @@ describe("validateBackupLists（NGワード・ユーザー IDの検証）", () =
       ],
     });
 
-    expect(validateBackupLists(content)).not.toBeNull();
+    expect(validateBackupLists(content, i18n.t)).not.toBeNull();
   });
 
   it("プリセット内カラムの NGワードに不正な正規表現があればエラーを返す", () => {
@@ -515,7 +516,7 @@ describe("validateBackupLists（NGワード・ユーザー IDの検証）", () =
       },
     });
 
-    expect(validateBackupLists(content)).not.toBeNull();
+    expect(validateBackupLists(content, i18n.t)).not.toBeNull();
   });
 
   it("リポスト非表示ユーザー IDが X の規則に違反していればエラーを返す", () => {
@@ -527,17 +528,20 @@ describe("validateBackupLists（NGワード・ユーザー IDの検証）", () =
       },
     });
 
-    expect(validateBackupLists(content)).not.toBeNull();
+    expect(validateBackupLists(content, i18n.t)).not.toBeNull();
   });
 });
 
 describe("describeBackupError（エラー種別から文言を作る）", () => {
   it("将来バージョンは「アプリを更新してください」と案内する", () => {
-    const message = describeBackupError({
-      kind: "futureVersion",
-      found: 2,
-      current: 1,
-    });
+    const message = describeBackupError(
+      {
+        kind: "futureVersion",
+        found: 2,
+        current: 1,
+      },
+      i18n.t,
+    );
 
     expect(message).toContain("アプリを更新してください");
   });
@@ -553,7 +557,7 @@ describe("describeBackupError（エラー種別から文言を作る）", () => 
       { kind: "settingsUnreadable" },
     ] as const;
 
-    const messages = kinds.map((e) => describeBackupError(e));
+    const messages = kinds.map((e) => describeBackupError(e, i18n.t));
 
     for (const message of messages) {
       expect(message.length).toBeGreaterThan(0);

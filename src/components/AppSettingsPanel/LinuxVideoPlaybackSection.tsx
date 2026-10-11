@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import type { H264DownloadState } from "@/hooks/useH264Setup";
 import styles from "./AppSettingsPanel.module.scss";
 import type { SettingsDraft, SetSettingsDraft } from "./settingsDraft";
@@ -24,9 +25,8 @@ interface LinuxVideoPlaybackSectionProps {
   h264?: H264SettingsInfo;
 }
 
-const RESTART_NOTICE = "再起動後に反映されます";
-
 const H264Row: React.FC<{ h264: H264SettingsInfo }> = ({ h264 }) => {
+  const { t } = useTranslation();
   const { downloadState, h264Available } = h264;
 
   // 取得に成功すると h264Available も true になるが、再起動案内を出し続けるため
@@ -35,14 +35,16 @@ const H264Row: React.FC<{ h264: H264SettingsInfo }> = ({ h264 }) => {
     return (
       <div className={styles.inlineRow}>
         <span className={styles.hint} role="status">
-          H.264: {RESTART_NOTICE}
+          {t("settings:linuxVideo.h264Restart", {
+            notice: t("settings:linuxVideo.restartNotice"),
+          })}
         </span>
         <button
           type="button"
           className={styles.applyAllBtn}
           onClick={h264.onRelaunch}
         >
-          今すぐ再起動
+          {t("settings:linuxVideo.relaunch")}
         </button>
       </div>
     );
@@ -52,10 +54,10 @@ const H264Row: React.FC<{ h264: H264SettingsInfo }> = ({ h264 }) => {
     return (
       <div className={styles.inlineRow}>
         <button type="button" className={styles.applyAllBtn} disabled>
-          H.264 を有効化
+          {t("settings:linuxVideo.enable")}
         </button>
         <span className={styles.hint} role="status">
-          ダウンロード中…
+          {t("settings:linuxVideo.downloading")}
         </span>
       </div>
     );
@@ -65,7 +67,7 @@ const H264Row: React.FC<{ h264: H264SettingsInfo }> = ({ h264 }) => {
     return (
       <>
         <p className={styles.errorText} role="alert">
-          {h264.downloadError ?? "H.264 の取得に失敗しました"}
+          {h264.downloadError ?? t("settings:linuxVideo.fetchFailed")}
         </p>
         <div className={styles.inlineRow}>
           <button
@@ -73,7 +75,7 @@ const H264Row: React.FC<{ h264: H264SettingsInfo }> = ({ h264 }) => {
             className={styles.applyAllBtn}
             onClick={h264.onEnable}
           >
-            再試行
+            {t("settings:linuxVideo.retry")}
           </button>
         </div>
       </>
@@ -81,7 +83,7 @@ const H264Row: React.FC<{ h264: H264SettingsInfo }> = ({ h264 }) => {
   }
 
   if (h264Available) {
-    return <p className={styles.hint}>H.264: 有効化済み</p>;
+    return <p className={styles.hint}>{t("settings:linuxVideo.enabled")}</p>;
   }
 
   return (
@@ -91,11 +93,9 @@ const H264Row: React.FC<{ h264: H264SettingsInfo }> = ({ h264 }) => {
         className={styles.applyAllBtn}
         onClick={h264.onEnable}
       >
-        H.264 を有効化
+        {t("settings:linuxVideo.enable")}
       </button>
-      <span className={styles.hint}>
-        動画の再生に必要なデコーダを取得します
-      </span>
+      <span className={styles.hint}>{t("settings:linuxVideo.enableHint")}</span>
     </div>
   );
 };
@@ -107,6 +107,7 @@ const H264Row: React.FC<{ h264: H264SettingsInfo }> = ({ h264 }) => {
 export const LinuxVideoPlaybackSection: React.FC<
   LinuxVideoPlaybackSectionProps
 > = ({ draft, set, isLinux, startupHardwareVideoDecodeEnabled, h264 }) => {
+  const { t } = useTranslation();
   if (!isLinux) return null;
 
   const hardwareDecodeChanged =
@@ -114,7 +115,7 @@ export const LinuxVideoPlaybackSection: React.FC<
 
   return (
     <section className={styles.section}>
-      <h3 className={styles.sectionTitle}>動画再生（Linux）</h3>
+      <h3 className={styles.sectionTitle}>{t("settings:linuxVideo.title")}</h3>
       {h264?.downloadApplicable && <H264Row h264={h264} />}
       <label className={styles.checkLabel}>
         <input
@@ -122,11 +123,11 @@ export const LinuxVideoPlaybackSection: React.FC<
           checked={draft.hardwareVideoDecodeEnabled}
           onChange={(e) => set("hardwareVideoDecodeEnabled", e.target.checked)}
         />
-        ハードウェアデコードを使う（VA-API）
+        {t("settings:linuxVideo.hardwareDecode")}
       </label>
       {hardwareDecodeChanged && (
         <p className={styles.hint} role="status">
-          {RESTART_NOTICE}
+          {t("settings:linuxVideo.restartNotice")}
         </p>
       )}
     </section>

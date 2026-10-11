@@ -1,0 +1,25 @@
+{
+  "compose": {
+    "title": "Compose post (Ctrl+T)",
+    "label": "Post"
+  },
+  "linkPopup": {
+    "title": "Open URL in popup (Ctrl+L)",
+    "label": "Open URL"
+  },
+  "addColumn": {
+    "title": "Add column (Ctrl+N)",
+    "label": "Add column"
+  },
+  "accounts": {
+    "title": "Manage accounts (Ctrl+Shift+A)",
+    "label": "Accounts"
+  },
+  "settings": {
+    "title": "App settings (Ctrl+,)",
+    "label": "Settings"
+  },
+  "collapse": "Collapse toolbar (Ctrl+B)",
+  "expand": "Expand toolbar (Ctrl+B)",
+  "closeColumn": "Close column"
+}

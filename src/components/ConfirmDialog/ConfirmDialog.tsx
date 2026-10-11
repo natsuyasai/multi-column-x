@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import styles from "./ConfirmDialog.module.scss";
 
@@ -15,12 +16,13 @@ interface ConfirmDialogProps {
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   title,
   message,
-  confirmLabel = "OK",
-  cancelLabel = "キャンセル",
+  confirmLabel,
+  cancelLabel,
   onConfirm,
   onCancel,
   singleButton = false,
 }) => {
+  const { t } = useTranslation();
   useEscapeKey(onCancel);
 
   return (
@@ -36,7 +38,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
               className={styles.cancelBtn}
               onClick={onCancel}
             >
-              {cancelLabel}
+              {cancelLabel ?? t("dialogs:confirm.cancel")}
             </button>
           )}
           <button
@@ -44,7 +46,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             className={styles.confirmBtn}
             onClick={onConfirm}
           >
-            {confirmLabel}
+            {confirmLabel ?? t("dialogs:confirm.ok")}
           </button>
         </div>
       </div>

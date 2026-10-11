@@ -1,0 +1,45 @@
+{
+  "pageType": {
+    "home": "ホーム",
+    "notifications": "通知",
+    "search": "検索",
+    "searchWithQuery": "検索: {{query}}",
+    "list": "リスト",
+    "custom": "カスタム",
+    "external": "外部サイト",
+    "externalWithHost": "外部: {{host}}",
+    "compose": "投稿"
+  },
+  "addDialog": {
+    "title": "カラムを追加",
+    "account": "アカウント",
+    "pageType": "ページタイプ",
+    "pageTypeOption": {
+      "custom": "カスタムURL",
+      "external": "外部URL（アカウント非依存）"
+    },
+    "homeTabName": "タブ名（任意）",
+    "homeTabNamePlaceholder": "例: フォロー中",
+    "searchQuery": "検索クエリ",
+    "searchQueryPlaceholder": "例: tauri",
+    "listId": "リストID",
+    "listIdPlaceholder": "例: 1234567890",
+    "url": "URL",
+    "urlPlaceholder": "https://x.com/...",
+    "externalHint": "アカウントに依存しない専用セッションで開きます。カスタムCSS以外の設定は無効になります。",
+    "label": "表示名（任意）",
+    "labelPlaceholder": "例: 仕事用",
+    "cancel": "キャンセル",
+    "submit": "追加"
+  },
+  "header": {
+    "clearUnread": "未読をクリア",
+    "unread": "未読あり",
+    "nextReload": "次の自動更新まで",
+    "scrollTop": "先頭までスクロール",
+    "reload": "更新",
+    "reloadPage": "ページを再読み込み",
+    "settings": "設定",
+    "close": "カラムを閉じる"
+  }
+}
