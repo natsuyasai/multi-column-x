@@ -64,6 +64,50 @@
   },
   "rustError": {
     "unknown": "予期しないエラーが発生しました",
-    "unknownWithDetail": "予期しないエラーが発生しました（{{detail}}）"
+    "unknownWithDetail": "予期しないエラーが発生しました（{{detail}}）",
+    "common": {
+      "internal": "{{detail}}"
+    },
+    "extension": {
+      "notFound": "拡張機能が見つかりません",
+      "unsupported": "この環境では拡張機能に対応していません",
+      "alreadyAdded": "すでに追加されています",
+      "networkFolder": "ネットワークフォルダは追加できません。ローカルフォルダを指定してください",
+      "folderNotFound": "指定されたフォルダが見つかりません",
+      "folderRequired": "フォルダを指定してください",
+      "folderUnreadable": "拡張機能のフォルダを読み込めません",
+      "folderTooLarge": "拡張機能のフォルダが大きすぎます",
+      "noBrowser": "Chrome / Edge が見つかりません",
+      "notInBrowser": "ブラウザに該当する拡張機能が見つかりません",
+      "noPopup": "この拡張機能にはポップアップがありません",
+      "noOptions": "この拡張機能にはオプションページがありません",
+      "noPage": "開けるページがありません",
+      "disabled": "無効な拡張機能は開けません",
+      "invalidKind": "開くページの種類が不正です",
+      "invalidId": "拡張機能の ID が不正です",
+      "invalidEntryId": "entry_id に使用できない文字が含まれています",
+      "invalidPagePath": "拡張機能のページのパスが不正です",
+      "invalidUrl": "URL が不正です: {{detail}}",
+      "accountRequired": "アカウントを選択してください",
+      "columnRequired": "このアカウントのカラムを先に表示してください",
+      "noTarget": "このアカウントに拡張機能を適用できませんでした",
+      "destInsideSource": "コピー先が拡張機能のフォルダの内側にあります",
+      "manifestMissing": "拡張機能として読み込めません（manifest.json が見つかりません）",
+      "manifestInvalid": "拡張機能として読み込めません（manifest.json の内容が不正です）",
+      "unreadableFiles": "拡張機能に読み込めないファイルが含まれています（名前が「_」で始まるファイルなど）",
+      "loadFailedPath": "拡張機能を読み込めませんでした（パスを確認してください）",
+      "invalidDefinition": "拡張機能の定義が正しくありません",
+      "loadFailed": "拡張機能を読み込めませんでした（エラーコード {{detail}}）",
+      "listFailed": "拡張機能の一覧を取得できません（{{detail}}）",
+      "listCallFailed": "拡張機能の一覧を取得できません: {{detail}}",
+      "removeFailed": "拡張機能を削除できません（{{detail}}）",
+      "removeCallFailed": "拡張機能を削除できません: {{detail}}",
+      "setEnabledFailed": "拡張機能の有効状態を変更できません（{{detail}}）",
+      "setEnabledCallFailed": "拡張機能の有効状態を変更できません: {{detail}}",
+      "profileUnavailable": "プロファイルを取得できません: {{detail}}",
+      "webviewAccess": "WebView へアクセスできません: {{detail}}",
+      "noReply": "WebView2 から応答がありませんでした",
+      "timeout": "WebView2 の応答がタイムアウトしました"
+    }
   }
 }

@@ -64,6 +64,50 @@
   },
   "rustError": {
     "unknown": "An unexpected error occurred",
-    "unknownWithDetail": "An unexpected error occurred ({{detail}})"
+    "unknownWithDetail": "An unexpected error occurred ({{detail}})",
+    "common": {
+      "internal": "{{detail}}"
+    },
+    "extension": {
+      "notFound": "Extension not found",
+      "unsupported": "Extensions are not supported in this environment",
+      "alreadyAdded": "Already added",
+      "networkFolder": "Network folders can't be added. Specify a local folder",
+      "folderNotFound": "The specified folder was not found",
+      "folderRequired": "Specify a folder",
+      "folderUnreadable": "Can't read the extension folder",
+      "folderTooLarge": "The extension folder is too large",
+      "noBrowser": "Chrome / Edge not found",
+      "notInBrowser": "No matching extension was found in the browser",
+      "noPopup": "This extension has no popup",
+      "noOptions": "This extension has no options page",
+      "noPage": "There is no page to open",
+      "disabled": "Disabled extensions can't be opened",
+      "invalidKind": "Invalid page type",
+      "invalidId": "Invalid extension ID",
+      "invalidEntryId": "entry_id contains invalid characters",
+      "invalidPagePath": "Invalid extension page path",
+      "invalidUrl": "Invalid URL: {{detail}}",
+      "accountRequired": "Select an account",
+      "columnRequired": "Show a column for this account first",
+      "noTarget": "Couldn't apply the extension to this account",
+      "destInsideSource": "The copy destination is inside the extension folder",
+      "manifestMissing": "Can't load as an extension (manifest.json not found)",
+      "manifestInvalid": "Can't load as an extension (manifest.json is invalid)",
+      "unreadableFiles": "The extension contains files that can't be loaded (such as files whose names start with \"_\")",
+      "loadFailedPath": "Couldn't load the extension (check the path)",
+      "invalidDefinition": "The extension definition is invalid",
+      "loadFailed": "Couldn't load the extension (error code {{detail}})",
+      "listFailed": "Can't get the list of extensions ({{detail}})",
+      "listCallFailed": "Can't get the list of extensions: {{detail}}",
+      "removeFailed": "Can't remove the extension ({{detail}})",
+      "removeCallFailed": "Can't remove the extension: {{detail}}",
+      "setEnabledFailed": "Can't change the extension's enabled state ({{detail}})",
+      "setEnabledCallFailed": "Can't change the extension's enabled state: {{detail}}",
+      "profileUnavailable": "Can't get the profile: {{detail}}",
+      "webviewAccess": "Can't access the WebView: {{detail}}",
+      "noReply": "No response from WebView2",
+      "timeout": "WebView2 timed out"
+    }
   }
 }

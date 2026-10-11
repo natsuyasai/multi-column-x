@@ -46,16 +46,18 @@ pub enum UiText {
     WindowTitleAddAccount,
     WindowTitleReauth,
     BackupFileFilter,
+    ExtensionUnnamed,
 }
 
 impl UiText {
-    pub const ALL: [UiText; 6] = [
+    pub const ALL: [UiText; 7] = [
         UiText::WindowTitleMedia,
         UiText::WindowTitleLink,
         UiText::WindowTitleCompose,
         UiText::WindowTitleAddAccount,
         UiText::WindowTitleReauth,
         UiText::BackupFileFilter,
+        UiText::ExtensionUnnamed,
     ];
 }
 
@@ -73,6 +75,8 @@ pub fn ui_text(key: UiText, lang: UiLang) -> &'static str {
         (UiText::WindowTitleReauth, UiLang::En) => "Re-authenticate account",
         (UiText::BackupFileFilter, UiLang::Ja) => "Multi Column X バックアップ",
         (UiText::BackupFileFilter, UiLang::En) => "Multi Column X Backup",
+        (UiText::ExtensionUnnamed, UiLang::Ja) => "(名前なし)",
+        (UiText::ExtensionUnnamed, UiLang::En) => "(Unnamed)",
     }
 }
 
@@ -119,6 +123,7 @@ mod tests {
             (UiText::WindowTitleAddAccount, "アカウントを追加"),
             (UiText::WindowTitleReauth, "アカウントを再認証"),
             (UiText::BackupFileFilter, "Multi Column X バックアップ"),
+            (UiText::ExtensionUnnamed, "(名前なし)"),
         ];
         assert_eq!(expected.len(), UiText::ALL.len());
         for (key, text) in expected {

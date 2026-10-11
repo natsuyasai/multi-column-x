@@ -9,6 +9,24 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use crate::commands::app_error::{codes, AppError};
+
+/// 種別コードだけを持つ `InvalidInput` の `io::Error`。`app_error_of` で `AppError` に戻せる。
+fn coded_error(code: &'static str) -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidInput, AppError::new(code))
+}
+
+/// `coded_error` で作った `io::Error` は元の種別コード、それ以外（OS 由来）は `detail` 付きの内部エラーにする。
+pub fn app_error_of(error: &io::Error) -> AppError {
+    match error
+        .get_ref()
+        .and_then(|inner| inner.downcast_ref::<AppError>())
+    {
+        Some(app_error) => app_error.clone(),
+        None => AppError::internal(error),
+    }
+}
+
 /// 直下にあっても許容される `_` 始まりのエントリ名。
 const ALLOWED_UNDERSCORE_ENTRIES: [&str; 2] = ["_locales", "_metadata"];
 
@@ -49,10 +67,7 @@ fn sanitized_copy_dir(copy_root: &Path, entry_id: &str) -> io::Result<PathBuf> {
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
     if !valid {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "entry_id に使用できない文字が含まれています",
-        ));
+        return Err(coded_error(codes::EXTENSION_INVALID_ENTRY_ID));
     }
     Ok(copy_root.join(entry_id))
 }
@@ -113,10 +128,7 @@ fn is_inside(parent: &Path, child: &Path) -> bool {
 }
 
 fn too_large_error() -> io::Error {
-    io::Error::new(
-        io::ErrorKind::InvalidInput,
-        "拡張機能のフォルダが大きすぎます",
-    )
+    coded_error(codes::EXTENSION_FOLDER_TOO_LARGE)
 }
 
 /// 指紋の保存先（`copy_root/<entry_id>.fingerprint`）。コピー先フォルダの外に置く。
@@ -245,10 +257,7 @@ pub fn prepare_extension_dir_with_limits(
         });
     }
     if is_inside(source, copy_root) {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "コピー先が拡張機能のフォルダの内側にあります",
-        ));
+        return Err(coded_error(codes::EXTENSION_DEST_INSIDE_SOURCE));
     }
     let fingerprint = compute_fingerprint(source, limits)?;
     let fingerprint_file = fingerprint_path(copy_root, entry_id);
@@ -420,11 +429,25 @@ mod tests {
     }
 
     #[test]
+    fn 種別コードを持たないosのエラーは内部エラーとして詳細に入る() {
+        let err = io::Error::new(io::ErrorKind::PermissionDenied, "access is denied");
+
+        let app_error = app_error_of(&err);
+
+        assert_eq!(app_error.code, codes::COMMON_INTERNAL);
+        assert_eq!(app_error.detail.as_deref(), Some("access is denied"));
+    }
+
+    #[test]
     fn entry_id_に親ディレクトリ参照や区切り文字を含むとエラーになる() {
         let (tmp, source, copy_root) = setup();
         for bad in ["..", "../evil", "a/b", "a\\b", "", "."] {
             let err = prepare_extension_dir(&source, &copy_root, bad).unwrap_err();
             assert_eq!(err.kind(), io::ErrorKind::InvalidInput, "{bad:?}");
+            assert_eq!(
+                app_error_of(&err),
+                AppError::new(codes::EXTENSION_INVALID_ENTRY_ID)
+            );
             let err = remove_sanitized_copy(&copy_root, bad).unwrap_err();
             assert_eq!(err.kind(), io::ErrorKind::InvalidInput, "{bad:?}");
         }
@@ -528,7 +551,10 @@ mod tests {
         let err = prepare_extension_dir_with_limits(&source, &copy_root, "id-1", &小さな上限())
             .unwrap_err();
 
-        assert!(err.to_string().contains("拡張機能のフォルダが大きすぎます"));
+        assert_eq!(
+            app_error_of(&err),
+            AppError::new(codes::EXTENSION_FOLDER_TOO_LARGE)
+        );
         assert!(!copy_root.join("id-1").exists());
     }
 
@@ -540,7 +566,10 @@ mod tests {
         let err = prepare_extension_dir_with_limits(&source, &copy_root, "id-1", &小さな上限())
             .unwrap_err();
 
-        assert!(err.to_string().contains("拡張機能のフォルダが大きすぎます"));
+        assert_eq!(
+            app_error_of(&err),
+            AppError::new(codes::EXTENSION_FOLDER_TOO_LARGE)
+        );
     }
 
     #[test]
@@ -551,7 +580,10 @@ mod tests {
         let err = prepare_extension_dir_with_limits(&source, &copy_root, "id-1", &小さな上限())
             .unwrap_err();
 
-        assert!(err.to_string().contains("拡張機能のフォルダが大きすぎます"));
+        assert_eq!(
+            app_error_of(&err),
+            AppError::new(codes::EXTENSION_FOLDER_TOO_LARGE)
+        );
     }
 
     #[test]
@@ -573,6 +605,10 @@ mod tests {
         let err = prepare_extension_dir(&source, &inside, "id-1").unwrap_err();
 
         assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+        assert_eq!(
+            app_error_of(&err),
+            AppError::new(codes::EXTENSION_DEST_INSIDE_SOURCE)
+        );
         assert!(!inside.join("id-1").exists());
     }
 

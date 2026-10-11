@@ -26,17 +26,18 @@ use self::service::{
     add_chrome_entry, add_folder_entry, applied_webview_id, build_extension_url,
     cleanup_after_remove, find_representative_label, live_profile_targets, modify_state,
     prepare_folder_for_add, reconcile_all_live, reconcile_webview, remove_entry_from_state,
-    set_enabled_in_state, validate_open_page, PageKind, LOCALE, UNSUPPORTED_MESSAGE,
+    set_enabled_in_state, unsupported_error, validate_open_page, PageKind, LOCALE,
 };
+use crate::commands::app_error::{codes, AppError};
 use crate::commands::require_main_caller;
 use crate::commands::settings_store::resolve_account_data_directory;
 
 /// Windows 以外では拡張機能を扱えない。
-fn ensure_supported() -> Result<(), String> {
+fn ensure_supported() -> Result<(), AppError> {
     if cfg!(windows) {
         Ok(())
     } else {
-        Err(UNSUPPORTED_MESSAGE.to_string())
+        Err(unsupported_error())
     }
 }
 
@@ -49,15 +50,15 @@ pub struct DetectResult {
 }
 
 /// 検出結果から指定 ID の拡張機能を選ぶ。ブラウザが無い／ID が無いときは文言付きのエラー。
-fn pick_detected(outcome: DetectOutcome, chrome_id: &str) -> Result<DetectedExtension, String> {
+fn pick_detected(outcome: DetectOutcome, chrome_id: &str) -> Result<DetectedExtension, AppError> {
     if !outcome.browser_found {
-        return Err("Chrome / Edge が見つかりません".to_string());
+        return Err(AppError::new(codes::EXTENSION_NO_BROWSER));
     }
     outcome
         .items
         .into_iter()
         .find(|d| d.chrome_id == chrome_id)
-        .ok_or_else(|| "ブラウザに該当する拡張機能が見つかりません".to_string())
+        .ok_or_else(|| AppError::new(codes::EXTENSION_NOT_IN_BROWSER))
 }
 
 /// 保存済みの拡張機能の一覧（`missing` を最新化して返す）。
@@ -65,8 +66,8 @@ fn pick_detected(outcome: DetectOutcome, chrome_id: &str) -> Result<DetectedExte
 pub async fn list_extensions(
     caller: tauri::Webview,
     app: AppHandle,
-) -> Result<Vec<ExtensionEntry>, String> {
-    require_main_caller(&caller)?;
+) -> Result<Vec<ExtensionEntry>, AppError> {
+    require_main_caller(&caller).map_err(AppError::internal)?;
     ensure_supported()?;
     service::list_refreshed(&app).await
 }
@@ -76,15 +77,15 @@ pub async fn list_extensions(
 pub async fn detect_chrome_extensions(
     caller: tauri::Webview,
     app: AppHandle,
-) -> Result<DetectResult, String> {
-    require_main_caller(&caller)?;
+) -> Result<DetectResult, AppError> {
+    require_main_caller(&caller).map_err(AppError::internal)?;
     ensure_supported()?;
     let state = store::load(&app)?;
     let added = service::added_chrome_ids(&state);
     let roots = browser_roots_from_env();
     let outcome = tokio::task::spawn_blocking(move || detect_all(&roots, LOCALE, &added))
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(AppError::internal)?;
     Ok(DetectResult {
         browser_found: outcome.browser_found,
         items: outcome.items,
@@ -97,14 +98,14 @@ pub async fn detect_chrome_extensions(
 pub async fn pick_extension_folder(
     caller: tauri::Webview,
     app: AppHandle,
-) -> Result<Option<String>, String> {
-    require_main_caller(&caller)?;
+) -> Result<Option<String>, AppError> {
+    require_main_caller(&caller).map_err(AppError::internal)?;
     ensure_supported()?;
     pick_folder(&app).await
 }
 
 #[cfg(windows)]
-async fn pick_folder(app: &AppHandle) -> Result<Option<String>, String> {
+async fn pick_folder(app: &AppHandle) -> Result<Option<String>, AppError> {
     use tauri_plugin_dialog::DialogExt;
 
     // ダイアログ待ちで tokio ワーカーを占有しないよう、コールバックを oneshot で受ける。
@@ -112,16 +113,16 @@ async fn pick_folder(app: &AppHandle) -> Result<Option<String>, String> {
     app.dialog().file().pick_folder(move |path| {
         let _ = tx.send(path);
     });
-    let Some(path) = rx.await.map_err(|e| e.to_string())? else {
+    let Some(path) = rx.await.map_err(AppError::internal)? else {
         return Ok(None);
     };
-    let path = path.into_path().map_err(|e| e.to_string())?;
+    let path = path.into_path().map_err(AppError::internal)?;
     Ok(Some(path.to_string_lossy().into_owned()))
 }
 
 #[cfg(not(windows))]
-async fn pick_folder(_app: &AppHandle) -> Result<Option<String>, String> {
-    Err(UNSUPPORTED_MESSAGE.to_string())
+async fn pick_folder(_app: &AppHandle) -> Result<Option<String>, AppError> {
+    Err(unsupported_error())
 }
 
 /// 展開済みの拡張機能フォルダを追加する。manifest が無い／壊れている場合は追加せずエラー。
@@ -130,12 +131,12 @@ pub async fn add_extension_from_folder(
     caller: tauri::Webview,
     app: AppHandle,
     path: String,
-) -> Result<ExtensionEntry, String> {
-    require_main_caller(&caller)?;
+) -> Result<ExtensionEntry, AppError> {
+    require_main_caller(&caller).map_err(AppError::internal)?;
     ensure_supported()?;
     let (stored_path, info) = tokio::task::spawn_blocking(move || prepare_folder_for_add(&path))
         .await
-        .map_err(|e| e.to_string())??;
+        .map_err(AppError::internal)??;
     let new_id = uuid::Uuid::new_v4().to_string();
     let entry = modify_state(&app, |state| {
         add_folder_entry(state, info, stored_path, new_id)
@@ -151,14 +152,14 @@ pub async fn add_chrome_extension(
     caller: tauri::Webview,
     app: AppHandle,
     #[allow(non_snake_case)] chromeId: String,
-) -> Result<ExtensionEntry, String> {
-    require_main_caller(&caller)?;
+) -> Result<ExtensionEntry, AppError> {
+    require_main_caller(&caller).map_err(AppError::internal)?;
     ensure_supported()?;
     let roots = browser_roots_from_env();
     let outcome =
         tokio::task::spawn_blocking(move || detect_all(&roots, LOCALE, &Default::default()))
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(AppError::internal)?;
     let detected = pick_detected(outcome, &chromeId)?;
     let new_id = uuid::Uuid::new_v4().to_string();
     let entry = modify_state(&app, |state| add_chrome_entry(state, &detected, new_id)).await?;
@@ -173,8 +174,8 @@ pub async fn set_extension_enabled(
     app: AppHandle,
     id: String,
     enabled: bool,
-) -> Result<(), String> {
-    require_main_caller(&caller)?;
+) -> Result<(), AppError> {
+    require_main_caller(&caller).map_err(AppError::internal)?;
     ensure_supported()?;
     modify_state(&app, |state| set_enabled_in_state(state, &id, enabled)).await?;
     reconcile_all_live(&app).await?;
@@ -187,15 +188,15 @@ pub async fn remove_extension(
     caller: tauri::Webview,
     app: AppHandle,
     id: String,
-) -> Result<(), String> {
-    require_main_caller(&caller)?;
+) -> Result<(), AppError> {
+    require_main_caller(&caller).map_err(AppError::internal)?;
     ensure_supported()?;
     let removed = modify_state(&app, |state| remove_entry_from_state(state, &id)).await?;
     reconcile_all_live(&app).await?;
     let copy_root = service::copy_root(&app)?;
     if let Err(e) = tokio::task::spawn_blocking(move || cleanup_after_remove(&copy_root, &removed))
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(AppError::internal)?
     {
         log::warn!("[extensions] サニタイズコピーの削除に失敗: {e}");
     }
@@ -210,15 +211,16 @@ pub async fn open_extension_page(
     id: String,
     kind: String,
     #[allow(non_snake_case)] accountId: Option<String>,
-) -> Result<(), String> {
-    require_main_caller(&caller)?;
+) -> Result<(), AppError> {
+    require_main_caller(&caller).map_err(AppError::internal)?;
     ensure_supported()?;
 
     let state = store::load(&app)?;
     let entry = state.entries.iter().find(|e| e.id == id).cloned();
     let target = validate_open_page(entry.as_ref(), &kind, accountId.as_deref())?;
-    let entry = entry.ok_or("拡張機能が見つかりません")?;
-    let data_directory = resolve_account_data_directory(&app, &target.account_id)?;
+    let entry = entry.ok_or_else(|| AppError::new(codes::EXTENSION_NOT_FOUND))?;
+    let data_directory =
+        resolve_account_data_directory(&app, &target.account_id).map_err(AppError::internal)?;
 
     // 読み込み元フォルダの manifest から、開くページの相対パスを得る。
     let resolved = service::resolve_all(&app, std::slice::from_ref(&entry)).await?;
@@ -227,29 +229,29 @@ pub async fn open_extension_page(
         .cloned()
         .unwrap_or(ResolvedEntry::Missing)
     else {
-        return Err("拡張機能のフォルダを読み込めません".to_string());
+        return Err(AppError::new(codes::EXTENSION_FOLDER_UNREADABLE));
     };
-    let info = manifest::read_manifest_info(std::path::Path::new(&dir), LOCALE)
-        .map_err(|e| e.to_string())?;
+    let info =
+        manifest::read_manifest_info(std::path::Path::new(&dir), LOCALE).map_err(AppError::from)?;
     let relative_path = match target.kind {
         PageKind::Popup => info.popup_path,
         PageKind::Options => info.options_path,
     }
-    .ok_or("開けるページがありません")?;
+    .ok_or_else(|| AppError::new(codes::EXTENSION_NO_PAGE))?;
 
     // 対象プロファイルに未適用なら、そのプロファイルのカラム WebView で先に reconcile する。
     let mut webview_id = applied_webview_id(&state, &data_directory, &entry.id);
     if webview_id.is_none() {
         let targets = live_profile_targets(&app);
         let label = find_representative_label(&targets, &data_directory)
-            .ok_or("このアカウントのカラムを先に表示してください")?;
+            .ok_or_else(|| AppError::new(codes::EXTENSION_COLUMN_REQUIRED))?;
         let webview = app
             .get_webview(label)
-            .ok_or("このアカウントのカラムを先に表示してください")?;
+            .ok_or_else(|| AppError::new(codes::EXTENSION_COLUMN_REQUIRED))?;
         reconcile_webview(&app, &webview, &data_directory).await?;
         webview_id = applied_webview_id(&store::load(&app)?, &data_directory, &entry.id);
     }
-    let webview_id = webview_id.ok_or("このアカウントに拡張機能を適用できませんでした")?;
+    let webview_id = webview_id.ok_or_else(|| AppError::new(codes::EXTENSION_NO_TARGET))?;
 
     let url = build_extension_url(&webview_id, &relative_path)?;
     open_page_window(&app, &url, &entry.name, &data_directory, target.kind)
@@ -263,13 +265,20 @@ fn open_page_window(
     title: &str,
     data_directory: &str,
     kind: PageKind,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
+    use crate::commands::ui_language::{current_ui_lang, ui_text, UiText};
     use crate::commands::webview::external_link;
     use crate::ipc_constants::labels;
 
+    // 名前が解決できなかった拡張機能（名前が空）は、表示言語に応じた「名前なし」をタイトルにする。
+    let title = if title.is_empty() {
+        ui_text(UiText::ExtensionUnnamed, current_ui_lang(app))
+    } else {
+        title
+    };
     let parsed = url
         .parse::<tauri::Url>()
-        .map_err(|e| format!("URL が不正です: {e}"))?;
+        .map_err(|e| AppError::with_detail(codes::EXTENSION_INVALID_URL, e))?;
     let label = format!(
         "{}{}",
         labels::EXTENSION_PREFIX,
@@ -286,7 +295,7 @@ fn open_page_window(
         .browser_extensions_enabled(true)
         .on_new_window(external_link::new_window_handler(app.clone()))
         .build()
-        .map_err(|e| e.to_string())?;
+        .map_err(AppError::internal)?;
     Ok(())
 }
 
@@ -297,8 +306,8 @@ fn open_page_window(
     _title: &str,
     _data_directory: &str,
     _kind: PageKind,
-) -> Result<(), String> {
-    Err(UNSUPPORTED_MESSAGE.to_string())
+) -> Result<(), AppError> {
+    Err(unsupported_error())
 }
 
 #[cfg(test)]
@@ -306,6 +315,7 @@ mod tests {
     use super::chrome::{DetectOutcome, DetectedExtension};
     use super::model::Browser;
     use super::pick_detected;
+    use crate::commands::app_error::{codes, AppError};
 
     #[test]
     fn 追加時にブラウザが無いときとidが無いときで別の文言のエラーになる() {
@@ -315,7 +325,7 @@ mod tests {
         };
         assert_eq!(
             pick_detected(none, "x").unwrap_err(),
-            "Chrome / Edge が見つかりません"
+            AppError::new(codes::EXTENSION_NO_BROWSER)
         );
         let empty = DetectOutcome {
             browser_found: true,
@@ -323,7 +333,7 @@ mod tests {
         };
         assert_eq!(
             pick_detected(empty, "x").unwrap_err(),
-            "ブラウザに該当する拡張機能が見つかりません"
+            AppError::new(codes::EXTENSION_NOT_IN_BROWSER)
         );
         let hit = DetectOutcome {
             browser_found: true,

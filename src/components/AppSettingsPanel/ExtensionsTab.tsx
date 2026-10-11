@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { AppTFunction } from "@/i18n/types";
+import { describeAppError } from "@/lib/appError";
 import type { ExtensionPageKind } from "@/services/extensions";
 import type { DetectResult, ExtensionBrowser, ExtensionEntry } from "@/types";
 import styles from "./ExtensionsTab.module.scss";
@@ -27,11 +28,6 @@ interface ExtensionsTabProps {
 
 const DETECT_KEY = "detect";
 const PICK_KEY = "pick";
-
-function toMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return String(error);
-}
 
 const BROWSER_LABELS: Record<ExtensionBrowser, string> = {
   chrome: "Chrome",
@@ -63,7 +59,11 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
   const [entries, setEntries] = useState<ExtensionEntry[]>([]);
   const [detected, setDetected] = useState<DetectResult | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // 失敗の値そのものを持ち、描画時に表示言語で文言にする（言語切替に追従させる）
+  const [failure, setFailure] = useState<{ error: unknown } | null>(null);
+  /** 名前が解決できなかった拡張機能（名前が空）の表示名 */
+  const displayName = (name: string) =>
+    name === "" ? t("settings:extensions.unnamed") : name;
 
   const refresh = useCallback(async () => {
     setEntries(await listExtensions());
@@ -76,7 +76,7 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
         if (!cancelled) setEntries(items);
       },
       (e: unknown) => {
-        if (!cancelled) setError(toMessage(e));
+        if (!cancelled) setFailure({ error: e });
       },
     );
     return () => {
@@ -99,7 +99,7 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
   ) => {
     if (busy) return;
     setBusyKey(key);
-    setError(null);
+    setFailure(null);
     try {
       await action();
       if (changed) {
@@ -107,7 +107,7 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
         await refresh();
       }
     } catch (e) {
-      setError(toMessage(e));
+      setFailure({ error: e });
     } finally {
       setBusyKey(null);
     }
@@ -214,9 +214,9 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
             {t("settings:extensions.addFromFolder")}
           </button>
         </div>
-        {error && (
+        {failure && (
           <p role="alert" className={`${styles.message} ${styles.error}`}>
-            {error}
+            {describeAppError(failure.error, t)}
           </p>
         )}
         {detected && !detected.browserFound && (
@@ -236,7 +236,7 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
             )}
             {detected.items.map((item) => (
               <li key={item.chromeId} className={styles.row}>
-                <span className={styles.name}>{item.name}</span>
+                <span className={styles.name}>{displayName(item.name)}</span>
                 <span className={styles.meta}>
                   {t("settings:extensions.candidateMeta", {
                     browser: BROWSER_LABELS[item.browser],
@@ -255,7 +255,7 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
                   disabled={busy || item.added}
                   aria-busy={busyKey === `chrome:${item.chromeId}`}
                   aria-label={t("settings:extensions.addLabel", {
-                    name: item.name,
+                    name: displayName(item.name),
                   })}
                 >
                   {t("settings:extensions.add")}
@@ -289,7 +289,9 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
               return (
                 <li key={entry.id} className={styles.row}>
                   <div className={styles.nameBlock}>
-                    <span className={styles.name}>{entry.name}</span>
+                    <span className={styles.name}>
+                      {displayName(entry.name)}
+                    </span>
                     <span className={styles.meta}>
                       {describeSource(entry, t)}
                     </span>
@@ -308,7 +310,7 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
                       }
                       disabled={busy || entry.missing}
                       aria-label={t("settings:extensions.enableLabel", {
-                        name: entry.name,
+                        name: displayName(entry.name),
                       })}
                     />
                     {t("settings:extensions.enabled")}
@@ -321,7 +323,7 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
                       disabled={pageDisabled}
                       title={pageTitle}
                       aria-label={t("settings:extensions.openPopupLabel", {
-                        name: entry.name,
+                        name: displayName(entry.name),
                       })}
                     >
                       {t("settings:extensions.openPopup")}
@@ -335,7 +337,7 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
                       disabled={pageDisabled}
                       title={pageTitle}
                       aria-label={t("settings:extensions.openOptionsLabel", {
-                        name: entry.name,
+                        name: displayName(entry.name),
                       })}
                     >
                       {t("settings:extensions.openOptions")}
@@ -348,7 +350,7 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
                     disabled={busy}
                     aria-busy={busyKey === `remove:${entry.id}`}
                     aria-label={t("settings:extensions.removeLabel", {
-                      name: entry.name,
+                      name: displayName(entry.name),
                     })}
                   >
                     {t("settings:extensions.remove")}

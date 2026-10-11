@@ -238,7 +238,8 @@
     "openOptionsLabel": "{{name}} のオプションを開く",
     "accountRequired": "アカウントを選択してください",
     "remove": "削除",
-    "removeLabel": "{{name}} を削除"
+    "removeLabel": "{{name}} を削除",
+    "unnamed": "(名前なし)"
   },
   "backup": {
     "noCredentials": "このバックアップにはログイン情報は含まれません。復元先で事前にログインしてください",
