@@ -1,0 +1,7 @@
+{
+  "language": {
+    "label": "Language",
+    "hint": "The language of the app's screens. \"Auto\" follows your device's language. The display language inside columns (x.com) follows your X settings.",
+    "groupLabel": "Language"
+  }
+}

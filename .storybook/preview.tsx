@@ -1,6 +1,25 @@
 import type { Preview } from "@storybook/react-vite";
+import i18n from "../src/i18n";
 
 const preview: Preview = {
+  globalTypes: {
+    locale: {
+      description: "表示言語",
+      toolbar: {
+        title: "言語",
+        icon: "globe",
+        items: ["ja", "en"],
+        dynamicTitle: true,
+      },
+    },
+  },
+  initialGlobals: { locale: "ja" },
+  decorators: [
+    (Story, context) => {
+      void i18n.changeLanguage(context.globals.locale);
+      return <Story />;
+    },
+  ],
   parameters: {
     controls: {
       matchers: {
