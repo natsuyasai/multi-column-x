@@ -26,6 +26,7 @@ pub mod codes {
     pub const EXTENSION_INVALID_ID: &str = "extension.invalidId";
     pub const EXTENSION_INVALID_ENTRY_ID: &str = "extension.invalidEntryId";
     pub const EXTENSION_INVALID_PAGE_PATH: &str = "extension.invalidPagePath";
+    #[cfg_attr(not(windows), allow(dead_code))] // Windows 専用の拡張機能コードからのみ使う
     pub const EXTENSION_INVALID_URL: &str = "extension.invalidUrl";
     pub const EXTENSION_ACCOUNT_REQUIRED: &str = "extension.accountRequired";
     pub const EXTENSION_COLUMN_REQUIRED: &str = "extension.columnRequired";
@@ -37,15 +38,25 @@ pub mod codes {
     pub const EXTENSION_LOAD_FAILED_PATH: &str = "extension.loadFailedPath";
     pub const EXTENSION_INVALID_DEFINITION: &str = "extension.invalidDefinition";
     pub const EXTENSION_LOAD_FAILED: &str = "extension.loadFailed";
+    #[cfg_attr(not(windows), allow(dead_code))] // Windows 専用の拡張機能コードからのみ使う
     pub const EXTENSION_LIST_FAILED: &str = "extension.listFailed";
+    #[cfg_attr(not(windows), allow(dead_code))] // Windows 専用の拡張機能コードからのみ使う
     pub const EXTENSION_LIST_CALL_FAILED: &str = "extension.listCallFailed";
+    #[cfg_attr(not(windows), allow(dead_code))] // Windows 専用の拡張機能コードからのみ使う
     pub const EXTENSION_REMOVE_FAILED: &str = "extension.removeFailed";
+    #[cfg_attr(not(windows), allow(dead_code))] // Windows 専用の拡張機能コードからのみ使う
     pub const EXTENSION_REMOVE_CALL_FAILED: &str = "extension.removeCallFailed";
+    #[cfg_attr(not(windows), allow(dead_code))] // Windows 専用の拡張機能コードからのみ使う
     pub const EXTENSION_SET_ENABLED_FAILED: &str = "extension.setEnabledFailed";
+    #[cfg_attr(not(windows), allow(dead_code))] // Windows 専用の拡張機能コードからのみ使う
     pub const EXTENSION_SET_ENABLED_CALL_FAILED: &str = "extension.setEnabledCallFailed";
+    #[cfg_attr(not(windows), allow(dead_code))] // Windows 専用の拡張機能コードからのみ使う
     pub const EXTENSION_PROFILE_UNAVAILABLE: &str = "extension.profileUnavailable";
+    #[cfg_attr(not(windows), allow(dead_code))] // Windows 専用の拡張機能コードからのみ使う
     pub const EXTENSION_WEBVIEW_ACCESS: &str = "extension.webviewAccess";
+    #[cfg_attr(not(windows), allow(dead_code))] // Windows 専用の拡張機能コードからのみ使う
     pub const EXTENSION_NO_REPLY: &str = "extension.noReply";
+    #[cfg_attr(not(windows), allow(dead_code))] // Windows 専用の拡張機能コードからのみ使う
     pub const EXTENSION_TIMEOUT: &str = "extension.timeout";
     pub const H264_UNSUPPORTED_ARCH: &str = "h264.unsupportedArch";
     // 使用箇所（openh264_fetch）は Linux desktop 限定のため、他環境では未使用警告を抑止する。

@@ -51,6 +51,8 @@ pub enum UiText {
     WindowTitleAddAccount,
     WindowTitleReauth,
     BackupFileFilter,
+    #[cfg_attr(not(windows), allow(dead_code))]
+    // Windows 専用の拡張機能ページのタイトルからのみ使う
     ExtensionUnnamed,
 }
 
