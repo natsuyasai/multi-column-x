@@ -74,6 +74,12 @@ gitignore 対象の Android 生成ファイル（`src-tauri/gen/android/tauri.se
 - `handle_android_video_download_request`（Rust）は複数箇所で `?` による早期returnがあるため、そのまま素直に書くと「開始は呼んだが終了(finished)を呼ばずに関数を抜けるパス」が生まれ、Foreground Serviceの通知が消えないまま残ってしまう。**処理本体を `async { ... }` ブロックに包んで結果を一旦ローカル変数で受け、成否に関わらず必ず `notify_video_download_finished()` を呼んでから元の結果を返す**、という構造にして防いだ。早期returnが多い非同期関数で「必ず後始末する」処理を挟みたい場合の定石として記録する。
 - 進捗表示自体（desktop側、`popup_toolbar.ts` の `window.__TAURI__.event.listen` でRustの `app.emit_to(window_label, event, payload)` を受信する経路）は、このプロジェクトで初めて使う経路だった（既存のinjectスクリプトは全て `invoke` による一方向通知のみ）。`src-tauri/capabilities/column-webview.json` が popup ウィンドウに許可している `core:default` パーミッションセットには `core:event:default` が含まれており（Tauri v2の `gen/schemas/desktop-schema.json` で確認可能）、追加のcapabilities設定変更なしに動作した。同様にRust→WebViewへイベントを送りたくなった場合、この経路をそのまま使ってよい。
 
+## 文字列リソース（多言語）
+
+- 利用者に見えるネイティブ文言は `app/src/main/res/values/strings.xml`（既定＝英語）と `res/values-ja/strings.xml`（日本語）で管理する。**端末の言語に従い、アプリ内の `language` 設定とは独立**（現状は `VideoDownloadForegroundService` の通知文言のみ）。`app_name` / `main_activity_title` は既定のみ。
+- 追加手順: ①両方の `strings.xml` に同じキーを追加（書式付きは `%1$d` の位置指定子を揃える。`%` 自体は `%%`）②コードは `getString(R.string.…)` で参照し、日本語・英語を直書きしない ③日本語側の文言一覧は `StringResourcesTest` の期待表にも追加する。R クラスのリソース ID は ProGuard の keep 不要。
+- `StringResourcesTest`（キー集合・書式指定子の一致、既定側に日本語なし、日本語の現行文言、通知サービスへの日本語直書きなし）と `VideoDownloadProgressTextTest`（`buildProgressText`）が検証する。注意: テストは `strings.xml` を `File` で読むため Gradle の入力に含まれず、リソースだけ変えると `testUniversalDebugUnitTest` が UP-TO-DATE になる。手元で確認するときは `:app:cleanTestUniversalDebugUnitTest` を併用する。
+
 ## reqwest 等ネイティブ依存クレートの Android クロスビルド
 
 - `reqwest`（`rustls-tls` feature）が依存する `ring` crate は Android ターゲットのビルド時にネイティブ C コードのコンパイルが必要で、`ANDROID_NDK_HOME`（または `NDK_HOME`）環境変数と NDK の `clang` が見つからないとビルドに失敗する。**`cargo check`（デフォルトのdesktopターゲット）だけでは検出できず**、`cargo check --target aarch64-linux-android` や実際の `npm run tauri:android:build[:debug]` を通さないと問題が判明しない。ローカル開発機でこの手のネイティブ依存クレートを新規追加した場合は、Androidターゲットでのビルドも一度は試すこと（Android SDK/NDK が `AppData/Local/Android/Sdk` 等にインストール済みでも、シェルの環境変数 `ANDROID_HOME` / `ANDROID_NDK_HOME` が未設定だと同じエラーになる点に注意）。

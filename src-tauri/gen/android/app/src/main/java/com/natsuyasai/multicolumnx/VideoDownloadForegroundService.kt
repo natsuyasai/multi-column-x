@@ -38,7 +38,7 @@ class VideoDownloadForegroundService : Service() {
   private fun handleStart() {
     createNotificationChannel()
     val notification =
-      buildNotificationBuilder(contentText = "ダウンロードを準備しています")
+      buildNotificationBuilder(contentText = getString(R.string.video_download_preparing))
         .setProgress(0, 0, true)
         .build()
     ServiceCompat.startForeground(
@@ -57,7 +57,8 @@ class VideoDownloadForegroundService : Service() {
     val current = intent.getLongExtra(EXTRA_CURRENT, 0L)
     val total = intent.getLongExtra(EXTRA_TOTAL, 0L)
 
-    val builder = buildNotificationBuilder(contentText = buildProgressText(fileIndex, fileCount, current, total))
+    val filePrefix = getString(R.string.video_download_progress_file, fileIndex, fileCount)
+    val builder = buildNotificationBuilder(contentText = buildProgressText(filePrefix, current, total))
     if (total > 0) {
       val percent = ((current * 100) / total).toInt().coerceIn(0, 100)
       builder.setProgress(100, percent, false)
@@ -73,19 +74,6 @@ class VideoDownloadForegroundService : Service() {
   private fun handleFinish() {
     ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
     stopSelf()
-  }
-
-  // 通知本文（「ファイル 1/2 (42%)」のような文字列）を組み立てる純粋関数。
-  private fun buildProgressText(
-    fileIndex: Int,
-    fileCount: Int,
-    current: Long,
-    total: Long,
-  ): String {
-    val prefix = "ファイル $fileIndex/$fileCount"
-    if (total <= 0) return prefix
-    val percent = ((current * 100) / total).coerceIn(0, 100)
-    return "$prefix ($percent%)"
   }
 
   // 通知タップ時、既存タスクを前面に戻すだけ（新規タスクは積まない）。
@@ -107,7 +95,7 @@ class VideoDownloadForegroundService : Service() {
   private fun buildNotificationBuilder(contentText: String): NotificationCompat.Builder =
     NotificationCompat.Builder(this, CHANNEL_ID)
       .setSmallIcon(android.R.drawable.stat_sys_download)
-      .setContentTitle("動画をダウンロード中")
+      .setContentTitle(getString(R.string.video_download_notification_title))
       .setContentText(contentText)
       .setOngoing(true)
       .setOnlyAlertOnce(true)
@@ -120,8 +108,12 @@ class VideoDownloadForegroundService : Service() {
     val manager = getSystemService(NotificationManager::class.java)
     if (manager.getNotificationChannel(CHANNEL_ID) != null) return
     val channel =
-      NotificationChannel(CHANNEL_ID, "動画ダウンロード", NotificationManager.IMPORTANCE_LOW).apply {
-        description = "動画ダウンロードの進捗を表示します"
+      NotificationChannel(
+        CHANNEL_ID,
+        getString(R.string.video_download_channel_name),
+        NotificationManager.IMPORTANCE_LOW,
+      ).apply {
+        description = getString(R.string.video_download_channel_description)
         setShowBadge(false)
       }
     manager.createNotificationChannel(channel)
@@ -140,4 +132,16 @@ class VideoDownloadForegroundService : Service() {
     private const val CHANNEL_ID = "video_download"
     private const val NOTIFICATION_ID = 1001
   }
+}
+
+// 通知本文（「ファイル 1/2 (42%)」のような文字列）を組み立てる純粋関数。
+// filePrefix は文字列リソースで整形済みの「ファイル 1/2」部分。total <= 0 は進捗不明のため prefix のみ返す。
+internal fun buildProgressText(
+  filePrefix: String,
+  current: Long,
+  total: Long,
+): String {
+  if (total <= 0) return filePrefix
+  val percent = ((current * 100) / total).coerceIn(0, 100)
+  return "$filePrefix ($percent%)"
 }

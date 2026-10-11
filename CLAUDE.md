@@ -141,7 +141,7 @@ Windows の WebView2 に Chrome 拡張を読み込む機能。`src-tauri/src/com
 
 - 画面文言は `src/locales/{ja,en}/<名前空間>.json` に集約し、`t("ns:key")` の名前空間付き完全キーで参照する（`useTranslation()` は引数なし）。React 外は `i18n.t` を呼び出し時に評価、純粋関数は `t` を引数で受ける。
 - ja と en のキー集合・補間変数は契約テストで一致を保証。辞書の未使用キーも `unusedKeys.contract.test.ts` が失敗にする。
-- 画面コードへの日本語直書きは ESLint（`no-restricted-syntax`）の **error** で検出する（`eslint-disable` を使う場合は理由必須）。React UI（`src`）の文言は辞書化済み。**Rust は文章を返さない**: エラーは `AppError`（種別コード＋詳細。`codes` に集約し `messages:rustError.*` で翻訳。契約テストあり）、ウィンドウタイトル等は `ui_language.rs` の `ui_text`、開発者向けログは固定の英語（契約テストあり）。inject の文言は `window.__mcxI18n` 経由（ES import しない）で辞書化済みで、X の画面と照合する日本語は契約テストの許可リストで明示する。Android ネイティブの文言は今後の PR で対応予定で、当面は日本語のまま。
+- 画面コードへの日本語直書きは ESLint（`no-restricted-syntax`）の **error** で検出する（`eslint-disable` を使う場合は理由必須）。React UI（`src`）の文言は辞書化済み。**Rust は文章を返さない**: エラーは `AppError`（種別コード＋詳細。`codes` に集約し `messages:rustError.*` で翻訳。契約テストあり）、ウィンドウタイトル等は `ui_language.rs` の `ui_text`、開発者向けログは固定の英語（契約テストあり）。inject の文言は `window.__mcxI18n` 経由（ES import しない）で辞書化済みで、X の画面と照合する日本語は契約テストの許可リストで明示する。Android ネイティブの文言（動画ダウンロード通知）は `res/values{,-ja}/strings.xml` の文字列リソースで、アプリ設定ではなく端末の言語に従う（詳細は `docs/development/android-notes.md`）。
 - 設定 `language`（auto/ja/en）の既定値は Rust `impl Default`・TS・`contracts/default-settings.json` の3点同期（上記の既定値ルールに従う）。
 - 規約・名前空間・用語集・追加手順の詳細は `docs/development/i18n-notes.md` を参照。
 
