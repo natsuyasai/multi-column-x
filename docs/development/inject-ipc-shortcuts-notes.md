@@ -30,6 +30,18 @@ inject スクリプトは X(twitter.com) の実 DOM 構造に依存する。X �
 - `eval_in_webview` 用の Rust 側テンプレート文字列には、グローバル変数名（`window.__multiColumnX` など）が**文字列として直接埋め込まれている**。グローバル変数名を変更する場合、型定義2箇所・inject 各スクリプトのローカル定数に加えて、このテンプレート文字列内の埋め込みも別途更新が必要になる。見落としやすい同期漏れポイント。
 - コマンド名・イベント名・ラベルプレフィックスを変更する際は、Rust 側の IPC 定数定義・TS 側の IPC 定数定義・inject 側の参照用定数ドキュメント・各 inject スクリプトのローカル定数・両方の `window` 型定義、という**5箇所同期**が必要。ショートカット追加時の複数箇所同期と同種の、より広い範囲に及ぶ配線ルールとして把握しておくこと。
 
+## 多言語（`__mcxI18n`）
+
+inject の自前 UI 文言（ポップアップで開くメニュー、ヘッダーカスタマイズ、ポップアップツールバー、前回の続きへ戻るボタン、動画長押しメニュー）は日本語・英語に対応している。
+
+- **ハブ**: `src-tauri/src/inject/_src/i18n.ts` が `window.__mcxI18n = { lang, t, setLang, apply, onChange }` を公開する。`build_init_script` / `build_popup_init_script` が `DOM_OBSERVER_HUB` の直後・他のスクリプトより前に連結する。`t` は現在言語 → ja → キー文字列の順に引く。補間は `{name}` 形式（TS 側 i18next とは独立）。
+- **import しない理由**: 各エントリは独立した IIFE で、複数エントリから同じモジュールを import すると Rollup が共有チャンクを生成し、`include_str!` での連結が壊れる。そのため各エントリは必ず `window.__mcxI18n` 経由で参照する（型は `types.d.ts`）。
+- **`__mcxLang` が `config` でない理由**: 初期言語は `window.__mcxLang`（"ja" | "en"）を Rust がハブより前に定義する。`config_script` の配列長・キー順は既存テストが固定しているため、言語は config に入れず別グローバルにしている。
+- **辞書の追加手順**: ① `i18n.ts` の `ja` と `en` に同じキーを追加（ja は現行文言を一字一句変えない。補間変数名も揃える）② 呼び出し側で `t` / `apply` を使う（動的テキストは呼び出しごとに `t`、静的な要素は `apply` で `data-mcx-i18n*` を付けると `setLang` で自動再適用される。React 描画などは `onChange` で追従）③ `i18n.contract.test.ts`（キー集合・補間変数名の一致、日本語直書きの検出）を通す。
+- **翻訳しない日本語**: X の画面（DOM）と照合する値（`hide_ad.ts` / `return_to_last_read_logic.ts` の `AD_TEXTS`、`notification_header_hide.ts` の `aria-label="通知タイムライン"`、`headerCustomizerTypes.ts` のキーと `ariaLabel`）は翻訳せず、`i18n.contract.test.ts` の許可リスト（ファイル＋部分文字列＋理由）に載せる。新たに照合用の日本語を足すときは許可リストに理由付きで追加する。未使用の許可項目が残っていてもテストが失敗する。
+- **即時反映**: カラムは設定画面で言語を適用すると `useSettingsApplyHandlers.handleApplyGlobalSettings` が全カラムへ `evalInColumn(col.id, WEBVIEW_SCRIPTS.setInjectLanguage(lang))`（`window.__mcxI18n && window.__mcxI18n.setLang("en");`）を送り、再読み込みなしで切り替わる。`lang` は `resolveLanguage(normalizeLanguageSetting(...), getOsLocale())` で解決した "ja" / "en" のみ。`setInjectLanguage` は "ja" 以外を "en" に丸め、任意の文字列を埋め込まない。グローバル名 `__mcxI18n` は Rust の `globals::MCX_I18N` と `contracts/ipc-constants.json` で同期され、`__multiColumnX` と同様に `ipc.ts` の eval テンプレートへ直接埋め込まれている（名前を変えるときはここも更新）。
+- **ポップアップ**: 即時反映の対象外。作成時の言語（`current_ui_lang`）で初期化され、新しく開くものから反映される。
+
 ## キーボードショートカット
 
 - `Ctrl+A` はブラウザ標準の「全選択」と競合するため、アカウント管理には `Ctrl+Shift+A` を意図的に割り当てている（実 DOM 検証ではなく設計判断レベルの回避）。
