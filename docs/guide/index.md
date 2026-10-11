@@ -22,7 +22,7 @@ Windows / Linux のデスクトップと Android に対応しています（環�
 
 _Windows の画面です。ホーム・通知・検索など、複数のカラムを横に並べて同時に表示できます（アカウント名とタイムラインの内容はモザイク処理しています）。_
 
-![Android のアプリ画面](images/android-app-screen.png)
+<img src="./images/android-app-screen.png" alt="Android のアプリ画面" width="320">
 
 _Android の画面です。画面下部のタブバーでカラムを切り替えます（タイムラインの内容はモザイク処理しています）。_
 
