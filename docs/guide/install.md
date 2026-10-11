@@ -32,7 +32,7 @@ _「詳細情報」を開くと「実行」ボタンが表示されます。ア�
 
 ## Linux
 
-次のいずれかを利用できます。
+次のいずれかを利用できます（AppImage 版はインストールスクリプトでも導入できます。[下記](#インストールスクリプトを使う-appimage-版) を参照）。
 
 - **AppImage**（推奨・アプリ本体の自動更新に対応）
   1. Assets から `MultiColumnX_<バージョン>_amd64.AppImage` をダウンロードします。
@@ -41,6 +41,49 @@ _「詳細情報」を開くと「実行」ボタンが表示されます。ア�
 - **deb パッケージ**（Debian / Ubuntu 系・手動更新）
   1. Assets から `MultiColumnX_<バージョン>_amd64.deb` をダウンロードします。
   2. `sudo apt install ./MultiColumnX_*.deb` でインストールします。
+
+### インストールスクリプトを使う（AppImage 版）
+
+Assets の `install.sh` を使うと、AppImage のダウンロードからアプリケーションメニューへの登録までを自動で行えます。
+
+- 最新の AppImage を `~/.local/bin/MultiColumnX.AppImage` に配置します。
+- アイコンとデスクトップエントリ（`~/.local/share/applications/multi-column-x.desktop`）を作成し、アプリケーションメニューから起動できるようにします。
+- 必要なコマンドは `curl` です。
+
+**ワンライナーでダウンロードしてインストールする**
+
+```bash
+bash <(curl -fsSL https://github.com/natsuyasai/multi-column-x/releases/latest/download/install.sh)
+```
+
+すでにインストール済みの場合は上書きの確認（`y` / `N`）が表示されます。確認の入力を受け付けるため、`curl ... | bash` ではなく上記の形式で実行してください。
+
+**スクリプトを保存してから実行する**
+
+1. Assets から `install.sh` をダウンロードします。
+2. 実行権限を付与して実行します。
+
+```bash
+chmod +x install.sh
+./install.sh
+```
+
+**アンインストール**
+
+AppImage・アイコン・デスクトップエントリを削除します。
+
+```bash
+./install.sh --uninstall
+```
+
+ワンライナーで実行する場合は、次のとおりです。
+
+```bash
+bash <(curl -fsSL https://github.com/natsuyasai/multi-column-x/releases/latest/download/install.sh) --uninstall
+```
+
+> `~/.local/bin` が `PATH` に含まれていない場合は、インストール完了時に追記方法が表示されます（アプリケーションメニューからの起動には影響しません）。
+> AppImage 版は動画の再生に必要な H.264 コーデックを同梱していません。インストール完了時に、お使いのディストリビューション向けの導入コマンドが表示されます。アプリ内の案内から有効化することもできます（[設定](./settings#アプリ全体設定) の「動画再生（Linux）」を参照）。
 
 ## Android
 
