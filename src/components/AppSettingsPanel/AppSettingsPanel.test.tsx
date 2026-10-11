@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import i18n from "@/i18n";
 import * as extensionsService from "@/services/extensions";
 import type { GlobalSettings, Column, Account } from "../../types";
 import { AppSettingsPanel } from "./AppSettingsPanel";
@@ -1052,6 +1053,7 @@ describe("AppSettingsPanel 設定パッチの全項目反映", () => {
       blurImageAmount: "20px",
       hideAdEnabled: false,
       apiRateLimitMonitorEnabled: false,
+      language: "auto",
       useXAppForCompose: true,
       mobileSwipeAreaEnabled: false,
       mobileSwipeAreaHeight: 30,
@@ -1735,5 +1737,60 @@ describe("AppSettingsPanel 拡張機能タブ", () => {
     );
 
     await waitFor(() => expect(onExtensionsChanged).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe("AppSettingsPanel 表示言語", () => {
+  const getLanguageGroup = (name: string) =>
+    screen.getByRole("group", { name });
+
+  it("設定画面の言語選択肢は自動・日本語・Englishの3つである", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    const buttons = within(getLanguageGroup("表示言語")).getAllByRole("button");
+    expect(buttons.map((b) => b.textContent)).toEqual([
+      "自動",
+      "日本語",
+      "English",
+    ]);
+  });
+
+  it("英語表示でも日本語とEnglishはそれぞれの言語の表記で表示される", async () => {
+    await i18n.changeLanguage("en");
+    render(<AppSettingsPanel {...defaultProps} />);
+    const buttons = within(getLanguageGroup("Language")).getAllByRole("button");
+    expect(buttons.map((b) => b.textContent)).toEqual([
+      "Auto",
+      "日本語",
+      "English",
+    ]);
+  });
+
+  it("Englishを選んで適用するとonApplyに渡るパッチの言語がenになる", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    fireEvent.click(
+      within(getLanguageGroup("表示言語")).getByRole("button", {
+        name: "English",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ language: "en" }),
+    );
+  });
+
+  it("言語を変更しなければ現在の言語設定がそのままパッチに渡る", () => {
+    const onApply = vi.fn();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={{ ...baseGlobalSettings, language: "ja" }}
+        onApply={onApply}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ language: "ja" }),
+    );
   });
 });

@@ -72,6 +72,7 @@ describe("toGlobalSettingsPatch", () => {
       blurImageAmount: "10px",
       hideAdEnabled: true,
       apiRateLimitMonitorEnabled: true,
+      language: "auto",
       useXAppForCompose: false,
       mobileSwipeAreaEnabled: true,
       mobileSwipeAreaHeight: 28,
@@ -81,6 +82,25 @@ describe("toGlobalSettingsPatch", () => {
       ngWords: ["spam"],
       repostHiddenUserIds: ["user_a"],
     });
+  });
+
+  it("未対応の言語設定が保存されていてもdraftでは自動に正規化される", () => {
+    const draft = createSettingsDraft({
+      ...baseGlobalSettings,
+      language: "fr" as GlobalSettings["language"],
+    });
+    expect(draft.language).toBe("auto");
+  });
+
+  it("言語設定は上書きチェック無しで常にパッチへ含まれる", () => {
+    for (const language of ["auto", "ja", "en"] as const) {
+      const draft = createSettingsDraft({ ...baseGlobalSettings, language });
+      const patch = toGlobalSettingsPatch(draft, {
+        ngWords: [],
+        repostHiddenUserIds: [],
+      });
+      expect(patch.language).toBe(language);
+    }
   });
 
   it("hardwareVideoDecodeEnabledが設定からドラフトを経てパッチへ往復する", () => {
