@@ -8,6 +8,7 @@ import {
 } from "@/constants/apiRateLimitLabels";
 import { useEscapeKey } from "@/hooks/useEscapeKey";
 import { useOutsideClick } from "@/hooks/useOutsideClick";
+import type { AppTFunction } from "@/i18n/types";
 import { getRateLimitSeverity } from "@/lib/apiRateLimit";
 import type { Account, ApiRateLimitBucket } from "@/types";
 import styles from "./ApiRateLimitIndicator.module.scss";
@@ -35,12 +36,14 @@ const SEVERITY_ORDER: Record<Severity, number> = {
  * reset（Unix秒）から「あとN分」形式のラベルを作る。
  * 0分以下（既に経過済み・まもなく解除）の場合は「まもなく」と表示する。
  */
-function formatResetLabel(resetUnixSeconds: number): string {
+function formatResetLabel(resetUnixSeconds: number, t: AppTFunction): string {
   const minutes = Math.max(
     0,
     Math.round((resetUnixSeconds * 1000 - Date.now()) / 60000),
   );
-  return minutes <= 0 ? "まもなく" : `あと${minutes}分`;
+  return minutes <= 0
+    ? t("rateLimit:indicator.soon")
+    : t("rateLimit:indicator.resetInMinutes", { count: minutes });
 }
 
 function joinClassNames(...names: (string | false | undefined)[]): string {
@@ -87,7 +90,9 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
 
   const popoverContent = (
     <>
-      {accounts.length === 0 && <p className={styles.empty}>データなし</p>}
+      {accounts.length === 0 && (
+        <p className={styles.empty}>{t("rateLimit:indicator.noData")}</p>
+      )}
       {accounts.map((account) => {
         const observedBuckets = apiRateLimits[account.id] ?? {};
         const bucketList: BucketListItem[] = getColumnRelatedBucketKeys().map(
@@ -115,8 +120,6 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
                     item.bucketKey,
                     t,
                   );
-                  const unobservedNote = "（まだ使用されていないため未計測）";
-
                   return (
                     <li key={item.bucketKey} className={styles.bucketRow}>
                       <div className={styles.bucketMain}>
@@ -128,8 +131,10 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
                       </div>
                       <p className={styles.bucketDescription}>
                         {description
-                          ? `${description}${unobservedNote}`
-                          : unobservedNote}
+                          ? t("rateLimit:indicator.unobservedWithDescription", {
+                              description,
+                            })
+                          : t("rateLimit:indicator.unobserved")}
                       </p>
                     </li>
                   );
@@ -160,7 +165,7 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
                         {bucket.remaining}/{bucket.limit}
                       </span>
                       <span className={styles.bucketReset}>
-                        {formatResetLabel(bucket.reset)}
+                        {formatResetLabel(bucket.reset, t)}
                       </span>
                     </div>
                     {description && (
@@ -188,9 +193,9 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
             return next;
           })
         }
-        aria-label="APIレート制限"
+        aria-label={t("rateLimit:indicator.triggerLabel")}
         aria-expanded={isOpen}
-        title="APIレート制限"
+        title={t("rateLimit:indicator.triggerLabel")}
       >
         API
       </button>
@@ -205,7 +210,7 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
           <div
             className={joinClassNames(styles.popover, styles.popoverMobile)}
             role="dialog"
-            aria-label="APIレート制限一覧"
+            aria-label={t("rateLimit:indicator.listLabel")}
           >
             {popoverContent}
           </div>
@@ -215,7 +220,7 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
         <div
           className={styles.popover}
           role="dialog"
-          aria-label="APIレート制限一覧"
+          aria-label={t("rateLimit:indicator.listLabel")}
         >
           {popoverContent}
         </div>

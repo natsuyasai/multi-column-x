@@ -1,4 +1,6 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
+import type { AppTFunction } from "@/i18n/types";
 import type { AppUpdate, UpdateProgress } from "../../services/updater";
 import styles from "./UpdateDialog.module.scss";
 
@@ -12,7 +14,10 @@ interface Props {
 }
 
 /** 進捗のフェーズから表示文言とパーセント（不確定なら null）を導出する。 */
-function describeProgress(progress: UpdateProgress): {
+function describeProgress(
+  progress: UpdateProgress,
+  t: AppTFunction,
+): {
   label: string;
   percent: number | null;
 } {
@@ -23,17 +28,20 @@ function describeProgress(progress: UpdateProgress): {
           100,
           Math.round((progress.downloaded / progress.total) * 100),
         );
-        return { label: `ダウンロード中... ${percent}%`, percent };
+        return {
+          label: t("dialogs:update.downloadingPercent", { percent }),
+          percent,
+        };
       }
-      return { label: "ダウンロード中...", percent: null };
+      return { label: t("dialogs:update.downloading"), percent: null };
     }
     case "installing":
-      return { label: "インストール中...", percent: null };
+      return { label: t("dialogs:update.installing"), percent: null };
     case "restarting":
-      return { label: "再起動中...", percent: null };
+      return { label: t("dialogs:update.restarting"), percent: null };
     case "awaitingInstall":
       return {
-        label: "ダウンロード中です。完了後にインストール画面が表示されます。",
+        label: t("dialogs:update.awaitingInstall"),
         percent: null,
       };
   }
@@ -47,12 +55,15 @@ export const UpdateDialog: React.FC<Props> = ({
   onInstall,
   onLater,
 }) => {
-  const status = progress ? describeProgress(progress) : null;
+  const { t } = useTranslation();
+  const status = progress ? describeProgress(progress, t) : null;
   return (
     <div className={styles.overlay}>
       <div className={styles.dialog}>
-        <h2 className={styles.title}>新しいバージョンがあります</h2>
-        <p className={styles.version}>バージョン {update.version}</p>
+        <h2 className={styles.title}>{t("dialogs:update.title")}</h2>
+        <p className={styles.version}>
+          {t("dialogs:update.version", { version: update.version })}
+        </p>
         {update.notes && <pre className={styles.notes}>{update.notes}</pre>}
         {status && (
           <div className={styles.progress}>
@@ -60,7 +71,7 @@ export const UpdateDialog: React.FC<Props> = ({
             <div
               className={styles.progressTrack}
               role="progressbar"
-              aria-label="更新の進捗"
+              aria-label={t("dialogs:update.progressAria")}
               aria-valuemin={0}
               aria-valuemax={100}
               {...(status.percent !== null
@@ -94,7 +105,7 @@ export const UpdateDialog: React.FC<Props> = ({
             onClick={onLater}
             disabled={installing}
           >
-            後で
+            {t("dialogs:update.later")}
           </button>
           <button
             type="button"
@@ -102,7 +113,9 @@ export const UpdateDialog: React.FC<Props> = ({
             onClick={onInstall}
             disabled={installing}
           >
-            {installing ? "更新中..." : "更新する"}
+            {installing
+              ? t("dialogs:update.installingButton")
+              : t("dialogs:update.install")}
           </button>
         </div>
       </div>

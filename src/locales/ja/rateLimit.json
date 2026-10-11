@@ -60,5 +60,15 @@
       "label": "通知",
       "description": "通知一覧を取得するAPI。"
     }
+  },
+  "indicator": {
+    "triggerLabel": "APIレート制限",
+    "listLabel": "APIレート制限一覧",
+    "noData": "データなし",
+    "soon": "まもなく",
+    "resetInMinutes_one": "あと{{count}}分",
+    "resetInMinutes_other": "あと{{count}}分",
+    "unobserved": "（まだ使用されていないため未計測）",
+    "unobservedWithDescription": "{{description}}（まだ使用されていないため未計測）"
   }
 }

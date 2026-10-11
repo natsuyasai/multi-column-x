@@ -60,5 +60,15 @@
       "label": "Notifications",
       "description": "API that fetches the list of notifications."
     }
+  },
+  "indicator": {
+    "triggerLabel": "API rate limits",
+    "listLabel": "API rate limit list",
+    "noData": "No data",
+    "soon": "Soon",
+    "resetInMinutes_one": "in {{count}} min",
+    "resetInMinutes_other": "in {{count}} min",
+    "unobserved": "(Not measured yet because it hasn't been used)",
+    "unobservedWithDescription": "{{description}} (Not measured yet because it hasn't been used)"
   }
 }

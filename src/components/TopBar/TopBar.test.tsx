@@ -720,8 +720,7 @@ describe("TopBar 表示言語", () => {
       ...defaultProps,
       accounts: [englishAccount],
       columns: englishColumns,
-      // APIレート制限表示の文言は別領域の移行対象のため、ここでは描画しない
-      apiRateLimitMonitorEnabled: false,
+      apiRateLimitMonitorEnabled: true,
     };
     const { container, rerender } = render(<TopBar {...props} />);
     expectNoJapanese(container);

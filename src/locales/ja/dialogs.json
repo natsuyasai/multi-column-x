@@ -14,5 +14,52 @@
   "confirm": {
     "ok": "OK",
     "cancel": "キャンセル"
+  },
+  "update": {
+    "title": "新しいバージョンがあります",
+    "version": "バージョン {{version}}",
+    "progressAria": "更新の進捗",
+    "downloadingPercent": "ダウンロード中... {{percent}}%",
+    "downloading": "ダウンロード中...",
+    "installing": "インストール中...",
+    "restarting": "再起動中...",
+    "awaitingInstall": "ダウンロード中です。完了後にインストール画面が表示されます。",
+    "later": "後で",
+    "install": "更新する",
+    "installingButton": "更新中..."
+  },
+  "h264": {
+    "title": "動画を再生するための追加コンポーネント",
+    "description": "動画の再生に必要な H.264 デコーダが見つかりません。Cisco の公式配布元から H.264 デコーダ（OpenH264）を取得して有効化できます。",
+    "note": "このデコーダは Cisco のライセンスに基づいて提供されます。",
+    "downloading": "ダウンロード中…",
+    "dismiss": "今はしない",
+    "download": "ダウンロードして有効化",
+    "success": "有効化しました。反映するにはアプリの再起動が必要です。",
+    "later": "後で",
+    "relaunch": "今すぐ再起動",
+    "fallbackError": "ダウンロードに失敗しました。",
+    "close": "閉じる",
+    "retry": "再試行"
+  },
+  "shortcutHelp": {
+    "title": "キーボードショートカット",
+    "close": "閉じる",
+    "items": {
+      "createPost": "ツイートを作成",
+      "openUrlPopup": "URLをポップアップで開く",
+      "addColumn": "カラムを追加",
+      "manageAccounts": "アカウント管理",
+      "appSettings": "アプリ設定",
+      "toggleToolbar": "TopBarの折りたたみ/展開",
+      "jumpToColumn": "指定カラムへジャンプ",
+      "reloadFocusedColumn": "フォーカスカラムを更新",
+      "showHelp": "このヘルプを表示"
+    }
+  },
+  "whatsNew": {
+    "title": "アプリが更新されました",
+    "version": "バージョン {{version}} の更新内容",
+    "close": "閉じる"
   }
 }

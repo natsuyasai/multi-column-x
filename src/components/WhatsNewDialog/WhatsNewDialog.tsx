@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import styles from "./WhatsNewDialog.module.scss";
 
 interface Props {
@@ -60,17 +61,20 @@ export const WhatsNewDialog: React.FC<Props> = ({
   notes,
   onClose,
 }) => {
+  const { t } = useTranslation();
   return (
     <div className={styles.overlay}>
       <div className={styles.dialog}>
-        <h2 className={styles.title}>アプリが更新されました</h2>
+        <h2 className={styles.title}>{t("dialogs:whatsNew.title")}</h2>
         {version && (
-          <p className={styles.version}>バージョン {version} の更新内容</p>
+          <p className={styles.version}>
+            {t("dialogs:whatsNew.version", { version })}
+          </p>
         )}
         {notes && <div className={styles.notes}>{renderNotes(notes)}</div>}
         <div className={styles.actions}>
           <button type="button" className={styles.closeBtn} onClick={onClose}>
-            閉じる
+            {t("dialogs:whatsNew.close")}
           </button>
         </div>
       </div>

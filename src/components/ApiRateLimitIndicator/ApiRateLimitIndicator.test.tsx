@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as apiRateLimitLabels from "@/constants/apiRateLimitLabels";
 import i18n from "@/i18n";
+import { expectNoJapanese } from "@/test-utils/japanese";
 import type { Account, ApiRateLimitBucket } from "@/types";
 import { ApiRateLimitIndicator } from "./ApiRateLimitIndicator";
 import styles from "./ApiRateLimitIndicator.module.scss";
@@ -518,7 +519,7 @@ describe("ApiRateLimitIndicator の表示言語", () => {
         apiRateLimits={normalRateLimits}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "APIレート制限" }));
+    fireEvent.click(screen.getByRole("button", { name: "API rate limits" }));
 
     expect(screen.getByText("Home timeline")).toBeInTheDocument();
     expect(
@@ -541,5 +542,70 @@ describe("ApiRateLimitIndicator の表示言語", () => {
     await act(() => i18n.changeLanguage("en"));
 
     expect(screen.getByText("Home timeline")).toBeInTheDocument();
+  });
+
+  const englishAccounts: Account[] = accounts.map((account, index) => ({
+    ...account,
+    label: ["Account A", "Account B", "Account C"][index],
+  }));
+
+  it("表示言語が英語のときAPIレート制限の表示に日本語の文言が表示されない（severity・未計測・まもなく・あと◯分）", async () => {
+    await act(() => i18n.changeLanguage("en"));
+    const rateLimits: Record<string, Record<string, ApiRateLimitBucket>> = {
+      ...mixedSeverityRateLimits,
+      "acc-1": {
+        HomeTimeline: {
+          ...bucket("HomeTimeline", 900, 900),
+          reset: NOW_SEC - 10,
+        },
+        HomeLatestTimeline: bucket("HomeLatestTimeline", 1, 1),
+      },
+    };
+    const { container } = render(
+      <ApiRateLimitIndicator
+        accounts={englishAccounts}
+        apiRateLimits={rateLimits}
+      />,
+    );
+    expectNoJapanese(container);
+    fireEvent.click(screen.getByRole("button", { name: "API rate limits" }));
+
+    expectNoJapanese(container);
+    expect(
+      screen.getByRole("dialog", { name: "API rate limit list" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Soon")).toBeInTheDocument();
+    expect(screen.getAllByText("in 5 min").length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(/(Not measured yet because it hasn.t been used)/)
+        .length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("表示言語が英語のときAPIレート制限の表示に日本語の文言が表示されない（データなし・モバイル）", async () => {
+    await act(() => i18n.changeLanguage("en"));
+    const { container } = render(
+      <ApiRateLimitIndicator accounts={[]} apiRateLimits={{}} isMobile />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "API rate limits" }));
+
+    expectNoJapanese(container);
+    expect(screen.getByText("No data")).toBeInTheDocument();
+  });
+
+  it("APIレート制限の複数形キーは日本語でも英語でも件数が補間される", async () => {
+    expect(i18n.t("rateLimit:indicator.resetInMinutes", { count: 1 })).toBe(
+      "あと1分",
+    );
+    expect(i18n.t("rateLimit:indicator.resetInMinutes", { count: 5 })).toBe(
+      "あと5分",
+    );
+    await act(() => i18n.changeLanguage("en"));
+    expect(i18n.t("rateLimit:indicator.resetInMinutes", { count: 1 })).toBe(
+      "in 1 min",
+    );
+    expect(i18n.t("rateLimit:indicator.resetInMinutes", { count: 5 })).toBe(
+      "in 5 min",
+    );
   });
 });

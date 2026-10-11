@@ -14,5 +14,52 @@
   "confirm": {
     "ok": "OK",
     "cancel": "Cancel"
+  },
+  "update": {
+    "title": "A new version is available",
+    "version": "Version {{version}}",
+    "progressAria": "Update progress",
+    "downloadingPercent": "Downloading... {{percent}}%",
+    "downloading": "Downloading...",
+    "installing": "Installing...",
+    "restarting": "Restarting...",
+    "awaitingInstall": "Downloading. The installer will appear when it finishes.",
+    "later": "Later",
+    "install": "Update",
+    "installingButton": "Updating..."
+  },
+  "h264": {
+    "title": "Additional component for video playback",
+    "description": "The H.264 decoder required for video playback was not found. You can download and enable the H.264 decoder (OpenH264) from Cisco's official distribution site.",
+    "note": "This decoder is provided under Cisco's license.",
+    "downloading": "Downloading…",
+    "dismiss": "Not now",
+    "download": "Download and enable",
+    "success": "Enabled. Restart the app to apply the change.",
+    "later": "Later",
+    "relaunch": "Restart now",
+    "fallbackError": "Download failed.",
+    "close": "Close",
+    "retry": "Retry"
+  },
+  "shortcutHelp": {
+    "title": "Keyboard shortcuts",
+    "close": "Close",
+    "items": {
+      "createPost": "Compose a post",
+      "openUrlPopup": "Open a URL in a popup",
+      "addColumn": "Add a column",
+      "manageAccounts": "Manage accounts",
+      "appSettings": "App settings",
+      "toggleToolbar": "Collapse/expand the toolbar",
+      "jumpToColumn": "Jump to the specified column",
+      "reloadFocusedColumn": "Reload the focused column",
+      "showHelp": "Show this help"
+    }
+  },
+  "whatsNew": {
+    "title": "The app has been updated",
+    "version": "What's new in version {{version}}",
+    "close": "Close"
   }
 }
