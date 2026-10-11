@@ -88,6 +88,40 @@ fn find_account_data_directory(accounts: &serde_json::Value, account_id: &str) -
     })
 }
 
+/// accounts 配列から全アカウントの dataDirectory の集合を返す（純粋関数）。
+/// 配列でない（キー無し・型違い）場合、または有効な dataDirectory が 1 つも取れない場合は None。
+/// 呼び出し側は None のとき「掃除しない」側に倒す（誤って全削除しないため）。
+#[cfg_attr(not(windows), allow(dead_code))]
+pub(crate) fn account_data_directories(
+    accounts: &serde_json::Value,
+) -> Option<std::collections::HashSet<String>> {
+    let dirs: std::collections::HashSet<String> = accounts
+        .as_array()?
+        .iter()
+        .filter_map(|a| a.get("dataDirectory")?.as_str())
+        .filter(|dir| !dir.is_empty())
+        .map(String::from)
+        .collect();
+    if dirs.is_empty() {
+        None
+    } else {
+        Some(dirs)
+    }
+}
+
+/// 設定に登録された全アカウントの dataDirectory の集合を返す。取得できなければ None。
+#[cfg_attr(not(windows), allow(dead_code))]
+pub(crate) fn load_account_data_directories(
+    app: &AppHandle,
+) -> Option<std::collections::HashSet<String>> {
+    let accounts = app
+        .store("settings.json")
+        .ok()
+        .and_then(|store| store.get("appSettings"))
+        .and_then(|v| v.get("accounts").cloned())?;
+    account_data_directories(&accounts)
+}
+
 /// 設定に登録されたアカウントの保存先を accountId から解決する。未登録ならエラーを返す。
 #[cfg_attr(target_os = "android", allow(dead_code))]
 pub(crate) fn resolve_account_data_directory(
@@ -436,5 +470,31 @@ mod tests {
             { "id": "", "label": "acc1", "color": "#fff", "dataDirectory": "/data/1" }
         ]);
         assert_eq!(find_account_data_directory(&accounts, ""), None);
+    }
+
+    #[test]
+    fn 全アカウントのdatadirectoryが集合として取り出せる() {
+        let accounts = serde_json::json!([
+            {"id": "1", "dataDirectory": "/d/a"},
+            {"id": "2", "dataDirectory": "/d/b"},
+            {"id": "3", "dataDirectory": "/d/a"},
+            {"id": "4"},
+            {"id": "5", "dataDirectory": ""}
+        ]);
+        let dirs = account_data_directories(&accounts).unwrap();
+        let expected: std::collections::HashSet<String> =
+            ["/d/a", "/d/b"].iter().map(|s| s.to_string()).collect();
+        assert_eq!(dirs, expected);
+    }
+
+    #[test]
+    fn アカウント一覧が取れないときはdatadirectory集合もnoneになる() {
+        assert_eq!(account_data_directories(&serde_json::Value::Null), None);
+        assert_eq!(account_data_directories(&serde_json::json!({"a": 1})), None);
+        assert_eq!(account_data_directories(&serde_json::json!([])), None);
+        assert_eq!(
+            account_data_directories(&serde_json::json!([{"id": "1"}])),
+            None
+        );
     }
 }

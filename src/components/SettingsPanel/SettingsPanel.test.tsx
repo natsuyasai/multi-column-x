@@ -1,6 +1,8 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { act, render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import i18n from "@/i18n";
+import { expectNoJapanese } from "@/test-utils/japanese";
 import type { Column } from "../../types";
 import { SettingsPanel } from "./SettingsPanel";
 
@@ -588,6 +590,16 @@ describe("SettingsPanel 新着デスクトップ通知", () => {
       undefined,
     );
   });
+
+  it("モバイル（isMobile: true）では通知セクションが表示されない", () => {
+    render(<SettingsPanel {...defaultProps} isMobile={true} />);
+    expect(
+      screen.queryByRole("checkbox", { name: "新着をデスクトップ通知する" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "通知" }),
+    ).not.toBeInTheDocument();
+  });
 });
 
 describe("SettingsPanel 表示名", () => {
@@ -736,5 +748,317 @@ describe("SettingsPanel 前回の境目へ戻るボタン設定", () => {
       350,
       undefined,
     );
+  });
+});
+
+describe("SettingsPanel onChangeキー対応の特性テスト", () => {
+  it.each<[string, keyof typeof baseSettings, Partial<typeof baseSettings>]>([
+    ["自動更新を有効にする", "autoReloadEnabled", {}],
+    ["カウントダウンを表示する", "showCountdown", { autoReloadEnabled: true }],
+    [
+      "カスタムメニューボタンを表示する",
+      "showCustomMenu",
+      { hideHeaderEnabled: true },
+    ],
+    [
+      "写真閲覧後のスクロール位置を復元する",
+      "scrollPosRestoreEnabled",
+      { smallImageEnabled: true },
+    ],
+    ["更新後に前回の続きへ戻るボタンを表示する", "returnToLastReadEnabled", {}],
+    ["画像を縮小表示する", "smallImageEnabled", {}],
+    ["画像をぼかして表示する", "blurImageEnabled", {}],
+  ])(
+    "%sのチェックボックスを操作すると%sが反転してonApplyに渡される",
+    async (label, key, overrides) => {
+      const onApply = vi.fn();
+      const col = {
+        ...mockColumn,
+        settings: { ...baseSettings, ...overrides },
+      };
+      render(
+        <SettingsPanel {...defaultProps} column={col} onApply={onApply} />,
+      );
+      const checkbox = screen.getByRole("checkbox", {
+        name: label,
+      }) as HTMLInputElement;
+      const before = checkbox.checked;
+      await userEvent.click(checkbox);
+      await userEvent.click(screen.getByRole("button", { name: "適用" }));
+      expect(onApply).toHaveBeenCalledWith(
+        "col-1",
+        expect.objectContaining({ [key]: !before }),
+        350,
+        undefined,
+      );
+    },
+  );
+
+  it.each<
+    [
+      string,
+      keyof typeof baseSettings,
+      Partial<typeof baseSettings>,
+      string,
+      string | number,
+    ]
+  >([
+    [
+      "更新間隔（秒）",
+      "autoReloadInterval",
+      { autoReloadEnabled: true },
+      "120",
+      120,
+    ],
+    [
+      "幅（例: 50%, 200px）",
+      "smallImageWidth",
+      { smallImageEnabled: true },
+      "80%",
+      "80%",
+    ],
+    [
+      "ブラー量（例: 10px）",
+      "blurImageAmount",
+      { blurImageEnabled: true },
+      "5px",
+      "5px",
+    ],
+  ])(
+    "%sの入力欄を編集すると%sがonApplyに渡される",
+    async (label, key, overrides, inputValue, expected) => {
+      const onApply = vi.fn();
+      const col = {
+        ...mockColumn,
+        settings: { ...baseSettings, ...overrides },
+      };
+      render(
+        <SettingsPanel {...defaultProps} column={col} onApply={onApply} />,
+      );
+      const field = screen.getByLabelText(label);
+      await userEvent.clear(field);
+      await userEvent.type(field, inputValue);
+      await userEvent.click(screen.getByRole("button", { name: "適用" }));
+      expect(onApply).toHaveBeenCalledWith(
+        "col-1",
+        expect.objectContaining({ [key]: expected }),
+        350,
+        undefined,
+      );
+    },
+  );
+
+  it("カスタムCSS入力欄を編集するとcustomCSSがonApplyに渡される", async () => {
+    const onApply = vi.fn();
+    render(<SettingsPanel {...defaultProps} onApply={onApply} />);
+    const textarea = screen.getByPlaceholderText("/* カスタムCSSを入力 */");
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, ".foo {{ color: red; }");
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.objectContaining({ customCSS: ".foo { color: red; }" }),
+      350,
+      undefined,
+    );
+  });
+});
+
+describe("SettingsPanel 写真閲覧後のスクロール位置を復元する設定と画像縮小の連動", () => {
+  const label = "写真閲覧後のスクロール位置を復元する";
+  const renderWith = (overrides: Partial<typeof baseSettings>) => {
+    const onApply = vi.fn();
+    const column = {
+      ...mockColumn,
+      settings: { ...baseSettings, ...overrides },
+    };
+    render(
+      <SettingsPanel {...defaultProps} column={column} onApply={onApply} />,
+    );
+    return onApply;
+  };
+  const apply = () =>
+    userEvent.click(screen.getByRole("button", { name: "適用" }));
+
+  it("画像を縮小表示するがONのとき写真閲覧後のスクロール位置を復元する設定が表示される", () => {
+    renderWith({ smallImageEnabled: true });
+    expect(screen.getByRole("checkbox", { name: label })).toBeInTheDocument();
+  });
+
+  it("画像を縮小表示するがOFFのとき写真閲覧後のスクロール位置を復元する設定は表示されない", () => {
+    renderWith({ smallImageEnabled: false });
+    expect(
+      screen.queryByRole("checkbox", { name: label }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("画像を縮小表示するをOFFにすると写真閲覧後のスクロール位置を復元する設定もOFFになる", async () => {
+    const onApply = renderWith({
+      smallImageEnabled: true,
+      scrollPosRestoreEnabled: true,
+    });
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: "画像を縮小表示する" }),
+    );
+    expect(
+      screen.queryByRole("checkbox", { name: label }),
+    ).not.toBeInTheDocument();
+    await apply();
+    expect(onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.objectContaining({
+        smallImageEnabled: false,
+        scrollPosRestoreEnabled: false,
+      }),
+      350,
+      undefined,
+    );
+  });
+
+  it("画像を縮小表示するをOFFにしてから再度ONにしても復元設定はOFFのままである", async () => {
+    const onApply = renderWith({
+      smallImageEnabled: true,
+      scrollPosRestoreEnabled: true,
+    });
+    const toggle = screen.getByRole("checkbox", { name: "画像を縮小表示する" });
+    await userEvent.click(toggle);
+    await userEvent.click(toggle);
+    expect(screen.getByRole("checkbox", { name: label })).not.toBeChecked();
+    await apply();
+    expect(onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.objectContaining({
+        smallImageEnabled: true,
+        scrollPosRestoreEnabled: false,
+      }),
+      350,
+      undefined,
+    );
+  });
+
+  it("画像を縮小表示するをOFFにしても復元設定がもともとOFFならOFFのままである", async () => {
+    const onApply = renderWith({
+      smallImageEnabled: true,
+      scrollPosRestoreEnabled: false,
+    });
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: "画像を縮小表示する" }),
+    );
+    await apply();
+    expect(onApply).toHaveBeenCalledWith(
+      "col-1",
+      expect.objectContaining({
+        smallImageEnabled: false,
+        scrollPosRestoreEnabled: false,
+      }),
+      350,
+      undefined,
+    );
+  });
+});
+
+describe("SettingsPanel の表示言語", () => {
+  const allOnSettings = {
+    ...baseSettings,
+    autoReloadEnabled: true,
+    hideHeaderEnabled: true,
+    smallImageEnabled: true,
+    blurImageEnabled: true,
+    whitelistEnabled: true,
+    desktopNotifyEnabled: true,
+  };
+
+  it("表示言語が英語のときカラム設定パネルに日本語の文言が表示されない", async () => {
+    await i18n.changeLanguage("en");
+    const user = userEvent.setup();
+    const { container, rerender } = render(
+      <SettingsPanel
+        {...defaultProps}
+        column={{ ...mockColumn, settings: allOnSettings }}
+        onReload={vi.fn()}
+      />,
+    );
+    await user.click(
+      screen.getByRole("button", { name: "How to write muted words" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "How to write the allowlist" }),
+    );
+    expectNoJapanese(container);
+    expect(screen.getByText("Column settings")).toBeInTheDocument();
+    expect(screen.getByText("Muted words")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apply" })).toBeInTheDocument();
+
+    // 条件分岐で出る文言も確認する（モバイル・外部サイト）
+    rerender(
+      <SettingsPanel
+        {...defaultProps}
+        isMobile
+        column={{ ...mockColumn, settings: baseSettings }}
+      />,
+    );
+    expectNoJapanese(container);
+    rerender(
+      <SettingsPanel
+        {...defaultProps}
+        column={{
+          ...mockColumn,
+          pageType: "external",
+          settings: allOnSettings,
+        }}
+      />,
+    );
+    expectNoJapanese(container);
+  });
+
+  it("ダイアログを開いたまま表示言語を切り替えると開いている画面の文言も切り替わる", async () => {
+    render(<SettingsPanel {...defaultProps} />);
+    expect(screen.getByText("カラム設定")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "適用" })).toBeInTheDocument();
+
+    await act(async () => {
+      await i18n.changeLanguage("en");
+    });
+
+    expect(screen.getByText("Column settings")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apply" })).toBeInTheDocument();
+    expect(screen.queryByText("カラム設定")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Users whose reposts are hidden" }),
+    ).toBeInTheDocument();
+  });
+
+  it("表示言語が英語のとき入力検証のエラーが英語で表示され日本語を含まない", async () => {
+    await i18n.changeLanguage("en");
+    const onApply = vi.fn();
+    const user = userEvent.setup();
+    const { container } = render(
+      <SettingsPanel {...defaultProps} onApply={onApply} />,
+    );
+    const ngWords = screen.getByPlaceholderText(
+      "One word per line (/regex/flags is also supported)",
+    );
+    await user.clear(ngWords);
+    await user.type(ngWords, "/[[/");
+    await user.click(screen.getByRole("button", { name: "Apply" }));
+    expect(
+      screen.getByText("Invalid regular expression: /[/"),
+    ).toBeInTheDocument();
+    expectNoJapanese(container);
+
+    await user.clear(ngWords);
+    const userIds = screen.getByRole("textbox", {
+      name: "Users whose reposts are hidden",
+    });
+    await user.clear(userIds);
+    await user.type(userIds, "bad-id!");
+    await user.click(screen.getByRole("button", { name: "Apply" }));
+    expect(
+      screen.getByText(
+        "`bad-id!` is not a valid X username (1–15 letters, numbers, or underscores)",
+      ),
+    ).toBeInTheDocument();
+    expectNoJapanese(container);
+    expect(onApply).not.toHaveBeenCalled();
   });
 });

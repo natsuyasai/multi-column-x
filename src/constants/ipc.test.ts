@@ -111,6 +111,27 @@ describe("WEBVIEW_SCRIPTS.applyOfficialSettingsSnapshot", () => {
   });
 });
 
+describe("WEBVIEW_SCRIPTS.setInjectLanguage", () => {
+  it("jaを渡すとwindow.__mcxI18n.setLangを日本語で呼ぶスクリプトを生成する", () => {
+    expect(WEBVIEW_SCRIPTS.setInjectLanguage("ja")).toBe(
+      'window.__mcxI18n && window.__mcxI18n.setLang("ja");',
+    );
+  });
+
+  it("enを渡すとwindow.__mcxI18n.setLangを英語で呼ぶスクリプトを生成する", () => {
+    expect(WEBVIEW_SCRIPTS.setInjectLanguage("en")).toBe(
+      'window.__mcxI18n && window.__mcxI18n.setLang("en");',
+    );
+  });
+
+  it("不正な値が渡されても任意の文字列は埋め込まれずenにフォールバックする", () => {
+    const evil = '");alert(1);//' as unknown as "ja";
+    const script = WEBVIEW_SCRIPTS.setInjectLanguage(evil);
+    expect(script).toBe('window.__mcxI18n && window.__mcxI18n.setLang("en");');
+    expect(script).not.toContain("alert");
+  });
+});
+
 describe("WEBVIEW_SCRIPTS.applyNightModeCookie", () => {
   it("night_modeというCookie名を参照するスクリプトを生成する", () => {
     const script = WEBVIEW_SCRIPTS.applyNightModeCookie("2");

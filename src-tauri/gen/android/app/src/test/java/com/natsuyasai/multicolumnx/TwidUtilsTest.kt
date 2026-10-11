@@ -53,4 +53,14 @@ class TwidUtilsTest {
   fun `twidが無いcookie文字列はnullを返す`() {
     assertNull(twidUserIdFromCookieString("ct0=abc; lang=en"))
   }
+
+  @Test
+  fun `アカウント追加のセンチネル本文はユーザーidをそのまま返す`() {
+    assertEquals("1234567890", addAccountSentinelBody("1234567890"))
+  }
+
+  @Test
+  fun `アカウント追加のセンチネル本文はユーザーid未取得なら空文字列を返す`() {
+    assertEquals("", addAccountSentinelBody(null))
+  }
 }

@@ -222,6 +222,68 @@ describe("ColumnLayoutTab", () => {
     expect(itemButton).toBeDisabled();
   });
 
+  it("高さを固定にして値を入力して適用すると、そのカラムの高さ設定が渡される", () => {
+    const onApply = vi.fn();
+    render(
+      <ColumnLayoutTab
+        columns={mockColumns}
+        accounts={mockAccounts}
+        onApply={onApply}
+        onCancel={vi.fn()}
+      />,
+    );
+    const grid = screen.getByTestId("grid-preview");
+    fireEvent.click(within(grid).getByText("テストアカウント - ホーム"));
+    const heightSettings = screen.getByText(/高さ設定/).parentElement!;
+    fireEvent.click(within(heightSettings).getByLabelText("固定:"));
+    const valueInput = within(heightSettings).getByRole("spinbutton");
+    fireEvent.change(valueInput, { target: { value: "500" } });
+    fireEvent.click(screen.getByText("適用"));
+    const calledWith = onApply.mock.calls[0][0] as Column[];
+    const c1 = calledWith.find((c) => c.id === "c1")!;
+    expect(c1.heightMode).toBe("fixed");
+    expect(c1.heightValue).toBe(500);
+    expect(c1.heightUnit).toBe("px");
+  });
+
+  it("同じ列に2行割り当てられているとき、その列には2行分のセルが表示される", () => {
+    render(
+      <ColumnLayoutTab
+        columns={mockColumnsWithStack}
+        accounts={mockAccounts}
+        onApply={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    const grid = screen.getByTestId("grid-preview");
+    expect(within(grid).getByLabelText("列1行1のセル")).toBeInTheDocument();
+    expect(within(grid).getByLabelText("列1行2のセル")).toBeInTheDocument();
+  });
+
+  it("空セルをクリックするとpendingCellになり未割当アイテムが有効になる", () => {
+    render(
+      <ColumnLayoutTab
+        columns={mockColumns}
+        accounts={mockAccounts}
+        onApply={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    const removeButtons = screen.getAllByLabelText("割り当て解除");
+    fireEvent.click(removeButtons[0]);
+    const grid = screen.getByTestId("grid-preview");
+    const emptyCell = within(grid).getByLabelText("列1行1のセル");
+    fireEvent.click(emptyCell);
+    expect(
+      screen.getByText("クリックして列 1 の行 1 に配置"),
+    ).toBeInTheDocument();
+    const unassignedSection = screen.getByText("未割当").parentElement!;
+    const itemButton = within(unassignedSection).getByRole("button", {
+      name: /テストアカウント/,
+    });
+    expect(itemButton).not.toBeDisabled();
+  });
+
   it("空セル選択後に未割当アイテムボタンをクリックすると割り当てられる", () => {
     render(
       <ColumnLayoutTab

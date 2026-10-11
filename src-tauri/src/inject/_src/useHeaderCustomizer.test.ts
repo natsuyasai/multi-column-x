@@ -18,6 +18,8 @@ import {
   TWEET_INPUT_HIDE_STYLE_ID,
 } from "./headerCustomizerTypes";
 import { useHeaderCustomizer } from "./useHeaderCustomizer";
+// 画面文言の共有ハブ（window.__mcxI18n）を読み込む（日本語固定の既定言語で従来の文言を検証する）
+import "./i18n";
 
 // 共有DOM監視ハブ(dom_observer.ts)は自身の内部MutationObserverを明示的に
 // disconnectしない常駐前提の設計のため、ハブが作るMutationObserverを追跡し、

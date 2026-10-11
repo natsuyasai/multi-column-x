@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_store::StoreExt;
 
+use crate::commands::settings_file::{SettingsRecovery, SettingsRecoveryState};
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AccountData {
     pub id: String,
@@ -100,6 +102,12 @@ fn default_height_mode() -> String {
 fn default_column_scale() -> String {
     "default".to_string()
 }
+fn default_ui_scale() -> String {
+    "auto".to_string()
+}
+fn default_language() -> String {
+    "auto".to_string()
+}
 
 impl Default for WindowBounds {
     fn default() -> Self {
@@ -118,7 +126,7 @@ impl Default for WindowBounds {
 impl Default for GlobalSettingsData {
     fn default() -> Self {
         Self {
-            theme: "dark".to_string(),
+            theme: "system".to_string(),
             custom_css: String::new(),
             window_bounds: WindowBounds::default(),
             default_account_id: None,
@@ -134,7 +142,6 @@ impl Default for GlobalSettingsData {
             video_auto_play_stop_enabled: true,
             image_popup_enabled: true,
             video_popup_enabled: true,
-            show_sort_buttons: false,
             small_image_enabled: false,
             small_image_width: "50%".to_string(),
             blur_image_enabled: false,
@@ -142,15 +149,20 @@ impl Default for GlobalSettingsData {
             hide_ad_enabled: true,
             api_rate_limit_monitor_enabled: true,
             column_scale: default_column_scale(),
+            ui_scale: default_ui_scale(),
+            language: default_language(),
             use_x_app_for_compose: false,
             mobile_swipe_area_enabled: true,
             mobile_swipe_area_height: 28,
             mobile_swipe_area_opacity: 50,
             mobile_two_column_enabled: true,
+            mobile_column_count: 2,
             presets: vec![],
             ng_words: vec![],
             repost_hidden_user_ids: vec![],
             pending_data_directory_deletions: vec![],
+            hardware_video_decode_enabled: true,
+            h264_download_prompt_dismissed: false,
         }
     }
 }
@@ -234,8 +246,6 @@ pub struct GlobalSettingsData {
     pub image_popup_enabled: bool,
     #[serde(rename = "videoPopupEnabled")]
     pub video_popup_enabled: bool,
-    #[serde(rename = "showSortButtons")]
-    pub show_sort_buttons: bool,
     #[serde(rename = "defaultShowCountdown")]
     pub default_show_countdown: bool,
     #[serde(rename = "defaultHideHeaderEnabled")]
@@ -262,6 +272,9 @@ pub struct GlobalSettingsData {
     pub api_rate_limit_monitor_enabled: bool,
     #[serde(rename = "columnScale")]
     pub column_scale: String,
+    #[serde(rename = "uiScale")]
+    pub ui_scale: String,
+    pub language: String,
     #[serde(rename = "useXAppForCompose")]
     pub use_x_app_for_compose: bool,
     #[serde(rename = "mobileSwipeAreaEnabled")]
@@ -272,6 +285,8 @@ pub struct GlobalSettingsData {
     pub mobile_swipe_area_opacity: u8,
     #[serde(rename = "mobileTwoColumnEnabled")]
     pub mobile_two_column_enabled: bool,
+    #[serde(rename = "mobileColumnCount")]
+    pub mobile_column_count: u8,
     pub presets: Vec<ColumnPresetData>,
     #[serde(rename = "ngWords")]
     pub ng_words: Vec<String>,
@@ -282,6 +297,12 @@ pub struct GlobalSettingsData {
     #[serde(rename = "pendingDataDirectoryDeletions")]
     #[serde(default)]
     pub pending_data_directory_deletions: Vec<String>,
+    /// Linux で動画のハードウェアデコード（VA-API）を使うか。端末依存のためバックアップ対象外。
+    #[serde(rename = "hardwareVideoDecodeEnabled")]
+    pub hardware_video_decode_enabled: bool,
+    /// H.264 デコーダ取得の案内を「今後表示しない」と拒否したか。端末依存のためバックアップ対象外。
+    #[serde(rename = "h264DownloadPromptDismissed")]
+    pub h264_download_prompt_dismissed: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -402,15 +423,21 @@ fn civil_from_days(days: i64) -> (i64, u32, u32) {
     (y, m, d)
 }
 
-/// 退避ファイル名を生成する（純粋関数）。既存の退避ファイルを上書きしないよう
-/// タイムスタンプ（UTC, YYYYMMDD-HHMMSS）を含める。
-pub(crate) fn backup_file_name(unix_secs: u64) -> String {
+/// UTC の Unix 秒を (年, 月, 日, 時, 分, 秒) に分解する（純粋関数）。
+pub(crate) fn utc_datetime_parts(unix_secs: u64) -> (i64, u32, u32, u64, u64, u64) {
     let days = (unix_secs / 86400) as i64;
     let secs_of_day = unix_secs % 86400;
     let (year, month, day) = civil_from_days(days);
     let hour = secs_of_day / 3600;
     let minute = (secs_of_day % 3600) / 60;
     let second = secs_of_day % 60;
+    (year, month, day, hour, minute, second)
+}
+
+/// 退避ファイル名を生成する（純粋関数）。既存の退避ファイルを上書きしないよう
+/// タイムスタンプ（UTC, YYYYMMDD-HHMMSS）を含める。
+pub(crate) fn backup_file_name(unix_secs: u64) -> String {
+    let (year, month, day, hour, minute, second) = utc_datetime_parts(unix_secs);
     format!("settings.json.{year:04}{month:02}{day:02}-{hour:02}{minute:02}{second:02}.bak")
 }
 
@@ -420,12 +447,12 @@ fn backup_invalid_settings(app: &AppHandle, raw: &serde_json::Value) -> Option<S
     let dir = match app.path().app_data_dir() {
         Ok(d) => d,
         Err(e) => {
-            log::error!("設定の退避先ディレクトリの取得に失敗しました: {e}");
+            log::error!("failed to get the settings backup directory: {e}");
             return None;
         }
     };
     if let Err(e) = std::fs::create_dir_all(&dir) {
-        log::error!("設定の退避先ディレクトリの作成に失敗しました: {e}");
+        log::error!("failed to create the settings backup directory: {e}");
         return None;
     }
 
@@ -438,7 +465,7 @@ fn backup_invalid_settings(app: &AppHandle, raw: &serde_json::Value) -> Option<S
     let content = match serde_json::to_string_pretty(raw) {
         Ok(c) => c,
         Err(e) => {
-            log::error!("退避データのシリアライズに失敗しました: {e}");
+            log::error!("failed to serialize the backup data: {e}");
             return None;
         }
     };
@@ -446,7 +473,7 @@ fn backup_invalid_settings(app: &AppHandle, raw: &serde_json::Value) -> Option<S
     match std::fs::write(&path, content) {
         Ok(()) => Some(path.to_string_lossy().to_string()),
         Err(e) => {
-            log::error!("設定の退避に失敗しました: {e}");
+            log::error!("failed to back up the settings: {e}");
             None
         }
     }
@@ -463,12 +490,35 @@ pub struct LoadSettingsResult {
     pub backup_path: Option<String>,
 }
 
+/// 起動時の復旧結果から load_settings の戻り値を決める（純粋関数）。
+/// 復旧不能のときだけ「読み込み失敗」として返し、それ以外は従来処理へ進める（None）。
+fn apply_recovery(recovery: Option<SettingsRecovery>) -> Option<LoadSettingsResult> {
+    match recovery {
+        Some(SettingsRecovery::Unrecoverable { backup_path }) => Some(LoadSettingsResult {
+            settings: AppSettingsData::default(),
+            load_failed: true,
+            backup_path,
+        }),
+        Some(SettingsRecovery::Restored) => {
+            log::warn!("restored the corrupted settings file from the previous generation");
+            None
+        }
+        Some(SettingsRecovery::Healthy) | None => None,
+    }
+}
+
 #[tauri::command]
 pub async fn load_settings(
     caller: tauri::Webview,
     app: AppHandle,
 ) -> Result<LoadSettingsResult, String> {
     crate::commands::require_main_caller(&caller)?;
+    let recovery = app
+        .try_state::<SettingsRecoveryState>()
+        .and_then(|state| state.0.lock().unwrap_or_else(|e| e.into_inner()).take());
+    if let Some(result) = apply_recovery(recovery) {
+        return Ok(result);
+    }
     let store = app.store("settings.json").map_err(|e| e.to_string())?;
     let stored = store.get("appSettings");
 
@@ -484,7 +534,7 @@ pub async fn load_settings(
             backup_path: None,
         }),
         ParsedSettings::Invalid { raw, error } => {
-            log::error!("設定の読み込みに失敗しました: {error}");
+            log::error!("failed to load the settings: {error}");
             let backup_path = backup_invalid_settings(&app, &raw);
             Ok(LoadSettingsResult {
                 settings: AppSettingsData::default(),
@@ -507,7 +557,7 @@ pub async fn save_settings(
         "appSettings",
         serde_json::to_value(&settings).map_err(|e| e.to_string())?,
     );
-    store.save().map_err(|e| e.to_string())?;
+    crate::commands::settings_file::save_store_atomically(&app, &store)?;
     Ok(())
 }
 
@@ -525,15 +575,63 @@ mod tests {
     }
 
     #[test]
-    fn global_settings_default_theme_is_dark() {
+    fn global_settings_default_theme_is_system() {
         let gs = GlobalSettingsData::default();
-        assert_eq!(gs.theme, "dark");
+        assert_eq!(gs.theme, "system");
     }
 
     #[test]
     fn global_settings_default_column_scale_is_default() {
         let gs = GlobalSettingsData::default();
         assert_eq!(gs.column_scale, "default");
+    }
+
+    #[test]
+    fn 既定ではアプリuiの表示サイズは端末に合わせるが選ばれている() {
+        let gs = GlobalSettingsData::default();
+        assert_eq!(gs.ui_scale, "auto");
+    }
+
+    #[test]
+    fn 旧バージョンの設定jsonを読み込んでもアプリuiの表示サイズはautoになる() {
+        let json = serde_json::json!({ "columnScale": "large" });
+        let gs: GlobalSettingsData = serde_json::from_value(json).unwrap();
+        assert_eq!(gs.ui_scale, "auto");
+        assert_eq!(gs.column_scale, "large");
+    }
+
+    #[test]
+    fn 選んだアプリuiの表示サイズは保存と読み込みの往復で保たれる() {
+        let mut settings = AppSettingsData::default();
+        settings.global_settings.ui_scale = "xLarge".to_string();
+        let json = serde_json::to_value(&settings).unwrap();
+        assert_eq!(json["globalSettings"]["uiScale"], "xLarge");
+        let restored: AppSettingsData = serde_json::from_value(json).unwrap();
+        assert_eq!(restored.global_settings.ui_scale, "xLarge");
+    }
+
+    #[test]
+    fn 初回起動時の言語設定は自動である() {
+        let gs = GlobalSettingsData::default();
+        assert_eq!(gs.language, "auto");
+    }
+
+    #[test]
+    fn 言語設定が保存されていない旧設定jsonを読み込んでも言語設定は自動になる() {
+        let json = serde_json::json!({ "columnScale": "large" });
+        let gs: GlobalSettingsData = serde_json::from_value(json).unwrap();
+        assert_eq!(gs.language, "auto");
+        assert_eq!(gs.column_scale, "large");
+    }
+
+    #[test]
+    fn 言語設定を変更すると保存と読み込みの往復で引き継がれる() {
+        let mut settings = AppSettingsData::default();
+        settings.global_settings.language = "en".to_string();
+        let json = serde_json::to_value(&settings).unwrap();
+        assert_eq!(json["globalSettings"]["language"], "en");
+        let restored: AppSettingsData = serde_json::from_value(json).unwrap();
+        assert_eq!(restored.global_settings.language, "en");
     }
 
     #[test]
@@ -583,6 +681,26 @@ mod tests {
     }
 
     #[test]
+    fn global_settings_default_mobile_column_count() {
+        let gs = GlobalSettingsData::default();
+        assert_eq!(gs.mobile_column_count, 2);
+    }
+
+    /// 列数を含まない既存の設定ファイルを読み込むと列数は2になる。
+    #[test]
+    fn mobile_column_countが無い旧設定はデフォルトで2になる() {
+        let json = serde_json::json!({
+            "theme": "dark",
+            "customCSS": "",
+            "windowBounds": { "x": 0.0, "y": 0.0, "width": 1400.0, "height": 900.0 },
+            "defaultAccountId": null,
+            "mobileTwoColumnEnabled": true,
+        });
+        let settings: GlobalSettingsData = serde_json::from_value(json).unwrap();
+        assert_eq!(settings.mobile_column_count, 2);
+    }
+
+    #[test]
     fn global_settings_default_auto_reload_interval() {
         let gs = GlobalSettingsData::default();
         assert_eq!(gs.default_auto_reload_interval, 600);
@@ -623,14 +741,6 @@ mod tests {
         assert_eq!(actual, fixture["globalSettings"]);
     }
 
-    /// showSortButtons が欠落した旧全体設定は、新規インストール時と同じ false になる
-    /// （旧 serde 既定値 true から変更）。
-    #[test]
-    fn showsortbuttonsが無い旧全体設定はデフォルトでfalseになる() {
-        let settings: GlobalSettingsData = serde_json::from_value(serde_json::json!({})).unwrap();
-        assert!(!settings.show_sort_buttons);
-    }
-
     /// defaultScrollPosRestoreEnabled が欠落した旧全体設定は、新規インストール時と同じ false になる
     /// （旧 serde 既定値 true から変更）。
     #[test]
@@ -661,6 +771,20 @@ mod tests {
     fn defaultaccountidが無い旧全体設定はデフォルトでnoneになる() {
         let settings: GlobalSettingsData = serde_json::from_value(serde_json::json!({})).unwrap();
         assert_eq!(settings.default_account_id, None);
+    }
+
+    /// 設定ファイルにハードウェアデコードの項目が無いとき、ハードウェアデコードは有効になる。
+    #[test]
+    fn ハードウェアデコード設定の既定値は有効である() {
+        let settings: GlobalSettingsData = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert!(settings.hardware_video_decode_enabled);
+    }
+
+    /// 設定ファイルに H.264 取得案内の拒否状態が無いとき、拒否していない状態になる。
+    #[test]
+    fn h264取得案内の拒否状態の既定値は拒否していない状態である() {
+        let settings: GlobalSettingsData = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert!(!settings.h264_download_prompt_dismissed);
     }
 
     /// カラム設定の showCustomMenu が欠落しているとき、新規インストール時と同じ false（無効）になる。
@@ -991,7 +1115,7 @@ mod tests {
         let result = parse_stored_settings(Some(json));
         match result {
             ParsedSettings::Loaded(settings) => {
-                assert_eq!(settings.global_settings.theme, "dark");
+                assert_eq!(settings.global_settings.theme, "system");
             }
             _ => panic!("Loaded になるはず"),
         }
@@ -1163,5 +1287,35 @@ mod tests {
                 prop_assert_eq!(once, twice);
             }
         }
+    }
+
+    #[test]
+    fn 復旧不能のときは読み込み失敗と退避先を返す() {
+        let result = apply_recovery(Some(SettingsRecovery::Unrecoverable {
+            backup_path: Some("/data/settings.json.bak".to_string()),
+        }))
+        .expect("復旧不能なら結果を返す");
+
+        assert!(result.load_failed);
+        assert_eq!(
+            result.backup_path.as_deref(),
+            Some("/data/settings.json.bak")
+        );
+    }
+
+    #[test]
+    fn 退避に失敗した復旧不能でも読み込み失敗として返す() {
+        let result = apply_recovery(Some(SettingsRecovery::Unrecoverable { backup_path: None }))
+            .expect("復旧不能なら結果を返す");
+
+        assert!(result.load_failed);
+        assert_eq!(result.backup_path, None);
+    }
+
+    #[test]
+    fn 正常_復元済み_復旧結果なしのときは従来処理へ進む() {
+        assert!(apply_recovery(Some(SettingsRecovery::Healthy)).is_none());
+        assert!(apply_recovery(Some(SettingsRecovery::Restored)).is_none());
+        assert!(apply_recovery(None).is_none());
     }
 }

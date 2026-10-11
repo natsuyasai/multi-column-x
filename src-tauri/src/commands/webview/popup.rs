@@ -1,5 +1,6 @@
 //! メディア／リンクポップアップウィンドウの作成・セッション切替・クローズ。
 #[cfg(not(target_os = "android"))]
+use super::external_link;
 use super::parse_url;
 #[cfg(not(target_os = "android"))]
 use crate::commands::settings_store::resolve_account_data_directory;
@@ -19,6 +20,43 @@ use tauri::WebviewUrl;
 use tauri::{AppHandle, Emitter, Manager};
 #[cfg(desktop)]
 use tauri::{LogicalPosition, LogicalSize};
+
+/// hostname が x.com / twitter.com またはそのサブドメインかどうかを判定する（純粋関数）。
+fn is_x_hostname(host: &str) -> bool {
+    host == "x.com"
+        || host.ends_with(".x.com")
+        || host == "twitter.com"
+        || host.ends_with(".twitter.com")
+}
+
+/// 画像・動画ポップアップで開ける URL か検証する（純粋関数）。
+/// https かつホストが x.com / twitter.com またはそのサブドメインのみ許可する。
+pub(super) fn validate_media_popup_url(url: &str) -> Result<(), String> {
+    let parsed = url::Url::parse(url).map_err(|e| format!("invalid popup url: {e}"))?;
+    if parsed.scheme() != "https" {
+        return Err("invalid popup url: only https scheme is allowed".to_string());
+    }
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| "invalid popup url: missing host".to_string())?;
+    if is_x_hostname(host) {
+        Ok(())
+    } else {
+        Err(format!("invalid popup url: host '{host}' is not allowed"))
+    }
+}
+
+/// リンクポップアップ・セッション切替の移動先として開ける URL か検証する（純粋関数）。
+/// スキームが http / https のみ許可する（file: / javascript: / data: / 独自スキーム等を拒否）。
+pub(super) fn validate_link_popup_url(url: &str) -> Result<(), String> {
+    let parsed = url::Url::parse(url).map_err(|e| format!("invalid popup url: {e}"))?;
+    match parsed.scheme() {
+        "http" | "https" => Ok(()),
+        other => Err(format!(
+            "invalid popup url: scheme '{other}' is not allowed"
+        )),
+    }
+}
 
 #[cfg(desktop)]
 const POPUP_FALLBACK_BOUNDS: (LogicalPosition<f64>, LogicalSize<f64>) = (
@@ -90,6 +128,7 @@ pub(super) fn build_popup_init(
             current_account_id,
             target_href,
             esc_close_enabled,
+            crate::commands::ui_language::current_ui_lang(app).as_code(),
         ),
     }
 }
@@ -235,6 +274,7 @@ pub async fn open_popup_window(
     app: AppHandle,
     url: String,
 ) -> Result<(), String> {
+    validate_media_popup_url(&url)?;
     let state = app.state::<AppState>();
     let (data_dir, current_account_id) = {
         let registry = state.registry.lock().expect("registry mutex poisoned");
@@ -247,14 +287,23 @@ pub async fn open_popup_window(
     } = build_popup_init(&app, labels::POPUP_PREFIX, &current_account_id, &url);
     let (pos, size) = get_popup_bounds(&app);
 
-    tauri::WebviewWindowBuilder::new(&app, &popup_label, WebviewUrl::External(parse_url(&url)?))
-        .title("X - メディア")
-        .inner_size(size.width, size.height)
-        .position(pos.x, pos.y)
-        .initialization_script(&popup_init)
-        .data_directory(data_dir)
-        .build()
-        .map_err(|e| e.to_string())?;
+    let builder = tauri::WebviewWindowBuilder::new(
+        &app,
+        &popup_label,
+        WebviewUrl::External(parse_url(&url)?),
+    )
+    .title(crate::commands::ui_language::current_ui_text(
+        &app,
+        crate::commands::ui_language::UiText::WindowTitleMedia,
+    ))
+    .inner_size(size.width, size.height)
+    .position(pos.x, pos.y)
+    .initialization_script(&popup_init)
+    .on_new_window(external_link::new_window_handler(app.clone()))
+    .data_directory(data_dir);
+    #[cfg(windows)]
+    let builder = builder.browser_extensions_enabled(true);
+    builder.build().map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -266,6 +315,7 @@ pub async fn open_popup_window(
     app: AppHandle,
     url: String,
 ) -> Result<(), String> {
+    validate_media_popup_url(&url)?;
     let state = app.state::<AppState>();
     let current_account_id = {
         let registry = state.registry.lock().expect("registry mutex poisoned");
@@ -300,15 +350,17 @@ pub async fn open_popup_window(
                 .map(PathBuf::from)
                 .unwrap_or_default()
         };
-        tauri::WebviewWindowBuilder::new(
+        let builder = tauri::WebviewWindowBuilder::new(
             &app,
             &popup_label,
             WebviewUrl::External(parse_url(&url)?),
         )
         .initialization_script(&popup_init)
-        .data_directory(data_dir)
-        .build()
-        .map_err(|e| e.to_string())?;
+        .on_new_window(external_link::new_window_handler(app.clone()))
+        .data_directory(data_dir);
+        #[cfg(windows)]
+        let builder = builder.browser_extensions_enabled(true);
+        builder.build().map_err(|e| e.to_string())?;
         Ok(())
     }
 }
@@ -321,6 +373,7 @@ pub async fn open_link_popup_window(
     #[allow(non_snake_case)] accountId: Option<String>,
     url: String,
 ) -> Result<(), String> {
+    validate_link_popup_url(&url)?;
     let (data_dir, current_account_id) =
         match link_popup_account_source(caller.label(), accountId.as_deref()) {
             LinkPopupAccountSource::Explicit(aid) => {
@@ -346,11 +399,17 @@ pub async fn open_link_popup_window(
         &popup_label,
         WebviewUrl::External(parse_url(&url)?),
     )
-    .title("X - リンク")
+    .title(crate::commands::ui_language::current_ui_text(
+        &app,
+        crate::commands::ui_language::UiText::WindowTitleLink,
+    ))
     .inner_size(size.width, size.height)
     .position(pos.x, pos.y)
     .initialization_script(&popup_init)
+    .on_new_window(external_link::new_window_handler(app.clone()))
     .data_directory(data_dir);
+    #[cfg(windows)]
+    let builder = builder.browser_extensions_enabled(true);
 
     builder.build().map_err(|e| e.to_string())?;
     track_official_settings_popup_if_matches(&app, &popup_label, &url);
@@ -366,6 +425,7 @@ pub async fn open_link_popup_window(
     #[allow(non_snake_case)] accountId: Option<String>,
     url: String,
 ) -> Result<(), String> {
+    validate_link_popup_url(&url)?;
     let caller_label = caller.label();
     let current_account_id = match link_popup_account_source(caller_label, accountId.as_deref()) {
         LinkPopupAccountSource::Explicit(aid) => aid.to_string(),
@@ -405,15 +465,17 @@ pub async fn open_link_popup_window(
                 popup_session_for_caller(&registry, label).0
             }
         };
-        tauri::WebviewWindowBuilder::new(
+        let builder = tauri::WebviewWindowBuilder::new(
             &app,
             &popup_label,
             WebviewUrl::External(parse_url(&url)?),
         )
         .initialization_script(&popup_init)
-        .data_directory(data_dir)
-        .build()
-        .map_err(|e| e.to_string())?;
+        .on_new_window(external_link::new_window_handler(app.clone()))
+        .data_directory(data_dir);
+        #[cfg(windows)]
+        let builder = builder.browser_extensions_enabled(true);
+        builder.build().map_err(|e| e.to_string())?;
         track_official_settings_popup_if_matches(&app, &popup_label, &url);
         Ok(())
     }
@@ -430,6 +492,9 @@ pub fn switch_popup_session_android(
     account_id: &str,
     url: &str,
 ) -> Result<(), String> {
+    // popup_toolbar → PopupSessionBridge → AppBridge.onPopupSwitchSession（JNI）経由の
+    // 呼び出しは switch_popup_session（Tauri コマンド）を経由しないため、ここでも検証する。
+    validate_link_popup_url(url)?;
     // compose（COMPOSE_PREFIX）のセッション切替は「常駐の置換」として扱う。
     // POPUP_PREFIX 固定で再作成すると常駐ラベルが popup- になり compose 扱いから
     // 外れてしまう（旧バグ）ため、COMPOSE_PREFIX を維持し常駐状態も更新する。
@@ -479,6 +544,7 @@ pub async fn switch_popup_session(
     if !is_switchable_popup_caller_label(&popup_label) {
         return Err("forbidden: caller must be a popup or compose webview".to_string());
     }
+    validate_link_popup_url(&url)?;
 
     #[cfg(target_os = "android")]
     {
@@ -550,11 +616,18 @@ async fn switch_popup_session_window(
 
     let data_dir = PathBuf::from(&data_dir_str);
 
-    let mut builder =
+    let builder =
         tauri::WebviewWindowBuilder::new(&app, &new_label, WebviewUrl::External(parse_url(&url)?))
-            .title("X - メディア")
+            .title(crate::commands::ui_language::current_ui_text(
+                &app,
+                crate::commands::ui_language::UiText::WindowTitleMedia,
+            ))
             .initialization_script(&popup_init)
+            .on_new_window(external_link::new_window_handler(app.clone()))
             .data_directory(data_dir);
+    #[cfg(windows)]
+    let builder = builder.browser_extensions_enabled(true);
+    let mut builder = builder;
 
     if let (Some(p), Some(s)) = (pos, size) {
         let scale = app
@@ -893,5 +966,151 @@ mod tests {
         let (pos, size) = POPUP_FALLBACK_BOUNDS;
         assert_eq!((pos.x, pos.y), (50.0, 50.0));
         assert_eq!((size.width, size.height), (800.0, 600.0));
+    }
+}
+
+#[cfg(test)]
+mod validate_media_popup_url_tests {
+    use super::*;
+
+    #[test]
+    fn 画像や動画のポップアップはxのhttpsページなら開ける() {
+        let urls = [
+            "https://x.com/user/status/1/photo/1",
+            "https://twitter.com/user/status/1/video/1",
+            "https://mobile.x.com/user/status/1/photo/1",
+        ];
+        for url in urls {
+            assert!(validate_media_popup_url(url).is_ok(), "{url}");
+        }
+    }
+
+    #[test]
+    fn 画像や動画のポップアップはx以外やhttps以外のurlでは開かずエラーになる() {
+        let urls = [
+            "http://x.com/user/status/1",
+            "https://example.com/",
+            "https://x.com.example.com/",
+            "https://evilx.com/",
+            "file:///C:/Windows/win.ini",
+            "javascript:alert(1)",
+            "not a url",
+        ];
+        for url in urls {
+            assert!(validate_media_popup_url(url).is_err(), "{url}");
+        }
+    }
+
+    /// validate_media_popup_url のプロパティテスト。
+    /// 仕様「https かつホストが x.com / twitter.com またはそのサブドメインのときのみ Ok」を
+    /// 広い入力域で検証する。
+    mod properties {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            #[test]
+            fn ホストがx系以外なら常にエラーになる(h in "[a-z0-9-]{1,20}\\.(com|net|org)") {
+                prop_assume!(
+                    h != "x.com"
+                        && h != "twitter.com"
+                        && !h.ends_with(".x.com")
+                        && !h.ends_with(".twitter.com")
+                );
+                let url = format!("https://{h}/");
+                prop_assert!(validate_media_popup_url(&url).is_err());
+            }
+
+            #[test]
+            fn xホストの任意のサブドメインと任意のパスなら常に許可される(
+                base in "x\\.com|twitter\\.com",
+                sub in "[a-z0-9]{1,10}",
+                path in "[a-zA-Z0-9/_-]{0,30}"
+            ) {
+                let url = format!("https://{sub}.{base}/{path}");
+                prop_assert!(validate_media_popup_url(&url).is_ok());
+            }
+
+            #[test]
+            fn httpスキームならホストがxでも常にエラーになる(path in "[a-zA-Z0-9/_-]{0,30}") {
+                let url = format!("http://x.com/{path}");
+                prop_assert!(validate_media_popup_url(&url).is_err());
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod validate_link_popup_url_tests {
+    use super::*;
+
+    #[test]
+    fn リンクのポップアップはhttpまたはhttpsのurlなら開ける() {
+        let urls = [
+            "https://x.com/settings",
+            "https://example.com/article",
+            "http://example.com/",
+        ];
+        for url in urls {
+            assert!(validate_link_popup_url(url).is_ok(), "{url}");
+        }
+    }
+
+    #[test]
+    fn リンクのポップアップはhttpとhttps以外のurlでは開かずエラーになる() {
+        let urls = [
+            "file:///C:/Windows/win.ini",
+            "javascript:alert(1)",
+            "data:text/html,<p>x</p>",
+            "ms-settings:",
+            "not a url",
+        ];
+        for url in urls {
+            assert!(validate_link_popup_url(url).is_err(), "{url}");
+        }
+    }
+
+    #[test]
+    fn ポップアップのアカウント切替でhttpとhttps以外の移動先を指定するとエラーになる() {
+        assert!(validate_link_popup_url("file:///C:/Windows/win.ini").is_err());
+    }
+
+    /// validate_link_popup_url のプロパティテスト。
+    /// 仕様「スキームが http / https のときのみ Ok」を広い入力域で検証する。
+    mod properties {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            #[test]
+            fn httpとhttps以外のスキームなら常にエラーになる(
+                scheme in "[a-z][a-z0-9+.-]{0,10}",
+                rest in "[a-zA-Z0-9/_.-]{0,20}"
+            ) {
+                prop_assume!(scheme != "http" && scheme != "https");
+                let candidate = format!("{scheme}:{rest}");
+                // 生成された文字列は URL として解析できない場合がある
+                // （validate_link_popup_url の不具合ではない）。
+                // その場合は URL として成立しているケースのみを検証対象とする。
+                if url::Url::parse(&candidate).is_err() {
+                    return Ok(());
+                }
+                prop_assert!(validate_link_popup_url(&candidate).is_err());
+            }
+
+            #[test]
+            fn httpまたはhttpsとランダムホストなら常に許可される(
+                scheme in "http|https",
+                host in "[a-z0-9-]{1,20}\\.(com|net|org|dev)"
+            ) {
+                let candidate = format!("{scheme}://{host}/");
+                // 生成されたホストは URL として解析できない場合がある
+                // （validate_link_popup_url の不具合ではない）。
+                if url::Url::parse(&candidate).is_err() {
+                    return Ok(());
+                }
+                prop_assert!(validate_link_popup_url(&candidate).is_ok());
+            }
+        }
     }
 }

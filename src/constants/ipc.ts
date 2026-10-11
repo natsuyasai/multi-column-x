@@ -9,6 +9,11 @@ export const IPC_COMMANDS = {
   LOAD_SETTINGS: "load_settings",
   SAVE_SETTINGS: "save_settings",
 
+  // バックアップ／リストア
+  EXPORT_BACKUP: "export_backup",
+  READ_BACKUP: "read_backup",
+  APPLY_RESTORE: "apply_restore",
+
   // カラム WebView 管理
   CREATE_COLUMN_WEBVIEW: "create_column_webview",
   REMOVE_COLUMN_WEBVIEW: "remove_column_webview",
@@ -31,6 +36,7 @@ export const IPC_COMMANDS = {
   REAUTH_ACCOUNT_WINDOW: "reauth_account_window",
   DELETE_ACCOUNT_DATA: "delete_account_data",
   CLOSE_WINDOW: "close_window",
+  DETECT_ACCOUNT_USER_IDS: "detect_account_user_ids",
 
   // モバイル
   REPORT_WEBVIEW_SCROLL: "report_webview_scroll",
@@ -63,6 +69,16 @@ export const IPC_COMMANDS = {
   // メディアコーデック（Linux）
   CHECK_MEDIA_CODEC_SUPPORT: "check_media_codec_support",
   DOWNLOAD_AND_ENABLE_H264: "download_and_enable_h264",
+
+  // ブラウザ拡張機能（Windows のみ）
+  LIST_EXTENSIONS: "list_extensions",
+  DETECT_CHROME_EXTENSIONS: "detect_chrome_extensions",
+  PICK_EXTENSION_FOLDER: "pick_extension_folder",
+  ADD_EXTENSION_FROM_FOLDER: "add_extension_from_folder",
+  ADD_CHROME_EXTENSION: "add_chrome_extension",
+  SET_EXTENSION_ENABLED: "set_extension_enabled",
+  REMOVE_EXTENSION: "remove_extension",
+  OPEN_EXTENSION_PAGE: "open_extension_page",
 } as const;
 
 /** Tauri イベント名 */
@@ -192,6 +208,16 @@ export const WEBVIEW_SCRIPTS = {
   /** ホームタイムライン「前回の境目へ戻る」ボタンの有効/無効を動的に更新し、即時反映する（非ホームカラムでは関数が無いためno-op） */
   applyReturnToLastRead: (enabled: boolean) =>
     `if(window.__multiColumnXConfig){window.__multiColumnXConfig.returnToLastReadEnabled=${enabled};}window.__multiColumnX&&window.__multiColumnX.setReturnToLastReadEnabled&&window.__multiColumnX.setReturnToLastReadEnabled(${enabled});`,
+
+  /**
+   * 注入UI（window.__mcxI18n）の表示言語を切り替え、表示中の文言を即時に再適用する。
+   * 任意の文字列がスクリプトに埋め込まれないよう "ja" 以外はすべて "en" として扱う。
+   * ハブが無い WebView（外部サイト等）では何もしない。
+   */
+  setInjectLanguage: (lang: "ja" | "en"): string => {
+    const safe = lang === "ja" ? "ja" : "en";
+    return `window.__mcxI18n && window.__mcxI18n.setLang("${safe}");`;
+  },
 } as const;
 
 /** WebView を画面外へ退避させる座標 */

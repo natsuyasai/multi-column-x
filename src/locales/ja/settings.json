@@ -1,0 +1,279 @@
+{
+  "language": {
+    "label": "表示言語",
+    "hint": "アプリの画面の言語です。「自動」では端末の言語に合わせます。カラム内（x.com）の表示言語は X の設定に従います。",
+    "groupLabel": "表示言語"
+  },
+  "panel": {
+    "title": "アプリ設定",
+    "close": "閉じる",
+    "tabs": {
+      "general": "一般",
+      "layout": "カラム配置",
+      "presets": "プリセット",
+      "extensions": "拡張機能",
+      "backup": "バックアップ"
+    },
+    "groups": {
+      "display": "表示",
+      "columnDefaults": "新規カラムの既定値",
+      "filter": "閲覧・フィルタ",
+      "media": "メディア",
+      "android": "Android専用",
+      "maintenance": "アプリ・メンテナンス"
+    },
+    "actions": {
+      "cancel": "キャンセル",
+      "apply": "適用"
+    }
+  },
+  "general": {
+    "popup": {
+      "title": "ポップアップウィンドウ",
+      "escClose": "Escキーで閉じる",
+      "image": "画像をポップアップウィンドウで開く",
+      "video": "動画をポップアップウィンドウで開く"
+    },
+    "video": {
+      "title": "動画",
+      "autoPlayStop": "動画の自動再生を停止する"
+    },
+    "ad": {
+      "title": "広告",
+      "hide": "広告を非表示にする"
+    },
+    "apiRateLimit": {
+      "title": "API残量モニター",
+      "enable": "API残量モニターを有効にする"
+    },
+    "ngWords": {
+      "title": "グローバルNGワード",
+      "helpLabel": "NGワードの書き方",
+      "helpLine": "1行に1ワードを入力してください。",
+      "helpRegex": "<code>/pattern/flags</code> の形式で入力すると正規表現として扱われます（大文字・小文字は区別しません）。",
+      "helpExample": "例: /spam|広告/",
+      "placeholder": "1行に1ワードで入力（全カラムに適用・/正規表現/flags 形式も指定可）",
+      "hint": "全カラムのタイムラインに適用されます。各カラムのNGワードと合わせて使用されます。"
+    },
+    "repostHidden": {
+      "title": "リポストを非表示にするユーザー",
+      "placeholder": "1行に1ユーザーIDで入力（全カラムに適用）",
+      "hint": "1行に1ユーザーID（@以降）。指定ユーザーがリポストした投稿を非表示にします"
+    },
+    "android": {
+      "tweetTitle": "ツイート（Android）",
+      "useXApp": "ツイートボタンでXアプリを起動する",
+      "swipeTitle": "モバイル: スワイプ切替",
+      "swipeEnable": "スワイプでカラム切替を有効化",
+      "swipeHeight": "スワイプ領域の高さ(px)",
+      "swipeOpacity": "スワイプ領域の透過度({{value}}%)",
+      "multiColumn": "広い画面で複数カラム表示（タブレット・横向き）",
+      "columnCount": "同時表示する列数"
+    }
+  },
+  "display": {
+    "title": "表示",
+    "uiScale": {
+      "label": "アプリUIの表示サイズ",
+      "override": "アプリUIの表示サイズを変更する",
+      "options": {
+        "auto": "端末に合わせる",
+        "small": "小",
+        "standard": "標準",
+        "large": "大",
+        "xLarge": "特大"
+      },
+      "hint": "アプリの画面（ツールバーや設定など）の大きさです。カラムの中身は「カラム内の表示サイズ」で変更します。"
+    },
+    "columnScale": {
+      "label": "カラム内の表示サイズ",
+      "override": "カラム内の表示サイズを変更する",
+      "options": {
+        "small": "小",
+        "default": "標準",
+        "normal": "普通",
+        "large": "大",
+        "xLarge": "特大"
+      },
+      "hint": "カラム内（x.com の表示）の大きさです。"
+    },
+    "theme": {
+      "label": "テーマ",
+      "override": "テーマを変更する",
+      "options": {
+        "dark": "ダーク",
+        "light": "ライト",
+        "system": "システム"
+      }
+    }
+  },
+  "columnDefaults": {
+    "autoReload": {
+      "title": "カラムデフォルト - 自動更新",
+      "enable": "自動更新を有効にする",
+      "interval": "更新間隔（秒）",
+      "countdown": "カウントダウンを表示する"
+    },
+    "display": {
+      "title": "カラムデフォルト - 表示",
+      "hideHeader": "ヘッダーを非表示にする",
+      "hideTweetInput": "投稿欄を非表示にする",
+      "showCustomMenu": "カスタムメニューボタンを表示する",
+      "restoreScroll": "写真閲覧後のスクロール位置を復元する"
+    },
+    "image": {
+      "title": "カラムデフォルト - 画像",
+      "smallImage": "画像を縮小表示する",
+      "width": "幅（例: 50%, 200px）",
+      "blur": "画像をぼかして表示する",
+      "blurAmount": "ブラー量（例: 10px）"
+    },
+    "customCss": {
+      "title": "カラムデフォルト - カスタムCSS",
+      "placeholder": "/* カスタムCSSを入力 */",
+      "hint": "新しく追加するカラムに適用されます",
+      "applyAll": "既存の全カラムに適用"
+    }
+  },
+  "layout": {
+    "gridCols": "列数:",
+    "colHeader": "列 {{col}}",
+    "cellLabel": "列{{col}}行{{row}}のセル",
+    "heightEven": "均等",
+    "unassign": "割り当て解除",
+    "placeHere": "← ここに配置",
+    "addRow": "+ 行を追加",
+    "unassigned": "未割当",
+    "none": "なし",
+    "pendingHint": "クリックして列 {{col}} の行 {{row}} に配置",
+    "heightTitle": "高さ設定 — {{label}}",
+    "heightAuto": "均等（自動）",
+    "heightFixed": "固定:",
+    "dragReorder": "ドラッグして並び替え",
+    "moveUp": "上へ",
+    "moveDown": "下へ",
+    "orderLabel": "表示順序"
+  },
+  "presets": {
+    "saveTitle": "現在のレイアウトを保存",
+    "namePlaceholder": "プリセット名を入力",
+    "saveButton": "現在のレイアウトを保存",
+    "savedTitle": "保存済みプリセット",
+    "empty": "保存済みプリセットはありません",
+    "load": "読み込む",
+    "delete": "削除"
+  },
+  "info": {
+    "officialSettings": {
+      "title": "公式設定",
+      "hint": "X公式の設定画面をポップアップウィンドウで開きます。開いた画面から他アカウントへ設定を適用できます。",
+      "open": "公式設定を開く"
+    },
+    "webview": {
+      "title": "WebView",
+      "hint": "全カラムのWebViewを順番に再生成します。設定は維持されます。",
+      "reload": "全WebViewを再生成"
+    },
+    "app": {
+      "title": "アプリ情報",
+      "version": "現在のバージョン: {{version}}",
+      "checking": "確認中...",
+      "check": "更新を確認",
+      "upToDate": "最新のバージョンです",
+      "checkFailed": "更新の確認に失敗しました"
+    },
+    "dataDir": {
+      "title": "データフォルダの削除",
+      "pending_one": "削除できなかったデータフォルダが{{count}}件あります",
+      "pending_other": "削除できなかったデータフォルダが{{count}}件あります",
+      "retry": "データフォルダの削除を再実行",
+      "deleting": "削除中...",
+      "success": "データフォルダを削除しました",
+      "remaining_one": "{{count}}件のデータフォルダを削除できませんでした",
+      "remaining_other": "{{count}}件のデータフォルダを削除できませんでした"
+    }
+  },
+  "linuxVideo": {
+    "title": "動画再生（Linux）",
+    "restartNotice": "再起動後に反映されます",
+    "h264Restart": "H.264: {{notice}}",
+    "relaunch": "今すぐ再起動",
+    "enable": "H.264 を有効化",
+    "downloading": "ダウンロード中…",
+    "fetchFailed": "H.264 の取得に失敗しました",
+    "retry": "再試行",
+    "enabled": "H.264: 有効化済み",
+    "enableHint": "動画の再生に必要なデコーダを取得します",
+    "hardwareDecode": "ハードウェアデコードを使う（VA-API）"
+  },
+  "extensions": {
+    "addTitle": "拡張機能を追加",
+    "addNote": "展開済みの拡張機能フォルダを指定するか、Chrome / Edge にインストール済みの拡張機能から選んで、全アカウントに追加します。",
+    "storagePath": {
+      "location": "Chromium 系ブラウザの拡張機能は、通常 %LOCALAPPDATA%\\{組織名}\\{ブラウザ名}\\User Data\\Default\\Extensions\\<拡張ID>\\<バージョン> にあります（組織名のフォルダが無いブラウザもあります）。",
+      "example": "例: Chrome は %LOCALAPPDATA%\\Google\\Chrome\\User Data\\Default\\Extensions、Edge は %LOCALAPPDATA%\\Microsoft\\Edge\\User Data\\Default\\Extensions です。",
+      "others": "Chrome と Edge は「ブラウザから検出」で自動的に探します。Brave など他のブラウザは、上記の形式のバージョンフォルダを「フォルダを指定して追加」で指定してください。ユーザーデータの場所を変更している場合は、その場所の User Data\\Default\\Extensions 配下を指定してください。"
+    },
+    "trustNotice": "追加した拡張機能は、すべてのアカウントの X ページを読み書きできる場合があります。信頼できるものだけを追加してください。",
+    "unsupportedNotice": "拡張機能によっては正しく動作しないものがあります。特に、開いているページの内容を検出してツールバーのボタンから操作する種類の拡張機能は、ポップアップを別ウィンドウで開く仕様のため、動作しない場合があります。",
+    "reloadNotice": "追加・削除・有効無効を変更すると、全カラムが自動で再読込されます。",
+    "detect": "ブラウザから検出",
+    "addFromFolder": "フォルダを指定して追加",
+    "browserNotFound": "Chrome / Edge が見つかりません",
+    "candidatesLabel": "ブラウザの拡張機能の候補",
+    "noCandidates": "候補はありません",
+    "candidateMeta": "ブラウザ: {{browser}}・プロファイル: {{profile}}",
+    "added": "追加済み",
+    "add": "追加",
+    "addLabel": "{{name}} を追加",
+    "installedTitle": "追加済みの拡張機能",
+    "installedEmpty": "追加済みの拡張機能はありません",
+    "sourceProfile": "{{browser}}（プロファイル: {{profile}}）",
+    "missing": "見つかりません",
+    "enabled": "有効",
+    "enableLabel": "{{name}} を有効にする",
+    "openPopup": "ポップアップを開く",
+    "openPopupLabel": "{{name}} のポップアップを開く",
+    "openOptions": "オプションを開く",
+    "openOptionsLabel": "{{name}} のオプションを開く",
+    "accountRequired": "アカウントを選択してください",
+    "remove": "削除",
+    "removeLabel": "{{name}} を削除",
+    "unnamed": "(名前なし)"
+  },
+  "backup": {
+    "noCredentials": "このバックアップにはログイン情報は含まれません。復元先で事前にログインしてください",
+    "exportPrivacy": "バックアップファイルにはアカウント名・NGワード・リポスト非表示ユーザーなどの個人情報が含まれます。共有・保管するときは取り扱いに注意してください。",
+    "reauthHint": "Xユーザー IDが未取得のアカウントは自動で候補を選べません。該当アカウントを再認証すると自動候補が効くようになります。",
+    "saveBlocked": "設定を読み込めていないため、バックアップの読み込みと復元はできません。アプリを再起動してください。",
+    "replaceWarning": "現在のカラムと設定（ウィンドウ位置を除く）はすべてバックアップの内容に置き換わります。アカウントは置き換わりません。復元直前の設定は自動で退避されます。",
+    "confirm": {
+      "title": "復元の確認",
+      "summary": "復元されるカラム {{restore}} 件 / スキップ {{skip}} 件",
+      "back": "戻る",
+      "execute": "置き換えて復元"
+    },
+    "export": {
+      "title": "バックアップを作成",
+      "note": "アカウント情報（名前・色）・カラム構成・設定を1つのファイルに書き出します。",
+      "button": "バックアップを書き出す"
+    },
+    "restore": {
+      "title": "バックアップから復元",
+      "pickFile": "バックアップファイルを選択"
+    },
+    "mapping": {
+      "title": "アカウントの紐づけ",
+      "note": "バックアップ内のアカウントごとに、復元先のログイン済みアカウントを選んでください。 「復元しない」を選んだアカウントのカラムは復元されません。",
+      "noTargets": "復元先にログイン済みのアカウントがありません。先にアカウントを追加してください。",
+      "columnCount_one": "カラム {{count}} 件",
+      "columnCount_other": "カラム {{count}} 件",
+      "targetLabel": "{{name}} の復元先",
+      "skipOption": "復元しない",
+      "shared": "同じ復元先に複数のバックアップ内アカウントが割り当てられています（{{names}}）。意図した紐づけか確認してください。",
+      "nameSeparator": "、",
+      "none": "紐づけが1件もないため復元できません。復元先を1つ以上選んでください。",
+      "proceed": "確認へ進む"
+    }
+  }
+}

@@ -1,3 +1,6 @@
+import type { AppTFunction } from "@/i18n/types";
+import type { LanguageSetting } from "@/lib/language";
+
 export type PageType =
   | "home"
   | "notifications"
@@ -7,6 +10,7 @@ export type PageType =
   | "external"
   | "compose";
 export type ColumnScale = "small" | "default" | "normal" | "large" | "xLarge";
+export type UiScale = "auto" | "small" | "standard" | "large" | "xLarge";
 
 export interface Account {
   id: string;
@@ -79,7 +83,6 @@ export interface GlobalSettings {
   videoAutoPlayStopEnabled: boolean;
   imagePopupEnabled: boolean;
   videoPopupEnabled: boolean;
-  showSortButtons: boolean;
   smallImageEnabled: boolean;
   smallImageWidth: string;
   blurImageEnabled: boolean;
@@ -87,6 +90,10 @@ export interface GlobalSettings {
   hideAdEnabled: boolean;
   apiRateLimitMonitorEnabled: boolean;
   columnScale: ColumnScale;
+  /** アプリ自身のUIの表示サイズ（auto は端末の設定に追従） */
+  uiScale: UiScale;
+  /** アプリの表示言語（auto は端末の言語に追従） */
+  language: LanguageSetting;
   useXAppForCompose: boolean;
   mobileSwipeAreaEnabled: boolean;
   mobileSwipeAreaHeight: number;
@@ -94,12 +101,18 @@ export interface GlobalSettings {
   mobileSwipeAreaOpacity: number;
   /** 広い画面（>=600px）で2カラム同時表示する（Android のみ・Profile API 対応端末のみ有効） */
   mobileTwoColumnEnabled: boolean;
+  /** 複数カラム表示時の同時表示列数（2〜6、Android のみ。1列の最小幅に収まらない場合は自動で減る） */
+  mobileColumnCount: number;
   presets: ColumnPreset[];
   ngWords: string[];
   /** リポストを非表示にするユーザーID（全カラム共通） */
   repostHiddenUserIds: string[];
   /** アカウント削除時にデータフォルダの削除へ失敗し、再実行対象として記録された保存先パス一覧 */
   pendingDataDirectoryDeletions: string[];
+  /** Linux で動画のハードウェアデコード（VA-API）を使う（端末依存・バックアップ対象外） */
+  hardwareVideoDecodeEnabled: boolean;
+  /** H.264 デコーダ取得の案内を拒否済み（端末依存・バックアップ対象外） */
+  h264DownloadPromptDismissed: boolean;
 }
 
 export interface ApiRateLimitBucket {
@@ -199,7 +212,7 @@ export const DEFAULT_COLUMN_SETTINGS: ColumnSettings = {
  * 値を変更したら両側を更新し、fixture を再生成すること。
  */
 export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
-  theme: "dark",
+  theme: "system",
   customCSS: "",
   windowBounds: { x: 0, y: 0, width: 1400, height: 900 },
   defaultAutoReloadEnabled: true,
@@ -214,7 +227,6 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   videoAutoPlayStopEnabled: true,
   imagePopupEnabled: true,
   videoPopupEnabled: true,
-  showSortButtons: false,
   smallImageEnabled: false,
   smallImageWidth: "50%",
   blurImageEnabled: false,
@@ -222,15 +234,20 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   hideAdEnabled: true,
   apiRateLimitMonitorEnabled: true,
   columnScale: "default",
+  uiScale: "auto",
+  language: "auto",
   useXAppForCompose: false,
   mobileSwipeAreaEnabled: true,
   mobileSwipeAreaHeight: 28,
   mobileSwipeAreaOpacity: 50,
   mobileTwoColumnEnabled: true,
+  mobileColumnCount: 2,
   presets: [],
   ngWords: [],
   repostHiddenUserIds: [],
   pendingDataDirectoryDeletions: [],
+  hardwareVideoDecodeEnabled: true,
+  h264DownloadPromptDismissed: false,
 };
 
 export const COLUMN_LABEL_MAX_LENGTH = 30;
@@ -247,30 +264,81 @@ export function normalizeColumnLabel(input: string): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-export function getPageTypeLabel(input: GetPageTypeLabelInput): string {
+export function getPageTypeLabel(
+  input: GetPageTypeLabelInput,
+  t: AppTFunction,
+): string {
   switch (input.pageType) {
     case "home":
-      return input.homeTabName ?? "ホーム";
+      return input.homeTabName ?? t("columns:pageType.home");
     case "notifications":
-      return "通知";
+      return t("columns:pageType.notifications");
     case "search":
-      return input.searchQuery ? `検索: ${input.searchQuery}` : "検索";
+      return input.searchQuery
+        ? t("columns:pageType.searchWithQuery", { query: input.searchQuery })
+        : t("columns:pageType.search");
     case "list":
-      return "リスト";
+      return t("columns:pageType.list");
     case "custom":
-      return "カスタム";
+      return t("columns:pageType.custom");
     case "external":
-      if (!input.customUrl) return "外部サイト";
+      if (!input.customUrl) return t("columns:pageType.external");
       try {
-        return `外部: ${new URL(input.customUrl).hostname}`;
+        return t("columns:pageType.externalWithHost", {
+          host: new URL(input.customUrl).hostname,
+        });
       } catch {
-        return "外部サイト";
+        return t("columns:pageType.external");
       }
     case "compose":
-      return "投稿";
+      return t("columns:pageType.compose");
   }
 }
 
-export function getColumnLabel(column: Column): string {
-  return column.label || getPageTypeLabel(column);
+export function getColumnLabel(column: Column, t: AppTFunction): string {
+  return column.label || getPageTypeLabel(column, t);
+}
+
+/** 拡張機能の検出元ブラウザ */
+export type ExtensionBrowser = "chrome" | "edge";
+
+/** 拡張機能の取得元（フォルダ指定 / Chrome・Edge から検出） */
+export type ExtensionSource =
+  | { kind: "folder"; path: string }
+  | {
+      kind: "chrome";
+      chromeId: string;
+      profile: string;
+      /** 旧データ互換のため省略可。未指定は chrome とみなす */
+      browser?: ExtensionBrowser;
+    };
+
+/** 登録済みの拡張機能 */
+export interface ExtensionEntry {
+  id: string;
+  name: string;
+  source: ExtensionSource;
+  enabled: boolean;
+  hasPopup: boolean;
+  hasOptions: boolean;
+  /** 取得元（Chrome 側など）が見つからない */
+  missing: boolean;
+}
+
+/** Chrome / Edge から検出した拡張機能の候補 */
+export interface DetectedExtension {
+  chromeId: string;
+  profile: string;
+  browser: ExtensionBrowser;
+  name: string;
+  path: string;
+  hasPopup: boolean;
+  hasOptions: boolean;
+  /** すでに追加済み */
+  added: boolean;
+}
+
+export interface DetectResult {
+  browserFound: boolean;
+  items: DetectedExtension[];
 }

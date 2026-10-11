@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { renderHook, act, waitFor } from "@testing-library/react";
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import i18n from "@/i18n";
+import { containsJapanese } from "@/test-utils/japanese";
 import type { Account, Column } from "../types";
 import { DEFAULT_GLOBAL_SETTINGS } from "../types";
 import { useAppStore, migrateColumn } from "./useAppStore";
@@ -84,7 +86,6 @@ describe("useAppStore", () => {
         videoAutoPlayStopEnabled: false,
         imagePopupEnabled: true,
         videoPopupEnabled: true,
-        showSortButtons: true,
         smallImageEnabled: false,
         smallImageWidth: "50%",
         blurImageEnabled: false,
@@ -92,17 +93,23 @@ describe("useAppStore", () => {
         hideAdEnabled: false,
         apiRateLimitMonitorEnabled: true,
         columnScale: "default",
+        uiScale: "auto",
+        language: "auto",
         useXAppForCompose: false,
         mobileSwipeAreaEnabled: true,
         mobileSwipeAreaHeight: 28,
         mobileSwipeAreaOpacity: 50,
         mobileTwoColumnEnabled: true,
+        mobileColumnCount: 2,
         presets: [],
         ngWords: [],
         repostHiddenUserIds: [],
         pendingDataDirectoryDeletions: [],
+        hardwareVideoDecodeEnabled: true,
+        h264DownloadPromptDismissed: false,
       },
       isLoaded: false,
+      settingsSaveBlocked: false,
       isMobile: false,
       unreadCounts: {},
     });
@@ -497,6 +504,55 @@ describe("useAppStore", () => {
     ]);
   });
 
+  it("旧バージョンの設定ファイルを読み込んでもアプリUIの表示サイズは端末に合わせるになる", async () => {
+    const { uiScale: _omitted, ...legacyGlobal } = DEFAULT_GLOBAL_SETTINGS;
+    void _omitted;
+    mockInvoke.mockResolvedValueOnce({
+      settings: {
+        accounts: [],
+        columns: [],
+        globalSettings: { ...legacyGlobal, columnScale: "large" },
+      },
+      loadFailed: false,
+      backupPath: null,
+    });
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    expect(result.current.globalSettings.uiScale).toBe("auto");
+    expect(result.current.globalSettings.columnScale).toBe("large");
+  });
+
+  it("選んだ表示サイズは保存され次回起動時にも保たれる", async () => {
+    mockInvoke.mockClear();
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      result.current.updateGlobalSettings({ uiScale: "xLarge" });
+      await result.current.saveSettings();
+    });
+    const saveCall = mockInvoke.mock.calls.find(
+      ([cmd]) => cmd === "save_settings",
+    );
+    expect(saveCall).toBeDefined();
+    const saved = (saveCall![1] as { settings: { globalSettings: unknown } })
+      .settings;
+
+    // 保存した内容を次回起動時の読み込み結果として返す
+    mockInvoke.mockResolvedValueOnce({
+      settings: { accounts: [], columns: [], ...saved },
+      loadFailed: false,
+      backupPath: null,
+    });
+    act(() => {
+      useAppStore.setState({ globalSettings: DEFAULT_GLOBAL_SETTINGS });
+    });
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    expect(result.current.globalSettings.uiScale).toBe("xLarge");
+  });
+
   it("保存が連続したときは要求した順に1件ずつ保存される", async () => {
     const resolvers: Array<() => void> = [];
     mockInvoke.mockImplementation(
@@ -652,6 +708,103 @@ describe("useAppStore", () => {
     expect(result.current.settingsLoadNotice).not.toContain("次の場所");
   });
 
+  it("設定の読み込み自体に失敗したとき既定の状態で起動し読み込み失敗が通知される", async () => {
+    mockInvoke.mockRejectedValueOnce(new Error("ipc failed"));
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    expect(result.current.isLoaded).toBe(true);
+    expect(result.current.settingsLoadNotice).not.toBeNull();
+  });
+
+  it("設定の読み込み自体に失敗した状態では変更しても設定ファイルへ保存されない", async () => {
+    mockInvoke.mockRejectedValueOnce(new Error("ipc failed"));
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    mockInvoke.mockClear();
+    await act(async () => {
+      result.current.addAccount(mockAccount);
+      await result.current.saveSettings();
+    });
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "save_settings",
+      expect.anything(),
+    );
+  });
+
+  it("設定を正常に読み込めた状態では変更が設定ファイルへ保存される", async () => {
+    mockInvoke.mockResolvedValueOnce({
+      settings: {
+        accounts: [],
+        columns: [],
+        globalSettings: DEFAULT_GLOBAL_SETTINGS,
+      },
+      loadFailed: false,
+      backupPath: null,
+    });
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    mockInvoke.mockClear();
+    await act(async () => {
+      result.current.addAccount(mockAccount);
+      await result.current.saveSettings();
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("save_settings", expect.anything());
+  });
+
+  it("壊れた設定を退避して既定の状態で起動したときは変更が設定ファイルへ保存される", async () => {
+    mockInvoke.mockResolvedValueOnce({
+      settings: {
+        accounts: [],
+        columns: [],
+        globalSettings: DEFAULT_GLOBAL_SETTINGS,
+      },
+      loadFailed: true,
+      backupPath: "/data/settings.json.20260922-120000.bak",
+    });
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    mockInvoke.mockClear();
+    await act(async () => {
+      result.current.addAccount(mockAccount);
+      await result.current.saveSettings();
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("save_settings", expect.anything());
+  });
+
+  it("読み込み失敗後に再度読み込みに成功すると変更が保存される", async () => {
+    mockInvoke.mockRejectedValueOnce(new Error("ipc failed"));
+    const { result } = renderHook(() => useAppStore());
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    mockInvoke.mockResolvedValueOnce({
+      settings: {
+        accounts: [],
+        columns: [],
+        globalSettings: DEFAULT_GLOBAL_SETTINGS,
+      },
+      loadFailed: false,
+      backupPath: null,
+    });
+    await act(async () => {
+      await result.current.loadSettings();
+    });
+    mockInvoke.mockClear();
+    await act(async () => {
+      result.current.addAccount(mockAccount);
+      await result.current.saveSettings();
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("save_settings", expect.anything());
+  });
+
   it("dismissSettingsLoadNoticeを呼ぶと通知が消える", async () => {
     mockInvoke.mockResolvedValueOnce({
       settings: {
@@ -803,5 +956,62 @@ describe("migrateColumn", () => {
       searchQuery: "rust",
     };
     expect(migrateColumn(col).searchLiveTab).toBeUndefined();
+  });
+
+  describe("useAppStore 設定読込失敗の通知（表示言語）", () => {
+    beforeEach(async () => {
+      vi.clearAllMocks();
+      await i18n.changeLanguage("en");
+    });
+
+    afterEach(async () => {
+      await i18n.changeLanguage("ja");
+    });
+
+    const failedResult = (backupPath: string | null) => ({
+      settings: {
+        accounts: [],
+        columns: [],
+        globalSettings: DEFAULT_GLOBAL_SETTINGS,
+      },
+      loadFailed: true,
+      backupPath,
+    });
+
+    it("表示言語が英語のとき退避先付きの読み込み失敗通知が英語になる", async () => {
+      mockInvoke.mockResolvedValueOnce(failedResult("/data/settings.json.bak"));
+      const { result } = renderHook(() => useAppStore());
+      await act(async () => {
+        await result.current.loadSettings();
+      });
+
+      expect(result.current.settingsLoadNotice).toBe(
+        "Could not read the settings file, so the app started with default settings. The original settings were backed up to: /data/settings.json.bak",
+      );
+    });
+
+    it("表示言語が英語のとき退避にも失敗した通知が英語になる", async () => {
+      mockInvoke.mockResolvedValueOnce(failedResult(null));
+      const { result } = renderHook(() => useAppStore());
+      await act(async () => {
+        await result.current.loadSettings();
+      });
+
+      const notice = result.current.settingsLoadNotice ?? "";
+      expect(notice).toContain("Backing up the original settings also failed.");
+      expect(containsJapanese(notice)).toBe(false);
+    });
+
+    it("表示言語が英語のとき設定の読み込み自体に失敗した通知が英語になる", async () => {
+      mockInvoke.mockRejectedValueOnce(new Error("ipc failed"));
+      const { result } = renderHook(() => useAppStore());
+      await act(async () => {
+        await result.current.loadSettings();
+      });
+
+      const notice = result.current.settingsLoadNotice ?? "";
+      expect(notice).toContain("Could not load settings");
+      expect(containsJapanese(notice)).toBe(false);
+    });
   });
 });

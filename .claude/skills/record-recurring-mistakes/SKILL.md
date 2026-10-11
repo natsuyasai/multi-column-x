@@ -14,14 +14,16 @@ argument-hint: "再発しているミスの内容"
 
 1. **検知**: 同種の指摘・修正が2回以上出たことに気づく（同一セッション内・複数セッションまたぎ問わない）。
 2. **一般化**: 個別事象ではなく、再発を防ぐ一般的なルールとして言語化する。
-3. **追記**: `CLAUDE.md` の適切な箇所（実装ガイドライン／作業手順／アーキテクチャ上の重要な制約 など）に、具体的な指示として追記する。
+3. **追記**: `CLAUDE.md` の適切な箇所（実装ガイドライン／作業手順／サブエージェント運用／アーキテクチャ上の重要な制約 など）に、具体的な指示として追記する。
+   - 特定領域の詳細（実装ファイル・落とし穴・検証手順）が長くなる場合は、`docs/development/<領域>-notes.md` に書き、CLAUDE.md には「〇〇を変更する場合は `docs/development/...` を参照」と**必須ルールと参照先だけ**を書く（CLAUDE.md を肥大化させない現行の構成に合わせる）。
+   - サブエージェント委譲で起きたミスは、CLAUDE.md「サブエージェント運用」に加えて `subagent-tdd-implementation` の委譲プロンプト必須項目にも反映する。
 4. **共有**: 追記内容をユーザーに伝える。
 
 ## 追記の書き方
 
 - 何を・なぜ・どうするかを具体的に。再現条件と正しい対応をセットで書く。
 - 悪い例: 「import順に注意する」
-- 良い例: 「import順は外部パッケージ → `@/` エイリアス（internal）→ 相対パスの順。グループ間の空行は入れない（`newlines-between: "never"`）。`eslint --fix` で自動整列できる」
+- 良い例: 「import順は外部パッケージ → vitest/storybook → `@/` エイリアス（internal）→ 相対パスの順。グループ間の空行は入れない（`newlines-between: "never"`）。`npm run lint:fix` で自動整列できる」
 
 ## このプロジェクトで特に再発しやすい論点
 
@@ -29,7 +31,10 @@ argument-hint: "再発しているミスの内容"
 - **serde のフィールド命名**: JS側 camelCase には `#[serde(rename = "...")]` が必須。
 - **Android ProGuard keep ルール**: `MainActivity.kt` のメソッドシグネチャ変更時の keep ルール同期漏れ（リリースビルドでのみ顕在化）。
 - **inject スクリプト**: `_src` を変更したら `npm run build:inject` が必要。ビルド済み `.js` の直接編集禁止。
-- **ショートカット追加時の同期箇所**（既知の再発ポイント）。
+- **ショートカット追加時の同期漏れ**: `useKeyboardShortcuts.ts` の keydown / listen 側と inject `keyboard_shortcut.ts` の3箇所（`inject-script-dev` 参照）。
+- **Tauri コマンド追加時の ACL 更新漏れ**: build.rs の `AppManifest` と capability。
+- **設定既定値の3箇所同期漏れ**: Rust `impl Default` / TS 既定値 / `contracts/default-settings.json`。
+- **サブエージェントの TDD 違反**: テストと実装の同時作成、最初の Red で完成形を書く先書き。
 
 ## 判断の境界
 

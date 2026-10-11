@@ -14,25 +14,41 @@ function isEditableTarget(target: EventTarget | null): boolean {
   );
 }
 
+// Ctrl 併用のショートカット。キーは e.key.toLowerCase() で判定する。
+// Ctrl+Shift+A と Ctrl+1〜9 は表に入らない特別扱いのため resolveShortcutKey 内に残す。
+const CTRL_SHORTCUTS: Record<string, string> = {
+  t: "compose_tweet",
+  l: "open_link_popup",
+  n: "add_column",
+  ",": "app_settings",
+  b: "toggle_top_bar",
+};
+
+// 修飾キー無しのショートカット。
+// r は Shift+r（"R"）でも発火させるため小文字化して判定するが、
+// ? は小文字化しても値が変わらないため、同じ e.key.toLowerCase() のキーで
+// 両方を引ける（r の大文字小文字を区別しない・? はそのまま、という現状の違いを保つ）。
+const PLAIN_SHORTCUTS: Record<string, string> = {
+  r: "reload_column",
+  "?": "show_shortcut_help",
+};
+
+function resolveShortcutKey(e: KeyboardEvent): string | null {
+  if (e.ctrlKey) {
+    const key = e.key.toLowerCase();
+    if (key === "a" && e.shiftKey) return "account_manager";
+    if (key >= "1" && key <= "9") return "jump_column_" + key;
+    return CTRL_SHORTCUTS[key] ?? null;
+  }
+  if (isEditableTarget(e.target)) return null;
+  return PLAIN_SHORTCUTS[e.key.toLowerCase()] ?? null;
+}
+
 (function () {
   window.addEventListener(
     "keydown",
     function (e: KeyboardEvent) {
-      let shortcutKey: string | null = null;
-      if (e.ctrlKey) {
-        const key = e.key.toLowerCase();
-        if (key === "t") shortcutKey = "compose_tweet";
-        else if (key === "l") shortcutKey = "open_link_popup";
-        else if (key === "n") shortcutKey = "add_column";
-        else if (key === "a" && e.shiftKey) shortcutKey = "account_manager";
-        else if (key === ",") shortcutKey = "app_settings";
-        else if (key === "b") shortcutKey = "toggle_top_bar";
-        else if (key >= "1" && key <= "9") shortcutKey = "jump_column_" + key;
-      } else if (!isEditableTarget(e.target)) {
-        const key = e.key.toLowerCase();
-        if (key === "r") shortcutKey = "reload_column";
-        else if (e.key === "?") shortcutKey = "show_shortcut_help";
-      }
+      const shortcutKey = resolveShortcutKey(e);
       if (!shortcutKey) return;
       e.preventDefault();
       const invoke = window.__TAURI__?.core?.invoke ?? window.__TAURI__?.invoke;

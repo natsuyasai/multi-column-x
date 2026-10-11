@@ -30,6 +30,18 @@ inject スクリプトは X(twitter.com) の実 DOM 構造に依存する。X �
 - `eval_in_webview` 用の Rust 側テンプレート文字列には、グローバル変数名（`window.__multiColumnX` など）が**文字列として直接埋め込まれている**。グローバル変数名を変更する場合、型定義2箇所・inject 各スクリプトのローカル定数に加えて、このテンプレート文字列内の埋め込みも別途更新が必要になる。見落としやすい同期漏れポイント。
 - コマンド名・イベント名・ラベルプレフィックスを変更する際は、Rust 側の IPC 定数定義・TS 側の IPC 定数定義・inject 側の参照用定数ドキュメント・各 inject スクリプトのローカル定数・両方の `window` 型定義、という**5箇所同期**が必要。ショートカット追加時の複数箇所同期と同種の、より広い範囲に及ぶ配線ルールとして把握しておくこと。
 
+## 多言語（`__mcxI18n`）
+
+inject の自前 UI 文言（ポップアップで開くメニュー、ヘッダーカスタマイズ、ポップアップツールバー、前回の続きへ戻るボタン、動画長押しメニュー）は日本語・英語に対応している。
+
+- **ハブ**: `src-tauri/src/inject/_src/i18n.ts` が `window.__mcxI18n = { lang, t, setLang, apply, onChange }` を公開する。`build_init_script` / `build_popup_init_script` が `DOM_OBSERVER_HUB` の直後・他のスクリプトより前に連結する。`t` は現在言語 → ja → キー文字列の順に引く。補間は `{name}` 形式（TS 側 i18next とは独立）。
+- **import しない理由**: 各エントリは独立した IIFE で、複数エントリから同じモジュールを import すると Rollup が共有チャンクを生成し、`include_str!` での連結が壊れる。そのため各エントリは必ず `window.__mcxI18n` 経由で参照する（型は `types.d.ts`）。
+- **`__mcxLang` が `config` でない理由**: 初期言語は `window.__mcxLang`（"ja" | "en"）を Rust がハブより前に定義する。`config_script` の配列長・キー順は既存テストが固定しているため、言語は config に入れず別グローバルにしている。
+- **辞書の追加手順**: ① `i18n.ts` の `ja` と `en` に同じキーを追加（ja は現行文言を一字一句変えない。補間変数名も揃える）② 呼び出し側で `t` / `apply` を使う（動的テキストは呼び出しごとに `t`、静的な要素は `apply` で `data-mcx-i18n*` を付けると `setLang` で自動再適用される。React 描画などは `onChange` で追従）③ `i18n.contract.test.ts`（キー集合・補間変数名の一致、日本語直書きの検出）を通す。
+- **翻訳しない日本語**: X の画面（DOM）と照合する値（`hide_ad.ts` / `return_to_last_read_logic.ts` の `AD_TEXTS`、`notification_header_hide.ts` の `aria-label="通知タイムライン"`、`headerCustomizerTypes.ts` のキーと `ariaLabel`）は翻訳せず、`i18n.contract.test.ts` の許可リスト（ファイル＋部分文字列＋理由）に載せる。新たに照合用の日本語を足すときは許可リストに理由付きで追加する。未使用の許可項目が残っていてもテストが失敗する。
+- **即時反映**: カラムは設定画面で言語を適用すると `useSettingsApplyHandlers.handleApplyGlobalSettings` が全カラムへ `evalInColumn(col.id, WEBVIEW_SCRIPTS.setInjectLanguage(lang))`（`window.__mcxI18n && window.__mcxI18n.setLang("en");`）を送り、再読み込みなしで切り替わる。`lang` は `resolveLanguage(normalizeLanguageSetting(...), getOsLocale())` で解決した "ja" / "en" のみ。`setInjectLanguage` は "ja" 以外を "en" に丸め、任意の文字列を埋め込まない。グローバル名 `__mcxI18n` は Rust の `globals::MCX_I18N` と `contracts/ipc-constants.json` で同期され、`__multiColumnX` と同様に `ipc.ts` の eval テンプレートへ直接埋め込まれている（名前を変えるときはここも更新）。
+- **ポップアップ**: 即時反映の対象外。作成時の言語（`current_ui_lang`）で初期化され、新しく開くものから反映される。
+
 ## キーボードショートカット
 
 - `Ctrl+A` はブラウザ標準の「全選択」と競合するため、アカウント管理には `Ctrl+Shift+A` を意図的に割り当てている（実 DOM 検証ではなく設計判断レベルの回避）。
@@ -70,8 +82,27 @@ inject スクリプトは X(twitter.com) の実 DOM 構造に依存する。X �
 - 旧方式（監視開始時のスナップショットに無い ID が現れたら新着）は、おすすめのように取得のたびに表示が入れ替わるタイムラインで、更新のたびに誤って新着と報告した（実測 8/8）。
 - 現方式: ページを開いてから**見たことのある最大の status ID より新しい ID** が現れたときだけ新着とする（`createNewnessTracker`。ID の大小は数値文字列の比較 `compareStatusIds`。BigInt は inject のビルドターゲットに依存させないため使わない）。実測の誤報告は 8 回中 2 回まで減った。
 - 通知ページは ID ではなく `time[datetime]` の最大値（`collectMaxNotificationTimeMs`）で判定する。いいね等の通知には ID が無いため。
-- 基準はページ読み込み（IIFE 再実行）でリセットされる。起動直後の最初の判定で誤報告が 1 回残り得る。古いが未見のおすすめ投稿は新着として数えない。
-- ユーザーがスクロール中は報告しない（仮想リストの入れ替えの誤検出ガード）。ただし見えた値は基準へ取り込む。
+- 基準はページ読み込み（IIFE 再実行）でリセットされる。古いが未見のおすすめ投稿は新着として数えない。
+- ユーザーがスクロール中は報告しない（仮想リストの入れ替えの誤検出ガード）。通常ページの監視窓では見えた値を基準へ取り込む。
+
+### 通知・検索ページの常時監視（ずれの即時補正と新着の報告）
+
+- **背景（2026-10-07 実測、実アプリの通知カラム）**: X 自身の約 30 秒周期のポーリングが新着を先頭へ挿入すると、**先頭（`scrollTop` 0）を表示していても旧先頭の位置が保たれ、`scrollTop` が 0→136 のようにずれる**（新着は画面の上に押し出される）。自動更新の監視窓（30 秒）や先頭固定（1.5 秒）の外で起きるため、更新時だけの補正では次の自動更新まで新着が見えず、報告もされなかった。さらにページを開いて最初の自動更新より前にずれると「ユーザーのスクロール」とみなされ、`triggerReload` が `isScrolling()` で毎回 return して自動更新が止まったままになった。基準も最初の自動更新で初めて作られていたため、それまでに入った新着は報告されなかった。
+- **方式**: 通知・検索ページで scroll イベントと DOM 変化（`document.body` の childList+subtree）を常時監視する（`handleScrollRoundtripPageChange`）。
+  - ずれの補正（`correctExternalScrollOffset`）: 最後に観測した位置（`lastObservedTop`、初期値 `null`）が 0 で、今が 0 より下なら、ユーザーによるスクロールの可能性が無い限り `scrollTop = 0` に戻す。先頭以外→先頭以外の変化は補正しない。
+  - ユーザーによるスクロールの可能性（`isLikelyUserScroll`。誤判定は常にこちらへ倒す）: ユーザー入力（`wheel` / `touchstart` / `keydown` / `mousedown`）から 1000ms 以内、マウスボタン・タッチが押されたまま（`mouseup` / `touchend` / `touchcancel` / `blur` まで）、ページを開いてから・`popstate`（戻る/進む）から 2000ms 以内（X が表示位置を復元することがあるため）。**縦に動かないホイール（`deltaY === 0`）は数えない**（カラム群の横スクロールを `scroll_event.ts` が親へ中継するため、数えると横スクロール直後の挿入でずれたまま固着する）。
+  - 新着の報告: 先頭を表示している間に `absorb` が基準より新しいものを見つけたら、その場で報告する。基準が無ければ基準になるだけ（ページを開いて最初に表示された一覧は報告しない）。**先頭以外を表示している間は基準へ取り込まない**（取り込むと、下を読んでいる間に先頭へ入った新着が黙って吸収され、先頭へ戻っても報告されない）。先頭へ戻ったときの scroll イベントで報告される。
+  - 自動更新のスクロール往復の実行中（`scrollRoundtripRunning`）は補正・判定とも何もしない（往復の下方向スクロールを打ち消さないため）。
+  - 既存の更新時の判定（`primeNewnessBaseline` / `waitForNewTweet` / 先頭固定）は残している。同じ tracker を共有するので二重報告にはならない。
+- **DOM 監視に共有ハブ（`dom_observer.ts`）を使わない理由**: ハブは requestAnimationFrame でまとめて配信するため、描画されていないカラム（Android の非アクティブタブ、ダイアログ表示中に退避したカラム）では止まり、見ていないカラムの新着報告が遅れる。
+- **多重注入対策**: `window.__multiColumnX.disposeAutoReloadWatchers` で前回の監視を解除してから登録する（単体テストはモジュールを読み込み直すため、これが無いと前のテストのインスタンスが干渉する）。
+- **不採用**: 「自分で先頭へ戻したことがあるか（`hasProgrammaticTop`）＋ユーザー操作フラグ」方式（PR #204 の初版）。ずれは更新時にしか直らず、起動直後のデッドロックも解消できない。先頭でホイールを回しただけで、次に自分で先頭へ戻すまでユーザー扱いが続く。
+- **既知の限界**: 先頭でホイールを回した直後（1 秒以内）に X が挿入するとユーザー扱いになり、ユーザーが動かすまで自動更新が止まる（安全側）。WebView2 ではスクロールバーの押下で `mousedown` が届くことを CDP で確認済み（2026-10-07）。他プラットフォームのスクロールバー・実機（Android / macOS / Linux）は手動テストで確認する。
+- **計測時の注意**: 往復スクロールの直後に `NotificationsTimeline` の取得が起きない回があった（2026-10-07、高さ 336px の通知カラム。初回自動更新・手動更新とも、取得は X の 30 秒周期だけ）。上記「スクロール往復の実測パラメータ」の「約 105ms 後に取得」と食い違うため、往復の効き方は再計測が必要。`__TAURI_INTERNALS__.invoke` は書き換えられず、Tauri の IPC は CDP の Network にも出ないので、報告の確認はメインウィンドウ（`http://localhost:1420/`、`%LOCALAPPDATA%\com.natsuyasai.multicolumnx\EBWebView\DevToolsActivePort`）の未読バッジ（`[data-testid="unread-badge"]`）で行う。
+
+### 開発ビルドでの自動更新の二重実行（`useAutoReload`）
+
+`setRemaining` の更新関数の中で `invoke` していたため、`React.StrictMode`（`src/main.tsx`）の開発ビルドでは更新関数が 2 回実行され、自動更新ごとに `triggerReload` が同じミリ秒に 2 回呼ばれていた（2026-10-07 実測。リリースビルドでは 1 回）。残り秒数を ref で持ち、副作用は `setInterval` のコールバック本体で行う。state の更新関数に副作用を書かないこと。
 
 ### 自動更新と手動更新のスクリプト
 
@@ -112,6 +143,16 @@ Chrome 拡張だけでは、カラムの寸法など実アプリ固有の条件�
 - **閉じるボタン**: 戻るボタンの右隣に丸い「×」を置く（2 つをコンテナ `#mcx-return-to-last-read-container` にまとめ、表示/非表示はコンテナ単位）。押すと戻らずに消え、境目は消化扱いになる（次の更新で新しい基準を記録）。探索中は押せない。
 - **消化**: ボタンで戻ったとき、閉じるボタンで閉じたとき、または**直前 1000ms 以内のユーザー入力（wheel/touch/mousedown/スクロール系キー）を伴うスクロール**で戻り先が画面に入ったとき。自前のスクロール（`scrollTop = 0`・探索）で消化・中断しないための条件。未消化の間は次の更新で基準を上書きしない。タブ名が変わったら破棄（タブ名が一時的に取れない `null` のときは破棄しない）。
 - **更新の検知**: `window.__multiColumnX.triggerReload` をラップする。そのため `build_init_script` で **`auto_reload` より後ろに連結**する必要がある（Rust のテストで順序を検証）。
+- **x.com 上の直接更新操作の検知**（2026-10-03）: アプリ経由でなくても、次の操作で `reload` を記録する。いずれも `recordReload()`（`triggerReload` のラップと共通）を呼び、`window` の capture 相・passive リスナーで X 自身のハンドラより先に動く。判定の純粋部分は `return_to_last_read_logic.ts`（`isRefreshClickTarget` / `isPullRefreshGesture` / `isRefreshShortcut`）。
+  - 新着ピルのクリック: タイムライン内で投稿（`article`）を含まないセルの `button[type="button"]`（`UserCell` を除く）。**`auto_reload.ts` の `findNewPostsButton` と同じ条件を複製している**ため、X の DOM 変更時は両方を直す。
+  - 選択中タブの再クリック: `aria-selected="true"` かつ `aria-expanded` を持たない `div[role="tab"]`（`reselectTab` と同じ条件）。フォロー中タブは `aria-expanded` を持ち、クリックはドロップダウンを開くだけで更新ではないため対象外。未選択タブのクリックは更新ではなく、タブ切り替えとして既存の `tabChanged` が基準を破棄する。
+  - プルダウン更新（モバイル）: 1 本指で先頭（`scrollTop <= 1`）から始まり先頭のまま終わり、下方向へ `PULL_REFRESH_MIN_DISTANCE_PX`（暫定 80px）以上、かつ縦移動が横移動より大きい `touchstart` → `touchend`。**80px は未計測の暫定値**。長すぎると基準が記録されずボタンが出ない。短すぎても新着が無ければボタンは出ない（`topUpdated` が判定する）ので、迷ったら短めに倒す。
+  - 更新ショートカット: 修飾キー無しの `.`（X の「新しいポストを読み込む」）。`input` / `textarea` / `select` / `contenteditable` / `role="textbox"` の中では対象外。
+  - **アプリ自身の更新との二重記録は `isTrusted` で弾かず、reducer の冪等性に任せる**。`auto_reload.ts` の合成 `.click()` もこれらのリスナーに届くが、`reload` は `anchorIds === null || consumed` のときしか記録されないため、同じ更新の 2 回目は無視される。
+  - 探索中（`isAnySearching()`）・ホーム以外・設定 OFF のときは記録しない（`recordReload()` のガード）。設定 OFF の間に記録すると、後で ON にしたときに古い基準が残る。
+  - 落とし穴: `touchstart` は `handleUserInput` により「直近のユーザー入力」として扱われる。そのためプルダウン直後の `scroll` で基準側の投稿が画面内に見えていると `targetSeenByUser` で消化され、ボタンは出ない（基準側が見えているので境目は分かる、という既存の消化ルールどおり）。結合テストで否定系を書くときは、基準側を画面外に置かないと「誤って記録されてもボタンが出ない」空振りのテストになる（実際に発生した）。
+  - 実 X（Chrome・ログイン済み、2026-10-03）で確認済み: 判定関数をページに注入し capture 相のリスナーで記録した。`フォロー中`（選択中・`aria-expanded` あり）は判定 false、`おすすめ` は未選択時のクリックが false・選択中の再クリックが true（`isTrusted` true、クリック対象は内側の `span`）、ボディ上の `.` は true。クリック対象は内側の要素なので `closest()` での判定が必須。
+  - 未確認（実機・実 DOM）: 新着ピル（検証時にピルが出ておらず未確認）、プルダウンの発火距離、`.` で X が実際に新着を読み込むフォーカス状態、Android でのピル・タブのタッチ操作が `click` として届くこと。
 - **描画の差分更新**: ボタン・トーストの `textContent` などは値が変わるときだけ代入する。無条件に代入すると、自分の描画が共有 DOM 監視ハブ（`document.body` の childList+subtree）に拾われて再描画を呼ぶ無限ループになる（テストでハングして発覚）。
 
 ### 探索パラメータ（実測。変更時は再計測すること）
@@ -138,3 +179,12 @@ Chrome 拡張だけでは、カラムの寸法など実アプリ固有の条件�
 ### 未確認事項
 
 - フォロー中タブでのボタン表示から戻り動作までの通し確認（検証時は新着が出なかった）、Android のボタン位置（`__mobileBottomInset`・スワイプバーとの重なり）、ヘッダー非表示設定時の上端位置、ライト/ダークでの見え方は手動テストで確認する。
+
+## 写真閲覧後のスクロール位置復元（`return_to_last_read.ts` に統合）
+
+旧 `scroll_pos_restore.ts`（localStorage に写真 URL を保存し、500px ずつスクロールしてリンクを探す独自処理）は廃止し、`return_to_last_read.ts` に統合した（2026-10-03）。
+
+- 設定は `scrollPosRestoreEnabled`（カラム設定）。「画像を縮小表示」が ON のときだけ UI に表示し、縮小を OFF にすると復元設定も false に書き換える。Rust 側でも `scroll_pos_restore_enabled && small_image_enabled` を実効値として config（`window.__multiColumnXConfig.scrollPosRestoreEnabled`）に渡す（旧データ保護）。注入は config 経由で、ボタン機能（`returnToLastReadEnabled`）とは独立。config は WebView 生成時の値で、設定適用での即時反映はしない（旧実装も同じ）。
+- ホームで写真リンクをクリックしたとき、`closest("article")` のステータス ID をモジュール内変数 `pendingPhotoReturnId` に保存する。写真 → ホームの遷移（popstate / pushState）を検知したら、`waitForTimelineReady`（100ms ポーリング・上限 5 秒、ホーム離脱 or ユーザー入力で中止）でタイムライン表示を待ち、`searchReturnTarget([id])` で上端に合わせる。見つからなければ「前回の位置が見つかりませんでした」のトースト。
+- 写真復元中は `photoRestoring` を立てて他機能と排他するが、`render()` の可視判定には混ぜない（「探しています…」ボタンを出さないため）。
+- 未検証（実機）: X 実 DOM での article からの ID 取得、5 秒上限の十分性、ネイティブ WebView ごとの pushState/popstate の挙動。

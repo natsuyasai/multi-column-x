@@ -4,11 +4,12 @@ import { platform } from "@tauri-apps/plugin-os";
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { IPC_COMMANDS } from "../constants/ipc";
+import { setRootFontPx } from "../lib/uiScale";
 import { resolveColumnDataDirectory } from "../services/externalColumn";
 import { useAppStore } from "../store/useAppStore";
 import type { Account, Column } from "../types";
 import { DEFAULT_COLUMN_SETTINGS, DEFAULT_GLOBAL_SETTINGS } from "../types";
-import { useDesktopColumns } from "./useDesktopColumns";
+import { desktopGridBounds, useDesktopColumns } from "./useDesktopColumns";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -226,6 +227,35 @@ describe("useDesktopColumns", () => {
     expect(resizeCalls).toHaveLength(2);
   });
 
+  it("デスクトップで全カラムを再配置するとスクロール位置を考慮したx座標になる", async () => {
+    const containerRef = makeContainerRef(900);
+    const scrollbarRef = makeScrollbarRef(50);
+    const { result } = renderHook(() =>
+      useDesktopColumns({
+        containerRef,
+        scrollbarRef,
+        dialogOpenRef: { current: false },
+        activeColumnId: null,
+        setActiveColumn: vi.fn().mockResolvedValue(undefined),
+      }),
+    );
+    mockInvoke.mockClear();
+
+    await act(async () => {
+      await result.current.recalculateAllBounds();
+    });
+
+    const col1Resize = mockInvoke.mock.calls.find(
+      (c) =>
+        c[0] === IPC_COMMANDS.RESIZE_COLUMN_WEBVIEW &&
+        (c[1] as { bounds: { columnId: string; x: number } }).bounds
+          .columnId === "col-1",
+    );
+    expect(col1Resize).toBeDefined();
+    // col-1 は gridCol=1 のため xOffset=0。scrollLeft(50) を引いた x になる
+    expect((col1Resize?.[1] as { bounds: { x: number } }).bounds.x).toBe(-50);
+  });
+
   it("restoreDesktopColumnsはカラムごとにWebViewを作成し最後に全体を再配置する", async () => {
     const { result } = renderDesktopColumns();
     const columns = [
@@ -387,5 +417,34 @@ describe("useDesktopColumns（Linux: メインウィンドウ移動監視）", (
     });
 
     expect(unlistenFn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("desktopGridBounds（UI倍率の反映）", () => {
+  afterEach(() => {
+    setRootFontPx(16);
+  });
+
+  const viewport = {
+    containerHeight: 800,
+    scrollLeft: 0,
+    topBarHeight: 32,
+  };
+
+  it("倍率1.0ではヘッダー高さ36pxぶん下げた位置にカラムが配置される", () => {
+    const bounds = desktopGridBounds(
+      [makeColumn({ id: "c1", gridCol: 1 })],
+      viewport,
+    );
+    expect(bounds.c1.y).toBe(32 + 36);
+  });
+
+  it("倍率1.25ではヘッダー高さ45pxぶん下げた位置にカラムが配置される", () => {
+    setRootFontPx(20);
+    const bounds = desktopGridBounds([makeColumn({ id: "c1", gridCol: 1 })], {
+      ...viewport,
+      topBarHeight: 40,
+    });
+    expect(bounds.c1.y).toBe(40 + 45);
   });
 });

@@ -12,6 +12,10 @@ Android 対応（アカウント追加、モバイルタブバー、APK 自己�
 
 app モジュールの variant は universal フレーバー付きのため、`./gradlew.bat testDebugUnitTest` では **app のテストは実行されない**。`cd src-tauri/gen/android && ./gradlew.bat :app:testUniversalDebugUnitTest` を使うこと。
 
+### 新しい git worktree での生成ファイル
+
+gitignore 対象の Android 生成ファイル（`src-tauri/gen/android/tauri.settings.gradle`、`src-tauri/gen/android/app/tauri.build.gradle.kts`、`src-tauri/gen/android/app/tauri.properties`）は新しい git worktree には存在せず、`npm run format` の Kotlin 部や Android 単体テストが失敗する。元のリポジトリから同じパスへコピーすること。
+
 ## Android ProGuard keep ルールの同期
 
 `android_bridge.rs` が `env.call_method()` で文字列指定して呼び出す `MainActivity` のメソッドは、リリースビルドで R8 に難読化されると `NoSuchMethodException` が発生して WebView が作成されない。
@@ -70,6 +74,12 @@ app モジュールの variant は universal フレーバー付きのため、`.
 - `handle_android_video_download_request`（Rust）は複数箇所で `?` による早期returnがあるため、そのまま素直に書くと「開始は呼んだが終了(finished)を呼ばずに関数を抜けるパス」が生まれ、Foreground Serviceの通知が消えないまま残ってしまう。**処理本体を `async { ... }` ブロックに包んで結果を一旦ローカル変数で受け、成否に関わらず必ず `notify_video_download_finished()` を呼んでから元の結果を返す**、という構造にして防いだ。早期returnが多い非同期関数で「必ず後始末する」処理を挟みたい場合の定石として記録する。
 - 進捗表示自体（desktop側、`popup_toolbar.ts` の `window.__TAURI__.event.listen` でRustの `app.emit_to(window_label, event, payload)` を受信する経路）は、このプロジェクトで初めて使う経路だった（既存のinjectスクリプトは全て `invoke` による一方向通知のみ）。`src-tauri/capabilities/column-webview.json` が popup ウィンドウに許可している `core:default` パーミッションセットには `core:event:default` が含まれており（Tauri v2の `gen/schemas/desktop-schema.json` で確認可能）、追加のcapabilities設定変更なしに動作した。同様にRust→WebViewへイベントを送りたくなった場合、この経路をそのまま使ってよい。
 
+## 文字列リソース（多言語）
+
+- 利用者に見えるネイティブ文言は `app/src/main/res/values/strings.xml`（既定＝英語）と `res/values-ja/strings.xml`（日本語）で管理する。**端末の言語に従い、アプリ内の `language` 設定とは独立**（現状は `VideoDownloadForegroundService` の通知文言のみ）。`app_name` / `main_activity_title` は既定のみ。
+- 追加手順: ①両方の `strings.xml` に同じキーを追加（書式付きは `%1$d` の位置指定子を揃える。`%` 自体は `%%`）②コードは `getString(R.string.…)` で参照し、日本語・英語を直書きしない ③日本語側の文言一覧は `StringResourcesTest` の期待表にも追加する。R クラスのリソース ID は ProGuard の keep 不要。
+- `StringResourcesTest`（キー集合・書式指定子の一致、既定側に日本語なし、日本語の現行文言、通知サービスへの日本語直書きなし）と `VideoDownloadProgressTextTest`（`buildProgressText`）が検証する。注意: テストは `strings.xml` を `File` で読むため Gradle の入力に含まれず、リソースだけ変えると `testUniversalDebugUnitTest` が UP-TO-DATE になる。手元で確認するときは `:app:cleanTestUniversalDebugUnitTest` を併用する。
+
 ## reqwest 等ネイティブ依存クレートの Android クロスビルド
 
 - `reqwest`（`rustls-tls` feature）が依存する `ring` crate は Android ターゲットのビルド時にネイティブ C コードのコンパイルが必要で、`ANDROID_NDK_HOME`（または `NDK_HOME`）環境変数と NDK の `clang` が見つからないとビルドに失敗する。**`cargo check`（デフォルトのdesktopターゲット）だけでは検出できず**、`cargo check --target aarch64-linux-android` や実際の `npm run tauri:android:build[:debug]` を通さないと問題が判明しない。ローカル開発機でこの手のネイティブ依存クレートを新規追加した場合は、Androidターゲットでのビルドも一度は試すこと（Android SDK/NDK が `AppData/Local/Android/Sdk` 等にインストール済みでも、シェルの環境変数 `ANDROID_HOME` / `ANDROID_NDK_HOME` が未設定だと同じエラーになる点に注意）。
@@ -125,6 +135,14 @@ adb shell am start -n com.natsuyasai.multicolumnx/.MainActivity
 - `pm clear` 直後のアプリは OS 上「force-stopped 状態」として扱われ、その状態のまま `bmgr backupnow` を叩くと `Backup is not allowed` で失敗する。**バックアップ対象アプリは事前に一度フォアグラウンド起動しておく必要がある**（`adb shell am start` 等）。同様に、**署名の異なるビルド（デバッグ版⇔リリース版）を入れ替えてインストールすると、インストール時の自動リストアが signature mismatch で失敗し、アプリが force-stopped 状態のままになる**。ビルド種別を切り替えて検証する場合は、インストール直後に必ず `am start` で一度フォアグラウンド起動すること。
 - `adb shell run-as <pkg> sh -c '...'` は、複数コマンドを一度に文字列連結して渡す場合、シェル呼び出しの引数分割でクォートが失われ空白を含むパス（`Service Worker` 等）が壊れることがある。**コマンド全体を1つのダブルクォート文字列として `adb shell` に渡す**（`adb shell "run-as pkg sh -c '...'"`）と正しく解釈される。
 - **既知の制約（今回の検証では自動確認不可）**: 実際の Google アカウントクラウドバックアップおよび実機間 D2D（Quick Switch / ケーブル移行）が `BackupAgent.onFullBackup()` を同一経路で通るかは、ローカルトランスポートでの検証だけでは完全には裏付けられていない（Android バージョンにより挙動差の可能性が残る）。`fullBackupOnly` 修正後の検証は100MBダミーファイル・空マーカーファイルによる合成データのみで行っており、**実際にログイン済みの複数アカウントを持つ状態でのバックアップ→復元ラウンドトリップは未実施**（メカニズム自体は `Cookies` DBも除外対象外の通常ファイルとして同じ経路で扱われるため理論上は問題ないはずだが、実データでの確認ではない）。リリース前に実機2台での端末移行フローを手動確認する際、この実データラウンドトリップ確認も併せて実施すること。
+
+## 複数カラム表示（列数設定）
+
+- 実装: `src/lib/gridLayout.ts` の `mobileColumnLayout` / `clampMobileColumnCount`、`src/hooks/useMobileColumns.ts` の `mobileLayoutForViewport`。
+- 有効列数 = `min(設定値, floor(幅dp / 300), 登録数)`。設定値は 2〜6 にクランプ。幅 600dp 未満は常に 1 列。
+- 数値の決定: 1 列あたり最小幅 300dp、列数の上限 6、600dp 未満は 1 列（従来の 2 カラム表示の下限 `MOBILE_TWO_COLUMN_MIN_WIDTH` を維持）は Issue #218 の仕様検討で決めた値。変更する場合は `gridLayout.ts` の定数と本節を合わせて更新する。
+- 窓の規則: アクティブ位置から連続 N 列を表示。末尾付近では窓が左へずれ、最後のカラムが右端に来る。n=2 は従来の固定 2 カラム配置と一致する（回帰させないこと）。
+- 設定変更の反映: 設定を購読せず、設定パネルを閉じたときの `recalculateAllBounds` → `setActiveColumn` 経由で再配置される（ストア更新 → ダイアログを閉じる、の順序に依存）。
 
 ## デバッグビルドでは検出できない不具合
 

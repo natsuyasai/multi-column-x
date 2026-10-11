@@ -1,5 +1,7 @@
-import { render, screen, fireEvent } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent, act } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import i18n from "@/i18n";
+import { expectNoJapanese } from "@/test-utils/japanese";
 import { ConfirmDialog } from "./ConfirmDialog";
 
 describe("ConfirmDialog", () => {
@@ -95,5 +97,59 @@ describe("ConfirmDialog", () => {
     );
     expect(screen.getByText("OK")).toBeInTheDocument();
     expect(screen.queryByText("キャンセル")).not.toBeInTheDocument();
+  });
+
+  describe("表示言語", () => {
+    afterEach(async () => {
+      await i18n.changeLanguage("ja");
+    });
+
+    it("表示言語が英語のとき確認ダイアログの既定ラベルに日本語の文言が表示されない", async () => {
+      await i18n.changeLanguage("en");
+      const { container } = render(
+        <ConfirmDialog
+          title="Confirm"
+          message="Delete this account?"
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expectNoJapanese(container);
+      expect(screen.getByText("OK")).toBeInTheDocument();
+      expect(screen.getByText("Cancel")).toBeInTheDocument();
+    });
+
+    it("確認ダイアログを開いたまま表示言語を切り替えると既定ラベルも切り替わる", async () => {
+      render(
+        <ConfirmDialog
+          message="Delete this account?"
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.getByText("キャンセル")).toBeInTheDocument();
+
+      await act(async () => {
+        await i18n.changeLanguage("en");
+      });
+
+      expect(screen.getByText("Cancel")).toBeInTheDocument();
+      expect(screen.queryByText("キャンセル")).not.toBeInTheDocument();
+    });
+
+    it("呼び出し元が渡したラベルは表示言語に関わらずそのまま表示される", async () => {
+      await i18n.changeLanguage("en");
+      render(
+        <ConfirmDialog
+          message="Delete?"
+          confirmLabel="Remove"
+          cancelLabel="Keep"
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.getByText("Remove")).toBeInTheDocument();
+      expect(screen.getByText("Keep")).toBeInTheDocument();
+    });
   });
 });

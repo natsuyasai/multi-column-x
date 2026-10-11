@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ReactNode } from "react";
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 import { AppSettingsPanel } from "@/components/AppSettingsPanel/AppSettingsPanel";
+import i18n from "@/i18n";
+import { useAppStore } from "@/store/useAppStore";
 import type { Account, Column, GlobalSettings } from "@/types";
 
 const columnSettings = {
@@ -42,7 +44,6 @@ const globalSettings: GlobalSettings = {
   videoAutoPlayStopEnabled: true,
   imagePopupEnabled: true,
   videoPopupEnabled: true,
-  showSortButtons: false,
   smallImageEnabled: false,
   smallImageWidth: "50%",
   blurImageEnabled: false,
@@ -50,15 +51,20 @@ const globalSettings: GlobalSettings = {
   hideAdEnabled: true,
   apiRateLimitMonitorEnabled: true,
   columnScale: "default",
+  uiScale: "auto",
+  language: "auto",
   useXAppForCompose: false,
   mobileSwipeAreaEnabled: true,
   mobileSwipeAreaHeight: 28,
   mobileSwipeAreaOpacity: 50,
   mobileTwoColumnEnabled: true,
+  mobileColumnCount: 2,
   presets: [],
   ngWords: [],
   repostHiddenUserIds: [],
   pendingDataDirectoryDeletions: [],
+  hardwareVideoDecodeEnabled: true,
+  h264DownloadPromptDismissed: false,
 };
 
 const accounts: Account[] = [
@@ -105,6 +111,65 @@ function ThemeRoot({
   return <>{children}</>;
 }
 
+// isMobile は useAppStore から読まれるため、描画前にストアを書き換え、アンマウント時に元へ戻す
+function MobileRoot({ children }: { children: ReactNode }) {
+  const [prev] = useState(() => {
+    const before = useAppStore.getState().isMobile;
+    useAppStore.setState({ isMobile: true });
+    return before;
+  });
+  useEffect(() => {
+    useAppStore.setState({ isMobile: true });
+    return () => useAppStore.setState({ isMobile: prev });
+  }, [prev]);
+  return <>{children}</>;
+}
+
+// Android 向けスタイルは documentElement の data-platform で切り替わるため、Story でもそれに合わせる。
+// fontSize を渡すと html の font-size を上書きし（アプリUIの表示サイズ拡大の再現）、アンマウント時に元へ戻す
+function AndroidRoot({
+  fontSize,
+  children,
+}: {
+  fontSize?: string;
+  children: ReactNode;
+}) {
+  useLayoutEffect(() => {
+    const el = document.documentElement;
+    const prevPlatform = el.getAttribute("data-platform");
+    const prevFontSize = el.style.fontSize;
+    el.setAttribute("data-platform", "android");
+    if (fontSize !== undefined) el.style.fontSize = fontSize;
+    return () => {
+      if (prevPlatform === null) el.removeAttribute("data-platform");
+      else el.setAttribute("data-platform", prevPlatform);
+      el.style.fontSize = prevFontSize;
+    };
+  }, [fontSize]);
+  return <>{children}</>;
+}
+
+function queryPanel(canvasElement: HTMLElement): HTMLElement {
+  const panel = canvasElement.querySelector<HTMLElement>('[class*="panel"]');
+  if (!panel) throw new Error("panel 要素が見つかりません");
+  // Storybook ではテーマ変数の CSS が読み込まれず border が無効値になるため、枠線の有無を判定できるよう色を与える
+  panel.style.setProperty("--mcx-border", "#333333");
+  return panel;
+}
+
+function expectFullscreenPanel(panel: HTMLElement) {
+  const rect = panel.getBoundingClientRect();
+  const style = getComputedStyle(panel);
+  return expect({
+    left: rect.left,
+    top: rect.top,
+    width: rect.width,
+    height: rect.height,
+    borderRadius: style.borderTopLeftRadius,
+    borderWidth: style.borderTopWidth,
+  });
+}
+
 const meta: Meta<typeof AppSettingsPanel> = {
   title: "Components/AppSettingsPanel",
   component: AppSettingsPanel,
@@ -121,6 +186,9 @@ const meta: Meta<typeof AppSettingsPanel> = {
     onApplyColumnDefaults: fn(),
     onReloadAllWebviews: fn(),
     onLoadPreset: fn().mockResolvedValue(undefined),
+    onReplaceColumnsAndRecreate: fn().mockResolvedValue(undefined),
+    onExtensionsChanged: fn(),
+    extensionPageAccountId: "acc-1",
     onCheckUpdate: fn(),
     onOpenOfficialSettings: fn(),
     onClose: fn(),
@@ -234,14 +302,18 @@ export const ScaleThemeOverrideDisabled: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const scaleCheckbox = canvas.getByRole("checkbox", {
-      name: "表示サイズを変更する",
+      name: "カラム内の表示サイズを変更する",
     });
     const themeCheckbox = canvas.getByRole("checkbox", {
       name: "テーマを変更する",
     });
     await expect(scaleCheckbox).not.toBeChecked();
     await expect(themeCheckbox).not.toBeChecked();
-    await expect(canvas.getByRole("button", { name: "大" })).toBeDisabled();
+    await expect(
+      within(
+        canvas.getByRole("group", { name: "カラム内の表示サイズ" }),
+      ).getByRole("button", { name: "大" }),
+    ).toBeDisabled();
     await expect(canvas.getByRole("button", { name: "ライト" })).toBeDisabled();
   },
 };
@@ -251,22 +323,480 @@ export const ScaleThemeOverrideEnabled: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(
-      canvas.getByRole("checkbox", { name: "表示サイズを変更する" }),
+      canvas.getByRole("checkbox", { name: "カラム内の表示サイズを変更する" }),
     );
     await userEvent.click(
       canvas.getByRole("checkbox", { name: "テーマを変更する" }),
     );
-    await expect(canvas.getByRole("button", { name: "大" })).not.toBeDisabled();
+    const columnScaleLarge = within(
+      canvas.getByRole("group", { name: "カラム内の表示サイズ" }),
+    ).getByRole("button", { name: "大" });
+    await expect(columnScaleLarge).not.toBeDisabled();
     await expect(
       canvas.getByRole("button", { name: "ライト" }),
     ).not.toBeDisabled();
-    await userEvent.click(canvas.getByRole("button", { name: "大" }));
+    await userEvent.click(columnScaleLarge);
     await userEvent.click(canvas.getByRole("button", { name: "ライト" }));
-    await expect(canvas.getByRole("button", { name: "大" }).className).toMatch(
-      /scaleBtnActive/,
-    );
+    await expect(columnScaleLarge.className).toMatch(/scaleBtnActive/);
     await expect(
       canvas.getByRole("button", { name: "ライト" }).className,
     ).toMatch(/scaleBtnActive/);
+  },
+};
+
+export const EnglishLanguage: Story = {
+  name: "表示言語: 英語表示で言語選択肢が各言語の表記で並ぶ",
+  decorators: [
+    (Story) => {
+      // グローバル decorator が適用する locale より後に評価されるため、ここで英語を強制する
+      void i18n.changeLanguage("en");
+      return <Story />;
+    },
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const group = canvas.getByRole("group", { name: "Language" });
+    const labels = within(group)
+      .getAllByRole("button")
+      .map((b) => b.textContent);
+    await expect(labels).toEqual(["Auto", "日本語", "English"]);
+  },
+};
+
+export const UiScaleXLargeSelected: Story = {
+  name: "アプリUI表示サイズ: 特大選択中",
+  args: {
+    settings: { ...globalSettings, uiScale: "xLarge" },
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("カラム内の表示サイズ")).toBeInTheDocument();
+    const group = within(
+      canvas.getByRole("group", { name: "アプリUIの表示サイズ" }),
+    );
+    await expect(group.getByRole("button", { name: "特大" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(
+      group.getByRole("button", { name: "端末に合わせる" }),
+    ).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(
+      canvas.getByRole("checkbox", { name: "アプリUIの表示サイズを変更する" }),
+    );
+    await userEvent.click(group.getByRole("button", { name: "大" }));
+    await userEvent.click(canvas.getByRole("button", { name: "適用" }));
+    await expect(args.onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ uiScale: "large" }),
+    );
+    await expect(args.onApply).not.toHaveBeenCalledWith(
+      expect.objectContaining({ columnScale: expect.anything() }),
+    );
+  },
+};
+
+export const UiScaleMobile: Story = {
+  name: "アプリUI表示サイズ: モバイル幅",
+  args: {
+    settings: { ...globalSettings, uiScale: "xLarge" },
+  },
+  decorators: [
+    (Story) => (
+      <MobileRoot>
+        <ThemeRoot theme="dark">
+          <div style={{ width: "22.5rem", height: "100vh" }}>
+            <Story />
+          </div>
+        </ThemeRoot>
+      </MobileRoot>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole("group", { name: "アプリUIの表示サイズ" }),
+    ).toBeInTheDocument();
+  },
+};
+
+const linuxH264Base = {
+  downloadApplicable: true,
+  h264Available: false,
+  downloadState: "idle" as const,
+  downloadError: null,
+  onEnable: fn(),
+  onRelaunch: fn(),
+};
+
+export const LinuxAppImageH264NotInstalled: Story = {
+  name: "Linux AppImage・H.264未取得（有効化できる）",
+  args: {
+    isLinux: true,
+    startupHardwareVideoDecodeEnabled: true,
+    h264Setup: { ...linuxH264Base, onEnable: fn() },
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      canvas.getByRole("button", { name: "H.264 を有効化" }),
+    );
+    await expect(args.h264Setup?.onEnable).toHaveBeenCalledTimes(1);
+    const hwCheckbox = canvas.getByRole("checkbox", {
+      name: "ハードウェアデコードを使う（VA-API）",
+    });
+    await expect(
+      canvas.queryByText("再起動後に反映されます"),
+    ).not.toBeInTheDocument();
+    await userEvent.click(hwCheckbox);
+    await expect(
+      canvas.getByText("再起動後に反映されます"),
+    ).toBeInTheDocument();
+  },
+};
+
+export const LinuxAppImageH264Installed: Story = {
+  name: "Linux AppImage・H.264取得済み（有効化済み表示）",
+  args: {
+    isLinux: true,
+    startupHardwareVideoDecodeEnabled: true,
+    h264Setup: { ...linuxH264Base, h264Available: true },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("H.264: 有効化済み")).toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("button", { name: "H.264 を有効化" }),
+    ).not.toBeInTheDocument();
+  },
+};
+
+export const LinuxDeb: Story = {
+  name: "Linux deb版（H.264項目なし・HWデコードのみ）",
+  args: {
+    isLinux: true,
+    startupHardwareVideoDecodeEnabled: true,
+    h264Setup: { ...linuxH264Base, downloadApplicable: false },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.queryByText(/H\.264/)).not.toBeInTheDocument();
+    await expect(
+      canvas.getByRole("checkbox", {
+        name: "ハードウェアデコードを使う（VA-API）",
+      }),
+    ).toBeInTheDocument();
+  },
+};
+
+export const LinuxH264Downloading: Story = {
+  name: "Linux AppImage・H.264ダウンロード中",
+  args: {
+    isLinux: true,
+    startupHardwareVideoDecodeEnabled: true,
+    h264Setup: { ...linuxH264Base, downloadState: "downloading" },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("ダウンロード中…")).toBeInTheDocument();
+    await expect(
+      canvas.getByRole("button", { name: "H.264 を有効化" }),
+    ).toBeDisabled();
+  },
+};
+
+export const LinuxH264Success: Story = {
+  name: "Linux AppImage・H.264取得成功（今すぐ再起動）",
+  args: {
+    isLinux: true,
+    startupHardwareVideoDecodeEnabled: true,
+    h264Setup: {
+      ...linuxH264Base,
+      h264Available: true,
+      downloadState: "success",
+      onRelaunch: fn(),
+    },
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "今すぐ再起動" }));
+    await expect(args.h264Setup?.onRelaunch).toHaveBeenCalledTimes(1);
+  },
+};
+
+export const LinuxH264Error: Story = {
+  name: "Linux AppImage・H.264取得失敗（再試行）",
+  args: {
+    isLinux: true,
+    startupHardwareVideoDecodeEnabled: true,
+    h264Setup: {
+      ...linuxH264Base,
+      downloadState: "error",
+      downloadError: "ネットワークに接続できません",
+      onEnable: fn(),
+    },
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByText("ネットワークに接続できません"),
+    ).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "再試行" }));
+    await expect(args.h264Setup?.onEnable).toHaveBeenCalledTimes(1);
+  },
+};
+
+export const LinuxAppImageDarkTheme: Story = {
+  name: "Linux AppImage・ダークテーマ",
+  args: {
+    isLinux: true,
+    startupHardwareVideoDecodeEnabled: true,
+    h264Setup: linuxH264Base,
+  },
+  decorators: [
+    (Story) => (
+      <ThemeRoot theme="dark">
+        <Story />
+      </ThemeRoot>
+    ),
+  ],
+};
+
+export const LinuxAppImageLightTheme: Story = {
+  name: "Linux AppImage・ライトテーマ",
+  args: {
+    isLinux: true,
+    startupHardwareVideoDecodeEnabled: true,
+    h264Setup: linuxH264Base,
+  },
+  decorators: [
+    (Story) => (
+      <ThemeRoot theme="light">
+        <Story />
+      </ThemeRoot>
+    ),
+  ],
+};
+
+export const MobileGroups: Story = {
+  name: "モバイル（Android専用グループ表示・ポップアップ項目なし）",
+  decorators: [
+    (Story) => (
+      <MobileRoot>
+        <ThemeRoot theme="dark">
+          <Story />
+        </ThemeRoot>
+      </MobileRoot>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole("heading", { name: "Android専用" }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByRole("heading", { name: "メディア" }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("checkbox", { name: /ポップアップ/ }),
+    ).not.toBeInTheDocument();
+  },
+};
+
+export const MobileGroupsLightTheme: Story = {
+  name: "モバイル・ライトテーマ",
+  decorators: [
+    (Story) => (
+      <MobileRoot>
+        <ThemeRoot theme="light">
+          <Story />
+        </ThemeRoot>
+      </MobileRoot>
+    ),
+  ],
+};
+
+export const AndroidFullscreenWithMobileGroups: Story = {
+  name: "Android実機相当（全画面・Android専用グループ表示）",
+  decorators: [
+    (Story) => (
+      <MobileRoot>
+        <ThemeRoot theme="light">
+          <AndroidRoot>
+            <Story />
+          </AndroidRoot>
+        </ThemeRoot>
+      </MobileRoot>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole("heading", { name: "Android専用" }),
+    ).toBeInTheDocument();
+  },
+};
+
+const fullscreenExpected = () => ({
+  left: 0,
+  top: 0,
+  width: window.innerWidth,
+  height: window.innerHeight,
+  borderRadius: "0px",
+  borderWidth: "0px",
+});
+
+export const AndroidFullscreen: Story = {
+  name: "Androidではアプリ設定が画面全体を覆って表示される",
+  decorators: [
+    (Story) => (
+      <ThemeRoot theme="dark">
+        <AndroidRoot>
+          <Story />
+        </AndroidRoot>
+      </ThemeRoot>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const panel = queryPanel(canvasElement);
+    await expectFullscreenPanel(panel).toEqual(fullscreenExpected());
+  },
+};
+
+export const DesktopPanelUnchanged: Story = {
+  name: "デスクトップではアプリ設定の見た目は従来どおり画面全体にならない",
+  decorators: [
+    (Story) => (
+      <ThemeRoot theme="dark">
+        <Story />
+      </ThemeRoot>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const panel = queryPanel(canvasElement);
+    const rect = panel.getBoundingClientRect();
+    await expect(rect.width).toBeLessThan(window.innerWidth);
+    await expect(rect.height).toBeLessThan(window.innerHeight);
+    await expect(
+      parseFloat(getComputedStyle(panel).borderTopLeftRadius),
+    ).toBeGreaterThan(0);
+    await expect(
+      parseFloat(getComputedStyle(panel).borderTopWidth),
+    ).toBeGreaterThan(0);
+  },
+};
+
+// 狭い画面（スマホ幅）を再現するため、vitest の browser 実行時だけ viewport を絞る。戻す関数を返す。
+// Storybook の画面上で開いた場合は viewport を変えられないので何もしない
+async function narrowViewport(width: number, height: number) {
+  const originalWidth = window.innerWidth;
+  const originalHeight = window.innerHeight;
+  try {
+    const { page } = await import("vitest/browser");
+    await page.viewport(width, height);
+    return () => page.viewport(originalWidth, originalHeight);
+  } catch {
+    return async () => {};
+  }
+}
+
+function findScroller(panel: HTMLElement): HTMLElement {
+  const scroller = Array.from(panel.querySelectorAll<HTMLElement>("*")).find(
+    (el) => {
+      const overflowY = getComputedStyle(el).overflowY;
+      return (
+        (overflowY === "auto" || overflowY === "scroll") &&
+        el.scrollHeight > el.clientHeight
+      );
+    },
+  );
+  if (!scroller) throw new Error("スクロールする本文が見つかりません");
+  return scroller;
+}
+
+export const AndroidHeaderFixedBodyScrolls: Story = {
+  name: "Android全画面ではヘッダーが固定され本文だけがスクロールする",
+  decorators: [
+    (Story) => (
+      <ThemeRoot theme="dark">
+        <AndroidRoot fontSize="20px">
+          <Story />
+        </AndroidRoot>
+      </ThemeRoot>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const restoreViewport = await narrowViewport(360, 640);
+    try {
+      const canvas = within(canvasElement);
+      const panel = queryPanel(canvasElement);
+      const header = canvas.getByText("アプリ設定")
+        .parentElement as HTMLElement;
+      const scroller = findScroller(panel);
+      const headerTopBefore = header.getBoundingClientRect().top;
+
+      scroller.scrollTop = scroller.scrollHeight;
+
+      await expect(scroller.scrollTop).toBeGreaterThan(0);
+      await expect(header.getBoundingClientRect().top).toBe(headerTopBefore);
+      // ページ全体はスクロールしない（二重スクロールにならない）
+      await expect(document.documentElement.scrollHeight).toBeLessThanOrEqual(
+        document.documentElement.clientHeight,
+      );
+      // 本文の最後の項目までスクロールして到達できる
+      const lastItem = scroller.lastElementChild as HTMLElement;
+      await expect(lastItem.getBoundingClientRect().bottom).toBeLessThanOrEqual(
+        scroller.getBoundingClientRect().bottom + 1,
+      );
+    } finally {
+      await restoreViewport();
+    }
+  },
+};
+
+export const AndroidLargeScaleNoOverflow: Story = {
+  name: "Android・大きな表示サイズでも設定のタブとボタン行が画面外へはみ出さない",
+  decorators: [
+    (Story) => (
+      <ThemeRoot theme="dark">
+        <AndroidRoot fontSize="20px">
+          <Story />
+        </AndroidRoot>
+      </ThemeRoot>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const restoreViewport = await narrowViewport(360, 640);
+    try {
+      const canvas = within(canvasElement);
+      const root = document.documentElement;
+      await expect(root.scrollWidth).toBeLessThanOrEqual(root.clientWidth);
+
+      // フッターボタンが画面内に収まっている
+      for (const name of ["キャンセル", "適用"]) {
+        const rect = canvas
+          .getByRole("button", { name })
+          .getBoundingClientRect();
+        await expect(rect.left).toBeGreaterThanOrEqual(0);
+        await expect(rect.right).toBeLessThanOrEqual(window.innerWidth);
+        await expect(rect.bottom).toBeLessThanOrEqual(window.innerHeight);
+      }
+
+      // 最後のタブまでスクロールして到達でき、選択できる
+      const tabs = canvasElement.querySelector<HTMLElement>('[class*="tabs"]');
+      if (!tabs) throw new Error("tabs 要素が見つかりません");
+      // 溢れるタブ列はユーザーが横スクロールできる
+      await expect(tabs.scrollWidth).toBeGreaterThan(tabs.clientWidth);
+      await expect(getComputedStyle(tabs).overflowX).toBe("auto");
+      const lastTab = tabs.lastElementChild as HTMLElement;
+      lastTab.scrollIntoView({ inline: "end" });
+      const tabRect = lastTab.getBoundingClientRect();
+      await expect(tabRect.left).toBeGreaterThanOrEqual(0);
+      await expect(tabRect.right).toBeLessThanOrEqual(window.innerWidth + 1);
+      await userEvent.click(lastTab);
+      await expect(lastTab.className).toMatch(/tabActive/);
+      await expect(root.scrollWidth).toBeLessThanOrEqual(root.clientWidth);
+    } finally {
+      await restoreViewport();
+    }
   },
 };

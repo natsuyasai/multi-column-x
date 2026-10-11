@@ -7,6 +7,16 @@ const REPORT_OFFICIAL_SETTINGS = "report_official_settings";
 // イベント名定数の一覧は src/constants/ipc.ts の IPC_EVENTS を参照
 const VIDEO_DOWNLOAD_PROGRESS = "video-download-progress";
 
+// 画面文言は共有ハブ window.__mcxI18n（i18n.ts）経由で取得する。ハブ未ロード時はキー文字列を返す。
+function tr(key: string, params?: Record<string, string | number>): string {
+  return window.__mcxI18n?.t(key, params) ?? key;
+}
+// 静的な要素の文言は、言語切替時に再適用できるよう apply で設定する。
+function applyText(el: Element, key: string): void {
+  if (window.__mcxI18n) window.__mcxI18n.apply(el, key);
+  else el.textContent = key;
+}
+
 // src/constants/ipc.ts の OFFICIAL_SETTINGS_WHITELIST_KEYS と同じ値を維持すること。
 // inject スクリプトは ES module import が使えない制約により、独立定義が必要。
 const OFFICIAL_SETTINGS_WHITELIST_KEYS = [
@@ -39,12 +49,18 @@ export function formatVideoDownloadProgressText(
   const { fileIndex, fileCount, current, total, phase } = payload;
   const fileLabel = fileCount > 1 ? ` (${fileIndex}/${fileCount})` : "";
 
-  if (phase === "completed") return `ダウンロード完了${fileLabel}`;
-  if (phase === "failed") return `ダウンロード失敗${fileLabel}`;
+  if (phase === "completed")
+    return tr("popupToolbar.download.completed", { file: fileLabel });
+  if (phase === "failed")
+    return tr("popupToolbar.download.failed", { file: fileLabel });
 
-  if (total === null) return `ダウンロード中${fileLabel}`;
+  if (total === null)
+    return tr("popupToolbar.download.downloading", { file: fileLabel });
   const percent = total === 0 ? 0 : Math.floor((current / total) * 100);
-  return `ダウンロード中${fileLabel} ${percent}%`;
+  return tr("popupToolbar.download.downloadingPercent", {
+    file: fileLabel,
+    percent,
+  });
 }
 
 // 動画情報（variants）の抽出は image_popup.ts の extractQuotedTweetId と同じ
@@ -133,6 +149,52 @@ export function isOfficialSettingsPagePath(pathname: string): boolean {
   return pathname.startsWith("/settings");
 }
 
+/** hostname が x.com / twitter.com またはそのサブドメインかどうかを判定する。 */
+export function isXHostname(hostname: string): boolean {
+  return (
+    hostname === "x.com" ||
+    hostname.endsWith(".x.com") ||
+    hostname === "twitter.com" ||
+    hostname.endsWith(".twitter.com")
+  );
+}
+
+/**
+ * 初期化スクリプトが埋め込んだアカウント一覧を取り出し、window から削除する。
+ * ホストによる絞り込みは行わない（ツールバー自体を表示するかどうかの判定は
+ * ホストに関わらず「アカウントが登録されているか」で行うため、生の値が必要）。
+ */
+export function readAndClearPopupAccounts(win: Window): TvAccountInfo[] {
+  const accounts = win.__mcxAccounts ?? [];
+  delete win.__mcxAccounts;
+  return accounts;
+}
+
+/**
+ * アカウント一覧を、X 系のページでなければ空配列にする。
+ * 外部サイトのスクリプトにアカウント名等を渡さないための絞り込み。
+ */
+export function filterPopupAccountsByHostname(
+  accounts: TvAccountInfo[],
+  hostname: string,
+): TvAccountInfo[] {
+  return isXHostname(hostname) ? accounts : [];
+}
+
+/**
+ * 初期化スクリプトが埋め込んだアカウント一覧を取り出し、window から削除したうえで、
+ * X 系のページでなければ空配列を返す（外部サイトへアカウント情報を渡さないため）。
+ */
+export function takePopupAccounts(
+  win: Window,
+  hostname: string,
+): TvAccountInfo[] {
+  return filterPopupAccountsByHostname(
+    readAndClearPopupAccounts(win),
+    hostname,
+  );
+}
+
 /** Cookie文字列から "night_mode" の値を読む。存在しなければ null（システム設定を使う状態）を返す。 */
 export function readNightModeCookie(cookieString: string): string | null {
   const match = cookieString.match(/(?:^|; )night_mode=([^;]*)/);
@@ -154,7 +216,11 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
 }
 
 (function () {
-  const accounts: TvAccountInfo[] = window.__mcxAccounts ?? [];
+  const rawAccounts = readAndClearPopupAccounts(window);
+  const accounts = filterPopupAccountsByHostname(
+    rawAccounts,
+    location.hostname,
+  );
   const currentAccountId: string = window.__mcxCurrentAccountId ?? "";
   const targetHref: string = window.__mcxTargetHref ?? "";
   const escCloseEnabled: boolean = window.__mcxEscCloseEnabled ?? true;
@@ -164,7 +230,10 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
 
   if (document.getElementById("tv-popup-toolbar")) return;
 
-  if (accounts.length === 0) return;
+  // ツールバー自体の表示可否は「アカウントが登録されているか」で判定する
+  // （ホストによる絞り込み前）。X 以外のホストでもツールバー自体（閉じるボタン等）は
+  // 必要なため、アカウント切替 UI の表示可否とは分けて判定する。
+  if (rawAccounts.length === 0) return;
 
   function tauriInvoke(
     cmd: string,
@@ -217,59 +286,71 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
     "color: #e7e9ea",
   ].join(";");
 
-  const label = document.createElement("span");
-  label.textContent = "アカウント: ";
-  label.style.cssText = "margin-right: 8px; white-space: nowrap;";
+  // アカウント切替 UI（ラベル・select・option）は X 系ホストでのみ生成する。
+  // 非対象ホストでは accounts が空になっている（takePopupAccounts 参照）ため、
+  // ここで生成しなければページのスクリプトからアカウント名が読めることもない
+  // （非表示にするだけでは DOM に残ってしまうため、生成自体を行わない）。
+  let accountSwitcher: HTMLSpanElement | null = null;
+  let accountSelect: HTMLSelectElement | null = null;
 
-  const select = document.createElement("select");
-  select.style.cssText = [
-    "background: #253341",
-    "color: #e7e9ea",
-    "border: 1px solid #38444d",
-    "border-radius: 4px",
-    "padding: 4px 8px",
-    "font-size: 13px",
-    "cursor: pointer",
-    "max-width: 200px",
-  ].join(";");
+  if (accounts.length > 0) {
+    const label = document.createElement("span");
+    applyText(label, "popupToolbar.account");
+    label.style.cssText = "margin-right: 8px; white-space: nowrap;";
 
-  accounts.forEach((account) => {
-    const option = document.createElement("option");
-    option.value = account.id;
-    option.textContent = account.label;
-    if (account.id === currentAccountId) {
-      option.selected = true;
-    }
-    select.appendChild(option);
-  });
+    const select = document.createElement("select");
+    select.style.cssText = [
+      "background: #253341",
+      "color: #e7e9ea",
+      "border: 1px solid #38444d",
+      "border-radius: 4px",
+      "padding: 4px 8px",
+      "font-size: 13px",
+      "cursor: pointer",
+      "max-width: 200px",
+    ].join(";");
 
-  select.addEventListener("change", function () {
-    const selectedId = select.value;
-    const selectedAccount = accounts.find((a) => a.id === selectedId);
-    if (!selectedAccount) return;
-    // Android のネイティブ WebView には Tauri IPC が無いため、
-    // addJavascriptInterface で公開されたブリッジを優先して使う。
-    const androidBridge = window.__mcxPopupBridge;
-    if (androidBridge) {
-      postBridgeMessage(androidBridge, {
-        type: "switchPopupSession",
+    accounts.forEach((account) => {
+      const option = document.createElement("option");
+      option.value = account.id;
+      option.textContent = account.label;
+      if (account.id === currentAccountId) {
+        option.selected = true;
+      }
+      select.appendChild(option);
+    });
+
+    select.addEventListener("change", function () {
+      const selectedId = select.value;
+      const selectedAccount = accounts.find((a) => a.id === selectedId);
+      if (!selectedAccount) return;
+      // Android のネイティブ WebView には Tauri IPC が無いため、
+      // addJavascriptInterface で公開されたブリッジを優先して使う。
+      const androidBridge = window.__mcxPopupBridge;
+      if (androidBridge) {
+        postBridgeMessage(androidBridge, {
+          type: "switchPopupSession",
+          accountId: selectedAccount.id,
+          url: window.location.href,
+        });
+        return;
+      }
+      // popupLabel は渡さない。実際の送信元 WebView（呼び出し元）は Rust 側が
+      // caller.label() で判定するため、JS が自己申告する必要も権限も無い。
+      tauriInvoke(SWITCH_POPUP_SESSION, {
         accountId: selectedAccount.id,
         url: window.location.href,
       });
-      return;
-    }
-    // popupLabel は渡さない。実際の送信元 WebView（呼び出し元）は Rust 側が
-    // caller.label() で判定するため、JS が自己申告する必要も権限も無い。
-    tauriInvoke(SWITCH_POPUP_SESSION, {
-      accountId: selectedAccount.id,
-      url: window.location.href,
     });
-  });
+
+    accountSwitcher = label;
+    accountSelect = select;
+  }
 
   const downloadButton = document.createElement("button");
   downloadButton.type = "button";
   downloadButton.id = "tv-popup-download-button";
-  downloadButton.textContent = "動画をダウンロード";
+  applyText(downloadButton, "popupToolbar.downloadVideo");
   downloadButton.style.cssText = [
     "background: #253341",
     "color: #e7e9ea",
@@ -320,7 +401,7 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
   downloadButton.addEventListener("click", function () {
     const variants = extractVideoVariantsFromPlayer();
     if (!variants) {
-      showDownloadFeedback("動画を再生してからダウンロードしてください");
+      showDownloadFeedback(tr("popupToolbar.playBeforeDownload"));
       return;
     }
     const suggestedFileName = extractVideoIdFromPlayer() ?? "";
@@ -333,7 +414,7 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
   const applySettingsButton = document.createElement("button");
   applySettingsButton.type = "button";
   applySettingsButton.id = "tv-popup-apply-settings-button";
-  applySettingsButton.textContent = "各カラムに適用";
+  applyText(applySettingsButton, "popupToolbar.applyToColumns");
   applySettingsButton.style.cssText = downloadButton.style.cssText;
   applySettingsButton.style.display = isOfficialSettingsPage ? "" : "none";
 
@@ -360,7 +441,7 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
       g.onsuccess = function () {
         const value = g.result;
         if (!value || !value.local) {
-          applySettingsStatus.textContent = "設定が見つかりませんでした";
+          applySettingsStatus.textContent = tr("popupToolbar.settingsNotFound");
           clearApplySettingsFeedbackAfterDelay();
           return;
         }
@@ -379,7 +460,7 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
         applySettingsButton.disabled = true;
         const onDone = function () {
           applySettingsButton.disabled = false;
-          applySettingsStatus.textContent = "各カラムに適用しました";
+          applySettingsStatus.textContent = tr("popupToolbar.applied");
           clearApplySettingsFeedbackAfterDelay();
         };
         // Android ブリッジ優先、その次に Tauri IPC。
@@ -405,7 +486,7 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
   const exitButton = document.createElement("button");
   exitButton.type = "button";
   exitButton.id = "tv-popup-exit-button";
-  exitButton.textContent = "終了";
+  applyText(exitButton, "popupToolbar.exit");
   exitButton.style.cssText = downloadButton.style.cssText;
   exitButton.style.display = isOfficialSettingsPage ? "" : "none";
 
@@ -420,8 +501,10 @@ function extractVideoIdFromPlayer(startEl?: Element | null): string | null {
     });
   });
 
-  toolbar.appendChild(label);
-  toolbar.appendChild(select);
+  if (accountSwitcher && accountSelect) {
+    toolbar.appendChild(accountSwitcher);
+    toolbar.appendChild(accountSelect);
+  }
   toolbar.appendChild(downloadButton);
   toolbar.appendChild(downloadStatus);
   toolbar.appendChild(applySettingsButton);

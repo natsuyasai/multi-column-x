@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import styles from "./AccountNameDialog.module.scss";
 
@@ -15,6 +16,7 @@ export const AccountNameDialog: React.FC<AccountNameDialogProps> = ({
   onSubmit,
   onCancel,
 }) => {
+  const { t } = useTranslation();
   useEscapeKey(onCancel);
 
   const [name, setName] = useState(defaultValue);
@@ -33,7 +35,7 @@ export const AccountNameDialog: React.FC<AccountNameDialogProps> = ({
 
         <div className={styles.field}>
           <label className={styles.label} htmlFor="account-name-input">
-            アカウント名
+            {t("accounts:nameDialog.nameLabel")}
           </label>
           <input
             id="account-name-input"
@@ -45,14 +47,14 @@ export const AccountNameDialog: React.FC<AccountNameDialogProps> = ({
 
         <div className={styles.actions}>
           <button type="button" className={styles.cancelBtn} onClick={onCancel}>
-            キャンセル
+            {t("accounts:nameDialog.cancel")}
           </button>
           <button
             type="submit"
             className={styles.submitBtn}
             disabled={!trimmed}
           >
-            OK
+            {t("accounts:nameDialog.ok")}
           </button>
         </div>
       </form>

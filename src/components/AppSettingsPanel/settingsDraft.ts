@@ -1,4 +1,11 @@
-import type { ColumnScale, GlobalSettings } from "../../types";
+import { clampMobileColumnCount } from "@/lib/gridLayout";
+import { normalizeLanguageSetting, type LanguageSetting } from "@/lib/language";
+import type {
+  ColumnScale,
+  ColumnSettings,
+  GlobalSettings,
+  UiScale,
+} from "../../types";
 
 export const SWIPE_AREA_MIN_HEIGHT = 16;
 export const SWIPE_AREA_MAX_HEIGHT = 56;
@@ -22,6 +29,7 @@ export interface SettingsDraft {
   defaultColumnCustomCSS: string;
   popupEscCloseEnabled: boolean;
   videoAutoPlayStopEnabled: boolean;
+  hardwareVideoDecodeEnabled: boolean;
   imagePopupEnabled: boolean;
   videoPopupEnabled: boolean;
   smallImageEnabled: boolean;
@@ -31,6 +39,8 @@ export interface SettingsDraft {
   hideAdEnabled: boolean;
   apiRateLimitMonitorEnabled: boolean;
   columnScale: ColumnScale;
+  uiScale: UiScale;
+  language: LanguageSetting;
   useXAppForCompose: boolean;
   mobileSwipeAreaEnabled: boolean;
   /** number入力欄への入力中文字列をそのまま保持するため string で持つ */
@@ -38,12 +48,15 @@ export interface SettingsDraft {
   /** range inputのドラッグ操作のみで確定するため文字列保持は不要 */
   mobileSwipeAreaOpacity: number;
   mobileTwoColumnEnabled: boolean;
+  /** select の選択肢（2〜6）から選ぶため number で持つ */
+  mobileColumnCount: number;
   /** textarea への入力中文字列をそのまま保持するため string で持つ */
   globalNgWordsText: string;
   /** textarea への入力中文字列（1行1ユーザーID）をそのまま保持するため string で持つ */
   globalRepostHiddenUserIdsText: string;
   /** 「表示サイズ」欄の変更を有効化するチェックボックスの状態（GlobalSettingsには保存しないフォーム専用フラグ） */
   columnScaleOverrideEnabled: boolean;
+  uiScaleOverrideEnabled: boolean;
   /** 「テーマ」欄の変更を有効化するチェックボックスの状態（同上） */
   themeOverrideEnabled: boolean;
 }
@@ -70,6 +83,7 @@ export function createSettingsDraft(settings: GlobalSettings): SettingsDraft {
     defaultColumnCustomCSS: settings.defaultColumnCustomCSS,
     popupEscCloseEnabled: settings.popupEscCloseEnabled,
     videoAutoPlayStopEnabled: settings.videoAutoPlayStopEnabled,
+    hardwareVideoDecodeEnabled: settings.hardwareVideoDecodeEnabled,
     imagePopupEnabled: settings.imagePopupEnabled,
     videoPopupEnabled: settings.videoPopupEnabled,
     smallImageEnabled: settings.smallImageEnabled,
@@ -79,16 +93,20 @@ export function createSettingsDraft(settings: GlobalSettings): SettingsDraft {
     hideAdEnabled: settings.hideAdEnabled,
     apiRateLimitMonitorEnabled: settings.apiRateLimitMonitorEnabled ?? true,
     columnScale: settings.columnScale ?? "default",
+    uiScale: settings.uiScale ?? "auto",
+    language: normalizeLanguageSetting(settings.language),
     useXAppForCompose: settings.useXAppForCompose ?? false,
     mobileSwipeAreaEnabled: settings.mobileSwipeAreaEnabled,
     mobileSwipeAreaHeight: String(settings.mobileSwipeAreaHeight),
     mobileSwipeAreaOpacity: settings.mobileSwipeAreaOpacity ?? 50,
     mobileTwoColumnEnabled: settings.mobileTwoColumnEnabled,
+    mobileColumnCount: clampMobileColumnCount(settings.mobileColumnCount ?? 2),
     globalNgWordsText: (settings.ngWords ?? []).join("\n"),
     globalRepostHiddenUserIdsText: (settings.repostHiddenUserIds ?? []).join(
       "\n",
     ),
     columnScaleOverrideEnabled: false,
+    uiScaleOverrideEnabled: false,
     themeOverrideEnabled: false,
   };
 }
@@ -99,4 +117,86 @@ export function clampSwipeAreaHeight(value: string): number {
     SWIPE_AREA_MAX_HEIGHT,
     Math.max(SWIPE_AREA_MIN_HEIGHT, Number(value) || SWIPE_AREA_MIN_HEIGHT),
   );
+}
+
+/**
+ * フォームドラフトと検証済みのNGワード・リポスト非表示ユーザーID一覧から、
+ * 「一般」タブ適用時に onApply へ渡す GlobalSettings のパッチを組み立てる。
+ */
+export function toGlobalSettingsPatch(
+  draft: SettingsDraft,
+  lists: { ngWords: string[]; repostHiddenUserIds: string[] },
+): Partial<GlobalSettings> {
+  const patch: Partial<GlobalSettings> = {
+    defaultAutoReloadEnabled: draft.defaultAutoReloadEnabled,
+    defaultAutoReloadInterval: draft.defaultAutoReloadInterval,
+    defaultShowCountdown: draft.defaultShowCountdown,
+    defaultHideHeaderEnabled: draft.defaultHideHeaderEnabled,
+    defaultHideTweetInputEnabled: draft.defaultHideTweetInputEnabled,
+    defaultShowCustomMenu: draft.defaultShowCustomMenu,
+    defaultScrollPosRestoreEnabled: draft.defaultScrollPosRestoreEnabled,
+    defaultColumnCustomCSS: draft.defaultColumnCustomCSS,
+    popupEscCloseEnabled: draft.popupEscCloseEnabled,
+    videoAutoPlayStopEnabled: draft.videoAutoPlayStopEnabled,
+    hardwareVideoDecodeEnabled: draft.hardwareVideoDecodeEnabled,
+    imagePopupEnabled: draft.imagePopupEnabled,
+    videoPopupEnabled: draft.videoPopupEnabled,
+    smallImageEnabled: draft.smallImageEnabled,
+    smallImageWidth: draft.smallImageWidth,
+    blurImageEnabled: draft.blurImageEnabled,
+    blurImageAmount: draft.blurImageAmount,
+    hideAdEnabled: draft.hideAdEnabled,
+    apiRateLimitMonitorEnabled: draft.apiRateLimitMonitorEnabled,
+    language: draft.language,
+    useXAppForCompose: draft.useXAppForCompose,
+    mobileSwipeAreaEnabled: draft.mobileSwipeAreaEnabled,
+    mobileSwipeAreaHeight: clampSwipeAreaHeight(draft.mobileSwipeAreaHeight),
+    mobileSwipeAreaOpacity: draft.mobileSwipeAreaOpacity,
+    mobileTwoColumnEnabled: draft.mobileTwoColumnEnabled,
+    mobileColumnCount: clampMobileColumnCount(draft.mobileColumnCount),
+    ngWords: lists.ngWords,
+    repostHiddenUserIds: lists.repostHiddenUserIds,
+  };
+  if (draft.columnScaleOverrideEnabled) {
+    patch.columnScale = draft.columnScale;
+  }
+  if (draft.uiScaleOverrideEnabled) {
+    patch.uiScale = draft.uiScale;
+  }
+  if (draft.themeOverrideEnabled) {
+    patch.theme = draft.theme;
+  }
+  return patch;
+}
+
+/** `onApplyColumnDefaults` に渡す既存カラムへ一括適用するパッチの型 */
+export type ColumnDefaultsPatch = Omit<
+  ColumnSettings,
+  | "visibleLinks"
+  | "ngWords"
+  | "repostHiddenUserIds"
+  | "whitelistEnabled"
+  | "whitelistWords"
+  | "returnToLastReadEnabled"
+>;
+
+/**
+ * フォームドラフトから、「既存の全カラムに適用」時に onApplyColumnDefaults へ
+ * 渡すカラムデフォルトのパッチを組み立てる。
+ */
+export function toColumnDefaults(draft: SettingsDraft): ColumnDefaultsPatch {
+  return {
+    autoReloadEnabled: draft.defaultAutoReloadEnabled,
+    autoReloadInterval: draft.defaultAutoReloadInterval,
+    showCountdown: draft.defaultShowCountdown,
+    hideHeaderEnabled: draft.defaultHideHeaderEnabled,
+    hideTweetInputEnabled: draft.defaultHideTweetInputEnabled,
+    showCustomMenu: draft.defaultShowCustomMenu,
+    scrollPosRestoreEnabled: draft.defaultScrollPosRestoreEnabled,
+    customCSS: draft.defaultColumnCustomCSS,
+    smallImageEnabled: draft.smallImageEnabled,
+    smallImageWidth: draft.smallImageWidth,
+    blurImageEnabled: draft.blurImageEnabled,
+    blurImageAmount: draft.blurImageAmount,
+  };
 }

@@ -2432,7 +2432,7 @@ dependencies = [
 
 [[package]]
 name = "multicolumnx"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "bzip2",
  "gtk",
@@ -2444,6 +2444,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "sys-locale",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
@@ -2455,12 +2456,14 @@ dependencies = [
  "tauri-plugin-shell",
  "tauri-plugin-store",
  "tauri-plugin-updater",
+ "tempfile",
  "tokio",
  "url",
  "urlencoding",
  "uuid",
  "webkit2gtk",
  "webview2-com",
+ "windows-core 0.61.2",
  "wiremock",
 ]
 

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import CloseIcon from "../../assets/icons/close.svg?react";
 import StarOutlineIcon from "../../assets/icons/star-outline.svg?react";
 import StarIcon from "../../assets/icons/star.svg?react";
@@ -31,6 +32,7 @@ export const AccountManager: React.FC<AccountManagerProps> = ({
   onClose,
   onReauthAccount,
 }) => {
+  const { t } = useTranslation();
   useEscapeKey(onClose);
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -59,11 +61,11 @@ export const AccountManager: React.FC<AccountManagerProps> = ({
     <div className={styles.overlay}>
       <div className={styles.panel}>
         <div className={styles.header}>
-          <h2 className={styles.title}>アカウント管理</h2>
+          <h2 className={styles.title}>{t("accounts:manager.title")}</h2>
           <button
             className={styles.closeBtn}
             onClick={onClose}
-            aria-label="閉じる"
+            aria-label={t("accounts:manager.close")}
           >
             <CloseIcon width={16} height={16} data-testid="icon-close" />
           </button>
@@ -71,7 +73,7 @@ export const AccountManager: React.FC<AccountManagerProps> = ({
 
         <div className={styles.list}>
           {accounts.length === 0 && (
-            <p className={styles.empty}>アカウントがありません</p>
+            <p className={styles.empty}>{t("accounts:manager.empty")}</p>
           )}
           {accounts.map((account) => {
             const isDefault =
@@ -87,7 +89,7 @@ export const AccountManager: React.FC<AccountManagerProps> = ({
                       className={styles.editLabel}
                       htmlFor="account-name-edit-input"
                     >
-                      アカウント名
+                      {t("accounts:manager.nameLabel")}
                     </label>
                     <input
                       id="account-name-edit-input"
@@ -103,7 +105,9 @@ export const AccountManager: React.FC<AccountManagerProps> = ({
                           className={`${styles.colorSwatch}${account.color === color ? ` ${styles.colorSwatchActive}` : ""}`}
                           style={{ backgroundColor: color }}
                           onClick={() => onUpdateAccount(account.id, { color })}
-                          aria-label={`色を ${color} に変更`}
+                          aria-label={t("accounts:manager.changeColor", {
+                            color,
+                          })}
                         />
                       ))}
                     </div>
@@ -113,14 +117,14 @@ export const AccountManager: React.FC<AccountManagerProps> = ({
                         className={styles.cancelEditBtn}
                         onClick={cancelEditing}
                       >
-                        キャンセル
+                        {t("accounts:manager.cancel")}
                       </button>
                       <button
                         type="button"
                         className={styles.saveEditBtn}
                         onClick={() => saveEditing(account.id)}
                       >
-                        保存
+                        {t("accounts:manager.save")}
                       </button>
                     </div>
                   </div>
@@ -130,55 +134,71 @@ export const AccountManager: React.FC<AccountManagerProps> = ({
 
             return (
               <div key={account.id} className={styles.item}>
-                <span
-                  className={styles.dot}
-                  style={{ backgroundColor: account.color }}
-                />
-                <span className={styles.label}>{account.label}</span>
-                <button
-                  className={styles.editBtn}
-                  onClick={() => startEditing(account)}
-                  aria-label={`${account.label} を編集`}
-                >
-                  編集
-                </button>
-                <button
-                  className={styles.editBtn}
-                  onClick={() => onReauthAccount(account.id)}
-                  aria-label={`${account.label} を再認証`}
-                >
-                  再認証
-                </button>
-                <button
-                  className={`${styles.defaultBtn}${isDefault ? ` ${styles.defaultBtnActive}` : ""}`}
-                  onClick={() => onSetDefault(account.id)}
-                  title="ツイート時のデフォルトアカウントに設定"
-                  aria-label={`${account.label} をデフォルトに設定`}
-                >
-                  {isDefault ? (
-                    <StarIcon width={16} height={16} data-testid="icon-star" />
-                  ) : (
-                    <StarOutlineIcon
-                      width={16}
-                      height={16}
-                      data-testid="icon-star-outline"
-                    />
-                  )}
-                </button>
-                <button
-                  className={styles.removeBtn}
-                  onClick={() => onRemoveAccount(account.id)}
-                  aria-label={`${account.label} を削除`}
-                >
-                  削除
-                </button>
+                <div className={styles.summary}>
+                  <span
+                    className={styles.dot}
+                    style={{ backgroundColor: account.color }}
+                  />
+                  <span className={styles.label}>{account.label}</span>
+                  <button
+                    className={`${styles.defaultBtn}${isDefault ? ` ${styles.defaultBtnActive}` : ""}`}
+                    onClick={() => onSetDefault(account.id)}
+                    title={t("accounts:manager.setDefaultTitle")}
+                    aria-label={t("accounts:manager.setDefault", {
+                      label: account.label,
+                    })}
+                  >
+                    {isDefault ? (
+                      <StarIcon
+                        width={16}
+                        height={16}
+                        data-testid="icon-star"
+                      />
+                    ) : (
+                      <StarOutlineIcon
+                        width={16}
+                        height={16}
+                        data-testid="icon-star-outline"
+                      />
+                    )}
+                  </button>
+                </div>
+                <div className={styles.actions}>
+                  <button
+                    className={styles.editBtn}
+                    onClick={() => startEditing(account)}
+                    aria-label={t("accounts:manager.editAria", {
+                      label: account.label,
+                    })}
+                  >
+                    {t("accounts:manager.edit")}
+                  </button>
+                  <button
+                    className={styles.editBtn}
+                    onClick={() => onReauthAccount(account.id)}
+                    aria-label={t("accounts:manager.reauthAria", {
+                      label: account.label,
+                    })}
+                  >
+                    {t("accounts:manager.reauth")}
+                  </button>
+                  <button
+                    className={styles.removeBtn}
+                    onClick={() => onRemoveAccount(account.id)}
+                    aria-label={t("accounts:manager.removeAria", {
+                      label: account.label,
+                    })}
+                  >
+                    {t("accounts:manager.remove")}
+                  </button>
+                </div>
               </div>
             );
           })}
         </div>
 
         <button className={styles.addBtn} onClick={onAddAccount}>
-          + アカウントを追加
+          {t("accounts:manager.add")}
         </button>
       </div>
     </div>

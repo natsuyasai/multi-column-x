@@ -40,25 +40,28 @@ digraph flow {
 
 ## 各フェーズと使用スキル
 
-| フェーズ                      | 内容                                                                                                                                               | 使用スキル                                                                                  |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| 1. 要求明確化                 | 要求の曖昧さ・不足を質問で潰し、合意した要求を確定する                                                                                             | `clarify-requirements`                                                                      |
-| 1.5 Gherkin仕様定義           | 確定要求を Gherkin 記法（`docs/specs/<機能名>.feature`）で仕様化し、シナリオごとに `@unit` / `@integration` / `@manual` を付けてユーザー承認を得る | `gherkin-spec`                                                                              |
-| 2. 実装プラン策定             | 確定要求を元にプランを設計。複数案があれば選択を確認。別セッションに引き継げるよう一時ドキュメント化                                               | `implementation-planning`                                                                   |
-| 3. 実装                       | 作業ブランチを切り、実装はサブエージェントに委譲。メインはレビュー・全体管理。t-wada推奨TDDで進め、作業毎にコミット                                | `subagent-tdd-implementation`（内部で `tdd` / `storybook-dev` / `component-create` を利用） |
-| 4. プロパティベーステスト     | 仕様が明確かつ対応コードから実装可能ならfast-checkで作成                                                                                           | `property-based-testing`                                                                    |
-| 5. 完了処理                   | フォーマッタ適用・Lint・全テスト実行・ビルド確認                                                                                                   | `check-creation`                                                                            |
-| 6. 手動テスト項目出力（必須） | `@manual` シナリオと自動チェックで検出できない手動QA観点を `integration-test.md` に出力する                                                        | `integration-test-viewpoints`                                                               |
+| フェーズ                      | 内容                                                                                                                                                       | 使用スキル                                                                                  |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 1. 要求明確化                 | 要求の曖昧さ・不足を質問で潰し、合意した要求を確定する                                                                                                     | `clarify-requirements`                                                                      |
+| 1.5 Gherkin仕様定義           | 確定要求を Gherkin 記法（`docs/specs/<機能名>.feature`）で仕様化し、シナリオごとに `@unit` / `@integration` / `@manual` を付けてユーザー承認を得る         | `gherkin-spec`                                                                              |
+| 2. 実装プラン策定             | 確定要求を元にプランを設計。複数案があれば選択を確認。別セッションに引き継げるよう一時ドキュメント化                                                       | `implementation-planning`                                                                   |
+| 3. 実装                       | 作業ブランチを切り、実装はサブエージェントに委譲。メインはレビュー・全体管理。t-wada推奨TDDで進め（Gherkin由来のテストは実装後作成も可）、作業毎にコミット | `subagent-tdd-implementation`（内部で `tdd` / `storybook-dev` / `component-create` を利用） |
+| 4. プロパティベーステスト     | 仕様が明確かつ対応コードから実装可能なら作成（TS=fast-check / Rust=proptest / Kotlin=kotest-property）                                                     | `property-based-testing`                                                                    |
+| 5. 完了処理                   | フォーマッタ適用・Lint・全テスト実行・ビルド確認                                                                                                           | `check-creation`                                                                            |
+| 6. 手動テスト項目出力（必須） | `@manual` シナリオと自動チェックで検出できない手動QA観点を `integration-test.md` に出力する                                                                | `integration-test-viewpoints`                                                               |
 
 ## Gherkin仕様駆動ルール（必須）
 
 - **機能追加・挙動変更・バグ修正では、必ずフェーズ1.5で Gherkin 仕様を定義し、ユーザー承認を得てから進む。**（挙動不変のリファクタ・docs・CI設定のみの変更は対象外）
 - 承認済み `.feature` のシナリオから、**単体テスト（`@unit`）と結合テスト（`@integration`）を作成する**（フェーズ3）。テスト名はシナリオ名を日本語で用い、`.feature` への参照はテスト側に書かない。
+- **Gherkinから導出するテストは、TDD（Red先行）に従わず、実装後に作成してもよい。** どちらで進めるかはフェーズ2のプランに明記する。実装後作成の場合も、シナリオごとのテスト作成とコミット前のミューテーション確認は必須（詳細は `tdd` スキル「進め方の選択」）。Gherkin対象外の変更・シナリオに無い追加テストは従来どおりTDD。
 - **自動化できないシナリオ（`@manual`）は手動テスト項目として必ず出力する**（フェーズ6）。
 - 仕様が途中で変わったら、実装に進む前に `.feature` を更新して再承認を得る。
 
 ## 横断ルール（全フェーズ共通）
 
+- **ブランチ運用**: 最新化した `develop` から作業ブランチを切り、PR は **`develop` 宛て**に作成する（`main` 宛てにしない。`main` へは `version-release` でのみ反映する）。`superpowers:finishing-a-development-branch` や既定の PR 作成手順は `main` を前提にしがちなので、base を必ず `develop` に指定する。
+- **PR 本文**: `.github/pull_request_template.md` に従い、ユーザー向けの変更点を `## リリースノート` に箇条書きする（リリースノートはこのセクションから自動生成され、カテゴリは PR タイトル接頭辞 `feat:` / `fix:` / その他で決まる）。内部的な変更のみの PR はセクションを空にする。
 - **同様のミスの指摘が複数回発生したら、必ず `CLAUDE.md` に再発防止ルールを追記する。** → `record-recurring-mistakes`
 - セキュリティに関わる変更（WebView/IPC/inject/capabilities/外部入力）では `security-review` を併用する。
 - **各フェーズの手順は途中で打ち切らず、定義された順番通り最後まで実行する。** → `skill-order-discipline`
@@ -67,6 +70,8 @@ digraph flow {
 
 - **desktop / mobile**: 同名コマンドでも `#[cfg(desktop)]` / `#[cfg(mobile)]` で実装が異なる。両方確認する。
 - **inject スクリプト**: `src-tauri/src/inject/_src/` を変更したら `npm run build:inject`。ビルド済み `.js` は編集禁止。inject の開発手順は `inject-script-dev` スキルに従う。
+- **Tauri コマンドの追加・削除**: `src-tauri/build.rs` の `AppManifest` と capability（`default.json` / `column-webview.json`）の更新が必須（`acl_contract.rs` の契約テストで検出される）。
+- **領域別の設計ノート**: 変更対象に対応する `docs/development/*-notes.md`（CLAUDE.md「アーキテクチャ上の重要な制約」が参照先を示す）を着手前に読む。
 - **serde 命名**: JS側 camelCase には `#[serde(rename)]` が必須。
 - **Android**: `MainActivity.kt` のメソッド変更時は ProGuard keep ルールを同期（リリースビルドで動作確認）。
 
@@ -75,7 +80,7 @@ digraph flow {
 - 各フェーズの完了判定とフェーズ間のゲート管理
 - フェーズ1.5での Gherkin 仕様の承認取得と、シナリオ↔テスト/手動項目の漏れチェック
 - フェーズ2でのプラン確定（複数案はユーザーに選択を確認）
-- フェーズ3では**実装そのものをサブエージェントに委譲**し、自身はレビューと進行管理に徹する
+- フェーズ3では**実装そのものをサブエージェント（知的作業は `model: sonnet`、機械的な作業は `model: haiku`）に委譲**し、自身はレビュー・進行管理・コミット・品質チェック実行・ドキュメント整備に徹する
 - 横断ルールの監視（同じ指摘の再発をCLAUDE.mdに反映）
 
 ## 禁止事項
@@ -84,8 +89,9 @@ digraph flow {
 - Gherkin 仕様が未承認のまま（対象外の変更を除き）実装プランや実装に進むこと
 - `@unit` / `@integration` シナリオにテストがない、または `@manual` シナリオが手動テスト項目に出力されていない状態で「完了」と報告すること
 - プラン未確定のまま実装に着手すること
-- 作業ブランチを切らずに（mainで）実装を進めること
+- 作業ブランチを切らずに（develop / main で）実装を進めること
+- PR を `main` 宛てに作成すること（`version-release` を除く）
 - メインエージェントが自分で実装を書き進めてしまうこと（委譲が原則）
-- TDDのRed-Green-Refactorを飛ばすこと
+- TDDのRed-Green-Refactorを飛ばすこと（ただしGherkinから導出するテストを「実装後作成」で進める場合を除く）
 - 完了処理（format/lint/test/build）を省略して「完了」と報告すること
 - フェーズ6（手動テスト項目出力）を省略すること

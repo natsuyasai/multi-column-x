@@ -5,6 +5,7 @@ import {
   WEBVIEW_LABELS,
   WEBVIEW_SCRIPTS,
 } from "../constants/ipc";
+import { useAppStore } from "../store/useAppStore";
 
 interface UseAutoReloadOptions {
   columnId: string;
@@ -24,6 +25,8 @@ export function useAutoReload({
 }: UseAutoReloadOptions): UseAutoReloadResult {
   const [remaining, setRemaining] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // 残り秒数の正（setInterval のコールバックから読む）。state は表示用。
+  const remainingRef = useRef<number | null>(null);
   const intervalSecRef = useRef(intervalSec);
   intervalSecRef.current = intervalSec;
 
@@ -31,19 +34,25 @@ export function useAutoReload({
     if (timerRef.current !== null) {
       clearInterval(timerRef.current);
     }
-    setRemaining(intervalSecRef.current);
+    remainingRef.current = intervalSecRef.current;
+    setRemaining(remainingRef.current);
     timerRef.current = setInterval(() => {
-      setRemaining((prev) => {
-        if (prev === null) return null;
-        if (prev <= 1) {
+      const prev = remainingRef.current;
+      if (prev === null) return;
+      if (prev <= 1) {
+        // バックアップ復元中は WebView の破棄・再生成と競合するため更新しない（カウントは続ける）。
+        // 状態更新関数の外で呼ぶ（StrictMode の開発ビルドでは更新関数が 2 回実行されるため）
+        if (!useAppStore.getState().restoreInProgress) {
           invoke(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
             label: WEBVIEW_LABELS.column(columnId),
             script: WEBVIEW_SCRIPTS.TRIGGER_RELOAD,
           }).catch(() => {});
-          return intervalSecRef.current;
         }
-        return prev - 1;
-      });
+        remainingRef.current = intervalSecRef.current;
+      } else {
+        remainingRef.current = prev - 1;
+      }
+      setRemaining(remainingRef.current);
     }, 1000);
   }, [columnId]);
 
@@ -53,6 +62,7 @@ export function useAutoReload({
       timerRef.current = null;
     }
     if (!enabled || intervalSec <= 0) {
+      remainingRef.current = null;
       setRemaining(null);
       return;
     }

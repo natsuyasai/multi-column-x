@@ -1,21 +1,18 @@
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
+import i18n from "@/i18n";
 import { IPC_COMMANDS } from "../constants/ipc";
 import { logError } from "../lib/log";
 import type {
   Account,
   ApiRateLimitBucket,
+  AppSettings,
   Column,
   ColumnPreset,
   GlobalSettings,
   LoadSettingsResult,
 } from "../types";
 import { DEFAULT_GLOBAL_SETTINGS } from "../types";
-
-const SETTINGS_LOAD_FAILED_WITH_BACKUP_MESSAGE = (backupPath: string) =>
-  `設定ファイルを読み込めなかったため、初期設定で起動しました。元の設定は次の場所にバックアップしました: ${backupPath}`;
-const SETTINGS_LOAD_FAILED_WITHOUT_BACKUP_MESSAGE =
-  "設定ファイルを読み込めなかったため、初期設定で起動しました。元の設定のバックアップにも失敗しました。";
 
 export function migrateColumn(
   col: Partial<Column> &
@@ -47,6 +44,15 @@ interface AppStore {
   columns: Column[];
   globalSettings: GlobalSettings;
   isLoaded: boolean;
+  settingsSaveBlocked: boolean;
+  /** バックアップ復元の実行中。true の間は自動保存を発行しない */
+  restoreInProgress: boolean;
+  beginRestore: () => void;
+  finishRestore: () => void;
+  /** 復元結果をメモリへ反映する（保存は発行しない。ディスクは apply_restore が更新済み）。accounts は置き換えない */
+  applyRestoredSettings: (settings: AppSettings) => void;
+  /** これまでに要求された保存がすべて完了するまで待つ */
+  flushPendingSaves: () => Promise<void>;
   settingsLoadNotice: string | null;
   dismissSettingsLoadNotice: () => void;
   topBarExpanded: boolean;
@@ -93,6 +99,21 @@ export const useAppStore = create<AppStore>((set, get) => ({
   columns: [],
   globalSettings: DEFAULT_GLOBAL_SETTINGS,
   isLoaded: false,
+  settingsSaveBlocked: false,
+  restoreInProgress: false,
+  beginRestore: () => set({ restoreInProgress: true }),
+  finishRestore: () => set({ restoreInProgress: false }),
+  applyRestoredSettings: (settings) =>
+    set({
+      columns: settings.columns
+        .map(migrateColumn)
+        .sort((a, b) => a.order - b.order),
+      globalSettings: {
+        ...DEFAULT_GLOBAL_SETTINGS,
+        ...settings.globalSettings,
+      },
+    }),
+  flushPendingSaves: () => saveChain,
   settingsLoadNotice: null,
   dismissSettingsLoadNotice: () => set({ settingsLoadNotice: null }),
   topBarExpanded: false,
@@ -136,21 +157,31 @@ export const useAppStore = create<AppStore>((set, get) => ({
           ...settings.globalSettings,
         },
         isLoaded: true,
+        settingsSaveBlocked: false,
         settingsLoadNotice: loadFailed
           ? backupPath
-            ? SETTINGS_LOAD_FAILED_WITH_BACKUP_MESSAGE(backupPath)
-            : SETTINGS_LOAD_FAILED_WITHOUT_BACKUP_MESSAGE
+            ? i18n.t("messages:settings.loadFailed.withBackup", { backupPath })
+            : i18n.t("messages:settings.loadFailed.withoutBackup")
           : null,
       });
     } catch {
-      set({ isLoaded: true });
+      // 既定状態のまま保存すると保存済みの設定を空で上書きしてしまうため、保存を止める。
+      set({
+        isLoaded: true,
+        settingsSaveBlocked: true,
+        settingsLoadNotice: i18n.t("messages:settings.loadFailed.error"),
+      });
     }
   },
 
   saveSettings: () => {
+    // 復元中は保存を発行しない（要求時点で判定する）。復元前に積まれた保存は
+    // 復元開始前に flushPendingSaves で完了させ、復元後の内容はディスクが既に持っている。
+    if (get().restoreInProgress) return saveChain;
     // 前の保存の完了を待ってから実行する。状態は実行時点(get())で読むため、
     // 連続して呼ばれても最後に書き込まれるのは最新の状態になる。
     saveChain = saveChain.then(async () => {
+      if (get().settingsSaveBlocked) return;
       const { accounts, columns, globalSettings } = get();
       await invoke(IPC_COMMANDS.SAVE_SETTINGS, {
         settings: { accounts, columns, globalSettings },

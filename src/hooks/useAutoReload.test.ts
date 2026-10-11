@@ -1,7 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { renderHook, act } from "@testing-library/react";
+import { StrictMode } from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { WEBVIEW_SCRIPTS } from "@/constants/ipc";
+import { useAppStore } from "@/store/useAppStore";
 import { useAutoReload } from "./useAutoReload";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -70,6 +72,19 @@ describe("useAutoReload", () => {
     expect(script).not.toContain("triggerReload(true)");
   });
 
+  it("自動更新の間隔が経過したとき、StrictModeでも更新は1回だけ実行される", () => {
+    renderHook(
+      () => useAutoReload({ columnId: "col-1", enabled: true, intervalSec: 3 }),
+      { wrapper: StrictMode },
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(mockInvoke).toHaveBeenCalledTimes(1);
+  });
+
   it("resetでカウントがintervalSecに戻る", () => {
     const { result } = renderHook(() =>
       useAutoReload({ columnId: "col-1", enabled: true, intervalSec: 60 }),
@@ -111,5 +126,52 @@ describe("useAutoReload", () => {
       vi.advanceTimersByTime(10000);
     });
     expect(mockInvoke).not.toHaveBeenCalled();
+  });
+});
+
+describe("useAutoReload（バックアップ復元中の停止）", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    useAppStore.setState({ restoreInProgress: false });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    useAppStore.setState({ restoreInProgress: false });
+  });
+
+  it("復元中は更新時刻になっても eval_in_webview を呼ばない", () => {
+    renderHook(() =>
+      useAutoReload({ columnId: "col-1", enabled: true, intervalSec: 3 }),
+    );
+    useAppStore.getState().beginRestore();
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(mockInvoke).not.toHaveBeenCalled();
+  });
+
+  it("同じタイマーのまま復元が終わると、次の更新時刻から再び更新する", () => {
+    renderHook(() =>
+      useAutoReload({ columnId: "col-1", enabled: true, intervalSec: 3 }),
+    );
+    useAppStore.getState().beginRestore();
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    useAppStore.getState().finishRestore();
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(mockInvoke).toHaveBeenCalledTimes(1);
+    expect(mockInvoke).toHaveBeenCalledWith("eval_in_webview", {
+      label: "column-col-1",
+      script: WEBVIEW_SCRIPTS.TRIGGER_RELOAD,
+    });
   });
 });

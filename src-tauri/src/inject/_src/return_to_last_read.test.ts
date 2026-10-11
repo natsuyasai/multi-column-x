@@ -4,6 +4,8 @@
 // ユーザースクロール検知・探索のDOM接続）のみを検証する。
 // jsdom はレイアウトを持たないため getBoundingClientRect は要素ごとにスタブする。
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+// 画面文言の共有ハブ（window.__mcxI18n）を読み込む（日本語固定の既定言語で従来の文言を検証する）
+import "./i18n";
 
 // --- テスト間の汚染防止 ---
 // return_to_last_read.ts は import 時に window への addEventListener と
@@ -39,6 +41,16 @@ window.addEventListener = ((
   addedListeners.push({ type, listener, options });
   return originalAddEventListener(type, listener, options);
 }) as typeof window.addEventListener;
+
+// 写真復元の移植で history.pushState / replaceState をフックするため、
+// テスト間でフックが積み重ならないよう afterEach で元の関数に戻す。
+const originalPushState = history.pushState;
+const originalReplaceState = history.replaceState;
+
+/** かな・カタカナ・漢字を1文字でも含むか（英語表示の検証用） */
+function containsJapanese(text: string): boolean {
+  return /[\u3040-\u30ff\u4e00-\u9fff]/.test(text);
+}
 
 // --- DOM構築ヘルパー ---
 
@@ -192,6 +204,7 @@ function getCloseButton(): HTMLButtonElement | null {
 async function importReturnToLastRead(
   options: {
     enabled?: boolean;
+    scrollPosRestoreEnabled?: boolean;
     triggerReload?: ReturnType<typeof vi.fn> | null;
     mobileSwipeAreaOffset?: number;
   } = {},
@@ -206,6 +219,7 @@ async function importReturnToLastRead(
   ) as MultiColumnXAPI;
   window.__multiColumnXConfig = {
     returnToLastReadEnabled: options.enabled ?? false,
+    scrollPosRestoreEnabled: options.scrollPosRestoreEnabled ?? false,
     mobileSwipeAreaOffset: options.mobileSwipeAreaOffset,
   } as MultiColumnXConfig;
 
@@ -227,6 +241,8 @@ describe("inject/return_to_last_read", () => {
       window.removeEventListener(type, listener, options);
     });
     addedListeners.length = 0;
+    history.pushState = originalPushState;
+    history.replaceState = originalReplaceState;
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
@@ -508,6 +524,25 @@ describe("inject/return_to_last_read", () => {
       expect(closeBtn?.style.justifyContent).toBe("center");
       expect(closeBtn?.style.padding).toBe("0px");
       expect(closeBtn?.style.lineHeight).toBe("1");
+    });
+
+    it("閉じるボタンと戻るボタンはタップしやすい48px以上の大きさで表示される", async () => {
+      const tablist = addTablist();
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["1", "2", "3", "4", "5"]);
+
+      await importReturnToLastRead({ enabled: true });
+      window.__multiColumnX.triggerReload?.();
+
+      setTimeline(section, ["100", "1", "2", "3", "4"]);
+      window.dispatchEvent(new Event("scroll"));
+
+      const closeBtn = getCloseButton();
+      expect(closeBtn?.style.width).toBe("48px");
+      expect(closeBtn?.style.height).toBe("48px");
+      const btn = document.getElementById("mcx-return-to-last-read");
+      expect(btn?.style.minHeight).toBe("48px");
     });
 
     it("戻るボタンが表示されているときはその隣に閉じるボタンが表示される", async () => {
@@ -872,5 +907,818 @@ describe("inject/return_to_last_read", () => {
       await vi.advanceTimersByTimeAsync(3000);
       expect(toast?.style.display).toBe("none");
     }, 15000);
+  });
+
+  describe("先頭スナップショット更新・目視判定の境界条件", () => {
+    it("先頭から離れた位置にいるときは基準候補の読み直しを行わない", async () => {
+      const tablist = addTablist();
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["1", "2", "3", "4", "5"]);
+
+      await importReturnToLastRead({ enabled: true });
+      window.__multiColumnX.triggerReload?.();
+
+      // 新着が入りボタンが表示される
+      setTimeline(section, ["100", "1", "2", "3", "4"]);
+      window.dispatchEvent(new Event("scroll"));
+      expect(isButtonVisible()).toBe(true);
+
+      // 先頭から離れた位置（scrollTop > 1）で、先頭の内容が基準と完全一致する状態に
+      // 戻っても、基準候補の読み直しは行われないため表示状態は変わらない
+      setScrollTop(50);
+      setTimeline(section, ["1", "2", "3", "4", "5"]);
+      window.dispatchEvent(new Event("scroll"));
+
+      expect(isButtonVisible()).toBe(true);
+    });
+
+    it("DOM変化による呼び出しでは、戻り先が画面内にあっても目視済みにしない", async () => {
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["11", "12", "13", "14", "15", "16"]);
+
+      await importReturnToLastRead({ enabled: true });
+      window.__multiColumnX.triggerReload?.();
+
+      setTimeline(section, ["101", "11", "12", "13", "14"]);
+      window.dispatchEvent(new Event("scroll"));
+      expect(isButtonVisible()).toBe(true);
+
+      // 直前にユーザー操作があった状態を作り、戻り先（run一致する "11"）が
+      // 画面内にある状況を用意する
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown" }));
+      setScrollTop(200);
+      setTimeline(section, ["101", "11", "12", "13", "14"], { topStep: 200 });
+      const articles = section.querySelectorAll("article");
+      setElementRect(articles[0], { top: -100 }); // 101: 画面外（上）
+      setElementRect(articles[1], { top: 100 }); // 11: 画面内
+      setElementRect(articles[2], { top: 300 }); // 12: 画面内
+
+      // scroll イベントではなく、DOM 変化契機の呼び出し（source="dom"）を
+      // setReturnToLastReadEnabled の再適用で模す
+      window.__multiColumnX.setReturnToLastReadEnabled?.(true);
+
+      // DOM変化による呼び出しでは目視済みにしないため、ボタンは表示されたまま
+      expect(isButtonVisible()).toBe(true);
+    });
+
+    it("ユーザーのスクロールでも、戻り先が画面外なら目視済みにしない", async () => {
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["11", "12", "13", "14", "15", "16"]);
+
+      await importReturnToLastRead({ enabled: true });
+      window.__multiColumnX.triggerReload?.();
+
+      setTimeline(section, ["101", "11", "12", "13", "14"]);
+      window.dispatchEvent(new Event("scroll"));
+      expect(isButtonVisible()).toBe(true);
+
+      // ユーザー操作直後に、run一致する戻り先（"11"）が画面外（上端未満）にある
+      // 状態でスクロールする
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown" }));
+      setScrollTop(200);
+      setTimeline(section, ["101", "11", "12", "13", "14"], { topStep: 200 });
+      const articles = section.querySelectorAll("article");
+      setElementRect(articles[0], { top: -300 }); // 101
+      setElementRect(articles[1], { top: -100 }); // 11: 画面外（上）
+      setElementRect(articles[2], { top: 100 }); // 12: 画面内
+
+      window.dispatchEvent(new Event("scroll"));
+
+      // "11" が画面外なので目視済みにならず、ボタンは表示されたまま
+      expect(isButtonVisible()).toBe(true);
+    });
+
+    it("探索中は先頭の基準候補を読み直さない", async () => {
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["11", "12", "13", "14", "15"]);
+
+      await importReturnToLastRead({ enabled: true });
+      window.__multiColumnX.triggerReload?.();
+
+      // 新着（101）が入り、先頭スナップショットは [101,11,12,13,14] になる
+      setTimeline(section, ["101", "11", "12", "13", "14"]);
+      window.dispatchEvent(new Event("scroll"));
+      expect(isButtonVisible()).toBe(true);
+
+      // 探索対象（11〜15）がどこにもヒットしないタイムラインに変え、
+      // スクロール可能範囲を現在位置（300）でクランプする（＝仮想リスト終端）
+      setTimeline(section, ["901"]);
+      setClampedScrollingElement(300, 300);
+
+      vi.useFakeTimers();
+      const btn = getButton();
+      btn?.click();
+      await vi.advanceTimersByTimeAsync(0);
+
+      // 探索中（scrollTopは探索開始により0）に scroll イベントが発生しても、
+      // 探索中は先頭スナップショットの読み直しを行わないはず。
+      // ここで読み直しが起きると、[901] のみの1件が誤って先頭スナップショットとして
+      // 記録されてしまう。
+      window.dispatchEvent(new Event("scroll"));
+
+      // 探索を終わらせる（見つからず notFound で終了する）
+      await vi.advanceTimersByTimeAsync(3300);
+      expect(isButtonVisible()).toBe(false);
+
+      // 探索終了後に更新すると、探索中に読み直されていなければ元の
+      // 先頭スナップショット [101,11,12,13,14] が基準として記録される
+      window.__multiColumnX.triggerReload?.();
+      setScrollTop(0);
+      setTimeline(section, ["101", "11", "12", "13", "14"]);
+      window.dispatchEvent(new Event("scroll"));
+
+      // 新しい基準と完全一致する並びのため新着扱いされない
+      // （探索中に [901] のみへ読み直されていた場合、101 が基準に無いため
+      // 新着扱いされてボタンが表示されてしまう）
+      expect(isButtonVisible()).toBe(false);
+    }, 15000);
+  });
+
+  describe("写真閲覧後の位置復元", () => {
+    // 写真ページへの遷移で jsdom が実ナビゲーションを試みないよう、クリックの既定動作を止める。
+    function preventLinkNavigation(): void {
+      document.addEventListener("click", (e) => e.preventDefault());
+    }
+
+    function addPhotoLink(section: HTMLElement, id: string): HTMLAnchorElement {
+      const article = Array.from(section.querySelectorAll("article")).find(
+        (a) => a.querySelector(`a[href="/u/status/${id}"]`),
+      ) as HTMLElement;
+      const link = document.createElement("a");
+      link.setAttribute("href", `/u/status/${id}/photo/1`);
+      article.appendChild(link);
+      return link;
+    }
+
+    /** scrollTop 書き込みのたびに onSet を呼ぶスクロール要素スタブ。 */
+    function setHookedScrollingElement(
+      initial: number,
+      onSet: (value: number) => void,
+    ): { readonly scrollTop: number } {
+      let top = initial;
+      const stub = {
+        get scrollTop(): number {
+          return top;
+        },
+        set scrollTop(value: number) {
+          top = value;
+          onSet(value);
+        },
+        scrollHeight: 100000,
+      };
+      Object.defineProperty(document, "scrollingElement", {
+        value: stub,
+        configurable: true,
+      });
+      return stub;
+    }
+
+    /** 写真リンクをクリックして写真ページへ遷移する（その後にタイムラインの状態を整える）。 */
+    function openPhoto(link: HTMLAnchorElement): void {
+      link.click();
+      history.pushState(null, "", "/u/status/5/photo/1");
+    }
+
+    /** ホームへ戻る（フェイクタイマーは戻る直前に有効化）。 */
+    function returnHome(): void {
+      vi.useFakeTimers();
+      history.pushState(null, "", "/home");
+    }
+
+    it("ホームで写真を開いて戻ると、開いたツイートが画面上端に合わされる", async () => {
+      preventLinkNavigation();
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["3", "4", "5"]);
+      const link = addPhotoLink(section, "5");
+
+      await importReturnToLastRead({
+        enabled: true,
+        scrollPosRestoreEnabled: true,
+      });
+      openPhoto(link);
+
+      // 開いたツイート(5)は、スクロールして読み込まれる範囲より下にある
+      const scroller = setHookedScrollingElement(400, (value) => {
+        if (value >= 500) setTimeline(section, ["4", "5", "6"]);
+        else setTimeline(section, ["1", "2", "3"]);
+      });
+      setTimeline(section, ["1", "2", "3"]);
+
+      returnHome();
+      await vi.advanceTimersByTimeAsync(1000);
+
+      // 5 は 2 番目(top=100)、ヘッダー下端(53)に合わせるため +47
+      expect(scroller.scrollTop).toBe(window.innerHeight + 47);
+      // ボタンは出さず、見つからない通知も出ない
+      expect(isButtonVisible()).toBe(false);
+      expect(getToast()).toBeNull();
+    }, 15000);
+
+    it("戻った直後にタイムラインが未表示のときは、表示されるまで待ってから復元する", async () => {
+      preventLinkNavigation();
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["3", "4", "5"]);
+      const link = addPhotoLink(section, "5");
+
+      await importReturnToLastRead({ scrollPosRestoreEnabled: true });
+      openPhoto(link);
+
+      const scroller = setHookedScrollingElement(400, () => {});
+      // 戻った直後はツイートが1件も表示されていない
+      section.innerHTML = "";
+
+      returnHome();
+      await vi.advanceTimersByTimeAsync(1500);
+      // 表示されるまでは補正しない（探索の開始＝scrollTop 0 への移動も起きない）
+      expect(scroller.scrollTop).toBe(400);
+
+      // ツイートが表示される（5 は先頭付近にあり、探索開始後すぐ見つかる）
+      setTimeline(section, ["5", "6", "7"]);
+      await vi.advanceTimersByTimeAsync(1000);
+
+      // 5 は先頭(top=0)。ヘッダー下端(53)に合わせるため 0 + (0 - 53) = -53
+      expect(scroller.scrollTop).toBe(-53);
+    }, 15000);
+
+    it("復元中に戻り先が見つからないときは通知を表示する", async () => {
+      preventLinkNavigation();
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["3", "4", "5"]);
+      const link = addPhotoLink(section, "5");
+
+      await importReturnToLastRead({ scrollPosRestoreEnabled: true });
+      openPhoto(link);
+
+      // 開いたツイート(5)はどこにも現れず、これ以上スクロールできない
+      setTimeline(section, ["901"]);
+      setClampedScrollingElement(300, 300);
+
+      returnHome();
+      await vi.advanceTimersByTimeAsync(3500);
+
+      const toast = getToast();
+      expect(toast).not.toBeNull();
+      expect(toast?.textContent).toBe("前回の位置が見つかりませんでした");
+      expect(toast?.style.display).not.toBe("none");
+      // 元の位置に戻っている
+      expect(document.scrollingElement?.scrollTop).toBe(300);
+    }, 15000);
+
+    it("復元中にユーザーがスクロール操作をすると探索を中断する", async () => {
+      preventLinkNavigation();
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["3", "4", "5"]);
+      const link = addPhotoLink(section, "5");
+
+      await importReturnToLastRead({ scrollPosRestoreEnabled: true });
+      openPhoto(link);
+
+      // 開いたツイートが見つからないまま探索が長く続く状況
+      setTimeline(section, ["901"]);
+      setScrollTop(0);
+
+      returnHome();
+      await vi.advanceTimersByTimeAsync(400);
+      expect(document.scrollingElement?.scrollTop).toBeGreaterThan(0);
+
+      // ユーザーがスクロール操作
+      document.body.dispatchEvent(new Event("wheel", { bubbles: true }));
+      await vi.advanceTimersByTimeAsync(200);
+      const stoppedAt = document.scrollingElement?.scrollTop;
+
+      // 以降は自動でスクロールされず、通知も出ない
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(document.scrollingElement?.scrollTop).toBe(stoppedAt);
+      expect(getToast()).toBeNull();
+    }, 15000);
+
+    it("写真閲覧後のスクロール位置を復元する設定がOFFのときは戻っても位置を補正しない", async () => {
+      preventLinkNavigation();
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["3", "4", "5"]);
+      const link = addPhotoLink(section, "5");
+
+      await importReturnToLastRead({ scrollPosRestoreEnabled: false });
+      openPhoto(link);
+
+      const writes: number[] = [];
+      const scroller = setHookedScrollingElement(400, (v) => writes.push(v));
+      setTimeline(section, ["901"]);
+
+      returnHome();
+      await vi.advanceTimersByTimeAsync(6000);
+
+      expect(writes).toEqual([]);
+      expect(scroller.scrollTop).toBe(400);
+      expect(getToast()).toBeNull();
+    }, 15000);
+
+    it("復元探索は前回の続きへ戻るボタンの表示状態に影響しない", async () => {
+      preventLinkNavigation();
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["11", "12", "13", "14", "15"]);
+
+      await importReturnToLastRead({
+        enabled: true,
+        scrollPosRestoreEnabled: true,
+      });
+      window.__multiColumnX.triggerReload?.();
+
+      // 新着が入り、戻るボタンが表示されている
+      setTimeline(section, ["101", "11", "12", "13", "14"]);
+      window.dispatchEvent(new Event("scroll"));
+      expect(isButtonVisible()).toBe(true);
+      const link = addPhotoLink(section, "12");
+
+      // 開いたツイートは見つからない（探索に時間がかかる）状況にする
+      link.click();
+      history.pushState(null, "", "/u/status/12/photo/1");
+      setTimeline(section, ["901"]);
+      setClampedScrollingElement(300, 300);
+      returnHome();
+
+      // 復元の最中も「探しています…」にならず、ボタンは表示されたまま
+      await vi.advanceTimersByTimeAsync(300);
+      expect(isButtonVisible()).toBe(true);
+      expect(getButton()?.textContent).toBe("↓ 前回の続きへ");
+      expect(getButton()?.disabled).toBe(false);
+
+      // 復元が終わっても表示状態は変わらない
+      await vi.advanceTimersByTimeAsync(3500);
+      expect(getToast()?.textContent).toBe("前回の位置が見つかりませんでした");
+      expect(isButtonVisible()).toBe(true);
+      expect(getButton()?.textContent).toBe("↓ 前回の続きへ");
+    }, 15000);
+
+    it("待機中にユーザーがスクロール操作をするとタイムライン表示後も位置を補正しない", async () => {
+      preventLinkNavigation();
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["3", "4", "5"]);
+      const link = addPhotoLink(section, "5");
+
+      await importReturnToLastRead({ scrollPosRestoreEnabled: true });
+      openPhoto(link);
+
+      const writes: number[] = [];
+      const scroller = setHookedScrollingElement(400, (v) => writes.push(v));
+      section.innerHTML = "";
+
+      returnHome();
+      await vi.advanceTimersByTimeAsync(300);
+      document.body.dispatchEvent(new Event("wheel", { bubbles: true }));
+      await vi.advanceTimersByTimeAsync(200);
+
+      // ユーザー操作の後でタイムラインが表示される
+      setTimeline(section, ["5", "6", "7"]);
+      await vi.advanceTimersByTimeAsync(6000);
+
+      expect(writes).toEqual([]);
+      expect(scroller.scrollTop).toBe(400);
+      expect(getToast()).toBeNull();
+    }, 15000);
+
+    it("待機中にホーム以外へ遷移したら復元しない", async () => {
+      preventLinkNavigation();
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["3", "4", "5"]);
+      const link = addPhotoLink(section, "5");
+
+      await importReturnToLastRead({ scrollPosRestoreEnabled: true });
+      openPhoto(link);
+
+      const writes: number[] = [];
+      const scroller = setHookedScrollingElement(400, (v) => writes.push(v));
+      section.innerHTML = "";
+
+      returnHome();
+      await vi.advanceTimersByTimeAsync(300);
+      // ホーム以外（通知ページ）へ移動してから、ホーム相当の一覧が表示される
+      history.pushState(null, "", "/notifications");
+      setTimeline(section, ["5", "6", "7"]);
+      await vi.advanceTimersByTimeAsync(6000);
+
+      expect(writes).toEqual([]);
+      expect(scroller.scrollTop).toBe(400);
+      expect(getToast()).toBeNull();
+    }, 15000);
+
+    it("5秒経ってもタイムラインが表示されなければ探索せず通知も出さない", async () => {
+      preventLinkNavigation();
+      const tablist = addTablist(53);
+      addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["3", "4", "5"]);
+      const link = addPhotoLink(section, "5");
+
+      await importReturnToLastRead({ scrollPosRestoreEnabled: true });
+      openPhoto(link);
+
+      const writes: number[] = [];
+      const scroller = setHookedScrollingElement(400, (v) => writes.push(v));
+      section.innerHTML = "";
+
+      returnHome();
+      await vi.advanceTimersByTimeAsync(5500);
+
+      // 上限を過ぎてからタイムラインが表示されても補正しない
+      setTimeline(section, ["5", "6", "7"]);
+      await vi.advanceTimersByTimeAsync(3000);
+
+      expect(writes).toEqual([]);
+      expect(scroller.scrollTop).toBe(400);
+      expect(getToast()).toBeNull();
+    }, 15000);
+  });
+
+  describe("直接の更新操作での基準の記録", () => {
+    /** section の末尾に、投稿を含まないセル内の「新着ピル」ボタンを追加する。 */
+    function addPill(section: HTMLElement): HTMLButtonElement {
+      const cell = document.createElement("div");
+      cell.dataset.testid = "cellInnerDiv";
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "新しいポストを表示";
+      cell.appendChild(button);
+      section.appendChild(cell);
+      return button;
+    }
+
+    function touch(
+      clientX: number,
+      clientY: number,
+    ): { clientX: number; clientY: number } {
+      return { clientX, clientY };
+    }
+
+    function dispatchTouch(
+      type: "touchstart" | "touchend",
+      touches: { clientX: number; clientY: number }[],
+      changedTouches: { clientX: number; clientY: number }[] = touches,
+    ): void {
+      const event = new Event(type, { bubbles: true });
+      Object.defineProperty(event, "touches", { value: touches });
+      Object.defineProperty(event, "changedTouches", { value: changedTouches });
+      window.dispatchEvent(event);
+    }
+
+    /** 先頭 A..E(1..5) を表示した状態で、おすすめタブ選択中のホームカラムを用意する。 */
+    async function setupHome(options: { enabled?: boolean } = {}): Promise<{
+      tablist: HTMLElement;
+      tab: HTMLElement;
+      section: HTMLElement;
+    }> {
+      const tablist = addTablist();
+      const tab = addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["1", "2", "3", "4", "5"]);
+      await importReturnToLastRead({ enabled: options.enabled ?? true });
+      return { tablist, tab, section };
+    }
+
+    /** 更新で先頭が N1,N2,A,B になった状態を作り、scroll で反映する。 */
+    // タッチ操作は直近のユーザー入力として扱われ、基準が画面内に見えると消化されて
+    // しまうため、基準側の投稿が画面外になるよう topStep を大きくできるようにする。
+    function showNewPosts(section: HTMLElement, topStep = 100): void {
+      setTimeline(section, ["101", "102", "1", "2"], { topStep });
+      window.dispatchEvent(new Event("scroll"));
+    }
+
+    it("新着ピルを直接クリックして更新すると更新前の先頭が基準として記録される", async () => {
+      const { section } = await setupHome();
+      const pill = addPill(section);
+
+      pill.click();
+      showNewPosts(section);
+
+      expect(isButtonVisible()).toBe(true);
+    });
+
+    it("新着ピルをクリックして新しい投稿が入ると戻るボタンが表示される", async () => {
+      const { section } = await setupHome();
+      const pill = addPill(section);
+
+      pill.click();
+      showNewPosts(section);
+
+      expect(getButton()?.textContent).toBe("↓ 前回の続きへ");
+      expect(getButton()?.getAttribute("aria-label")).toBe("前回の続きへ戻る");
+      expect(getContainer()?.style.display).not.toBe("none");
+    });
+
+    it("表示言語を英語にするとボタンの文言とaria-labelが英語になり日本語を含まない", async () => {
+      const { section } = await setupHome();
+      const pill = addPill(section);
+      pill.click();
+      showNewPosts(section);
+      try {
+        window.__mcxI18n?.setLang("en");
+
+        const texts = [
+          getButton()?.textContent ?? "",
+          getButton()?.getAttribute("aria-label") ?? "",
+          getCloseButton()?.getAttribute("aria-label") ?? "",
+        ];
+        expect(texts).toEqual([
+          "↓ Where you left off",
+          "Back to where you left off",
+          "Close the back-to-where-you-left-off button",
+        ]);
+        expect(texts.some(containsJapanese)).toBe(false);
+      } finally {
+        window.__mcxI18n?.setLang("ja");
+      }
+    });
+
+    it("ボタン表示中に表示言語を切り替えると表示済みのボタンの文言も切り替わる", async () => {
+      const { section } = await setupHome();
+      const pill = addPill(section);
+      pill.click();
+      showNewPosts(section);
+      try {
+        expect(getButton()?.textContent).toBe("↓ 前回の続きへ");
+
+        window.__mcxI18n?.setLang("en");
+        expect(getButton()?.textContent).toBe("↓ Where you left off");
+        expect(getButton()?.getAttribute("aria-label")).toBe(
+          "Back to where you left off",
+        );
+
+        window.__mcxI18n?.setLang("ja");
+        expect(getButton()?.textContent).toBe("↓ 前回の続きへ");
+        expect(getButton()?.getAttribute("aria-label")).toBe(
+          "前回の続きへ戻る",
+        );
+      } finally {
+        window.__mcxI18n?.setLang("ja");
+      }
+    });
+
+    it("選択中のタブを直接クリックして更新すると更新前の先頭が基準として記録される", async () => {
+      const { tab, section } = await setupHome();
+
+      tab.click();
+      showNewPosts(section);
+
+      expect(isButtonVisible()).toBe(true);
+    });
+
+    it("選択されていない別のタブをクリックしても基準は記録されず切り替え前の基準は破棄される", async () => {
+      const { tablist, tab, section } = await setupHome();
+      const other = addTab(tablist, "フォロー中", false);
+
+      tab.click();
+      showNewPosts(section);
+      expect(isButtonVisible()).toBe(true);
+
+      // 未選択タブのクリックは更新ではない（キャプチャ時点ではまだ選択されていない）
+      other.click();
+      selectOnlyTab(tablist, "フォロー中");
+      setTimeline(section, ["201", "202", "203"]);
+      window.dispatchEvent(new Event("scroll"));
+      expect(isButtonVisible()).toBe(false);
+
+      // 切り替え前の基準は破棄されており、基準に無い並びが先頭に来ても表示されない
+      setTimeline(section, ["900", "201", "202", "203"]);
+      window.dispatchEvent(new Event("scroll"));
+      expect(isButtonVisible()).toBe(false);
+    });
+
+    it("先頭でのプルダウンで更新すると更新前の先頭が基準として記録される", async () => {
+      const { section } = await setupHome();
+
+      setScrollTop(0);
+      dispatchTouch("touchstart", [touch(100, 100)]);
+      dispatchTouch("touchend", [], [touch(105, 300)]);
+      showNewPosts(section, 1000);
+
+      expect(isButtonVisible()).toBe(true);
+    });
+
+    it("複数指のタッチでは基準を記録しない", async () => {
+      const { section } = await setupHome();
+
+      dispatchTouch("touchstart", [touch(100, 100), touch(200, 100)]);
+      dispatchTouch("touchend", [], [touch(100, 300)]);
+      showNewPosts(section, 1000);
+
+      expect(isButtonVisible()).toBe(false);
+    });
+
+    it("引き下げ量が足りないタッチでは基準を記録しない", async () => {
+      const { section } = await setupHome();
+
+      dispatchTouch("touchstart", [touch(100, 100)]);
+      dispatchTouch("touchend", [], [touch(100, 110)]);
+      showNewPosts(section, 1000);
+
+      expect(isButtonVisible()).toBe(false);
+    });
+
+    it("先頭でないスクロール位置から始まったタッチでは基準を記録しない", async () => {
+      const { section } = await setupHome();
+
+      setScrollTop(500);
+      dispatchTouch("touchstart", [touch(100, 100)]);
+      setScrollTop(0);
+      dispatchTouch("touchend", [], [touch(100, 300)]);
+      showNewPosts(section, 1000);
+
+      expect(isButtonVisible()).toBe(false);
+    });
+
+    it("更新のショートカットキーで更新すると更新前の先頭が基準として記録される", async () => {
+      const { section } = await setupHome();
+
+      document.body.dispatchEvent(
+        new KeyboardEvent("keydown", { key: ".", bubbles: true }),
+      );
+      showNewPosts(section);
+
+      expect(isButtonVisible()).toBe(true);
+    });
+
+    it("入力欄にフォーカスがある間のショートカットキーは基準を記録しない", async () => {
+      const { section } = await setupHome();
+      const input = document.createElement("input");
+      const textarea = document.createElement("textarea");
+      document.body.append(input, textarea);
+
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", { key: ".", bubbles: true }),
+      );
+      textarea.dispatchEvent(
+        new KeyboardEvent("keydown", { key: ".", bubbles: true }),
+      );
+      showNewPosts(section);
+
+      expect(isButtonVisible()).toBe(false);
+    });
+
+    it("基準を消化していないうちに直接更新しても基準は変わらない", async () => {
+      const { tab, section } = await setupHome();
+
+      tab.click();
+      // 1回目の更新: 先頭が N1,N2,A,B になる
+      showNewPosts(section);
+      expect(isButtonVisible()).toBe(true);
+
+      // 先頭の並びが変わった状態でもう一度直接更新する
+      tab.click();
+      window.dispatchEvent(new Event("scroll"));
+
+      // 基準が最初の A..E のままなら、N1,N2,A,B は引き続き新着扱いになる
+      // （基準が N1,N2,A,B に置き換わっていたら表示されなくなる）
+      expect(isButtonVisible()).toBe(true);
+    });
+
+    it("戻るボタンで基準へ戻った後の直接更新では新しい基準を記録する", async () => {
+      const { tab, section } = await setupHome();
+      // 戻り先は連続2件の一致で見つかる基準 A..E
+      tab.click();
+      setTimeline(section, ["101", "1", "2", "3", "4"]);
+      window.dispatchEvent(new Event("scroll"));
+      expect(isButtonVisible()).toBe(true);
+
+      vi.useFakeTimers();
+      getButton()?.click();
+      await vi.advanceTimersByTimeAsync(500);
+      vi.useRealTimers();
+      expect(isButtonVisible()).toBe(false);
+
+      // 先頭へ戻って新しい並びで更新する
+      setScrollTop(0);
+      setTimeline(section, ["21", "22", "23", "24", "25"]);
+      window.dispatchEvent(new Event("scroll"));
+      tab.click();
+      setTimeline(section, ["900", "21", "22", "23", "24"]);
+      window.dispatchEvent(new Event("scroll"));
+
+      expect(isButtonVisible()).toBe(true);
+    });
+
+    it("本アプリの自動更新が新着ピルや選択中タブを自動でクリックしても基準は1回だけ記録される", async () => {
+      const tablist = addTablist();
+      const tab = addTab(tablist, "おすすめ", true);
+      const section = addSection();
+      setTimeline(section, ["1", "2", "3", "4", "5"]);
+      const triggerReload = vi.fn(() => {
+        // 更新が走り、先頭が差し替わってから合成クリックが発生する状況を模す
+        setTimeline(section, ["101", "102", "1", "2"]);
+        window.dispatchEvent(new Event("scroll"));
+        addPill(section).click();
+        tab.click();
+      });
+      await importReturnToLastRead({ enabled: true, triggerReload });
+
+      window.__multiColumnX.triggerReload?.();
+
+      expect(triggerReload).toHaveBeenCalledTimes(1);
+      // 基準が最初のスナップショット A..E のままなら新着として表示される
+      expect(isButtonVisible()).toBe(true);
+    });
+
+    it("戻るボタンで基準を探している間の直接操作は基準を変えない", async () => {
+      const { tab, section } = await setupHome();
+      tab.click();
+      showNewPosts(section);
+      expect(isButtonVisible()).toBe(true);
+
+      // 閉じて消化済みにする（基準は残るが新しい基準を記録できる状態）
+      getCloseButton()?.click();
+      expect(isButtonVisible()).toBe(false);
+
+      // 探索を開始する（非表示のボタンを直接押す）。基準がどこにも見つからず末尾まで
+      // 探索が続く状況にして、探索中に直接更新し、その後ユーザー操作で中断する。
+      setClampedScrollingElement(300, 300);
+      vi.useFakeTimers();
+      getButton()?.click();
+      await vi.advanceTimersByTimeAsync(0);
+      setTimeline(section, ["901"]);
+      await vi.advanceTimersByTimeAsync(10);
+      expect(getButton()?.textContent).toBe("探しています…");
+      tab.click();
+      await vi.advanceTimersByTimeAsync(10);
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown" }));
+      await vi.advanceTimersByTimeAsync(500);
+      vi.useRealTimers();
+
+      // 探索中の直接更新が基準として記録されていたら、以下の並びは新着として表示される
+      setScrollTop(0);
+      // 直前のキー操作がユーザー入力として扱われるため、基準側が画面内に見えて
+      // 消化されないよう topStep を大きくして画面外に置く。
+      setTimeline(section, ["900", "101", "102", "1", "2"], { topStep: 1000 });
+      window.dispatchEvent(new Event("scroll"));
+
+      expect(isButtonVisible()).toBe(false);
+    }, 15000);
+
+    it("ホーム以外のページで更新操作をしても基準は記録されない", async () => {
+      const { tab, section } = await setupHome();
+
+      history.replaceState(null, "", "/search");
+      tab.click();
+      history.replaceState(null, "", "/home");
+      showNewPosts(section);
+
+      expect(isButtonVisible()).toBe(false);
+    });
+
+    it("更新操作ではない要素をクリックしても基準は記録されない", async () => {
+      const { section } = await setupHome();
+      const postButton = document.createElement("button");
+      postButton.type = "button";
+      section.querySelector("article")?.appendChild(postButton);
+      const plain = document.createElement("div");
+      document.body.appendChild(plain);
+
+      postButton.click();
+      plain.click();
+      showNewPosts(section, 1000);
+
+      expect(isButtonVisible()).toBe(false);
+    });
+
+    it("設定OFFの間に直接更新した後で設定をONにしても古い基準は残らない", async () => {
+      const { tab, section } = await setupHome();
+      window.__multiColumnX.setReturnToLastReadEnabled?.(false);
+
+      tab.click();
+      window.__multiColumnX.setReturnToLastReadEnabled?.(true);
+      showNewPosts(section, 1000);
+
+      expect(isButtonVisible()).toBe(false);
+    });
+
+    it("設定がOFFのときは直接更新しても戻るボタンが表示されない", async () => {
+      const { tab, section } = await setupHome({ enabled: false });
+
+      tab.click();
+      showNewPosts(section);
+
+      expect(isButtonVisible()).toBe(false);
+    });
   });
 });

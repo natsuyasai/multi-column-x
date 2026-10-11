@@ -46,6 +46,12 @@ describe("TS/Rust IPC定数の契約", () => {
     );
   });
 
+  it("WEBVIEW_SCRIPTS.setInjectLanguageはfixtureの多言語ハブのグローバル名を参照している", () => {
+    expect(WEBVIEW_SCRIPTS.setInjectLanguage("ja")).toContain(
+      `window.${fixture.globals.MCX_I18N}`,
+    );
+  });
+
   it("WEBVIEW_SCRIPTS.applyWhitelistはホワイトリスト有効かつ単語ありの場合に設定値を反映する", () => {
     const script = WEBVIEW_SCRIPTS.applyWhitelist(true, ["keep"]);
     expect(script).toContain("whitelistEnabled=true");

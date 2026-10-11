@@ -6,12 +6,15 @@ mod inject;
 mod ipc_constants;
 #[cfg(all(desktop, target_os = "linux"))]
 mod linux_codec_env;
+#[cfg(test)]
+mod log_language_contract;
 mod state;
 mod video;
 
 use state::AppState;
+use tauri::Manager;
 #[cfg(desktop)]
-use tauri::{Manager, PhysicalPosition, PhysicalSize};
+use tauri::{PhysicalPosition, PhysicalSize};
 #[cfg(desktop)]
 use tauri_plugin_store::StoreExt;
 
@@ -69,18 +72,34 @@ fn save_window_bounds(window: &tauri::Window) {
     });
     let value = merge_window_bounds(settings, bounds);
     store.set("appSettings", value);
-    if let Err(e) = store.save() {
+    if let Err(e) =
+        crate::commands::settings_file::save_store_atomically(window.app_handle(), &store)
+    {
         log::error!("failed to save window bounds: {e}");
     }
+}
+
+/// opener プラグインの自動クリックスクリプト（全フレームで target=_blank を IPC に変換する）を有効にするか。
+///
+/// デスクトップでは別オリジン iframe から IPC が ACL 拒否され既定動作だけ潰れるため無効にし、
+/// 新規ウィンドウ要求を `on_new_window` で処理する。mobile は従来どおり有効。
+fn opener_js_links_on_click() -> bool {
+    cfg!(mobile)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(all(desktop, target_os = "linux"))]
     linux_codec_env::ensure_openh264_ld_library_path();
+    #[cfg(all(desktop, target_os = "linux"))]
+    linux_codec_env::configure_gstreamer_env();
 
     let builder = tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
+        .plugin(
+            tauri_plugin_opener::Builder::new()
+                .open_js_links_on_click(opener_js_links_on_click())
+                .build(),
+        )
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
@@ -98,6 +117,23 @@ pub fn run() {
         )
         .manage(AppState::new())
         .setup(|app| {
+            // 設定ファイルの検査・復旧は、プラグインが読み込み失敗を握りつぶす前（ストア生成前）に行う。
+            let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+            let unix_secs = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            let recovery =
+                crate::commands::settings_file::recover_settings_file(&data_dir, unix_secs);
+            app.manage(crate::commands::settings_file::SettingsRecoveryState(
+                std::sync::Mutex::new(Some(recovery)),
+            ));
+            // 自動保存を無効にしたストアを先に登録する（以降の app.store("settings.json") はこれを返す）。
+            // 自動保存が生きているとアトミック書き込みをすり抜けるため必須。
+            tauri_plugin_store::StoreBuilder::new(app, "settings.json")
+                .disable_auto_save()
+                .build()
+                .map_err(|e| e.to_string())?;
             #[cfg(desktop)]
             {
                 use crate::commands::settings::AppSettingsData;
@@ -135,8 +171,6 @@ pub fn run() {
             }
             #[cfg(target_os = "android")]
             crate::android_bridge::store_app_handle(app.handle().clone());
-            #[cfg(not(desktop))]
-            let _ = app;
             Ok(())
         });
 
@@ -205,6 +239,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::settings::load_settings,
             commands::settings::save_settings,
+            commands::backup::export_backup,
+            commands::backup::read_backup,
+            commands::backup::apply_restore,
             commands::webview::create_column_webview,
             commands::webview::get_external_column_data_directory,
             commands::webview::delete_external_column_data,
@@ -229,6 +266,7 @@ pub fn run() {
             commands::account::reauth_account_window,
             commands::account::delete_account_data,
             commands::account::close_window,
+            commands::account::detect_account_user_ids,
             commands::webview::open_compose_window,
             commands::update::install_apk_update,
             commands::media_codec::check_media_codec_support,
@@ -236,6 +274,14 @@ pub fn run() {
             commands::openh264_fetch::download_and_enable_h264,
             #[cfg(desktop)]
             commands::video_download::download_video,
+            commands::extensions::list_extensions,
+            commands::extensions::detect_chrome_extensions,
+            commands::extensions::pick_extension_folder,
+            commands::extensions::add_extension_from_folder,
+            commands::extensions::add_chrome_extension,
+            commands::extensions::set_extension_enabled,
+            commands::extensions::remove_extension,
+            commands::extensions::open_extension_page,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -314,6 +360,51 @@ mod tests {
         assert_eq!(
             merged_from_array["globalSettings"]["windowBounds"],
             sample_bounds()
+        );
+    }
+}
+
+#[cfg(test)]
+mod opener_tests {
+    use super::*;
+
+    #[cfg(desktop)]
+    #[test]
+    fn デスクトップではopenerの自動クリックスクリプトが無効() {
+        assert!(!opener_js_links_on_click());
+    }
+
+    #[cfg(mobile)]
+    #[test]
+    fn モバイルではopenerの自動クリックスクリプトが有効() {
+        assert!(opener_js_links_on_click());
+    }
+
+    #[test]
+    fn openerプラグインは自動クリックスクリプトの有無を明示して登録されている() {
+        let src = include_str!("lib.rs");
+        // テストモジュール以降（このテスト自身の文字列リテラルを含む）は照合対象外にする
+        let body = src
+            .split("#[cfg(all(test, desktop))]")
+            .next()
+            .expect("split は必ず1要素以上を返す");
+        let code: String = body
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(
+            code.contains("tauri_plugin_opener::Builder::new()"),
+            "opener は Builder 経由で登録されていない"
+        );
+        assert!(
+            code.contains(".open_js_links_on_click(opener_js_links_on_click())"),
+            "opener の自動クリックスクリプトの有無が判定関数で指定されていない"
+        );
+        assert!(
+            !code.contains("tauri_plugin_opener::init()"),
+            "opener が init() で直接登録されている（自動クリックスクリプトが常に有効になる）"
         );
     }
 }

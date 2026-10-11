@@ -1,5 +1,7 @@
 import { render, screen, fireEvent } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import i18n from "@/i18n";
+import { expectNoJapanese } from "@/test-utils/japanese";
 import { AccountNameDialog } from "./AccountNameDialog";
 
 describe("AccountNameDialog", () => {
@@ -73,5 +75,27 @@ describe("AccountNameDialog", () => {
     );
     fireEvent.click(screen.getByText("キャンセル"));
     expect(onCancel).toHaveBeenCalled();
+  });
+
+  describe("表示言語", () => {
+    afterEach(async () => {
+      await i18n.changeLanguage("ja");
+    });
+
+    it("表示言語が英語のときアカウント名変更ダイアログに日本語の文言が表示されない", async () => {
+      await i18n.changeLanguage("en");
+      const { container } = render(
+        <AccountNameDialog
+          defaultValue="Main"
+          title="Enter account name"
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expectNoJapanese(container);
+      expect(screen.getByLabelText("Account name")).toHaveValue("Main");
+      expect(screen.getByText("Cancel")).toBeInTheDocument();
+      expect(screen.getByText("OK")).toBeInTheDocument();
+    });
   });
 });

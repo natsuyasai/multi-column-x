@@ -1,0 +1,118 @@
+{
+  "backup": {
+    "error": {
+      "withDetail": "{{base}} ({{detail}})",
+      "futureVersion": "This backup was created by a newer version of the app. Please update the app.",
+      "brokenJson": "The file is corrupted or cannot be read as JSON.",
+      "formatMismatch": "This is not a Multi Column X backup file.",
+      "tooLarge": "The file is too large to load.",
+      "limitExceeded": "The number or length of items in the backup exceeds the limit",
+      "invalidField": "The backup contains an invalid value",
+      "io": "Failed to read or write the file",
+      "settingsUnreadable": "Current settings could not be loaded, so the backup cannot be restored. Please restart the app."
+    },
+    "exportDone": "Backup exported.",
+    "notChangedSuffix": " Your existing columns and settings were not changed.",
+    "recreateFailed": "Settings were restored, but the columns could not be recreated. Restart the app and check the display. The settings from just before the restore were saved in the restore_snapshots folder inside the app data folder (appsettings-<date and time>.json).",
+    "reason": {
+      "urlSchemeUnsupported": "Only http or https URLs are allowed",
+      "themeUnsupported": "Unsupported theme",
+      "columnScaleUnsupported": "Unsupported scale",
+      "schemaVersionTooOld": "Version is too old to migrate",
+      "schemaVersionInvalid": "Must be an integer of 1 or more",
+      "idUnsafe": "Column id is not safe",
+      "idConflictsWithExisting": "Conflicts with an existing column id at the restore target",
+      "idDuplicate": "Column id is duplicated",
+      "externalAccountIdMismatch": "An external column's accountId must match the column's own id",
+      "accountMissing": "References an account that does not exist at the restore target"
+    },
+    "ioCode": {
+      "selectionCancelled": "File selection was interrupted",
+      "selectionTimeout": "File selection timed out",
+      "unexpectedReply": "Unexpected response: {{detail}}",
+      "snapshotNamesExhausted": "Backup file names for the same second have run out"
+    }
+  },
+  "app": {
+    "loading": "Loading...",
+    "officialSettingsTitle": "Open official settings",
+    "accountNameTitle": "Enter account name",
+    "removeAccount": {
+      "title": "Delete account",
+      "message": "Delete “{{label}}”? Its session data will also be deleted.",
+      "confirm": "Delete"
+    },
+    "settingsLoadFailedTitle": "Failed to load settings"
+  },
+  "update": {
+    "installFailed": "Failed to install the update. Please try again later."
+  },
+  "notification": {
+    "newPostsTitle": "New posts",
+    "newPostsBody": "{{columnName}} has new posts"
+  },
+  "settings": {
+    "loadFailed": {
+      "withBackup": "Could not read the settings file, so the app started with default settings. The original settings were backed up to: {{backupPath}}",
+      "withoutBackup": "Could not read the settings file, so the app started with default settings. Backing up the original settings also failed.",
+      "error": "Could not load settings, so the app started in its initial state. Changes will not be saved until you restart the app, to avoid overwriting your saved settings."
+    }
+  },
+  "validation": {
+    "regexInvalid": "Invalid regular expression: {{raw}}",
+    "userIdInvalid": "`{{id}}` is not a valid X username (1–15 letters, numbers, or underscores)"
+  },
+  "rustError": {
+    "unknown": "An unexpected error occurred",
+    "unknownWithDetail": "An unexpected error occurred ({{detail}})",
+    "common": {
+      "internal": "{{detail}}"
+    },
+    "extension": {
+      "notFound": "Extension not found",
+      "unsupported": "Extensions are not supported in this environment",
+      "alreadyAdded": "Already added",
+      "networkFolder": "Network folders can't be added. Specify a local folder",
+      "folderNotFound": "The specified folder was not found",
+      "folderRequired": "Specify a folder",
+      "folderUnreadable": "Can't read the extension folder",
+      "folderTooLarge": "The extension folder is too large",
+      "noBrowser": "Chrome / Edge not found",
+      "notInBrowser": "No matching extension was found in the browser",
+      "noPopup": "This extension has no popup",
+      "noOptions": "This extension has no options page",
+      "noPage": "There is no page to open",
+      "disabled": "Disabled extensions can't be opened",
+      "invalidKind": "Invalid page type",
+      "invalidId": "Invalid extension ID",
+      "invalidEntryId": "entry_id contains invalid characters",
+      "invalidPagePath": "Invalid extension page path",
+      "invalidUrl": "Invalid URL: {{detail}}",
+      "accountRequired": "Select an account",
+      "columnRequired": "Show a column for this account first",
+      "noTarget": "Couldn't apply the extension to this account",
+      "destInsideSource": "The copy destination is inside the extension folder",
+      "manifestMissing": "Can't load as an extension (manifest.json not found)",
+      "manifestInvalid": "Can't load as an extension (manifest.json is invalid)",
+      "unreadableFiles": "The extension contains files that can't be loaded (such as files whose names start with \"_\")",
+      "loadFailedPath": "Couldn't load the extension (check the path)",
+      "invalidDefinition": "The extension definition is invalid",
+      "loadFailed": "Couldn't load the extension (error code {{detail}})",
+      "listFailed": "Can't get the list of extensions ({{detail}})",
+      "listCallFailed": "Can't get the list of extensions: {{detail}}",
+      "removeFailed": "Can't remove the extension ({{detail}})",
+      "removeCallFailed": "Can't remove the extension: {{detail}}",
+      "setEnabledFailed": "Can't change the extension's enabled state ({{detail}})",
+      "setEnabledCallFailed": "Can't change the extension's enabled state: {{detail}}",
+      "profileUnavailable": "Can't get the profile: {{detail}}",
+      "webviewAccess": "Can't access the WebView: {{detail}}",
+      "noReply": "No response from WebView2",
+      "timeout": "WebView2 timed out"
+    },
+    "h264": {
+      "unsupportedArch": "This environment ({{detail}}) is not supported. Automatic H.264 codec download is only available on x86_64",
+      "extractFailed": "Failed to decompress the bzip2 archive: {{detail}}",
+      "downloadTimeout": "The download timed out: {{detail}}"
+    }
+  }
+}

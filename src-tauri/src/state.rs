@@ -102,6 +102,34 @@ impl WebviewRegistry {
     pub fn get_data_directory(&self, label: &str) -> Option<&str> {
         self.entries.get(label).map(|e| e.data_directory.as_str())
     }
+
+    /// 稼働中プロファイル（data_directory）ごとの代表 label。
+    /// 空の data_directory は除外し、同一 data_directory では辞書順最小の label を代表にする。
+    /// 結果は data_directory 順（決定的）。
+    // 拡張機能の同期（後続ステップ）で使用するまで未使用。
+    #[allow(dead_code)]
+    pub fn distinct_data_directories(&self) -> Vec<(String, String)> {
+        let mut representatives: HashMap<&str, &str> = HashMap::new();
+        for (label, entry) in &self.entries {
+            if entry.data_directory.is_empty() {
+                continue;
+            }
+            representatives
+                .entry(entry.data_directory.as_str())
+                .and_modify(|current| {
+                    if label.as_str() < *current {
+                        *current = label.as_str();
+                    }
+                })
+                .or_insert(label.as_str());
+        }
+        let mut result: Vec<(String, String)> = representatives
+            .into_iter()
+            .map(|(dir, label)| (dir.to_string(), label.to_string()))
+            .collect();
+        result.sort();
+        result
+    }
 }
 
 #[cfg(test)]
@@ -275,5 +303,30 @@ mod tests {
             account_id: "account-1".to_string(),
         };
         assert!(!is_persistent_compose_label(Some(&current), "popup-2"));
+    }
+
+    #[test]
+    fn data_directoryで重複排除し代表labelは辞書順最小になる() {
+        let mut registry = new_registry();
+        for (label, dir) in [
+            ("c-2", "/d/b"),
+            ("c-1", "/d/b"),
+            ("c-3", "/d/a"),
+            ("c-0", ""),
+        ] {
+            registry.register(label.into(), "col".into(), "acc".into(), dir.into());
+        }
+        assert_eq!(
+            registry.distinct_data_directories(),
+            vec![
+                ("/d/a".to_string(), "c-3".to_string()),
+                ("/d/b".to_string(), "c-1".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn 空のregistryではdistinct_data_directoriesが空になる() {
+        assert!(new_registry().distinct_data_directories().is_empty());
     }
 }

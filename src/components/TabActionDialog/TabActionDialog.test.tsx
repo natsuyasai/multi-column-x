@@ -1,5 +1,7 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
+import i18n from "@/i18n";
+import { expectNoJapanese } from "@/test-utils/japanese";
 import { TabActionDialog } from "./TabActionDialog";
 
 const defaultProps = {
@@ -80,5 +82,21 @@ describe("TabActionDialog", () => {
     render(<TabActionDialog {...defaultProps} onClose={onClose} />);
     fireEvent.click(screen.getByRole("dialog"));
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe("TabActionDialog の表示言語", () => {
+  it("表示言語が英語のときタブ操作ダイアログに日本語の文言が表示されない", async () => {
+    await i18n.changeLanguage("en");
+    const { container } = render(
+      <TabActionDialog {...defaultProps} columnLabel="Test column" />,
+    );
+    expectNoJapanese(container);
+    expect(screen.getByRole("button", { name: /Reload/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Settings/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Delete/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
   });
 });

@@ -2,6 +2,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useRef, useState } from "react";
+import i18n from "@/i18n";
 import { ACCOUNT_COLORS } from "../constants/accountColors";
 import { IPC_COMMANDS, IPC_EVENTS } from "../constants/ipc";
 import { logError } from "../lib/log";
@@ -14,6 +15,13 @@ interface AccountWindowResult {
   accountId: string;
   dataDirectory: string;
   windowLabel: string;
+  /** ログイン済みセッションの twid Cookie から取得した X ユーザー ID（mobile のみ。取得できなければ無し） */
+  xUserId?: string | null;
+}
+
+// desktop: ACCOUNT_LOGIN_COMPLETE イベントの payload
+interface AccountLoginCompletePayload {
+  xUserId: string | null;
 }
 
 interface ReauthCompletePayload {
@@ -52,16 +60,61 @@ function parseAccountWindowResult(raw: string): AccountWindowResult {
   }
 }
 
-const REAUTH_FAILED_MESSAGE =
-  "再認証に失敗しました（アカウント識別子を取得できませんでした）";
-const REAUTH_MISMATCH_MESSAGE =
-  "登録済みと異なるアカウントでログインされたため、セッションを更新しませんでした";
-const REAUTH_SKIP_MESSAGE =
-  "初回の再認証のため同一性の照合をスキップし、アカウント識別子を記録しました";
-const ACCOUNT_DATA_DELETE_FAILED_MESSAGE =
-  "アカウントのデータフォルダを削除できませんでした。アプリ設定の「データフォルダの削除を再実行」から後で削除できます。";
-const REAUTH_NOTICE_TITLE = "再認証";
-const ACCOUNT_DATA_DELETE_FAILED_TITLE = "アカウントの削除";
+type ReauthWindowOutcome =
+  | { kind: "complete"; xUserId: string | null }
+  | { kind: "cancelled" };
+
+// 再認証ウィンドウの完了イベントか、ウィンドウ破棄（キャンセル）のどちらか先に起きた方を返す。
+function waitForReauthWindowOutcome(
+  accountId: string,
+  windowLabel: string,
+): Promise<ReauthWindowOutcome> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let unlistenComplete: (() => void) | null = null;
+    let unlistenDestroyed: (() => void) | null = null;
+
+    const cleanup = () => {
+      unlistenComplete?.();
+      unlistenComplete = null;
+      unlistenDestroyed?.();
+      unlistenDestroyed = null;
+    };
+
+    listen<ReauthEventPayload>(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, (event) => {
+      if (settled || event.payload.accountId !== accountId) return;
+      settled = true;
+      cleanup();
+      resolve({ kind: "complete", xUserId: event.payload.xUserId });
+    })
+      .then((fn) => {
+        unlistenComplete = fn;
+      })
+      .catch(reject);
+
+    // 再認証ウィンドウを閉じたことを検出（ユーザーがキャンセル）
+    import("@tauri-apps/api/webviewWindow")
+      .then(({ WebviewWindow }) => {
+        WebviewWindow.getByLabel(windowLabel)
+          .then((reauthWindow) => {
+            if (!reauthWindow) return;
+            reauthWindow
+              .once("tauri://destroyed", () => {
+                if (settled) return;
+                settled = true;
+                cleanup();
+                resolve({ kind: "cancelled" });
+              })
+              .then((fn) => {
+                unlistenDestroyed = fn;
+              })
+              .catch(() => {});
+          })
+          .catch(() => {});
+      })
+      .catch(() => {});
+  });
+}
 
 // アカウント関連の通知（再認証結果・削除失敗など）を表す状態。
 // タイトルは通知の種類によって切り替える（例: 再認証系は「再認証」、
@@ -78,6 +131,8 @@ export interface PendingAccountName {
   dataDirectory: string;
   windowLabel: string;
   defaultValue: string;
+  /** 追加時に取得できた X ユーザー ID。バックアップ復元の自動候補に使う */
+  xUserId?: string;
 }
 
 // アカウント削除の確認待ちであることを表す状態。
@@ -111,13 +166,21 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
   );
 
   const requestAccountName = useCallback(
-    (accountId: string, dataDirectory: string, windowLabel: string) => {
+    (
+      accountId: string,
+      dataDirectory: string,
+      windowLabel: string,
+      xUserId?: string | null,
+    ) => {
       const currentAccounts = useAppStore.getState().accounts;
       setPendingAccountName({
         accountId,
         dataDirectory,
         windowLabel,
-        defaultValue: `アカウント ${currentAccounts.length + 1}`,
+        defaultValue: i18n.t("accounts:defaultName", {
+          n: currentAccounts.length + 1,
+        }),
+        xUserId: xUserId ?? undefined,
       });
     },
     [],
@@ -137,6 +200,7 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
         dataDirectory: pending.dataDirectory,
         color,
         createdAt: new Date().toISOString(),
+        ...(pending.xUserId ? { xUserId: pending.xUserId } : {}),
       };
 
       addAccount(account);
@@ -167,7 +231,13 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
   }, [pendingAccountName]);
 
   const startAddAccount = useCallback(async () => {
-    if (isAddingRef.current || pendingAccountName) return;
+    // バックアップ復元中はアカウントの追加を始めない（復元の置換と競合するため）
+    if (
+      isAddingRef.current ||
+      pendingAccountName ||
+      useAppStore.getState().restoreInProgress
+    )
+      return;
     isAddingRef.current = true;
 
     try {
@@ -186,6 +256,7 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
           parsed.accountId,
           parsed.dataDirectory,
           parsed.windowLabel,
+          parsed.xUserId,
         );
       } else {
         // -----------------------------------------------
@@ -208,11 +279,19 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
             unlistenDestroyed = null;
           };
 
-          listen<void>(IPC_EVENTS.ACCOUNT_LOGIN_COMPLETE, () => {
-            cleanup();
-            requestAccountName(accountId, dataDirectory, windowLabel);
-            resolve();
-          })
+          listen<AccountLoginCompletePayload>(
+            IPC_EVENTS.ACCOUNT_LOGIN_COMPLETE,
+            (event) => {
+              cleanup();
+              requestAccountName(
+                accountId,
+                dataDirectory,
+                windowLabel,
+                event.payload.xUserId,
+              );
+              resolve();
+            },
+          )
             .then((fn) => {
               unlistenLogin = fn;
             })
@@ -260,173 +339,147 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
 
   const startReauth = useCallback(
     async (accountId: string) => {
-      if (isReauthingRef.current) return;
+      // バックアップ復元中は再認証を始めない（復元の置換と競合するため）
+      if (isReauthingRef.current || useAppStore.getState().restoreInProgress)
+        return;
       const account = accounts.find((a) => a.id === accountId);
       if (!account) return;
 
       isReauthingRef.current = true;
-      try {
-        if (isMobile) {
-          // -----------------------------------------------
-          // mobile 専用フロー
-          // -----------------------------------------------
-          // reauth_account_window は AddAccount Activity（reauth モード）が
-          // 終了するまでブロックする。Kotlin 側で twid 照合済みのため、
-          // ここでは skip 通知の要否だけ evaluateReauthIdentity で判定する。
-          const raw = await invoke<string>(IPC_COMMANDS.REAUTH_ACCOUNT_WINDOW, {
-            accountId,
-            dataDirectory: account.dataDirectory,
-            expectedUserId: account.xUserId ?? null,
-          });
-          const payload = JSON.parse(raw) as ReauthCompletePayload;
-          const xUserId = payload.xUserId;
-          if (!xUserId) {
-            setAccountNotice({
-              title: REAUTH_NOTICE_TITLE,
-              message: REAUTH_FAILED_MESSAGE,
-            });
-            return;
-          }
 
-          const verdict = evaluateReauthIdentity(account.xUserId, xUserId);
-          updateAccount(accountId, { xUserId });
-          await reloadAllWebviews?.();
-          if (verdict === "skip") {
-            setAccountNotice({
-              title: REAUTH_NOTICE_TITLE,
-              message: REAUTH_SKIP_MESSAGE,
-            });
-          }
+      const showReauthNotice = (message: string) =>
+        setAccountNotice({
+          title: i18n.t("accounts:notice.reauthTitle"),
+          message,
+        });
+
+      const deleteDataDirectory = async (dataDirectory: string) => {
+        try {
+          await invoke(IPC_COMMANDS.DELETE_ACCOUNT_DATA, { dataDirectory });
+        } catch (e) {
+          logError("startReauth:deleteAccountData")(e);
+          addPendingDataDirectoryDeletion(dataDirectory);
+        }
+      };
+
+      const reauthOnMobile = async (account: Account) => {
+        // -----------------------------------------------
+        // mobile 専用フロー
+        // -----------------------------------------------
+        // reauth_account_window は AddAccount Activity（reauth モード）が
+        // 終了するまでブロックする。Kotlin 側で twid 照合済みのため、
+        // ここでは skip 通知の要否だけ evaluateReauthIdentity で判定する。
+        const raw = await invoke<string>(IPC_COMMANDS.REAUTH_ACCOUNT_WINDOW, {
+          accountId: account.id,
+          dataDirectory: account.dataDirectory,
+          expectedUserId: account.xUserId ?? null,
+        });
+        const payload = JSON.parse(raw) as ReauthCompletePayload;
+        const xUserId = payload.xUserId;
+        if (!xUserId) {
+          showReauthNotice(i18n.t("accounts:notice.reauthFailed"));
           return;
         }
 
+        const verdict = evaluateReauthIdentity(account.xUserId, xUserId);
+        updateAccount(account.id, { xUserId });
+        await reloadAllWebviews?.();
+        if (verdict === "skip") {
+          showReauthNotice(i18n.t("accounts:notice.reauthSkipped"));
+        }
+      };
+
+      const applyDesktopReauthResult = async (
+        account: Account,
+        xUserId: string | null,
+        windowLabel: string,
+        oldDataDirectory: string,
+        newDataDirectory: string,
+      ) => {
+        const closeReauthWindow = () => {
+          invoke(IPC_COMMANDS.CLOSE_WINDOW, { label: windowLabel }).catch(
+            () => {},
+          );
+        };
+
+        if (!xUserId) {
+          closeReauthWindow();
+          await deleteDataDirectory(newDataDirectory);
+          showReauthNotice(i18n.t("accounts:notice.reauthFailed"));
+          return;
+        }
+
+        const verdict = evaluateReauthIdentity(account.xUserId, xUserId);
+        if (verdict === "mismatch") {
+          closeReauthWindow();
+          await deleteDataDirectory(newDataDirectory);
+          showReauthNotice(i18n.t("accounts:notice.reauthMismatch"));
+          return;
+        }
+
+        closeReauthWindow();
+        updateAccount(account.id, {
+          xUserId,
+          dataDirectory: newDataDirectory,
+        });
+        // 旧保存先を使っているWebViewがまだ生きている可能性があるため、
+        // 新セッションで全WebViewを作り直した後に旧保存先を削除する
+        // （Windows の WebView2 はプロセス生存中フォルダをロックするため）。
+        await reloadAllWebviews?.();
+        await deleteDataDirectory(oldDataDirectory);
+        if (verdict === "skip") {
+          showReauthNotice(i18n.t("accounts:notice.reauthSkipped"));
+        }
+      };
+
+      const reauthOnDesktop = async (account: Account) => {
         const oldDataDirectory = account.dataDirectory;
         const raw = await invoke<string>(IPC_COMMANDS.REAUTH_ACCOUNT_WINDOW, {
-          accountId,
+          accountId: account.id,
           dataDirectory: account.dataDirectory,
         });
-        const { windowLabel, newDataDirectory: initialNewDataDirectory } =
-          parseReauthWindowResult(raw);
+        const { windowLabel, newDataDirectory } = parseReauthWindowResult(raw);
 
-        await new Promise<void>((resolve, reject) => {
-          let settled = false;
-          const newDataDirectory = initialNewDataDirectory;
-          let unlistenComplete: (() => void) | null = null;
-          let unlistenDestroyed: (() => void) | null = null;
+        const outcome = await waitForReauthWindowOutcome(
+          account.id,
+          windowLabel,
+        );
+        if (outcome.kind === "cancelled") {
+          await deleteDataDirectory(newDataDirectory);
+          return;
+        }
+        await applyDesktopReauthResult(
+          account,
+          outcome.xUserId,
+          windowLabel,
+          oldDataDirectory,
+          newDataDirectory,
+        );
+      };
 
-          const cleanup = () => {
-            unlistenComplete?.();
-            unlistenComplete = null;
-            unlistenDestroyed?.();
-            unlistenDestroyed = null;
-          };
-
-          const closeReauthWindow = () => {
-            invoke(IPC_COMMANDS.CLOSE_WINDOW, { label: windowLabel }).catch(
-              () => {},
-            );
-          };
-
-          const deleteDataDirectory = (dataDirectory: string) => {
-            invoke(IPC_COMMANDS.DELETE_ACCOUNT_DATA, { dataDirectory }).catch(
-              () => {},
-            );
-          };
-
-          const handleComplete = async (xUserId: string | null) => {
-            if (!xUserId) {
-              closeReauthWindow();
-              deleteDataDirectory(newDataDirectory);
-              setAccountNotice({
-                title: REAUTH_NOTICE_TITLE,
-                message: REAUTH_FAILED_MESSAGE,
-              });
-              resolve();
-              return;
-            }
-
-            const verdict = evaluateReauthIdentity(account.xUserId, xUserId);
-            if (verdict === "mismatch") {
-              closeReauthWindow();
-              deleteDataDirectory(newDataDirectory);
-              setAccountNotice({
-                title: REAUTH_NOTICE_TITLE,
-                message: REAUTH_MISMATCH_MESSAGE,
-              });
-              resolve();
-              return;
-            }
-
-            closeReauthWindow();
-            updateAccount(accountId, {
-              xUserId,
-              dataDirectory: newDataDirectory,
-            });
-            // 旧保存先を使っているWebViewがまだ生きている可能性があるため、
-            // 新セッションで全WebViewを作り直した後に旧保存先を削除する
-            // （Windows の WebView2 はプロセス生存中フォルダをロックするため）。
-            await reloadAllWebviews?.();
-            deleteDataDirectory(oldDataDirectory);
-            if (verdict === "skip") {
-              setAccountNotice({
-                title: REAUTH_NOTICE_TITLE,
-                message: REAUTH_SKIP_MESSAGE,
-              });
-            }
-            resolve();
-          };
-
-          listen<ReauthEventPayload>(
-            IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE,
-            (event) => {
-              if (settled || event.payload.accountId !== accountId) return;
-              settled = true;
-              cleanup();
-              void handleComplete(event.payload.xUserId);
-            },
-          )
-            .then((fn) => {
-              unlistenComplete = fn;
-            })
-            .catch(reject);
-
-          // 再認証ウィンドウを閉じたことを検出（ユーザーがキャンセル）
-          import("@tauri-apps/api/webviewWindow")
-            .then(({ WebviewWindow }) => {
-              WebviewWindow.getByLabel(windowLabel)
-                .then((reauthWindow) => {
-                  if (!reauthWindow) return;
-                  reauthWindow
-                    .once("tauri://destroyed", () => {
-                      if (settled) return;
-                      settled = true;
-                      cleanup();
-                      deleteDataDirectory(newDataDirectory);
-                      resolve();
-                    })
-                    .then((fn) => {
-                      unlistenDestroyed = fn;
-                    })
-                    .catch(() => {});
-                })
-                .catch(() => {});
-            })
-            .catch(() => {});
-        });
+      try {
+        if (isMobile) {
+          await reauthOnMobile(account);
+        } else {
+          await reauthOnDesktop(account);
+        }
       } catch (e) {
         // mobile: Kotlin 側で不一致と判定された場合は Rust が "account-mismatch" で reject する。
         // それ以外（cancelled/timeout、desktop のウィンドウclose）はエラー表示不要。
         if (isMobile && String(e).includes("account-mismatch")) {
-          setAccountNotice({
-            title: REAUTH_NOTICE_TITLE,
-            message: REAUTH_MISMATCH_MESSAGE,
-          });
+          showReauthNotice(i18n.t("accounts:notice.reauthMismatch"));
         }
       } finally {
         isReauthingRef.current = false;
       }
     },
-    [accounts, isMobile, reloadAllWebviews, updateAccount],
+    [
+      accounts,
+      isMobile,
+      reloadAllWebviews,
+      updateAccount,
+      addPendingDataDirectoryDeletion,
+    ],
   );
 
   const requestRemoveAccount = useCallback(
@@ -471,8 +524,8 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
       logError("confirmRemoval:deleteAccountData")(e);
       addPendingDataDirectoryDeletion(pending.dataDirectory);
       setAccountNotice({
-        title: ACCOUNT_DATA_DELETE_FAILED_TITLE,
-        message: ACCOUNT_DATA_DELETE_FAILED_MESSAGE,
+        title: i18n.t("accounts:notice.removeFailedTitle"),
+        message: i18n.t("accounts:notice.removeFailedMessage"),
       });
     }
 

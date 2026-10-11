@@ -1,5 +1,6 @@
 //! ツイート作成ウィンドウ。
 #[cfg(not(target_os = "android"))]
+use super::external_link;
 use super::parse_url;
 use super::popup::{build_popup_init, PopupInit};
 #[cfg(target_os = "android")]
@@ -45,15 +46,22 @@ pub(super) fn create_compose_window(
     const COMPOSE_WIDTH: f64 = 600.0;
     const COMPOSE_WINDOW_HEIGHT: f64 = 580.0; // コンテンツ 540px + ツールバー 40px
 
-    let mut builder = tauri::WebviewWindowBuilder::new(
+    let builder = tauri::WebviewWindowBuilder::new(
         app,
         &compose_label,
         WebviewUrl::External(parse_url(COMPOSE_URL)?),
     )
-    .title("X - ツイート")
+    .title(crate::commands::ui_language::current_ui_text(
+        app,
+        crate::commands::ui_language::UiText::WindowTitleCompose,
+    ))
     .inner_size(COMPOSE_WIDTH, COMPOSE_WINDOW_HEIGHT)
     .initialization_script(&popup_init)
+    .on_new_window(external_link::new_window_handler(app.clone()))
     .data_directory(data_dir);
+    #[cfg(windows)]
+    let builder = builder.browser_extensions_enabled(true);
+    let mut builder = builder;
 
     if let Some(window) = app.get_window(labels::MAIN) {
         if let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) {
@@ -208,15 +216,17 @@ pub async fn open_compose_window(
     #[cfg(not(target_os = "android"))]
     {
         let data_dir = std::path::PathBuf::from(&dataDirectory);
-        tauri::WebviewWindowBuilder::new(
+        let builder = tauri::WebviewWindowBuilder::new(
             &app,
             &compose_label,
             WebviewUrl::External(parse_url("https://x.com/compose/post")?),
         )
         .initialization_script(&popup_init)
-        .data_directory(data_dir)
-        .build()
-        .map_err(|e| e.to_string())?;
+        .on_new_window(external_link::new_window_handler(app.clone()))
+        .data_directory(data_dir);
+        #[cfg(windows)]
+        let builder = builder.browser_extensions_enabled(true);
+        builder.build().map_err(|e| e.to_string())?;
         Ok(())
     }
 }

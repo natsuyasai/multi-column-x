@@ -1,0 +1,70 @@
+{
+  "title": "カラム設定",
+  "close": "閉じる",
+  "column": {
+    "title": "カラム",
+    "label": "表示名",
+    "labelPlaceholder": "未指定の場合は既定の表示名",
+    "width": "幅（px）"
+  },
+  "autoReload": {
+    "title": "自動更新",
+    "enable": "自動更新を有効にする",
+    "interval": "更新間隔（秒）",
+    "showCountdown": "カウントダウンを表示する"
+  },
+  "display": {
+    "title": "表示",
+    "hideHeader": "ヘッダーを非表示にする",
+    "hideTweetInput": "投稿欄を非表示にする",
+    "showCustomMenu": "カスタムメニューボタンを表示する",
+    "scrollPosRestore": "写真閲覧後のスクロール位置を復元する",
+    "returnToLastRead": "更新後に前回の続きへ戻るボタンを表示する"
+  },
+  "image": {
+    "title": "画像",
+    "small": "画像を縮小表示する",
+    "width": "幅（例: 50%, 200px）"
+  },
+  "imageBlur": {
+    "title": "画像ブラー",
+    "enable": "画像をぼかして表示する",
+    "amount": "ブラー量（例: 10px）",
+    "hint": "右クリック（PC）または長押し（モバイル）でブラーを解除できます"
+  },
+  "notification": {
+    "title": "通知",
+    "desktopNotify": "新着をデスクトップ通知する"
+  },
+  "ngWords": {
+    "title": "NGワード",
+    "helpLabel": "NGワードの書き方",
+    "helpLine": "1行に1ワードを入力してください。",
+    "helpRegex": "<code>/pattern/flags</code> の形式で入力すると正規表現として扱われます（大文字・小文字は区別しません）。",
+    "helpExample": "例: /spam|広告/",
+    "placeholder": "1行に1ワードで入力（/正規表現/flags 形式も指定可）"
+  },
+  "repostHidden": {
+    "title": "リポストを非表示にするユーザー",
+    "placeholder": "1行に1ユーザーIDで入力",
+    "hint": "1行に1ユーザーID（@以降）。指定ユーザーがリポストした投稿を非表示にします"
+  },
+  "whitelist": {
+    "title": "ホワイトリスト",
+    "helpLabel": "ホワイトリストの書き方",
+    "helpPurpose": "指定したワードを含むツイートのみを表示します（NGワードとは逆の効果です）。",
+    "helpLine": "1行に1ワードを入力してください。",
+    "helpRegex": "<code>/pattern/flags</code> の形式で入力すると正規表現として扱われます（大文字・小文字は区別しません）。",
+    "enable": "ホワイトリストを有効にする",
+    "placeholder": "1行に1ワードで入力（/正規表現/flags 形式も指定可、ホワイトリスト）"
+  },
+  "customCss": {
+    "title": "カスタム CSS",
+    "placeholder": "/* カスタムCSSを入力 */"
+  },
+  "actions": {
+    "reload": "再読み込み",
+    "cancel": "キャンセル",
+    "apply": "適用"
+  }
+}

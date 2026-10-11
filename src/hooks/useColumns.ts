@@ -3,13 +3,7 @@
 import { useCallback, useRef } from "react";
 import { OFFSCREEN } from "../constants/ipc";
 import { moveGroup } from "../lib/columnOrder";
-import {
-  HEADER_HEIGHT,
-  SCROLLBAR_HEIGHT,
-  getTopBarHeight,
-  calculateGridBounds,
-  mobileColumnLayout,
-} from "../lib/gridLayout";
+import { getHeaderHeight, getTopBarHeight } from "../lib/gridLayout";
 import { logError } from "../lib/log";
 import {
   createColumnWebview,
@@ -23,20 +17,34 @@ import {
 } from "../services/externalColumn";
 import { useAppStore } from "../store/useAppStore";
 import type { Column } from "../types";
-import { useDesktopColumns } from "./useDesktopColumns";
-import { resolveTwoColumnEnabled, useMobileColumns } from "./useMobileColumns";
+import { desktopGridBounds, useDesktopColumns } from "./useDesktopColumns";
+import { mobileLayoutForViewport, useMobileColumns } from "./useMobileColumns";
 
 // グリッド座標計算は src/lib/gridLayout.ts へ移動した。既存 import 互換のため re-export する。
 export {
-  HEADER_HEIGHT,
-  SCROLLBAR_HEIGHT,
-  MOBILE_TAB_BAR_HEIGHT,
-  TOPBAR_COLLAPSED_HEIGHT,
-  TOPBAR_EXPANDED_HEIGHT,
+  getHeaderHeight,
+  getScrollbarHeight,
+  getMobileTabBarHeight,
   getTopBarHeight,
   calculateGridBounds,
 } from "../lib/gridLayout";
 export type { ColumnBounds } from "../lib/gridLayout";
+
+// モバイルの新規カラム WebView を画面外（非表示）で作成する。
+// handleAddColumn / recreateColumnWebview の mobile 分岐から共通利用する。
+// logTag は呼び出し元ごとの logError タグ文字列（呼び出し元の識別を維持するため引数で渡す）。
+async function createOffscreenMobileColumnWebview(
+  column: Column,
+  dataDirectory: string,
+  logTag: string,
+): Promise<void> {
+  const offscreenLayout = mobileLayoutForViewport([column], null);
+  await createColumnWebview(
+    column,
+    dataDirectory,
+    offscreenLayout[column.id],
+  ).catch(logError(logTag));
+}
 
 export function useColumns() {
   const { columns, accounts, addColumn, removeColumn, updateColumn } =
@@ -99,32 +107,25 @@ export function useColumns() {
 
   // カラム追加
   const handleAddColumn = useCallback(
-    async (column: Column) => {
-      if (!containerRef.current) return;
+    // store へ追加できたら true、追加前に中断したら false を返す
+    async (column: Column): Promise<boolean> => {
+      if (!containerRef.current) return false;
       const dataDirectory = await resolveColumnDataDirectory(column, accounts);
-      if (dataDirectory === undefined) return;
+      if (dataDirectory === undefined) return false;
 
       addColumn(column);
 
       const { isMobile } = useAppStore.getState();
       if (isMobile) {
         // 追加カラムは非表示で作成する（activeColumnId: null なので必ず画面外 bounds になる）
-        const offscreenLayout = mobileColumnLayout({
-          columns: [column],
-          activeColumnId: null,
-          twoColumnEnabled: resolveTwoColumnEnabled(),
-          viewportWidth: window.innerWidth,
-          viewportHeight: window.innerHeight,
-        });
-        await createColumnWebview(
+        await createOffscreenMobileColumnWebview(
           column,
           dataDirectory,
-          offscreenLayout[column.id],
-        ).catch(logError("handleAddColumn:createColumnWebview(mobile)"));
-        if (activeColumnId === null) {
-          await setActiveColumn(column.id);
-        }
-        return;
+          "handleAddColumn:createColumnWebview(mobile)",
+        );
+        // 追加したカラムを常にアクティブにする
+        await setActiveColumn(column.id);
+        return true;
       }
 
       const containerHeight = containerRef.current.clientHeight;
@@ -133,36 +134,29 @@ export function useColumns() {
         useAppStore.getState();
       const topBarHeight = getTopBarHeight(topBarExpanded);
 
-      const bounds = calculateGridBounds(updatedColumns, {
+      const bounds = desktopGridBounds(updatedColumns, {
         containerHeight,
         scrollLeft,
-        headerHeight: HEADER_HEIGHT,
-        scrollbarHeight: SCROLLBAR_HEIGHT,
         topBarHeight,
       });
 
       setColumnBounds(bounds);
       const b = bounds[column.id];
-      if (!b) return;
+      if (!b) return true;
 
       await createColumnWebview(column, dataDirectory, b).catch(
         logError("handleAddColumn:createColumnWebview"),
       );
+      return true;
     },
-    [accounts, addColumn, activeColumnId, setActiveColumn, setColumnBounds],
+    [accounts, addColumn, setActiveColumn, setColumnBounds],
   );
 
   // ダイアログ表示時に全カラムWebViewをオフスクリーンへ退避（native WebViewはz-indexを無視するため）
   const hideColumnWebviews = useCallback(async () => {
     const { columns: currentColumns, isMobile } = useAppStore.getState();
     const mobileLayout = isMobile
-      ? mobileColumnLayout({
-          columns: currentColumns,
-          activeColumnId: null,
-          twoColumnEnabled: resolveTwoColumnEnabled(),
-          viewportWidth: window.innerWidth,
-          viewportHeight: window.innerHeight,
-        })
+      ? mobileLayoutForViewport(currentColumns, null)
       : null;
     await Promise.all(
       currentColumns.map((col) =>
@@ -174,7 +168,7 @@ export function useColumns() {
                 x: OFFSCREEN.DESKTOP_X,
                 y:
                   getTopBarHeight(useAppStore.getState().topBarExpanded) +
-                  HEADER_HEIGHT,
+                  getHeaderHeight(),
                 width: col.width,
                 // height を極小値（1px 等）に圧縮すると、退避先が画面外(x=-9999)でも
                 // X.com 側の仮想リストが復元後に再描画されなくなる副作用があるため、
@@ -205,13 +199,8 @@ export function useColumns() {
         isMobile &&
         activeColumnId != null &&
         activeColumnId !== columnId &&
-        mobileColumnLayout({
-          columns: columnsBeforeRemoval,
-          activeColumnId,
-          twoColumnEnabled: resolveTwoColumnEnabled(),
-          viewportWidth: window.innerWidth,
-          viewportHeight: window.innerHeight,
-        })[columnId]?.x >= 0;
+        mobileLayoutForViewport(columnsBeforeRemoval, activeColumnId)[columnId]
+          ?.x >= 0;
 
       await removeColumnWebview(columnId).catch(
         logError("handleRemoveColumn:removeColumnWebview"),
@@ -302,28 +291,18 @@ export function useColumns() {
       );
 
       if (isMobile) {
-        const offscreenLayout = mobileColumnLayout({
-          columns: [column],
-          activeColumnId: null,
-          twoColumnEnabled: resolveTwoColumnEnabled(),
-          viewportWidth: window.innerWidth,
-          viewportHeight: window.innerHeight,
-        });
-        await createColumnWebview(
+        await createOffscreenMobileColumnWebview(
           column,
           dataDirectory,
-          offscreenLayout[column.id],
-        ).catch(logError("recreateColumnWebview:createColumnWebview(mobile)"));
+          "recreateColumnWebview:createColumnWebview(mobile)",
+        );
         // 再作成したカラムが現在の表示ペア（アクティブ or その隣）に含まれるなら
         // setActiveColumn で再配置して可視化する（2カラム時、右隣カラムの再作成でも必要）
         if (activeColumnId) {
-          const displayLayout = mobileColumnLayout({
-            columns: currentColumns,
+          const displayLayout = mobileLayoutForViewport(
+            currentColumns,
             activeColumnId,
-            twoColumnEnabled: resolveTwoColumnEnabled(),
-            viewportWidth: window.innerWidth,
-            viewportHeight: window.innerHeight,
-          });
+          );
           if (displayLayout[columnId].x >= 0) {
             await setActiveColumn(activeColumnId);
           }
@@ -334,11 +313,9 @@ export function useColumns() {
       if (!containerRef.current) return;
       const containerHeight = containerRef.current.clientHeight;
       const scrollLeft = scrollbarRef.current?.scrollLeft ?? 0;
-      const bounds = calculateGridBounds(currentColumns, {
+      const bounds = desktopGridBounds(currentColumns, {
         containerHeight,
         scrollLeft,
-        headerHeight: HEADER_HEIGHT,
-        scrollbarHeight: SCROLLBAR_HEIGHT,
         topBarHeight: getTopBarHeight(topBarExpanded),
       });
       const b = bounds[columnId];
@@ -405,6 +382,18 @@ export function useColumns() {
     [removeWebviewsOf, rebuildWebviews],
   );
 
+  // バックアップ復元: 現在の全カラムの WebView を破棄し、apply でストアを置換（保存はしない）してから
+  // 置換後のカラムの WebView を作り直す。置換前に旧 id の WebView を必ず破棄する（id が変わるため）。
+  const replaceColumnsAndRecreateWebviews = useCallback(
+    async (apply: () => void) => {
+      const { columns: before } = useAppStore.getState();
+      await removeWebviewsOf(before);
+      apply();
+      await rebuildWebviews();
+    },
+    [removeWebviewsOf, rebuildWebviews],
+  );
+
   return {
     columns,
     columnBounds,
@@ -427,5 +416,6 @@ export function useColumns() {
     recreateAllWebviews,
     recreateColumnWebview,
     loadPresetAndRecreateWebviews,
+    replaceColumnsAndRecreateWebviews,
   };
 }

@@ -172,7 +172,6 @@ describe("useColumns mobile", () => {
         videoAutoPlayStopEnabled: false,
         imagePopupEnabled: true,
         videoPopupEnabled: true,
-        showSortButtons: true,
         smallImageEnabled: false,
         smallImageWidth: "50%",
         blurImageEnabled: false,
@@ -180,15 +179,20 @@ describe("useColumns mobile", () => {
         hideAdEnabled: false,
         apiRateLimitMonitorEnabled: true,
         columnScale: "default",
+        uiScale: "auto",
+        language: "auto",
         useXAppForCompose: false,
         mobileSwipeAreaEnabled: true,
         mobileSwipeAreaHeight: 28,
         mobileSwipeAreaOpacity: 50,
         mobileTwoColumnEnabled: true,
+        mobileColumnCount: 2,
         presets: [],
         ngWords: [],
         repostHiddenUserIds: [],
         pendingDataDirectoryDeletions: [],
+        hardwareVideoDecodeEnabled: true,
+        h264DownloadPromptDismissed: false,
       },
       isLoaded: true,
       isMobile: true,
@@ -256,6 +260,27 @@ describe("useColumns mobile", () => {
     });
 
     expect(mockInvoke).not.toHaveBeenCalled();
+  });
+
+  it("モバイルで表示ペアに含まれないカラムを作り直してもアクティブカラムの再配置は行わない", async () => {
+    const { result } = renderHook(() => useColumns());
+    await act(async () => {
+      await result.current.setActiveColumn("col-1");
+    });
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    // profileApiSupported: false のため1カラム表示（表示ペアは col-1 のみ）。
+    // col-3 は表示ペアに含まれない。
+    await act(async () => {
+      await result.current.recreateColumnWebview("col-3");
+    });
+
+    // 表示ペアに含まれないため setActiveColumn による再配置(resize)は発生しない
+    const resizeCalls = mockInvoke.mock.calls.filter(
+      (c) => c[0] === "resize_column_webview",
+    );
+    expect(resizeCalls).toHaveLength(0);
   });
 
   it("handleRemoveColumn でアクティブ列を削除すると order が最小の列がアクティブになる", async () => {
@@ -620,6 +645,125 @@ describe("useColumns desktop loadPresetAndRecreateWebviews", () => {
   });
 });
 
+describe("useColumns desktop replaceColumnsAndRecreateWebviews（バックアップ復元）", () => {
+  const mockInvoke = vi.mocked(invoke);
+
+  function attachContainer(ref: { current: HTMLDivElement | null }) {
+    const div = document.createElement("div");
+    Object.defineProperty(div, "clientHeight", {
+      value: 900,
+      configurable: true,
+    });
+    ref.current = div;
+  }
+
+  function makeColumn(id: string, gridCol: number): Column {
+    return {
+      id,
+      accountId: "acc-1",
+      pageType: "home",
+      homeTabName: "フォロー中",
+      width: 350,
+      order: gridCol - 1,
+      gridRow: 1,
+      gridCol,
+      heightMode: "auto",
+      settings: { ...DEFAULT_COLUMN_SETTINGS },
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+    mockResolveColumnDataDirectory.mockImplementation(
+      async (column, accounts) =>
+        accounts.find((a) => a.id === column.accountId)?.dataDirectory,
+    );
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-1",
+          label: "Test",
+          dataDirectory: "/data/acc-1",
+          color: "#1d9bf0",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      columns: [makeColumn("old-1", 1), makeColumn("old-2", 2)],
+      globalSettings: { ...DEFAULT_GLOBAL_SETTINGS },
+      isLoaded: true,
+      isMobile: false,
+      topBarExpanded: false,
+    });
+  });
+
+  it("旧カラムの表示を破棄してから置換を適用し、置換後のカラムの表示を作る", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+    const order: string[] = [];
+    mockInvoke.mockImplementation(async (cmd, args) => {
+      if (cmd === "remove_column_webview") {
+        order.push(`remove:${(args as { columnId: string }).columnId}`);
+      }
+      if (cmd === "create_column_webview") {
+        order.push(
+          `create:${(args as { args: { column: Column } }).args.column.id}`,
+        );
+      }
+      return undefined;
+    });
+
+    await act(async () => {
+      await result.current.replaceColumnsAndRecreateWebviews(() => {
+        order.push("apply");
+        useAppStore.getState().applyRestoredSettings({
+          accounts: useAppStore.getState().accounts,
+          columns: [makeColumn("new-1", 1)],
+          globalSettings: { ...DEFAULT_GLOBAL_SETTINGS },
+        });
+      });
+    });
+
+    expect(order.indexOf("remove:old-1")).toBeGreaterThanOrEqual(0);
+    expect(order.indexOf("remove:old-2")).toBeGreaterThanOrEqual(0);
+    expect(order.indexOf("apply")).toBeGreaterThan(
+      order.indexOf("remove:old-1"),
+    );
+    expect(order.indexOf("apply")).toBeGreaterThan(
+      order.indexOf("remove:old-2"),
+    );
+    expect(order.indexOf("create:new-1")).toBeGreaterThan(
+      order.indexOf("apply"),
+    );
+    expect(order).not.toContain("create:old-1");
+  });
+
+  it("置換の適用では設定の保存を発行しない", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+    useAppStore.getState().beginRestore();
+
+    await act(async () => {
+      await result.current.replaceColumnsAndRecreateWebviews(() => {
+        useAppStore.getState().applyRestoredSettings({
+          accounts: useAppStore.getState().accounts,
+          columns: [makeColumn("new-1", 1)],
+          globalSettings: { ...DEFAULT_GLOBAL_SETTINGS },
+        });
+      });
+    });
+    useAppStore.getState().finishRestore();
+
+    expect(
+      mockInvoke.mock.calls.filter((c) => c[0] === "save_settings"),
+    ).toHaveLength(0);
+  });
+});
+
 describe("useColumns desktop hideColumnWebviews", () => {
   const mockInvoke = vi.mocked(invoke);
 
@@ -831,6 +975,308 @@ describe("useColumns handleAddColumn", () => {
     expect(
       useAppStore.getState().columns.some((c) => c.id === "col-orphan"),
     ).toBe(false);
+  });
+
+  it("カラム追加に成功すると真を返す（デスクトップ）", async () => {
+    const column = makeColumn({ id: "col-new" });
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+
+    let added: boolean | undefined;
+    await act(async () => {
+      added = await result.current.handleAddColumn(column);
+    });
+
+    expect(added).toBe(true);
+    expect(useAppStore.getState().columns.map((c) => c.id)).toEqual([
+      "col-new",
+    ]);
+  });
+
+  it("データディレクトリを解決できないカラムを追加すると偽を返しカラムは追加されない", async () => {
+    const orphanColumn = makeColumn({
+      id: "col-orphan",
+      accountId: "acc-missing",
+    });
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+
+    let added: boolean | undefined;
+    await act(async () => {
+      added = await result.current.handleAddColumn(orphanColumn);
+    });
+
+    expect(added).toBe(false);
+    expect(useAppStore.getState().columns).toEqual([]);
+  });
+
+  it("コンテナが未設定のときにカラムを追加すると偽を返しカラムは追加されない", async () => {
+    const column = makeColumn({ id: "col-new" });
+    const { result } = renderHook(() => useColumns());
+
+    let added: boolean | undefined;
+    await act(async () => {
+      added = await result.current.handleAddColumn(column);
+    });
+
+    expect(added).toBe(false);
+    expect(useAppStore.getState().columns).toEqual([]);
+  });
+
+  it("デスクトップでカラムを追加するとトップバーの高さを考慮した位置に作成される", async () => {
+    useAppStore.setState({ topBarExpanded: true });
+    const column = makeColumn({ id: "col-new" });
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+
+    await act(async () => {
+      await result.current.handleAddColumn(column);
+    });
+
+    const createCall = mockInvoke.mock.calls.find(
+      (c) => c[0] === "create_column_webview",
+    );
+    expect(createCall).toBeDefined();
+    // topBarExpanded: true のとき y は TopBar 展開高さ(64) + ヘッダー高さ(36) = 100
+    expect((createCall?.[1] as { args: { y: number } }).args.y).toBe(100);
+  });
+});
+
+describe("useColumns handleAddColumn mobile", () => {
+  const mockInvoke = vi.mocked(invoke);
+
+  function attachContainer(
+    ref: { current: HTMLDivElement | null },
+    clientHeight = 900,
+  ) {
+    const div = document.createElement("div");
+    Object.defineProperty(div, "clientHeight", {
+      value: clientHeight,
+      configurable: true,
+    });
+    ref.current = div;
+  }
+
+  function makeColumn(overrides: Partial<Column> & Pick<Column, "id">): Column {
+    return {
+      accountId: "acc-1",
+      pageType: "home",
+      homeTabName: "フォロー中",
+      width: 350,
+      order: 0,
+      gridRow: 1,
+      gridCol: 1,
+      heightMode: "auto",
+      settings: { ...DEFAULT_COLUMN_SETTINGS },
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+    mockResolveColumnDataDirectory.mockImplementation(
+      async (column, accounts) =>
+        accounts.find((a) => a.id === column.accountId)?.dataDirectory,
+    );
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-1",
+          label: "Test",
+          dataDirectory: "/data/acc-1",
+          color: "#1d9bf0",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      columns: [],
+      globalSettings: { ...DEFAULT_GLOBAL_SETTINGS },
+      isLoaded: true,
+      isMobile: true,
+      profileApiSupported: false,
+    });
+  });
+
+  it("モバイルでカラムを追加すると新しいカラムは画面外に作成される", async () => {
+    const column = makeColumn({ id: "col-new" });
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+
+    await act(async () => {
+      await result.current.handleAddColumn(column);
+    });
+
+    const createCall = mockInvoke.mock.calls.find(
+      (c) => c[0] === "create_column_webview",
+    );
+    expect(createCall).toBeDefined();
+    expect((createCall?.[1] as { args: { x: number } }).args.x).toBe(
+      OFFSCREEN.MOBILE_X,
+    );
+  });
+
+  it("カラム追加に成功すると真を返す（モバイル）", async () => {
+    const column = makeColumn({ id: "col-new" });
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+
+    let added: boolean | undefined;
+    await act(async () => {
+      added = await result.current.handleAddColumn(column);
+    });
+
+    expect(added).toBe(true);
+    expect(useAppStore.getState().columns.map((c) => c.id)).toEqual([
+      "col-new",
+    ]);
+  });
+
+  it("モバイルでアクティブなカラムが無いときにカラムを追加すると新カラムがアクティブになる", async () => {
+    const column = makeColumn({ id: "col-new" });
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    expect(result.current.activeColumnId).toBeNull();
+
+    await act(async () => {
+      await result.current.handleAddColumn(column);
+    });
+
+    expect(result.current.activeColumnId).toBe("col-new");
+  });
+
+  it("モバイルで別のカラムがアクティブなときにカラムを追加しても新カラムへ切り替わる", async () => {
+    const existing = makeColumn({ id: "col-existing" });
+    useAppStore.setState({ columns: [existing] });
+    const column = makeColumn({ id: "col-new", order: 1, gridCol: 2 });
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    await act(async () => {
+      await result.current.setActiveColumn("col-existing");
+    });
+    expect(result.current.activeColumnId).toBe("col-existing");
+
+    await act(async () => {
+      await result.current.handleAddColumn(column);
+    });
+
+    expect(result.current.activeColumnId).toBe("col-new");
+  });
+
+  it("カラム追加が失敗したときはアクティブなカラムが変わらない", async () => {
+    const existing = makeColumn({ id: "col-existing" });
+    useAppStore.setState({ columns: [existing] });
+    const column = makeColumn({ id: "col-new", order: 1, gridCol: 2 });
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    await act(async () => {
+      await result.current.setActiveColumn("col-existing");
+    });
+    mockResolveColumnDataDirectory.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.handleAddColumn(column);
+    });
+
+    expect(result.current.activeColumnId).toBe("col-existing");
+    expect(useAppStore.getState().columns.map((c) => c.id)).toEqual([
+      "col-existing",
+    ]);
+  });
+});
+
+describe("useColumns desktop recreateColumnWebview", () => {
+  const mockInvoke = vi.mocked(invoke);
+
+  function attachContainer(
+    ref: { current: HTMLDivElement | null },
+    clientHeight = 900,
+  ) {
+    const div = document.createElement("div");
+    Object.defineProperty(div, "clientHeight", {
+      value: clientHeight,
+      configurable: true,
+    });
+    ref.current = div;
+  }
+
+  function makeColumn(id: string, gridCol: number): Column {
+    return {
+      id,
+      accountId: "acc-1",
+      pageType: "home",
+      homeTabName: "フォロー中",
+      width: 350,
+      order: gridCol - 1,
+      gridRow: 1,
+      gridCol,
+      heightMode: "auto",
+      settings: { ...DEFAULT_COLUMN_SETTINGS },
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+    mockResolveColumnDataDirectory.mockImplementation(
+      async (column, accounts) =>
+        accounts.find((a) => a.id === column.accountId)?.dataDirectory,
+    );
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-1",
+          label: "Test",
+          dataDirectory: "/data/acc-1",
+          color: "#1d9bf0",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      columns: [makeColumn("col-1", 1), makeColumn("col-2", 2)],
+      globalSettings: { ...DEFAULT_GLOBAL_SETTINGS },
+      isLoaded: true,
+      isMobile: false,
+      topBarExpanded: true,
+    });
+  });
+
+  it("デスクトップでカラムを作り直すとトップバーの高さを考慮した位置に作成される", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.recreateColumnWebview("col-1");
+    });
+
+    const createCall = mockInvoke.mock.calls.find(
+      (c) =>
+        c[0] === "create_column_webview" &&
+        (c[1] as { args: { column: Column } }).args.column.id === "col-1",
+    );
+    expect(createCall).toBeDefined();
+    // topBarExpanded: true のとき y は TopBar 展開高さ(64) + ヘッダー高さ(36) = 100
+    expect((createCall?.[1] as { args: { y: number } }).args.y).toBe(100);
+  });
+
+  it("デスクトップでカラムを作り直すと作成後に全カラムの位置を再計算する", async () => {
+    const { result } = renderHook(() => useColumns());
+    attachContainer(result.current.containerRef);
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.recreateColumnWebview("col-1");
+    });
+
+    // 再作成対象ではない col-2 が resize されていれば、作成後に
+    // recalculateAllBounds が実行された証拠になる
+    const col2Resize = mockInvoke.mock.calls.find(
+      (c) =>
+        c[0] === "resize_column_webview" &&
+        (c[1] as { bounds: { columnId: string } }).bounds.columnId === "col-2",
+    );
+    expect(col2Resize).toBeDefined();
   });
 });
 

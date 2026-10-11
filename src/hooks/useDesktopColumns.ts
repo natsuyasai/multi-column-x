@@ -4,8 +4,8 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { platform } from "@tauri-apps/plugin-os";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  HEADER_HEIGHT,
-  SCROLLBAR_HEIGHT,
+  getHeaderHeight,
+  getScrollbarHeight,
   getTopBarHeight,
   calculateGridBounds,
   type ColumnBounds,
@@ -28,6 +28,29 @@ interface DesktopColumnsArgs {
   /** モバイル時の再計算はアクティブカラムの再配置に委譲する */
   activeColumnId: string | null;
   setActiveColumn: (id: string) => Promise<void>;
+}
+
+interface DesktopViewport {
+  containerHeight: number;
+  scrollLeft: number;
+  topBarHeight: number;
+}
+
+/**
+ * デスクトップの全カラム WebView 配置を計算する。
+ * getHeaderHeight / getScrollbarHeight の取得元を一本化するためのラッパー。
+ */
+export function desktopGridBounds(
+  columns: Column[],
+  viewport: DesktopViewport,
+): Record<string, ColumnBounds> {
+  return calculateGridBounds(columns, {
+    containerHeight: viewport.containerHeight,
+    scrollLeft: viewport.scrollLeft,
+    headerHeight: getHeaderHeight(),
+    scrollbarHeight: getScrollbarHeight(),
+    topBarHeight: viewport.topBarHeight,
+  });
 }
 
 export function useDesktopColumns({
@@ -58,11 +81,9 @@ export function useDesktopColumns({
     const { columns: currentColumns, topBarExpanded } = useAppStore.getState();
     const topBarHeight = getTopBarHeight(topBarExpanded);
 
-    const bounds = calculateGridBounds(currentColumns, {
+    const bounds = desktopGridBounds(currentColumns, {
       containerHeight,
       scrollLeft,
-      headerHeight: HEADER_HEIGHT,
-      scrollbarHeight: SCROLLBAR_HEIGHT,
       topBarHeight,
     });
 
@@ -85,11 +106,9 @@ export function useDesktopColumns({
       scrollLeft: number,
       topBarHeight: number,
     ) => {
-      const bounds = calculateGridBounds(currentColumns, {
+      const bounds = desktopGridBounds(currentColumns, {
         containerHeight,
         scrollLeft,
-        headerHeight: HEADER_HEIGHT,
-        scrollbarHeight: SCROLLBAR_HEIGHT,
         topBarHeight,
       });
 

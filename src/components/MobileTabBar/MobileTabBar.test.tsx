@@ -1,6 +1,8 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, afterEach } from "vitest";
+import i18n from "@/i18n";
+import { expectNoJapanese } from "@/test-utils/japanese";
 import type { Column, Account } from "../../types";
 import apiRateLimitIndicatorStyles from "../ApiRateLimitIndicator/ApiRateLimitIndicator.module.scss";
 import { MobileTabBar } from "./MobileTabBar";
@@ -363,6 +365,39 @@ describe("MobileTabBar", () => {
     });
   });
 
+  describe("開閉ボタンの SVG アイコン", () => {
+    it("折りたたみ時は開閉ボタンに chevron-left SVG が表示され chevron-right は無い", () => {
+      render(<MobileTabBar {...defaultProps} columns={[]} />);
+      const toggle = screen.getByTitle("メニュー表示の切り替え");
+      expect(
+        toggle.querySelector('[data-testid="icon-chevron-left"]'),
+      ).toBeInTheDocument();
+      expect(
+        toggle.querySelector('[data-testid="icon-chevron-right"]'),
+      ).not.toBeInTheDocument();
+    });
+
+    it("開閉ボタンをクリックすると chevron-right SVG に切り替わり chevron-left は無くなる", async () => {
+      render(<MobileTabBar {...defaultProps} columns={[]} />);
+      await userEvent.click(screen.getByTitle("メニュー表示の切り替え"));
+      const toggle = screen.getByTitle("メニュー表示の切り替え");
+      expect(
+        toggle.querySelector('[data-testid="icon-chevron-right"]'),
+      ).toBeInTheDocument();
+      expect(
+        toggle.querySelector('[data-testid="icon-chevron-left"]'),
+      ).not.toBeInTheDocument();
+    });
+
+    it("開閉ボタンに文字の « » が含まれない", async () => {
+      render(<MobileTabBar {...defaultProps} columns={[]} />);
+      const toggle = screen.getByTitle("メニュー表示の切り替え");
+      expect(toggle).not.toHaveTextContent(/[«»]/);
+      await userEvent.click(toggle);
+      expect(toggle).not.toHaveTextContent(/[«»]/);
+    });
+  });
+
   describe("タブのダブルタップ検出", () => {
     afterEach(() => {
       vi.useRealTimers();
@@ -437,5 +472,62 @@ describe("MobileTabBar", () => {
       fireEvent.click(screen.getByText("通知"));
       expect(onDoubleTapColumn).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("MobileTabBar 表示言語", () => {
+  const englishAccount: Account = { ...acc1, label: "Main account" };
+  const englishColumns: Column[] = [
+    col1,
+    col2,
+    { ...col1, id: "col-3", order: 2, pageType: "search" },
+    { ...col1, id: "col-4", order: 3, pageType: "list" },
+    { ...col1, id: "col-5", order: 4, pageType: "custom" },
+    { ...col1, id: "col-6", order: 5, pageType: "compose" },
+    {
+      ...col1,
+      id: "col-7",
+      order: 6,
+      pageType: "external",
+      customUrl: "https://example.com/x",
+    },
+  ];
+
+  it("表示言語が英語のときモバイルのタブバーに日本語の文言が表示されない", async () => {
+    await i18n.changeLanguage("en");
+    const props = {
+      ...defaultProps,
+      accounts: [englishAccount],
+      columns: englishColumns,
+      // APIレート制限表示の文言は別領域の移行対象のため、ここでは描画しない
+      apiRateLimitMonitorEnabled: false,
+      swipeState: { direction: "left", phase: "progress" } as const,
+    };
+    const { container } = render(<MobileTabBar {...props} />);
+    expectNoJapanese(container);
+    expect(screen.getByText("Notifications")).toBeInTheDocument();
+    expect(screen.getByText("External: example.com")).toBeInTheDocument();
+    expect(screen.getByLabelText("Compose post")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByTitle("Toggle menu"));
+    expectNoJapanese(container);
+    expect(screen.getByLabelText("Open URL in popup")).toBeInTheDocument();
+    expect(screen.getByLabelText("App settings")).toBeInTheDocument();
+    expect(screen.getByLabelText("Manage accounts")).toBeInTheDocument();
+    expect(screen.getByLabelText("Add column")).toBeInTheDocument();
+  });
+
+  it("タブバーを開いたまま表示言語を切り替えると開いている画面の文言も切り替わる", async () => {
+    render(<MobileTabBar {...defaultProps} columns={[col1, col2]} />);
+    expect(screen.getByText("通知")).toBeInTheDocument();
+    expect(screen.getByLabelText("ツイートを作成")).toBeInTheDocument();
+
+    await act(async () => {
+      await i18n.changeLanguage("en");
+    });
+
+    expect(screen.getByText("Notifications")).toBeInTheDocument();
+    expect(screen.getByLabelText("Compose post")).toBeInTheDocument();
+    expect(screen.queryByText("通知")).not.toBeInTheDocument();
   });
 });

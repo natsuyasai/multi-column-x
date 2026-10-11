@@ -1,42 +1,23 @@
 import React, { useState, useRef } from "react";
+import { useTranslation } from "react-i18next";
+import type { AppTFunction } from "@/i18n/types";
 import { isAutoReloadSupported } from "@/lib/autoReloadTarget";
+import ChevronLeftIcon from "../../assets/icons/chevron-left.svg?react";
+import ChevronRightIcon from "../../assets/icons/chevron-right.svg?react";
 import LinkIcon from "../../assets/icons/link.svg?react";
 import PencilIcon from "../../assets/icons/pencil.svg?react";
 import PersonIcon from "../../assets/icons/person.svg?react";
 import PlusIcon from "../../assets/icons/plus.svg?react";
 import SettingsIcon from "../../assets/icons/settings.svg?react";
 import { useAutoReload } from "../../hooks/useAutoReload";
-import type {
-  Column,
-  Account,
-  ApiRateLimitBucket,
-  PageType,
-} from "../../types";
+import { getPageTypeLabel } from "../../types";
+import type { Column, Account, ApiRateLimitBucket } from "../../types";
 import { ApiRateLimitIndicator } from "../ApiRateLimitIndicator/ApiRateLimitIndicator";
 import styles from "./MobileTabBar.module.scss";
 
-function getExternalTabLabel(customUrl: string | undefined): string {
-  if (!customUrl) return "外部サイト";
-  try {
-    return `外部: ${new URL(customUrl).hostname}`;
-  } catch {
-    return "外部サイト";
-  }
-}
-
-function getTabLabel(column: Column): string {
+function getTabLabel(column: Column, t: AppTFunction): string {
   if (column.label) return column.label;
-  if (column.pageType === "external")
-    return getExternalTabLabel(column.customUrl);
-  const labels: Record<Exclude<PageType, "external">, string> = {
-    home: column.homeTabName ?? "ホーム",
-    notifications: "通知",
-    search: column.searchQuery ? `検索: ${column.searchQuery}` : "検索",
-    list: "リスト",
-    custom: "カスタム",
-    compose: "投稿",
-  };
-  return labels[column.pageType];
+  return getPageTypeLabel(column, t);
 }
 
 interface TabItemProps {
@@ -61,6 +42,7 @@ const TabItem: React.FC<TabItemProps> = ({
   onLongPress,
   onDoubleTap,
 }) => {
+  const { t } = useTranslation();
   const isExternal = column.pageType === "external";
   const { remaining } = useAutoReload({
     columnId: column.id,
@@ -148,7 +130,7 @@ const TabItem: React.FC<TabItemProps> = ({
         className={styles.accountColor}
         style={{ backgroundColor: account?.color ?? "#888" }}
       />
-      <span className={styles.label}>{getTabLabel(column)}</span>
+      <span className={styles.label}>{getTabLabel(column, t)}</span>
       {showCountdown && <span className={styles.countdown}>{remaining}s</span>}
     </div>
   );
@@ -192,6 +174,7 @@ export const MobileTabBar: React.FC<Props> = ({
   apiRateLimits,
   onApiRateLimitPopoverOpenChange,
 }) => {
+  const { t } = useTranslation();
   const sorted = [...columns].sort((a, b) => a.order - b.order);
   const [expanded, setExpanded] = useState(false);
 
@@ -230,66 +213,84 @@ export const MobileTabBar: React.FC<Props> = ({
           );
         })}
       </div>
-      <button
-        className={styles.actionBtn}
-        aria-label="ツイートを作成"
-        title="ツイートを作成"
-        onClick={onComposeTweet}
-      >
-        <PencilIcon width={18} height={18} data-testid="icon-pencil" />
-      </button>
+      <div className={styles.menu}>
+        <button
+          className={styles.actionBtn}
+          aria-label={t("mobile:composeTweet")}
+          title={t("mobile:composeTweet")}
+          onClick={onComposeTweet}
+        >
+          <PencilIcon width={18} height={18} data-testid="icon-pencil" />
+        </button>
 
-      <button
-        className={styles.toggleBtn}
-        onClick={() => setExpanded((prev) => !prev)}
-        title="メニュー表示の切り替え"
-      >
-        {expanded ? "»" : "«"}
-      </button>
-      {expanded && (
-        <div className={styles.actions}>
-          <button
-            className={styles.actionBtn}
-            aria-label="URLをポップアップで開く"
-            title="URLをポップアップで開く"
-            onClick={onOpenLinkPopup}
-          >
-            <LinkIcon width={18} height={18} data-testid="icon-link" />
-          </button>
-          <button
-            className={styles.actionBtn}
-            aria-label="アプリ設定"
-            title="アプリ設定"
-            onClick={onAppSettings}
-          >
-            <SettingsIcon width={18} height={18} data-testid="icon-settings" />
-          </button>
-          <button
-            className={styles.actionBtn}
-            aria-label="アカウント管理"
-            title="アカウント管理"
-            onClick={onAccountManager}
-          >
-            <PersonIcon width={18} height={18} data-testid="icon-person" />
-          </button>
-          <button
-            className={styles.actionBtn}
-            aria-label="カラムを追加"
-            title="カラムを追加"
-            onClick={onAddColumn}
-          >
-            <PlusIcon width={18} height={18} data-testid="icon-plus" />
-          </button>
-          {apiRateLimitMonitorEnabled && (
-            <ApiRateLimitIndicator
-              accounts={accounts}
-              apiRateLimits={apiRateLimits}
-              onOpenChange={onApiRateLimitPopoverOpenChange}
-              isMobile
+        <button
+          className={styles.toggleBtn}
+          onClick={() => setExpanded((prev) => !prev)}
+          title={t("mobile:toggleMenu")}
+        >
+          {expanded ? (
+            <ChevronRightIcon
+              width={18}
+              height={18}
+              data-testid="icon-chevron-right"
+            />
+          ) : (
+            <ChevronLeftIcon
+              width={18}
+              height={18}
+              data-testid="icon-chevron-left"
             />
           )}
-        </div>
-      )}
+        </button>
+        {expanded && (
+          <div className={styles.actions}>
+            <button
+              className={styles.actionBtn}
+              aria-label={t("mobile:openLinkPopup")}
+              title={t("mobile:openLinkPopup")}
+              onClick={onOpenLinkPopup}
+            >
+              <LinkIcon width={18} height={18} data-testid="icon-link" />
+            </button>
+            <button
+              className={styles.actionBtn}
+              aria-label={t("mobile:appSettings")}
+              title={t("mobile:appSettings")}
+              onClick={onAppSettings}
+            >
+              <SettingsIcon
+                width={18}
+                height={18}
+                data-testid="icon-settings"
+              />
+            </button>
+            <button
+              className={styles.actionBtn}
+              aria-label={t("mobile:accountManager")}
+              title={t("mobile:accountManager")}
+              onClick={onAccountManager}
+            >
+              <PersonIcon width={18} height={18} data-testid="icon-person" />
+            </button>
+            <button
+              className={styles.actionBtn}
+              aria-label={t("mobile:addColumn")}
+              title={t("mobile:addColumn")}
+              onClick={onAddColumn}
+            >
+              <PlusIcon width={18} height={18} data-testid="icon-plus" />
+            </button>
+            {apiRateLimitMonitorEnabled && (
+              <ApiRateLimitIndicator
+                accounts={accounts}
+                apiRateLimits={apiRateLimits}
+                onOpenChange={onApiRateLimitPopoverOpenChange}
+                isMobile
+              />
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

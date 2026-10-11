@@ -1,91 +1,62 @@
 // APIレート制限モニターが表示するbucketKey（GraphQLのOperationNameやv1.1パス）と
-// 日本語ラベル・説明文の対応表。
+// 辞書（rateLimit 名前空間）のラベル・説明文の対応表。
 // 説明文の出典: X公式 https://docs.x.com/x-api/fundamentals/rate-limits 、
 // 非公式リバースエンジニアリングドキュメント apidance.pro (https://doc.apidance.pro/)、
 // trevorhobenshield/twitter-api-client (https://github.com/trevorhobenshield/twitter-api-client) 等。
-interface ApiRateLimitLabelEntry {
-  label: string;
-  description: string;
+import type { AppTFunction } from "@/i18n/types";
+
+// 辞書（rateLimit 名前空間）の buckets.<id> に対応する識別子。
+// bucketKey は "/" や "." を含み辞書キーに使えないため、camelCase の識別子へ対応づける。
+const API_RATE_LIMIT_BUCKET_IDS = {
+  // 実測済みのoperationName
+  UserTweets: "userTweets",
+  UserByScreenName: "userByScreenName",
+  ProfileSpotlightsQuery: "profileSpotlightsQuery",
+  isEligibleForVoButtonUpsellQuery: "voButtonEligibility",
+  "flow/viewer.json": "flowViewer",
+  "graphql/viewer_context.json": "viewerContext",
+  // 一般的に知られる主要operationName（フォールバック用の代表例、完全網羅は不要）
+  HomeTimeline: "homeTimeline",
+  HomeLatestTimeline: "homeLatestTimeline",
+  SearchTimeline: "searchTimeline",
+  Followers: "followers",
+  Following: "following",
+  Likes: "likes",
+  CreateTweet: "createTweet",
+  DeleteTweet: "deleteTweet",
+  NotificationsTimeline: "notificationsTimeline",
+} as const;
+
+type ApiRateLimitBucketId =
+  (typeof API_RATE_LIMIT_BUCKET_IDS)[keyof typeof API_RATE_LIMIT_BUCKET_IDS];
+
+function findBucketId(bucketKey: string): ApiRateLimitBucketId | undefined {
+  return Object.prototype.hasOwnProperty.call(
+    API_RATE_LIMIT_BUCKET_IDS,
+    bucketKey,
+  )
+    ? API_RATE_LIMIT_BUCKET_IDS[
+        bucketKey as keyof typeof API_RATE_LIMIT_BUCKET_IDS
+      ]
+    : undefined;
 }
 
-export const API_RATE_LIMIT_LABELS: Record<string, ApiRateLimitLabelEntry> = {
-  // 実測済みのoperationName
-  UserTweets: {
-    label: "ユーザーのツイート取得",
-    description: "指定ユーザーのツイート一覧を取得するAPI。",
-  },
-  UserByScreenName: {
-    label: "ユーザー情報取得",
-    description:
-      "screen_name（@ID）からユーザープロフィール（rest_id・bio・フォロワー数・認証状態等）を取得するAPI。",
-  },
-  ProfileSpotlightsQuery: {
-    label: "プロフィールスポットライト",
-    description:
-      "プロフィールページの補助情報を取得するAPIと推測されるが、詳細仕様は非公開で未確認。",
-  },
-  isEligibleForVoButtonUpsellQuery: {
-    label: "VoButton表示判定",
-    description:
-      "特定ボタン（Vo Button）の表示可否を判定するAPIと推測されるが、詳細仕様は非公開で未確認。",
-  },
-  "flow/viewer.json": {
-    label: "ログインフロー",
-    description: "ログイン処理シーケンス（flow）の進行状況を扱うAPI。",
-  },
-  "graphql/viewer_context.json": {
-    label: "ビューワーコンテキスト",
-    description: "ログイン中ユーザーのコンテキスト情報を取得するAPI。",
-  },
-  // 一般的に知られる主要operationName（フォールバック用の代表例、完全網羅は不要）
-  HomeTimeline: {
-    label: "ホームタイムライン",
-    description:
-      "フォロー中ユーザーのツイートをアルゴリズム順で並べたタイムラインを取得するAPI。",
-  },
-  HomeLatestTimeline: {
-    label: "ホームタイムライン（最新）",
-    description:
-      "フォロー中ユーザーのツイートを投稿日時順（最新順）で並べたタイムラインを取得するAPI。",
-  },
-  SearchTimeline: {
-    label: "検索",
-    description:
-      "検索クエリに一致するツイート・ユーザー等の検索結果を取得するAPI。",
-  },
-  Followers: {
-    label: "フォロワー一覧",
-    description: "指定ユーザーのフォロワー一覧を取得するAPI。",
-  },
-  Following: {
-    label: "フォロー中一覧",
-    description: "指定ユーザーのフォロー中一覧を取得するAPI。",
-  },
-  Likes: {
-    label: "いいね一覧",
-    description: "指定ユーザーがいいねしたツイート一覧を取得するAPI。",
-  },
-  CreateTweet: {
-    label: "ツイート投稿",
-    description: "新規ツイートを投稿するAPI。",
-  },
-  DeleteTweet: {
-    label: "ツイート削除",
-    description: "既存ツイートを削除するAPI。",
-  },
-  NotificationsTimeline: {
-    label: "通知",
-    description: "通知一覧を取得するAPI。",
-  },
-};
+/** 辞書に登録されている bucketKey を定義順で返す（辞書との整合性検査用） */
+export function getKnownApiRateLimitBucketKeys(): string[] {
+  return Object.keys(API_RATE_LIMIT_BUCKET_IDS);
+}
 
 /**
- * bucketKey（GraphQLのOperationNameやv1.1パス）を日本語ラベルに変換する。
+ * bucketKey（GraphQLのOperationNameやv1.1パス）を表示言語のラベルに変換する。
  * 辞書に無い場合はbucketKeyをそのままフォールバック表示する
  * （X側の内部API仕様変更に強くするため、完全網羅を目指さない）。
  */
-export function getApiRateLimitLabel(bucketKey: string): string {
-  return API_RATE_LIMIT_LABELS[bucketKey]?.label ?? bucketKey;
+export function getApiRateLimitLabel(
+  bucketKey: string,
+  t: AppTFunction,
+): string {
+  const id = findBucketId(bucketKey);
+  return id ? t(`rateLimit:buckets.${id}.label`) : bucketKey;
 }
 
 /**
@@ -94,8 +65,10 @@ export function getApiRateLimitLabel(bucketKey: string): string {
  */
 export function getApiRateLimitDescription(
   bucketKey: string,
+  t: AppTFunction,
 ): string | undefined {
-  return API_RATE_LIMIT_LABELS[bucketKey]?.description;
+  const id = findBucketId(bucketKey);
+  return id ? t(`rateLimit:buckets.${id}.description`) : undefined;
 }
 
 // カラムとして追加できる項目（PageType）が実際に使用するoperationName。

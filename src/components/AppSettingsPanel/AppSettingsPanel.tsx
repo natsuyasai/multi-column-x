@@ -1,10 +1,27 @@
 import React, { useState } from "react";
-import { useEscapeKey } from "../../hooks/useEscapeKey";
-import { validateNgWordLines } from "../../lib/ngWordPattern";
+import { useTranslation } from "react-i18next";
 import {
-  parseUserIdLines,
-  validateUserIdLine,
-} from "../../lib/repostHiddenUserId";
+  currentPlatformName,
+  isExtensionsSupported,
+} from "@/lib/extensionsSupport";
+import {
+  parseAndValidateUserIdLines,
+  parseAndValidateWordLines,
+} from "@/lib/lineListValidation";
+import { nextDraftOnSmallImageChange } from "@/lib/scrollRestoreSetting";
+import type { ReplaceColumnsAndRecreate } from "@/services/backup";
+import {
+  addChromeExtension,
+  addExtensionFromFolder,
+  detectChromeExtensions,
+  listExtensions,
+  openExtensionPage,
+  pickExtensionFolder,
+  removeExtension,
+  setExtensionEnabled,
+} from "@/services/extensions";
+import { useBackupFlow } from "../../hooks/useBackupFlow";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useAppStore } from "../../store/useAppStore";
 import type {
   GlobalSettings,
@@ -14,16 +31,29 @@ import type {
 } from "../../types";
 import { AppInfoSections } from "./AppInfoSections";
 import styles from "./AppSettingsPanel.module.scss";
+import { BackupTab } from "./BackupTab";
 import { ColumnDefaultsSections } from "./ColumnDefaultsSections";
 import { ColumnLayoutTab } from "./ColumnLayoutTab";
 import { DisplaySettingsSection } from "./DisplaySettingsSection";
-import { GeneralSettingsSections } from "./GeneralSettingsSections";
+import { ExtensionsTab } from "./ExtensionsTab";
+import {
+  AndroidSettingsSections,
+  FilterSettingsSections,
+  PopupSettingsSection,
+  VideoSettingsSection,
+} from "./GeneralSettingsSections";
+import {
+  LinuxVideoPlaybackSection,
+  type H264SettingsInfo,
+} from "./LinuxVideoPlaybackSection";
 import { PresetsTab } from "./PresetsTab";
 import {
-  clampSwipeAreaHeight,
   createSettingsDraft,
+  toColumnDefaults,
+  toGlobalSettingsPatch,
   type SettingsDraft,
 } from "./settingsDraft";
+import { SettingsGroup } from "./SettingsGroup";
 
 interface AppSettingsPanelProps {
   settings: GlobalSettings;
@@ -44,6 +74,12 @@ interface AppSettingsPanelProps {
   ) => void;
   onReloadAllWebviews: () => void;
   onLoadPreset: (id: string) => Promise<void>;
+  /** バックアップ復元: 旧カラムの WebView 破棄 → ストア置換 → WebView 再生成 */
+  onReplaceColumnsAndRecreate: ReplaceColumnsAndRecreate;
+  /** 拡張機能の追加・削除・有効無効の変更に成功したとき（全カラムの再読込に使う） */
+  onExtensionsChanged: () => void;
+  /** 拡張機能のポップアップ / オプションを開くアカウント。決まらなければ null */
+  extensionPageAccountId: string | null;
   appVersion: string;
   updateChecking: boolean;
   updateManualResult: "idle" | "none" | "error";
@@ -52,6 +88,12 @@ interface AppSettingsPanelProps {
   onClose: () => void;
   pendingDataDirectoryDeletionCount: number;
   onRetryDataDirectoryDeletion: () => Promise<{ remaining: number }>;
+  /** Linux デスクトップか（動画再生設定セクションの表示条件） */
+  isLinux?: boolean;
+  /** アプリ起動時に読み込んだハードウェアデコード設定。未指定なら settings の値を使う */
+  startupHardwareVideoDecodeEnabled?: boolean;
+  /** H.264 有効化の状態と操作（AppImage のときのみ表示に使われる） */
+  h264Setup?: H264SettingsInfo;
 }
 
 export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
@@ -63,6 +105,9 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   onApplyColumnDefaults,
   onReloadAllWebviews,
   onLoadPreset,
+  onReplaceColumnsAndRecreate,
+  onExtensionsChanged,
+  extensionPageAccountId,
   appVersion,
   updateChecking,
   updateManualResult,
@@ -71,13 +116,22 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   onClose,
   pendingDataDirectoryDeletionCount,
   onRetryDataDirectoryDeletion,
+  isLinux = false,
+  startupHardwareVideoDecodeEnabled,
+  h264Setup,
 }) => {
+  const { t } = useTranslation();
   const isMobile = useAppStore((s) => s.isMobile);
   const { savePreset, deletePreset } = useAppStore();
   useEscapeKey(onClose);
-  const [activeTab, setActiveTab] = useState<"general" | "layout" | "presets">(
-    "general",
+  const [activeTab, setActiveTab] = useState<
+    "general" | "layout" | "presets" | "extensions" | "backup"
+  >("general");
+  const extensionsSupported = isExtensionsSupported(
+    currentPlatformName(),
+    isMobile,
   );
+  const backup = useBackupFlow(onReplaceColumnsAndRecreate, onClose);
 
   const [draft, setDraft] = useState<SettingsDraft>(() =>
     createSettingsDraft(settings),
@@ -115,96 +169,52 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
     key: K,
     value: SettingsDraft[K],
   ) => {
-    setDraft((prev) => ({ ...prev, [key]: value }));
+    setDraft((prev) =>
+      key === "smallImageEnabled"
+        ? nextDraftOnSmallImageChange(prev, value as boolean)
+        : { ...prev, [key]: value },
+    );
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const ngWords = draft.globalNgWordsText
-      .split("\n")
-      .map((w) => w.trim())
-      .filter((w) => w.length > 0);
-    const ngWordsValidationError = validateNgWordLines(ngWords);
-    if (ngWordsValidationError) {
-      setNgWordsError(ngWordsValidationError);
+    const ngWords = parseAndValidateWordLines(draft.globalNgWordsText, t);
+    if (ngWords.kind === "invalid") {
+      setNgWordsError(ngWords.error);
       return;
     }
     setNgWordsError(null);
-    const repostHiddenUserIds = parseUserIdLines(
+    const repostHiddenUserIds = parseAndValidateUserIdLines(
       draft.globalRepostHiddenUserIdsText,
+      t,
     );
-    const repostHiddenUserIdsValidationError =
-      repostHiddenUserIds
-        .map((id) => validateUserIdLine(id))
-        .find((error) => error !== null) ?? null;
-    if (repostHiddenUserIdsValidationError) {
-      setRepostHiddenUserIdsError(repostHiddenUserIdsValidationError);
+    if (repostHiddenUserIds.kind === "invalid") {
+      setRepostHiddenUserIdsError(repostHiddenUserIds.error);
       return;
     }
     setRepostHiddenUserIdsError(null);
-    const patch: Partial<GlobalSettings> = {
-      defaultAutoReloadEnabled: draft.defaultAutoReloadEnabled,
-      defaultAutoReloadInterval: draft.defaultAutoReloadInterval,
-      defaultShowCountdown: draft.defaultShowCountdown,
-      defaultHideHeaderEnabled: draft.defaultHideHeaderEnabled,
-      defaultHideTweetInputEnabled: draft.defaultHideTweetInputEnabled,
-      defaultShowCustomMenu: draft.defaultShowCustomMenu,
-      defaultScrollPosRestoreEnabled: draft.defaultScrollPosRestoreEnabled,
-      defaultColumnCustomCSS: draft.defaultColumnCustomCSS,
-      popupEscCloseEnabled: draft.popupEscCloseEnabled,
-      videoAutoPlayStopEnabled: draft.videoAutoPlayStopEnabled,
-      imagePopupEnabled: draft.imagePopupEnabled,
-      videoPopupEnabled: draft.videoPopupEnabled,
-      smallImageEnabled: draft.smallImageEnabled,
-      smallImageWidth: draft.smallImageWidth,
-      blurImageEnabled: draft.blurImageEnabled,
-      blurImageAmount: draft.blurImageAmount,
-      hideAdEnabled: draft.hideAdEnabled,
-      apiRateLimitMonitorEnabled: draft.apiRateLimitMonitorEnabled,
-      useXAppForCompose: draft.useXAppForCompose,
-      mobileSwipeAreaEnabled: draft.mobileSwipeAreaEnabled,
-      mobileSwipeAreaHeight: clampSwipeAreaHeight(draft.mobileSwipeAreaHeight),
-      mobileSwipeAreaOpacity: draft.mobileSwipeAreaOpacity,
-      mobileTwoColumnEnabled: draft.mobileTwoColumnEnabled,
-      ngWords,
-      repostHiddenUserIds,
-    };
-    if (draft.columnScaleOverrideEnabled) {
-      patch.columnScale = draft.columnScale;
-    }
-    if (draft.themeOverrideEnabled) {
-      patch.theme = draft.theme;
-    }
-    onApply(patch);
+    onApply(
+      toGlobalSettingsPatch(draft, {
+        ngWords: ngWords.values,
+        repostHiddenUserIds: repostHiddenUserIds.values,
+      }),
+    );
     onClose();
   };
 
   const handleApplyColumnDefaults = () => {
-    onApplyColumnDefaults({
-      autoReloadEnabled: draft.defaultAutoReloadEnabled,
-      autoReloadInterval: draft.defaultAutoReloadInterval,
-      showCountdown: draft.defaultShowCountdown,
-      hideHeaderEnabled: draft.defaultHideHeaderEnabled,
-      hideTweetInputEnabled: draft.defaultHideTweetInputEnabled,
-      showCustomMenu: draft.defaultShowCustomMenu,
-      scrollPosRestoreEnabled: draft.defaultScrollPosRestoreEnabled,
-      customCSS: draft.defaultColumnCustomCSS,
-      smallImageEnabled: draft.smallImageEnabled,
-      smallImageWidth: draft.smallImageWidth,
-      blurImageEnabled: draft.blurImageEnabled,
-      blurImageAmount: draft.blurImageAmount,
-    });
+    onApplyColumnDefaults(toColumnDefaults(draft));
   };
 
   return (
     <div className={styles.overlay}>
       <div className={styles.panel}>
         <div className={styles.header}>
-          <h2 className={styles.title}>アプリ設定</h2>
+          <h2 className={styles.title}>{t("settings:panel.title")}</h2>
           <button
             className={styles.closeBtn}
             onClick={onClose}
-            aria-label="閉じる"
+            aria-label={t("settings:panel.close")}
           >
             ✕
           </button>
@@ -215,22 +225,36 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
             className={`${styles.tab} ${activeTab === "general" ? styles.tabActive : ""}`}
             onClick={() => setActiveTab("general")}
           >
-            一般
+            {t("settings:panel.tabs.general")}
           </button>
           <button
             className={`${styles.tab} ${activeTab === "layout" ? styles.tabActive : ""}`}
             onClick={() => setActiveTab("layout")}
           >
-            カラム配置
+            {t("settings:panel.tabs.layout")}
           </button>
           {!isMobile && (
             <button
               className={`${styles.tab} ${activeTab === "presets" ? styles.tabActive : ""}`}
               onClick={() => setActiveTab("presets")}
             >
-              プリセット
+              {t("settings:panel.tabs.presets")}
             </button>
           )}
+          {extensionsSupported && (
+            <button
+              className={`${styles.tab} ${activeTab === "extensions" ? styles.tabActive : ""}`}
+              onClick={() => setActiveTab("extensions")}
+            >
+              {t("settings:panel.tabs.extensions")}
+            </button>
+          )}
+          <button
+            className={`${styles.tab} ${activeTab === "backup" ? styles.tabActive : ""}`}
+            onClick={() => setActiveTab("backup")}
+          >
+            {t("settings:panel.tabs.backup")}
+          </button>
         </div>
 
         <div className={styles.tabContent}>
@@ -240,44 +264,74 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
               onSubmit={handleSubmit}
               className={styles.form}
             >
-              <DisplaySettingsSection draft={draft} set={set} />
+              <SettingsGroup title={t("settings:panel.groups.display")}>
+                <DisplaySettingsSection draft={draft} set={set} />
+              </SettingsGroup>
 
-              <ColumnDefaultsSections
-                draft={draft}
-                set={set}
-                onApplyToAllColumns={handleApplyColumnDefaults}
-              />
+              <SettingsGroup title={t("settings:panel.groups.columnDefaults")}>
+                <ColumnDefaultsSections
+                  draft={draft}
+                  set={set}
+                  onApplyToAllColumns={handleApplyColumnDefaults}
+                />
+              </SettingsGroup>
 
-              <GeneralSettingsSections
-                draft={draft}
-                set={set}
-                isMobile={isMobile}
-                ngWordsError={ngWordsError}
-                repostHiddenUserIdsError={repostHiddenUserIdsError}
-              />
+              <SettingsGroup title={t("settings:panel.groups.filter")}>
+                <FilterSettingsSections
+                  draft={draft}
+                  set={set}
+                  ngWordsError={ngWordsError}
+                  repostHiddenUserIdsError={repostHiddenUserIdsError}
+                />
+              </SettingsGroup>
 
-              <AppInfoSections
-                onOpenOfficialSettings={onOpenOfficialSettings}
-                onReloadAllWebviews={() => {
-                  onReloadAllWebviews();
-                  onClose();
-                }}
-                appVersion={appVersion}
-                updateChecking={updateChecking}
-                updateManualResult={updateManualResult}
-                onCheckUpdate={onCheckUpdate}
-                pendingDataDirectoryDeletionCount={
-                  pendingDataDirectoryDeletionCount
-                }
-                retryingDataDirectoryDeletion={retryingDataDirectoryDeletion}
-                dataDirectoryDeletionRetryResult={
-                  dataDirectoryDeletionRetryResult
-                }
-                dataDirectoryDeletionRemainingCount={
-                  dataDirectoryDeletionRemainingCount
-                }
-                onRetryDataDirectoryDeletion={handleRetryDataDirectoryDeletion}
-              />
+              <SettingsGroup title={t("settings:panel.groups.media")}>
+                <VideoSettingsSection draft={draft} set={set} />
+                {!isMobile && <PopupSettingsSection draft={draft} set={set} />}
+                <LinuxVideoPlaybackSection
+                  draft={draft}
+                  set={set}
+                  isLinux={isLinux && !isMobile}
+                  startupHardwareVideoDecodeEnabled={
+                    startupHardwareVideoDecodeEnabled ??
+                    settings.hardwareVideoDecodeEnabled
+                  }
+                  h264={h264Setup}
+                />
+              </SettingsGroup>
+
+              {isMobile && (
+                <SettingsGroup title={t("settings:panel.groups.android")}>
+                  <AndroidSettingsSections draft={draft} set={set} />
+                </SettingsGroup>
+              )}
+
+              <SettingsGroup title={t("settings:panel.groups.maintenance")}>
+                <AppInfoSections
+                  onOpenOfficialSettings={onOpenOfficialSettings}
+                  onReloadAllWebviews={() => {
+                    onReloadAllWebviews();
+                    onClose();
+                  }}
+                  appVersion={appVersion}
+                  updateChecking={updateChecking}
+                  updateManualResult={updateManualResult}
+                  onCheckUpdate={onCheckUpdate}
+                  pendingDataDirectoryDeletionCount={
+                    pendingDataDirectoryDeletionCount
+                  }
+                  retryingDataDirectoryDeletion={retryingDataDirectoryDeletion}
+                  dataDirectoryDeletionRetryResult={
+                    dataDirectoryDeletionRetryResult
+                  }
+                  dataDirectoryDeletionRemainingCount={
+                    dataDirectoryDeletionRemainingCount
+                  }
+                  onRetryDataDirectoryDeletion={
+                    handleRetryDataDirectoryDeletion
+                  }
+                />
+              </SettingsGroup>
             </form>
           )}
 
@@ -308,6 +362,40 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
               onDelete={(id) => deletePreset(id)}
             />
           )}
+
+          {extensionsSupported && activeTab === "extensions" && (
+            <ExtensionsTab
+              accountId={extensionPageAccountId}
+              onExtensionsChanged={onExtensionsChanged}
+              listExtensions={listExtensions}
+              detectChromeExtensions={detectChromeExtensions}
+              pickFolder={pickExtensionFolder}
+              addFromFolder={addExtensionFromFolder}
+              addChrome={addChromeExtension}
+              setEnabled={setExtensionEnabled}
+              remove={removeExtension}
+              openPage={openExtensionPage}
+            />
+          )}
+
+          {activeTab === "backup" && (
+            <BackupTab
+              accounts={backup.accounts}
+              step={backup.step}
+              content={backup.content}
+              mapping={backup.mapping}
+              busy={backup.busy}
+              saveBlocked={backup.saveBlocked}
+              message={backup.message}
+              onExport={() => void backup.exportToFile()}
+              onPickFile={() => void backup.pickFile()}
+              onChangeMapping={backup.changeMapping}
+              onCancel={backup.cancel}
+              onProceedToConfirm={backup.proceedToConfirm}
+              onBackToMapping={backup.backToMapping}
+              onExecute={() => void backup.execute()}
+            />
+          )}
         </div>
 
         {activeTab === "general" && (
@@ -317,14 +405,14 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
               className={styles.cancelBtn}
               onClick={onClose}
             >
-              キャンセル
+              {t("settings:panel.actions.cancel")}
             </button>
             <button
               type="submit"
               form="app-settings-form"
               className={styles.applyBtn}
             >
-              適用
+              {t("settings:panel.actions.apply")}
             </button>
           </div>
         )}

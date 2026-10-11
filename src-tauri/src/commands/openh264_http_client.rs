@@ -5,6 +5,8 @@
 
 use std::time::Duration;
 
+use crate::commands::app_error::{codes, AppError};
+
 /// 接続確立（TCPハンドシェイク）までのタイムアウト。
 #[cfg_attr(not(all(desktop, target_os = "linux")), allow(dead_code))]
 pub(crate) const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -18,22 +20,22 @@ pub(crate) const READ_TIMEOUT: Duration = Duration::from_secs(30);
 pub(crate) fn build_client_with(
     read: Duration,
     connect: Duration,
-) -> Result<reqwest::Client, String> {
+) -> Result<reqwest::Client, AppError> {
     reqwest::Client::builder()
         .read_timeout(read)
         .connect_timeout(connect)
         .build()
-        .map_err(|e| e.to_string())
+        .map_err(AppError::internal)
 }
 
-/// reqwest のエラーをユーザー向け文言に変換する（純粋関数）。
-/// タイムアウト由来のエラーには「タイムアウトしました」を含める。
+/// reqwest のエラーを `AppError` に変換する（純粋関数）。
+/// タイムアウト由来のエラーは専用コード、それ以外は生のエラー文字列を持つ内部エラーにする。
 #[cfg_attr(not(all(desktop, target_os = "linux")), allow(dead_code))]
-pub(crate) fn map_reqwest_error(e: reqwest::Error) -> String {
+pub(crate) fn map_reqwest_error(e: reqwest::Error) -> AppError {
     if e.is_timeout() {
-        format!("ダウンロードがタイムアウトしました: {e}")
+        AppError::with_detail(codes::H264_DOWNLOAD_TIMEOUT, e)
     } else {
-        e.to_string()
+        AppError::internal(e)
     }
 }
 
@@ -62,6 +64,8 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.is_timeout());
-        assert!(map_reqwest_error(err).contains("タイムアウトしました"));
+        let mapped = map_reqwest_error(err);
+        assert_eq!(mapped.code, codes::H264_DOWNLOAD_TIMEOUT);
+        assert!(mapped.detail.is_some());
     }
 }

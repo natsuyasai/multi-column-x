@@ -34,3 +34,7 @@ tmp/
 docs/superpowers/
 
 docs/specs/
+
+# VitePress（ユーザーガイド）の生成物
+docs/.vitepress/cache
+docs/.vitepress/dist

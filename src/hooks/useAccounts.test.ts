@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import i18n from "@/i18n";
+import { containsJapanese } from "@/test-utils/japanese";
 import { IPC_EVENTS } from "../constants/ipc";
 import { useAppStore } from "../store/useAppStore";
 import { DEFAULT_COLUMN_SETTINGS } from "../types";
@@ -82,6 +84,19 @@ function fireListenEvent(eventName: string, payload: unknown) {
   const callback = listenCallbacks.get(eventName);
   if (!callback) throw new Error(`listen(${eventName}) is not registered yet`);
   callback({ payload });
+}
+
+// 呼び出し側から任意のタイミングで settle できる Promise を作る。
+// 「delete_account_data の完了を待ってから startReauth が完了する」ことを
+// 検証するため、削除処理の完了タイミングをテストから制御する。
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
 }
 
 const addAccountResult = JSON.stringify({
@@ -369,7 +384,7 @@ describe("useAccounts (desktop addAccount)", () => {
     await act(async () => {
       startPromise = result.current.startAddAccount();
       await flushMicrotasks();
-      fireListenEvent(IPC_EVENTS.ACCOUNT_LOGIN_COMPLETE, undefined);
+      fireListenEvent(IPC_EVENTS.ACCOUNT_LOGIN_COMPLETE, { xUserId: null });
       await startPromise;
     });
 
@@ -1054,6 +1069,417 @@ describe("useAccounts (desktop reauth)", () => {
     expect(mockReload).not.toHaveBeenCalled();
     expect(result.current.accountNotice).toBeNull();
   });
+
+  it("再認証が失敗したとき新しい保存先の削除に失敗すると削除保留リストに記録され、失敗通知のみが表示される", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: [],
+      },
+    });
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "reauth_account_window") return reauthWindowResult;
+      if (cmd === "delete_account_data") throw new Error("locked");
+      return undefined;
+    });
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: null,
+        newDataDirectory: NEW_DATA_DIRECTORY,
+      });
+      await reauthPromise;
+    });
+
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual([NEW_DATA_DIRECTORY]);
+    expect(result.current.accountNotice).toEqual({
+      title: "再認証",
+      message: "再認証に失敗しました（アカウント識別子を取得できませんでした）",
+    });
+  });
+
+  it("別アカウントでログインしたとき新しい保存先の削除に失敗すると削除保留リストに記録され、不一致通知のみが表示される", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: [],
+      },
+    });
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "reauth_account_window") return reauthWindowResult;
+      if (cmd === "delete_account_data") throw new Error("locked");
+      return undefined;
+    });
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: "999",
+        newDataDirectory: NEW_DATA_DIRECTORY,
+      });
+      await reauthPromise;
+    });
+
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual([NEW_DATA_DIRECTORY]);
+    expect(result.current.accountNotice).toEqual({
+      title: "再認証",
+      message:
+        "登録済みと異なるアカウントでログインされたため、セッションを更新しませんでした",
+    });
+  });
+
+  it("再認証をキャンセルしたとき新しい保存先の削除に失敗すると削除保留リストに記録され、通知は表示されない", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: [],
+      },
+    });
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "reauth_account_window") return reauthWindowResult;
+      if (cmd === "delete_account_data") throw new Error("locked");
+      return undefined;
+    });
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireDestroyedEvent("reauth-acc-1");
+      await reauthPromise;
+    });
+
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual([NEW_DATA_DIRECTORY]);
+    expect(result.current.accountNotice).toBeNull();
+  });
+
+  it("再認証が成功したとき旧保存先の削除に失敗すると削除保留リストに記録され、アカウントは新しい保存先に更新され通知は表示されない", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: [],
+      },
+    });
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "reauth_account_window") return reauthWindowResult;
+      if (cmd === "delete_account_data") throw new Error("locked");
+      return undefined;
+    });
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: "123",
+        newDataDirectory: NEW_DATA_DIRECTORY,
+      });
+      await reauthPromise;
+    });
+
+    expect(useAppStore.getState().accounts[0].dataDirectory).toBe(
+      NEW_DATA_DIRECTORY,
+    );
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual([OLD_DATA_DIRECTORY]);
+    expect(result.current.accountNotice).toBeNull();
+  });
+
+  it("再認証後の保存先の削除に成功したとき削除保留リストには何も追加されない", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: [],
+      },
+    });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "reauth_account_window" ? reauthWindowResult : undefined,
+    );
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: "123",
+        newDataDirectory: NEW_DATA_DIRECTORY,
+      });
+      await reauthPromise;
+    });
+
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual([]);
+  });
+
+  it("再認証が失敗したとき保存先の削除が終わるまで再認証処理は完了せず、完了時には削除保留リストに記録されている", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: [],
+      },
+    });
+    const deleteDeferred = createDeferred<void>();
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "reauth_account_window") return reauthWindowResult;
+      if (cmd === "delete_account_data") return deleteDeferred.promise;
+      return undefined;
+    });
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    let done = false;
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      reauthPromise
+        .then(() => {
+          done = true;
+        })
+        .catch(() => {});
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: null,
+        newDataDirectory: NEW_DATA_DIRECTORY,
+      });
+      await flushMicrotasks();
+    });
+
+    // 削除がまだ完了していない間は startReauth も完了していない
+    expect(done).toBe(false);
+
+    await act(async () => {
+      deleteDeferred.reject(new Error("locked"));
+      await reauthPromise;
+    });
+
+    expect(done).toBe(true);
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual([NEW_DATA_DIRECTORY]);
+  });
+
+  it("別アカウントでログインしたとき保存先の削除が終わるまで再認証処理は完了せず、完了時には削除保留リストに記録されている", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: [],
+      },
+    });
+    const deleteDeferred = createDeferred<void>();
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "reauth_account_window") return reauthWindowResult;
+      if (cmd === "delete_account_data") return deleteDeferred.promise;
+      return undefined;
+    });
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    let done = false;
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      reauthPromise
+        .then(() => {
+          done = true;
+        })
+        .catch(() => {});
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: "999",
+        newDataDirectory: NEW_DATA_DIRECTORY,
+      });
+      await flushMicrotasks();
+    });
+
+    // 削除がまだ完了していない間は startReauth も完了していない
+    expect(done).toBe(false);
+
+    await act(async () => {
+      deleteDeferred.reject(new Error("locked"));
+      await reauthPromise;
+    });
+
+    expect(done).toBe(true);
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual([NEW_DATA_DIRECTORY]);
+  });
+
+  it("再認証が成功したとき旧保存先の削除が終わるまで再認証処理は完了せず、完了時には削除保留リストに記録されている", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: [],
+      },
+    });
+    const deleteDeferred = createDeferred<void>();
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "reauth_account_window") return reauthWindowResult;
+      if (cmd === "delete_account_data") return deleteDeferred.promise;
+      return undefined;
+    });
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    let done = false;
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      reauthPromise
+        .then(() => {
+          done = true;
+        })
+        .catch(() => {});
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: "123",
+        newDataDirectory: NEW_DATA_DIRECTORY,
+      });
+      await flushMicrotasks();
+    });
+
+    // 削除がまだ完了していない間は startReauth も完了していない
+    expect(done).toBe(false);
+
+    await act(async () => {
+      deleteDeferred.reject(new Error("locked"));
+      await reauthPromise;
+    });
+
+    expect(done).toBe(true);
+    expect(useAppStore.getState().accounts[0].dataDirectory).toBe(
+      NEW_DATA_DIRECTORY,
+    );
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual([OLD_DATA_DIRECTORY]);
+  });
+
+  it("再認証をキャンセルしたとき保存先の削除が終わるまで再認証処理は完了せず、完了時には削除保留リストに記録されている", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+      globalSettings: {
+        ...useAppStore.getState().globalSettings,
+        pendingDataDirectoryDeletions: [],
+      },
+    });
+    const deleteDeferred = createDeferred<void>();
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "reauth_account_window") return reauthWindowResult;
+      if (cmd === "delete_account_data") return deleteDeferred.promise;
+      return undefined;
+    });
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let reauthPromise: Promise<void> = Promise.resolve();
+    let done = false;
+    await act(async () => {
+      reauthPromise = result.current.startReauth("acc-1");
+      reauthPromise
+        .then(() => {
+          done = true;
+        })
+        .catch(() => {});
+      await flushMicrotasks();
+      fireDestroyedEvent("reauth-acc-1");
+      await flushMicrotasks();
+    });
+
+    // 削除がまだ完了していない間は startReauth も完了していない
+    expect(done).toBe(false);
+
+    await act(async () => {
+      deleteDeferred.reject(new Error("locked"));
+      await reauthPromise;
+    });
+
+    expect(done).toBe(true);
+    expect(
+      useAppStore.getState().globalSettings.pendingDataDirectoryDeletions,
+    ).toEqual([NEW_DATA_DIRECTORY]);
+  });
+
+  it("再認証の処理中に同じアカウントの再認証を開始しても再認証ウィンドウは1回しか開かれない", async () => {
+    useAppStore.setState({
+      accounts: [makeReauthAccount("123")],
+      isMobile: false,
+    });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "reauth_account_window" ? reauthWindowResult : undefined,
+    );
+    const mockReload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAccounts(mockReload));
+
+    let firstReauthPromise: Promise<void> = Promise.resolve();
+    let secondReauthPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      firstReauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      secondReauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: "123",
+        newDataDirectory: NEW_DATA_DIRECTORY,
+      });
+      await firstReauthPromise;
+      await secondReauthPromise;
+    });
+
+    expect(
+      mockInvoke.mock.calls.filter(
+        (call) => call[0] === "reauth_account_window",
+      ),
+    ).toHaveLength(1);
+  });
 });
 
 describe("useAccounts (mobile reauth)", () => {
@@ -1198,5 +1624,98 @@ describe("useAccounts (mobile reauth)", () => {
       title: "再認証",
       message: "再認証に失敗しました（アカウント識別子を取得できませんでした）",
     });
+  });
+});
+
+describe("useAccounts 表示言語", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(async () => {
+    await i18n.changeLanguage("ja");
+  });
+
+  const addAccountForDefaultName = async () => {
+    useAppStore.setState({ accounts: [], isMobile: true });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "open_add_account_window" ? addAccountResult : undefined,
+    );
+    const { result } = renderHook(() => useAccounts());
+    await act(async () => {
+      await result.current.startAddAccount();
+    });
+    return result.current.pendingAccountName;
+  };
+
+  it("表示言語が日本語のとき既定のアカウント名は従来どおり「アカウント 1」になる", async () => {
+    const pending = await addAccountForDefaultName();
+
+    expect(pending?.defaultValue).toBe("アカウント 1");
+  });
+
+  it("表示言語が英語のとき既定のアカウント名は「Account 1」になり日本語を含まない", async () => {
+    await i18n.changeLanguage("en");
+
+    const pending = await addAccountForDefaultName();
+
+    expect(pending?.defaultValue).toBe("Account 1");
+  });
+
+  it("表示言語が英語のとき再認証のスキップ通知が英語で表示される", async () => {
+    await i18n.changeLanguage("en");
+    useAppStore.setState({ accounts: [makeReauthAccount()], isMobile: false });
+    mockInvoke.mockImplementation(async (cmd) =>
+      cmd === "reauth_account_window" ? reauthWindowResult : undefined,
+    );
+    const { result } = renderHook(() => useAccounts(vi.fn()));
+
+    await act(async () => {
+      const reauthPromise = result.current.startReauth("acc-1");
+      await flushMicrotasks();
+      fireListenEvent(IPC_EVENTS.ACCOUNT_REAUTH_COMPLETE, {
+        accountId: "acc-1",
+        xUserId: "123",
+        newDataDirectory: NEW_DATA_DIRECTORY,
+      });
+      await reauthPromise;
+    });
+
+    const notice = result.current.accountNotice;
+    expect(notice?.title).toBe("Re-authentication");
+    expect(notice?.message).toBe(
+      "This was the first re-authentication, so the identity check was skipped and the account identifier was recorded.",
+    );
+    expect(containsJapanese(`${notice?.title}${notice?.message}`)).toBe(false);
+  });
+
+  it("表示言語が英語のときアカウントのデータフォルダ削除失敗の通知が英語で表示される", async () => {
+    await i18n.changeLanguage("en");
+    useAppStore.setState({
+      accounts: [makeReauthAccount()],
+      columns: [],
+      isMobile: false,
+    });
+    mockInvoke.mockImplementation(async (cmd) => {
+      if (cmd === "delete_account_data") {
+        throw new Error("locked");
+      }
+      return undefined;
+    });
+    const { result } = renderHook(() => useAccounts());
+
+    act(() => {
+      result.current.removeAccount("acc-1");
+    });
+    await act(async () => {
+      await result.current.confirmRemoval();
+    });
+
+    const notice = result.current.accountNotice;
+    expect(notice?.title).toBe("Delete account");
+    expect(notice?.message).toBe(
+      "Could not delete the account's data folder. You can delete it later with “Retry deleting data folders” in the app settings.",
+    );
+    expect(containsJapanese(`${notice?.title}${notice?.message}`)).toBe(false);
   });
 });

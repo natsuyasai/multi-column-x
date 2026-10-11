@@ -1,11 +1,40 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  act,
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import i18n from "@/i18n";
+import * as extensionsService from "@/services/extensions";
+import { expectNoJapanese } from "@/test-utils/japanese";
 import type { GlobalSettings, Column, Account } from "../../types";
 import { AppSettingsPanel } from "./AppSettingsPanel";
 
+const mockPlatform = vi.hoisted(() => vi.fn(() => "windows"));
+
+vi.mock("@tauri-apps/plugin-os", () => ({
+  platform: mockPlatform,
+}));
+
+vi.mock("@/services/extensions", () => ({
+  listExtensions: vi.fn(async () => []),
+  detectChromeExtensions: vi.fn(),
+  pickExtensionFolder: vi.fn(),
+  addExtensionFromFolder: vi.fn(),
+  addChromeExtension: vi.fn(),
+  setExtensionEnabled: vi.fn(),
+  removeExtension: vi.fn(),
+  openExtensionPage: vi.fn(),
+}));
+
 const mockStoreState = {
   isMobile: false,
+  accounts: [] as Account[],
+  settingsSaveBlocked: false,
   savePreset: vi.fn(),
   loadPreset: vi.fn(),
   deletePreset: vi.fn(),
@@ -33,7 +62,6 @@ const baseGlobalSettings: GlobalSettings = {
   videoAutoPlayStopEnabled: true,
   imagePopupEnabled: true,
   videoPopupEnabled: true,
-  showSortButtons: false,
   smallImageEnabled: false,
   smallImageWidth: "50%",
   blurImageEnabled: false,
@@ -41,15 +69,20 @@ const baseGlobalSettings: GlobalSettings = {
   hideAdEnabled: true,
   apiRateLimitMonitorEnabled: true,
   columnScale: "default",
+  uiScale: "auto",
+  language: "auto",
   useXAppForCompose: false,
   mobileSwipeAreaEnabled: true,
   mobileSwipeAreaHeight: 28,
   mobileSwipeAreaOpacity: 50,
   mobileTwoColumnEnabled: true,
+  mobileColumnCount: 2,
   presets: [],
   ngWords: [],
   repostHiddenUserIds: [],
   pendingDataDirectoryDeletions: [],
+  hardwareVideoDecodeEnabled: true,
+  h264DownloadPromptDismissed: false,
 };
 
 const baseSettings = {
@@ -106,6 +139,9 @@ const defaultProps = {
   onApplyColumnDefaults: vi.fn(),
   onReloadAllWebviews: vi.fn(),
   onLoadPreset: vi.fn().mockResolvedValue(undefined),
+  onReplaceColumnsAndRecreate: vi.fn().mockResolvedValue(undefined),
+  onExtensionsChanged: vi.fn(),
+  extensionPageAccountId: "acc-1" as string | null,
   appVersion: "0.1.1",
   updateChecking: false,
   updateManualResult: "idle" as const,
@@ -118,6 +154,7 @@ const defaultProps = {
 
 beforeEach(() => {
   mockStoreState.isMobile = false;
+  mockPlatform.mockReturnValue("windows");
 });
 
 describe("AppSettingsPanel", () => {
@@ -203,6 +240,19 @@ describe("AppSettingsPanel グローバルNGワード", () => {
     );
   });
 
+  it("NGワードの前後の空白を除いてngWordsに含める", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    const textarea = screen.getByPlaceholderText(
+      "1行に1ワードで入力（全カラムに適用・/正規表現/flags 形式も指定可）",
+    );
+    fireEvent.change(textarea, { target: { value: "  spam  \n bot " } });
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ ngWords: ["spam", "bot"] }),
+    );
+  });
+
   it("NGワードの書き方ヘルプポップオーバーが表示される", () => {
     render(<AppSettingsPanel {...defaultProps} />);
     expect(
@@ -229,6 +279,33 @@ describe("AppSettingsPanel グローバルNGワード", () => {
     expect(screen.getByText("正規表現が不正です: /[/")).toBeInTheDocument();
     expect(onApply).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("不正なNGワードを修正して再度適用するとNGワードのエラーが消える", async () => {
+    const onApply = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        onApply={onApply}
+        onClose={onClose}
+      />,
+    );
+    const textarea = screen.getByPlaceholderText(
+      "1行に1ワードで入力（全カラムに適用・/正規表現/flags 形式も指定可）",
+    );
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, "/[[/");
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(screen.getByText("正規表現が不正です: /[/")).toBeInTheDocument();
+
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, "spam");
+    await userEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(screen.queryByText(/正規表現が不正です/)).not.toBeInTheDocument();
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ ngWords: ["spam"] }),
+    );
   });
 
   it("有効なNGワード（通常文字列・正規表現）を入力して適用すると、エラーは表示されずonApplyとonCloseが呼ばれる", async () => {
@@ -375,16 +452,48 @@ describe("AppSettingsPanel スワイプ切替設定", () => {
     );
   });
 
-  it("広い画面で2カラム表示トグルを切り替えるとonApplyに反映される", () => {
+  it("広い画面で複数カラム表示トグルを切り替えるとonApplyに反映される", () => {
     const onApply = vi.fn();
     render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
     const checkbox = screen.getByRole("checkbox", {
-      name: "広い画面で2カラム表示（タブレット・横向き）",
+      name: "広い画面で複数カラム表示（タブレット・横向き）",
     });
     fireEvent.click(checkbox);
     fireEvent.click(screen.getByRole("button", { name: "適用" }));
     expect(onApply).toHaveBeenCalledWith(
       expect.objectContaining({ mobileTwoColumnEnabled: false }),
+    );
+  });
+
+  it("設定画面で複数カラム表示がONのときだけ列数を選べる", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    const select = screen.getByRole("combobox", { name: "同時表示する列数" });
+    expect(
+      Array.from((select as HTMLSelectElement).options).map((o) => o.value),
+    ).toEqual(["2", "3", "4", "5", "6"]);
+
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: "広い画面で複数カラム表示（タブレット・横向き）",
+      }),
+    );
+    expect(
+      screen.queryByRole("combobox", { name: "同時表示する列数" }),
+    ).toBeNull();
+  });
+
+  it("設定画面で列数を変更すると設定として保存される", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "同時表示する列数" }),
+      {
+        target: { value: "4" },
+      },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ mobileColumnCount: 4 }),
     );
   });
 
@@ -712,6 +821,17 @@ describe("AppSettingsPanel テーマ選択", () => {
   });
 });
 
+const カラム内ボタン = (name: string) =>
+  within(screen.getByRole("group", { name: "カラム内の表示サイズ" })).getByRole(
+    "button",
+    { name },
+  );
+const アプリUIボタン = (name: string) =>
+  within(screen.getByRole("group", { name: "アプリUIの表示サイズ" })).getByRole(
+    "button",
+    { name },
+  );
+
 describe("AppSettingsPanel 表示サイズ・テーマの変更チェックボックス", () => {
   it("チェックボックスがいずれもOFFのまま適用すると、patchにcolumnScale/themeキーが含まれない", () => {
     const onApply = vi.fn();
@@ -727,9 +847,9 @@ describe("AppSettingsPanel 表示サイズ・テーマの変更チェックボ�
     const onApply = vi.fn();
     render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
     fireEvent.click(
-      screen.getByRole("checkbox", { name: "表示サイズを変更する" }),
+      screen.getByRole("checkbox", { name: "カラム内の表示サイズを変更する" }),
     );
-    fireEvent.click(screen.getByRole("button", { name: "大" }));
+    fireEvent.click(カラム内ボタン("大"));
     fireEvent.click(screen.getByRole("button", { name: "適用" }));
     const patch = onApply.mock.calls[0][0] as Record<string, unknown>;
     expect(patch).toHaveProperty("columnScale", "large");
@@ -749,18 +869,19 @@ describe("AppSettingsPanel 表示サイズ・テーマの変更チェックボ�
 
   it("表示サイズ・テーマのボタンはチェックボックスがOFFの間は操作できない", () => {
     render(<AppSettingsPanel {...defaultProps} />);
-    expect(screen.getByRole("button", { name: "大" })).toBeDisabled();
+    expect(カラム内ボタン("大")).toBeDisabled();
+    expect(アプリUIボタン("大")).toBeDisabled();
     expect(screen.getByRole("button", { name: "ライト" })).toBeDisabled();
   });
 
   it("パネルを開き直す（再マウント）と、チェックボックスは常にOFF状態で表示される", () => {
     const { unmount } = render(<AppSettingsPanel {...defaultProps} />);
     fireEvent.click(
-      screen.getByRole("checkbox", { name: "表示サイズを変更する" }),
+      screen.getByRole("checkbox", { name: "カラム内の表示サイズを変更する" }),
     );
     fireEvent.click(screen.getByRole("checkbox", { name: "テーマを変更する" }));
     expect(
-      screen.getByRole("checkbox", { name: "表示サイズを変更する" }),
+      screen.getByRole("checkbox", { name: "カラム内の表示サイズを変更する" }),
     ).toBeChecked();
     expect(
       screen.getByRole("checkbox", { name: "テーマを変更する" }),
@@ -769,11 +890,81 @@ describe("AppSettingsPanel 表示サイズ・テーマの変更チェックボ�
 
     render(<AppSettingsPanel {...defaultProps} />);
     expect(
-      screen.getByRole("checkbox", { name: "表示サイズを変更する" }),
+      screen.getByRole("checkbox", { name: "カラム内の表示サイズを変更する" }),
     ).not.toBeChecked();
     expect(
       screen.getByRole("checkbox", { name: "テーマを変更する" }),
     ).not.toBeChecked();
+  });
+});
+
+describe("AppSettingsPanel アプリUIの表示サイズ", () => {
+  it("カラム内の表示サイズとアプリUIの表示サイズは別項目として区別できる", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(screen.getByText("カラム内の表示サイズ")).toBeInTheDocument();
+    expect(screen.getByText("アプリUIの表示サイズ")).toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", { name: "カラム内の表示サイズを変更する" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", { name: "アプリUIの表示サイズを変更する" }),
+    ).toBeInTheDocument();
+  });
+
+  it("アプリUIの表示サイズを大にして適用すると、patchにuiScaleが含まれ、columnScaleは含まれない", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "アプリUIの表示サイズを変更する" }),
+    );
+    fireEvent.click(アプリUIボタン("大"));
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    const patch = onApply.mock.calls[0][0] as Record<string, unknown>;
+    expect(patch).toHaveProperty("uiScale", "large");
+    expect(patch).not.toHaveProperty("columnScale");
+  });
+
+  it("アプリUIの表示サイズの変更チェックをOFFのまま適用すると、patchにuiScaleが含まれない", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    const patch = onApply.mock.calls[0][0] as Record<string, unknown>;
+    expect(patch).not.toHaveProperty("uiScale");
+  });
+
+  it("端末に合わせるを選んで適用すると、patchのuiScaleがautoになる", () => {
+    const onApply = vi.fn();
+    const settings = { ...baseGlobalSettings, uiScale: "xLarge" as const };
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={settings}
+        onApply={onApply}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "アプリUIの表示サイズを変更する" }),
+    );
+    fireEvent.click(アプリUIボタン("端末に合わせる"));
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    const patch = onApply.mock.calls[0][0] as Record<string, unknown>;
+    expect(patch).toHaveProperty("uiScale", "auto");
+  });
+
+  it("アプリUIの表示サイズのボタン群はaria-pressedで選択状態を表す", () => {
+    const settings = { ...baseGlobalSettings, uiScale: "small" as const };
+    render(<AppSettingsPanel {...defaultProps} settings={settings} />);
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "アプリUIの表示サイズを変更する" }),
+    );
+    expect(アプリUIボタン("小")).toHaveAttribute("aria-pressed", "true");
+    expect(アプリUIボタン("端末に合わせる")).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    fireEvent.click(アプリUIボタン("特大"));
+    expect(アプリUIボタン("特大")).toHaveAttribute("aria-pressed", "true");
+    expect(アプリUIボタン("小")).toHaveAttribute("aria-pressed", "false");
   });
 });
 
@@ -799,6 +990,110 @@ describe("AppSettingsPanel プリセット", () => {
     // ストアの loadPreset を直接呼ばず、onLoadPreset 経由のみで読み込むこと
     expect(mockStoreState.loadPreset).not.toHaveBeenCalled();
     await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+});
+
+describe("AppSettingsPanel 設定パッチの全項目反映", () => {
+  const distinctGlobalSettings: GlobalSettings = {
+    ...baseGlobalSettings,
+    defaultAutoReloadEnabled: false,
+    defaultAutoReloadInterval: 123,
+    defaultShowCountdown: false,
+    defaultHideHeaderEnabled: false,
+    defaultHideTweetInputEnabled: false,
+    defaultShowCustomMenu: true,
+    defaultScrollPosRestoreEnabled: true,
+    defaultColumnCustomCSS: ".test{}",
+    popupEscCloseEnabled: false,
+    videoAutoPlayStopEnabled: false,
+    imagePopupEnabled: false,
+    videoPopupEnabled: false,
+    smallImageEnabled: true,
+    smallImageWidth: "70%",
+    blurImageEnabled: true,
+    blurImageAmount: "20px",
+    hideAdEnabled: false,
+    apiRateLimitMonitorEnabled: false,
+    useXAppForCompose: true,
+    mobileSwipeAreaEnabled: false,
+    mobileSwipeAreaHeight: 30,
+    mobileSwipeAreaOpacity: 80,
+    mobileTwoColumnEnabled: false,
+    mobileColumnCount: 4,
+    ngWords: ["spam", "bot"],
+    repostHiddenUserIds: ["user_a", "user_b"],
+  };
+
+  it("適用すると全体設定の全項目がonApplyに渡される", () => {
+    const onApply = vi.fn();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={distinctGlobalSettings}
+        onApply={onApply}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledTimes(1);
+    expect(onApply).toHaveBeenCalledWith({
+      defaultAutoReloadEnabled: false,
+      defaultAutoReloadInterval: 123,
+      defaultShowCountdown: false,
+      defaultHideHeaderEnabled: false,
+      defaultHideTweetInputEnabled: false,
+      defaultShowCustomMenu: true,
+      defaultScrollPosRestoreEnabled: true,
+      defaultColumnCustomCSS: ".test{}",
+      popupEscCloseEnabled: false,
+      videoAutoPlayStopEnabled: false,
+      hardwareVideoDecodeEnabled: true,
+      imagePopupEnabled: false,
+      videoPopupEnabled: false,
+      smallImageEnabled: true,
+      smallImageWidth: "70%",
+      blurImageEnabled: true,
+      blurImageAmount: "20px",
+      hideAdEnabled: false,
+      apiRateLimitMonitorEnabled: false,
+      language: "auto",
+      useXAppForCompose: true,
+      mobileSwipeAreaEnabled: false,
+      mobileSwipeAreaHeight: 30,
+      mobileSwipeAreaOpacity: 80,
+      mobileTwoColumnEnabled: false,
+      mobileColumnCount: 4,
+      ngWords: ["spam", "bot"],
+      repostHiddenUserIds: ["user_a", "user_b"],
+    });
+  });
+
+  it("カラムデフォルトを全カラムに適用すると全項目がonApplyColumnDefaultsに渡される", () => {
+    const onApplyColumnDefaults = vi.fn();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={distinctGlobalSettings}
+        onApplyColumnDefaults={onApplyColumnDefaults}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "既存の全カラムに適用" }),
+    );
+    expect(onApplyColumnDefaults).toHaveBeenCalledTimes(1);
+    expect(onApplyColumnDefaults).toHaveBeenCalledWith({
+      autoReloadEnabled: false,
+      autoReloadInterval: 123,
+      showCountdown: false,
+      hideHeaderEnabled: false,
+      hideTweetInputEnabled: false,
+      showCustomMenu: true,
+      scrollPosRestoreEnabled: true,
+      customCSS: ".test{}",
+      smallImageEnabled: true,
+      smallImageWidth: "70%",
+      blurImageEnabled: true,
+      blurImageAmount: "20px",
+    });
   });
 });
 
@@ -880,5 +1175,917 @@ describe("AppSettingsPanel 削除保留データフォルダの再実行", () =>
     expect(onApply).toHaveBeenCalledTimes(1);
     const patch = onApply.mock.calls[0][0] as Record<string, unknown>;
     expect(patch).not.toHaveProperty("pendingDataDirectoryDeletions");
+  });
+});
+
+describe("AppSettingsPanel カラムデフォルトの写真閲覧後スクロール位置復元と画像縮小の連動", () => {
+  const label = "写真閲覧後のスクロール位置を復元する";
+  const renderWith = (overrides: Partial<GlobalSettings>) => {
+    const onApply = vi.fn();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={{ ...baseGlobalSettings, ...overrides }}
+        onApply={onApply}
+      />,
+    );
+    return onApply;
+  };
+  const toggleSmallImage = () =>
+    screen.getByRole("checkbox", { name: "画像を縮小表示する" });
+
+  it("画像を縮小表示するがONのとき写真閲覧後のスクロール位置を復元する設定が表示される", () => {
+    renderWith({ smallImageEnabled: true });
+    expect(screen.getByRole("checkbox", { name: label })).toBeInTheDocument();
+  });
+
+  it("画像を縮小表示するがOFFのとき写真閲覧後のスクロール位置を復元する設定は表示されない", () => {
+    renderWith({ smallImageEnabled: false });
+    expect(
+      screen.queryByRole("checkbox", { name: label }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("画像を縮小表示するをOFFにすると写真閲覧後のスクロール位置を復元する設定もOFFになる", () => {
+    const onApply = renderWith({
+      smallImageEnabled: true,
+      defaultScrollPosRestoreEnabled: true,
+    });
+    fireEvent.click(toggleSmallImage());
+    expect(
+      screen.queryByRole("checkbox", { name: label }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        smallImageEnabled: false,
+        defaultScrollPosRestoreEnabled: false,
+      }),
+    );
+  });
+
+  it("画像を縮小表示するをOFFにしてから再度ONにしても復元設定はOFFのままである", () => {
+    const onApply = renderWith({
+      smallImageEnabled: true,
+      defaultScrollPosRestoreEnabled: true,
+    });
+    fireEvent.click(toggleSmallImage());
+    fireEvent.click(toggleSmallImage());
+    expect(screen.getByRole("checkbox", { name: label })).not.toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        smallImageEnabled: true,
+        defaultScrollPosRestoreEnabled: false,
+      }),
+    );
+  });
+
+  it("画像を縮小表示するをOFFにしても復元設定がもともとOFFならOFFのままである", () => {
+    const onApply = renderWith({
+      smallImageEnabled: true,
+      defaultScrollPosRestoreEnabled: false,
+    });
+    fireEvent.click(toggleSmallImage());
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        smallImageEnabled: false,
+        defaultScrollPosRestoreEnabled: false,
+      }),
+    );
+  });
+});
+
+describe("AppSettingsPanel バックアップタブ", () => {
+  it("デスクトップでもバックアップタブが表示され、開くと作成と復元の操作が出る", () => {
+    mockStoreState.isMobile = false;
+    render(<AppSettingsPanel {...defaultProps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "バックアップ" }));
+
+    expect(
+      screen.getByRole("button", { name: "バックアップを書き出す" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "バックアップファイルを選択" }),
+    ).toBeInTheDocument();
+  });
+
+  it("isMobile=true（Android）でもバックアップタブが表示される", () => {
+    mockStoreState.isMobile = true;
+    render(<AppSettingsPanel {...defaultProps} />);
+
+    expect(
+      screen.getByRole("button", { name: "バックアップ" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("AppSettingsPanel Linux向け動画再生設定", () => {
+  const h264Base = {
+    downloadApplicable: true,
+    h264Available: false,
+    downloadState: "idle" as const,
+    downloadError: null,
+    onEnable: vi.fn(),
+    onRelaunch: vi.fn(),
+  };
+
+  beforeEach(() => {
+    h264Base.onEnable = vi.fn();
+    h264Base.onRelaunch = vi.fn();
+  });
+
+  it("案内を拒否した後でもアプリ設定画面からh264を有効化できる", () => {
+    const settings = {
+      ...baseGlobalSettings,
+      h264DownloadPromptDismissed: true,
+    };
+    const { rerender } = render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={settings}
+        isLinux
+        h264Setup={h264Base}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "H.264 を有効化" }));
+    expect(h264Base.onEnable).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={settings}
+        isLinux
+        h264Setup={{ ...h264Base, downloadState: "downloading" }}
+      />,
+    );
+    expect(screen.getByText("ダウンロード中…")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "H.264 を有効化" }),
+    ).toBeDisabled();
+  });
+
+  it("h264が取得済みのときアプリ設定画面には有効化済みと表示される", () => {
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        isLinux
+        h264Setup={{ ...h264Base, h264Available: true }}
+      />,
+    );
+    expect(screen.getByText("H.264: 有効化済み")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "H.264 を有効化" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("deb版ではアプリ設定画面にh264の項目は表示されずハードウェアデコードの項目は表示される", () => {
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        isLinux
+        h264Setup={{ ...h264Base, downloadApplicable: false }}
+      />,
+    );
+    expect(screen.queryByText(/H\.264/)).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", {
+        name: "ハードウェアデコードを使う（VA-API）",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("linux以外のデスクトップではアプリ設定画面にh264とハードウェアデコードの項目が表示されない", () => {
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        isLinux={false}
+        h264Setup={h264Base}
+      />,
+    );
+    expect(screen.queryByText(/H\.264/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("checkbox", {
+        name: "ハードウェアデコードを使う（VA-API）",
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("モバイルではLinux向け動画再生設定が表示されない", () => {
+    mockStoreState.isMobile = true;
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(
+      screen.queryByRole("checkbox", {
+        name: "ハードウェアデコードを使う（VA-API）",
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("ハードウェアデコード設定を切り替えると再起動が必要である旨が表示される", () => {
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        isLinux
+        startupHardwareVideoDecodeEnabled
+      />,
+    );
+    expect(
+      screen.queryByText("再起動後に反映されます"),
+    ).not.toBeInTheDocument();
+
+    const checkbox = screen.getByRole("checkbox", {
+      name: "ハードウェアデコードを使う（VA-API）",
+    });
+    expect(checkbox).toBeChecked();
+    fireEvent.click(checkbox);
+    expect(screen.getByText("再起動後に反映されます")).toBeInTheDocument();
+
+    // 起動時の値へ戻すと案内は消える
+    fireEvent.click(checkbox);
+    expect(
+      screen.queryByText("再起動後に反映されます"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("保存済みの設定が起動時の値と異なるときは開いた直後から再起動の案内が表示される", () => {
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={{ ...baseGlobalSettings, hardwareVideoDecodeEnabled: false }}
+        isLinux
+        startupHardwareVideoDecodeEnabled
+      />,
+    );
+    expect(screen.getByText("再起動後に反映されます")).toBeInTheDocument();
+  });
+
+  it("ハードウェアデコードを切り替えて適用するとパッチに反映されh264の拒否状態は含まれない", () => {
+    const onApply = vi.fn();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        onApply={onApply}
+        isLinux
+        startupHardwareVideoDecodeEnabled
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: "ハードウェアデコードを使う（VA-API）",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ hardwareVideoDecodeEnabled: false }),
+    );
+    expect(onApply.mock.calls[0][0]).not.toHaveProperty(
+      "h264DownloadPromptDismissed",
+    );
+  });
+
+  it("h264の取得に成功すると再起動の案内と今すぐ再起動ボタンが表示され押すと再起動される", () => {
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        isLinux
+        h264Setup={{
+          ...h264Base,
+          h264Available: true,
+          downloadState: "success",
+        }}
+      />,
+    );
+    expect(screen.getByText(/再起動後に反映されます/)).toBeInTheDocument();
+    expect(screen.queryByText("H.264: 有効化済み")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "今すぐ再起動" }));
+    expect(h264Base.onRelaunch).toHaveBeenCalledTimes(1);
+  });
+
+  it("h264の取得に失敗するとエラー文が表示され再試行できる", () => {
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        isLinux
+        h264Setup={{
+          ...h264Base,
+          downloadState: "error",
+          downloadError: "ネットワークに接続できません",
+        }}
+      />,
+    );
+    expect(
+      screen.getByText("ネットワークに接続できません"),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "再試行" }));
+    expect(h264Base.onEnable).toHaveBeenCalledTimes(1);
+  });
+
+  it("h264の取得失敗がAppErrorのとき表示言語に応じた文言になり言語切替に追従する", async () => {
+    const { container } = render(
+      <AppSettingsPanel
+        {...defaultProps}
+        isLinux
+        h264Setup={{
+          ...h264Base,
+          downloadState: "error",
+          downloadError: { code: "h264.unsupportedArch", detail: "aarch64" },
+        }}
+      />,
+    );
+    expect(
+      screen.getByText(
+        "この環境（aarch64）には対応していません。H.264 コーデックの自動取得は x86_64 のみ対応です",
+      ),
+    ).toBeInTheDocument();
+
+    await act(() => i18n.changeLanguage("en"));
+    try {
+      expect(
+        screen.getByText(
+          "This environment (aarch64) is not supported. Automatic H.264 codec download is only available on x86_64",
+        ),
+      ).toBeInTheDocument();
+      const alert = container.querySelector('[role="alert"]');
+      expectNoJapanese(alert as HTMLElement);
+    } finally {
+      await act(() => i18n.changeLanguage("ja"));
+    }
+  });
+});
+
+const グループ見出し一覧 = () =>
+  screen
+    .getAllByRole("heading", { level: 2 })
+    .map((h) => h.textContent)
+    .filter((t) => t !== "アプリ設定");
+
+const グループ要素 = (title: string) => {
+  const heading = screen.getByRole("heading", { level: 2, name: title });
+  return heading.parentElement as HTMLElement;
+};
+
+describe("AppSettingsPanel 一般タブのグループ構成", () => {
+  it("一般タブのグループが依存関係順に並ぶ（デスクトップ）", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(グループ見出し一覧()).toEqual([
+      "表示",
+      "新規カラムの既定値",
+      "閲覧・フィルタ",
+      "メディア",
+      "アプリ・メンテナンス",
+    ]);
+  });
+
+  it("一般タブのグループが依存関係順に並び、モバイルではメディアとアプリ・メンテナンスの間にAndroid専用が入る", () => {
+    mockStoreState.isMobile = true;
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(グループ見出し一覧()).toEqual([
+      "表示",
+      "新規カラムの既定値",
+      "閲覧・フィルタ",
+      "メディア",
+      "Android専用",
+      "アプリ・メンテナンス",
+    ]);
+  });
+
+  it("閲覧・フィルタグループにNGワード・リポスト非表示ユーザー・広告・API残量モニターが含まれる", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    const group = グループ要素("閲覧・フィルタ");
+    for (const name of [
+      /グローバルNGワード/,
+      /リポストを非表示にするユーザー/,
+      /広告/,
+      /API残量モニター/,
+    ]) {
+      expect(
+        within(group).getByRole("heading", { level: 3, name }),
+      ).toBeInTheDocument();
+    }
+  });
+
+  it("デスクトップではポップアップ設定がメディアグループに表示される", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    const group = グループ要素("メディア");
+    for (const name of [
+      "Escキーで閉じる",
+      "画像をポップアップウィンドウで開く",
+      "動画をポップアップウィンドウで開く",
+    ]) {
+      expect(within(group).getByRole("checkbox", { name })).toBeInTheDocument();
+    }
+  });
+
+  it("モバイルではポップアップ設定が表示されない", () => {
+    mockStoreState.isMobile = true;
+    render(<AppSettingsPanel {...defaultProps} />);
+    for (const name of [
+      "Escキーで閉じる",
+      "画像をポップアップウィンドウで開く",
+      "動画をポップアップウィンドウで開く",
+    ]) {
+      expect(screen.queryByRole("checkbox", { name })).not.toBeInTheDocument();
+    }
+  });
+
+  it("Linuxデスクトップでは動画再生（Linux）がメディアグループに表示される", () => {
+    render(<AppSettingsPanel {...defaultProps} isLinux />);
+    const group = グループ要素("メディア");
+    expect(
+      within(group).getByRole("checkbox", {
+        name: "ハードウェアデコードを使う（VA-API）",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it.each(["Windows", "macOS"])(
+    "Linux以外のデスクトップ（%s）では動画再生（Linux）が表示されない",
+    () => {
+      render(<AppSettingsPanel {...defaultProps} isLinux={false} />);
+      expect(screen.queryByText(/動画再生（Linux）/)).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("checkbox", {
+          name: "ハードウェアデコードを使う（VA-API）",
+        }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it("モバイルでは動画再生（Linux）が表示されない", () => {
+    mockStoreState.isMobile = true;
+    render(<AppSettingsPanel {...defaultProps} isLinux />);
+    expect(screen.queryByText(/動画再生（Linux）/)).not.toBeInTheDocument();
+  });
+
+  it("モバイルではAndroid専用グループにツイート（Android）とスワイプ切替が表示される", () => {
+    mockStoreState.isMobile = true;
+    render(<AppSettingsPanel {...defaultProps} />);
+    const group = グループ要素("Android専用");
+    expect(
+      within(group).getByRole("heading", {
+        level: 3,
+        name: /ツイート（Android）/,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(group).getByRole("heading", { level: 3, name: /スワイプ切替/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(group).getByRole("checkbox", {
+        name: "広い画面で複数カラム表示（タブレット・横向き）",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("デスクトップではAndroid専用グループが見出しごと表示されない", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(
+      screen.queryByRole("heading", { name: "Android専用" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/ツイート（Android）/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/スワイプ切替/)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["デスクトップ", false],
+    ["モバイル", true],
+  ])(
+    "全環境（%s）で動画の自動再生停止・表示・新規カラムの既定値が表示される",
+    (_name, isMobile) => {
+      mockStoreState.isMobile = isMobile;
+      render(<AppSettingsPanel {...defaultProps} />);
+      expect(
+        within(グループ要素("メディア")).getByRole("checkbox", {
+          name: "動画の自動再生を停止する",
+        }),
+      ).toBeInTheDocument();
+      expect(
+        within(グループ要素("表示")).getByRole("heading", { level: 3 }),
+      ).toBeInTheDocument();
+      expect(
+        within(グループ要素("新規カラムの既定値")).getAllByRole("heading", {
+          level: 3,
+        }).length,
+      ).toBeGreaterThan(0);
+    },
+  );
+
+  it.each([
+    ["デスクトップ", false],
+    ["モバイル", true],
+  ])(
+    "全環境（%s）でアプリ・メンテナンスに公式設定・WebView・アプリ情報が表示される",
+    (_name, isMobile) => {
+      mockStoreState.isMobile = isMobile;
+      render(<AppSettingsPanel {...defaultProps} />);
+      const group = グループ要素("アプリ・メンテナンス");
+      expect(
+        within(group).getByRole("button", { name: "公式設定を開く" }),
+      ).toBeInTheDocument();
+      expect(
+        within(group).getByRole("heading", { level: 3, name: "WebView" }),
+      ).toBeInTheDocument();
+      expect(
+        within(group).getByRole("heading", { level: 3, name: "アプリ情報" }),
+      ).toBeInTheDocument();
+    },
+  );
+
+  it("モバイルで非表示のポップアップ関連設定値も適用時のpatchに保存内容のまま含まれる", () => {
+    mockStoreState.isMobile = true;
+    const onApply = vi.fn();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={{
+          ...baseGlobalSettings,
+          popupEscCloseEnabled: false,
+          imagePopupEnabled: false,
+          videoPopupEnabled: false,
+        }}
+        onApply={onApply}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        popupEscCloseEnabled: false,
+        imagePopupEnabled: false,
+        videoPopupEnabled: false,
+      }),
+    );
+  });
+});
+
+describe("AppSettingsPanel 拡張機能タブ", () => {
+  it("Windowsでは設定画面に拡張機能の管理が表示される", async () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "拡張機能" }));
+
+    expect(
+      await screen.findByRole("button", { name: "フォルダを指定して追加" }),
+    ).toBeInTheDocument();
+    expect(extensionsService.listExtensions).toHaveBeenCalled();
+  });
+
+  it.each([
+    ["Linux", "linux", false],
+    ["macOS", "macos", false],
+    ["Android（モバイル）", "android", true],
+    ["Windowsのモバイル扱い", "windows", true],
+  ])(
+    "Windows以外とモバイルでは拡張機能の管理が表示されない（%s）",
+    (_name, platformName, isMobile) => {
+      mockPlatform.mockReturnValue(platformName);
+      mockStoreState.isMobile = isMobile;
+
+      render(<AppSettingsPanel {...defaultProps} />);
+
+      expect(
+        screen.queryByRole("button", { name: "拡張機能" }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it("拡張機能タブの変更成功がonExtensionsChangedで通知される", async () => {
+    const onExtensionsChanged = vi.fn();
+    vi.mocked(extensionsService.pickExtensionFolder).mockResolvedValue(
+      "C:/ext",
+    );
+    vi.mocked(extensionsService.addExtensionFromFolder).mockResolvedValue(
+      {} as never,
+    );
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        onExtensionsChanged={onExtensionsChanged}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "拡張機能" }));
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "フォルダを指定して追加" }),
+    );
+
+    await waitFor(() => expect(onExtensionsChanged).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe("AppSettingsPanel 表示言語", () => {
+  const getLanguageGroup = (name: string) =>
+    screen.getByRole("group", { name });
+
+  it("設定画面の言語選択肢は自動・日本語・Englishの3つである", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    const buttons = within(getLanguageGroup("表示言語")).getAllByRole("button");
+    expect(buttons.map((b) => b.textContent)).toEqual([
+      "自動",
+      "日本語",
+      "English",
+    ]);
+  });
+
+  it("英語表示でも日本語とEnglishはそれぞれの言語の表記で表示される", async () => {
+    await i18n.changeLanguage("en");
+    render(<AppSettingsPanel {...defaultProps} />);
+    const buttons = within(getLanguageGroup("Language")).getAllByRole("button");
+    expect(buttons.map((b) => b.textContent)).toEqual([
+      "Auto",
+      "日本語",
+      "English",
+    ]);
+  });
+
+  it("Englishを選んで適用するとonApplyに渡るパッチの言語がenになる", () => {
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    fireEvent.click(
+      within(getLanguageGroup("表示言語")).getByRole("button", {
+        name: "English",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ language: "en" }),
+    );
+  });
+
+  it("言語を変更しなければ現在の言語設定がそのままパッチに渡る", () => {
+    const onApply = vi.fn();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={{ ...baseGlobalSettings, language: "ja" }}
+        onApply={onApply}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ language: "ja" }),
+    );
+  });
+});
+
+/** 言語選択肢の「日本語」は各言語の自国語表記で出すため、検査対象から外して日本語が残っていないか確認する */
+function expectNoJapaneseOutsideLanguagePicker() {
+  const clone = document.body.cloneNode(true) as HTMLElement;
+  clone.querySelector('[role="group"][aria-label="Language"]')?.remove();
+  expectNoJapanese(clone);
+}
+
+describe("AppSettingsPanel 英語表示", () => {
+  const englishAccount: Account = {
+    id: "acc-en",
+    label: "Main",
+    dataDirectory: "/data-en",
+    color: "#1d9bf0",
+    createdAt: "2026-05-03T00:00:00Z",
+  };
+  const layoutColumns: Column[] = [
+    {
+      ...mockColumns[0],
+      id: "e1",
+      accountId: "acc-en",
+      gridRow: 1,
+      gridCol: 1,
+      heightMode: "fixed",
+      heightValue: 300,
+      heightUnit: "px",
+      order: 0,
+    },
+    {
+      ...mockColumns[0],
+      id: "e2",
+      accountId: "acc-en",
+      pageType: "notifications",
+      gridRow: 0,
+      gridCol: 0,
+      order: 1,
+    },
+  ];
+  const h264Idle = {
+    downloadApplicable: true,
+    h264Available: false,
+    downloadState: "idle" as const,
+    downloadError: null,
+    onEnable: vi.fn(),
+    onRelaunch: vi.fn(),
+  };
+
+  beforeEach(async () => {
+    await i18n.changeLanguage("en");
+  });
+
+  it("表示言語が英語のとき一般タブに日本語の文言が表示されない", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <AppSettingsPanel
+        {...defaultProps}
+        accounts={[englishAccount]}
+        pendingDataDirectoryDeletionCount={2}
+        updateManualResult="error"
+        isLinux
+        h264Setup={h264Idle}
+        settings={{ ...baseGlobalSettings, hardwareVideoDecodeEnabled: false }}
+        startupHardwareVideoDecodeEnabled
+      />,
+    );
+    await user.click(
+      screen.getByRole("button", { name: "How to write muted words" }),
+    );
+    await user.click(screen.getByRole("checkbox", { name: /VA-API/ }));
+    await user.click(
+      screen.getByRole("checkbox", {
+        name: "Change the app UI display size",
+      }),
+    );
+    expectNoJapaneseOutsideLanguagePicker();
+    expect(screen.getByText("App settings")).toBeInTheDocument();
+    expect(screen.getByText("Global muted words")).toBeInTheDocument();
+
+    // 状態の違う文言も確認する
+    for (const props of [
+      { updateManualResult: "none" as const, updateChecking: true },
+      { pendingDataDirectoryDeletionCount: 1 },
+    ]) {
+      rerender(
+        <AppSettingsPanel
+          {...defaultProps}
+          accounts={[englishAccount]}
+          isLinux
+          h264Setup={{ ...h264Idle, downloadState: "success" }}
+          {...props}
+        />,
+      );
+      expectNoJapaneseOutsideLanguagePicker();
+    }
+    for (const h264 of [
+      { ...h264Idle, downloadState: "downloading" as const },
+      { ...h264Idle, downloadState: "error" as const },
+      { ...h264Idle, h264Available: true },
+    ]) {
+      rerender(<AppSettingsPanel {...defaultProps} isLinux h264Setup={h264} />);
+      expectNoJapaneseOutsideLanguagePicker();
+    }
+  });
+
+  it("表示言語が英語のとき削除保留データフォルダの件数が単数形と複数形で表示される", async () => {
+    const user = userEvent.setup();
+    const onRetry = vi.fn().mockResolvedValue({ remaining: 1 });
+    const { rerender } = render(
+      <AppSettingsPanel
+        {...defaultProps}
+        pendingDataDirectoryDeletionCount={1}
+        onRetryDataDirectoryDeletion={onRetry}
+      />,
+    );
+    expect(
+      screen.getByText("1 data folder could not be deleted"),
+    ).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: "Retry deleting data folders" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getAllByText("1 data folder could not be deleted"),
+      ).toHaveLength(2),
+    );
+    rerender(
+      <AppSettingsPanel
+        {...defaultProps}
+        pendingDataDirectoryDeletionCount={3}
+        onRetryDataDirectoryDeletion={onRetry}
+      />,
+    );
+    expect(
+      screen.getByText("3 data folders could not be deleted"),
+    ).toBeInTheDocument();
+  });
+
+  it("表示言語が英語のときモバイルの一般タブとカラム配置タブに日本語の文言が表示されない", async () => {
+    mockStoreState.isMobile = true;
+    const user = userEvent.setup();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        accounts={[englishAccount]}
+        columns={layoutColumns}
+      />,
+    );
+    expect(screen.getByText("Android only")).toBeInTheDocument();
+    expectNoJapaneseOutsideLanguagePicker();
+    await user.click(screen.getByRole("button", { name: "Column layout" }));
+    expect(screen.getByText("Display order")).toBeInTheDocument();
+    expectNoJapaneseOutsideLanguagePicker();
+  });
+
+  it("表示言語が英語のときカラム配置タブに日本語の文言が表示されない", async () => {
+    const user = userEvent.setup();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        accounts={[englishAccount]}
+        columns={layoutColumns}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Column layout" }));
+    expectNoJapaneseOutsideLanguagePicker();
+
+    // 空きセルを選ぶと配置待ちの案内が出る
+    fireEvent.change(screen.getByRole("spinbutton"), {
+      target: { value: "2" },
+    });
+    await user.click(screen.getAllByRole("button", { name: "+ Add row" })[0]);
+    expect(screen.getByText("← Place here")).toBeInTheDocument();
+    expect(
+      screen.getByText("Click to place at column 1, row 2"),
+    ).toBeInTheDocument();
+    expectNoJapaneseOutsideLanguagePicker();
+
+    // 割り当て済みセルを選ぶと高さ設定が出る
+    await user.click(
+      screen.getByRole("button", { name: "Cell at column 1, row 1" }),
+    );
+    expect(screen.getByText(/Height settings/)).toBeInTheDocument();
+    expectNoJapaneseOutsideLanguagePicker();
+  });
+
+  it("表示言語が英語のときプリセットタブに日本語の文言が表示されない", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<AppSettingsPanel {...defaultProps} />);
+    await user.click(screen.getByRole("button", { name: "Presets" }));
+    expect(screen.getByText("No saved presets")).toBeInTheDocument();
+    expectNoJapaneseOutsideLanguagePicker();
+
+    rerender(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={{
+          ...baseGlobalSettings,
+          presets: [{ id: "p1", name: "Work", columns: [] }],
+        }}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Load" })).toBeInTheDocument();
+    expectNoJapaneseOutsideLanguagePicker();
+  });
+});
+
+describe("AppSettingsPanel 表示言語の動的な切り替え", () => {
+  it("画面を開いたまま言語を適用すると開いている画面の文言が切り替わる", async () => {
+    const user = userEvent.setup();
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(screen.getByText("アプリ設定")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "適用" })).toBeInTheDocument();
+
+    await act(async () => {
+      await i18n.changeLanguage("en");
+    });
+
+    expect(screen.getByText("App settings")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apply" })).toBeInTheDocument();
+    expect(screen.queryByText("アプリ設定")).not.toBeInTheDocument();
+
+    // 開いたまま別タブへ移動しても英語のまま
+    await user.click(screen.getByRole("button", { name: "Presets" }));
+    expect(screen.getByText("No saved presets")).toBeInTheDocument();
+  });
+
+  it("表示言語が英語のとき入力検証のエラーが英語で表示され日本語を含まない", async () => {
+    await i18n.changeLanguage("en");
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    fireEvent.change(
+      screen.getByPlaceholderText(
+        "One word per line (applies to all columns; /regex/flags is also accepted)",
+      ),
+      { target: { value: "/[[/" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+    expect(
+      screen.getByText("Invalid regular expression: /[[/"),
+    ).toBeInTheDocument();
+    expectNoJapaneseOutsideLanguagePicker();
+
+    fireEvent.change(
+      screen.getByPlaceholderText(
+        "One word per line (applies to all columns; /regex/flags is also accepted)",
+      ),
+      { target: { value: "" } },
+    );
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Users whose reposts are hidden" }),
+      { target: { value: "bad-id!" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+    expect(
+      screen.getByText(
+        "`bad-id!` is not a valid X username (1–15 letters, numbers, or underscores)",
+      ),
+    ).toBeInTheDocument();
+    expect(onApply).not.toHaveBeenCalled();
   });
 });

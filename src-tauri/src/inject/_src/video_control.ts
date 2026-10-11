@@ -12,17 +12,53 @@ const VIDEO_CONTROL_PLAYER_SELECTOR = '[data-testid="videoComponent"]';
   // タイムライン仮想リストの再マウントでXが自動 play() を呼んでも止めない。
   const unlockedVideos = new WeakSet<HTMLVideoElement>();
 
+  // X のプレイヤーは pause されると play() を再試行する。毎回 pause で応じると
+  // play/pause が無限ループしてスピナーと CPU が張り付くため、未アンロックの動画は
+  // 最初の play() だけ通し（playing を出してスピナーを消させ）、直後に 1 回だけ止める。
+  // 以降の play() は何もせず解決済みの Promise を返す。
+  const firstPlayDone = new WeakSet<HTMLVideoElement>();
+  const firstPlayPassing = new WeakSet<HTMLVideoElement>();
+  const originalPlay = HTMLMediaElement.prototype.play;
+
+  HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+    if (
+      this instanceof HTMLVideoElement &&
+      !isMediaViewerPath(window.location.pathname) &&
+      !unlockedVideos.has(this)
+    ) {
+      if (firstPlayDone.has(this)) {
+        return Promise.resolve();
+      }
+      firstPlayDone.add(this);
+      firstPlayPassing.add(this);
+      const video = this;
+      video.addEventListener(
+        "playing",
+        () => {
+          firstPlayPassing.delete(video);
+          if (!unlockedVideos.has(video)) {
+            video.pause();
+          }
+        },
+        { once: true },
+      );
+    }
+    return originalPlay.call(this);
+  };
+
   function blockFirstAutoplay(video: HTMLVideoElement): void {
     // mediaviewer ではブロックしない（処理時点の URL でその都度判定する）
     if (isMediaViewerPath(window.location.pathname)) {
       return;
     }
-    video.pause();
+    if (!firstPlayPassing.has(video)) {
+      video.pause();
+    }
     video.addEventListener(
       "play",
       (e) => {
         const target = e.target as HTMLVideoElement;
-        if (!unlockedVideos.has(target)) {
+        if (!unlockedVideos.has(target) && !firstPlayPassing.has(target)) {
           target.pause();
         }
       },

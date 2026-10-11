@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import i18n from "@/i18n";
+import { containsJapanese } from "@/test-utils/japanese";
 import { parseUserIdLines, validateUserIdLine } from "./repostHiddenUserId";
 
 describe("parseUserIdLines", () => {
@@ -49,42 +51,58 @@ describe("parseUserIdLines", () => {
 
 describe("validateUserIdLine", () => {
   it("英数字とアンダースコアのIDは有効(null)を返す", () => {
-    expect(validateUserIdLine("Alice_01")).toBeNull();
+    expect(validateUserIdLine("Alice_01", i18n.t)).toBeNull();
   });
 
   it("15文字のIDは有効(null)を返す", () => {
-    expect(validateUserIdLine("a".repeat(15))).toBeNull();
+    expect(validateUserIdLine("a".repeat(15), i18n.t)).toBeNull();
   });
 
   it("1文字のIDは有効(null)を返す", () => {
-    expect(validateUserIdLine("a")).toBeNull();
+    expect(validateUserIdLine("a", i18n.t)).toBeNull();
   });
 
   it("16文字以上のIDはエラーメッセージを返す", () => {
-    expect(validateUserIdLine("a".repeat(16))).toBe(
+    expect(validateUserIdLine("a".repeat(16), i18n.t)).toBe(
       `\`${"a".repeat(16)}\` はXのユーザーIDとして正しくありません（英数字とアンダースコアの1〜15文字）`,
     );
   });
 
   it("空文字列はエラーメッセージを返す", () => {
-    expect(validateUserIdLine("")).not.toBeNull();
+    expect(validateUserIdLine("", i18n.t)).not.toBeNull();
   });
 
   it("ハイフンなど使えない文字を含むIDはエラーメッセージを返す", () => {
-    expect(validateUserIdLine("bad-id")).toBe(
+    expect(validateUserIdLine("bad-id", i18n.t)).toBe(
       "`bad-id` はXのユーザーIDとして正しくありません（英数字とアンダースコアの1〜15文字）",
     );
   });
 
   it("スラッシュを含むIDはエラーメッセージを返す", () => {
-    expect(validateUserIdLine("alice/status")).not.toBeNull();
+    expect(validateUserIdLine("alice/status", i18n.t)).not.toBeNull();
   });
 
   it("空白を含むIDはエラーメッセージを返す", () => {
-    expect(validateUserIdLine("a b")).not.toBeNull();
+    expect(validateUserIdLine("a b", i18n.t)).not.toBeNull();
   });
 
   it("日本語を含むIDはエラーメッセージを返す", () => {
-    expect(validateUserIdLine("ユーザー")).not.toBeNull();
+    expect(validateUserIdLine("ユーザー", i18n.t)).not.toBeNull();
+  });
+});
+
+describe("validateUserIdLine（エラー文言の言語）", () => {
+  it("日本語の翻訳関数を渡すと日本語のエラー文言を返す", () => {
+    expect(validateUserIdLine("bad-id", i18n.getFixedT("ja"))).toBe(
+      "`bad-id` はXのユーザーIDとして正しくありません（英数字とアンダースコアの1〜15文字）",
+    );
+  });
+
+  it("英語の翻訳関数を渡すと日本語を含まない英語のエラー文言を返す", () => {
+    const result = validateUserIdLine("bad-id", i18n.getFixedT("en"));
+    expect(result).toBe(
+      "`bad-id` is not a valid X username (1–15 letters, numbers, or underscores)",
+    );
+    expect(containsJapanese(result ?? "")).toBe(false);
   });
 });

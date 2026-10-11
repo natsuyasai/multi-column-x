@@ -1,5 +1,6 @@
 //! カラム WebView の作成・削除・リサイズ・Cookie 切替。
 #[cfg(desktop)]
+use super::external_link;
 use super::parse_url;
 use crate::commands::settings::ColumnData;
 use crate::commands::settings_store::{column_script_settings_from, load_global_settings};
@@ -92,6 +93,12 @@ fn is_return_to_last_read_target(column: &ColumnData) -> bool {
     column.page_type == "home"
 }
 
+/// 写真閲覧後のスクロール位置復元は、画像縮小表示が有効なときだけ有効にする。
+/// 縮小表示がOFFのときは復元設定がONでも無効として扱う。
+fn effective_scroll_pos_restore_enabled(column: &ColumnData) -> bool {
+    column.settings.scroll_pos_restore_enabled && column.settings.small_image_enabled
+}
+
 /// モバイルかつスワイプ切替領域が有効なときだけ、その高さ(px/dp)を返す。
 /// それ以外（デスクトップ、またはモバイルでも無効時）は0を返し、
 /// 「前回の続きへ戻る」ボタン等の下端位置補正に使う。
@@ -116,7 +123,7 @@ fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: boo
         hide_header_enabled: column.settings.hide_header_enabled,
         hide_tweet_input_enabled: effective_hide_tweet_input_enabled(column),
         show_custom_menu: column.settings.show_custom_menu,
-        scroll_pos_restore_enabled: column.settings.scroll_pos_restore_enabled,
+        scroll_pos_restore_enabled: effective_scroll_pos_restore_enabled(column),
         video_auto_play_stop_enabled: script_settings.video_auto_play_stop_enabled,
         small_image_enabled: column.settings.small_image_enabled,
         small_image_width: &column.settings.small_image_width,
@@ -140,6 +147,7 @@ fn build_column_init_script(app: &AppHandle, column: &ColumnData, is_mobile: boo
         return_to_last_read_included: is_return_to_last_read_target(column),
         return_to_last_read_enabled: column.settings.return_to_last_read_enabled,
         mobile_swipe_area_offset: resolve_mobile_swipe_area_offset(is_mobile, &script_settings),
+        language: crate::commands::ui_language::current_ui_lang(app).as_code(),
     })
 }
 
@@ -246,6 +254,7 @@ pub async fn create_column_webview(
         let webview_window =
             tauri::WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(parse_url(&url)?))
                 .initialization_script(&init_script)
+                .on_new_window(external_link::new_window_handler(app.clone()))
                 .data_directory(data_dir)
                 .decorations(false)
                 .skip_taskbar(true)
@@ -280,15 +289,23 @@ pub async fn create_column_webview(
     }
 
     #[cfg(not(target_os = "linux"))]
-    let child_webview = window
-        .add_child(
-            WebviewBuilder::new(&label, WebviewUrl::External(parse_url(&url)?))
-                .initialization_script(&init_script)
-                .data_directory(data_dir),
-            LogicalPosition::new(args.x, args.y),
-            LogicalSize::new(args.width, args.height),
-        )
-        .map_err(|e| e.to_string())?;
+    let child_webview = {
+        let builder = WebviewBuilder::new(&label, WebviewUrl::External(parse_url(&url)?))
+            .initialization_script(&init_script)
+            .on_new_window(external_link::new_window_handler(app.clone()))
+            .data_directory(data_dir);
+        // 同一 data_directory の WebView2 環境はフラグが食い違うと生成に失敗するため、
+        // アカウントの data_directory を使う全 builder で Windows 限定で有効にする。
+        #[cfg(windows)]
+        let builder = builder.browser_extensions_enabled(true);
+        window
+            .add_child(
+                builder,
+                LogicalPosition::new(args.x, args.y),
+                LogicalSize::new(args.width, args.height),
+            )
+            .map_err(|e| e.to_string())?
+    };
 
     // Windows: カラム WebView が OS フォーカスを得たら column-webview-focused を emit する。
     // TS 側はこれを listen して、フォーカスが当たったカラムの未読バッジを自動的に消す。
@@ -318,6 +335,35 @@ pub async fn create_column_webview(
         args.column.account_id.clone(),
         args.data_directory.clone(),
     );
+    drop(registry);
+
+    // Windows: 拡張機能をこのカラムのプロファイルへ同期する。カラム作成のレスポンスを遅らせないよう
+    // 別タスクで実行し、WebView2 側に Add / Remove があったときだけ再読込する。
+    // 同一 data_directory のカラムが同時に作られても、service 側の直列化 Mutex により
+    // 2 回目以降は差分ゼロで即終了する。external カラムはアカウントではないため同期しない。
+    #[cfg(windows)]
+    if args.column.page_type != "external" {
+        let sync_app = app.clone();
+        let sync_webview = child_webview.clone();
+        let sync_data_directory = args.data_directory.clone();
+        tauri::async_runtime::spawn(async move {
+            match crate::commands::extensions::service::reconcile_webview(
+                &sync_app,
+                &sync_webview,
+                &sync_data_directory,
+            )
+            .await
+            {
+                Ok(true) => {
+                    if let Err(e) = sync_webview.reload() {
+                        log::warn!("[extensions] failed to reload the column: {e}");
+                    }
+                }
+                Ok(false) => {}
+                Err(e) => log::warn!("[extensions] failed to sync when creating the column: {e}"),
+            }
+        });
+    }
 
     Ok(())
 }
@@ -778,6 +824,30 @@ mod tests {
         let mut col = column("home");
         col.settings.hide_tweet_input_enabled = false;
         assert!(!effective_hide_tweet_input_enabled(&col));
+    }
+
+    #[test]
+    fn effective_scroll_pos_restore_enabledは縮小表示onかつ復元onでtrueになる() {
+        let mut col = column("home");
+        col.settings.small_image_enabled = true;
+        col.settings.scroll_pos_restore_enabled = true;
+        assert!(effective_scroll_pos_restore_enabled(&col));
+    }
+
+    #[test]
+    fn effective_scroll_pos_restore_enabledは縮小表示offなら復元onでもfalseになる() {
+        let mut col = column("home");
+        col.settings.small_image_enabled = false;
+        col.settings.scroll_pos_restore_enabled = true;
+        assert!(!effective_scroll_pos_restore_enabled(&col));
+    }
+
+    #[test]
+    fn effective_scroll_pos_restore_enabledは復元offなら縮小表示onでもfalseになる() {
+        let mut col = column("home");
+        col.settings.small_image_enabled = true;
+        col.settings.scroll_pos_restore_enabled = false;
+        assert!(!effective_scroll_pos_restore_enabled(&col));
     }
 
     #[test]

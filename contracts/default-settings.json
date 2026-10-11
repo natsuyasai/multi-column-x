@@ -2,7 +2,7 @@
   "accounts": [],
   "columns": [],
   "globalSettings": {
-    "theme": "dark",
+    "theme": "system",
     "customCSS": "",
     "windowBounds": {
       "x": 0.0,
@@ -17,7 +17,6 @@
     "videoAutoPlayStopEnabled": true,
     "imagePopupEnabled": true,
     "videoPopupEnabled": true,
-    "showSortButtons": false,
     "defaultShowCountdown": true,
     "defaultHideHeaderEnabled": true,
     "defaultHideTweetInputEnabled": true,
@@ -31,15 +30,20 @@
     "hideAdEnabled": true,
     "apiRateLimitMonitorEnabled": true,
     "columnScale": "default",
+    "uiScale": "auto",
+    "language": "auto",
     "useXAppForCompose": false,
     "mobileSwipeAreaEnabled": true,
     "mobileSwipeAreaHeight": 28,
     "mobileSwipeAreaOpacity": 50,
     "mobileTwoColumnEnabled": true,
+    "mobileColumnCount": 2,
     "presets": [],
     "ngWords": [],
     "repostHiddenUserIds": [],
-    "pendingDataDirectoryDeletions": []
+    "pendingDataDirectoryDeletions": [],
+    "hardwareVideoDecodeEnabled": true,
+    "h264DownloadPromptDismissed": false
   },
   "columnSettings": {
     "autoReloadEnabled": true,

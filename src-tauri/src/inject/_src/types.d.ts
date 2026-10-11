@@ -10,6 +10,10 @@ declare global {
     ) => void;
     recheckNgWords: () => void;
     /**
+     * 通知・検索ページの常時監視（auto_reload.ts）を解除する。多重注入時に前回の監視を外すために使う。
+     */
+    disposeAutoReloadWatchers?: () => void;
+    /**
      * 投稿カラム（/home）でインライン投稿フォーム以外を隠すスポットライトの再適用。
      * compose_only.ts が公開し、テストからの検証にも用いる。
      */
@@ -46,6 +50,7 @@ declare global {
     whitelistEnabled?: boolean;
     whitelistWords?: string[];
     returnToLastReadEnabled?: boolean;
+    scrollPosRestoreEnabled?: boolean;
     mobileSwipeAreaOffset?: number;
   }
 
@@ -109,6 +114,15 @@ declare global {
     subscribe: (callback: (mutations: MutationRecord[]) => void) => () => void;
   }
 
+  // inject の自前 UI 文言を ja/en で切り替える共有ハブ。i18n.ts が公開する。
+  interface McxI18n {
+    lang: string;
+    t: (key: string, params?: Record<string, string | number>) => string;
+    setLang: (lang: string) => void;
+    apply: (el: Element, key: string, opts?: { attr?: string }) => void;
+    onChange: (cb: (lang: string) => void) => () => void;
+  }
+
   interface Window {
     __multiColumnX: MultiColumnXAPI;
     __multiColumnXConfig?: MultiColumnXConfig;
@@ -125,6 +139,8 @@ declare global {
     __mobileBottomInset?: number;
     __xhrRateLimitPatched?: boolean;
     __mcxDomObserver?: McxDomObserver;
+    __mcxLang?: string;
+    __mcxI18n?: McxI18n;
   }
 }
 

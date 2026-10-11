@@ -1,0 +1,279 @@
+{
+  "language": {
+    "label": "Language",
+    "hint": "The language of the app's screens. \"Auto\" follows your device's language. The display language inside columns (x.com) follows your X settings.",
+    "groupLabel": "Language"
+  },
+  "panel": {
+    "title": "App settings",
+    "close": "Close",
+    "tabs": {
+      "general": "General",
+      "layout": "Column layout",
+      "presets": "Presets",
+      "extensions": "Extensions",
+      "backup": "Backup"
+    },
+    "groups": {
+      "display": "Display",
+      "columnDefaults": "Defaults for new columns",
+      "filter": "Browsing & filters",
+      "media": "Media",
+      "android": "Android only",
+      "maintenance": "App & maintenance"
+    },
+    "actions": {
+      "cancel": "Cancel",
+      "apply": "Apply"
+    }
+  },
+  "general": {
+    "popup": {
+      "title": "Popup windows",
+      "escClose": "Close with the Esc key",
+      "image": "Open images in a popup window",
+      "video": "Open videos in a popup window"
+    },
+    "video": {
+      "title": "Video",
+      "autoPlayStop": "Stop videos from autoplaying"
+    },
+    "ad": {
+      "title": "Ads",
+      "hide": "Hide ads"
+    },
+    "apiRateLimit": {
+      "title": "API usage monitor",
+      "enable": "Enable the API usage monitor"
+    },
+    "ngWords": {
+      "title": "Global muted words",
+      "helpLabel": "How to write muted words",
+      "helpLine": "Enter one word per line.",
+      "helpRegex": "Entering <code>/pattern/flags</code> treats it as a regular expression (case-insensitive).",
+      "helpExample": "Example: /spam|ads/",
+      "placeholder": "One word per line (applies to all columns; /regex/flags is also accepted)",
+      "hint": "Applies to the timelines of all columns, together with each column's own muted words."
+    },
+    "repostHidden": {
+      "title": "Users whose reposts are hidden",
+      "placeholder": "One user ID per line (applies to all columns)",
+      "hint": "One user ID per line (the part after @). Posts reposted by these users are hidden."
+    },
+    "android": {
+      "tweetTitle": "Posting (Android)",
+      "useXApp": "Launch the X app with the post button",
+      "swipeTitle": "Mobile: swipe to switch",
+      "swipeEnable": "Enable swiping to switch columns",
+      "swipeHeight": "Swipe area height (px)",
+      "swipeOpacity": "Swipe area opacity ({{value}}%)",
+      "multiColumn": "Show multiple columns on wide screens (tablet / landscape)",
+      "columnCount": "Number of columns shown at once"
+    }
+  },
+  "display": {
+    "title": "Display",
+    "uiScale": {
+      "label": "App UI display size",
+      "override": "Change the app UI display size",
+      "options": {
+        "auto": "Match device",
+        "small": "Small",
+        "standard": "Standard",
+        "large": "Large",
+        "xLarge": "Extra large"
+      },
+      "hint": "The size of the app's own screens (toolbar, settings, etc.). Change the size of column contents with \"Display size inside columns\"."
+    },
+    "columnScale": {
+      "label": "Display size inside columns",
+      "override": "Change the display size inside columns",
+      "options": {
+        "small": "Small",
+        "default": "Standard",
+        "normal": "Normal",
+        "large": "Large",
+        "xLarge": "Extra large"
+      },
+      "hint": "The size of content inside columns (the x.com display)."
+    },
+    "theme": {
+      "label": "Theme",
+      "override": "Change the theme",
+      "options": {
+        "dark": "Dark",
+        "light": "Light",
+        "system": "System"
+      }
+    }
+  },
+  "columnDefaults": {
+    "autoReload": {
+      "title": "Column defaults - Auto-reload",
+      "enable": "Enable auto-reload",
+      "interval": "Reload interval (seconds)",
+      "countdown": "Show countdown"
+    },
+    "display": {
+      "title": "Column defaults - Display",
+      "hideHeader": "Hide the header",
+      "hideTweetInput": "Hide the post box",
+      "showCustomMenu": "Show the custom menu button",
+      "restoreScroll": "Restore the scroll position after viewing photos"
+    },
+    "image": {
+      "title": "Column defaults - Images",
+      "smallImage": "Show images smaller",
+      "width": "Width (e.g. 50%, 200px)",
+      "blur": "Blur images",
+      "blurAmount": "Blur amount (e.g. 10px)"
+    },
+    "customCss": {
+      "title": "Column defaults - Custom CSS",
+      "placeholder": "/* Enter custom CSS */",
+      "hint": "Applies to columns you add from now on.",
+      "applyAll": "Apply to all existing columns"
+    }
+  },
+  "layout": {
+    "gridCols": "Columns:",
+    "colHeader": "Column {{col}}",
+    "cellLabel": "Cell at column {{col}}, row {{row}}",
+    "heightEven": "Even",
+    "unassign": "Unassign",
+    "placeHere": "← Place here",
+    "addRow": "+ Add row",
+    "unassigned": "Unassigned",
+    "none": "None",
+    "pendingHint": "Click to place at column {{col}}, row {{row}}",
+    "heightTitle": "Height settings — {{label}}",
+    "heightAuto": "Even (auto)",
+    "heightFixed": "Fixed:",
+    "dragReorder": "Drag to reorder",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "orderLabel": "Display order"
+  },
+  "presets": {
+    "saveTitle": "Save current layout",
+    "namePlaceholder": "Enter a preset name",
+    "saveButton": "Save current layout",
+    "savedTitle": "Saved presets",
+    "empty": "No saved presets",
+    "load": "Load",
+    "delete": "Delete"
+  },
+  "info": {
+    "officialSettings": {
+      "title": "Official settings",
+      "hint": "Opens X's official settings in a popup window. From there you can apply settings to your other accounts.",
+      "open": "Open official settings"
+    },
+    "webview": {
+      "title": "WebView",
+      "hint": "Recreates the WebView of every column in turn. Your settings are kept.",
+      "reload": "Recreate all WebViews"
+    },
+    "app": {
+      "title": "About the app",
+      "version": "Current version: {{version}}",
+      "checking": "Checking...",
+      "check": "Check for updates",
+      "upToDate": "You're on the latest version",
+      "checkFailed": "Failed to check for updates"
+    },
+    "dataDir": {
+      "title": "Delete data folders",
+      "pending_one": "{{count}} data folder could not be deleted",
+      "pending_other": "{{count}} data folders could not be deleted",
+      "retry": "Retry deleting data folders",
+      "deleting": "Deleting...",
+      "success": "Data folders deleted",
+      "remaining_one": "{{count}} data folder could not be deleted",
+      "remaining_other": "{{count}} data folders could not be deleted"
+    }
+  },
+  "linuxVideo": {
+    "title": "Video playback (Linux)",
+    "restartNotice": "Takes effect after restarting",
+    "h264Restart": "H.264: {{notice}}",
+    "relaunch": "Restart now",
+    "enable": "Enable H.264",
+    "downloading": "Downloading...",
+    "fetchFailed": "Failed to get H.264",
+    "retry": "Retry",
+    "enabled": "H.264: Enabled",
+    "enableHint": "Gets the decoder needed to play videos.",
+    "hardwareDecode": "Use hardware decoding (VA-API)"
+  },
+  "extensions": {
+    "addTitle": "Add extensions",
+    "addNote": "Specify an unpacked extension folder, or pick from extensions already installed in Chrome / Edge, to add them to all accounts.",
+    "storagePath": {
+      "location": "Extensions for Chromium-based browsers are usually located at %LOCALAPPDATA%\\{organization}\\{browser}\\User Data\\Default\\Extensions\\<extension ID>\\<version> (some browsers have no organization folder).",
+      "example": "Example: Chrome is at %LOCALAPPDATA%\\Google\\Chrome\\User Data\\Default\\Extensions, and Edge is at %LOCALAPPDATA%\\Microsoft\\Edge\\User Data\\Default\\Extensions.",
+      "others": "Chrome and Edge are found automatically with \"Detect from browser\". For other browsers such as Brave, specify a version folder in the format above with \"Add from folder\". If you have changed the user data location, specify the User Data\\Default\\Extensions folder under that location."
+    },
+    "trustNotice": "Added extensions may be able to read and modify X pages for all accounts. Only add extensions you trust.",
+    "unsupportedNotice": "Some extensions may not work correctly. In particular, extensions that detect the content of the open page and are used from a toolbar button may not work, because their popups open in a separate window.",
+    "reloadNotice": "Adding, removing, or enabling/disabling extensions automatically reloads all columns.",
+    "detect": "Detect from browser",
+    "addFromFolder": "Add from folder",
+    "browserNotFound": "Chrome / Edge not found",
+    "candidatesLabel": "Browser extension candidates",
+    "noCandidates": "No candidates",
+    "candidateMeta": "Browser: {{browser}} · Profile: {{profile}}",
+    "added": "Added",
+    "add": "Add",
+    "addLabel": "Add {{name}}",
+    "installedTitle": "Added extensions",
+    "installedEmpty": "No extensions added",
+    "sourceProfile": "{{browser}} (profile: {{profile}})",
+    "missing": "Not found",
+    "enabled": "Enabled",
+    "enableLabel": "Enable {{name}}",
+    "openPopup": "Open popup",
+    "openPopupLabel": "Open popup of {{name}}",
+    "openOptions": "Open options",
+    "openOptionsLabel": "Open options of {{name}}",
+    "accountRequired": "Select an account",
+    "remove": "Delete",
+    "removeLabel": "Delete {{name}}",
+    "unnamed": "(Unnamed)"
+  },
+  "backup": {
+    "noCredentials": "This backup does not include login information. Log in on the destination beforehand.",
+    "exportPrivacy": "Backup files contain personal information such as account names, muted words, and users whose reposts are hidden. Be careful when sharing or storing them.",
+    "reauthHint": "Accounts without a known X user ID can't be matched automatically. Re-authenticate those accounts to enable automatic suggestions.",
+    "saveBlocked": "Settings could not be loaded, so loading and restoring backups is unavailable. Please restart the app.",
+    "replaceWarning": "All current columns and settings (except window position) will be replaced with the backup contents. Accounts are not replaced. Your settings just before restoring are backed up automatically.",
+    "confirm": {
+      "title": "Confirm restore",
+      "summary": "Columns to restore: {{restore}} / Skipped: {{skip}}",
+      "back": "Back",
+      "execute": "Replace and restore"
+    },
+    "export": {
+      "title": "Create a backup",
+      "note": "Exports account info (names and colors), column layout, and settings to a single file.",
+      "button": "Export backup"
+    },
+    "restore": {
+      "title": "Restore from backup",
+      "pickFile": "Select backup file"
+    },
+    "mapping": {
+      "title": "Link accounts",
+      "note": "For each account in the backup, choose a logged-in account to restore to. Columns of accounts set to \"Don't restore\" will not be restored.",
+      "noTargets": "There are no logged-in accounts to restore to. Add an account first.",
+      "columnCount_one": "{{count}} column",
+      "columnCount_other": "{{count}} columns",
+      "targetLabel": "Restore destination for {{name}}",
+      "skipOption": "Don't restore",
+      "shared": "Multiple accounts in the backup are assigned to the same destination ({{names}}). Check that this is intended.",
+      "nameSeparator": ", ",
+      "none": "Nothing is linked, so nothing can be restored. Choose at least one destination.",
+      "proceed": "Continue to confirmation"
+    }
+  }
+}

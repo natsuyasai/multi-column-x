@@ -798,6 +798,90 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onVideoDownl
     });
 }
 
+/// MainActivity.detectXUserId(accountId) を呼び出し、そのアカウントのプロファイルの
+/// twid Cookie から X ユーザーIDを取得する。取得できなければ None。
+pub fn detect_x_user_id(account_id: &str) -> Result<Option<String>, String> {
+    let mut detected = None;
+    call_activity_method(|env, activity| {
+        let j_account_id = env.new_string(account_id).map_err(|e| e.to_string())?;
+        let result = env
+            .call_method(
+                activity,
+                "detectXUserId",
+                "(Ljava/lang/String;)Ljava/lang/String;",
+                &[JValue::Object(&*j_account_id)],
+            )
+            .and_then(|v| v.l())
+            .map_err(|e| e.to_string())?;
+        let value: String = env
+            .get_string(&jni::objects::JString::from(result))
+            .map_err(|e| e.to_string())?
+            .into();
+        detected = Some(value).filter(|v| !v.is_empty());
+        Ok(())
+    })?;
+    Ok(detected)
+}
+
+// ── バックアップ／リストア（Android SAF） ─────────────────────────────────
+
+/// MainActivity.startBackupExport(tempPath, suggestedFileName) を呼び出す。
+/// Rust が書いた一時ファイルを、Kotlin 側の SAF「名前を付けて保存」ダイアログで
+/// 利用者が選んだ場所へコピーしてもらう。結果は onBackupFileResult で通知される。
+pub fn start_backup_export(temp_path: &str, suggested_file_name: &str) -> Result<(), String> {
+    call_activity_method(|env, activity| {
+        let j_temp_path = env.new_string(temp_path).map_err(|e| e.to_string())?;
+        let j_suggested = env
+            .new_string(suggested_file_name)
+            .map_err(|e| e.to_string())?;
+        env.call_method(
+            activity,
+            "startBackupExport",
+            "(Ljava/lang/String;Ljava/lang/String;)V",
+            &[JValue::Object(&*j_temp_path), JValue::Object(&*j_suggested)],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
+/// MainActivity.startBackupImport(destPath, maxBytes) を呼び出す。
+/// Kotlin 側の SAF「ファイルを開く」ダイアログで選ばれたファイルを、maxBytes を超えた時点で
+/// 打ち切りながら destPath へコピーしてもらう。結果は onBackupFileResult で通知される。
+pub fn start_backup_import(dest_path: &str, max_bytes: i64) -> Result<(), String> {
+    call_activity_method(|env, activity| {
+        let j_dest_path = env.new_string(dest_path).map_err(|e| e.to_string())?;
+        env.call_method(
+            activity,
+            "startBackupImport",
+            "(Ljava/lang/String;J)V",
+            &[JValue::Object(&*j_dest_path), JValue::Long(max_bytes)],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
+/// AppBridge.onBackupFileResult(status, detail) から呼ばれる JNI エントリポイント。
+/// SAF ダイアログの結果（saved / picked / cancelled / tooLarge / error）を、
+/// Rust 側で待っているバックアップコマンドへ渡す。
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onBackupFileResult<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    status: jni::objects::JString<'local>,
+    detail: jni::objects::JString<'local>,
+) {
+    fn to_string(env: &mut JNIEnv, s: &jni::objects::JString) -> String {
+        env.get_string(s).map(String::from).unwrap_or_default()
+    }
+    let status = to_string(&mut env, &status);
+    let detail = to_string(&mut env, &detail);
+    crate::commands::backup::file_io::deliver_bridge_result(
+        crate::commands::backup::file_io::BridgeResult::from_bridge(&status, &detail),
+    );
+}
+
 /// MAIN_ACTIVITY の JavaVM / GlobalRef を使って JNI 処理を実行するヘルパー。
 fn call_activity_method<F>(f: F) -> Result<(), String>
 where

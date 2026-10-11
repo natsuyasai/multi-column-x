@@ -70,7 +70,7 @@ X内部APIのレスポンスヘッダ、以下3種を見る:
 2. 見つからなければ `AppState.compose`（常駐コンポーズの `ComposeSession { label, account_id }`）を見る
 3. どちらにも無ければ `None`
 
-この解決ロジックは `resolve_account_id` という純粋関数（テストしやすい形）に切り出してある。2つのMutex（`registry` と `compose`）は同時にロックせず、順にロック・解放する作り。デッドロック怖くない設計。
+この解決ロジックは `resolve_account_id` という純粋関数（テストしやすい形）に切り出してある。実際のロック処理（`emit_api_rate_limit_resolving_account`）は `registry`→`compose` の順に**同じブロック内で両方ロックしたまま** `resolve_account_id` へ渡し、ブロックを抜けるときに両方まとめて解放する作り。常にこの順序でしか2つのMutexを取得しない（`compose`→`registry`の順で取る箇所が無い）ため、ロック順序の食い違いによるデッドロックは起きない設計。
 
 emitする `webview-api-rate-limit` イベントのpayloadに `accountId`（解決できなければ `null`）が乗るようになった。フロント側はもう `columns.find` しない。payloadの `accountId` そのまま使うだけ。`accountId` が `null` なら何もしない（記録スキップ）。
 

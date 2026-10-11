@@ -10,15 +10,25 @@ import {
   USER_INPUT_WINDOW_MS,
   extractArticleStatusId,
   isListTopRendered,
+  isPullRefreshGesture,
+  isRefreshClickTarget,
+  isRefreshShortcut,
   readTimelineIds,
   reduceReturnState,
   scanReturnTarget,
   searchReturnTarget,
   selectAnchorIds,
+  waitForTimelineReady,
+  type PullGesture,
   type ReturnEvent,
   type ReturnState,
   type SearchDeps,
 } from "./return_to_last_read_logic";
+
+// 画面文言は共有ハブ window.__mcxI18n（i18n.ts）経由で取得する。ハブ未ロード時はキー文字列を返す。
+function tr(key: string, params?: Record<string, string | number>): string {
+  return window.__mcxI18n?.t(key, params) ?? key;
+}
 
 (function () {
   const CONTAINER_ID = "mcx-return-to-last-read-container";
@@ -26,7 +36,7 @@ import {
   const CLOSE_BUTTON_ID = "mcx-return-to-last-read-close";
   const TOAST_ID = "mcx-return-to-last-read-toast";
   const TOAST_DURATION_MS = 3000;
-  const NOT_FOUND_MESSAGE = "前回の位置が見つかりませんでした";
+  const PHOTO_PATH_PATTERN = /^\/[^/]+\/status\/\d+\/photo\/\d+/;
   const SCROLL_KEYS = new Set([
     "PageDown",
     "PageUp",
@@ -43,6 +53,11 @@ import {
   let enabled = window.__multiColumnXConfig?.returnToLastReadEnabled ?? false;
   let topSnapshot: string[] = [];
   let searching = false;
+  // 写真閲覧後の位置復元中（待機＋探索）。render() の可視判定には混ぜない
+  // （「探しています…」ボタンを出さないため）。他機能との排他にだけ使う。
+  let photoRestoring = false;
+  // 写真リンクをクリックしたツイートの ID（SPA 遷移を跨いで保持するモジュール内変数）。
+  let pendingPhotoReturnId: string | null = null;
   let lastUserInputAt = 0;
   let searchStartedAt = 0;
   let containerEl: HTMLElement | null = null;
@@ -57,6 +72,14 @@ import {
 
   function isHomePath(): boolean {
     return location.pathname === "/home";
+  }
+
+  function isAnySearching(): boolean {
+    return searching || photoRestoring;
+  }
+
+  function isPhotoPath(pathname: string): boolean {
+    return PHOTO_PATH_PATTERN.test(pathname);
   }
 
   function currentTabName(): string | null {
@@ -105,11 +128,11 @@ import {
   }
 
   function buttonStyle(): string {
-    return `background:#1d9bf0; color:#fff; border:none; border-radius:9999px; padding:8px 16px; font:bold 14px/1.2 system-ui, sans-serif; box-shadow:0 2px 8px rgba(0,0,0,.3); cursor:pointer;`;
+    return `background:#1d9bf0; color:#fff; border:none; border-radius:9999px; min-height:48px; padding:12px 24px; font:bold 16px/1.2 system-ui, sans-serif; box-shadow:0 2px 8px rgba(0,0,0,.3); cursor:pointer;`;
   }
 
   function closeButtonStyle(): string {
-    return `width:32px; height:32px; border-radius:9999px; background:rgba(0,0,0,.6); color:#fff; border:none; font:bold 16px/1 system-ui, sans-serif; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; line-height:1;`;
+    return `width:48px; height:48px; border-radius:9999px; background:rgba(0,0,0,.6); color:#fff; border:none; font:bold 24px/1 system-ui, sans-serif; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; line-height:1;`;
   }
 
   function toastStyle(): string {
@@ -132,7 +155,9 @@ import {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.id = BUTTON_ID;
-    btn.setAttribute("aria-label", "前回の続きへ戻る");
+    if (window.__mcxI18n) {
+      window.__mcxI18n.apply(btn, "lastRead.aria", { attr: "aria-label" });
+    }
     btn.style.cssText = buttonStyle();
     btn.addEventListener("click", () => {
       handleClick().catch((e) => {
@@ -150,7 +175,11 @@ import {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.id = CLOSE_BUTTON_ID;
-    btn.setAttribute("aria-label", "前回の続きへ戻るボタンを閉じる");
+    if (window.__mcxI18n) {
+      window.__mcxI18n.apply(btn, "lastRead.ariaClose", {
+        attr: "aria-label",
+      });
+    }
     btn.textContent = "×";
     btn.style.cssText = closeButtonStyle();
     btn.addEventListener("click", () => {
@@ -187,6 +216,9 @@ import {
     }, TOAST_DURATION_MS);
   }
 
+  // 表示言語が切り替わったら、ボタンの文言（動的に設定している部分）を描画し直す
+  window.__mcxI18n?.onChange(() => render());
+
   function render(): void {
     const visible =
       enabled && isHomePath() && (state.buttonVisible || searching);
@@ -196,7 +228,7 @@ import {
       // （textContent の無条件代入は MutationObserver との無限ループを引き起こす）。
       if (container.style.display !== "flex") container.style.display = "flex";
       const btn = ensureButton();
-      const text = searching ? "探しています…" : "↓ 前回の続きへ";
+      const text = tr(searching ? "lastRead.searching" : "lastRead.label");
       if (btn.textContent !== text) btn.textContent = text;
       if (btn.disabled !== searching) btn.disabled = searching;
       const closeBtn = ensureCloseButton();
@@ -207,6 +239,48 @@ import {
   }
 
   // --- 更新検知・ユーザースクロール検知 ---
+
+  // 先頭表示中（探索中でなく、スクロール位置が先頭付近で、仮想リストの先頭セルが
+  // 描画済み）なら、基準候補（topSnapshot）を読み直して topUpdated を dispatch する。
+  function refreshTopSnapshot(
+    section: Element | null,
+    scrollTop: number,
+  ): void {
+    if (
+      !section ||
+      isAnySearching() ||
+      scrollTop > 1 ||
+      !isListTopRendered(section)
+    ) {
+      return;
+    }
+    topSnapshot = selectAnchorIds(readTimelineIds(section));
+    dispatch({ type: "topUpdated", topIds: topSnapshot });
+  }
+
+  // ユーザー操作によるスクロール（source === "scroll" かつ直近のユーザー入力から
+  // USER_INPUT_WINDOW_MS 以内）で、戻り先（run 一致する基準）が画面内に入ったら
+  // targetSeenByUser を dispatch する。
+  function detectTargetSeenByUser(
+    section: Element | null,
+    source: "dom" | "scroll",
+  ): void {
+    if (
+      !section ||
+      source !== "scroll" ||
+      isAnySearching() ||
+      state.anchorIds === null ||
+      Date.now() - lastUserInputAt >= USER_INPUT_WINDOW_MS
+    ) {
+      return;
+    }
+    const scan = scanReturnTarget(readTimelineIds(section), state.anchorIds);
+    if (scan.kind !== "run") return;
+    const article = findArticleById(section, scan.id);
+    if (article && isInViewport(article)) {
+      dispatch({ type: "targetSeenByUser" });
+    }
+  }
 
   function onDomOrScroll(source: "dom" | "scroll"): void {
     if (!enabled || !isHomePath()) {
@@ -226,26 +300,8 @@ import {
     const scrollingElement = document.scrollingElement;
     const scrollTop = scrollingElement ? scrollingElement.scrollTop : 0;
 
-    if (section && !searching && scrollTop <= 1 && isListTopRendered(section)) {
-      topSnapshot = selectAnchorIds(readTimelineIds(section));
-      dispatch({ type: "topUpdated", topIds: topSnapshot });
-    }
-
-    if (
-      section &&
-      source === "scroll" &&
-      !searching &&
-      state.anchorIds !== null &&
-      Date.now() - lastUserInputAt < USER_INPUT_WINDOW_MS
-    ) {
-      const scan = scanReturnTarget(readTimelineIds(section), state.anchorIds);
-      if (scan.kind === "run") {
-        const article = findArticleById(section, scan.id);
-        if (article && isInViewport(article)) {
-          dispatch({ type: "targetSeenByUser" });
-        }
-      }
-    }
+    refreshTopSnapshot(section, scrollTop);
+    detectTargetSeenByUser(section, source);
 
     render();
   }
@@ -261,7 +317,45 @@ import {
     lastUserInputAt = Date.now();
   }
 
+  function handleRefreshClick(event: MouseEvent): void {
+    if (isRefreshClickTarget(event.target)) recordReload();
+  }
+
+  // プルダウン更新の検知（touchstart で起点を保持し touchend で判定）
+  let pullStart: { x: number; y: number; scrollTop: number } | null = null;
+
+  function handlePullStart(event: TouchEvent): void {
+    // 複数指・ボタン上の操作は対象外
+    if (event.touches.length !== 1 || isFromButton(event.target)) {
+      pullStart = null;
+      return;
+    }
+    const t = event.touches[0];
+    pullStart = {
+      x: t.clientX,
+      y: t.clientY,
+      scrollTop: document.scrollingElement?.scrollTop ?? 0,
+    };
+  }
+
+  function handlePullEnd(event: TouchEvent): void {
+    const start = pullStart;
+    pullStart = null;
+    const t = event.changedTouches[0];
+    if (!start || !t) return;
+    const gesture: PullGesture = {
+      startX: start.x,
+      startY: start.y,
+      endX: t.clientX,
+      endY: t.clientY,
+      startScrollTop: start.scrollTop,
+      endScrollTop: document.scrollingElement?.scrollTop ?? 0,
+    };
+    if (isPullRefreshGesture(gesture)) recordReload();
+  }
+
   function handleKeydown(event: KeyboardEvent): void {
+    if (isRefreshShortcut(event)) recordReload();
     if (!SCROLL_KEYS.has(event.key)) return;
     handleUserInput(event);
   }
@@ -279,44 +373,52 @@ import {
 
   // --- 探索 ---
 
+  function buildSearchDeps(): SearchDeps {
+    const getSection = (): Element | null => timelineSection();
+    const getScroller = (): Element | null => document.scrollingElement;
+    return {
+      readIds: () => {
+        const section = getSection();
+        return section ? readTimelineIds(section) : [];
+      },
+      getScrollTop: () => getScroller()?.scrollTop ?? 0,
+      setScrollTop: (value: number) => {
+        const scroller = getScroller();
+        if (scroller) scroller.scrollTop = value;
+      },
+      getViewportHeight: () => window.innerHeight,
+      getScrollHeight: () => getScroller()?.scrollHeight ?? 0,
+      wait: (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
+      isInterrupted: () => lastUserInputAt > searchStartedAt,
+      scrollIdToTop: (id: string) => {
+        const section = getSection();
+        const scroller = getScroller();
+        if (!section || !scroller) return false;
+        const article = findArticleById(section, id);
+        if (!article) return false;
+        const rect = (article as HTMLElement).getBoundingClientRect();
+        scroller.scrollTop += rect.top - headerOffset();
+        return true;
+      },
+    };
+  }
+
   async function handleClick(): Promise<void> {
-    if (searching || state.anchorIds === null) return;
+    if (isAnySearching() || state.anchorIds === null) return;
 
     searching = true;
     searchStartedAt = Date.now();
     render();
 
     const anchorIds = state.anchorIds;
-    const section = timelineSection();
-    const scrollingElement = document.scrollingElement;
-
-    const deps: SearchDeps = {
-      readIds: () => (section ? readTimelineIds(section) : []),
-      getScrollTop: () => (scrollingElement ? scrollingElement.scrollTop : 0),
-      setScrollTop: (value: number) => {
-        if (scrollingElement) scrollingElement.scrollTop = value;
-      },
-      getViewportHeight: () => window.innerHeight,
-      getScrollHeight: () =>
-        scrollingElement ? scrollingElement.scrollHeight : 0,
-      wait: (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
-      isInterrupted: () => lastUserInputAt > searchStartedAt,
-      scrollIdToTop: (id: string) => {
-        if (!section || !scrollingElement) return false;
-        const article = findArticleById(section, id);
-        if (!article) return false;
-        const rect = (article as HTMLElement).getBoundingClientRect();
-        scrollingElement.scrollTop += rect.top - headerOffset();
-        return true;
-      },
-    };
+    const deps = buildSearchDeps();
 
     try {
       const result = await searchReturnTarget(anchorIds, deps);
       if (result.kind === "found") {
         dispatch({ type: "returnFinished" });
       } else if (result.kind === "notFound") {
-        showToast(NOT_FOUND_MESSAGE);
+        showToast(tr("lastRead.notFound"));
         dispatch({ type: "returnFinished" });
       }
       // interrupted: 何もしない（ボタンは残す）
@@ -328,7 +430,103 @@ import {
     }
   }
 
+  // --- 写真閲覧後の位置復元 ---
+
+  function isPhotoRestoreEnabled(): boolean {
+    return window.__multiColumnXConfig?.scrollPosRestoreEnabled ?? false;
+  }
+
+  function isTimelineReady(): boolean {
+    if (!isHomePath()) return false;
+    const section = timelineSection();
+    return (
+      !!section &&
+      readTimelineIds(section).length > 0 &&
+      isListTopRendered(section)
+    );
+  }
+
+  async function restoreAfterPhoto(): Promise<void> {
+    const id = pendingPhotoReturnId;
+    if (id === null || isAnySearching()) return;
+
+    photoRestoring = true;
+    searchStartedAt = Date.now();
+    try {
+      const ready = await waitForTimelineReady({
+        isReady: isTimelineReady,
+        shouldAbort: () => lastUserInputAt > searchStartedAt || !isHomePath(),
+        wait: (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
+      });
+      if (ready !== "ready") return;
+      const result = await searchReturnTarget([id], buildSearchDeps());
+      if (result.kind === "notFound") {
+        showToast(tr("lastRead.notFound"));
+      }
+    } catch (e) {
+      console.error("[return_to_last_read]", e);
+    } finally {
+      pendingPhotoReturnId = null;
+      photoRestoring = false;
+    }
+  }
+
+  function startPhotoRestore(): void {
+    restoreAfterPhoto().catch((e) => {
+      console.error("[return_to_last_read]", e);
+    });
+  }
+
+  function handlePhotoLinkClick(event: MouseEvent): void {
+    if (!isPhotoRestoreEnabled() || !isHomePath()) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const link = target.closest("a");
+    if (!link || link.origin !== location.origin) return;
+    if (!isPhotoPath(link.pathname)) return;
+    const article = link.closest("article");
+    if (!article) return;
+    const id = extractArticleStatusId(article);
+    if (id !== null) pendingPhotoReturnId = id;
+  }
+
+  function observeNavigation(): void {
+    let previousPath = location.pathname;
+
+    const onNavigated = (): void => {
+      const returnedFromPhoto = isPhotoPath(previousPath) && isHomePath();
+      previousPath = location.pathname;
+      if (returnedFromPhoto && isPhotoRestoreEnabled()) startPhotoRestore();
+    };
+
+    window.addEventListener("popstate", onNavigated);
+
+    const originalPushState = history.pushState;
+    const originalReplaceState = history.replaceState;
+    history.pushState = function (...args) {
+      originalPushState.apply(history, args);
+      onNavigated();
+    };
+    history.replaceState = function (...args) {
+      originalReplaceState.apply(history, args);
+      previousPath = location.pathname;
+    };
+  }
+
   // --- 公開 API / triggerReload のラップ ---
+
+  function recordReload(): void {
+    if (!enabled || !isHomePath() || isAnySearching()) return;
+    const tabName = currentTabName();
+    // タブバーが一時的に見つからない（tabName === null）ときに tabChanged を
+    // dispatch すると基準が誤って破棄されるため、null のときは dispatch しない。
+    // reload イベントの tabName に null を渡すこと自体は問題ない。
+    if (tabName !== null) {
+      dispatch({ type: "tabChanged", tabName });
+    }
+    dispatch({ type: "reload", snapshot: topSnapshot, tabName });
+    render();
+  }
 
   window.__multiColumnX =
     window.__multiColumnX || ({} as Window["__multiColumnX"]);
@@ -351,17 +549,7 @@ import {
     window.__multiColumnX.triggerReload = function (
       scrollToTop?: boolean,
     ): void {
-      if (enabled && isHomePath() && !searching) {
-        const tabName = currentTabName();
-        // タブバーが一時的に見つからない（tabName === null）ときに tabChanged を
-        // dispatch すると基準が誤って破棄されるため、null のときは dispatch しない。
-        // reload イベントの tabName に null を渡すこと自体は問題ない。
-        if (tabName !== null) {
-          dispatch({ type: "tabChanged", tabName });
-        }
-        dispatch({ type: "reload", snapshot: topSnapshot, tabName });
-        render();
-      }
+      recordReload();
       originalTriggerReload(scrollToTop);
     };
   }
@@ -395,6 +583,20 @@ import {
       handleKeydown as EventListenerOrEventListenerObject,
       { capture: true, passive: true },
     );
+    window.addEventListener("click", handlePhotoLinkClick, { capture: true });
+    window.addEventListener("click", handleRefreshClick, {
+      capture: true,
+      passive: true,
+    });
+    window.addEventListener("touchstart", handlePullStart, {
+      capture: true,
+      passive: true,
+    });
+    window.addEventListener("touchend", handlePullEnd, {
+      capture: true,
+      passive: true,
+    });
+    observeNavigation();
     onDomOrScroll("dom");
   }
 

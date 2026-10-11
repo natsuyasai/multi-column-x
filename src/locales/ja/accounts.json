@@ -1,0 +1,38 @@
+{
+  "manager": {
+    "title": "アカウント管理",
+    "close": "閉じる",
+    "empty": "アカウントがありません",
+    "nameLabel": "アカウント名",
+    "changeColor": "色を {{color}} に変更",
+    "cancel": "キャンセル",
+    "save": "保存",
+    "setDefaultTitle": "ツイート時のデフォルトアカウントに設定",
+    "setDefault": "{{label}} をデフォルトに設定",
+    "edit": "編集",
+    "editAria": "{{label}} を編集",
+    "reauth": "再認証",
+    "reauthAria": "{{label}} を再認証",
+    "remove": "削除",
+    "removeAria": "{{label}} を削除",
+    "add": "+ アカウントを追加"
+  },
+  "nameDialog": {
+    "nameLabel": "アカウント名",
+    "cancel": "キャンセル",
+    "ok": "OK"
+  },
+  "noAccounts": {
+    "message": "先にアカウントを追加してください",
+    "openManager": "アカウント管理を開く"
+  },
+  "defaultName": "アカウント {{n}}",
+  "notice": {
+    "reauthTitle": "再認証",
+    "reauthFailed": "再認証に失敗しました（アカウント識別子を取得できませんでした）",
+    "reauthMismatch": "登録済みと異なるアカウントでログインされたため、セッションを更新しませんでした",
+    "reauthSkipped": "初回の再認証のため同一性の照合をスキップし、アカウント識別子を記録しました",
+    "removeFailedTitle": "アカウントの削除",
+    "removeFailedMessage": "アカウントのデータフォルダを削除できませんでした。アプリ設定の「データフォルダの削除を再実行」から後で削除できます。"
+  }
+}

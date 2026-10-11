@@ -19,7 +19,7 @@ argument-hint: "（省略可）対象スキル名。省略時は現在実行中�
 このプロジェクトの `.claude/skills/` 配下にある、順序付きフェーズ・ステップを持つスキル全般に適用する。例:
 
 - `feature-development-flow`（フェーズ1〜6）
-- `subagent-tdd-implementation`（委譲 → コミット → レビューの実装サイクル）
+- `subagent-tdd-implementation`（委譲 → レビュー → コミットの実装サイクル）
 - `refactor` / `tdd`（Phase 1〜4 / Red-Green-Refactor）
 - `check-creation`（検証コマンドの実行順序）
 

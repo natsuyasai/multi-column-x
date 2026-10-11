@@ -1,5 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import i18n from "@/i18n";
+import { expectNoJapanese } from "@/test-utils/japanese";
 import { WhatsNewDialog } from "./WhatsNewDialog";
 
 describe("WhatsNewDialog", () => {
@@ -84,5 +86,30 @@ describe("WhatsNewDialog", () => {
   it("見出しでもリストでもない行は p として描画される", () => {
     render(<WhatsNewDialog notes={"通常テキスト行"} onClose={vi.fn()} />);
     expect(screen.getByText("通常テキスト行")).toBeInTheDocument();
+  });
+
+  describe("表示言語", () => {
+    afterEach(async () => {
+      await i18n.changeLanguage("ja");
+    });
+
+    it("表示言語が英語のとき更新内容ダイアログの枠に日本語の文言が表示されない", async () => {
+      await i18n.changeLanguage("en");
+      const { container } = render(
+        <WhatsNewDialog
+          version="0.2.0"
+          notes={"### New features\n- Item A\n\nPlain line"}
+          onClose={vi.fn()}
+        />,
+      );
+      expectNoJapanese(container);
+      expect(
+        screen.getByRole("heading", { name: "The app has been updated" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("What's new in version 0.2.0"),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
+    });
   });
 });

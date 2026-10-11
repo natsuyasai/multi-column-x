@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import type { Account } from "../../types";
 import styles from "./LinkPopupDialog.module.scss";
 
@@ -21,6 +22,7 @@ export const LinkPopupDialog: React.FC<LinkPopupDialogProps> = ({
   fixedUrl,
   title,
 }) => {
+  const { t } = useTranslation();
   const [url, setUrl] = useState(fixedUrl ?? "");
   const [accountId, setAccountId] = useState(defaultAccountId);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -42,12 +44,12 @@ export const LinkPopupDialog: React.FC<LinkPopupDialogProps> = ({
   return (
     <div className={styles.overlay}>
       <div className={styles.panel}>
-        <h3>{title ?? "URLをポップアップウィンドウで開く"}</h3>
+        <h3>{title ?? t("dialogs:linkPopup.defaultTitle")}</h3>
         {!fixedUrl && (
           <input
             ref={inputRef}
             type="text"
-            placeholder="https://x.com/..."
+            placeholder={t("dialogs:linkPopup.urlPlaceholder")}
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             onKeyDown={(e) => {
@@ -70,10 +72,10 @@ export const LinkPopupDialog: React.FC<LinkPopupDialogProps> = ({
         )}
         <div className={styles.actions}>
           <button className={styles.cancelBtn} onClick={handleCancel}>
-            キャンセル
+            {t("dialogs:linkPopup.cancel")}
           </button>
           <button className={styles.okBtn} onClick={handleSubmit}>
-            開く
+            {t("dialogs:linkPopup.open")}
           </button>
         </div>
       </div>

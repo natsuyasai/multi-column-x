@@ -1,11 +1,14 @@
 import type { DragEndEvent } from "@dnd-kit/core";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement } from "react";
 import type { ComponentProps } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import i18n from "@/i18n";
+import { expectNoJapanese } from "@/test-utils/japanese";
 import type { Column, Account } from "../../types";
 import { TopBar } from "./TopBar";
+import styles from "./TopBar.module.scss";
 
 // jsdom では getBoundingClientRect が全て 0 となり実 D&D の衝突判定が成立しないため、
 // DndContext に渡された onDragEnd を捕捉して、ドロップ結果を直接流し込む。
@@ -204,6 +207,37 @@ describe("TopBar", () => {
         .querySelector('[title="カラムを閉じる"]')
         ?.querySelector('[data-testid="icon-close"]'),
     ).toBeInTheDocument();
+  });
+
+  describe("展開時のボタンラベルとクラス", () => {
+    it.each([
+      ["ツイートを作成 (Ctrl+T)", "ツイート"],
+      ["URLをポップアップで開く (Ctrl+L)", "URLを開く"],
+      ["カラムを追加 (Ctrl+N)", "カラム追加"],
+      ["アカウント管理 (Ctrl+Shift+A)", "アカウント"],
+      ["アプリ設定 (Ctrl+,)", "設定"],
+    ])(
+      "「%s」ボタンは展開時にラベル「%s」が表示されbtnExpandedクラスが付き、折りたたみ時はどちらも無い",
+      (title, label) => {
+        const { rerender } = render(
+          <TopBar {...defaultProps} expanded={false} />,
+        );
+        const collapsedButton = screen.getByTitle(title);
+        expect(
+          within(collapsedButton).queryByText(label),
+        ).not.toBeInTheDocument();
+        expect(collapsedButton.classList.contains(styles.btnExpanded)).toBe(
+          false,
+        );
+
+        rerender(<TopBar {...defaultProps} expanded={true} />);
+        const expandedButton = screen.getByTitle(title);
+        expect(within(expandedButton).getByText(label)).toBeInTheDocument();
+        expect(expandedButton.classList.contains(styles.btnExpanded)).toBe(
+          true,
+        );
+      },
+    );
   });
 
   describe("アクションボタンの SVG アイコン", () => {
@@ -659,5 +693,64 @@ describe("TopBar", () => {
         ).toBeInTheDocument();
       },
     );
+  });
+});
+
+describe("TopBar 表示言語", () => {
+  const englishAccount: Account = { ...acc1, label: "Main account" };
+  const englishColumns: Column[] = [
+    col1,
+    col2,
+    { ...col1, id: "col-3", order: 2, gridCol: 3, pageType: "search" },
+    { ...col1, id: "col-4", order: 3, gridCol: 4, pageType: "list" },
+    {
+      ...col1,
+      id: "col-5",
+      order: 4,
+      gridCol: 5,
+      pageType: "external",
+      customUrl: "https://example.com/path",
+    },
+    { ...col1, id: "col-6", order: 5, gridCol: 6, pageType: "compose" },
+  ];
+
+  it("表示言語が英語のときツールバーに日本語の文言が表示されない", async () => {
+    await i18n.changeLanguage("en");
+    const props = {
+      ...defaultProps,
+      accounts: [englishAccount],
+      columns: englishColumns,
+      apiRateLimitMonitorEnabled: true,
+    };
+    const { container, rerender } = render(<TopBar {...props} />);
+    expectNoJapanese(container);
+    expect(screen.getByTitle("Compose post (Ctrl+T)")).toBeInTheDocument();
+    expect(screen.getByTitle("Expand toolbar (Ctrl+B)")).toBeInTheDocument();
+
+    rerender(<TopBar {...props} expanded />);
+    expectNoJapanese(container);
+    expect(screen.getByText("Post")).toBeInTheDocument();
+    expect(screen.getByText("Open URL")).toBeInTheDocument();
+    expect(screen.getByText("Add column")).toBeInTheDocument();
+    expect(screen.getByText("Accounts")).toBeInTheDocument();
+    expect(screen.getByText("Settings")).toBeInTheDocument();
+    expect(screen.getByTitle("Collapse toolbar (Ctrl+B)")).toBeInTheDocument();
+    expect(screen.getAllByLabelText("Close column")).toHaveLength(6);
+  });
+
+  it("ツールバーを開いたまま表示言語を切り替えると開いている画面の文言も切り替わる", async () => {
+    render(<TopBar {...defaultProps} expanded />);
+    expect(screen.getByText("カラム追加")).toBeInTheDocument();
+    expect(
+      screen.getByTitle("ツールバーを折りたたむ (Ctrl+B)"),
+    ).toBeInTheDocument();
+
+    await act(async () => {
+      await i18n.changeLanguage("en");
+    });
+
+    expect(screen.getByText("Add column")).toBeInTheDocument();
+    expect(screen.getByTitle("Collapse toolbar (Ctrl+B)")).toBeInTheDocument();
+    expect(screen.queryByText("カラム追加")).not.toBeInTheDocument();
   });
 });

@@ -77,6 +77,34 @@ export default tseslint.config(
     },
   },
   {
+    // 画面の文言（日本語）の直書きを検出する。辞書（t()）を経由させるため。
+    // 移行は完了しているため error。disable する場合は理由を `--` で明記する。
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: [
+      "src/**/*.{test,stories}.{ts,tsx}",
+      "src/locales/**",
+      "src/i18n/**",
+    ],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "JSXText[value=/[\\u3040-\\u30ff\\u4e00-\\u9fff]/]",
+          message: "画面の文言は辞書（t()）を経由してください",
+        },
+        {
+          selector: "Literal[value=/[\\u3040-\\u30ff\\u4e00-\\u9fff]/]",
+          message: "画面の文言は辞書（t()）を経由してください",
+        },
+        {
+          selector:
+            "TemplateElement[value.raw=/[\\u3040-\\u30ff\\u4e00-\\u9fff]/]",
+          message: "画面の文言は辞書（t()）を経由してください",
+        },
+      ],
+    },
+  },
+  {
     // テスト・Story はインタラクション記述の都合上ルールを一部緩める
     files: ["src/**/*.{test,stories}.{ts,tsx}"],
     rules: {

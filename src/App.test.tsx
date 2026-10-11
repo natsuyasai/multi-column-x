@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { platform } from "@tauri-apps/plugin-os";
 import {
   render,
@@ -8,8 +9,10 @@ import {
   act,
 } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { expectNoJapanese } from "@/test-utils/japanese";
 import App from "./App";
 import { WEBVIEW_SCRIPTS } from "./constants/ipc";
+import { getHeaderHeight, getTopBarHeight } from "./lib/gridLayout";
 import { useAppStore } from "./store/useAppStore";
 import type { Column, GlobalSettings } from "./types";
 import { DEFAULT_GLOBAL_SETTINGS, DEFAULT_COLUMN_SETTINGS } from "./types";
@@ -33,6 +36,39 @@ vi.mock("@tauri-apps/api/window", () => ({
 vi.mock("@tauri-apps/plugin-log", () => ({
   error: vi.fn().mockResolvedValue(undefined),
 }));
+
+// 実フックを素通しし、配線の検証に必要な箇所だけ差し替える
+const hookSpies = vi.hoisted(() => ({
+  jumpToColumnWhenReady: vi.fn(),
+  addColumnResult: { value: undefined as boolean | undefined },
+}));
+
+vi.mock("./hooks/useColumnNavigation", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("./hooks/useColumnNavigation")>();
+  return {
+    ...actual,
+    useColumnNavigation: (
+      args: Parameters<typeof actual.useColumnNavigation>[0],
+    ) => ({
+      ...actual.useColumnNavigation(args),
+      jumpToColumnWhenReady: hookSpies.jumpToColumnWhenReady,
+    }),
+  };
+});
+
+vi.mock("./hooks/useColumns", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./hooks/useColumns")>();
+  return {
+    ...actual,
+    useColumns: () => {
+      const result = actual.useColumns();
+      const forced = hookSpies.addColumnResult.value;
+      if (forced === undefined) return result;
+      return { ...result, handleAddColumn: async () => forced };
+    },
+  };
+});
 
 const mockInvoke = vi.mocked(invoke);
 const mockPlatform = vi.mocked(platform);
@@ -81,12 +117,30 @@ const column: Column = {
   settings: { ...DEFAULT_COLUMN_SETTINGS },
 };
 
-const globalSettings: GlobalSettings = { ...DEFAULT_GLOBAL_SETTINGS };
+// 既存テストは日本語表示を前提にするため、OS ロケールに依存しないよう言語を固定する
+const globalSettings: GlobalSettings = {
+  ...DEFAULT_GLOBAL_SETTINGS,
+  language: "ja",
+};
+
+// App のマウント時に走る load_settings が、テストで setState した状態をそのまま返すようにする。
+// （load_settings が失敗すると保存ブロック＋通知ダイアログが出て、カラム位置の検証に影響するため）
+function mockInvokeWithCurrentSettings() {
+  mockInvoke.mockImplementation(async (cmd: string) => {
+    if (cmd !== "load_settings") return undefined;
+    const { accounts, columns, globalSettings } = useAppStore.getState();
+    return {
+      settings: { accounts, columns, globalSettings },
+      loadFailed: false,
+      backupPath: null,
+    };
+  });
+}
 
 describe("App (desktop)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockInvoke.mockResolvedValue(undefined);
+    mockInvokeWithCurrentSettings();
     mockPlatform.mockReturnValue("windows");
     useAppStore.setState({
       accounts: [account],
@@ -133,6 +187,194 @@ describe("App (desktop)", () => {
     });
   });
 
+  it("アプリUIの表示サイズを変更するとカラムの表示位置が新しい倍率のTopBarとヘッダーの直下に移動する", async () => {
+    useAppStore.setState({ columns: [column], topBarExpanded: false });
+    render(<App />);
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "create_column_webview",
+        expect.anything(),
+      );
+    });
+    // 復元完了（columnsRestored）の反映を待つ
+    await act(async () => {});
+    mockInvoke.mockClear();
+
+    act(() => {
+      useAppStore.getState().updateGlobalSettings({ uiScale: "xLarge" });
+    });
+
+    // xLarge は 20px 基準: TopBar 2rem(40px) + ヘッダー 2.25rem(45px)
+    await waitFor(() => {
+      const resizeCalls = mockInvoke.mock.calls.filter(
+        (c) => c[0] === "resize_column_webview",
+      );
+      expect(resizeCalls.length).toBeGreaterThan(0);
+      expect((resizeCalls[resizeCalls.length - 1][1] as any).bounds.y).toBe(85);
+    });
+  });
+
+  it("TopBarを展開するとカラムの表示位置が待ち時間なしで展開後のTopBarの直下に移動する", async () => {
+    useAppStore.setState({ columns: [column], topBarExpanded: false });
+    render(<App />);
+    // 起動時のカラム復元（非同期）が完了するのを待ってから、TopBar操作の効果だけを検証する
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "create_column_webview",
+        expect.anything(),
+      );
+    });
+    mockInvoke.mockClear();
+
+    fireEvent.click(screen.getByTitle("ツールバーを展開 (Ctrl+B)"));
+
+    const expectedY = getTopBarHeight(true) + getHeaderHeight();
+    await waitFor(
+      () => {
+        const resizeCalls = mockInvoke.mock.calls.filter(
+          (c) => c[0] === "resize_column_webview",
+        );
+        expect(resizeCalls.length).toBeGreaterThan(0);
+        expect((resizeCalls[0][1] as any).bounds).toMatchObject({
+          columnId: "col-1",
+          y: expectedY,
+        });
+      },
+      { timeout: 100 },
+    );
+  });
+
+  it("TopBarを折りたたむとカラムの表示位置が待ち時間なしで折りたたみ後のTopBarの直下に移動する", async () => {
+    useAppStore.setState({ columns: [column], topBarExpanded: true });
+    render(<App />);
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "create_column_webview",
+        expect.anything(),
+      );
+    });
+    mockInvoke.mockClear();
+
+    fireEvent.click(screen.getByTitle("ツールバーを折りたたむ (Ctrl+B)"));
+
+    const expectedY = getTopBarHeight(false) + getHeaderHeight();
+    await waitFor(
+      () => {
+        const resizeCalls = mockInvoke.mock.calls.filter(
+          (c) => c[0] === "resize_column_webview",
+        );
+        expect(resizeCalls.length).toBeGreaterThan(0);
+        expect((resizeCalls[0][1] as any).bounds).toMatchObject({
+          columnId: "col-1",
+          y: expectedY,
+        });
+      },
+      { timeout: 100 },
+    );
+  });
+
+  it("キーボードショートカットでTopBarを開閉してもカラムの表示位置が待ち時間なしで追従する", async () => {
+    useAppStore.setState({ columns: [column], topBarExpanded: false });
+    render(<App />);
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "create_column_webview",
+        expect.anything(),
+      );
+    });
+    mockInvoke.mockClear();
+
+    fireEvent.keyDown(window, { key: "b", ctrlKey: true });
+
+    const expectedY = getTopBarHeight(true) + getHeaderHeight();
+    await waitFor(
+      () => {
+        const resizeCalls = mockInvoke.mock.calls.filter(
+          (c) => c[0] === "resize_column_webview",
+        );
+        expect(resizeCalls.length).toBeGreaterThan(0);
+        expect((resizeCalls[0][1] as any).bounds).toMatchObject({
+          columnId: "col-1",
+          y: expectedY,
+        });
+      },
+      { timeout: 100 },
+    );
+  });
+
+  it("ダイアログ表示中にTopBarを開閉してもカラムは退避したままで閉じると新しい位置に表示される", async () => {
+    useAppStore.setState({ columns: [column], topBarExpanded: false });
+    render(<App />);
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "create_column_webview",
+        expect.anything(),
+      );
+    });
+
+    fireEvent.click(screen.getByTitle("カラムを追加 (Ctrl+N)"));
+    await waitFor(() => {
+      const resizeCalls = mockInvoke.mock.calls.filter(
+        (c) => c[0] === "resize_column_webview",
+      );
+      expect(resizeCalls.length).toBeGreaterThan(0);
+      expect(
+        (resizeCalls[resizeCalls.length - 1][1] as any).bounds,
+      ).toMatchObject({ columnId: "col-1", x: -9999 });
+    });
+
+    mockInvoke.mockClear();
+    fireEvent.click(screen.getByTitle("ツールバーを展開 (Ctrl+B)"));
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const resizeCallsDuringDialog = mockInvoke.mock.calls.filter(
+      (c) => c[0] === "resize_column_webview",
+    );
+    const expectedExpandedY = getTopBarHeight(true) + getHeaderHeight();
+    expect(
+      resizeCallsDuringDialog.some(
+        (c) => (c[1] as any).bounds?.y === expectedExpandedY,
+      ),
+    ).toBe(false);
+
+    fireEvent.click(screen.getByText("キャンセル"));
+
+    await waitFor(() => {
+      const resizeCalls = mockInvoke.mock.calls.filter(
+        (c) => c[0] === "resize_column_webview",
+      );
+      expect(
+        resizeCalls.some((c) => (c[1] as any).bounds?.y === expectedExpandedY),
+      ).toBe(true);
+    });
+  });
+
+  it("アプリ起動時にはTopBar開閉による再配置は行われない", async () => {
+    useAppStore.setState({ columns: [column], topBarExpanded: false });
+    render(<App />);
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "create_column_webview",
+        expect.anything(),
+      );
+    });
+
+    // 観点: 起動時のカラム復元（create_column_webview）より前に発生する
+    // resize_column_webviewは、既存のダイアログ復元effect（anyDialogOpen初期値false
+    // による1回分）のみであり、TopBar開閉用effectが追加でもう1回発火しないこと。
+    // useLayoutEffectはマウント時のDOM反映直後に同期実行されるため、
+    // 初回マウントでも実行してしまう実装では、この余分なresize呼び出しが
+    // 非同期のcreate_column_webviewより先に発生し、件数が2件に増える。
+    const firstCreateIndex = mockInvoke.mock.calls.findIndex(
+      (c) => c[0] === "create_column_webview",
+    );
+    const resizeCallsBeforeCreate = mockInvoke.mock.calls
+      .slice(0, firstCreateIndex)
+      .filter((c) => c[0] === "resize_column_webview").length;
+
+    expect(resizeCallsBeforeCreate).toBe(1);
+  });
+
   it("ツイート作成ボタンでopen_compose_windowが呼ばれる", async () => {
     render(<App />);
     fireEvent.click(screen.getByTitle("ツイートを作成 (Ctrl+T)"));
@@ -175,6 +417,78 @@ describe("App (desktop)", () => {
     expect(screen.getByText("外部: example.com")).toBeInTheDocument();
   });
 
+  describe("H.264取得案内", () => {
+    function mockCodecStatus(h264DownloadApplicable: boolean) {
+      mockInvoke.mockImplementation(async (cmd: string) => {
+        if (cmd === "check_media_codec_support") {
+          return {
+            h264Available: false,
+            aacAvailable: true,
+            h264DownloadApplicable,
+          };
+        }
+        if (cmd !== "load_settings") return undefined;
+        const { accounts, columns, globalSettings } = useAppStore.getState();
+        return {
+          settings: { accounts, columns, globalSettings },
+          loadFailed: false,
+          backupPath: null,
+        };
+      });
+    }
+
+    it("H.264が未取得でダウンロード対象の環境では起動時に案内ダイアログが表示される", async () => {
+      mockCodecStatus(true);
+      render(<App />);
+      expect(
+        await screen.findByRole("dialog", { name: /追加コンポーネント/ }),
+      ).toBeInTheDocument();
+    });
+
+    it("案内ダイアログの表示中は全カラムWebViewが画面外へ退避される", async () => {
+      mockCodecStatus(true);
+      useAppStore.setState({ columns: [column] });
+      render(<App />);
+      await screen.findByRole("dialog", { name: /追加コンポーネント/ });
+
+      await waitFor(() => {
+        const offscreen = mockInvoke.mock.calls.filter(
+          (c) =>
+            c[0] === "resize_column_webview" &&
+            (c[1] as any).bounds.columnId === "col-1" &&
+            (c[1] as any).bounds.x === -9999,
+        );
+        expect(offscreen.length).toBeGreaterThan(0);
+      });
+    });
+
+    it("案内で「今はしない」を選ぶとダイアログが閉じ拒否が保存される", async () => {
+      mockCodecStatus(true);
+      render(<App />);
+      fireEvent.click(
+        await screen.findByRole("button", { name: "今はしない" }),
+      );
+
+      expect(
+        screen.queryByRole("dialog", { name: /追加コンポーネント/ }),
+      ).toBeNull();
+      expect(
+        useAppStore.getState().globalSettings.h264DownloadPromptDismissed,
+      ).toBe(true);
+    });
+
+    it("ダウンロード対象でない環境では案内ダイアログは表示されない", async () => {
+      mockCodecStatus(false);
+      render(<App />);
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("check_media_codec_support");
+      });
+      expect(
+        screen.queryByRole("dialog", { name: /追加コンポーネント/ }),
+      ).toBeNull();
+    });
+  });
+
   it("設定読み込み失敗の通知があるとダイアログが表示され、OKを押すと消える", () => {
     useAppStore.setState({
       settingsLoadNotice:
@@ -197,7 +511,7 @@ describe("App (desktop)", () => {
 describe("App (mobile)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockInvoke.mockResolvedValue(undefined);
+    mockInvokeWithCurrentSettings();
     mockPlatform.mockReturnValue("android");
     useAppStore.setState({
       accounts: [account],
@@ -219,6 +533,7 @@ describe("App (mobile)", () => {
   });
 
   it("カラム復元完了後にupdate_mobile_swipe_barがvisible:trueで呼ばれる", async () => {
+    installMatchMedia(true); // 既定テーマ system が OS ダークに解決される
     render(<App />);
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith(
@@ -227,7 +542,7 @@ describe("App (mobile)", () => {
           visible: true,
           height: 28,
           opacity: 50,
-          darkTheme: true, // DEFAULT_GLOBAL_SETTINGS.theme === "dark"
+          darkTheme: true, // DEFAULT_GLOBAL_SETTINGS.theme === "system"（OS ダーク）
         }),
       );
     });
@@ -328,7 +643,7 @@ describe("App (mobile)", () => {
 describe("App (テーマ適用時のnight_mode Cookie反映)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockInvoke.mockResolvedValue(undefined);
+    mockInvokeWithCurrentSettings();
     mockPlatform.mockReturnValue("windows");
     useAppStore.setState({
       accounts: [account],
@@ -424,10 +739,74 @@ describe("App (テーマ適用時のnight_mode Cookie反映)", () => {
   });
 });
 
+describe("App (Linux向け動画再生設定の配線)", () => {
+  const hwDecodeLabel = "ハードウェアデコードを使う（VA-API）";
+  const restartNotice = "再起動後に反映されます";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInvokeWithCurrentSettings();
+    mockPlatform.mockReturnValue("windows");
+    // Linux ではメインウィンドウの移動監視（onMoved）が登録される
+    vi.mocked(getCurrentWindow).mockReturnValue({
+      onMoved: vi.fn().mockResolvedValue(() => {}),
+    } as unknown as ReturnType<typeof getCurrentWindow>);
+    useAppStore.setState({
+      accounts: [account],
+      columns: [],
+      globalSettings: { ...globalSettings, hardwareVideoDecodeEnabled: true },
+      isLoaded: true,
+      isMobile: false,
+      topBarExpanded: false,
+      unreadCounts: {},
+    });
+  });
+
+  const openAppSettings = () =>
+    fireEvent.click(screen.getByTitle("アプリ設定 (Ctrl+,)"));
+
+  it("linux以外ではアプリ設定にハードウェアデコードの項目が表示されない", () => {
+    mockPlatform.mockReturnValue("windows");
+    render(<App />);
+    openAppSettings();
+    expect(screen.queryByRole("checkbox", { name: hwDecodeLabel })).toBeNull();
+  });
+
+  it("linuxではアプリ設定にハードウェアデコードの項目が表示される", () => {
+    mockPlatform.mockReturnValue("linux");
+    render(<App />);
+    openAppSettings();
+    expect(
+      screen.getByRole("checkbox", { name: hwDecodeLabel }),
+    ).toBeInTheDocument();
+  });
+
+  it("ハードウェアデコード設定を切り替えて適用した後も再起動までは再起動の案内が表示され続ける", () => {
+    mockPlatform.mockReturnValue("linux");
+    render(<App />);
+    openAppSettings();
+    expect(screen.queryByText(restartNotice)).toBeNull();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: hwDecodeLabel }));
+    expect(screen.getByText(restartNotice)).toBeInTheDocument();
+    fireEvent.click(screen.getByText("適用"));
+    expect(
+      useAppStore.getState().globalSettings.hardwareVideoDecodeEnabled,
+    ).toBe(false);
+
+    // 保存後に設定画面を開き直しても、起動時の値と異なるため案内が残る
+    openAppSettings();
+    expect(
+      screen.getByRole("checkbox", { name: hwDecodeLabel }),
+    ).not.toBeChecked();
+    expect(screen.getByText(restartNotice)).toBeInTheDocument();
+  });
+});
+
 describe("App (手動更新のスクロール扱い)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockInvoke.mockResolvedValue(undefined);
+    mockInvokeWithCurrentSettings();
     mockPlatform.mockReturnValue("windows");
     useAppStore.setState({
       accounts: [account],
@@ -471,5 +850,337 @@ describe("App (手動更新のスクロール扱い)", () => {
     fireEvent.click(screen.getByText("再読み込み"));
 
     expect(getEvalScripts()).toEqual([WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD]);
+  });
+});
+
+// 手順0: フック抽出前の特性テスト（既存の振る舞いを固定する。追加直後はGreenが正しい）
+describe("App (フック抽出前の特性テスト)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInvokeWithCurrentSettings();
+    mockPlatform.mockReturnValue("windows");
+    useAppStore.setState({
+      accounts: [account],
+      columns: [],
+      globalSettings,
+      isLoaded: true,
+      isMobile: false,
+      topBarExpanded: false,
+      unreadCounts: {},
+    });
+  });
+
+  const createCallsOf = (columnId: string) =>
+    mockInvoke.mock.calls.filter(
+      (c) =>
+        c[0] === "create_column_webview" &&
+        (c[1] as any).args?.column?.id === columnId,
+    );
+
+  it("Ctrl+数字のジャンプは表示順（order）で数えたカラムへ移動する", async () => {
+    // 配列上の並びと order フィールドの大小関係をあえて逆にする
+    const columnB: Column = {
+      ...column,
+      id: "col-b",
+      order: 1,
+      gridCol: 2,
+      width: 200,
+    };
+    const columnA: Column = {
+      ...column,
+      id: "col-a",
+      order: 0,
+      gridCol: 1,
+      width: 100,
+    };
+    useAppStore.setState({ columns: [columnB, columnA] });
+    const { container } = render(<App />);
+
+    await waitFor(() => {
+      expect(createCallsOf("col-a").length).toBeGreaterThan(0);
+      expect(createCallsOf("col-b").length).toBeGreaterThan(0);
+    });
+    const xOfColA = (createCallsOf("col-a")[0][1] as any).args.x;
+    const xOfColB = (createCallsOf("col-b")[0][1] as any).args.x;
+    expect(xOfColA).not.toBe(xOfColB);
+
+    const scrollbar = container.querySelector(
+      '[class*="_bottomScrollbar_"]',
+    ) as HTMLDivElement;
+    expect(scrollbar).toBeTruthy();
+
+    fireEvent.keyDown(window, { key: "1", ctrlKey: true });
+
+    // order が最小(0)の col-a（配列では2番目）へジャンプするはず
+    expect(scrollbar.scrollLeft).toBe(xOfColA);
+  });
+
+  it("リンクを開くときに指定アカウントが見つからなければ先頭のアカウントで開く", async () => {
+    useAppStore.setState({
+      globalSettings: { ...globalSettings, defaultAccountId: "acc-missing" },
+    });
+    render(<App />);
+    mockInvoke.mockClear();
+
+    fireEvent.click(screen.getByTitle("URLをポップアップで開く (Ctrl+L)"));
+    fireEvent.change(screen.getByPlaceholderText("https://x.com/..."), {
+      target: { value: "https://x.com/foo" },
+    });
+    fireEvent.click(screen.getByText("開く"));
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "open_link_popup_window",
+        expect.objectContaining({ accountId: "acc-1" }),
+      );
+    });
+  });
+
+  it("起動時に各カラムへ表示サイズの設定を適用する", async () => {
+    useAppStore.setState({ columns: [column] });
+    render(<App />);
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("eval_in_webview", {
+        label: expect.stringContaining("col-1"),
+        script: WEBVIEW_SCRIPTS.applyColumnScale("default"),
+      });
+    });
+  });
+
+  describe("カラム追加後のジャンプ", () => {
+    beforeEach(() => {
+      hookSpies.addColumnResult.value = undefined;
+    });
+
+    afterEach(() => {
+      hookSpies.addColumnResult.value = undefined;
+    });
+
+    const openDialogAndSubmit = (openTitle: string) => {
+      fireEvent.click(screen.getByTitle(openTitle));
+      fireEvent.click(screen.getByRole("button", { name: "追加" }));
+    };
+
+    it("デスクトップでAddColumnDialogからカラムを追加すると新カラムへジャンプする", async () => {
+      useAppStore.setState({ columns: [column] });
+      render(<App />);
+
+      openDialogAndSubmit("カラムを追加 (Ctrl+N)");
+
+      await waitFor(() => {
+        expect(hookSpies.jumpToColumnWhenReady).toHaveBeenCalledTimes(1);
+      });
+      const addedId = useAppStore
+        .getState()
+        .columns.find((c) => c.id !== column.id)?.id;
+      expect(addedId).toBeDefined();
+      expect(hookSpies.jumpToColumnWhenReady).toHaveBeenCalledWith(addedId);
+    });
+
+    it("モバイルでカラムを追加してもデスクトップ用の横スクロールジャンプは行わない", async () => {
+      mockPlatform.mockReturnValue("android");
+      useAppStore.setState({ columns: [column], isMobile: true });
+      render(<App />);
+
+      fireEvent.click(screen.getByTitle("メニュー表示の切り替え"));
+      openDialogAndSubmit("カラムを追加");
+
+      await waitFor(() => {
+        expect(useAppStore.getState().columns).toHaveLength(2);
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(hookSpies.jumpToColumnWhenReady).not.toHaveBeenCalled();
+    });
+
+    it("カラム追加に失敗したときは新カラムへジャンプしない", async () => {
+      hookSpies.addColumnResult.value = false;
+      useAppStore.setState({ columns: [column] });
+      render(<App />);
+
+      openDialogAndSubmit("カラムを追加 (Ctrl+N)");
+
+      await waitFor(() => {
+        expect(
+          screen.queryByRole("button", { name: "追加" }),
+        ).not.toBeInTheDocument();
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(hookSpies.jumpToColumnWhenReady).not.toHaveBeenCalled();
+    });
+  });
+
+  it("アカウントが無いときに投稿のショートカットを押しても何も起きない", () => {
+    useAppStore.setState({ accounts: [] });
+    render(<App />);
+    mockInvoke.mockClear();
+
+    fireEvent.keyDown(window, { key: "t", ctrlKey: true });
+
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "open_compose_window",
+      expect.anything(),
+    );
+  });
+});
+
+describe("App (拡張機能の変更後の全カラム再読込)", () => {
+  const secondColumn: Column = { ...column, id: "col-2", order: 1, gridCol: 2 };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPlatform.mockReturnValue("windows");
+    useAppStore.setState({
+      accounts: [account],
+      columns: [column, secondColumn],
+      globalSettings,
+      isLoaded: true,
+      isMobile: false,
+      topBarExpanded: false,
+      unreadCounts: {},
+    });
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      switch (cmd) {
+        case "load_settings": {
+          const { accounts, columns, globalSettings } = useAppStore.getState();
+          return {
+            settings: { accounts, columns, globalSettings },
+            loadFailed: false,
+            backupPath: null,
+          };
+        }
+        case "list_extensions":
+          return [];
+        case "pick_extension_folder":
+          return "C:/ext";
+        default:
+          return undefined;
+      }
+    });
+  });
+
+  const getReloadTargets = () =>
+    mockInvoke.mock.calls
+      .filter(
+        (c) =>
+          c[0] === "eval_in_webview" &&
+          (c[1] as { script?: string })?.script === "location.reload();",
+      )
+      .map((c) => (c[1] as { label: string }).label);
+
+  it("拡張機能を追加すると全カラムのページが再読込される", async () => {
+    render(<App />);
+    fireEvent.click(screen.getByTitle("アプリ設定 (Ctrl+,)"));
+    fireEvent.click(screen.getByRole("button", { name: "拡張機能" }));
+    mockInvoke.mockClear();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "フォルダを指定して追加" }),
+    );
+
+    await waitFor(() => expect(getReloadTargets()).toHaveLength(2));
+    expect(getReloadTargets()).toEqual([
+      expect.stringContaining("col-1"),
+      expect.stringContaining("col-2"),
+    ]);
+  });
+});
+
+describe("App (表示言語)", () => {
+  const englishSettings: GlobalSettings = {
+    ...DEFAULT_GLOBAL_SETTINGS,
+    language: "en",
+  };
+  const englishAccount = { ...account, label: "Main" };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInvokeWithCurrentSettings();
+    mockPlatform.mockReturnValue("windows");
+    useAppStore.setState({
+      accounts: [englishAccount],
+      columns: [],
+      globalSettings: englishSettings,
+      isLoaded: true,
+      isMobile: false,
+      topBarExpanded: false,
+      unreadCounts: {},
+      settingsLoadNotice: null,
+    });
+  });
+
+  afterEach(() => {
+    useAppStore.setState({ settingsLoadNotice: null });
+  });
+
+  it("表示言語が日本語のとき読み込み中の表示は従来どおりの文言になる", () => {
+    useAppStore.setState({ isLoaded: false, globalSettings });
+    render(<App />);
+    expect(screen.getByText("読み込み中...")).toBeInTheDocument();
+  });
+
+  it("表示言語が英語のとき読み込み中の表示が英語になる", async () => {
+    useAppStore.setState({ isLoaded: false });
+    mockInvoke.mockImplementation(() => new Promise(() => {}));
+    render(<App />);
+    expect(await screen.findByText("Loading...")).toBeInTheDocument();
+    expectNoJapanese(document.body);
+  });
+
+  it("表示言語が英語のとき設定読み込み失敗のダイアログに日本語が表示されない", async () => {
+    useAppStore.setState({ isLoaded: false });
+    mockInvoke.mockImplementation(async (cmd: string) =>
+      cmd === "load_settings"
+        ? {
+            settings: {
+              accounts: [englishAccount],
+              columns: [],
+              globalSettings: englishSettings,
+            },
+            loadFailed: true,
+            backupPath: "/data/settings.json.bak",
+          }
+        : undefined,
+    );
+    render(<App />);
+    expect(
+      await screen.findByText("Failed to load settings"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/The original settings were backed up to/),
+    ).toBeInTheDocument();
+    expectNoJapanese(document.body);
+  });
+
+  it("表示言語が英語のときアカウント削除の確認ダイアログに日本語が表示されない", async () => {
+    await act(async () => {
+      render(<App />);
+    });
+    fireEvent.click(screen.getByTitle("Manage accounts (Ctrl+Shift+A)"));
+    fireEvent.click(screen.getByLabelText("Delete Main"));
+
+    expect(
+      screen.getByText("Delete “Main”? Its session data will also be deleted."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Delete account")).toBeInTheDocument();
+    expectNoJapanese(document.body);
+  });
+
+  it("表示言語が英語のとき公式設定ポップアップのタイトルが英語になる", async () => {
+    await act(async () => {
+      render(<App />);
+    });
+    fireEvent.click(screen.getByTitle("App settings (Ctrl+,)"));
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Open official settings" })[0],
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Open official settings" }),
+    ).toBeInTheDocument();
   });
 });

@@ -2,6 +2,9 @@
   "commands": [
     "load_settings",
     "save_settings",
+    "export_backup",
+    "read_backup",
+    "apply_restore",
     "create_column_webview",
     "remove_column_webview",
     "resize_column_webview",
@@ -17,6 +20,7 @@
     "reauth_account_window",
     "delete_account_data",
     "close_window",
+    "detect_account_user_ids",
     "report_webview_scroll",
     "get_mobile_insets",
     "set_column_cookies",
@@ -24,6 +28,14 @@
     "report_new_posts_count",
     "report_keyboard_shortcut",
     "download_video",
+    "list_extensions",
+    "detect_chrome_extensions",
+    "pick_extension_folder",
+    "add_extension_from_folder",
+    "add_chrome_extension",
+    "set_extension_enabled",
+    "remove_extension",
+    "open_extension_page",
     "report_api_rate_limit",
     "report_official_settings",
     "update_mobile_swipe_bar",
@@ -62,6 +74,8 @@
     "MCX_ACCOUNTS": "__mcxAccounts",
     "MCX_CURRENT_ACCOUNT_ID": "__mcxCurrentAccountId",
     "MCX_TARGET_HREF": "__mcxTargetHref",
-    "MCX_ESC_CLOSE_ENABLED": "__mcxEscCloseEnabled"
+    "MCX_ESC_CLOSE_ENABLED": "__mcxEscCloseEnabled",
+    "MCX_LANG": "__mcxLang",
+    "MCX_I18N": "__mcxI18n"
   }
 }

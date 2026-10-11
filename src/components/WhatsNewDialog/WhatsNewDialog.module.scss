@@ -1,3 +1,5 @@
+@use "../../styles/dialog-fullscreen" as fs;
+
 .overlay {
   position: fixed;
   inset: 0;
@@ -6,26 +8,33 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
+
+  @include fs.android-fullscreen-overlay;
 }
 
 .dialog {
   background: var(--mcx-surface);
   color: var(--mcx-text);
-  border-radius: 8px;
-  padding: 20px;
-  width: min(480px, 90vw);
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  width: min(30rem, 90vw);
   max-height: 80vh;
   overflow: auto;
-  box-shadow: 0 8px 32px var(--mcx-shadow);
+  box-shadow: 0 0.5rem 2rem var(--mcx-shadow);
+
+  @include fs.android-fullscreen-panel(1.25rem, true);
 }
 
 .title {
-  margin: 0 0 8px;
+  margin: 0 0 0.5rem;
   font-size: 1.1rem;
+
+  // 全画面時は panel 全体がスクロールするので、ヘッダーを上に固定して本文だけを流す
+  @include fs.android-fullscreen-sticky-header(1.25rem);
 }
 
 .version {
-  margin: 0 0 16px;
+  margin: 0 0 1rem;
   font-size: 0.9rem;
   color: var(--mcx-text);
   opacity: 0.7;
@@ -33,13 +42,19 @@
 
 .notes {
   background: var(--mcx-surface-muted);
-  padding: 12px 16px;
-  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  border-radius: 0.25rem;
   max-height: 45vh;
   overflow: auto;
 
+  // 全画面時は dialog 側だけをスクロールさせ、二重スクロールにしない
+  :global([data-platform="android"]) & {
+    max-height: none;
+    overflow: visible;
+  }
+
   h3 {
-    margin: 12px 0 6px;
+    margin: 0.75rem 0 0.375rem;
     font-size: 0.95rem;
 
     &:first-child {
@@ -48,17 +63,17 @@
   }
 
   ul {
-    margin: 0 0 8px;
+    margin: 0 0 0.5rem;
     padding-left: 1.4em;
   }
 
   li {
-    margin: 2px 0;
+    margin: 0.125rem 0;
     font-size: 0.9rem;
   }
 
   p {
-    margin: 0 0 8px;
+    margin: 0 0 0.5rem;
     font-size: 0.9rem;
 
     &:last-child {
@@ -70,14 +85,14 @@
 .actions {
   display: flex;
   justify-content: flex-end;
-  margin-top: 16px;
+  margin-top: 1rem;
 }
 
 .closeBtn {
-  padding: 8px 20px;
-  border-radius: 4px;
+  padding: 0.5rem 1.25rem;
+  border-radius: 0.25rem;
   cursor: pointer;
-  background: var(--mcx-accent);
+  background: var(--mcx-accent-fill);
   color: var(--mcx-text-on-accent);
   border: none;
   font-size: 0.9rem;

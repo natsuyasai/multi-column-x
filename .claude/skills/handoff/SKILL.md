@@ -50,7 +50,7 @@ git -C $projectRoot log --oneline -15
 
 **ファイル構造**:
 
-```markdown
+````markdown
 # セッション引き継ぎファイル
 
 **生成日時**: {datetime}
@@ -63,24 +63,21 @@ git -C $projectRoot log --oneline -15
 ## Git 状態
 
 ### 現在のブランチ
+
 ```
-
 {gitBranch}
-
 ```
 
 ### 変更ファイル (git status --short)
+
 ```
-
 {gitStatus}
-
 ```
 
 ### 直近 15 コミット
+
 ```
-
 {gitLog}
-
 ```
 
 ---
@@ -127,9 +124,9 @@ git -C $projectRoot log --oneline -15
 
 ---
 
-*このファイルは /handoff スキルにより手動生成されました。*
-*次のセッション開始時にこのファイルを参照して作業文脈を復元してください。*
-```
+_このファイルは /handoff スキルにより手動生成されました。_
+_次のセッション開始時にこのファイルを参照して作業文脈を復元してください。_
+````
 
 ### Step 5: 完了報告
 

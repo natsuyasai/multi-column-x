@@ -1,0 +1,7 @@
+<resources>
+    <string name="video_download_notification_title">動画をダウンロード中</string>
+    <string name="video_download_preparing">ダウンロードを準備しています</string>
+    <string name="video_download_progress_file">ファイル %1$d/%2$d</string>
+    <string name="video_download_channel_name">動画ダウンロード</string>
+    <string name="video_download_channel_description">動画ダウンロードの進捗を表示します</string>
+</resources>

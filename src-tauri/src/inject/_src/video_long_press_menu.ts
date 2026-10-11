@@ -35,6 +35,13 @@ function isLongPressRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+// 画面文言は共有ハブ window.__mcxI18n（i18n.ts）経由で設定する。ハブ未ロード時はキー文字列を表示する。
+// 表示済みの要素の文言は、言語切替時に再適用できるよう apply で設定する。
+function applyText(el: Element, key: string): void {
+  if (window.__mcxI18n) window.__mcxI18n.apply(el, key);
+  else el.textContent = key;
+}
+
 const VIDEO_PLAYER_SELECTOR = '[data-testid="videoComponent"]';
 
 /**
@@ -290,7 +297,7 @@ export function extractLongPressQuotedTweetId(
     ].join(";");
 
     const item = document.createElement("div");
-    item.textContent = "動画をダウンロード";
+    applyText(item, "videoMenu.download");
     item.style.cssText = [
       "padding: 8px 16px",
       "cursor: pointer",
@@ -313,7 +320,7 @@ export function extractLongPressQuotedTweetId(
 
     if (isLongPressVideoPopupEnabled()) {
       const popupItem = document.createElement("div");
-      popupItem.textContent = "動画をポップアップで表示";
+      applyText(popupItem, "videoMenu.popup");
       popupItem.style.cssText = [
         "padding: 8px 16px",
         "cursor: pointer",

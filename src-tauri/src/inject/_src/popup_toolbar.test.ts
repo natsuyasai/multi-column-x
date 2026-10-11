@@ -1,7 +1,13 @@
+// @vitest-environment-options {"url":"https://x.com/"}
 // popup_toolbar.ts は IIFE のため、import 時にツールバーが DOM へ注入される。
 // vi.resetModules で再 import し、Android ブリッジ有無それぞれの転送先を検証する。
+// takePopupAccounts が hostname を検証するようになったため、location を明示的に
+// 上書きしないテストでも X 系ホストとして扱われるよう、テスト環境の URL を
+// https://x.com/ に固定する（jsdom のデフォルトは localhost で空配列になってしまうため）。
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { formatVideoDownloadProgressText } from "./popup_toolbar";
+// 画面文言の共有ハブ（window.__mcxI18n）を読み込む（日本語固定の既定言語で従来の文言を検証する）
+import "./i18n";
 
 // 共有DOM監視ハブ(dom_observer.ts)は自身の内部MutationObserverを明示的に
 // disconnectしない常駐前提の設計のため、共有ハブ経由のテストではハブが作る
@@ -648,6 +654,68 @@ describe("isOfficialSettingsPagePath", () => {
   });
 });
 
+describe("isXHostname", () => {
+  it("x.comとそのサブドメインはtrueを返す", async () => {
+    const { isXHostname } = await import("./popup_toolbar");
+    expect(isXHostname("x.com")).toBe(true);
+    expect(isXHostname("mobile.x.com")).toBe(true);
+  });
+
+  it("twitter.comとそのサブドメインはtrueを返す", async () => {
+    const { isXHostname } = await import("./popup_toolbar");
+    expect(isXHostname("twitter.com")).toBe(true);
+    expect(isXHostname("mobile.twitter.com")).toBe(true);
+  });
+
+  it("x.comに似た別ドメインはfalseを返す", async () => {
+    const { isXHostname } = await import("./popup_toolbar");
+    expect(isXHostname("x.com.example.com")).toBe(false);
+    expect(isXHostname("evilx.com")).toBe(false);
+    expect(isXHostname("example.com")).toBe(false);
+  });
+});
+
+describe("takePopupAccounts", () => {
+  const popupAccounts: TvAccountInfo[] = [
+    { id: "acc1", label: "アカウント1", color: "#fff" },
+    { id: "acc2", label: "アカウント2", color: "#000" },
+  ];
+
+  function fakeWindow(initialAccounts?: TvAccountInfo[]): Window {
+    return { __mcxAccounts: initialAccounts } as unknown as Window;
+  }
+
+  it("ポップアップのページがXのときはアカウント一覧が渡される", async () => {
+    const { takePopupAccounts } = await import("./popup_toolbar");
+    const win = fakeWindow(popupAccounts);
+
+    expect(takePopupAccounts(win, "x.com")).toEqual(popupAccounts);
+  });
+
+  it("ポップアップのページがX以外のときはアカウント一覧が空になる", async () => {
+    const { takePopupAccounts } = await import("./popup_toolbar");
+    const win = fakeWindow(popupAccounts);
+
+    expect(takePopupAccounts(win, "example.com")).toEqual([]);
+  });
+
+  it("Xに似た名前の別サイトではアカウント一覧が空になる", async () => {
+    const { takePopupAccounts } = await import("./popup_toolbar");
+    const win = fakeWindow(popupAccounts);
+
+    expect(takePopupAccounts(win, "x.com.example.com")).toEqual([]);
+  });
+
+  it("呼び出し後はwindowからアカウント一覧が削除される", async () => {
+    const { takePopupAccounts } = await import("./popup_toolbar");
+    const win = fakeWindow(popupAccounts);
+
+    takePopupAccounts(win, "example.com");
+
+    expect(win.__mcxAccounts).toBeUndefined();
+  });
+});
+
 describe("readNightModeCookie", () => {
   it("Cookie 文字列に night_mode=2 が含まれる場合は '2' を返す", async () => {
     const { readNightModeCookie } = await import("./popup_toolbar");
@@ -894,5 +962,119 @@ describe("inject/popup_toolbar の動画ダウンロード進捗イベント受�
 
     await expect(importToolbar()).resolves.not.toThrow();
     expect(tauriListenMock).not.toHaveBeenCalled();
+  });
+});
+
+/** かな・カタカナ・漢字を1文字でも含むか（英語表示の検証用） */
+function containsJapanese(text: string): boolean {
+  return /[\u3040-\u30ff\u4e00-\u9fff]/.test(text);
+}
+
+describe("inject/popup_toolbar の表示言語", () => {
+  beforeEach(() => {
+    tauriInvokeMock.mockClear();
+    window.__TAURI__ = { core: { invoke: tauriInvokeMock } };
+    window.__mcxAccounts = accounts;
+    window.__mcxCurrentAccountId = "acc1";
+    window.__mcxTargetHref = "";
+    window.__mcxEscCloseEnabled = false;
+    delete window.__mcxPopupBridge;
+    document
+      .querySelectorAll('[data-testid="videoComponent"]')
+      .forEach((el) => el.remove());
+  });
+
+  afterEach(() => {
+    window.__mcxI18n?.setLang("ja");
+  });
+
+  function toolbarTexts(): string[] {
+    const toolbar = document.getElementById("tv-popup-toolbar");
+    if (!toolbar) throw new Error("toolbar not found");
+    return [
+      toolbar.querySelector("span")?.textContent ?? "",
+      document.getElementById("tv-popup-download-button")?.textContent ?? "",
+      document.getElementById("tv-popup-apply-settings-button")?.textContent ??
+        "",
+      document.getElementById("tv-popup-exit-button")?.textContent ?? "",
+    ];
+  }
+
+  it("表示言語が英語のときダウンロード進捗の文言が英語になり日本語を含まない", () => {
+    window.__mcxI18n?.setLang("en");
+    const base = { fileIndex: 1, fileCount: 2, current: 45, total: 100 };
+
+    const texts = [
+      formatVideoDownloadProgressText({ ...base, phase: "completed" }),
+      formatVideoDownloadProgressText({ ...base, phase: "failed" }),
+      formatVideoDownloadProgressText({
+        ...base,
+        total: null,
+        phase: "downloading",
+      }),
+      formatVideoDownloadProgressText({ ...base, phase: "downloading" }),
+    ];
+
+    expect(texts).toEqual([
+      "Download complete (1/2)",
+      "Download failed (1/2)",
+      "Downloading (1/2)",
+      "Downloading (1/2) 45%",
+    ]);
+    expect(texts.some(containsJapanese)).toBe(false);
+  });
+
+  it("表示言語が英語のときツールバーのラベルとボタンが英語になり日本語を含まない", async () => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: new URL("https://x.com/settings/display"),
+    });
+    window.__mcxI18n?.setLang("en");
+
+    await importToolbar();
+
+    const texts = toolbarTexts();
+    expect(texts).toEqual([
+      "Account: ",
+      "Download video",
+      "Apply to columns",
+      "Exit",
+    ]);
+    expect(texts.some(containsJapanese)).toBe(false);
+  });
+
+  it("表示言語が英語のとき動画未再生のフィードバックが英語になり日本語を含まない", async () => {
+    window.__mcxI18n?.setLang("en");
+    await importToolbar();
+
+    clickDownloadButton();
+
+    const text =
+      document.getElementById("tv-popup-download-status")?.textContent ?? "";
+    expect(text).toBe("Play the video before downloading");
+    expect(containsJapanese(text)).toBe(false);
+  });
+
+  it("ツールバー表示後に表示言語を切り替えると表示済みの文言も切り替わる", async () => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: new URL("https://x.com/settings/display"),
+    });
+    await importToolbar();
+    expect(toolbarTexts()).toEqual([
+      "アカウント: ",
+      "動画をダウンロード",
+      "各カラムに適用",
+      "終了",
+    ]);
+
+    window.__mcxI18n?.setLang("en");
+
+    expect(toolbarTexts()).toEqual([
+      "Account: ",
+      "Download video",
+      "Apply to columns",
+      "Exit",
+    ]);
   });
 });

@@ -1,6 +1,8 @@
 // src/lib/ngWordPattern.ts
 // NGワード1行が正規表現形式("/pattern/flags")かどうかの判定・検証（Tauri 非依存の純粋関数）
 
+import type { AppTFunction } from "@/i18n/types";
+
 const REGEX_NG_WORD_PATTERN = /^\/(.+)\/([a-z]*)$/;
 
 /**
@@ -21,7 +23,10 @@ export function isRegexNgWord(raw: string): boolean {
  * 既に "i" を含む場合に単純に "+ 'i'" すると "ii" となり
  * `new RegExp` が SyntaxError を投げるため、includes チェックで防ぐ。
  */
-export function validateNgWordLine(raw: string): string | null {
+export function validateNgWordLine(
+  raw: string,
+  t: AppTFunction,
+): string | null {
   const match = REGEX_NG_WORD_PATTERN.exec(raw);
   if (!match) {
     return null;
@@ -32,16 +37,19 @@ export function validateNgWordLine(raw: string): string | null {
     new RegExp(pattern, normalizedFlags);
     return null;
   } catch {
-    return `正規表現が不正です: ${raw}`;
+    return t("messages:validation.regexInvalid", { raw });
   }
 }
 
 /**
  * NGワードの複数行を検証し、最初に見つかったエラーメッセージを返す（なければ null）。
  */
-export function validateNgWordLines(lines: string[]): string | null {
+export function validateNgWordLines(
+  lines: string[],
+  t: AppTFunction,
+): string | null {
   for (const line of lines) {
-    const error = validateNgWordLine(line);
+    const error = validateNgWordLine(line, t);
     if (error !== null) {
       return error;
     }

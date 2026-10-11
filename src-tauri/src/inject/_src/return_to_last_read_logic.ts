@@ -207,6 +207,17 @@ export type ReturnEvent =
   | { type: "dismissed" }
   | { type: "disabled" };
 
+/**
+ * 戻り先が消費済み（ユーザーが目視した／戻り操作が完了した／閉じられた）
+ * になったことを表す状態遷移。3つの event（targetSeenByUser / returnFinished /
+ * dismissed）で共通の処理。
+ */
+function markConsumed(state: ReturnState): ReturnState {
+  if (state.anchorIds === null) return state;
+  if (state.consumed && !state.buttonVisible) return state;
+  return { ...state, consumed: true, buttonVisible: false };
+}
+
 export function reduceReturnState(
   state: ReturnState,
   event: ReturnEvent,
@@ -236,23 +247,10 @@ export function reduceReturnState(
       return state;
     }
 
-    case "targetSeenByUser": {
-      if (state.anchorIds === null) return state;
-      if (state.consumed && !state.buttonVisible) return state;
-      return { ...state, consumed: true, buttonVisible: false };
-    }
-
-    case "returnFinished": {
-      if (state.anchorIds === null) return state;
-      if (state.consumed && !state.buttonVisible) return state;
-      return { ...state, consumed: true, buttonVisible: false };
-    }
-
-    case "dismissed": {
-      if (state.anchorIds === null) return state;
-      if (state.consumed && !state.buttonVisible) return state;
-      return { ...state, consumed: true, buttonVisible: false };
-    }
+    case "targetSeenByUser":
+    case "returnFinished":
+    case "dismissed":
+      return markConsumed(state);
 
     case "disabled":
       return INITIAL_RETURN_STATE;
@@ -300,6 +298,74 @@ export type SearchResult =
   | { kind: "notFound" }
   | { kind: "interrupted" };
 
+// 単独一致した基準ごとに、見えたときの scrollTop と、そのとき読み取った
+// 列内での並び位置（画面内で上から何番目か）を覚えておく。
+// フォールバック選定は (scrollTop, position) の辞書順最大＝画面内で最も下のもの。
+interface SingleSeen {
+  scrollTop: number;
+  position: number;
+}
+
+/** scan.singles を、見えたときの scrollTop / 並び位置とともに記録する。 */
+function recordSingles(
+  singlesSeen: Map<string, SingleSeen>,
+  singles: string[],
+  scrollTop: number,
+): void {
+  singles.forEach((id, position) => {
+    singlesSeen.set(id, { scrollTop, position });
+  });
+}
+
+/**
+ * 記録済みの単独一致のうち、(scrollTop, position) の辞書順最大＝画面内で
+ * 最も下のものを選ぶ。同値なら先に入った方を残す（Map の反復順＝挿入順）。
+ */
+function pickBottomSingle(
+  singlesSeen: Map<string, SingleSeen>,
+): { id: string; seen: SingleSeen } | null {
+  let bottomId: string | null = null;
+  let bottom: SingleSeen | null = null;
+  for (const [id, seen] of singlesSeen) {
+    if (
+      bottom === null ||
+      seen.scrollTop > bottom.scrollTop ||
+      (seen.scrollTop === bottom.scrollTop && seen.position > bottom.position)
+    ) {
+      bottom = seen;
+      bottomId = id;
+    }
+  }
+  if (bottomId !== null && bottom !== null) {
+    return { id: bottomId, seen: bottom };
+  }
+  return null;
+}
+
+/**
+ * 末尾でスクロールが進まなくなったとき、追加読み込みで scrollHeight が
+ * 増えるのを待つ。中断されたら "interrupted"、上限まで増えなければ
+ * "notGrew"、増えれば "grew" を返す。
+ */
+async function waitForListGrowth(
+  deps: SearchDeps,
+  opts: SearchOptions,
+): Promise<"grew" | "notGrew" | "interrupted"> {
+  const beforeHeight = deps.getScrollHeight();
+  let waited = 0;
+  while (waited < opts.endWaitMs) {
+    if (deps.isInterrupted()) {
+      return "interrupted";
+    }
+    await deps.wait(END_POLL_INTERVAL_MS);
+    waited += END_POLL_INTERVAL_MS;
+    if (deps.getScrollHeight() > beforeHeight) {
+      return "grew";
+    }
+  }
+  return "notGrew";
+}
+
 /**
  * 基準（anchorIds）の戻り先を、先頭からスクロールしながら探す。
  * アルゴリズムは plan §4-1 のとおり（run 一致 → 単独基準の即時一致 →
@@ -316,14 +382,7 @@ export async function searchReturnTarget(
   deps.setScrollTop(0);
   await deps.wait(opts.stepWaitMs);
 
-  // 単独一致した基準ごとに、見えたときの scrollTop と、そのとき読み取った
-  // 列内での並び位置（画面内で上から何番目か）を覚えておく。
-  // フォールバック選定は (scrollTop, position) の辞書順最大＝画面内で最も下のもの。
   // 同じ ID を後のステップで再び見た場合は新しい位置で上書きする。
-  interface SingleSeen {
-    scrollTop: number;
-    position: number;
-  }
   const singlesSeen = new Map<string, SingleSeen>();
   let firstSingleSeenStep: number | null = null;
 
@@ -347,9 +406,7 @@ export async function searchReturnTarget(
 
     if (scan.singles.length > 0) {
       const currentScrollTop = deps.getScrollTop();
-      scan.singles.forEach((id, position) => {
-        singlesSeen.set(id, { scrollTop: currentScrollTop, position });
-      });
+      recordSingles(singlesSeen, scan.singles, currentScrollTop);
       if (firstSingleSeenStep === null) {
         firstSingleSeenStep = step;
       }
@@ -367,45 +424,130 @@ export async function searchReturnTarget(
     await deps.wait(opts.stepWaitMs);
 
     if (deps.getScrollTop() === prev) {
-      const beforeHeight = deps.getScrollHeight();
-      let grew = false;
-      let waited = 0;
-      while (waited < opts.endWaitMs) {
-        if (deps.isInterrupted()) {
-          return { kind: "interrupted" };
-        }
-        await deps.wait(END_POLL_INTERVAL_MS);
-        waited += END_POLL_INTERVAL_MS;
-        if (deps.getScrollHeight() > beforeHeight) {
-          grew = true;
-          break;
-        }
+      const growth = await waitForListGrowth(deps, opts);
+      if (growth === "interrupted") {
+        return { kind: "interrupted" };
       }
-      if (!grew) break;
+      if (growth === "notGrew") break;
     }
   }
 
   if (singlesSeen.size > 0) {
-    let bottomId: string | null = null;
-    let bottom: SingleSeen | null = null;
-    for (const [id, seen] of singlesSeen) {
-      if (
-        bottom === null ||
-        seen.scrollTop > bottom.scrollTop ||
-        (seen.scrollTop === bottom.scrollTop && seen.position > bottom.position)
-      ) {
-        bottom = seen;
-        bottomId = id;
-      }
-    }
-    if (bottomId !== null && bottom !== null) {
-      deps.setScrollTop(bottom.scrollTop);
+    const picked = pickBottomSingle(singlesSeen);
+    if (picked !== null) {
+      deps.setScrollTop(picked.seen.scrollTop);
       await deps.wait(opts.stepWaitMs);
-      deps.scrollIdToTop(bottomId);
-      return { kind: "found", id: bottomId, fallback: true };
+      deps.scrollIdToTop(picked.id);
+      return { kind: "found", id: picked.id, fallback: true };
     }
   }
 
   deps.setScrollTop(start);
   return { kind: "notFound" };
+}
+
+export const PHOTO_RESTORE_POLL_INTERVAL_MS = 100;
+export const PHOTO_RESTORE_READY_TIMEOUT_MS = 5000;
+
+export interface TimelineReadyDeps {
+  /** タイムラインが表示完了している（探索を始めてよい）か。 */
+  isReady: () => boolean;
+  /** ユーザー入力があった、またはホームでなくなったなど、待機を中止すべきか。 */
+  shouldAbort: () => boolean;
+  wait: (ms: number) => Promise<void>;
+}
+
+/**
+ * タイムラインの表示完了を、固定時間ではなくポーリングで待つ。
+ * 準備完了なら "ready"、中止条件を満たしたら "aborted"、上限まで待っても
+ * 準備できなければ "timeout" を返す。
+ */
+export async function waitForTimelineReady(
+  deps: TimelineReadyDeps,
+  options: { pollIntervalMs?: number; timeoutMs?: number } = {},
+): Promise<"ready" | "aborted" | "timeout"> {
+  const pollIntervalMs =
+    options.pollIntervalMs ?? PHOTO_RESTORE_POLL_INTERVAL_MS;
+  const timeoutMs = options.timeoutMs ?? PHOTO_RESTORE_READY_TIMEOUT_MS;
+  let waited = 0;
+  for (;;) {
+    if (deps.shouldAbort()) return "aborted";
+    if (deps.isReady()) return "ready";
+    if (waited >= timeoutMs) return "timeout";
+    await deps.wait(pollIntervalMs);
+    waited += pollIntervalMs;
+  }
+}
+
+// --- 直接更新操作の判定 ---
+// プルダウン更新とみなす下方向の最小移動量（px）。暫定値。Android 実機で X の更新と
+// 一致する距離を計測して確定する。
+export const PULL_REFRESH_MIN_DISTANCE_PX = 80;
+
+export interface PullGesture {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  startScrollTop: number;
+  endScrollTop: number;
+}
+
+// 先頭（scrollTop <= 1）で始まり先頭のまま終わり、下方向へ十分引き下げ、
+// かつ横移動より縦移動が大きいときだけプルダウン更新とみなす。
+export function isPullRefreshGesture(g: PullGesture): boolean {
+  if (g.startScrollTop > 1 || g.endScrollTop > 1) return false;
+  const dy = g.endY - g.startY;
+  const dx = Math.abs(g.endX - g.startX);
+  return dy >= PULL_REFRESH_MIN_DISTANCE_PX && dy > dx;
+}
+
+// 入力欄（編集可能要素）か。keyboard_shortcut.ts の isEditableTarget とは
+// 連結後のトップレベル名が重複しないよう別名にしている。
+export function isEditableEventTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return (
+    target.closest(
+      'input, textarea, select, [contenteditable=""], [contenteditable="true"], [role="textbox"]',
+    ) !== null
+  );
+}
+
+// X の「新しいポストを読み込む」ショートカット（"."）。修飾キー無し・編集可能要素以外のとき。
+export function isRefreshShortcut(event: {
+  key: string;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  altKey: boolean;
+  shiftKey: boolean;
+  target: EventTarget | null;
+}): boolean {
+  if (event.key !== ".") return false;
+  if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) {
+    return false;
+  }
+  return !isEditableEventTarget(event.target);
+}
+
+// 更新操作となるクリック対象か。
+// (1) タイムライン内の新着ピル（投稿を含まないセル内の button[type=button]、UserCell 除く。
+//     auto_reload.ts の findNewPostsButton と同じ条件）
+// (2) 選択中で aria-expanded を持たないタブ（auto_reload の reselectTab と同じ条件）
+export function isRefreshClickTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+
+  const tab = target.closest<HTMLElement>('div[role="tab"]');
+  if (tab) {
+    return (
+      tab.getAttribute("aria-selected") === "true" &&
+      !tab.hasAttribute("aria-expanded")
+    );
+  }
+
+  const button = target.closest<HTMLButtonElement>('button[type="button"]');
+  if (!button) return false;
+  if (button.getAttribute("data-testid") === "UserCell") return false;
+  const cell = button.closest('[data-testid="cellInnerDiv"]');
+  if (!cell || cell.querySelector("article")) return false;
+  return cell.closest("section[aria-labelledby]") !== null;
 }

@@ -10,6 +10,9 @@
     "notification:default",
     "allow-load-settings",
     "allow-save-settings",
+    "allow-export-backup",
+    "allow-read-backup",
+    "allow-apply-restore",
     "allow-create-column-webview",
     "allow-get-external-column-data-directory",
     "allow-delete-external-column-data",
@@ -26,9 +29,18 @@
     "allow-reauth-account-window",
     "allow-delete-account-data",
     "allow-close-window",
+    "allow-detect-account-user-ids",
     "allow-open-compose-window",
     "allow-install-apk-update",
     "allow-check-media-codec-support",
-    "allow-download-and-enable-h264"
+    "allow-download-and-enable-h264",
+    "allow-list-extensions",
+    "allow-detect-chrome-extensions",
+    "allow-pick-extension-folder",
+    "allow-add-extension-from-folder",
+    "allow-add-chrome-extension",
+    "allow-set-extension-enabled",
+    "allow-remove-extension",
+    "allow-open-extension-page"
   ]
 }

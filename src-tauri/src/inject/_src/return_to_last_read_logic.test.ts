@@ -9,6 +9,10 @@ import {
   extractArticleStatusId,
   isAdArticle,
   isListTopRendered,
+  isPullRefreshGesture,
+  isRefreshClickTarget,
+  isRefreshShortcut,
+  PULL_REFRESH_MIN_DISTANCE_PX,
   readTimelineIds,
   selectAnchorIds,
   hasNewPostsAbove,
@@ -16,6 +20,9 @@ import {
   INITIAL_RETURN_STATE,
   reduceReturnState,
   searchReturnTarget,
+  waitForTimelineReady,
+  type PullGesture,
+  type ReturnEvent,
   type ReturnState,
   type SearchDeps,
 } from "./return_to_last_read_logic";
@@ -601,6 +608,154 @@ describe("inject/return_to_last_read_logic", () => {
 
       expect(next).toEqual(INITIAL_RETURN_STATE);
     });
+
+    describe("状態が変わらないイベントでは同じ参照を返す", () => {
+      const CONSUMING_EVENT_TYPES = [
+        "targetSeenByUser",
+        "returnFinished",
+        "dismissed",
+      ] as const satisfies readonly ReturnEvent["type"][];
+
+      it("未消化の基準があるときのreloadでは同じ参照を返す", () => {
+        const state: ReturnState = {
+          anchorIds: ["A", "B", "C", "D", "E"],
+          tabName: "おすすめ",
+          consumed: false,
+          buttonVisible: false,
+        };
+
+        const next = reduceReturnState(state, {
+          type: "reload",
+          snapshot: ["N1", "N2", "A", "B", "C"],
+          tabName: "おすすめ",
+        });
+
+        expect(next).toBe(state);
+      });
+
+      it("表示中の投稿が無いときのreloadでは同じ参照を返す", () => {
+        const state: ReturnState = { ...INITIAL_RETURN_STATE };
+
+        const next = reduceReturnState(state, {
+          type: "reload",
+          snapshot: [],
+          tabName: "おすすめ",
+        });
+
+        expect(next).toBe(state);
+      });
+
+      it("基準が無いときのtopUpdatedでは同じ参照を返す", () => {
+        const state: ReturnState = { ...INITIAL_RETURN_STATE };
+
+        const next = reduceReturnState(state, {
+          type: "topUpdated",
+          topIds: ["N1", "N2"],
+        });
+
+        expect(next).toBe(state);
+      });
+
+      it("消化済みの基準へのtopUpdatedでは同じ参照を返す", () => {
+        const state: ReturnState = {
+          anchorIds: ["A", "B", "C", "D", "E"],
+          tabName: "おすすめ",
+          consumed: true,
+          buttonVisible: false,
+        };
+
+        const next = reduceReturnState(state, {
+          type: "topUpdated",
+          topIds: ["N1", "N2"],
+        });
+
+        expect(next).toBe(state);
+      });
+
+      it.each([
+        {
+          label: "buttonVisibleがfalseのまま",
+          buttonVisible: false,
+          topIds: ["A", "B"],
+        },
+        {
+          label: "buttonVisibleがtrueのまま",
+          buttonVisible: true,
+          topIds: ["N1", "A"],
+        },
+      ])(
+        "戻るボタンの表示状態が変わらないtopUpdatedでは同じ参照を返す（$label）",
+        ({ buttonVisible, topIds }) => {
+          const state: ReturnState = {
+            anchorIds: ["A", "B", "C", "D", "E"],
+            tabName: "おすすめ",
+            consumed: false,
+            buttonVisible,
+          };
+
+          const next = reduceReturnState(state, {
+            type: "topUpdated",
+            topIds,
+          });
+
+          expect(next).toBe(state);
+        },
+      );
+
+      it("基準が無いときのtabChangedでは同じ参照を返す", () => {
+        const state: ReturnState = { ...INITIAL_RETURN_STATE };
+
+        const next = reduceReturnState(state, {
+          type: "tabChanged",
+          tabName: "フォロー中",
+        });
+
+        expect(next).toBe(state);
+      });
+
+      it("同じタブへのtabChangedでは同じ参照を返す", () => {
+        const state: ReturnState = {
+          anchorIds: ["A", "B", "C", "D", "E"],
+          tabName: "おすすめ",
+          consumed: false,
+          buttonVisible: true,
+        };
+
+        const next = reduceReturnState(state, {
+          type: "tabChanged",
+          tabName: "おすすめ",
+        });
+
+        expect(next).toBe(state);
+      });
+
+      it.each(CONSUMING_EVENT_TYPES)(
+        "基準が無いときの%sでは同じ参照を返す",
+        (type) => {
+          const state: ReturnState = { ...INITIAL_RETURN_STATE };
+
+          const next = reduceReturnState(state, { type });
+
+          expect(next).toBe(state);
+        },
+      );
+
+      it.each(CONSUMING_EVENT_TYPES)(
+        "消化済みでボタンが消えている基準への%sでは同じ参照を返す",
+        (type) => {
+          const state: ReturnState = {
+            anchorIds: ["A", "B", "C", "D", "E"],
+            tabName: "おすすめ",
+            consumed: true,
+            buttonVisible: false,
+          };
+
+          const next = reduceReturnState(state, { type });
+
+          expect(next).toBe(state);
+        },
+      );
+    });
   });
 
   describe("searchReturnTarget", () => {
@@ -842,5 +997,285 @@ describe("inject/return_to_last_read_logic", () => {
       expect(waitCalls).toBe(2);
       expect(getScrollHeightCalls).toBe(1);
     });
+
+    it("単独一致を見つけた後は追加ステップ数の上限で探索を打ち切り、最も下の単独一致へフォールバックする", async () => {
+      const anchorIds = ["A", "B", "C", "D", "E"];
+      // スクロールすれば常に進む（末尾に到達しない）リストを模す。
+      let scrollTop = 0;
+      let readCalls = 0;
+      const deps: SearchDeps = {
+        readIds: () => {
+          const page = readCalls;
+          readCalls += 1;
+          if (page === 0) return ["A", "N1"];
+          if (page === 1) return ["N2", "B"];
+          return ["N3"];
+        },
+        getScrollTop: () => scrollTop,
+        setScrollTop: (value: number) => {
+          scrollTop = value; // クランプしない＝常に進む
+        },
+        getViewportHeight: () => 800,
+        getScrollHeight: () => 999999,
+        wait: () => Promise.resolve(),
+        isInterrupted: () => false,
+        scrollIdToTop: () => false,
+      };
+
+      const result = await searchReturnTarget(anchorIds, deps, {
+        extraStepsAfterSingle: 3,
+        maxSteps: 1000,
+      });
+
+      // 最初の単独一致（step0のA）から3ステップ後（step3）で打ち切られる＝readIds呼び出しは4回のみ
+      expect(readCalls).toBe(4);
+      // 後から見えたBの方がscrollTopが大きい（画面内でより下）ためBへフォールバックする
+      expect(result).toEqual({ kind: "found", id: "B", fallback: true });
+    });
+  });
+
+  describe("waitForTimelineReady", () => {
+    function makeDeps(opts: {
+      isReady: () => boolean;
+      shouldAbort?: () => boolean;
+    }) {
+      const waits: number[] = [];
+      return {
+        waits,
+        deps: {
+          isReady: opts.isReady,
+          shouldAbort: opts.shouldAbort ?? (() => false),
+          wait: async (ms: number) => {
+            waits.push(ms);
+          },
+        },
+      };
+    }
+
+    it("準備完了ならすぐ ready を返し待機しない", async () => {
+      const { deps, waits } = makeDeps({ isReady: () => true });
+      expect(await waitForTimelineReady(deps)).toBe("ready");
+      expect(waits).toEqual([]);
+    });
+
+    it("途中で準備完了になれば ready を返す", async () => {
+      let calls = 0;
+      const { deps, waits } = makeDeps({ isReady: () => ++calls > 3 });
+      expect(await waitForTimelineReady(deps)).toBe("ready");
+      expect(waits).toEqual([100, 100, 100]);
+    });
+
+    it("中止条件を満たしたら aborted を返す", async () => {
+      const { deps } = makeDeps({
+        isReady: () => false,
+        shouldAbort: () => true,
+      });
+      expect(await waitForTimelineReady(deps)).toBe("aborted");
+    });
+
+    it("準備完了でも中止条件が先に成立していれば aborted を返す", async () => {
+      const { deps } = makeDeps({
+        isReady: () => true,
+        shouldAbort: () => true,
+      });
+      expect(await waitForTimelineReady(deps)).toBe("aborted");
+    });
+
+    it("待機中に中止条件を満たしたら aborted を返し、以降は待たない", async () => {
+      let calls = 0;
+      const { deps, waits } = makeDeps({
+        isReady: () => false,
+        shouldAbort: () => ++calls > 2,
+      });
+      expect(await waitForTimelineReady(deps)).toBe("aborted");
+      expect(waits).toEqual([100, 100]);
+    });
+
+    it("上限を超えても準備できなければ timeout を返す", async () => {
+      const { deps, waits } = makeDeps({ isReady: () => false });
+      expect(await waitForTimelineReady(deps)).toBe("timeout");
+      expect(waits.length).toBe(50);
+    });
+
+    it("上限を指定した場合はその時間で timeout を返す", async () => {
+      const { deps, waits } = makeDeps({ isReady: () => false });
+      expect(
+        await waitForTimelineReady(deps, {
+          pollIntervalMs: 10,
+          timeoutMs: 30,
+        }),
+      ).toBe("timeout");
+      expect(waits).toEqual([10, 10, 10]);
+    });
+
+    it("ready 以外の戻り値は ready と区別できる（後続処理を呼ばない判定に使える）", async () => {
+      const aborted = await waitForTimelineReady(
+        makeDeps({ isReady: () => false, shouldAbort: () => true }).deps,
+      );
+      const timedOut = await waitForTimelineReady(
+        makeDeps({ isReady: () => false }).deps,
+      );
+      expect(aborted).not.toBe("ready");
+      expect(timedOut).not.toBe("ready");
+    });
+  });
+});
+
+// --- 直接更新操作の判定 ---
+
+describe("更新操作のクリック判定 (isRefreshClickTarget)", () => {
+  /** section[aria-labelledby] > cellInnerDiv > 子 を構築して section を返す。 */
+  function buildCell(inner: string): HTMLElement {
+    document.body.innerHTML = `<section aria-labelledby="h"><div data-testid="cellInnerDiv">${inner}</div></section>`;
+    return document.body.querySelector("section")!;
+  }
+
+  it("新着ピルをクリックして更新したとき更新操作と判定される", () => {
+    const section = buildCell(
+      '<button type="button"><span id="t">3件のポストを表示</span></button>',
+    );
+    expect(isRefreshClickTarget(section.querySelector("#t"))).toBe(true);
+    expect(isRefreshClickTarget(section.querySelector("button"))).toBe(true);
+  });
+
+  it("投稿を含むセル内のボタンのクリックは更新操作と判定されない", () => {
+    const section = buildCell(
+      '<article><button type="button" id="like">いいね</button></article>',
+    );
+    expect(isRefreshClickTarget(section.querySelector("#like"))).toBe(false);
+  });
+
+  it("UserCell のボタンのクリックは更新操作と判定されない", () => {
+    const section = buildCell(
+      '<button type="button" data-testid="UserCell">ユーザー</button>',
+    );
+    expect(isRefreshClickTarget(section.querySelector("button"))).toBe(false);
+  });
+
+  it("section の外にあるボタンのクリックは更新操作と判定されない", () => {
+    document.body.innerHTML =
+      '<div data-testid="cellInnerDiv"><button type="button">x</button></div>';
+    expect(isRefreshClickTarget(document.querySelector("button"))).toBe(false);
+  });
+
+  it("aria-labelledby の無い section 内のボタンは更新操作と判定されない", () => {
+    document.body.innerHTML =
+      '<section><div data-testid="cellInnerDiv"><button type="button">x</button></div></section>';
+    expect(isRefreshClickTarget(document.querySelector("button"))).toBe(false);
+  });
+
+  it("target が Element でなければ更新操作と判定されない", () => {
+    expect(isRefreshClickTarget(null)).toBe(false);
+    expect(isRefreshClickTarget(document)).toBe(false);
+  });
+
+  it("選択中のタブのクリックは更新操作と判定される", () => {
+    document.body.innerHTML =
+      '<div role="tablist"><div role="tab" aria-selected="true"><span id="l">おすすめ</span></div></div>';
+    expect(isRefreshClickTarget(document.querySelector("#l"))).toBe(true);
+    expect(isRefreshClickTarget(document.querySelector('[role="tab"]'))).toBe(
+      true,
+    );
+  });
+
+  it("選択されていない別のタブのクリックは更新操作と判定されない", () => {
+    document.body.innerHTML =
+      '<div role="tablist"><div role="tab" aria-selected="false"><span id="l">フォロー中</span></div></div>';
+    expect(isRefreshClickTarget(document.querySelector("#l"))).toBe(false);
+  });
+
+  it("フォロー中タブ（選択中だが aria-expanded あり）のクリックは更新操作と判定されない", () => {
+    document.body.innerHTML =
+      '<div role="tablist"><div role="tab" aria-selected="true" aria-expanded="false"><span id="l">フォロー中</span></div></div>';
+    expect(isRefreshClickTarget(document.querySelector("#l"))).toBe(false);
+  });
+});
+
+describe("プルダウン更新の判定 (isPullRefreshGesture)", () => {
+  const base: PullGesture = {
+    startX: 100,
+    startY: 100,
+    endX: 100,
+    endY: 100 + PULL_REFRESH_MIN_DISTANCE_PX + 120,
+    startScrollTop: 0,
+    endScrollTop: 0,
+  };
+
+  it("先頭で下方向に更新とみなせる距離だけ引き下げて指を離すとプルダウン更新と判定される", () => {
+    expect(isPullRefreshGesture(base)).toBe(true);
+  });
+
+  it("引き下げ距離が足りないまま指を離しても更新と判定されない（境界値）", () => {
+    expect(PULL_REFRESH_MIN_DISTANCE_PX).toBe(80);
+    expect(isPullRefreshGesture({ ...base, endY: 100 + 79 })).toBe(false);
+    expect(isPullRefreshGesture({ ...base, endY: 100 + 80 })).toBe(true);
+  });
+
+  it("上方向への移動は更新と判定されない", () => {
+    expect(isPullRefreshGesture({ ...base, endY: 100 - 200 })).toBe(false);
+  });
+
+  it("先頭でない位置から始まった下方向の操作は更新と判定されない", () => {
+    expect(isPullRefreshGesture({ ...base, startScrollTop: 2 })).toBe(false);
+    expect(isPullRefreshGesture({ ...base, startScrollTop: 500 })).toBe(false);
+  });
+
+  it("先頭でない位置で終わった下方向の操作は更新と判定されない", () => {
+    expect(isPullRefreshGesture({ ...base, endScrollTop: 2 })).toBe(false);
+  });
+
+  it("scrollTop が 1 以下なら先頭とみなして更新と判定される", () => {
+    expect(
+      isPullRefreshGesture({ ...base, startScrollTop: 1, endScrollTop: 1 }),
+    ).toBe(true);
+  });
+
+  it("縦移動より横移動のほうが大きいスワイプは更新と判定されない", () => {
+    expect(
+      isPullRefreshGesture({ ...base, endX: 100 + 400, endY: 100 + 150 }),
+    ).toBe(false);
+    expect(
+      isPullRefreshGesture({ ...base, endX: 100 - 400, endY: 100 + 150 }),
+    ).toBe(false);
+  });
+});
+
+describe("更新ショートカットの判定 (isRefreshShortcut)", () => {
+  type ShortcutEvent = Parameters<typeof isRefreshShortcut>[0];
+  const key = (over: Partial<ShortcutEvent> = {}): ShortcutEvent => ({
+    key: ".",
+    ctrlKey: false,
+    metaKey: false,
+    altKey: false,
+    shiftKey: false,
+    target: document.body,
+    ...over,
+  });
+
+  it("更新のショートカットキー . は更新操作と判定される", () => {
+    expect(isRefreshShortcut(key())).toBe(true);
+    expect(isRefreshShortcut(key({ target: null }))).toBe(true);
+  });
+
+  it("入力欄にフォーカスがある間の . は更新と判定されない", () => {
+    document.body.innerHTML =
+      '<input id="i"><textarea id="t"></textarea><div id="c" contenteditable="true"><span id="cs"></span></div><div id="r" role="textbox"></div>';
+    for (const id of ["i", "t", "c", "cs", "r"]) {
+      expect(
+        isRefreshShortcut(key({ target: document.getElementById(id) })),
+      ).toBe(false);
+    }
+  });
+
+  it("修飾キー付きの . は更新と判定されない", () => {
+    expect(isRefreshShortcut(key({ ctrlKey: true }))).toBe(false);
+    expect(isRefreshShortcut(key({ metaKey: true }))).toBe(false);
+    expect(isRefreshShortcut(key({ altKey: true }))).toBe(false);
+    expect(isRefreshShortcut(key({ shiftKey: true }))).toBe(false);
+  });
+
+  it("別のキーは更新と判定されない", () => {
+    expect(isRefreshShortcut(key({ key: "j" }))).toBe(false);
+    expect(isRefreshShortcut(key({ key: "," }))).toBe(false);
   });
 });

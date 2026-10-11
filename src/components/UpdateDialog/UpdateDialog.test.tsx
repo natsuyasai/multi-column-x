@@ -1,5 +1,7 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import i18n from "@/i18n";
+import { expectNoJapanese } from "@/test-utils/japanese";
 import { UpdateDialog } from "./UpdateDialog";
 
 describe("UpdateDialog", () => {
@@ -147,5 +149,113 @@ describe("UpdateDialog", () => {
     expect(
       screen.getByText(/完了後にインストール画面が表示されます/),
     ).toBeInTheDocument();
+  });
+
+  describe("表示言語", () => {
+    afterEach(async () => {
+      await i18n.changeLanguage("ja");
+    });
+
+    const englishUpdate = { version: "1.2.0", notes: "Bug fixes" };
+
+    it("表示言語が英語のとき更新ダイアログに日本語の文言が表示されない（更新あり・更新中）", async () => {
+      await i18n.changeLanguage("en");
+      const { container, rerender } = render(
+        <UpdateDialog
+          update={englishUpdate}
+          installing={false}
+          onInstall={vi.fn()}
+          onLater={vi.fn()}
+        />,
+      );
+      expectNoJapanese(container);
+      expect(
+        screen.getByText("A new version is available"),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Version 1.2.0")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Later" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Update" }),
+      ).toBeInTheDocument();
+
+      rerender(
+        <UpdateDialog
+          update={englishUpdate}
+          installing={true}
+          onInstall={vi.fn()}
+          onLater={vi.fn()}
+        />,
+      );
+      expectNoJapanese(container);
+      expect(
+        screen.getByRole("button", { name: "Updating..." }),
+      ).toBeDisabled();
+    });
+
+    it("表示言語が英語のとき更新ダイアログの進捗表示に日本語の文言が表示されない", async () => {
+      await i18n.changeLanguage("en");
+      const progresses = [
+        {
+          progress: { phase: "downloading", downloaded: 50, total: 100 },
+          text: "Downloading... 50%",
+        },
+        {
+          progress: { phase: "downloading", downloaded: 0, total: null },
+          text: "Downloading...",
+        },
+        { progress: { phase: "installing" }, text: "Installing..." },
+        { progress: { phase: "restarting" }, text: "Restarting..." },
+        {
+          progress: { phase: "awaitingInstall" },
+          text: "Downloading. The installer will appear when it finishes.",
+        },
+      ] as const;
+      for (const { progress, text } of progresses) {
+        const { container, unmount } = render(
+          <UpdateDialog
+            update={englishUpdate}
+            installing={true}
+            progress={progress}
+            installError="Install failed."
+            onInstall={vi.fn()}
+            onLater={vi.fn()}
+          />,
+        );
+        expectNoJapanese(container);
+        expect(screen.getByText(text)).toBeInTheDocument();
+        expect(
+          screen.getByRole("progressbar", { name: "Update progress" }),
+        ).toBeInTheDocument();
+        unmount();
+      }
+    });
+
+    it("更新ダイアログを開いたまま表示言語を切り替えると開いている画面の文言も切り替わる", async () => {
+      render(
+        <UpdateDialog
+          update={englishUpdate}
+          installing={true}
+          progress={{ phase: "installing" }}
+          onInstall={vi.fn()}
+          onLater={vi.fn()}
+        />,
+      );
+      expect(
+        screen.getByText("新しいバージョンがあります"),
+      ).toBeInTheDocument();
+      expect(screen.getByText("インストール中...")).toBeInTheDocument();
+
+      await act(async () => {
+        await i18n.changeLanguage("en");
+      });
+
+      expect(
+        screen.getByText("A new version is available"),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Installing...")).toBeInTheDocument();
+      expect(
+        screen.queryByText("新しいバージョンがあります"),
+      ).not.toBeInTheDocument();
+    });
   });
 });
