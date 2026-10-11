@@ -18,9 +18,13 @@ Windows / Linux のデスクトップと Android に対応しています（環�
 
 ## Multi Column X とは
 
-![複数のカラムを並べた画面（概観）](images/columns-overview.png)
+![Windows でのアプリ画面](images/windows-app-screen.png)
 
-_ホーム・通知・検索など、複数のカラムを横に並べて同時に表示できます。_
+_Windows の画面です。ホーム・通知・検索など、複数のカラムを横に並べて同時に表示できます（アカウント名とタイムラインの内容はモザイク処理しています）。_
+
+![Android のアプリ画面](images/android-app-screen.png)
+
+_Android の画面です。画面下部のタブバーでカラムを切り替えます（タイムラインの内容はモザイク処理しています）。_
 
 主な特徴は次のとおりです。
 
