@@ -81,7 +81,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const result = validateLineListInputs(lineListTexts);
+    const result = validateLineListInputs(lineListTexts, t);
     setLineListErrors((prev) => nextLineListErrors(prev, result));
     if (result.kind === "invalid") {
       return;

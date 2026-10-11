@@ -1,6 +1,7 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import i18n from "@/i18n";
+import { containsJapanese } from "@/test-utils/japanese";
 import { IPC_EVENTS, WEBVIEW_SCRIPTS } from "../constants/ipc";
 import { useAppStore } from "../store/useAppStore";
 import { DEFAULT_COLUMN_SETTINGS, getColumnLabel } from "../types";
@@ -1096,5 +1097,43 @@ describe("useOfficialSettingsPopupReload", () => {
     });
     expect(oldRecreateAllWebviews).not.toHaveBeenCalled();
     expect(newRecreateAllWebviews).toHaveBeenCalledTimes(1);
+  });
+
+  describe("useNewPostsNotification（表示言語）", () => {
+    beforeEach(async () => {
+      capturedCallbacks.clear();
+      isPermissionGrantedMock.mockReset();
+      sendNotificationMock.mockReset();
+      __resetNotificationPermissionCacheForTests();
+      await i18n.changeLanguage("en");
+    });
+
+    afterEach(async () => {
+      await i18n.changeLanguage("ja");
+    });
+
+    it("表示言語が英語のときデスクトップ通知のタイトルと本文が英語になる", async () => {
+      isPermissionGrantedMock.mockResolvedValue(true);
+      const col = makeColumn({
+        id: "col-1",
+        pageType: "notifications",
+        settings: { ...DEFAULT_COLUMN_SETTINGS, desktopNotifyEnabled: true },
+      });
+      useAppStore.setState({ columns: [col] });
+      renderHook(() => useNewPostsNotification(vi.fn()));
+
+      await act(async () => {
+        capturedCallbacks.get(IPC_EVENTS.WEBVIEW_NEW_POSTS_COUNT)?.({
+          payload: { label: "column-col-1", count: 1 },
+        });
+      });
+
+      const columnName = getColumnLabel(col, i18n.t);
+      expect(sendNotificationMock).toHaveBeenCalledWith({
+        title: "New posts",
+        body: `${columnName} has new posts`,
+      });
+      expect(containsJapanese(columnName)).toBe(false);
+    });
   });
 });

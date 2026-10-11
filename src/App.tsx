@@ -8,6 +8,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { useTranslation } from "react-i18next";
 import styles from "./App.module.scss";
 import { AccountManager } from "./components/AccountManager/AccountManager";
 import { AccountNameDialog } from "./components/AccountNameDialog/AccountNameDialog";
@@ -194,6 +195,7 @@ const App: React.FC = () => {
   // モバイルスワイプバーのネイティブオーバーレイ同期にも再利用する（matchMedia 購読の重複を避ける）。
   const resolvedTheme = useTheme(globalSettings.theme);
   useAppLanguage(globalSettings.language);
+  const { t } = useTranslation();
 
   // WebView 内の横ホイール → スクロールバー追従、新着カウント → バッジ・デスクトップ通知
   useApiRateLimitReports(setApiRateLimit);
@@ -416,7 +418,7 @@ const App: React.FC = () => {
   if (!isLoaded) {
     return (
       <div className={styles.loading}>
-        <span>読み込み中...</span>
+        <span>{t("messages:app.loading")}</span>
       </div>
     );
   }
@@ -521,7 +523,7 @@ const App: React.FC = () => {
           accounts={accounts}
           defaultAccountId={linkPopupDefaultAccountId}
           fixedUrl="https://x.com/settings"
-          title="公式設定を開く"
+          title={t("messages:app.officialSettingsTitle")}
           onSubmit={handleSubmitOfficialSettings}
           onClose={() => setShowOfficialSettingsDialog(false)}
         />
@@ -571,7 +573,7 @@ const App: React.FC = () => {
       {pendingAccountName && (
         <AccountNameDialog
           defaultValue={pendingAccountName.defaultValue}
-          title="アカウント名を入力"
+          title={t("messages:app.accountNameTitle")}
           onSubmit={submitAccountName}
           onCancel={cancelAccountName}
         />
@@ -579,9 +581,11 @@ const App: React.FC = () => {
 
       {pendingRemoval && (
         <ConfirmDialog
-          title="アカウントの削除"
-          message={`「${pendingRemoval.label}」を削除しますか？セッションデータも削除されます。`}
-          confirmLabel="削除する"
+          title={t("messages:app.removeAccount.title")}
+          message={t("messages:app.removeAccount.message", {
+            label: pendingRemoval.label,
+          })}
+          confirmLabel={t("messages:app.removeAccount.confirm")}
           onConfirm={confirmRemoval}
           onCancel={cancelRemoval}
         />
@@ -601,7 +605,7 @@ const App: React.FC = () => {
       {settingsLoadNotice && (
         <ConfirmDialog
           singleButton
-          title="設定の読み込みに失敗しました"
+          title={t("messages:app.settingsLoadFailedTitle")}
           message={settingsLoadNotice}
           confirmLabel="OK"
           onConfirm={dismissSettingsLoadNotice}

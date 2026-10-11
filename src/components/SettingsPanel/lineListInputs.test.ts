@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
+import i18n from "@/i18n";
 import { nextLineListErrors, validateLineListInputs } from "./lineListInputs";
 
 describe("validateLineListInputs", () => {
   it("すべて正しい入力ならvalidを返し、空行と前後空白を除いた配列を返す", () => {
-    const result = validateLineListInputs({
-      ngWords: " spam \n\nbot",
-      repostHiddenUserIds: "user_a\n\nuser_b",
-      whitelistWords: "推し\n\n限定",
-    });
+    const result = validateLineListInputs(
+      {
+        ngWords: " spam \n\nbot",
+        repostHiddenUserIds: "user_a\n\nuser_b",
+        whitelistWords: "推し\n\n限定",
+      },
+      i18n.t,
+    );
     expect(result).toEqual({
       kind: "valid",
       values: {
@@ -19,11 +23,14 @@ describe("validateLineListInputs", () => {
   });
 
   it("ngWordsが不正ならngWordsのエラーを返す", () => {
-    const result = validateLineListInputs({
-      ngWords: "/(/",
-      repostHiddenUserIds: "",
-      whitelistWords: "",
-    });
+    const result = validateLineListInputs(
+      {
+        ngWords: "/(/",
+        repostHiddenUserIds: "",
+        whitelistWords: "",
+      },
+      i18n.t,
+    );
     expect(result).toEqual({
       kind: "invalid",
       field: "ngWords",
@@ -32,11 +39,14 @@ describe("validateLineListInputs", () => {
   });
 
   it("ngWordsとwhitelistの両方が不正ならngWordsだけを返す（最初の失敗のみ）", () => {
-    const result = validateLineListInputs({
-      ngWords: "/(/",
-      repostHiddenUserIds: "",
-      whitelistWords: "/(/",
-    });
+    const result = validateLineListInputs(
+      {
+        ngWords: "/(/",
+        repostHiddenUserIds: "",
+        whitelistWords: "/(/",
+      },
+      i18n.t,
+    );
     expect(result).toEqual({
       kind: "invalid",
       field: "ngWords",
@@ -45,11 +55,14 @@ describe("validateLineListInputs", () => {
   });
 
   it("repostHiddenUserIdsの不正行でエラーを返す", () => {
-    const result = validateLineListInputs({
-      ngWords: "",
-      repostHiddenUserIds: "valid_id\nbad-id!",
-      whitelistWords: "",
-    });
+    const result = validateLineListInputs(
+      {
+        ngWords: "",
+        repostHiddenUserIds: "valid_id\nbad-id!",
+        whitelistWords: "",
+      },
+      i18n.t,
+    );
     expect(result).toEqual({
       kind: "invalid",
       field: "repostHiddenUserIds",
@@ -59,11 +72,14 @@ describe("validateLineListInputs", () => {
   });
 
   it("whitelistWordsが不正ならwhitelistWordsのエラーを返す", () => {
-    const result = validateLineListInputs({
-      ngWords: "",
-      repostHiddenUserIds: "",
-      whitelistWords: "/(/",
-    });
+    const result = validateLineListInputs(
+      {
+        ngWords: "",
+        repostHiddenUserIds: "",
+        whitelistWords: "/(/",
+      },
+      i18n.t,
+    );
     expect(result).toEqual({
       kind: "invalid",
       field: "whitelistWords",

@@ -2,6 +2,7 @@
 // SettingsPanel の行リスト入力（NGワード / リポスト非表示ユーザー / ホワイトリスト）の
 // parse・validate をまとめた純粋関数（Tauri 非依存）。
 
+import type { AppTFunction } from "@/i18n/types";
 import {
   parseAndValidateUserIdLines,
   parseAndValidateWordLines,
@@ -22,14 +23,16 @@ export type LineListValidation =
 
 export function validateLineListInputs(
   texts: LineListTexts,
+  t: AppTFunction,
 ): LineListValidation {
-  const ngWords = parseAndValidateWordLines(texts.ngWords);
+  const ngWords = parseAndValidateWordLines(texts.ngWords, t);
   if (ngWords.kind === "invalid") {
     return { kind: "invalid", field: "ngWords", error: ngWords.error };
   }
 
   const repostHiddenUserIds = parseAndValidateUserIdLines(
     texts.repostHiddenUserIds,
+    t,
   );
   if (repostHiddenUserIds.kind === "invalid") {
     return {
@@ -39,7 +42,7 @@ export function validateLineListInputs(
     };
   }
 
-  const whitelistWords = parseAndValidateWordLines(texts.whitelistWords);
+  const whitelistWords = parseAndValidateWordLines(texts.whitelistWords, t);
   if (whitelistWords.kind === "invalid") {
     return {
       kind: "invalid",

@@ -178,7 +178,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const ngWords = parseAndValidateWordLines(draft.globalNgWordsText);
+    const ngWords = parseAndValidateWordLines(draft.globalNgWordsText, t);
     if (ngWords.kind === "invalid") {
       setNgWordsError(ngWords.error);
       return;
@@ -186,6 +186,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
     setNgWordsError(null);
     const repostHiddenUserIds = parseAndValidateUserIdLines(
       draft.globalRepostHiddenUserIdsText,
+      t,
     );
     if (repostHiddenUserIds.kind === "invalid") {
       setRepostHiddenUserIdsError(repostHiddenUserIds.error);

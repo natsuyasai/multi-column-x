@@ -10,6 +10,38 @@
       "invalidField": "バックアップに不正な値が含まれています",
       "io": "ファイルの読み書きに失敗しました",
       "settingsUnreadable": "現在の設定を読み込めていないため、復元できません。アプリを再起動してください。"
+    },
+    "exportDone": "バックアップを書き出しました。",
+    "notChangedSuffix": "既存のカラムと設定は変更されていません。",
+    "recreateFailed": "設定の復元は完了しましたが、カラムの表示を作り直せませんでした。アプリを再起動して表示を確認してください。復元直前の設定は、アプリのデータフォルダ内の restore_snapshots フォルダ（appsettings-日時.json）に退避してあります。"
+  },
+  "app": {
+    "loading": "読み込み中...",
+    "officialSettingsTitle": "公式設定を開く",
+    "accountNameTitle": "アカウント名を入力",
+    "removeAccount": {
+      "title": "アカウントの削除",
+      "message": "「{{label}}」を削除しますか？セッションデータも削除されます。",
+      "confirm": "削除する"
+    },
+    "settingsLoadFailedTitle": "設定の読み込みに失敗しました"
+  },
+  "update": {
+    "installFailed": "更新のインストールに失敗しました。時間をおいて再度お試しください。"
+  },
+  "notification": {
+    "newPostsTitle": "新着通知",
+    "newPostsBody": "{{columnName}}に新着があります"
+  },
+  "settings": {
+    "loadFailed": {
+      "withBackup": "設定ファイルを読み込めなかったため、初期設定で起動しました。元の設定は次の場所にバックアップしました: {{backupPath}}",
+      "withoutBackup": "設定ファイルを読み込めなかったため、初期設定で起動しました。元の設定のバックアップにも失敗しました。",
+      "error": "設定を読み込めなかったため、初期状態で起動しました。保存済みの設定を上書きしないよう、アプリを再起動するまで変更は保存されません。"
     }
+  },
+  "validation": {
+    "regexInvalid": "正規表現が不正です: {{raw}}",
+    "userIdInvalid": "`{{id}}` はXのユーザーIDとして正しくありません（英数字とアンダースコアの1〜15文字）"
   }
 }

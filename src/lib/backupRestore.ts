@@ -193,7 +193,10 @@ export function buildRestorePayload(
 }
 
 /** NG ワード（正規表現の構文）とリポスト非表示ユーザー ID を既存の基準で検証する。問題があればメッセージ */
-export function validateBackupLists(content: BackupContent): string | null {
+export function validateBackupLists(
+  content: BackupContent,
+  t: AppTFunction,
+): string | null {
   const settingsList = [
     {
       ngWords: content.globalSettings.ngWords,
@@ -208,10 +211,10 @@ export function validateBackupLists(content: BackupContent): string | null {
     })),
   ];
   for (const { ngWords, userIds } of settingsList) {
-    const ngError = validateNgWordLines(ngWords);
+    const ngError = validateNgWordLines(ngWords, t);
     if (ngError) return ngError;
     for (const id of userIds) {
-      const idError = validateUserIdLine(id);
+      const idError = validateUserIdLine(id, t);
       if (idError) return idError;
     }
   }

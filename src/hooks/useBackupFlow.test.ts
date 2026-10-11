@@ -1,8 +1,10 @@
 import { renderHook, act } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import i18n from "@/i18n";
 import type { BackupContent } from "@/lib/backupRestore";
 import * as backup from "@/services/backup";
 import { useAppStore } from "@/store/useAppStore";
+import { containsJapanese } from "@/test-utils/japanese";
 import { DEFAULT_COLUMN_SETTINGS, DEFAULT_GLOBAL_SETTINGS } from "@/types";
 import type { Account, Column } from "@/types";
 import { useBackupFlow } from "./useBackupFlow";
@@ -250,5 +252,59 @@ describe("useBackupFlow 復元", () => {
     expect(result.current.step).toBe("idle");
     expect(result.current.content).toBeNull();
     expect(result.current.mapping).toEqual({});
+  });
+
+  describe("表示言語が英語のとき", () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage("en");
+    });
+
+    afterEach(async () => {
+      await i18n.changeLanguage("ja");
+    });
+
+    it("書き出しの完了メッセージが英語で表示される", async () => {
+      mocked.exportBackup.mockResolvedValue(true);
+      const { result } = setup();
+
+      await act(async () => {
+        await result.current.exportToFile();
+      });
+
+      expect(result.current.message?.text).toBe("Backup exported.");
+    });
+
+    it("復元が拒否されたときのメッセージが英語で表示され日本語を含まない", async () => {
+      mocked.performRestore.mockResolvedValue({
+        status: "rejected",
+        error: { kind: "io", message: "disk full" },
+      });
+      const { result } = setup();
+      await toConfirm(result);
+
+      await act(async () => {
+        await result.current.execute();
+      });
+
+      const text = result.current.message?.text ?? "";
+      expect(text).toContain(
+        "Your existing columns and settings were not changed.",
+      );
+      expect(containsJapanese(text)).toBe(false);
+    });
+
+    it("WebView の再生成に失敗したときの案内が英語で表示される", async () => {
+      mocked.performRestore.mockResolvedValue({ status: "recreateFailed" });
+      const { result } = setup();
+      await toConfirm(result);
+
+      await act(async () => {
+        await result.current.execute();
+      });
+
+      const text = result.current.message?.text ?? "";
+      expect(text).toContain("restore_snapshots");
+      expect(containsJapanese(text)).toBe(false);
+    });
   });
 });

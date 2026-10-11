@@ -4,6 +4,7 @@ export function parseHexColor(hex: string): {
   b: number;
 } {
   if (!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex)) {
+    // eslint-disable-next-line no-restricted-syntax -- 開発者向けの不正引数エラー（画面には表示しない）
     throw new Error(`不正な色指定です: ${hex}`);
   }
   const digits = hex.slice(1);

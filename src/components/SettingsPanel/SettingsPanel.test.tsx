@@ -1027,4 +1027,38 @@ describe("SettingsPanel の表示言語", () => {
       screen.getByRole("textbox", { name: "Users whose reposts are hidden" }),
     ).toBeInTheDocument();
   });
+
+  it("表示言語が英語のとき入力検証のエラーが英語で表示され日本語を含まない", async () => {
+    await i18n.changeLanguage("en");
+    const onApply = vi.fn();
+    const user = userEvent.setup();
+    const { container } = render(
+      <SettingsPanel {...defaultProps} onApply={onApply} />,
+    );
+    const ngWords = screen.getByPlaceholderText(
+      "One word per line (/regex/flags is also supported)",
+    );
+    await user.clear(ngWords);
+    await user.type(ngWords, "/[[/");
+    await user.click(screen.getByRole("button", { name: "Apply" }));
+    expect(
+      screen.getByText("Invalid regular expression: /[/"),
+    ).toBeInTheDocument();
+    expectNoJapanese(container);
+
+    await user.clear(ngWords);
+    const userIds = screen.getByRole("textbox", {
+      name: "Users whose reposts are hidden",
+    });
+    await user.clear(userIds);
+    await user.type(userIds, "bad-id!");
+    await user.click(screen.getByRole("button", { name: "Apply" }));
+    expect(
+      screen.getByText(
+        "`bad-id!` is not a valid X username (1–15 letters, numbers, or underscores)",
+      ),
+    ).toBeInTheDocument();
+    expectNoJapanese(container);
+    expect(onApply).not.toHaveBeenCalled();
+  });
 });

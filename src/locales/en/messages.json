@@ -10,6 +10,38 @@
       "invalidField": "The backup contains an invalid value",
       "io": "Failed to read or write the file",
       "settingsUnreadable": "Current settings could not be loaded, so the backup cannot be restored. Please restart the app."
+    },
+    "exportDone": "Backup exported.",
+    "notChangedSuffix": " Your existing columns and settings were not changed.",
+    "recreateFailed": "Settings were restored, but the columns could not be recreated. Restart the app and check the display. The settings from just before the restore were saved in the restore_snapshots folder inside the app data folder (appsettings-<date and time>.json)."
+  },
+  "app": {
+    "loading": "Loading...",
+    "officialSettingsTitle": "Open official settings",
+    "accountNameTitle": "Enter account name",
+    "removeAccount": {
+      "title": "Delete account",
+      "message": "Delete “{{label}}”? Its session data will also be deleted.",
+      "confirm": "Delete"
+    },
+    "settingsLoadFailedTitle": "Failed to load settings"
+  },
+  "update": {
+    "installFailed": "Failed to install the update. Please try again later."
+  },
+  "notification": {
+    "newPostsTitle": "New posts",
+    "newPostsBody": "{{columnName}} has new posts"
+  },
+  "settings": {
+    "loadFailed": {
+      "withBackup": "Could not read the settings file, so the app started with default settings. The original settings were backed up to: {{backupPath}}",
+      "withoutBackup": "Could not read the settings file, so the app started with default settings. Backing up the original settings also failed.",
+      "error": "Could not load settings, so the app started in its initial state. Changes will not be saved until you restart the app, to avoid overwriting your saved settings."
     }
+  },
+  "validation": {
+    "regexInvalid": "Invalid regular expression: {{raw}}",
+    "userIdInvalid": "`{{id}}` is not a valid X username (1–15 letters, numbers, or underscores)"
   }
 }

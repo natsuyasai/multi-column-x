@@ -2021,4 +2021,39 @@ describe("AppSettingsPanel 表示言語の動的な切り替え", () => {
     await user.click(screen.getByRole("button", { name: "Presets" }));
     expect(screen.getByText("No saved presets")).toBeInTheDocument();
   });
+
+  it("表示言語が英語のとき入力検証のエラーが英語で表示され日本語を含まない", async () => {
+    await i18n.changeLanguage("en");
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    fireEvent.change(
+      screen.getByPlaceholderText(
+        "One word per line (applies to all columns; /regex/flags is also accepted)",
+      ),
+      { target: { value: "/[[/" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+    expect(
+      screen.getByText("Invalid regular expression: /[[/"),
+    ).toBeInTheDocument();
+    expectNoJapaneseOutsideLanguagePicker();
+
+    fireEvent.change(
+      screen.getByPlaceholderText(
+        "One word per line (applies to all columns; /regex/flags is also accepted)",
+      ),
+      { target: { value: "" } },
+    );
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Users whose reposts are hidden" }),
+      { target: { value: "bad-id!" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+    expect(
+      screen.getByText(
+        "`bad-id!` is not a valid X username (1–15 letters, numbers, or underscores)",
+      ),
+    ).toBeInTheDocument();
+    expect(onApply).not.toHaveBeenCalled();
+  });
 });

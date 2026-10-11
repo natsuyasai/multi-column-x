@@ -1,6 +1,8 @@
 // src/lib/repostHiddenUserId.ts
 // リポストを非表示にするユーザーID（1行1ID）の解析・検証（Tauri 非依存の純粋関数）
 
+import type { AppTFunction } from "@/i18n/types";
+
 const USER_ID_PATTERN = /^[A-Za-z0-9_]{1,15}$/;
 
 /**
@@ -29,9 +31,9 @@ export function parseUserIdLines(text: string): string[] {
  * ユーザーID1件を検証する（parseUserIdLines 済みの値を受け取る前提）。
  * Xのユーザー名規則（英数字とアンダースコアの1〜15文字）に合致すれば null、違反ならエラーメッセージを返す。
  */
-export function validateUserIdLine(id: string): string | null {
+export function validateUserIdLine(id: string, t: AppTFunction): string | null {
   if (USER_ID_PATTERN.test(id)) {
     return null;
   }
-  return `\`${id}\` はXのユーザーIDとして正しくありません（英数字とアンダースコアの1〜15文字）`;
+  return t("messages:validation.userIdInvalid", { id });
 }

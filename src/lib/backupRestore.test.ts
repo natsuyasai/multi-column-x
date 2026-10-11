@@ -471,7 +471,7 @@ describe("buildRestorePayload（スキップ後のグリッド正規化）", () 
 
 describe("validateBackupLists（NGワード・ユーザー IDの検証）", () => {
   it("正常な内容は null を返す", () => {
-    expect(validateBackupLists(makeContent())).toBeNull();
+    expect(validateBackupLists(makeContent(), i18n.t)).toBeNull();
   });
 
   it("グローバルの NGワードに不正な正規表現があればエラーを返す", () => {
@@ -480,7 +480,7 @@ describe("validateBackupLists（NGワード・ユーザー IDの検証）", () =
       globalSettings: { ...base.globalSettings, ngWords: ["/(/"] },
     });
 
-    expect(validateBackupLists(content)).not.toBeNull();
+    expect(validateBackupLists(content, i18n.t)).not.toBeNull();
   });
 
   it("カラム設定の NGワードに不正な正規表現があればエラーを返す", () => {
@@ -493,7 +493,7 @@ describe("validateBackupLists（NGワード・ユーザー IDの検証）", () =
       ],
     });
 
-    expect(validateBackupLists(content)).not.toBeNull();
+    expect(validateBackupLists(content, i18n.t)).not.toBeNull();
   });
 
   it("プリセット内カラムの NGワードに不正な正規表現があればエラーを返す", () => {
@@ -516,7 +516,7 @@ describe("validateBackupLists（NGワード・ユーザー IDの検証）", () =
       },
     });
 
-    expect(validateBackupLists(content)).not.toBeNull();
+    expect(validateBackupLists(content, i18n.t)).not.toBeNull();
   });
 
   it("リポスト非表示ユーザー IDが X の規則に違反していればエラーを返す", () => {
@@ -528,7 +528,7 @@ describe("validateBackupLists（NGワード・ユーザー IDの検証）", () =
       },
     });
 
-    expect(validateBackupLists(content)).not.toBeNull();
+    expect(validateBackupLists(content, i18n.t)).not.toBeNull();
   });
 });
 

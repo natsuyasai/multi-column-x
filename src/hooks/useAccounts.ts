@@ -2,6 +2,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useRef, useState } from "react";
+import i18n from "@/i18n";
 import { ACCOUNT_COLORS } from "../constants/accountColors";
 import { IPC_COMMANDS, IPC_EVENTS } from "../constants/ipc";
 import { logError } from "../lib/log";
@@ -115,17 +116,6 @@ function waitForReauthWindowOutcome(
   });
 }
 
-const REAUTH_FAILED_MESSAGE =
-  "再認証に失敗しました（アカウント識別子を取得できませんでした）";
-const REAUTH_MISMATCH_MESSAGE =
-  "登録済みと異なるアカウントでログインされたため、セッションを更新しませんでした";
-const REAUTH_SKIP_MESSAGE =
-  "初回の再認証のため同一性の照合をスキップし、アカウント識別子を記録しました";
-const ACCOUNT_DATA_DELETE_FAILED_MESSAGE =
-  "アカウントのデータフォルダを削除できませんでした。アプリ設定の「データフォルダの削除を再実行」から後で削除できます。";
-const REAUTH_NOTICE_TITLE = "再認証";
-const ACCOUNT_DATA_DELETE_FAILED_TITLE = "アカウントの削除";
-
 // アカウント関連の通知（再認証結果・削除失敗など）を表す状態。
 // タイトルは通知の種類によって切り替える（例: 再認証系は「再認証」、
 // データフォルダ削除失敗は「アカウントの削除」）。
@@ -187,7 +177,9 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
         accountId,
         dataDirectory,
         windowLabel,
-        defaultValue: `アカウント ${currentAccounts.length + 1}`,
+        defaultValue: i18n.t("accounts:defaultName", {
+          n: currentAccounts.length + 1,
+        }),
         xUserId: xUserId ?? undefined,
       });
     },
@@ -356,7 +348,10 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
       isReauthingRef.current = true;
 
       const showReauthNotice = (message: string) =>
-        setAccountNotice({ title: REAUTH_NOTICE_TITLE, message });
+        setAccountNotice({
+          title: i18n.t("accounts:notice.reauthTitle"),
+          message,
+        });
 
       const deleteDataDirectory = async (dataDirectory: string) => {
         try {
@@ -382,7 +377,7 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
         const payload = JSON.parse(raw) as ReauthCompletePayload;
         const xUserId = payload.xUserId;
         if (!xUserId) {
-          showReauthNotice(REAUTH_FAILED_MESSAGE);
+          showReauthNotice(i18n.t("accounts:notice.reauthFailed"));
           return;
         }
 
@@ -390,7 +385,7 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
         updateAccount(account.id, { xUserId });
         await reloadAllWebviews?.();
         if (verdict === "skip") {
-          showReauthNotice(REAUTH_SKIP_MESSAGE);
+          showReauthNotice(i18n.t("accounts:notice.reauthSkipped"));
         }
       };
 
@@ -410,7 +405,7 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
         if (!xUserId) {
           closeReauthWindow();
           await deleteDataDirectory(newDataDirectory);
-          showReauthNotice(REAUTH_FAILED_MESSAGE);
+          showReauthNotice(i18n.t("accounts:notice.reauthFailed"));
           return;
         }
 
@@ -418,7 +413,7 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
         if (verdict === "mismatch") {
           closeReauthWindow();
           await deleteDataDirectory(newDataDirectory);
-          showReauthNotice(REAUTH_MISMATCH_MESSAGE);
+          showReauthNotice(i18n.t("accounts:notice.reauthMismatch"));
           return;
         }
 
@@ -433,7 +428,7 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
         await reloadAllWebviews?.();
         await deleteDataDirectory(oldDataDirectory);
         if (verdict === "skip") {
-          showReauthNotice(REAUTH_SKIP_MESSAGE);
+          showReauthNotice(i18n.t("accounts:notice.reauthSkipped"));
         }
       };
 
@@ -472,7 +467,7 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
         // mobile: Kotlin 側で不一致と判定された場合は Rust が "account-mismatch" で reject する。
         // それ以外（cancelled/timeout、desktop のウィンドウclose）はエラー表示不要。
         if (isMobile && String(e).includes("account-mismatch")) {
-          showReauthNotice(REAUTH_MISMATCH_MESSAGE);
+          showReauthNotice(i18n.t("accounts:notice.reauthMismatch"));
         }
       } finally {
         isReauthingRef.current = false;
@@ -529,8 +524,8 @@ export function useAccounts(reloadAllWebviews?: () => void | Promise<void>) {
       logError("confirmRemoval:deleteAccountData")(e);
       addPendingDataDirectoryDeletion(pending.dataDirectory);
       setAccountNotice({
-        title: ACCOUNT_DATA_DELETE_FAILED_TITLE,
-        message: ACCOUNT_DATA_DELETE_FAILED_MESSAGE,
+        title: i18n.t("accounts:notice.removeFailedTitle"),
+        message: i18n.t("accounts:notice.removeFailedMessage"),
       });
     }
 

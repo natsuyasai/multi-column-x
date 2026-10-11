@@ -158,8 +158,8 @@ async function notifyNewPosts(columnName: string): Promise<void> {
   const granted = await ensureNotificationPermissionGranted();
   if (!granted) return;
   sendNotification({
-    title: "新着通知",
-    body: `${columnName}に新着があります`,
+    title: i18n.t("messages:notification.newPostsTitle"),
+    body: i18n.t("messages:notification.newPostsBody", { columnName }),
   });
 }
 

@@ -3,6 +3,7 @@
 // 検証・退避・置換は Rust 側（commands/backup）が担い、ここは IPC と結果の正規化だけを行う。
 import { invoke } from "@tauri-apps/api/core";
 import { IPC_COMMANDS } from "@/constants/ipc";
+import i18n from "@/i18n";
 import {
   buildRestorePayload,
   toBackupErrorInfo,
@@ -67,7 +68,7 @@ export async function readBackup(): Promise<BackupContent | null> {
   const raw = await invoke<RawBackupFile | null>(IPC_COMMANDS.READ_BACKUP);
   if (!raw) return null;
   const content = normalizeBackupFile(raw);
-  const message = validateBackupLists(content);
+  const message = validateBackupLists(content, i18n.t);
   if (message) {
     throw { kind: "invalidField", reason: message };
   }
