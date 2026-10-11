@@ -51,3 +51,7 @@ IPC・capability に頼らず、**Rust 側の `on_new_window`（Tauri 2.11 の `
 - 修正後: YouTube カードをクリックして出た埋め込みプレイヤー内のタイトルをクリックすると、既定ブラウザで YouTube の動画ページが開く。
   iframe 内クリックでも `on_new_window` が発火する。アプリ内に余計なウィンドウは作られない。本文の t.co リンクも従来どおり開く。
 - 未確認（手動テスト項目）: Linux / macOS、ポップアップ・コンポーズ内のリンク、Android で挙動が変わらないこと。
+
+## ファイルドロップ無効化（`.disable_drag_drop_handler()`）
+
+全 WebView builder（column / popup / compose）に `.disable_drag_drop_handler()` が必須。Windows で Tauri 既定のドラッグ&ドロップハンドラが X ページ側の HTML5 DnD を横取りし、画像ファイルの DnD 添付が効かなくなるため。契約テスト（`webview/mod.rs` の `全てのwebview生成箇所にファイルドロップ無効化が付いている`）が検査する。
