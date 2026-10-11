@@ -16,7 +16,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.create_tag.outputs.tag }}
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - name: Read version from tauri.conf.json
@@ -33,7 +33,7 @@ jobs:
           fi
       - name: Determine release tag
         id: create_tag
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           VERSION: ${{ steps.version.outputs.version }}
         with:
@@ -105,7 +105,7 @@ jobs:
           echo "head=$head_ref" >> "$GITHUB_OUTPUT"
       - name: Create or update draft release with notes
         id: create
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           PREV_TAG: ${{ steps.prevtag.outputs.prev }}
           HEAD_REF: ${{ steps.prevtag.outputs.head }}
@@ -201,8 +201,8 @@ jobs:
         platform: [windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
@@ -244,7 +244,7 @@ jobs:
         run: |
           ./scripts/verify-appimage-media.sh "$(ls src-tauri/target/release/bundle/appimage/*.AppImage | head -n1)" /usr/lib/x86_64-linux-gnu
       - name: Upload CI artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: desktop-${{ matrix.platform }}
           path: |
@@ -257,12 +257,12 @@ jobs:
     environment: release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
-      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "17"
@@ -313,7 +313,7 @@ jobs:
             "MultiColumnX_${VERSION}_universal.apk" \
             "MultiColumnX_${VERSION}_universal.apk.sha256" --clobber
       - name: Upload CI artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: android-apk
           path: src-tauri/gen/android/app/build/outputs/apk/**/*release*.apk
@@ -323,7 +323,7 @@ jobs:
     needs: [create-release, desktop, android]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             await github.rest.repos.updateRelease({
