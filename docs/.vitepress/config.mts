@@ -21,6 +21,8 @@ const editLinkPattern =
 export default defineConfig({
   base: "/multi-column-x/",
   cleanUrls: true,
+  // 検索エンジンにページを伝えるための sitemap.xml を出力する（Search Console に送信する）
+  sitemap: { hostname: "https://natsuyasai.github.io/multi-column-x/" },
   // 公開対象は docs/guide/ 配下のみ（開発者向け資料は srcDir の外にあるため公開されない）
   srcDir: "guide",
   themeConfig: {
