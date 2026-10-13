@@ -6,3 +6,6 @@ src-tauri/gen/android/.idea
 # VitePress（ユーザーガイド）の生成物
 docs/.vitepress/cache
 docs/.vitepress/dist
+
+# Google Search Console の所有権確認ファイル（内容を一字でも変えると確認に失敗するため整形しない）
+docs/guide/public/google*.html
