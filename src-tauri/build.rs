@@ -28,7 +28,6 @@ fn main() {
             "get_mobile_insets",
             "set_column_cookies",
             "is_webview_profile_supported",
-            "open_in_browser",
             "update_mobile_swipe_bar",
             "flash_mobile_swipe_bar",
             "open_add_account_window",
