@@ -1,5 +1,5 @@
 ---
-description: "品質チェック（format, typecheck, lint, test, story, property, build）をまとめて実行する"
+description: "品質チェック（format, prettier --check, typecheck, lint, test, story, property, build, docs:build）をまとめて実行する"
 user-invocable: true
 argument-hint: "（省略可）絞り込みたいチェック対象。省略時は下記手順を上から順にすべて実行する"
 ---
@@ -34,6 +34,24 @@ npm run test:story
 # 6. プロパティテスト（存在する場合）
 npm run test:property
 ```
+
+### 6.5 CI と同じ整形チェック（必須）
+
+```bash
+npx prettier --check .
+```
+
+- CI（`.github/workflows/ci.yml`）と同じコマンド。**docs・md・CLAUDE.md・SKILL.md だけの変更でも必ず実行する。**
+- PostToolUse hook が整形するのは Edit/Write したファイルだけで、`git mv` で生じた変更や hook が効かない経路は漏れる（整形漏れで CI が落ちた実績あり）。
+- 失敗したら `npx prettier --write <対象>` で直す。
+
+### 6.6 ユーザーガイドのビルド（`docs/guide/` を変更した場合は必須）
+
+```bash
+npm run docs:build
+```
+
+- VitePress のビルド。リンク切れ検出を兼ねる（CI でも実行される）。
 
 ### 7. ビルド確認（最終）
 

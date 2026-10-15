@@ -25,7 +25,7 @@
   - デスクトップは **1.0 固定**。WebView が OS の DPI で既に拡大済みのため、補正すると二重拡大になる。
   - Android は WebView の既定フォントサイズを測る。`font-size: medium`（`html` の font-size に依存しないキーワード）を持つ不可視プローブ要素の computed font-size ÷ 16 を端末倍率とし、`[0.75, 1.5]` にクランプする（`clampUiScale`。NaN / 0 以下は 1）。実行中の変化は `resize` と `visibilitychange`（フォアグラウンド復帰）で再測定する。
 - **プリセット**（小 0.875 / 標準 1 / 大 1.125 / 特大 1.25）は端末値に**乗算せず置き換える**。未知の値は `auto` 扱いにフォールバックする。
-- **Android のプローブは実機未検証。** Chromium WebView が Android のフォントサイズ設定を既定フォントサイズへ反映する想定で実装している。反映されない場合のフォールバック案は、`MainActivity.kt` から `Configuration.fontScale` を返す Tauri コマンドを追加すること。その場合は **ACL 3点セット（`build.rs` の `AppManifest` と capability 2ファイル）の更新と、ProGuard keep ルールの同期が必要**（CLAUDE.md の ACL・ProGuard の項を参照）。実機検証の結果は `integration-test.md` に記録する。
+- **Android のプローブは実機未検証。** Chromium WebView が Android のフォントサイズ設定を既定フォントサイズへ反映する想定で実装している。反映されない場合のフォールバック案は、`MainActivity.kt` から `Configuration.fontScale` を返す Tauri コマンドを追加すること。その場合は **ACL 3点セット（`build.rs` の `AppManifest` と capability 2ファイル）の更新と、ProGuard keep ルールの同期が必要**（CLAUDE.md の ACL・ProGuard の項を参照）。実機で検証できたら、結果をこのノートに追記すること。
 
 ## ネイティブ WebView の bounds
 
