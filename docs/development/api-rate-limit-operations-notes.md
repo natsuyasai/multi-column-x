@@ -4,7 +4,7 @@ X内部API（GraphQL / v1.1）のレスポンスヘッダから読むレート�
 
 ## 対象ファイル
 
-- `src/constants/apiRateLimitLabels.ts` — bucketKey（operationName・v1.1パス）→日本語ラベル・説明文の対応表
+- `src/constants/apiRateLimitLabels.ts` — bucketKey（operationName・v1.1パス）→辞書（`rateLimit` 名前空間の `buckets.<id>`）の識別子の対応表。ラベル・説明文の実体は `src/locales/{ja,en}/rateLimit.json`
 - `src/components/ApiRateLimitIndicator/ApiRateLimitIndicator.tsx` — ツールバーのポップオーバー表示コンポーネント
 - `src/lib/apiRateLimit.ts` — severity（warning/critical）判定ロジック
 
@@ -34,7 +34,7 @@ X内部APIのレスポンスヘッダ、以下3種を見る:
 
 出典: 非公式リバースエンジニアリングドキュメント apidance.pro（https://doc.apidance.pro/）、trevorhobenshield/twitter-api-client（https://github.com/trevorhobenshield/twitter-api-client）。X公式の完全な仕様書は無く、コミュニティ調査ベースの情報である点、留意すること。
 
-| bucketKey                          | ラベル                     | 説明                                                                                              |
+| bucketKey                          | ラベル（ja 辞書）          | 説明                                                                                              |
 | ---------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------- |
 | `UserTweets`                       | ユーザーのツイート取得     | 指定ユーザーのツイート一覧を取得するAPI                                                           |
 | `UserByScreenName`                 | ユーザー情報取得           | screen_name（@ID）からユーザープロフィール（rest_id・bio・フォロワー数・認証状態等）を取得するAPI |

@@ -42,15 +42,16 @@ gitignore 対象の Android 生成ファイル（`src-tauri/gen/android/tauri.se
 ## モバイルタブバー（inject 方式からの方針転換）
 
 - 当初は X の DOM に注入するスクリプトでタブバーを実装していたが、column WebView（x.com を表示する外部 WebView）には Tauri の IPC ブリッジが注入されないため、タブバー自体は見えるのに操作が一切効かないという不具合があった。**inject スクリプトはメイン React アプリの UI 代替を担えない**（IPC 制約）という教訓から、この方式は全面撤去している。
-- 代わりに React 側の `MobileTabBar` を column WebView の下に 56px の隙間を空けて常時表示する方式に置き換えた。撤去に伴い、旧方式専用だった Rust コマンドや `eval_in_webview` 経由のタブバー更新呼び出しも不要になり削除している。
-- column WebView と React タブバーの境界（`y = innerHeight - 56` 付近）に視覚的な段差が生じうる、というリスクが設計時点で指摘されている。x.com コンテンツ下端が切れて見える場合は `padding-bottom: 56px` の CSS 注入や、column 高さをタブバーと重ねる対処が候補として挙がっていたが、実装完了時点で解消済みという確証はない。実機で段差が見えたらこの経緯を思い出すこと。
+- 代わりに React 側の `MobileTabBar` を column WebView の下にタブバー高さ（`MOBILE_TAB_BAR_HEIGHT_REM` = 3.5rem、標準倍率で 56px）の隙間を空けて常時表示する方式に置き換えた。撤去に伴い、旧方式専用だった Rust コマンドや `eval_in_webview` 経由のタブバー更新呼び出しも不要になり削除している。
+- column WebView と React タブバーの境界（`y = innerHeight - タブバー高さ` 付近）に視覚的な段差が生じうる、というリスクが設計時点で指摘されている。x.com コンテンツ下端が切れて見える場合は `padding-bottom` の CSS 注入や、column 高さをタブバーと重ねる対処が候補として挙がっていたが、実装完了時点で解消済みという確証はない。実機で段差が見えたらこの経緯を思い出すこと。
 
 ## APK 自己更新
 
 - Android は Tauri 標準の自動アップデータを使わず、GitHub Releases API を直接叩いて自前で APK をダウンロード・インストーラ起動する独自経路（JNI 経由で MainActivity 側のダウンロード・インストール処理を呼ぶ）。desktop の更新機構とは UI 層のみ共有し、実処理は完全に別。
 - Android 8.0 以降は `packageManager.canRequestPackageInstalls()` が false の場合、ダウンロードせず「不明アプリのインストール許可」設定画面へ誘導して return する分岐がある。初回インストール時に必ず踏む導線。
 - 同一署名であることが上書き更新（アンインストール不要）の前提条件。署名が変わると自己更新は失敗し、ユーザーは手動再インストールが必要になる。
-- GitHub Release の資産名判定は `.apk` 拡張子で最初にマッチしたものを使う実装。将来 Release に複数の `.apk`（アーキテクチャ別など）を置くと、意図しない資産を掴むリスクが仕様上ある。
+- APK の整合性は GitHub アセットの `digest`（`sha256:<hex>`）を `install_apk_update` の `expected_sha256` として渡し、Kotlin 側 `ApkHashVerifier` で検証してからインストーラを起動する。URL は自リポジトリの Releases ダウンロード URL に限定され、呼び出し元は main ウィンドウのみ（`commands/update.rs` の `validate_install_request`）。
+- GitHub Release の資産名判定（`src/lib/githubRelease.ts`）は `.apk` 拡張子で最初にマッチしたものを使う実装。将来 Release に複数の `.apk`（アーキテクチャ別など）を置くと、意図しない資産を掴むリスクが仕様上ある。
 - バージョン比較は `.`/`-`/`+` 区切りの数値パースによる簡易版で、プレリリースタグの大小関係などは考慮していない。
 
 ## Cookie 共有まわり

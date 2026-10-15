@@ -30,7 +30,7 @@
 - 拡張機能は **全アカウント共通**。WebView2 は data_directory（= アカウントのプロファイル）ごとに拡張を持つので、アプリが各アカウントのプロファイルへ追加する。
 - 導入方法は 2 つ: 展開済みフォルダの指定（`add_extension_from_folder`）と、Chrome / Edge の Default プロファイルからの検出（`detect_chrome_extensions` → `add_chrome_extension`）。検出元は `%LOCALAPPDATA%\Google\Chrome\User Data\Default\Extensions\<ID>\<version>\`（Chrome）と `%LOCALAPPDATA%\Microsoft\Edge\User Data\Default\Extensions\<ID>\<version>\`（Edge）。Default 以外のプロファイルや Brave / Vivaldi などの自動検出は対象外（フォルダ指定で追加する）。UI のボタンは「ブラウザから検出」の 1 つで、候補と追加済み一覧に由来ブラウザ名（Chrome / Edge）を表示し、追加セクションに保存先パスの案内文を表示する。
 - 管理操作は追加・削除・有効/無効・ポップアップ / オプションページを別ウィンドウで開く。変更後はフロントが全カラムを再読込する。
-- **Windows 以外では UI を出さず、コマンドは種別コード `extension.unsupported`（表示は「この環境では拡張機能に対応していません」）を返すスタブ**（`mod.rs` の `ensure_supported`）。コマンド自体は全 OS の `generate_handler!` に登録されている（ACL 契約テストとの整合のため。`lib.rs` で cfg を付けていない）。
+- **Windows 以外では UI を出さず、コマンドは種別コード `extension.unsupported`を返すスタブ**（`mod.rs` の `ensure_supported`。画面文言は ja/en 辞書 `messages:rustError.extension.*`）。コマンド自体は全 OS の `generate_handler!` に登録されている（ACL 契約テストとの整合のため。`lib.rs` で cfg を付けていない）。
 
 ### macOS・Linux を見送った調査結果と再検討の条件
 
@@ -68,10 +68,10 @@
 
 - `ExtensionSource::Chrome` に `browser`（`chrome` | `edge`、`#[serde(default)]` で既定 `Chrome`）を足し、`kind: "chrome"` はそのまま。**新 kind `edge` は作らなかった**: 旧版へ戻したときに `settings.json` の `browserExtensions` が読めなくなり、`match` の分岐も増えるため。`browser` 無しの旧保存データは Chrome 由来として読む（移行不要。書き戻しで `browser: "chrome"` が付くだけ）。
 - **IPC コマンド名（`detect_chrome_extensions` / `add_chrome_extension`）と引数名 `chromeId`、TS の `chromeId` フィールドは据え置いた**。名前が実態（Chrome / Edge 両対応）とずれるが、変えると ACL 3 点セット（`build.rs` / `capabilities/default.json` / `lib.rs`）と `contracts/ipc-constants.json` / `src/constants/ipc.ts` の同時変更が要るため。`add_chrome_extension` にブラウザ指定は無い（ID は重複排除済みなので `chromeId` だけで一意）。
-- **戻り値**: `DetectResult.chromeFound` は `browserFound`（`#[serde(rename = "browserFound")]`。Chrome / Edge のどちらかの `Extensions` ルートが存在）に改名した。`DetectedExtension` に `browser` を追加。どちらも無いときは UI が「Chrome / Edge が見つかりません」（`BROWSER_NOT_FOUND_NOTICE`）を出し、片方だけ見つかる場合は見つかった方の候補を通知なしで出す。
+- **戻り値**: `DetectResult.chromeFound` は `browserFound`（`#[serde(rename = "browserFound")]`。Chrome / Edge のどちらかの `Extensions` ルートが存在）に改名した。`DetectedExtension` に `browser` を追加。どちらも無いときは UI が「Chrome / Edge が見つかりません」（辞書キー `settings:extensions.browserNotFound`）を出し、片方だけ見つかる場合は見つかった方の候補を通知なしで出す。
 - **ID 重複は Chrome 優先で 1 件**（`merge_detected`）。Edge にしか無い ID は Edge 由来。結果は名前 → ID 順。Edge で追加済みの ID は Chrome 側の候補にも「追加済み」と出る（重複判定は ID のみでブラウザ非依存）。
 - **パス解決**: `resolve_entry`（`reconcile_plan.rs`）は `BrowserRoots` から `ExtensionSource::Chrome { browser, .. }` の `browser` に対応するルートだけで最新バージョンを解決する。**Edge 由来が Chrome 側へフォールバックすることは無い**（Edge のフォルダが消えたら、Chrome に同じ ID があっても `Missing`）。バージョン追従・「見つかりません」判定はブラウザ別に従来どおり動く。
-- `add_chrome_extension` は `spawn_blocking` 内で両ルートを検出して `chromeId` を探す（ルートが両方無いと「Chrome / Edge が見つかりません」、ID が無いと「ブラウザに該当する拡張機能が見つかりません」）。
+- `add_chrome_extension` は `spawn_blocking` 内で両ルートを検出して `chromeId` を探す（ルートが両方無いと `extension.noBrowser`「Chrome / Edge が見つかりません」、ID が無いと `extension.notInBrowser`「ブラウザに該当する拡張機能が見つかりません」）。
 
 ### ポップアップ / オプションページ
 
@@ -93,15 +93,15 @@
 
 - `WebviewBuilder::browser_extensions_enabled(true)`（`#[cfg(windows)]`）で拡張 API が使える。`with_webview` → `controller.CoreWebView2()` → `cast::<ICoreWebView2_13>()` → `.Profile()` → `cast::<ICoreWebView2Profile7>()` で `AddBrowserExtension` / `GetBrowserExtensions` / `ICoreWebView2BrowserExtension::{Id, Name, IsEnabled, Enable, Remove}` に到達できる。
 - Chrome の拡張フォルダは**そのまま**渡せる（`_metadata` / `_locales` 含む）。**拡張フォルダ直下に `_locales` と `_metadata` 以外の `_` 始まりのエントリ（ファイル・空ディレクトリ・中身ありを問わない）があると `E_ACCESSDENIED`**。サブフォルダ内の `_` 始まりは問題ない。
-- Add 失敗の HRESULT（`hresult.rs`）:
+- Add 失敗の HRESULT（`hresult.rs` の `describe_add_error` が種別コード `AppError` に変換する。文言は `messages:rustError.extension.*` の ja 辞書）:
 
-  | HRESULT      | 意味                                              | 文言                                     |
-  | ------------ | ------------------------------------------------- | ---------------------------------------- |
-  | `0x80070002` | `manifest.json` が無い                            | 「manifest.json が見つかりません」       |
-  | `0x80070005` | 予約名エントリなど（E_ACCESSDENIED）              | 「読み込めないファイルが含まれています」 |
-  | `0x80004005` | 存在しないパス / ジャンクション経由パス（E_FAIL） | 「パスを確認してください」               |
-  | `0x80070057` | 定義が不正（E_INVALIDARG）                        | 「拡張機能の定義が正しくありません」     |
-  | その他       | -                                                 | エラーコードを 8 桁大文字 16 進で含める  |
+  | HRESULT      | 意味                                              | 種別コード（ja の文言）                                                   |
+  | ------------ | ------------------------------------------------- | ------------------------------------------------------------------------- |
+  | `0x80070002` | `manifest.json` が無い                            | `extension.manifestMissing`（「…manifest.json が見つかりません」）        |
+  | `0x80070005` | 予約名エントリなど（E_ACCESSDENIED）              | `extension.unreadableFiles`（「…読み込めないファイルが含まれています…」） |
+  | `0x80004005` | 存在しないパス / ジャンクション経由パス（E_FAIL） | `extension.loadFailedPath`（「…パスを確認してください」）                 |
+  | `0x80070057` | 定義が不正（E_INVALIDARG）                        | `extension.invalidDefinition`（「拡張機能の定義が正しくありません」）     |
+  | その他       | -                                                 | `extension.loadFailed`（`detail` に 8 桁大文字 16 進を入れる）            |
 
   `0x80070057` は PoC の確認項目ではなく実装時に文言を割り当てたもの（実機で出る条件は未検証）。
 
@@ -122,8 +122,8 @@
 - 予約名を含むフォルダは、元フォルダを変更せず `app_data_dir/extensions/<entryId>/` に除外コピーして読み込む。削除時はコピーだけ消し、元フォルダは残す。シンボリックリンクはコピーせずスキップする。
 - 除外コピーは毎回作り直さない。コピー先の外（`copy_root/<entryId>.fingerprint`）に指紋（コピー元の絶対パス + 再帰的な（相対パス, サイズ, 更新時刻）を FNV-1a 64bit で要約した文字列。予約名エントリ・シンボリックリンクは対象外）を保存し、コピー先が在って指紋が一致する間は再コピーしない（WebView2 が読み込み中のフォルダを消さない・巨大フォルダで遅くならない）。不一致または無いときだけ指紋 → コピー先の順に消して作り直し、コピー完了後に指紋を書く。走査時に合計 20,000 ファイル・500MB・深さ 32 を超えると「拡張機能のフォルダが大きすぎます」エラー（`ScanLimits`）。
 - フォルダ指定の追加はネットワークフォルダ（UNC。`\\server\share\…`、`\\?\UNC\…`）を拒否する（`service::ensure_local_folder_path`。実パス化の前と後の両方で判定）。
-- 追加セクションに「すべてのアカウントの X ページを読み書きできる場合があります。信頼できるものだけを追加してください。」の注意を静的に表示する（`TRUST_NOTICE`）。
-- 同じく追加セクションに「拡張機能によっては正しく動作しないものがある（特にページ内容を検出してツールバーのボタンから操作する種類）」旨の注意を静的に表示する（`UNSUPPORTED_NOTICE`。`role="note"` は付けない: Story が `getByRole("note")` で `TRUST_NOTICE` を単一取得しているため）。
+- 追加セクションに「すべてのアカウントの X ページを読み書きできる場合があります。信頼できるものだけを追加してください。」の注意を静的に表示する（辞書キー `settings:extensions.trustNotice`）。
+- 同じく追加セクションに「拡張機能によっては正しく動作しないものがある（特にページ内容を検出してツールバーのボタンから操作する種類）」旨の注意を静的に表示する（`settings:extensions.unsupportedNotice`。`role="note"` は付けない: Story が `getByRole("note")` で `trustNotice` を単一取得しているため）。
 
 ## 落とし穴
 
@@ -174,4 +174,4 @@
 - **未配線**: reconcile の失敗は `log::warn!` のみで UI には出さない（カラム作成自体は成功させる）。
 - **拡張ページ用ウィンドウの孤児化（未検証）**: メインウィンドウ終了時に `extension-` ウィンドウが残らないかは実機で未確認（`prevent_close` を使わない通常ウィンドウなので `destroy()` は足していない）。
 - ポップアップ / オプションは、対象アカウントのカラムが 1 つも表示されていない（レジストリに無い）と、未適用時に開けない（「このアカウントのカラムを先に表示してください」）。
-- **ポップアップ型（ページ内容を検出して拡張のボタンで操作する）拡張は動かない場合がある**: ポップアップを別ウィンドウ（`extension-` ウィンドウ）で開くため、拡張が `chrome.tabs` 等で操作対象のカラムを指せない。設定画面に `UNSUPPORTED_NOTICE` を表示して利用者に周知している。対応は見送り: WebView2 にはアクション UI（ツールバーボタン）やタブの抽象が無く、任意の拡張への完全対応は困難なため。
+- **ポップアップ型（ページ内容を検出して拡張のボタンで操作する）拡張は動かない場合がある**: ポップアップを別ウィンドウ（`extension-` ウィンドウ）で開くため、拡張が `chrome.tabs` 等で操作対象のカラムを指せない。設定画面に `unsupportedNotice` を表示して利用者に周知している。対応は見送り: WebView2 にはアクション UI（ツールバーボタン）やタブの抽象が無く、任意の拡張への完全対応は困難なため。
