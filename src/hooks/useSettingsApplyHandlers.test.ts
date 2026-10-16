@@ -145,7 +145,7 @@ describe("全体設定の適用", () => {
     await setup({
       updateGlobalSettings,
       recreateStaleColumns,
-    }).handleApplyGlobalSettings({ blurImageEnabled: true } as never);
+    }).handleApplyGlobalSettings({ blurImageEnabled: true });
 
     expect(recreateStaleColumns).toHaveBeenCalledTimes(1);
     expect(order).toEqual(["update", "recreateStale"]);
