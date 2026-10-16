@@ -8,6 +8,11 @@ import {
   STORAGE_KEYS,
   WEBVIEW_SCRIPTS,
 } from "../constants/ipc";
+import {
+  recordColumnBuild,
+  resetColumnBuildRegistry,
+} from "../lib/columnBuildRegistry";
+import { columnBuildSignature } from "../lib/columnBuildSignature";
 import { setRootFontPx } from "../lib/uiScale";
 import { resolveColumnDataDirectory } from "../services/externalColumn";
 import { useAppStore } from "../store/useAppStore";
@@ -86,15 +91,22 @@ const column2 = {
   settings: { ...DEFAULT_COLUMN_SETTINGS },
 };
 
-function renderMobileColumns(dialogOpen = false) {
+function renderMobileColumns(
+  dialogOpen = false,
+  recreateColumnWebview?: (columnId: string) => Promise<void>,
+) {
   const dialogOpenRef = { current: dialogOpen };
-  const rendered = renderHook(() => useMobileColumns(dialogOpenRef));
+  const recreateRef = { current: recreateColumnWebview ?? null };
+  const rendered = renderHook(() =>
+    useMobileColumns(dialogOpenRef, recreateRef),
+  );
   return { ...rendered, dialogOpenRef };
 }
 
 describe("useMobileColumns", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetColumnBuildRegistry();
     capturedCallbacks.clear();
     mockUnlisten.mockReset();
     mockInvoke.mockResolvedValue(undefined);
@@ -676,6 +688,65 @@ describe("useMobileColumns", () => {
       });
     });
 
+    expect(mockInvoke).toHaveBeenCalledWith(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
+      label: "column-col-1",
+      script: WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD,
+    });
+  });
+
+  it("スワイプ領域のダブルタップで設定が変わったアクティブカラムは再構築される", () => {
+    const recreate = vi.fn().mockResolvedValue(undefined);
+    recordColumnBuild(
+      column1.id,
+      columnBuildSignature(column1, useAppStore.getState().globalSettings),
+    );
+    useAppStore.setState({
+      columns: [
+        {
+          ...column1,
+          settings: { ...column1.settings, blurImageEnabled: true },
+        },
+        column2,
+      ],
+    });
+    const { result } = renderMobileColumns(false, recreate);
+    act(() => {
+      result.current.setActiveColumnIdState("col-1");
+    });
+    mockInvoke.mockClear();
+
+    act(() => {
+      capturedCallbacks.get(IPC_EVENTS.MOBILE_SWIPE_DOUBLE_TAP)?.({
+        payload: "",
+      });
+    });
+
+    expect(recreate).toHaveBeenCalledWith("col-1");
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      IPC_COMMANDS.EVAL_IN_WEBVIEW,
+      expect.anything(),
+    );
+  });
+
+  it("スワイプ領域のダブルタップで設定が変わっていないアクティブカラムは再構築されず再読み込みされる", () => {
+    const recreate = vi.fn().mockResolvedValue(undefined);
+    recordColumnBuild(
+      column1.id,
+      columnBuildSignature(column1, useAppStore.getState().globalSettings),
+    );
+    const { result } = renderMobileColumns(false, recreate);
+    act(() => {
+      result.current.setActiveColumnIdState("col-1");
+    });
+    mockInvoke.mockClear();
+
+    act(() => {
+      capturedCallbacks.get(IPC_EVENTS.MOBILE_SWIPE_DOUBLE_TAP)?.({
+        payload: "",
+      });
+    });
+
+    expect(recreate).not.toHaveBeenCalled();
     expect(mockInvoke).toHaveBeenCalledWith(IPC_COMMANDS.EVAL_IN_WEBVIEW, {
       label: "column-col-1",
       script: WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD,

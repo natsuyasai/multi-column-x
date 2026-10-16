@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { WEBVIEW_SCRIPTS } from "@/constants/ipc";
 import type { ColumnBounds } from "@/lib/gridLayout";
-import { evalInColumn } from "@/services/columnWebview";
+import { reloadColumnOrRecreate } from "@/services/columnReload";
 import type { Column } from "@/types";
 
 interface UseColumnNavigationArgs {
@@ -12,6 +12,7 @@ interface UseColumnNavigationArgs {
   columnBounds: Record<string, ColumnBounds>;
   scrollbarRef: React.RefObject<HTMLDivElement | null>;
   dialogOpen: boolean;
+  recreateColumnWebview: (columnId: string) => Promise<void>;
 }
 
 interface UseColumnNavigationResult {
@@ -28,6 +29,7 @@ export function useColumnNavigation({
   columnBounds,
   scrollbarRef,
   dialogOpen,
+  recreateColumnWebview,
 }: UseColumnNavigationArgs): UseColumnNavigationResult {
   // 「フォーカスカラム」= 最後に 1-9 ジャンプ／TopBar クリックでジャンプしたカラム。
   // r キーでのリロード対象を決めるために使う（無ければ order 最小の先頭カラムにフォールバック）。
@@ -71,15 +73,28 @@ export function useColumnNavigation({
     [columns, handleJumpToColumn],
   );
 
-  // 手動更新（ヘッダー・設定パネル・r キー）: スクロール位置にかかわらず先頭へ戻して更新する
-  const handleReload = useCallback(async (columnId: string) => {
-    await evalInColumn(columnId, WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD);
-  }, []);
+  // 手動更新（ヘッダー・設定パネル・r キー・ダブルタップ）の共通処理:
+  // 埋め込み設定が構築時から変わっていれば WebView を再構築し、
+  // そうでなければスクロール位置にかかわらず先頭へ戻して更新する。
+  const reloadOrRecreate = useCallback(
+    (columnId: string) =>
+      reloadColumnOrRecreate(
+        columnId,
+        WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD,
+        recreateColumnWebview,
+      ),
+    [recreateColumnWebview],
+  );
+
+  const handleReload = reloadOrRecreate;
 
   // タブバーのダブルタップ／カラムヘッダーの先頭スクロールボタン共通: 対象カラムを先頭スクロール＋リロードする
-  const handleDoubleTapColumn = useCallback((columnId: string) => {
-    evalInColumn(columnId, WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD);
-  }, []);
+  const handleDoubleTapColumn = useCallback(
+    (columnId: string) => {
+      void reloadOrRecreate(columnId);
+    },
+    [reloadOrRecreate],
+  );
 
   // r キー用: フォーカスカラム（無ければ order 最小の先頭カラム）をリロードする
   const handleReloadFocusedColumn = useCallback(() => {

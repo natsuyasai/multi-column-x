@@ -1,6 +1,6 @@
 // src/hooks/useColumns.ts
 // モバイル/デスクトップ実装（useMobileColumns / useDesktopColumns）を組み合わせるファサード
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { OFFSCREEN } from "../constants/ipc";
 import { isColumnBuildStale } from "../lib/columnBuildRegistry";
 import { moveGroup } from "../lib/columnOrder";
@@ -54,6 +54,10 @@ export function useColumns() {
   const scrollbarRef = useRef<HTMLDivElement>(null); // 下部スクロールバーコンテナ
   // ダイアログが開いている間はリサイズによる WebView 再配置を抑制するためのフラグ
   const dialogOpenRef = useRef(false);
+  // useMobileColumns は recreateColumnWebview より先に呼ぶ必要があるため ref 経由で渡す
+  const recreateColumnWebviewRef = useRef<
+    ((columnId: string) => Promise<void>) | null
+  >(null);
 
   const {
     activeColumnId,
@@ -63,7 +67,7 @@ export function useColumns() {
     navigateColumn,
     setSwipeProgress,
     restoreMobileColumns,
-  } = useMobileColumns(dialogOpenRef);
+  } = useMobileColumns(dialogOpenRef, recreateColumnWebviewRef);
 
   const {
     columnBounds,
@@ -354,6 +358,14 @@ export function useColumns() {
       hideColumnWebviews,
     ],
   );
+
+  useEffect(() => {
+    recreateColumnWebviewRef.current = recreateColumnWebview;
+  }, [recreateColumnWebview]);
+
+  useEffect(() => {
+    recreateColumnWebviewRef.current = recreateColumnWebview;
+  }, [recreateColumnWebview]);
 
   // 構築後に埋め込み設定が変わったカラムだけを、直列に作り直す。
   // 対象はループ開始時点で確定する（再構築中にレジストリが更新されるため）。
