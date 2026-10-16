@@ -19,6 +19,10 @@
     "title": "App settings (Ctrl+,)",
     "label": "Settings"
   },
+  "reloadAll": {
+    "title": "Reload all columns",
+    "label": "Reload all"
+  },
   "collapse": "Collapse toolbar (Ctrl+B)",
   "expand": "Expand toolbar (Ctrl+B)",
   "closeColumn": "Close column"

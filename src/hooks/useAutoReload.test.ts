@@ -129,6 +129,95 @@ describe("useAutoReload", () => {
   });
 });
 
+describe("useAutoReload（全カラム再読み込みでのカウントダウン振り直し）", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    useAppStore.setState({ reloadAllSignal: 0 });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    useAppStore.setState({ reloadAllSignal: 0 });
+  });
+
+  it("全カラム再読み込みボタンを押すと各カラムの自動更新カウントダウンが振り直される", () => {
+    const a = renderHook(() =>
+      useAutoReload({ columnId: "col-a", enabled: true, intervalSec: 60 }),
+    );
+    const b = renderHook(() =>
+      useAutoReload({ columnId: "col-b", enabled: true, intervalSec: 30 }),
+    );
+    act(() => {
+      vi.advanceTimersByTime(10000);
+    });
+    expect(a.result.current.remaining).toBe(50);
+    expect(b.result.current.remaining).toBe(20);
+
+    act(() => {
+      useAppStore.getState().bumpReloadAllSignal();
+    });
+
+    expect(a.result.current.remaining).toBe(60);
+    expect(b.result.current.remaining).toBe(30);
+  });
+
+  it("振り直し後は間隔の最初から再びカウントダウンする", () => {
+    const { result } = renderHook(() =>
+      useAutoReload({ columnId: "col-1", enabled: true, intervalSec: 60 }),
+    );
+    act(() => {
+      vi.advanceTimersByTime(10000);
+    });
+    act(() => {
+      useAppStore.getState().bumpReloadAllSignal();
+    });
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(result.current.remaining).toBe(58);
+  });
+
+  it("初回マウントではカウントダウンを振り直さずintervalSecのまま開始する", () => {
+    useAppStore.setState({ reloadAllSignal: 5 });
+    const { result } = renderHook(() =>
+      useAutoReload({ columnId: "col-1", enabled: true, intervalSec: 60 }),
+    );
+    expect(result.current.remaining).toBe(60);
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(result.current.remaining).toBe(57);
+  });
+
+  it("自動更新が無効なカラムはsignalが増えてもremainingがnullのまま", () => {
+    const { result } = renderHook(() =>
+      useAutoReload({ columnId: "col-1", enabled: false, intervalSec: 60 }),
+    );
+    act(() => {
+      useAppStore.getState().bumpReloadAllSignal();
+    });
+    expect(result.current.remaining).toBeNull();
+  });
+
+  it("signalが増えてもeval_in_webviewは余計に呼ばれない", () => {
+    renderHook(() =>
+      useAutoReload({ columnId: "col-1", enabled: true, intervalSec: 60 }),
+    );
+    act(() => {
+      useAppStore.getState().bumpReloadAllSignal();
+    });
+    expect(mockInvoke).not.toHaveBeenCalled();
+  });
+
+  it("bumpReloadAllSignalを呼ぶたびにreloadAllSignalが1ずつ増える", () => {
+    expect(useAppStore.getState().reloadAllSignal).toBe(0);
+    useAppStore.getState().bumpReloadAllSignal();
+    useAppStore.getState().bumpReloadAllSignal();
+    expect(useAppStore.getState().reloadAllSignal).toBe(2);
+  });
+});
+
 describe("useAutoReload（バックアップ復元中の停止）", () => {
   beforeEach(() => {
     vi.clearAllMocks();

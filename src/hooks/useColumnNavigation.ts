@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { WEBVIEW_SCRIPTS } from "@/constants/ipc";
 import type { ColumnBounds } from "@/lib/gridLayout";
 import { reloadColumnOrRecreate } from "@/services/columnReload";
+import { useAppStore } from "@/store/useAppStore";
 import type { Column } from "@/types";
 
 interface UseColumnNavigationArgs {
@@ -20,6 +21,7 @@ interface UseColumnNavigationResult {
   jumpToColumnWhenReady: (columnId: string) => void;
   handleJumpToColumnByIndex: (index: number) => void;
   handleReload: (columnId: string) => Promise<void>;
+  handleReloadAll: () => Promise<void>;
   handleReloadFocusedColumn: () => void;
   handleDoubleTapColumn: (columnId: string) => void;
 }
@@ -88,6 +90,16 @@ export function useColumnNavigation({
 
   const handleReload = reloadOrRecreate;
 
+  // 全カラム再読み込み: external 以外を並列に更新し、自動更新カウントダウンを振り直させる。
+  // 復元中・対象 0 件のときは何もしない。個々の失敗は他カラムの更新を止めない。
+  const handleReloadAll = useCallback(async () => {
+    if (useAppStore.getState().restoreInProgress) return;
+    const targets = columns.filter((c) => c.pageType !== "external");
+    if (targets.length === 0) return;
+    await Promise.allSettled(targets.map((c) => handleReload(c.id)));
+    useAppStore.getState().bumpReloadAllSignal();
+  }, [columns, handleReload]);
+
   // タブバーのダブルタップ／カラムヘッダーの先頭スクロールボタン共通: 対象カラムを先頭スクロール＋リロードする
   const handleDoubleTapColumn = useCallback(
     (columnId: string) => {
@@ -109,6 +121,7 @@ export function useColumnNavigation({
     jumpToColumnWhenReady,
     handleJumpToColumnByIndex,
     handleReload,
+    handleReloadAll,
     handleReloadFocusedColumn,
     handleDoubleTapColumn,
   };
