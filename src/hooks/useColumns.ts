@@ -2,6 +2,7 @@
 // モバイル/デスクトップ実装（useMobileColumns / useDesktopColumns）を組み合わせるファサード
 import { useCallback, useRef } from "react";
 import { OFFSCREEN } from "../constants/ipc";
+import { isColumnBuildStale } from "../lib/columnBuildRegistry";
 import { moveGroup } from "../lib/columnOrder";
 import { getHeaderHeight, getTopBarHeight } from "../lib/gridLayout";
 import { logError } from "../lib/log";
@@ -290,6 +291,14 @@ export function useColumns() {
         logError("recreateColumnWebview:removeColumnWebview"),
       );
 
+      // ダイアログ表示中に作り直すと新 WebView が通常座標で前面に残るため退避する。
+      // ダイアログを閉じた時点で App 側の effect が正しく再配置する。
+      const hideIfDialogOpen = async () => {
+        if (dialogOpenRef.current) {
+          await hideColumnWebviews();
+        }
+      };
+
       if (isMobile) {
         await createOffscreenMobileColumnWebview(
           column,
@@ -307,10 +316,14 @@ export function useColumns() {
             await setActiveColumn(activeColumnId);
           }
         }
+        await hideIfDialogOpen();
         return;
       }
 
-      if (!containerRef.current) return;
+      if (!containerRef.current) {
+        await hideIfDialogOpen();
+        return;
+      }
       const containerHeight = containerRef.current.clientHeight;
       const scrollLeft = scrollbarRef.current?.scrollLeft ?? 0;
       const bounds = desktopGridBounds(currentColumns, {
@@ -319,7 +332,10 @@ export function useColumns() {
         topBarHeight: getTopBarHeight(topBarExpanded),
       });
       const b = bounds[columnId];
-      if (!b) return;
+      if (!b) {
+        await hideIfDialogOpen();
+        return;
+      }
 
       await createColumnWebview(column, dataDirectory, b).catch(
         logError("recreateColumnWebview:createColumnWebview"),
@@ -327,6 +343,7 @@ export function useColumns() {
       // Linux ではカラムを非表示で作成するため、作成後に recalculateAllBounds で
       // 正しい座標に配置・表示する。
       await recalculateAllBounds();
+      await hideIfDialogOpen();
     },
     [
       containerRef,
@@ -334,8 +351,21 @@ export function useColumns() {
       activeColumnId,
       setActiveColumn,
       recalculateAllBounds,
+      hideColumnWebviews,
     ],
   );
+
+  // 構築後に埋め込み設定が変わったカラムだけを、直列に作り直す。
+  // 対象はループ開始時点で確定する（再構築中にレジストリが更新されるため）。
+  const recreateStaleColumns = useCallback(async () => {
+    const { columns: currentColumns, globalSettings } = useAppStore.getState();
+    const staleColumns = currentColumns.filter((c) =>
+      isColumnBuildStale(c, globalSettings),
+    );
+    for (const column of staleColumns) {
+      await recreateColumnWebview(column.id);
+    }
+  }, [recreateColumnWebview]);
 
   // 指定カラム群の WebView をすべて破棄する（remove_column_webview の失敗は握りつぶす）
   const removeWebviewsOf = useCallback(async (cols: Column[]) => {
@@ -415,6 +445,7 @@ export function useColumns() {
     setDialogOpen,
     recreateAllWebviews,
     recreateColumnWebview,
+    recreateStaleColumns,
     loadPresetAndRecreateWebviews,
     replaceColumnsAndRecreateWebviews,
   };
