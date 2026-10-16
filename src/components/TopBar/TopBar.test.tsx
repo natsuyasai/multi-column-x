@@ -88,6 +88,7 @@ const defaultProps = {
   onAddColumn: vi.fn(),
   onAccountManager: vi.fn(),
   onAppSettings: vi.fn(),
+  onReloadAll: vi.fn(),
   onComposeTweet: vi.fn(),
   onOpenLinkPopup: vi.fn(),
   onJumpToColumn: vi.fn(),
@@ -143,6 +144,29 @@ describe("TopBar", () => {
     render(<TopBar {...defaultProps} onAppSettings={onSet} />);
     await userEvent.click(screen.getByTitle("アプリ設定 (Ctrl+,)"));
     expect(onSet).toHaveBeenCalled();
+  });
+
+  it("トップバーに全カラム再読み込みボタンが表示される", () => {
+    render(<TopBar {...defaultProps} />);
+    const button = screen.getByTitle("全カラムを再読み込み");
+    expect(button).toBeInTheDocument();
+    expect(within(button).getByTestId("icon-refresh")).toBeInTheDocument();
+  });
+
+  it("全カラム再読み込みボタンを押すと onReloadAll が1回呼ばれる", async () => {
+    const onReloadAll = vi.fn();
+    render(<TopBar {...defaultProps} onReloadAll={onReloadAll} />);
+    await userEvent.click(screen.getByTitle("全カラムを再読み込み"));
+    expect(onReloadAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("トップバーを展開しても全カラム再読み込みボタンが使える", async () => {
+    const onReloadAll = vi.fn();
+    render(<TopBar {...defaultProps} expanded onReloadAll={onReloadAll} />);
+    const button = screen.getByTitle("全カラムを再読み込み");
+    expect(within(button).getByText("全更新")).toBeInTheDocument();
+    await userEvent.click(button);
+    expect(onReloadAll).toHaveBeenCalledTimes(1);
   });
 
   it("展開トグルをクリックすると onToggleExpand が呼ばれる", async () => {
@@ -216,6 +240,7 @@ describe("TopBar", () => {
       ["カラムを追加 (Ctrl+N)", "カラム追加"],
       ["アカウント管理 (Ctrl+Shift+A)", "アカウント"],
       ["アプリ設定 (Ctrl+,)", "設定"],
+      ["全カラムを再読み込み", "全更新"],
     ])(
       "「%s」ボタンは展開時にラベル「%s」が表示されbtnExpandedクラスが付き、折りたたみ時はどちらも無い",
       (title, label) => {
@@ -726,6 +751,7 @@ describe("TopBar 表示言語", () => {
     expectNoJapanese(container);
     expect(screen.getByTitle("Compose post (Ctrl+T)")).toBeInTheDocument();
     expect(screen.getByTitle("Expand toolbar (Ctrl+B)")).toBeInTheDocument();
+    expect(screen.getByTitle("Reload all columns")).toBeInTheDocument();
 
     rerender(<TopBar {...props} expanded />);
     expectNoJapanese(container);
@@ -734,6 +760,7 @@ describe("TopBar 表示言語", () => {
     expect(screen.getByText("Add column")).toBeInTheDocument();
     expect(screen.getByText("Accounts")).toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
+    expect(screen.getByText("Reload all")).toBeInTheDocument();
     expect(screen.getByTitle("Collapse toolbar (Ctrl+B)")).toBeInTheDocument();
     expect(screen.getAllByLabelText("Close column")).toHaveLength(6);
   });

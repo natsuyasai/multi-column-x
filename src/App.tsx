@@ -298,6 +298,7 @@ const App: React.FC = () => {
     handleJumpToColumnByIndex,
     handleReload,
     handleReloadFocusedColumn,
+    handleReloadAll,
     handleDoubleTapColumn,
   } = useColumnNavigation({
     columns,
@@ -434,6 +435,7 @@ const App: React.FC = () => {
           onAddColumn={() => setShowAddColumn(true)}
           onAccountManager={() => setShowAccountManager(true)}
           onAppSettings={() => setShowAppSettings(true)}
+          onReloadAll={handleReloadAll}
           onComposeTweet={handleComposeTweet}
           onOpenLinkPopup={handleOpenLinkPopup}
           onJumpToColumn={handleJumpToColumn}
