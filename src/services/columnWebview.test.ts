@@ -1,5 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import {
+  isColumnBuildStale,
+  resetColumnBuildRegistry,
+} from "@/lib/columnBuildRegistry";
+import { useAppStore } from "@/store/useAppStore";
 import { WEBVIEW_SCRIPTS } from "../constants/ipc";
 import { DEFAULT_COLUMN_SETTINGS, DEFAULT_GLOBAL_SETTINGS } from "../types";
 import type { Column } from "../types";
@@ -18,8 +23,11 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
 describe("columnWebview service", () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     vi.clearAllMocks();
     vi.mocked(invoke).mockResolvedValue(undefined);
+    resetColumnBuildRegistry();
+    useAppStore.setState({ globalSettings: { ...DEFAULT_GLOBAL_SETTINGS } });
   });
 
   it("createColumnWebviewはcolumnとdataDirectoryとboundsをargsにまとめて送る", async () => {
@@ -189,6 +197,137 @@ describe("columnWebview service", () => {
         ["g"],
       ),
     );
+  });
+
+  describe("埋め込み設定の署名記録", () => {
+    const makeColumn = (blur = false): Column =>
+      ({
+        id: "col-1",
+        accountId: "acc-1",
+        pageType: "home",
+        width: 350,
+        order: 0,
+        gridRow: 1,
+        gridCol: 1,
+        heightMode: "auto",
+        settings: {
+          ...DEFAULT_COLUMN_SETTINGS,
+          blurImageEnabled: blur,
+          blurImageAmount: "9",
+        },
+      }) as Column;
+    const bounds = { x: 0, y: 36, width: 350, height: 800 };
+
+    it("カラム個別設定の適用後は再作成時にぼかし有効の設定が渡される", async () => {
+      const column = makeColumn(true);
+      await createColumnWebview(column, "/data/acc-1", bounds);
+      const args = vi.mocked(invoke).mock.calls[0][1] as {
+        args: { column: Column };
+      };
+      expect(args.args.column.settings.blurImageEnabled).toBe(true);
+      expect(args.args.column.settings.blurImageAmount).toBe("9");
+    });
+
+    it("作成した直後は stale にならない", async () => {
+      const column = makeColumn();
+      await createColumnWebview(column, "/data/acc-1", bounds);
+      expect(
+        isColumnBuildStale(column, useAppStore.getState().globalSettings),
+      ).toBe(false);
+    });
+
+    it("作成後にカラム設定が変わると stale になる", async () => {
+      await createColumnWebview(makeColumn(), "/data/acc-1", bounds);
+      expect(
+        isColumnBuildStale(
+          makeColumn(true),
+          useAppStore.getState().globalSettings,
+        ),
+      ).toBe(true);
+    });
+
+    it("作成後に全体設定が変わると stale になる", async () => {
+      const column = makeColumn();
+      await createColumnWebview(column, "/data/acc-1", bounds);
+      expect(
+        isColumnBuildStale(column, {
+          ...DEFAULT_GLOBAL_SETTINGS,
+          hideAdEnabled: !DEFAULT_GLOBAL_SETTINGS.hideAdEnabled,
+        }),
+      ).toBe(true);
+    });
+
+    it("作成時点の全体設定で署名が記録される", async () => {
+      const changedGlobal = {
+        ...DEFAULT_GLOBAL_SETTINGS,
+        hideAdEnabled: !DEFAULT_GLOBAL_SETTINGS.hideAdEnabled,
+      };
+      useAppStore.setState({ globalSettings: changedGlobal });
+      const column = makeColumn();
+      await createColumnWebview(column, "/data/acc-1", bounds);
+      expect(isColumnBuildStale(column, changedGlobal)).toBe(false);
+      expect(isColumnBuildStale(column, DEFAULT_GLOBAL_SETTINGS)).toBe(true);
+    });
+
+    it("作成が失敗したら記録されない", async () => {
+      const failing = makeColumn(true);
+      vi.mocked(invoke).mockRejectedValueOnce(new Error("失敗"));
+      await expect(
+        createColumnWebview(failing, "/data/acc-1", bounds),
+      ).rejects.toThrow("失敗");
+      // 失敗した構築の署名が記録されていれば stale ではなくなる。記録が無い状態では stale 扱いにならないため、
+      // 先に別設定で構築済みにしてから同じ失敗を起こし、旧署名のまま残ることで確認する
+      await createColumnWebview(makeColumn(), "/data/acc-1", bounds);
+      vi.mocked(invoke).mockRejectedValueOnce(new Error("失敗"));
+      await expect(
+        createColumnWebview(failing, "/data/acc-1", bounds),
+      ).rejects.toThrow("失敗");
+      expect(
+        isColumnBuildStale(failing, useAppStore.getState().globalSettings),
+      ).toBe(true);
+    });
+
+    it("破棄すると記録が消える", async () => {
+      await createColumnWebview(makeColumn(), "/data/acc-1", bounds);
+      await removeColumnWebview("col-1");
+      expect(
+        isColumnBuildStale(
+          makeColumn(true),
+          useAppStore.getState().globalSettings,
+        ),
+      ).toBe(false);
+    });
+
+    it("破棄が失敗したら記録は消えない", async () => {
+      await createColumnWebview(makeColumn(), "/data/acc-1", bounds);
+      vi.mocked(invoke).mockRejectedValueOnce(new Error("失敗"));
+      await expect(removeColumnWebview("col-1")).rejects.toThrow("失敗");
+      expect(
+        isColumnBuildStale(
+          makeColumn(true),
+          useAppStore.getState().globalSettings,
+        ),
+      ).toBe(true);
+    });
+
+    it("作成の前に保存完了を待つ", async () => {
+      let release: () => void = () => {};
+      const flush = vi.spyOn(useAppStore.getState(), "flushPendingSaves");
+      flush.mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            release = resolve;
+          }),
+      );
+      const pending = createColumnWebview(makeColumn(), "/data/acc-1", bounds);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(flush).toHaveBeenCalledTimes(1);
+      expect(invoke).not.toHaveBeenCalled();
+      release();
+      await pending;
+      expect(invoke).toHaveBeenCalledTimes(1);
+    });
   });
 });
 

@@ -1,6 +1,9 @@
 // src/services/columnWebview.ts
 // カラム WebView に対する Tauri IPC 呼び出しを集約するサービス層
 import { invoke } from "@tauri-apps/api/core";
+import { clearColumnBuild, recordColumnBuild } from "@/lib/columnBuildRegistry";
+import { columnBuildSignature } from "@/lib/columnBuildSignature";
+import { useAppStore } from "@/store/useAppStore";
 import {
   IPC_COMMANDS,
   WEBVIEW_LABELS,
@@ -10,15 +13,24 @@ import type { ColumnBounds } from "../lib/gridLayout";
 import { logError } from "../lib/log";
 import type { Column, ColumnSettings, GlobalSettings } from "../types";
 
-/** カラム WebView を作成する */
+/**
+ * カラム WebView を作成する。
+ * 全体設定は Rust が永続化済みの settings.json から読むため、作成前に保存完了を待つ。
+ * 作成に成功したら、埋め込んだ設定の署名を記録する（失敗時は記録しない）。
+ */
 export async function createColumnWebview(
   column: Column,
   dataDirectory: string,
   bounds: ColumnBounds,
 ): Promise<void> {
+  await useAppStore.getState().flushPendingSaves();
   await invoke(IPC_COMMANDS.CREATE_COLUMN_WEBVIEW, {
     args: { column, dataDirectory, ...bounds },
   });
+  recordColumnBuild(
+    column.id,
+    columnBuildSignature(column, useAppStore.getState().globalSettings),
+  );
 }
 
 /** カラム WebView の位置・サイズを更新する */
@@ -34,6 +46,7 @@ export async function resizeColumnWebview(
 /** カラム WebView を削除する */
 export async function removeColumnWebview(columnId: string): Promise<void> {
   await invoke(IPC_COMMANDS.REMOVE_COLUMN_WEBVIEW, { columnId });
+  clearColumnBuild(columnId);
 }
 
 /** アクティブカラムのアカウントに Cookie を切り替える（Android のみ実体動作） */
