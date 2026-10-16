@@ -25,13 +25,13 @@ If this is your first time, follow these steps and you can be up and running in 
 
 Multi Column X is a **TweetDeck alternative / replacement** for people who want Home, Notifications, Search and Lists side by side in multiple columns, like TweetDeck (now X Pro). It offers the following so that TweetDeck users can switch easily.
 
-| What you did in TweetDeck | In Multi Column X |
-| --- | --- |
+| What you did in TweetDeck                                   | In Multi Column X                                                                                    |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | Line up Home, Notifications, Search, Lists, etc. in columns | Show as many columns side by side as you like (grid layout and vertical stacking are also supported) |
-| Switch between multiple accounts | Register multiple accounts, each with its own login state, and pick the account per column |
-| Columns refresh automatically | Set the auto-refresh interval per column |
-| Hide posts with certain words | Per-column muted words / allowlist and hiding reposts |
-| Compose a post quickly | Open the compose window with `Ctrl+T` |
+| Switch between multiple accounts                            | Register multiple accounts, each with its own login state, and pick the account per column           |
+| Columns refresh automatically                               | Set the auto-refresh interval per column                                                             |
+| Hide posts with certain words                               | Per-column muted words / allowlist and hiding reposts                                                |
+| Compose a post quickly                                      | Open the compose window with `Ctrl+T`                                                                |
 
 It runs on Windows / Linux desktops and also on Android. If you are searching for a "TweetDeck alternative" or a "TweetDeck replacement", start with the [5-step quick start](#getting-started-in-5-steps-quick-start).
 

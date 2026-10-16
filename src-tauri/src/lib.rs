@@ -184,6 +184,20 @@ pub fn run() {
 
     #[cfg(desktop)]
     let builder = builder.on_window_event(|window, event| {
+        // SPIKE-TEMP: フォーカス挙動の確認用ログ（コミットしない）
+        if let tauri::WindowEvent::Focused(focused) = event {
+            let any = window
+                .app_handle()
+                .webview_windows()
+                .values()
+                .any(|w| w.is_focused().unwrap_or(false));
+            eprintln!(
+                "[SPIKE] Focused label={} value={} any_window_focused={}",
+                window.label(),
+                focused,
+                any
+            );
+        }
         if let tauri::WindowEvent::CloseRequested { .. } = event {
             if window.label() == crate::ipc_constants::labels::MAIN {
                 save_window_bounds(window);
