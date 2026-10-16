@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WEBVIEW_SCRIPTS } from "@/constants/ipc";
 import type { ColumnBounds } from "@/lib/gridLayout";
 import { evalInColumn } from "@/services/columnWebview";
+import { useAppStore } from "@/store/useAppStore";
 import type { Column } from "@/types";
 import { useColumnNavigation } from "./useColumnNavigation";
 
@@ -159,5 +160,115 @@ describe("useColumnNavigation の保留ジャンプ", () => {
       dialogOpen: false,
     });
     expect(scrollbar.scrollLeft).toBe(320);
+  });
+});
+
+describe("useColumnNavigation の全カラム再読み込み", () => {
+  const col = (id: string, pageType: Column["pageType"] = "home"): Column =>
+    ({ id, order: 0, pageType }) as Column;
+
+  const setupAll = (columns: Column[]) =>
+    renderHook(() =>
+      useColumnNavigation({
+        columns,
+        columnBounds: {},
+        scrollbarRef: { current: null },
+        dialogOpen: false,
+      }),
+    );
+
+  beforeEach(() => {
+    vi.mocked(evalInColumn).mockReset();
+    vi.mocked(evalInColumn).mockResolvedValue(undefined);
+    useAppStore.setState({ restoreInProgress: false, reloadAllSignal: 0 });
+  });
+
+  it("全カラム再読み込みボタンを押すと全カラムが更新される", async () => {
+    const { result } = setupAll([col("A"), col("B"), col("C")]);
+
+    await act(async () => {
+      await result.current.handleReloadAll();
+    });
+
+    expect(evalInColumn).toHaveBeenCalledTimes(3);
+    for (const id of ["A", "B", "C"]) {
+      expect(evalInColumn).toHaveBeenCalledWith(
+        id,
+        WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD,
+      );
+    }
+  });
+
+  it("全カラム再読み込みボタンを押すと各カラムの自動更新カウントダウンが振り直される", async () => {
+    const { result } = setupAll([col("A"), col("B")]);
+
+    await act(async () => {
+      await result.current.handleReloadAll();
+    });
+
+    expect(useAppStore.getState().reloadAllSignal).toBe(1);
+  });
+
+  it("外部サイトカラムは全カラム再読み込みの対象外である", async () => {
+    const { result } = setupAll([col("A"), col("X", "external"), col("C")]);
+
+    await act(async () => {
+      await result.current.handleReloadAll();
+    });
+
+    expect(evalInColumn).toHaveBeenCalledTimes(2);
+    expect(evalInColumn).not.toHaveBeenCalledWith("X", expect.anything());
+    expect(evalInColumn).toHaveBeenCalledWith(
+      "A",
+      WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD,
+    );
+    expect(evalInColumn).toHaveBeenCalledWith(
+      "C",
+      WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD,
+    );
+  });
+
+  it("一部のカラムの更新に失敗しても残りのカラムは更新される", async () => {
+    vi.mocked(evalInColumn).mockImplementation(async (id: string) => {
+      if (id === "B") throw new Error("失敗");
+    });
+    const { result } = setupAll([col("A"), col("B"), col("C")]);
+
+    await act(async () => {
+      await expect(result.current.handleReloadAll()).resolves.toBeUndefined();
+    });
+
+    expect(evalInColumn).toHaveBeenCalledWith(
+      "A",
+      WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD,
+    );
+    expect(evalInColumn).toHaveBeenCalledWith(
+      "C",
+      WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD,
+    );
+    expect(useAppStore.getState().reloadAllSignal).toBe(1);
+  });
+
+  it("バックアップ復元中は全カラム再読み込みボタンを押しても何も更新されない", async () => {
+    useAppStore.setState({ restoreInProgress: true });
+    const { result } = setupAll([col("A"), col("B")]);
+
+    await act(async () => {
+      await result.current.handleReloadAll();
+    });
+
+    expect(evalInColumn).not.toHaveBeenCalled();
+    expect(useAppStore.getState().reloadAllSignal).toBe(0);
+  });
+
+  it("カラムが1つもないとき全カラム再読み込みボタンを押しても何も起きない", async () => {
+    const { result } = setupAll([]);
+
+    await act(async () => {
+      await result.current.handleReloadAll();
+    });
+
+    expect(evalInColumn).not.toHaveBeenCalled();
+    expect(useAppStore.getState().reloadAllSignal).toBe(0);
   });
 });
