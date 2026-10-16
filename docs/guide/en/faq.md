@@ -1,9 +1,5 @@
 # FAQ and Troubleshooting
 
-## Can I use it as a TweetDeck alternative?
-
-Yes. Multi Column X is a **TweetDeck alternative** that shows multiple accounts and columns side by side, like TweetDeck (now X Pro). You can line up Home, Notifications, Search, Lists and more as columns, and set auto-refresh and muted words per column. It is a separate app from TweetDeck / X Pro, so the screens and features are not identical. See [Getting started](./) for details.
-
 ## A column is blank or the display is broken
 
 In App settings (`Ctrl+,`) → "General" → "WebView", press **"Recreate all WebViews"** to recreate all columns in turn (your settings are kept). See [App-wide settings](./settings#app-wide-settings) for details. For an individual column, you can also try **⟳ (Reload page)** in the column header.

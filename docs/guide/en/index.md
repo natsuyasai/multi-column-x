@@ -1,11 +1,11 @@
 ---
 title: Multi Column X User Guide | A TweetDeck alternative for Twitter/X with multiple columns
-description: Looking for a TweetDeck (now X Pro) alternative or replacement? Multi Column X is a TweetDeck-style Twitter/X client that shows multiple accounts and columns side by side on Windows, Linux and Android.
+description: Looking for a TweetDeck alternative or replacement? A TweetDeck-style Twitter/X client that shows multiple accounts and columns side by side.
 ---
 
 # Multi Column X User Guide
 
-Multi Column X is an app for browsing Twitter/X in a TweetDeck-style layout, built as an **alternative to TweetDeck (now X Pro)**.
+Multi Column X is an app for browsing Twitter/X in a TweetDeck-style layout. It may also work as an alternative to TweetDeck.
 It lets you display multiple accounts and multiple columns (timelines) side by side at the same time.
 It runs on Windows / Linux desktops and on Android (see [Supported Environments and Features](./environments) for the features available in each environment).
 
@@ -20,22 +20,6 @@ If this is your first time, follow these steps and you can be up and running in 
 3. **Add a column** — Click the "Add column" button on the toolbar (`Ctrl+N`), choose an account and a page type (Home, Notifications, Search, etc.), and click "Add". → [Using columns](./columns#using-columns)
 4. **Check auto-refresh and settings** — Each column refreshes automatically by default. Use the gear button in the column header to change the refresh interval and display, and the app settings (`Ctrl+,`) to change global settings. → [Column settings](./columns#per-column-settings), [App settings](./settings#app-wide-settings)
 5. **Compose a post / check the shortcuts** — Press `Ctrl+T` to open the compose window. Press the `?` key on a column to show the list of shortcuts. → [Popup features](./popup-shortcuts#popup-features), [Keyboard shortcuts](./popup-shortcuts#keyboard-shortcuts-advanced)
-
-## Looking for a TweetDeck alternative?
-
-Multi Column X is a **TweetDeck alternative / replacement** for people who want Home, Notifications, Search and Lists side by side in multiple columns, like TweetDeck (now X Pro). It offers the following so that TweetDeck users can switch easily.
-
-| What you did in TweetDeck                                   | In Multi Column X                                                                                    |
-| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Line up Home, Notifications, Search, Lists, etc. in columns | Show as many columns side by side as you like (grid layout and vertical stacking are also supported) |
-| Switch between multiple accounts                            | Register multiple accounts, each with its own login state, and pick the account per column           |
-| Columns refresh automatically                               | Set the auto-refresh interval per column                                                             |
-| Hide posts with certain words                               | Per-column muted words / allowlist and hiding reposts                                                |
-| Compose a post quickly                                      | Open the compose window with `Ctrl+T`                                                                |
-
-It runs on Windows / Linux desktops and also on Android. If you are searching for a "TweetDeck alternative" or a "TweetDeck replacement", start with the [5-step quick start](#getting-started-in-5-steps-quick-start).
-
-> Multi Column X is not an official app from X Corp. It is a separate app from TweetDeck / X Pro.
 
 ## What is Multi Column X?
 
