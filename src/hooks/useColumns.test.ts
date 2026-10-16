@@ -3,6 +3,11 @@ import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { OFFSCREEN } from "../constants/ipc";
 import {
+  recordColumnBuild,
+  resetColumnBuildRegistry,
+} from "../lib/columnBuildRegistry";
+import { columnBuildSignature } from "../lib/columnBuildSignature";
+import {
   deleteExternalColumnData,
   resolveColumnDataDirectory,
 } from "../services/externalColumn";
@@ -1550,5 +1555,247 @@ describe("useColumns desktop handleMoveColumnGroup", () => {
     expect(useAppStore.getState().columns).toBe(before);
     expect(callsOf("save_settings")).toHaveLength(0);
     expect(callsOf("resize_column_webview")).toHaveLength(0);
+  });
+});
+
+describe("useColumns desktop recreateStaleColumns", () => {
+  const mockInvoke = vi.mocked(invoke);
+
+  function attachContainer(
+    ref: { current: HTMLDivElement | null },
+    clientHeight = 900,
+  ) {
+    const div = document.createElement("div");
+    Object.defineProperty(div, "clientHeight", {
+      value: clientHeight,
+      configurable: true,
+    });
+    ref.current = div;
+  }
+
+  function makeColumn(id: string, gridCol: number): Column {
+    return {
+      id,
+      accountId: "acc-1",
+      pageType: "home",
+      homeTabName: "フォロー中",
+      width: 350,
+      order: gridCol - 1,
+      gridRow: 1,
+      gridCol,
+      heightMode: "auto",
+      settings: { ...DEFAULT_COLUMN_SETTINGS },
+    };
+  }
+
+  // 現在のストアの設定で全カラムが構築済みの状態を作る
+  function recordAllBuilt() {
+    const { columns, globalSettings } = useAppStore.getState();
+    for (const column of columns) {
+      recordColumnBuild(
+        column.id,
+        columnBuildSignature(column, globalSettings),
+      );
+    }
+  }
+
+  function callsOf(command: string): string[] {
+    return mockInvoke.mock.calls
+      .filter((c) => c[0] === command)
+      .map((c) => {
+        const arg = c[1] as {
+          columnId?: string;
+          args?: { column: Column };
+        };
+        return arg.columnId ?? arg.args?.column.id ?? "";
+      });
+  }
+
+  async function setup() {
+    const rendered = renderHook(() => useColumns());
+    attachContainer(rendered.result.current.containerRef);
+    recordAllBuilt();
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+    return rendered;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetColumnBuildRegistry();
+    mockInvoke.mockResolvedValue(undefined);
+    mockResolveColumnDataDirectory.mockImplementation(
+      async (column, accounts) =>
+        accounts.find((a) => a.id === column.accountId)?.dataDirectory,
+    );
+    useAppStore.setState({
+      accounts: [
+        {
+          id: "acc-1",
+          label: "Test",
+          dataDirectory: "/data/acc-1",
+          color: "#1d9bf0",
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+      ],
+      columns: [makeColumn("col-a", 1), makeColumn("col-b", 2)],
+      globalSettings: { ...DEFAULT_GLOBAL_SETTINGS },
+      isLoaded: true,
+      isMobile: false,
+      topBarExpanded: true,
+    });
+  });
+
+  it("設定が変わったカラムだけが再構築される", async () => {
+    const { result } = await setup();
+    act(() => {
+      useAppStore.getState().updateColumn("col-a", {
+        settings: { ...DEFAULT_COLUMN_SETTINGS, blurImageEnabled: true },
+      });
+    });
+
+    await act(async () => {
+      await result.current.recreateStaleColumns();
+    });
+
+    expect(callsOf("remove_column_webview")).toEqual(["col-a"]);
+    expect(callsOf("create_column_webview")).toEqual(["col-a"]);
+  });
+
+  it("全体設定の変更で埋め込み対象の項目が変わると全カラムが再構築される", async () => {
+    const { result } = await setup();
+    act(() => {
+      useAppStore.setState({
+        globalSettings: {
+          ...DEFAULT_GLOBAL_SETTINGS,
+          hideAdEnabled: !DEFAULT_GLOBAL_SETTINGS.hideAdEnabled,
+        },
+      });
+    });
+
+    await act(async () => {
+      await result.current.recreateStaleColumns();
+    });
+
+    expect(callsOf("remove_column_webview").sort()).toEqual(["col-a", "col-b"]);
+    expect(callsOf("create_column_webview").sort()).toEqual(["col-a", "col-b"]);
+  });
+
+  it("埋め込みに無関係な全体設定だけ変えても再構築されない", async () => {
+    const { result } = await setup();
+    act(() => {
+      useAppStore.setState({
+        globalSettings: {
+          ...DEFAULT_GLOBAL_SETTINGS,
+          theme: DEFAULT_GLOBAL_SETTINGS.theme === "dark" ? "light" : "dark",
+        },
+      });
+    });
+
+    await act(async () => {
+      await result.current.recreateStaleColumns();
+    });
+
+    expect(callsOf("remove_column_webview")).toEqual([]);
+    expect(callsOf("create_column_webview")).toEqual([]);
+  });
+
+  it("設定が古いカラムが無ければ何もしない", async () => {
+    const { result } = await setup();
+
+    await act(async () => {
+      await result.current.recreateStaleColumns();
+    });
+
+    expect(mockInvoke).not.toHaveBeenCalled();
+  });
+
+  it("古いカラムが複数ある場合は前の再構築が完了してから次を開始する", async () => {
+    const { result } = await setup();
+    act(() => {
+      useAppStore.setState({
+        globalSettings: {
+          ...DEFAULT_GLOBAL_SETTINGS,
+          hideAdEnabled: !DEFAULT_GLOBAL_SETTINGS.hideAdEnabled,
+        },
+      });
+    });
+    const events: string[] = [];
+    let releaseCreateA: () => void = () => {};
+    mockInvoke.mockImplementation(async (command, payload) => {
+      const arg = payload as { columnId?: string; args?: { column: Column } };
+      const id = arg?.columnId ?? arg?.args?.column.id;
+      if (command === "remove_column_webview") events.push(`remove:${id}`);
+      if (command === "create_column_webview") {
+        events.push(`create:${id}`);
+        if (id === "col-a") {
+          await new Promise<void>((resolve) => {
+            releaseCreateA = resolve;
+          });
+        }
+        events.push(`created:${id}`);
+      }
+      return undefined;
+    });
+
+    let done: Promise<void> = Promise.resolve();
+    await act(async () => {
+      done = result.current.recreateStaleColumns();
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    // col-a の作成が未完了の間は col-b に着手しない
+    expect(events).toEqual(["remove:col-a", "create:col-a"]);
+
+    await act(async () => {
+      releaseCreateA();
+      await done;
+    });
+    expect(events.indexOf("created:col-a")).toBeLessThan(
+      events.indexOf("remove:col-b"),
+    );
+    expect(events).toContain("created:col-b");
+  });
+
+  it("ダイアログ表示中に再構築した場合は新しい WebView を退避する", async () => {
+    const { result } = await setup();
+    act(() => {
+      useAppStore.getState().updateColumn("col-a", {
+        settings: { ...DEFAULT_COLUMN_SETTINGS, blurImageEnabled: true },
+      });
+      result.current.setDialogOpen(true);
+    });
+
+    await act(async () => {
+      await result.current.recreateStaleColumns();
+    });
+
+    const lastResizeX: Record<string, number> = {};
+    for (const c of mockInvoke.mock.calls) {
+      if (c[0] !== "resize_column_webview") continue;
+      const b = (c[1] as { bounds: { columnId: string; x: number } }).bounds;
+      lastResizeX[b.columnId] = b.x;
+    }
+    expect(lastResizeX["col-a"]).toBe(OFFSCREEN.DESKTOP_X);
+    expect(lastResizeX["col-b"]).toBe(OFFSCREEN.DESKTOP_X);
+  });
+
+  it("ダイアログが開いていないときの再構築では退避しない", async () => {
+    const { result } = await setup();
+    act(() => {
+      useAppStore.getState().updateColumn("col-a", {
+        settings: { ...DEFAULT_COLUMN_SETTINGS, blurImageEnabled: true },
+      });
+    });
+
+    await act(async () => {
+      await result.current.recreateStaleColumns();
+    });
+
+    const offscreen = mockInvoke.mock.calls.filter(
+      (c) =>
+        c[0] === "resize_column_webview" &&
+        (c[1] as { bounds: { x: number } }).bounds.x === OFFSCREEN.DESKTOP_X,
+    );
+    expect(offscreen).toEqual([]);
   });
 });

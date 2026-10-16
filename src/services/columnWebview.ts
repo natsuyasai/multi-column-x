@@ -1,6 +1,9 @@
 // src/services/columnWebview.ts
 // カラム WebView に対する Tauri IPC 呼び出しを集約するサービス層
 import { invoke } from "@tauri-apps/api/core";
+import { clearColumnBuild, recordColumnBuild } from "@/lib/columnBuildRegistry";
+import { columnBuildSignature } from "@/lib/columnBuildSignature";
+import { useAppStore } from "@/store/useAppStore";
 import {
   IPC_COMMANDS,
   WEBVIEW_LABELS,
@@ -8,17 +11,26 @@ import {
 } from "../constants/ipc";
 import type { ColumnBounds } from "../lib/gridLayout";
 import { logError } from "../lib/log";
-import type { Column, ColumnSettings, GlobalSettings } from "../types";
+import type { Column, GlobalSettings } from "../types";
 
-/** カラム WebView を作成する */
+/**
+ * カラム WebView を作成する。
+ * 全体設定は Rust が永続化済みの settings.json から読むため、作成前に保存完了を待つ。
+ * 作成に成功したら、埋め込んだ設定の署名を記録する（失敗時は記録しない）。
+ */
 export async function createColumnWebview(
   column: Column,
   dataDirectory: string,
   bounds: ColumnBounds,
 ): Promise<void> {
+  await useAppStore.getState().flushPendingSaves();
   await invoke(IPC_COMMANDS.CREATE_COLUMN_WEBVIEW, {
     args: { column, dataDirectory, ...bounds },
   });
+  recordColumnBuild(
+    column.id,
+    columnBuildSignature(column, useAppStore.getState().globalSettings),
+  );
 }
 
 /** カラム WebView の位置・サイズを更新する */
@@ -34,6 +46,7 @@ export async function resizeColumnWebview(
 /** カラム WebView を削除する */
 export async function removeColumnWebview(columnId: string): Promise<void> {
   await invoke(IPC_COMMANDS.REMOVE_COLUMN_WEBVIEW, { columnId });
+  clearColumnBuild(columnId);
 }
 
 /** アクティブカラムのアカウントに Cookie を切り替える（Android のみ実体動作） */
@@ -80,47 +93,6 @@ export async function evalInColumn(
     label: WEBVIEW_LABELS.column(columnId),
     script,
   }).catch(logError("evalInColumn"));
-}
-
-/** カラム設定変更時に必要な inject スクリプト一式を適用してリロードする */
-export async function applyColumnSettingsScripts(
-  columnId: string,
-  settings: ColumnSettings,
-  globalNgWords: string[],
-  globalRepostHiddenUserIds: string[],
-): Promise<void> {
-  await evalInColumn(
-    columnId,
-    WEBVIEW_SCRIPTS.applyAreaVisibility(
-      settings.hideHeaderEnabled,
-      settings.hideTweetInputEnabled,
-    ),
-  );
-  await evalInColumn(
-    columnId,
-    WEBVIEW_SCRIPTS.applyCustomCSS(settings.customCSS),
-  );
-  await evalInColumn(
-    columnId,
-    WEBVIEW_SCRIPTS.applyNgWords(
-      settings.ngWords,
-      globalNgWords,
-      settings.repostHiddenUserIds ?? [],
-      globalRepostHiddenUserIds,
-    ),
-  );
-  await evalInColumn(
-    columnId,
-    WEBVIEW_SCRIPTS.applyWhitelist(
-      settings.whitelistEnabled,
-      settings.whitelistWords,
-    ),
-  );
-  await evalInColumn(
-    columnId,
-    WEBVIEW_SCRIPTS.applyReturnToLastRead(settings.returnToLastReadEnabled),
-  );
-  await evalInColumn(columnId, WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD);
 }
 
 /**

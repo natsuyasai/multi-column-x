@@ -32,3 +32,12 @@
 - `order` フィールドは `gridRow` で代替可能になった後も、後方互換のためあえて残す設計判断をしている。
 - 新規カラムはグリッドの空きセルを探すのではなく、常に「既存カラムの最大 `gridCol` + 1」（同一行に横積み）へ配置される。行方向への自動積み増しは行わない。
 - ヘッダーをスクロールコンテナ内蔵の `headerRow` から、各カラム個別の `position: absolute` 要素に変更した経緯があり、`recalculateAllBounds` 実行時にヘッダーの DOM 位置も同時に更新しないとスクロール追従が壊れる。ヘッダー関連のレイアウト変更をする際は、この2つの更新が必ずセットであることに注意する。
+
+## 設定の埋め込みとカラム WebView の再構築
+
+- 画像ぼかし・小さい画像・カスタム CSS・広告非表示などの設定値は、カラム WebView の作成時に `initialization_script` へ埋め込まれる（`src-tauri/src/commands/webview/column.rs` の `build_column_init_script`）。個別設定は `create_column_webview` に渡す `column.settings`、全体設定は永続化済みの `settings.json` から Rust が読む。そのため、`eval` で上書きしても `location.reload` しても、埋め込み済みの値は WebView を作り直すまで変わらない（Issue #253）。
+- **古さの判定は「構築時の署名」で行う。** `createColumnWebview`（`src/services/columnWebview.ts`）が成功したとき、埋め込まれる項目だけから作る署名（`src/lib/columnBuildSignature.ts`）を `src/lib/columnBuildRegistry.ts` に記録し、`isColumnBuildStale` が現在の設定との差で判定する。永続化はしない（アプリ再起動で全カラムが作り直されるため）。署名に含める項目は `build_column_init_script` に渡す項目と対応させること。位置・幅・自動更新間隔・テーマなど埋め込まれない項目を含めると、無駄な再構築が起きる。
+- 再構築の入口: カラム個別設定の「適用」は当該カラムを必ず再構築、全体設定の「適用」と「全カラムに適用」は `recreateStaleColumns`（古いカラムだけを直列に再構築）、手動の再読み込み（ヘッダー↺・r キー・先頭スクロール・モバイルのスワイプ領域ダブルタップ・モバイルの再読み込み）は古い場合だけ再構築し、そうでなければ従来の軽量リロード（`src/services/columnReload.ts`）。再構築後の URL・スクロールは設定上の初期状態に戻る。
+- **`createColumnWebview` は作成前に `flushPendingSaves()` を待つ。** 全体設定は Rust が `settings.json` から読むため、`updateGlobalSettings` 直後に作ると保存前の古い値が埋め込まれる。この待ちは service 側に置いて全呼び出し元に効かせている。
+- ダイアログ表示中に `recreateColumnWebview` が走ると新 WebView が通常座標で前面に残るため、末尾で `dialogOpenRef` を見て `hideColumnWebviews()` する。
+- 不採用案: 各更新経路で dirty フラグを立てる方式。`onApplyColumnDefaults` のように `replaceColumns` で直接設定を書き換える経路が既にあり、経路が増えるたびに漏れるため、署名比較に一本化した。
