@@ -1,6 +1,11 @@
+---
+title: Multi Column X User Guide | A TweetDeck alternative for Twitter/X with multiple columns
+description: Looking for a TweetDeck alternative or replacement? A TweetDeck-style Twitter/X client that shows multiple accounts and columns side by side.
+---
+
 # Multi Column X User Guide
 
-Multi Column X is an app for browsing Twitter/X in a TweetDeck-style layout.
+Multi Column X is an app for browsing Twitter/X in a TweetDeck-style layout. It may also work as an alternative to TweetDeck.
 It lets you display multiple accounts and multiple columns (timelines) side by side at the same time.
 It runs on Windows / Linux desktops and on Android (see [Supported Environments and Features](./environments) for the features available in each environment).
 
