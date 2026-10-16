@@ -4,6 +4,7 @@ import LinkIcon from "../../assets/icons/link.svg?react";
 import PencilIcon from "../../assets/icons/pencil.svg?react";
 import PersonIcon from "../../assets/icons/person.svg?react";
 import PlusIcon from "../../assets/icons/plus.svg?react";
+import RefreshIcon from "../../assets/icons/refresh.svg?react";
 import SettingsIcon from "../../assets/icons/settings.svg?react";
 import type { Account, ApiRateLimitBucket, Column } from "../../types";
 import { ApiRateLimitIndicator } from "../ApiRateLimitIndicator/ApiRateLimitIndicator";
@@ -52,6 +53,7 @@ interface TopBarProps {
   onAddColumn: () => void;
   onAccountManager: () => void;
   onAppSettings: () => void;
+  onReloadAll: () => void;
   onComposeTweet: () => void;
   onOpenLinkPopup: () => void;
   onJumpToColumn: (columnId: string) => void;
@@ -70,6 +72,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onAddColumn,
   onAccountManager,
   onAppSettings,
+  onReloadAll,
   onComposeTweet,
   onOpenLinkPopup,
   onJumpToColumn,
@@ -128,6 +131,15 @@ export const TopBar: React.FC<TopBarProps> = ({
             Icon={SettingsIcon}
             iconTestId="icon-settings"
             label={t("topbar:settings.label")}
+          />
+          <ToolbarButton
+            baseClassName={styles.btn}
+            expanded={expanded}
+            onClick={onReloadAll}
+            title={t("topbar:reloadAll.title")}
+            Icon={RefreshIcon}
+            iconTestId="icon-refresh"
+            label={t("topbar:reloadAll.label")}
           />
           {apiRateLimitMonitorEnabled && (
             <ApiRateLimitIndicator

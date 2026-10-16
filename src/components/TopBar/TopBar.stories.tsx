@@ -112,6 +112,7 @@ const meta: Meta<typeof TopBar> = {
     onAddColumn: fn(),
     onAccountManager: fn(),
     onAppSettings: fn(),
+    onReloadAll: fn(),
     onComposeTweet: fn(),
     onOpenLinkPopup: fn(),
     onJumpToColumn: fn(),
@@ -133,6 +134,9 @@ export const Default: Story = {
     // ツイート作成ボタンを押すと onComposeTweet が呼ばれる
     await userEvent.click(canvas.getByTitle("ツイートを作成 (Ctrl+T)"));
     await expect(args.onComposeTweet).toHaveBeenCalled();
+    // 全カラム再読み込みボタンが表示され、押すと onReloadAll が呼ばれる
+    await userEvent.click(canvas.getByTitle("全カラムを再読み込み"));
+    await expect(args.onReloadAll).toHaveBeenCalledTimes(1);
     // 展開トグルを押すと onToggleExpand が呼ばれる
     await userEvent.click(canvas.getByTitle("ツールバーを展開 (Ctrl+B)"));
     await expect(args.onToggleExpand).toHaveBeenCalled();
