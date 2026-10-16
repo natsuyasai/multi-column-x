@@ -23,7 +23,7 @@ Android でアプリ起動直後〜ページ読み込み中に kill すると、
 - `setup` 冒頭で `recover_settings_file` → `SettingsRecoveryState` を manage → `StoreBuilder::...disable_auto_save().build()` の順に実行する。**順序が重要**: ストア生成前に直さないと、壊れたファイルをプラグインが握りつぶして読む。自動保存を無効にしないとアトミック化をすり抜ける。
 - 保存は `write_settings_atomically`: 現在の main が正常な JSON オブジェクトなら `settings.json.prev` へコピー（直前世代）→ `settings.json.tmp` へ書き込み → `sync_all` → `rename`。
 - `save_settings` と desktop の `save_window_bounds` が並行しても一時ファイルが衝突しないよう、`save_store_atomically` が `SAVE_LOCK` を取る。`Store::save` を直接呼ぶ箇所を作らないこと。
-- 復旧結果は `load_settings` が1回だけ `take()` する。`Unrecoverable` のときだけ既定値＋`loadFailed: true`＋`backupPath` を返し、フロントの既存通知（`SETTINGS_LOAD_FAILED_*`）を流用する。退避ファイル名は既存の `backup_file_name` を再利用する。
+- 復旧結果は `load_settings` が1回だけ `take()` する。`Unrecoverable` のときだけ既定値＋`loadFailed: true`＋`backupPath` を返し、フロントの既存通知（`useAppStore` の `settingsLoadNotice`。文言は `messages:settings.loadFailed.*`）を流用する。退避ファイル名は既存の `backup_file_name` を再利用する。
 
 ### 復旧ロジック
 

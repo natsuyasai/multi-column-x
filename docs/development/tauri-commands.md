@@ -49,3 +49,5 @@
 | `open_extension_page`                | 拡張機能のポップアップ / オプションを指定アカウントのデータで別ウィンドウに開く（`extension-` ラベル。capability の `windows` には含めない。Windows のみ・呼び出し元 main 限定）                                                                                                   |
 
 **新しいコマンドを `lib.rs` の `generate_handler!` に追加したら、`src-tauri/build.rs` の `AppManifest::commands` と、呼び出し元に応じた `src-tauri/capabilities/*.json` の許可（`allow-<コマンド名のケバブケース>`）を必ず同時に更新すること。** アプリ独自コマンドは ACL（capability）の対象であり、どの capability にも許可されていないコマンドは main を含む全 WebView から "not allowed by ACL" として拒否される（`src-tauri/src/acl_contract.rs` の契約テストが漏れを検知する）。
+
+**呼び出し元の制限**: 上表で明記していないコマンドも、設定・カラム WebView・アカウント・`eval_in_webview`・`open_compose_window`・`update_mobile_swipe_bar` / `flash_mobile_swipe_bar` などは `require_main_caller` で main 限定。一方、`report_*` 系・`get_mobile_insets`・`is_webview_profile_supported`・ポップアップ系は inject 等から呼ばれるため main 限定ではない（`close_popup_window` は main かポップアップ自身、`switch_popup_session` はポップアップ / コンポーズ WebView からのみ、`download_and_enable_h264` は `validate_window_label` で main のみ）。

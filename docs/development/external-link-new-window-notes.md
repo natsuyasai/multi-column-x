@@ -19,7 +19,7 @@
 IPC・capability に頼らず、**Rust 側の `on_new_window`（Tauri 2.11 の `WebviewBuilder` / `WebviewWindowBuilder`）で新規ウィンドウ要求を処理する**。
 
 - デスクトップでは opener の自動クリックスクリプトを無効化する（`src-tauri/src/lib.rs` の `opener_js_links_on_click()`、mobile のみ有効）。
-- `src-tauri/src/commands/webview/external_link.rs` の `new_window_handler` を、カラム / ポップアップ / コンポーズの**全 WebView builder** に付ける。
+- `src-tauri/src/commands/webview/external_link.rs` の `new_window_handler` を、カラム / ポップアップ / コンポーズ / 拡張機能ページ（`commands/extensions/mod.rs`）の**全 WebView builder** に付ける。
   - URL スキームが http / https / mailto / tel のときだけ Rust から外部ブラウザで開く（`OpenerExt::open_url`）。
   - 応答は常に `NewWindowResponse::Deny`（アプリ内に空ウィンドウを作らない）。
   - `javascript:` / `file:` / `data:` / `ms-msdt:` / `about:blank` 等は何も開かず Deny。
@@ -30,7 +30,7 @@ IPC・capability に頼らず、**Rust 側の `on_new_window`（Tauri 2.11 の `
 
 - **新しい WebView builder を追加したら必ず `.on_new_window(external_link::new_window_handler(app.clone()))` を付ける。**
   `commands/webview/mod.rs` の契約テスト（`全てのwebview生成箇所に新規ウィンドウハンドラが付いている`）が
-  `column.rs` / `popup.rs` / `compose.rs` の builder 数とハンドラ数の一致を検査する。別ファイルに builder を足す場合はこのテストの対象にも加えること。
+  `column.rs` / `popup.rs` / `compose.rs` の builder 数とハンドラ数の一致を検査する。別ファイルに builder を足す場合はこのテストの対象にも加えること（拡張機能ページは `commands/extensions/mod.rs` に専用の同種テストがある）。
 - `commands/account.rs` のアカウント追加・再認証ウィンドウの builder は意図的に**対象外**（OAuth 系のポップアップログインが必要になり得るため、従来動作を維持）。
 - `window.open()` / `target=_blank` は全て Deny になる。従来の「WebView2 の新規ウィンドウをアプリ内で開く」挙動は無くなった。
 - Windows では、`NewWindowResponse<Wry>` など**ランタイム型を実体化するテストはテストバイナリが起動しない**（`STATUS_ENTRYPOINT_NOT_FOUND`）。

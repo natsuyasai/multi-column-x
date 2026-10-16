@@ -80,5 +80,16 @@ export function useAutoReload({
     startTimer();
   }, [enabled, intervalSec, startTimer]);
 
+  // 全カラム再読み込み時にカウントダウンを振り直す（初回マウントでは何もしない）
+  const reloadAllSignal = useAppStore((s) => s.reloadAllSignal);
+  const prevSignalRef = useRef(reloadAllSignal);
+  const resetRef = useRef(reset);
+  resetRef.current = reset;
+  useEffect(() => {
+    if (prevSignalRef.current === reloadAllSignal) return;
+    prevSignalRef.current = reloadAllSignal;
+    resetRef.current();
+  }, [reloadAllSignal]);
+
   return { remaining, reset };
 }

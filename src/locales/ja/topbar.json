@@ -19,6 +19,10 @@
     "title": "アプリ設定 (Ctrl+,)",
     "label": "設定"
   },
+  "reloadAll": {
+    "title": "全カラムを再読み込み",
+    "label": "全更新"
+  },
   "collapse": "ツールバーを折りたたむ (Ctrl+B)",
   "expand": "ツールバーを展開 (Ctrl+B)",
   "closeColumn": "カラムを閉じる"

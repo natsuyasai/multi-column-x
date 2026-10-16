@@ -5,9 +5,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { IPC_EVENTS, STORAGE_KEYS, WEBVIEW_SCRIPTS } from "../constants/ipc";
 import { mobileColumnLayout, type ColumnBounds } from "../lib/gridLayout";
 import { logError } from "../lib/log";
+import { reloadColumnOrRecreate } from "../services/columnReload";
 import {
   createColumnWebview,
-  evalInColumn,
   flashMobileSwipeBar,
   resizeColumnWebview,
   setColumnCookies,
@@ -45,7 +45,13 @@ export function mobileLayoutForViewport(
   });
 }
 
-export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
+export function useMobileColumns(
+  dialogOpenRef: React.RefObject<boolean>,
+  // カラム WebView の再構築関数への参照。useColumns 内で後から定義されるため ref で受け取る。
+  recreateColumnWebviewRef?: React.RefObject<
+    ((columnId: string) => Promise<void>) | null
+  >,
+) {
   const isMobile = useAppStore((s) => s.isMobile);
   const [activeColumnId, setActiveColumnIdState] = useState<string | null>(
     null,
@@ -206,11 +212,15 @@ export function useMobileColumns(dialogOpenRef: React.RefObject<boolean>) {
   }, []);
 
   // スワイプ領域のダブルタップ時: タブのダブルタップ（App.tsx の handleDoubleTapColumn）と同じ動作。
-  // アクティブカラムを先頭スクロール+リロードする。
+  // アクティブカラムを先頭スクロール+リロードする（埋め込み設定が変わっていれば再構築する）。
   const handleSwipeAreaDoubleTap = useCallback(() => {
     if (!activeColumnId) return;
-    evalInColumn(activeColumnId, WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD);
-  }, [activeColumnId]);
+    void reloadColumnOrRecreate(
+      activeColumnId,
+      WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD,
+      recreateColumnWebviewRef?.current ?? undefined,
+    );
+  }, [activeColumnId, recreateColumnWebviewRef]);
 
   // ネイティブオーバーレイ（Android スワイプバー）からのジェスチャー通知を受信する。
   // desktop では Rust 側がこれらのイベントを emit しないため、isMobile のときのみ購読する。

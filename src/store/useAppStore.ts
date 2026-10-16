@@ -48,6 +48,9 @@ interface AppStore {
   /** バックアップ復元の実行中。true の間は自動保存を発行しない */
   restoreInProgress: boolean;
   beginRestore: () => void;
+  /** 全カラム再読み込みの通知用カウンタ（永続化しない一時状態） */
+  reloadAllSignal: number;
+  bumpReloadAllSignal: () => void;
   finishRestore: () => void;
   /** 復元結果をメモリへ反映する（保存は発行しない。ディスクは apply_restore が更新済み）。accounts は置き換えない */
   applyRestoredSettings: (settings: AppSettings) => void;
@@ -102,6 +105,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
   settingsSaveBlocked: false,
   restoreInProgress: false,
   beginRestore: () => set({ restoreInProgress: true }),
+  reloadAllSignal: 0,
+  bumpReloadAllSignal: () =>
+    set((s) => ({ reloadAllSignal: s.reloadAllSignal + 1 })),
   finishRestore: () => set({ restoreInProgress: false }),
   applyRestoredSettings: (settings) =>
     set({

@@ -22,20 +22,35 @@ notes=()
 case "$norm" in
   *"src-tauri/src/inject/_src/"*)                 notes=("$D/inject-ipc-shortcuts-notes.md") ;;
   *"/src/App.tsx")                                notes=("$D/column-layout-notes.md") ;;
-  *"/src/lib/gridLayout.ts")                      notes=("$D/column-layout-notes.md") ;;
+  *"/src/lib/gridLayout.ts")                      notes=("$D/column-layout-notes.md" "$D/ui-scale-notes.md") ;;
+  *"/src/styles/_dialog-fullscreen.scss" | \
+  *"/src/lib/uiScale.ts" | \
+  *"/src/hooks/useUiScale.ts")                    notes=("$D/ui-scale-notes.md") ;;
   *"/src/services/columnWebview.ts")              notes=("$D/column-layout-notes.md") ;;
-  *"/src-tauri/src/commands/webview/column.rs")   notes=("$D/linux-column-spec.md" "$D/linux-webview-notes.md") ;;
+  *"/src-tauri/src/commands/webview/column.rs")   notes=("$D/linux-column-spec.md" "$D/linux-webview-notes.md" "$D/external-link-new-window-notes.md" "$D/browser-extensions-notes.md") ;;
   *"/src/lib/rafThrottle.ts")                     notes=("$D/linux-webview-notes.md") ;;
-  *"/src-tauri/src/commands/webview/external_link.rs" | \
+  *"/src-tauri/src/commands/webview/external_link.rs") notes=("$D/external-link-new-window-notes.md") ;;
   *"/src-tauri/src/commands/webview/popup.rs" | \
-  *"/src-tauri/src/commands/webview/compose.rs")  notes=("$D/external-link-new-window-notes.md") ;;
+  *"/src-tauri/src/commands/webview/compose.rs")  notes=("$D/external-link-new-window-notes.md" "$D/browser-extensions-notes.md") ;;
   *"/src-tauri/src/lib.rs")                       notes=("$D/compose-popup-topbar-notes.md" "$D/settings-file-crash-safety-notes.md" "$D/external-link-new-window-notes.md") ;;
   *"/src-tauri/src/commands/settings_file.rs" | \
   *"/src-tauri/src/commands/settings.rs" | \
   *"/src/store/useAppStore.ts")                   notes=("$D/settings-file-crash-safety-notes.md") ;;
   *"/src/components/TopBar/"*)                    notes=("$D/topbar-column-reorder-notes.md" "$D/compose-popup-topbar-notes.md") ;;
-  *"/src-tauri/gen/android/app/proguard-rules.pro" | \
-  *"/MainActivity.kt")                            notes=("$D/android-notes.md") ;;
+  *"/src-tauri/gen/android/app/proguard-rules.pro") notes=("$D/android-notes.md") ;;
+  *"/MainActivity.kt")                            notes=("$D/android-notes.md" "$D/backup-restore-notes.md") ;;
+  *"/src-tauri/src/commands/backup/"* | \
+  *"/src/lib/backupRestore.ts" | \
+  *"/src/services/backup.ts" | \
+  *"/src/hooks/useBackupFlow.ts" | \
+  *"/src/components/AppSettingsPanel/BackupTab.tsx") notes=("$D/backup-restore-notes.md") ;;
+  *"/src-tauri/src/commands/extensions/"* | \
+  *"/src/components/AppSettingsPanel/ExtensionsTab.tsx" | \
+  *"/src/lib/extensionsSupport.ts")               notes=("$D/browser-extensions-notes.md") ;;
+  *"/src/locales/"* | \
+  *"/src/i18n/"* | \
+  *"/src-tauri/src/commands/ui_language.rs" | \
+  *"/src-tauri/src/commands/app_error.rs")        notes=("$D/i18n-notes.md") ;;
   *"/src/constants/apiRateLimitLabels.ts" | \
   *"/src/components/ApiRateLimitIndicator/"* | \
   *"/src/lib/apiRateLimit.ts")                    notes=("$D/api-rate-limit-operations-notes.md") ;;

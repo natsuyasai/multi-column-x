@@ -1,6 +1,11 @@
+---
+title: Multi Column X 利用ガイド｜TweetDeck の代替・代わりとして使える Twitter/X クライアント
+description: TweetDeck の代替・代わりを探している方へ。複数アカウント・複数カラムを横並びで表示できる TweetDeck スタイルの Twitter/X クライアントです。
+---
+
 # Multi Column X 利用ガイド
 
-Multi Column X（マルチカラム X）は、TweetDeck スタイルで Twitter/X を閲覧できるアプリです。
+Multi Column X（マルチカラム X）は、TweetDeck スタイルで Twitter/X を閲覧できるアプリです。TweetDeck の代わりとしても使えるかもしれません。
 複数のアカウントと複数のカラム（タイムライン）を同時に並べて表示できます。
 Windows / Linux のデスクトップと Android に対応しています（環境ごとの機能は [対応環境と機能一覧](./environments) を参照）。
 

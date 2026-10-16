@@ -8,12 +8,9 @@ import {
   normalizeLanguageSetting,
   resolveLanguage,
 } from "@/lib/language";
+import { logError } from "@/lib/log";
 import { resolveTheme } from "@/lib/theme";
-import {
-  applyColumnSettingsScripts,
-  buildGlobalNgScripts,
-  evalInColumn,
-} from "@/services/columnWebview";
+import { buildGlobalNgScripts, evalInColumn } from "@/services/columnWebview";
 import { useAppStore } from "@/store/useAppStore";
 import type { ColumnSettings, GlobalSettings } from "@/types";
 
@@ -24,6 +21,8 @@ interface UseSettingsApplyHandlersArgs {
   ) => void;
   setSettingsColumnId: (id: string | null) => void;
   updateGlobalSettings: (patch: Partial<GlobalSettings>) => void;
+  recreateColumnWebview: (columnId: string) => Promise<void>;
+  recreateStaleColumns: () => Promise<void>;
 }
 
 interface UseSettingsApplyHandlersResult {
@@ -33,13 +32,15 @@ interface UseSettingsApplyHandlersResult {
     width: number,
     label: string | undefined,
   ) => Promise<void>;
-  handleApplyGlobalSettings: (patch: Partial<GlobalSettings>) => void;
+  handleApplyGlobalSettings: (patch: Partial<GlobalSettings>) => Promise<void>;
 }
 
 export function useSettingsApplyHandlers({
   handleUpdateColumn,
   setSettingsColumnId,
   updateGlobalSettings,
+  recreateColumnWebview,
+  recreateStaleColumns,
 }: UseSettingsApplyHandlersArgs): UseSettingsApplyHandlersResult {
   const handleApplySettings = useCallback(
     async (
@@ -50,20 +51,14 @@ export function useSettingsApplyHandlers({
     ) => {
       handleUpdateColumn(columnId, { settings, width, label });
       setSettingsColumnId(null);
-      // クロージャの古い値を避けるため、最新の globalSettings をここで読み直す
-      const { globalSettings: currentGlobal } = useAppStore.getState();
-      await applyColumnSettingsScripts(
-        columnId,
-        settings,
-        currentGlobal.ngWords ?? [],
-        currentGlobal.repostHiddenUserIds ?? [],
-      );
+      // 埋め込み設定（ぼかし等）は WebView 作成時にしか反映されないため、当該カラムだけ再構築する
+      await recreateColumnWebview(columnId);
     },
-    [handleUpdateColumn, setSettingsColumnId],
+    [handleUpdateColumn, setSettingsColumnId, recreateColumnWebview],
   );
 
   const handleApplyGlobalSettings = useCallback(
-    (patch: Partial<GlobalSettings>) => {
+    async (patch: Partial<GlobalSettings>) => {
       updateGlobalSettings(patch);
       // クロージャの古い値を避けるため、最新の columns/globalSettings をここで読み直す
       const { columns: ngColumns, globalSettings: currentGlobal } =
@@ -93,8 +88,10 @@ export function useSettingsApplyHandlers({
           evalInColumn(col.id, WEBVIEW_SCRIPTS.setInjectLanguage(lang));
         });
       }
+      // 埋め込み値が古くなったカラムだけ再構築する（無関係な項目なら対象は0件）
+      await recreateStaleColumns().catch(logError("handleApplyGlobalSettings"));
     },
-    [updateGlobalSettings],
+    [updateGlobalSettings, recreateStaleColumns],
   );
 
   return { handleApplySettings, handleApplyGlobalSettings };

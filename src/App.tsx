@@ -54,6 +54,7 @@ import {
 import { useWhatsNew } from "./hooks/useWhatsNew";
 import { resolveExtensionPageAccountId } from "./lib/extensionsSupport";
 import { getHeaderHeight, getTopBarHeight } from "./lib/gridLayout";
+import { reloadColumnOrRecreate } from "./services/columnReload";
 import { evalInColumn } from "./services/columnWebview";
 import { useAppStore } from "./store/useAppStore";
 
@@ -98,6 +99,7 @@ const App: React.FC = () => {
     setDialogOpen,
     recreateAllWebviews,
     recreateColumnWebview,
+    recreateStaleColumns,
     loadPresetAndRecreateWebviews,
     replaceColumnsAndRecreateWebviews,
   } = useColumns();
@@ -298,12 +300,14 @@ const App: React.FC = () => {
     handleJumpToColumnByIndex,
     handleReload,
     handleReloadFocusedColumn,
+    handleReloadAll,
     handleDoubleTapColumn,
   } = useColumnNavigation({
     columns,
     columnBounds,
     scrollbarRef,
     dialogOpen,
+    recreateColumnWebview,
   });
 
   const handleOpenAddColumnDialog = useCallback(() => {
@@ -326,9 +330,15 @@ const App: React.FC = () => {
     async (columnId: string) => {
       // デスクトップ（特に Linux）では WebProcess クラッシュで location.reload が
       // 効かない白画面に陥るため、WebView 自体を作り直して復旧する。
-      // モバイル（Android ネイティブ WebView）は従来どおりページ再読み込みで十分。
+      // モバイル（Android ネイティブ WebView）はページ再読み込みで十分だが、
+      // location.reload は構築時の init script を再実行するため、埋め込み設定が
+      // 変わっている（stale）場合だけ WebView を再構築する。
       if (useAppStore.getState().isMobile) {
-        await evalInColumn(columnId, WEBVIEW_SCRIPTS.RELOAD_PAGE);
+        await reloadColumnOrRecreate(
+          columnId,
+          WEBVIEW_SCRIPTS.RELOAD_PAGE,
+          recreateColumnWebview,
+        );
       } else {
         await recreateColumnWebview(columnId);
       }
@@ -375,6 +385,8 @@ const App: React.FC = () => {
       handleUpdateColumn,
       setSettingsColumnId,
       updateGlobalSettings,
+      recreateColumnWebview,
+      recreateStaleColumns,
     });
 
   const linkPopupDefaultAccountId =
@@ -434,6 +446,7 @@ const App: React.FC = () => {
           onAddColumn={() => setShowAddColumn(true)}
           onAccountManager={() => setShowAccountManager(true)}
           onAppSettings={() => setShowAppSettings(true)}
+          onReloadAll={handleReloadAll}
           onComposeTweet={handleComposeTweet}
           onOpenLinkPopup={handleOpenLinkPopup}
           onJumpToColumn={handleJumpToColumn}
@@ -630,6 +643,7 @@ const App: React.FC = () => {
                 settings: { ...col.settings, ...patch },
               })),
             );
+            void recreateStaleColumns();
           }}
           onReloadAllWebviews={recreateAllWebviews}
           onLoadPreset={loadPresetAndRecreateWebviews}

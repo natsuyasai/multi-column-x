@@ -8,7 +8,7 @@ Tauri v2 の `window.add_child()` で作成した子 WebView は OS ネイティ
 
 ## 外部 WebView への IPC 注入（remote capability）
 
-x.com などの外部 URL を表示するカラム / ポップアップ WebView には、`src-tauri/capabilities/column-webview.json` の `remote` 設定によって IPC（`window.__TAURI__`）が注入される。inject スクリプト（新着数報告・横スクロール中継・メディアポップアップ等）はこの IPC を通じて Tauri コマンドを invoke する。リモートページにアプリのコマンドを開放する設定であるため、`remote.urls` の対象ドメインは必要最小限に保つこと。
+x.com などの外部 URL を表示するカラム / ポップアップ WebView には、`src-tauri/capabilities/column-webview.json` の `remote` 設定によって IPC（`window.__TAURI__`）が注入される。inject スクリプト（新着数報告・横スクロール中継・メディアポップアップ等）はこの IPC を通じて Tauri コマンドを invoke する。リモートページにアプリのコマンドを開放する設定であるため、対象ドメインは必要最小限に保つこと（次節）。
 
 なお、ログイン完了の検出だけは IPC ではなく、デスクトップでは Rust 側の tokio タスクが URL を 500ms ごとにポーリングして行う（ログイン画面の遷移を JS 注入に依存させないため）。
 
@@ -18,7 +18,7 @@ x.com などの外部 URL を表示するカラム / ポップアップ WebView 
 
 - **対象ドメイン**: `https://x.com/*` / `https://*.x.com/*` / `https://twitter.com/*` / `https://*.twitter.com/*` のみ。`http://*` は許可しない。
 - **縮退挙動**: 上記以外のドメイン（リンクポップアップで開いた外部サイト等）では IPC が注入されないため、ページ表示自体は正常に行われるが、ツールバーの invoke 系機能（新着バッジ通知・画像ポップアップ等）は無効化される。inject スクリプトは `if (invoke)` 等のガードで未注入時も例外を出さない設計。
-- **多層防御**: ドメイン限定に加え、破壊的コマンド（`delete_account_data` / `eval_in_webview` / `close_window` / `save_settings`）は呼び出し元ウィンドウが `main` であることを要求する（`commands::require_main_caller`）。x.com 自体がリモートコンテンツであるため、ドメイン限定だけに依存せず両輪で防御する。
+- **多層防御**: ドメイン限定に加え、破壊的コマンドをはじめ多くのコマンド（`delete_account_data` / `eval_in_webview` / `close_window` / `save_settings` など。一覧は `tauri-commands.md`）は呼び出し元ウィンドウが `main` であることを要求する（`commands::require_main_caller`）。x.com 自体がリモートコンテンツであるため、ドメイン限定だけに依存せず両輪で防御する。
 
 ## アップデート方式のセキュリティ
 
@@ -28,7 +28,7 @@ x.com などの外部 URL を表示するカラム / ポップアップ WebView 
 - **Android（APK 自己更新）**: `install_apk_update` コマンドを 3 層で検証する。
   1. **呼び出し元制限**: 純関数 `validate_install_request`（`commands/update.rs`）が呼び出し元ウィンドウを `main` に限定する。x.com を表示するカラム/ポップアップ WebView（remote capability で IPC が注入される）からの invoke を拒否する。
   2. **URL 許可リスト**: ダウンロード URL は自リポジトリの GitHub Releases（`https://github.com/natsuyasai/multi-column-x/releases/download/` プレフィックス）配下の `.apk` のみ許可。`..` / `\` / `?` / `#` / `@` / 空白などパストラバーサル・リダイレクト誘導・userinfo トリックに使われる文字を拒否する。
-  3. **SHA-256 検証（fail-closed）**: 期待ハッシュは GitHub Releases API（`/releases/latest`）の APK アセットの `digest` フィールド（`sha256:<hex>`）から取得する（`githubRelease.ts` の `parseDigestSha256`）。API は CORS ヘッダ（`Access-Control-Allow-Origin: *`）を返すため WebView から読める。TS 側（`updater.ts` / `githubRelease.ts`）がこの期待ハッシュを `install_apk_update` に渡し、Kotlin の `ApkHashVerifier` がダウンロード後に照合してから OS インストーラを起動する。`digest` が取得できない・不正な場合はインストールを中止する。
+  3. **SHA-256 検証（fail-closed）**: 期待ハッシュは GitHub Releases API（`/releases/latest`）の APK アセットの `digest` フィールド（`sha256:<hex>`）から取得する（`src/lib/githubRelease.ts` の `parseDigestSha256`）。API は CORS ヘッダ（`Access-Control-Allow-Origin: *`）を返すため WebView から読める。TS 側（`src/services/updater.ts` / `src/lib/githubRelease.ts`）がこの期待ハッシュを `install_apk_update` に渡し、Kotlin の `ApkHashVerifier` がダウンロード後に照合してから OS インストーラを起動する。`digest` が取得できない・不正な場合はインストールを中止する。
      - **なぜ API digest か**: リリースの `.apk` ダウンロード URL（`release-assets.githubusercontent.com`）は CORS ヘッダを返さないため、WebView の `fetch()` で直接ハッシュ（サイドカー等）を取得すると reject されて更新が中断する。CORS の効く API レスポンスに含まれる `digest` を使うことでこれを回避する。`release.yml` が併載する `.apk.sha256` はアプリでは使わず、`sha256sum -c` 等の手動検証用アーティファクトとして残している。
 - **CI/配信**: `release.yml` / `ci.yml` の GitHub Actions はすべてコミット SHA にピン留めし（タグ差し替え攻撃対策。特に署名鍵が渡る `tauri-action`）、署名鍵・keystore を扱う `desktop` / `android` ジョブは `environment: release` 下に置く（承認ゲート・Secrets 保護）。
 
