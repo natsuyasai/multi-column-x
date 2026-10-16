@@ -9,7 +9,6 @@ import { WEBVIEW_SCRIPTS } from "../constants/ipc";
 import { DEFAULT_COLUMN_SETTINGS, DEFAULT_GLOBAL_SETTINGS } from "../types";
 import type { Column } from "../types";
 import {
-  applyColumnSettingsScripts,
   buildGlobalNgScripts,
   createColumnWebview,
   flashMobileSwipeBar,
@@ -117,86 +116,6 @@ describe("columnWebview service", () => {
     expect(invoke).toHaveBeenCalledWith("flash_mobile_swipe_bar", {
       direction: "right",
     });
-  });
-
-  it("applyColumnSettingsScriptsは6つのスクリプトを順に適用する", async () => {
-    await applyColumnSettingsScripts(
-      "col-1",
-      {
-        ...DEFAULT_COLUMN_SETTINGS,
-        repostHiddenUserIds: ["col_user"],
-        returnToLastReadEnabled: true,
-      },
-      ["ng"],
-      ["global_user"],
-    );
-    expect(invoke).toHaveBeenCalledTimes(6);
-    const labels = vi
-      .mocked(invoke)
-      .mock.calls.map((c) => (c[1] as { label: string }).label);
-    expect(labels.every((l) => l === "column-col-1")).toBe(true);
-    const scripts = vi
-      .mocked(invoke)
-      .mock.calls.map((c) => (c[1] as { script: string }).script);
-    expect(scripts[0]).toBe(
-      WEBVIEW_SCRIPTS.applyAreaVisibility(
-        DEFAULT_COLUMN_SETTINGS.hideHeaderEnabled,
-        DEFAULT_COLUMN_SETTINGS.hideTweetInputEnabled,
-      ),
-    );
-    expect(scripts[1]).toBe(
-      WEBVIEW_SCRIPTS.applyCustomCSS(DEFAULT_COLUMN_SETTINGS.customCSS),
-    );
-    expect(scripts[2]).toBe(
-      WEBVIEW_SCRIPTS.applyNgWords(
-        DEFAULT_COLUMN_SETTINGS.ngWords,
-        ["ng"],
-        ["col_user"],
-        ["global_user"],
-      ),
-    );
-    expect(scripts[3]).toBe(
-      WEBVIEW_SCRIPTS.applyWhitelist(
-        DEFAULT_COLUMN_SETTINGS.whitelistEnabled,
-        DEFAULT_COLUMN_SETTINGS.whitelistWords,
-      ),
-    );
-    expect(scripts[4]).toBe(WEBVIEW_SCRIPTS.applyReturnToLastRead(true));
-    expect(scripts[5]).toBe(WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD);
-  });
-
-  it("evalInColumn経由の失敗はapplyColumnSettingsScriptsを中断しない", async () => {
-    vi.mocked(invoke).mockRejectedValueOnce(new Error("eval failed"));
-    const consoleError = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => {});
-    await applyColumnSettingsScripts("col-1", DEFAULT_COLUMN_SETTINGS, [], []);
-    expect(invoke).toHaveBeenCalledTimes(6);
-    consoleError.mockRestore();
-  });
-
-  it("applyColumnSettingsScriptsは旧データでカラム個別のIDが無くても空配列として適用する", async () => {
-    const legacy = {
-      ...DEFAULT_COLUMN_SETTINGS,
-    } as Partial<typeof DEFAULT_COLUMN_SETTINGS>;
-    delete legacy.repostHiddenUserIds;
-    await applyColumnSettingsScripts(
-      "col-1",
-      legacy as typeof DEFAULT_COLUMN_SETTINGS,
-      [],
-      ["g"],
-    );
-    const scripts = vi
-      .mocked(invoke)
-      .mock.calls.map((c) => (c[1] as { script: string }).script);
-    expect(scripts[2]).toBe(
-      WEBVIEW_SCRIPTS.applyNgWords(
-        DEFAULT_COLUMN_SETTINGS.ngWords,
-        [],
-        [],
-        ["g"],
-      ),
-    );
   });
 
   describe("埋め込み設定の署名記録", () => {

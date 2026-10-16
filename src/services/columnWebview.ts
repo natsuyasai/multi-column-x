@@ -11,7 +11,7 @@ import {
 } from "../constants/ipc";
 import type { ColumnBounds } from "../lib/gridLayout";
 import { logError } from "../lib/log";
-import type { Column, ColumnSettings, GlobalSettings } from "../types";
+import type { Column, GlobalSettings } from "../types";
 
 /**
  * カラム WebView を作成する。
@@ -93,47 +93,6 @@ export async function evalInColumn(
     label: WEBVIEW_LABELS.column(columnId),
     script,
   }).catch(logError("evalInColumn"));
-}
-
-/** カラム設定変更時に必要な inject スクリプト一式を適用してリロードする */
-export async function applyColumnSettingsScripts(
-  columnId: string,
-  settings: ColumnSettings,
-  globalNgWords: string[],
-  globalRepostHiddenUserIds: string[],
-): Promise<void> {
-  await evalInColumn(
-    columnId,
-    WEBVIEW_SCRIPTS.applyAreaVisibility(
-      settings.hideHeaderEnabled,
-      settings.hideTweetInputEnabled,
-    ),
-  );
-  await evalInColumn(
-    columnId,
-    WEBVIEW_SCRIPTS.applyCustomCSS(settings.customCSS),
-  );
-  await evalInColumn(
-    columnId,
-    WEBVIEW_SCRIPTS.applyNgWords(
-      settings.ngWords,
-      globalNgWords,
-      settings.repostHiddenUserIds ?? [],
-      globalRepostHiddenUserIds,
-    ),
-  );
-  await evalInColumn(
-    columnId,
-    WEBVIEW_SCRIPTS.applyWhitelist(
-      settings.whitelistEnabled,
-      settings.whitelistWords,
-    ),
-  );
-  await evalInColumn(
-    columnId,
-    WEBVIEW_SCRIPTS.applyReturnToLastRead(settings.returnToLastReadEnabled),
-  );
-  await evalInColumn(columnId, WEBVIEW_SCRIPTS.SCROLL_TOP_AND_RELOAD);
 }
 
 /**

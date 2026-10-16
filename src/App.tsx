@@ -98,6 +98,7 @@ const App: React.FC = () => {
     setDialogOpen,
     recreateAllWebviews,
     recreateColumnWebview,
+    recreateStaleColumns,
     loadPresetAndRecreateWebviews,
     replaceColumnsAndRecreateWebviews,
   } = useColumns();
@@ -375,6 +376,8 @@ const App: React.FC = () => {
       handleUpdateColumn,
       setSettingsColumnId,
       updateGlobalSettings,
+      recreateColumnWebview,
+      recreateStaleColumns,
     });
 
   const linkPopupDefaultAccountId =
@@ -630,6 +633,7 @@ const App: React.FC = () => {
                 settings: { ...col.settings, ...patch },
               })),
             );
+            void recreateStaleColumns();
           }}
           onReloadAllWebviews={recreateAllWebviews}
           onLoadPreset={loadPresetAndRecreateWebviews}
