@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="mcx-synced-commit" content="68b23eed" />
+    <title>Android 層 | MCX 開発者ガイド</title>
+    <link rel="stylesheet" href="assets/common.css" />
+  </head>
+  <body data-page="android">
+    <div id="mcx-header"></div>
+    <div class="layout">
+      <nav id="mcx-toc"></nav>
+      <main id="content">
+        <h1>Android ネイティブ層（Kotlin）</h1>
+        <p class="lead">
+          Android 版でだけ必要になる「ネイティブ側の仕事」を担う層です。カラムの
+          WebView
+          をどう並べるか、アカウントごとのセッション分離、スワイプバー、ファイル選択、動画ダウンロード、APK
+          自己更新、バックアップを、Rust・JS
+          とどう受け渡しているかを説明します。
+        </p>
+        <div class="callout note">
+          <b>対象ディレクトリ</b>
+          <p>
+            <code class="path">src-tauri/gen/android/</code> のうち、手書きの
+            Kotlin は
+            <code
+              >src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/</code
+            >
+            直下です。その中の <code>generated/</code> は Tauri
+            が自動生成するコードで、<b>編集してはいけません</b>（ktlint
+            の対象外です）。Rust 側の相手方は
+            <code class="path">src-tauri/src/android_bridge.rs</code> です。
+          </p>
+        </div>
+
+        <section id="prerequisites">
+          <h2>前提知識</h2>
+          <p>
+            Android や Tauri の Android
+            対応に慣れていない人向けに、このページを読むための最低限をまとめます。
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>用語</th>
+                <th>このプロジェクトでの意味</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Activity</td>
+                <td>
+                  Android の「画面」の単位。本アプリは
+                  <code>MainActivity</code>（メイン）と
+                  <code>AddAccount</code>（ログイン専用）の 2 つを使う。
+                </td>
+              </tr>
+              <tr>
+                <td>WebView</td>
+                <td>
+                  アプリ内にウェブページを表示する部品。React UI も、X
+                  を表示する各カラムも、すべて別々の WebView。
+                </td>
+              </tr>
+              <tr>
+                <td>Tauri Android の仕組み</td>
+                <td>
+                  Rust コードは共有ライブラリ（.so）としてビルドされ、Kotlin の
+                  Activity が起動時に読み込む。Activity が React UI の WebView
+                  をホストする。
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <span
+                    class="term"
+                    data-term="Java Native Interface。Kotlin(JVM) と Rust(ネイティブ)の間で関数を呼び合う仕組み。"
+                    >JNI</span
+                  >
+                </td>
+                <td>
+                  Rust→Kotlin は
+                  <code>call_method</code>
+                  でメソッド名を<b>文字列指定</b>して呼ぶ。Kotlin→Rust は
+                  <code>external fun</code> と、Rust 側の
+                  <code>Java_com_..._AppBridge_xxx</code> が対応する。
+                </td>
+              </tr>
+              <tr>
+                <td>addWebMessageListener</td>
+                <td>
+                  JS から
+                  <code>window.xxx.postMessage(文字列)</code>
+                  でネイティブへ送る仕組み。<b>送信元オリジンを限定</b>できる。本プロジェクトの
+                  JS→Kotlin ブリッジはこれを使う（<code
+                    >addJavascriptInterface</code
+                  >
+                  は使わない）。
+                </td>
+              </tr>
+              <tr>
+                <td>Foreground Service</td>
+                <td>
+                  通知を出し続けることで、アプリが裏に回っても OS に kill
+                  されにくくするサービス。動画 DL で使う。
+                </td>
+              </tr>
+              <tr>
+                <td>SAF（Storage Access Framework）</td>
+                <td>
+                  OS
+                  標準のファイル保存/選択ダイアログ。権限なしでユーザー指定の場所に読み書きできる。
+                </td>
+              </tr>
+              <tr>
+                <td>BackupAgent</td>
+                <td>
+                  OS の Auto
+                  Backup（端末引き継ぎ）に何を含めるかを決めるクラス。
+                </td>
+              </tr>
+              <tr>
+                <td>Gradle / ProGuard(R8) / ktlint</td>
+                <td>
+                  ビルドツール / リリースビルドでの難読化・縮小 / Kotlin
+                  の整形・静的検査。R8
+                  は文字列で呼ばれるメソッド名を勝手に変えるので、keep
+                  ルールが要る。
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="external">
+          <h2>外部設計: Android 層の責務</h2>
+          <p>
+            デスクトップではカラムが独立した Tauri の WebView
+            として作られますが、Android では
+            <code>window.add_child()</code> が使えません。そこでこの層が<b
+              >ネイティブの WebView を Activity の画面に直接重ねて</b
+            >カラムを表現します。
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>項目</th>
+                <th>デスクトップ</th>
+                <th>Android</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>カラムの表示</td>
+                <td>Rust が子 WebView を作る</td>
+                <td>
+                  Rust が JNI で <code>createColumnWebView</code> を呼び、Kotlin
+                  が View として重ねる
+                </td>
+              </tr>
+              <tr>
+                <td>X ページ側の IPC</td>
+                <td>Tauri の <code>invoke</code> が使える</td>
+                <td>
+                  <b>使えない</b>。代わりに
+                  <code>addWebMessageListener</code> ブリッジ→JNI→Rust
+                </td>
+              </tr>
+              <tr>
+                <td>アカウント分離</td>
+                <td>data_directory</td>
+                <td>WebView Profile API（非対応端末は Cookie の付け替え）</td>
+              </tr>
+              <tr>
+                <td>アカウント追加</td>
+                <td>URL ポーリング（tokio）</td>
+                <td>別 Activity + センチネルファイル</td>
+              </tr>
+              <tr>
+                <td>自動更新</td>
+                <td>Tauri updater</td>
+                <td>自前の APK ダウンロード・検証・インストール</td>
+              </tr>
+              <tr>
+                <td>戻るキー・スワイプバー・ファイル選択・動画 DL 通知</td>
+                <td>なし／別実装</td>
+                <td>この層が実装</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="callout tip">
+            <b>JS を介さない理由</b>
+            <p>
+              メイン React の WebView の JS は、AddAccount など別 Activity
+              が前面にいる間 Android に suspend
+              されます。そのため重要な完了通知は JS
+              ではなく、ファイル（センチネル）と tokio ポーリングで行います。
+            </p>
+          </div>
+        </section>
+
+        <section id="files">
+          <h2>構成図とファイル一覧</h2>
+          <p>ノードをクリックすると詳細が開きます。</p>
+          <div class="diagram" data-diagram>
+            <div class="dg-group" data-layer="inject">
+              <div class="dg-title">X ページの JS（inject）</div>
+              <button class="dg-node" data-detail="android.bridges">
+                window.__mcx*Bridge
+              </button>
+            </div>
+            <div class="dg-arrow" data-label="postMessage(JSON)">⇅</div>
+            <div class="dg-group" data-layer="android">
+              <div class="dg-title">Kotlin（手書き）</div>
+              <button class="dg-node" data-detail="android.mainactivity">
+                MainActivity
+              </button>
+              <button class="dg-node" data-detail="android.bridges">
+                Bridge ハンドラ群
+              </button>
+              <button class="dg-node" data-detail="android.appbridge">
+                AppBridge
+              </button>
+              <button class="dg-node" data-detail="android.addaccount">
+                AddAccount
+              </button>
+              <button class="dg-node" data-detail="android.profiles">
+                WebViewProfiles
+              </button>
+              <button class="dg-node" data-detail="android.swipebar">
+                SwipeBarOverlayView
+              </button>
+              <button class="dg-node" data-detail="android.fgservice">
+                VideoDownloadForegroundService
+              </button>
+              <button class="dg-node" data-detail="android.backupagent">
+                BackupAgent
+              </button>
+              <button class="dg-node" data-detail="android.generated">
+                generated/（自動生成）
+              </button>
+            </div>
+            <div class="dg-arrow" data-label="JNI（両方向）">⇅</div>
+            <div class="dg-group" data-layer="rust">
+              <div class="dg-title">Rust</div>
+              <button class="dg-node" data-detail="android.rust">
+                android_bridge.rs
+              </button>
+            </div>
+          </div>
+          <h3 id="files-catalog">Kotlin ファイル一覧</h3>
+          <div class="catalog" data-catalog="android.files"></div>
+        </section>
+
+        <section id="interfaces">
+          <h2>インターフェース一覧</h2>
+          <h3 id="if-rust-to-kotlin">Rust → Kotlin</h3>
+          <p>
+            <code>android_bridge.rs</code> が
+            <code>MainActivity</code>
+            のメソッドを文字列指定で呼びます。この一覧は
+            <code>src-tauri/gen/android/app/proguard-rules.pro</code>
+            の keep 対象と一致します。
+          </p>
+          <div class="catalog" data-catalog="android.rust-to-kotlin"></div>
+          <h3 id="if-kotlin-to-rust">Kotlin → Rust</h3>
+          <div class="catalog" data-catalog="android.kotlin-to-rust"></div>
+          <h3 id="if-js-to-kotlin">JS → Kotlin（addWebMessageListener）</h3>
+          <div class="catalog" data-catalog="android.js-bridges"></div>
+          <p>
+            JS 側は
+            <code>postMessage(JSON.stringify({ type, ... }))</code>
+            の形で送ります。Kotlin 側は <code>parseBridgeMessage</code> が
+            <code>BridgeMessage</code> に変換し、各ハンドラが
+            <code>AppBridge</code> の JNI 関数を呼びます。
+          </p>
+          <h3 id="if-sentinel">ファイルによる通知（センチネル）</h3>
+          <div class="catalog" data-catalog="android.sentinels"></div>
+        </section>
+
+        <section id="accounts">
+          <h2>アカウント追加・再認証（AddAccount）</h2>
+          <ul>
+            <li>
+              Rust の <code>open_add_account_window</code>（mobile 版）が新しい
+              accountId を作り、JNI で
+              <code>launchAddAccount</code>
+              を呼びます。以降は<b>ブロックして</b>センチネルの出現を待ちます（最大
+              10 分）。
+            </li>
+            <li>
+              <code>AddAccount</code> は
+              <code>x.com/login</code> を表示し、500ms ごとに
+              <code>location.pathname</code> を JS 評価します。X は SPA で
+              <code>pushState</code> 遷移のため、<code>onPageStarted</code>
+              では検知できません。
+            </li>
+            <li>
+              成功すると Cookie
+              のスナップショット（<code>x_cookies.txt</code>）を保存し、twid
+              Cookie から X ユーザー ID
+              を取り出して、センチネルの本文に書きます。戻るキーはページ遷移中は無視し、戻れる履歴があれば
+              WebView 内を戻ります。
+            </li>
+            <li>
+              <b>再認証</b>（<code>mode=reauth</code>）は一時プロファイル
+              <code>reauth-tmp-{uuid}</code> で再ログインさせ、<code
+                >expectedUserId</code
+              >
+              と一致した時だけ本番プロファイルへ Cookie
+              を転記します。不一致・取得不能は
+              <code>reauth_mismatch</code>（なりすまし防止）。
+            </li>
+          </ul>
+        </section>
+
+        <section id="webview-profiles">
+          <h2>WebView プロファイルとセッション分離</h2>
+          <p>
+            <code>WebViewProfiles</code> が Profile
+            API（<code>WebViewFeature.MULTI_PROFILE</code>）の対応判定と適用を担当します。プロファイル名は
+            <code>account-{accountId}</code
+            >、AddAccount・カラム・ポップアップは同じ名前を共有して同一セッションになります。
+          </p>
+          <div class="tabs">
+            <div
+              class="tab"
+              data-tab="supported"
+              data-label="Profile API 対応端末"
+            >
+              <ul>
+                <li>
+                  WebView 生成直後に
+                  <code>setProfile</code>（使用前でないと失敗する）。
+                </li>
+                <li>
+                  サードパーティ Cookie 許可（<code>api.x.com</code> の 401
+                  対策）はプロファイル側の CookieManager に設定。
+                </li>
+                <li>
+                  プロファイル初回作成時のみ、旧 <code>x_cookies.txt</code> から
+                  Cookie を移行。
+                </li>
+              </ul>
+            </div>
+            <div class="tab" data-tab="fallback" data-label="非対応端末">
+              <ul>
+                <li>CookieManager が全アカウント共有になる。</li>
+                <li>
+                  <code>loadUrlForAccount</code> が
+                  <code>removeAllCookies</code> の完了コールバック内で Cookie
+                  を設定してから <code>loadUrl</code>（順序を崩すと Cookie
+                  未設定でロードが始まる）。
+                </li>
+                <li>
+                  アクティブカラムの切替時は
+                  <code>setAccountCookies</code> で付け替える。
+                </li>
+              </ul>
+            </div>
+          </div>
+          <div class="callout warn">
+            <b>ログイン画面が出たら</b>
+            <p>
+              Cookie
+              反映のタイミング次第でログイン画面が一瞬表示されることがあります。<code
+                >ExternalLinkWebViewClient</code
+              >
+              が検知して、1.5 秒後に元 URL へ 1 回だけリカバリします。
+            </p>
+          </div>
+          <p>
+            バックアップ復元の自動候補に使う
+            <code>detectXUserId</code> も、プロファイルの CookieManager から
+            twid
+            を読みます。非対応端末ではアカウントを特定できないため空文字を返します。
+          </p>
+        </section>
+
+        <section id="swipe-bar">
+          <h2>スワイプバー</h2>
+          <p>
+            カラム下端の横スワイプ領域は、<code>SwipeBarOverlayView</code>（ネイティブ
+            View）で実装しています。WebView より手前に置くことで、X
+            ページへのタッチを奪わずに独自ジェスチャーを処理するためです。
+          </p>
+          <ul>
+            <li>
+              位置は Gravity ではなく<b>絶対座標</b>（<code>yDp</code>）。IME
+              表示・回転でカラムとずれないよう、カラムと同じ計算元を使う。
+            </li>
+            <li>
+              判定ロジックは
+              <code>SwipeGestureResolver</code>
+              に分離（方向・タップ・ダブルタップ 300ms）。React 版
+              <code>MobileSwipeBar</code> のしきい値と揃える。
+            </li>
+            <li>
+              Kotlin は
+              <code>onSwipeNavigate / onSwipeProgress / onSwipeDoubleTap</code>
+              を JNI で通知するだけ。実際にカラムが遷移するかは React
+              が決め、遷移した時のみ
+              <code>setSwipeBarFlash</code>（演出）が戻ってくる。
+            </li>
+            <li>
+              Z 順は <code>restoreOverlayOrder()</code> に集約：<b
+                >popup &gt; スワイプバー &gt; カラム &gt; メイン</b
+              >。
+            </li>
+            <li>
+              配色は <code class="path">src/index.css</code> のトークンを Kotlin
+              に複製しているため、
+              <code class="path">src/lib/swipeBarColors.contract.test.ts</code>
+              が値の一致を検査する。
+            </li>
+          </ul>
+        </section>
+
+        <section id="media">
+          <h2>ファイル選択・動画ダウンロード</h2>
+          <h3 id="media-chooser">ファイル選択</h3>
+          <p>
+            ネイティブ WebView は <code>onShowFileChooser</code> を実装しないと
+            <code>&lt;input type="file"&gt;</code> が無反応です。<code
+              >MainActivity</code
+            >
+            が SAF の Intent を起動し、結果を
+            <code>filePathCallback</code> に返します。
+          </p>
+          <ul>
+            <li>
+              複数 MIME は <code>EXTRA_MIME_TYPES</code> で渡す（<code
+                >createIntent()</code
+              >
+              は先頭 1 件しか type に反映しない）。
+            </li>
+            <li>
+              Google フォト等は結果を
+              <code>clipData</code> にだけ入れるため、<code
+                >pickChooserUris</code
+              >
+              が clipData を優先し、無い場合のみ
+              <code>parseResult</code> にフォールバック。
+            </li>
+            <li>
+              キャンセル時や選択アプリ無しは必ず
+              <code>null</code>
+              で解決する（さもないと以降のファイル選択が無反応になる）。
+            </li>
+          </ul>
+          <h3 id="media-video">動画ダウンロード</h3>
+          <p>
+            長押しメニュー（inject）→ブリッジ→Rust がダウンロード→Kotlin が SAF
+            保存、が基本経路です。ダウンロード中は
+            <code>VideoDownloadForegroundService</code>
+            が通知を出して延命します。詳しくは「フロー」のステップ再生を参照。
+          </p>
+          <ul>
+            <li>
+              通知文言は <code>res/values/strings.xml</code>（既定=英語）と
+              <code>values-ja</code>。<b>端末の言語</b>に従い、アプリ内
+              <code>language</code> 設定とは独立。
+            </li>
+            <li>
+              Android 13+ の <code>POST_NOTIFICATIONS</code> は許可リクエスト UI
+              を作らず、許可されていれば通知が出る方針。
+            </li>
+          </ul>
+        </section>
+
+        <section id="update-backup">
+          <h2>APK 自己更新・バックアップ</h2>
+          <h3 id="update">APK 自己更新</h3>
+          <p>
+            Rust の <code>install_apk_update</code> が URL・呼び出し元を検証して
+            JNI で <code>downloadAndInstallApk</code> を呼びます。Kotlin
+            は「不明なアプリのインストール」許可→別スレッドで DL→<code
+              >ApkHashVerifier</code
+            >
+            で SHA-256 照合→<code>FileProvider</code>
+            経由でインストーラ起動、の順です。ハッシュ不一致ならファイルを削除して中止します。同一署名でないと上書き更新は失敗します。
+          </p>
+          <h3 id="backup">バックアップ</h3>
+          <ul>
+            <li>
+              <b>ファイルの書き出し/読み込み</b>（エクスポート/インポート機能）:
+              Rust が
+              <code>startBackupExport / startBackupImport</code> を呼び、SAF
+              の結果を <code>AppBridge.onBackupFileResult</code> で非同期に Rust
+              へ返す。インポートは上限バイトで打ち切り
+              （<code>copyWithLimit</code>）、Rust 側でも再検査。
+            </li>
+            <li>
+              <b>端末引き継ぎ（Auto Backup）</b>:
+              <code>MultiColumnXBackupAgent.onFullBackup</code> が
+              <code>BackupFileSelector</code>
+              で選んだファイルだけを送る。Service Worker
+              など巨大で再生成可能なディレクトリを除外しないと、25MB
+              クォータ超過でバックアップが丸ごと失敗する。
+            </li>
+            <li>
+              <code>AndroidManifest.xml</code> の
+              <code>android:fullBackupOnly="true"</code> が必須。無いと
+              <code>onFullBackup</code>
+              が呼ばれず、成功を返すのに空の復元になる。
+            </li>
+          </ul>
+          <p>
+            詳細:
+            <a href="../development/backup-restore-notes.md"
+              >backup-restore-notes.md</a
+            >
+          </p>
+        </section>
+
+        <section id="security">
+          <h2>セキュリティ（ブリッジのオリジン検証）</h2>
+          <p>
+            X を表示する WebView
+            に、ネイティブ呼び出し口を開けるのは危険です。そこで次の多重防御を行っています。
+          </p>
+          <ol>
+            <li>
+              <code>shouldExposeBridge</code>:
+              <code>WEB_MESSAGE_LISTENER</code>
+              非対応端末ではブリッジを一切公開しない。
+            </li>
+            <li>
+              <code>BRIDGE_ALLOWED_ORIGIN_RULES</code>:
+              <code>https://x.com</code
+              >、<code>https://*.x.com</code>、twitter.com 同様のみ許可（WebView
+              内部のフィルタ）。
+            </li>
+            <li>
+              コールバック内で <code>isMainFrame</code> を確認（iframe
+              は拒否）し、<code>isAllowedBridgeOrigin</code> で再検査。
+              <code>x.com.example.com</code>
+              のような偽装ホストはホスト名の完全一致/サブドメイン判定で拒否。
+            </li>
+            <li>
+              <code>parseBridgeMessage</code>: 不正 JSON・未知の
+              type・必須フィールド欠落/空は null → 無視。
+            </li>
+            <li>
+              APK 更新は Rust 側で呼び出し元（main のみ）・URL（自リポジトリ
+              Releases のみ）を検証し、Kotlin 側で SHA-256 を検証。
+            </li>
+          </ol>
+          <div class="callout danger">
+            <b>addJavascriptInterface を使わない</b>
+            <p>
+              オリジン制限ができず、任意のページから呼べてしまうため採用しません。新しいブリッジも
+              <code>addWebMessageListener</code>
+              と同じ検証パターンで追加してください。
+            </p>
+          </div>
+        </section>
+
+        <section id="flows">
+          <h2>処理フロー</h2>
+          <h3 id="flow-add-account">アカウント追加（mobile）</h3>
+          <div class="flow" data-flow="android.add-account"></div>
+          <h3 id="flow-reauth">再認証</h3>
+          <div class="flow" data-flow="android.reauth"></div>
+          <h3 id="flow-video">動画ダウンロード要求→Foreground Service</h3>
+          <div class="flow" data-flow="android.video-download"></div>
+          <h3 id="flow-rust-to-kotlin">Rust から Kotlin メソッド呼び出し</h3>
+          <div class="flow" data-flow="android.rust-to-kotlin"></div>
+          <h3 id="flow-apk">APK 自己更新</h3>
+          <div class="flow" data-flow="android.apk-update"></div>
+          <h3 id="flow-backup">バックアップのエクスポート</h3>
+          <div class="flow" data-flow="android.backup-export"></div>
+        </section>
+
+        <section id="build-test">
+          <h2>ビルド・テスト</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>やりたいこと</th>
+                <th>コマンド</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>APK ビルド</td>
+                <td>
+                  <code>npm run tauri:android:build</code>（デバッグは
+                  <code>:debug</code>）
+                </td>
+              </tr>
+              <tr>
+                <td>Kotlin 単体テスト</td>
+                <td>
+                  <code
+                    >cd src-tauri/gen/android &amp;&amp; ./gradlew.bat
+                    :app:testUniversalDebugUnitTest</code
+                  >
+                </td>
+              </tr>
+              <tr>
+                <td>Kotlin の整形/検査</td>
+                <td>
+                  <code>npm run format:kotlin</code
+                  >（<code>ktlintFormat</code>）、CI は <code>ktlintCheck</code>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <ul>
+            <li>
+              app の variant は <b>universal フレーバー付き</b>。<code
+                >testDebugUnitTest</code
+              >
+              では app のテストが実行されない。
+            </li>
+            <li>
+              プロパティテストは <code>kotest-property</code> の
+              <b>5.x</b>（jvmTarget 1.8 互換）。6.x は JVM 11 なので上げない。
+              JUnit4 の <code>@Test</code> 内から
+              <code>runBlocking</code> 経由で呼ぶ。
+            </li>
+            <li>
+              文字列リソースのテスト（<code>StringResourcesTest</code>）は
+              <code>strings.xml</code> を File
+              で読むため、リソースだけ変えるとタスクが UP-TO-DATE になる。<code
+                >:app:cleanTestUniversalDebugUnitTest</code
+              >
+              を併用。
+            </li>
+            <li>
+              新しい git worktree では gitignore 対象の Gradle
+              生成ファイルをコピーする必要がある（android-notes.md 参照）。
+            </li>
+          </ul>
+          <div class="callout danger">
+            <b
+              >MainActivity.kt のシグネチャを変えたら proguard-rules.pro
+              も同時に更新</b
+            >
+            <p>
+              Rust は
+              <code>env.call_method</code>
+              で名前を文字列指定して呼びます。デバッグビルドは R8
+              が無効のため通りますが、<b>リリースビルドでだけ</b>
+              <code>NoSuchMethodException</code>
+              でカラムが作れなくなります。メソッド追加→
+              <code>-keepclassmembers</code>
+              にエントリ追加、引数変更→型リスト更新、削除→エントリ削除。JNI
+              関連の変更は必ずリリースビルドで確認します。
+            </p>
+          </div>
+        </section>
+
+        <section id="pitfalls">
+          <h2>落とし穴・関連資料</h2>
+          <ul>
+            <li>
+              <code>WebviewWindowBuilder::build()</code> 直後に IPC
+              ルーティング先が新規 Activity に移るため、Rust は
+              <code>Ok</code> を先に返す設計になっている（android-notes.md）。
+            </li>
+            <li>
+              カラム WebView の初期 visibility は <code>INVISIBLE</code>。<code
+                >GONE</code
+              >
+              だとビューポートサイズが伝わらず、X の仮想リストが壊れる。
+            </li>
+            <li>
+              同一 id のカラムが既にある場合
+              <code>createColumnWebView</code> は再作成しない（React
+              がリロードされてもネイティブ側は残る）。
+            </li>
+            <li>
+              <code>registerForActivityResult</code> は Activity
+              生成前（プロパティ初期化子）で登録。<code>onCreate</code>
+              内だと実行時エラー。
+            </li>
+            <li>
+              デスクトップの外部リンク処理（<code>on_new_window</code>）とは別で、Android
+              は
+              <code
+                >ExternalLinkWebViewClient / ExternalLinkWebChromeClient</code
+              >
+              が x.com 以外をシステムブラウザへ渡す。
+            </li>
+            <li>
+              新しい JS ブリッジを足すと column には元々 Tauri IPC
+              が無いので、<code>PopupSessionBridge</code> の転用はできず、<code
+                >createColumnWebView</code
+              >
+              内で個別に登録する。
+            </li>
+            <li>
+              実機の複数アカウント分離は、Profile API
+              非対応端末では確実でない可能性がある。
+            </li>
+          </ul>
+          <h3 id="pitfalls-docs">関連資料</h3>
+          <ul>
+            <li>
+              <a href="../development/android-notes.md">android-notes.md</a
+              >（本層の設計判断・落とし穴の一次資料）
+            </li>
+            <li>
+              <a href="../development/backup-restore-notes.md"
+                >backup-restore-notes.md</a
+              >
+            </li>
+            <li>
+              <a href="../development/ui-scale-notes.md">ui-scale-notes.md</a
+              >（Android 全画面ダイアログなど）
+            </li>
+          </ul>
+        </section>
+      </main>
+    </div>
+    <aside id="mcx-detail" hidden></aside>
+    <script src="assets/data/index.js"></script>
+    <script src="assets/data/android.js"></script>
+    <script src="assets/common.js"></script>
+  </body>
+</html>
