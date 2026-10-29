@@ -1,0 +1,799 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="mcx-synced-commit" content="68b23eed" />
+    <title>inject スクリプト | MCX 開発者ガイド</title>
+    <link rel="stylesheet" href="assets/common.css" />
+  </head>
+  <body data-page="inject">
+    <div id="mcx-header"></div>
+    <div class="layout">
+      <nav id="mcx-toc"></nav>
+      <main id="content">
+        <h1>inject スクリプト（X の画面に注入する JS）</h1>
+        <p class="lead">
+          Multi Column X は x.com をそのまま
+          <span
+            class="term"
+            data-term="OS ネイティブのブラウザ部品。ページを表示する枠で、Tauri が提供します。"
+            >WebView</span
+          >
+          で表示し、見た目や挙動の独自機能は<b
+            >ページの中に JavaScript を差し込んで</b
+          >実現しています。この差し込む JS が inject
+          です。このページでは、inject
+          の責務と境界、ビルドから注入までの仕組み、全スクリプトの一覧、主要機能の設計判断、開発時の落とし穴を説明します。
+        </p>
+
+        <section id="prerequisites">
+          <h2>前提知識</h2>
+
+          <h3 id="pre-init-script">
+            initialization script（ページ読み込み時に必ず走る JS）
+          </h3>
+          <p>
+            Tauri は WebView を作るとき、<code>initialization_script</code>
+            として JS
+            文字列を登録できます。これは<b>ページ遷移や再読み込みのたびに</b>、ページ本体のスクリプトより先に実行されます。inject
+            はこの仕組みで X のページに入り込みます。<span
+              class="badge"
+              data-layer="rust"
+              >Rust</span
+            >
+            側が「どの機能を含めるか」を決めて 1 本の文字列に連結し、WebView
+            に渡します。
+          </p>
+
+          <h3 id="pre-observer">
+            MutationObserver と、X の DOM は変わりやすいこと
+          </h3>
+          <p>
+            X は
+            <span
+              class="term"
+              data-term="Single Page Application。ページ全体を再読み込みせず、JS が画面を書き換え続けるアプリ。URL が変わっても文書は同じままです。"
+              >SPA</span
+            >
+            で、タイムラインは<b>仮想リスト</b>（画面に見える投稿だけを描画し、スクロールで
+            DOM を差し替える）です。そのため「読み込み時に 1
+            回処理して終わり」では足りず、<span
+              class="term"
+              data-term="DOM の変化（ノードの追加・削除など）を非同期に通知してくれるブラウザ標準 API。"
+              >MutationObserver</span
+            >
+            で変化を追い続けます。また <code>data-testid</code> や構造は X
+            の都合で予告なく変わるため、inject
+            は<b>常に壊れうる前提</b>で書き、実 DOM での検証を重視します。
+          </p>
+
+          <h3 id="pre-ipc">window.__TAURI__ と IPC</h3>
+          <p>
+            WebView 内の JS から Rust のコマンドを呼ぶ仕組みが
+            <span
+              class="term"
+              data-term="Inter-Process Communication。WebView（JS）と Rust 本体の間でコマンド呼び出しやイベントをやり取りする仕組み。"
+              >IPC</span
+            >
+            です。<code>tauri.conf.json</code> の
+            <code>withGlobalTauri: true</code> により、ページには
+            <code>window.__TAURI__.core.invoke(コマンド名, 引数)</code>
+            が用意されます。ただし x.com
+            のような外部ページに任意のコマンドを許すのは危険なので、<b>許可したコマンドだけ</b>を
+            capability で列挙しています（外部設計で後述）。
+          </p>
+
+          <h3 id="pre-android">
+            Android は別経路（ネイティブ WebView + ブリッジ）
+          </h3>
+          <p>
+            Android のカラム／ポップアップは Tauri の WebView ではなく Android
+            標準の WebView なので、<code>__TAURI__</code>
+            がありません。代わりにネイティブ側（Kotlin）が
+            <code>addWebMessageListener</code> で公開した
+            <code>__mcxPopupBridge</code> などに
+            <code>postMessage(JSON)</code> を送ります。つまり同じ機能でも
+            <b>desktop は invoke、Android はブリッジ</b
+            >と書き分けられている箇所があります。
+          </p>
+
+          <h3 id="pre-build">
+            なぜビルドが要るのか／ビルド済み JS をコミットしない
+          </h3>
+          <p>
+            ソースは TypeScript（<code>_src/</code>）で、Vite でビルドした
+            <code>src-tauri/src/inject/*.js</code> を Rust が
+            <code>include_str!</code> でバイナリに埋め込みます。出力 .js は
+            <code>.gitignore</code>
+            対象で<b>コミットされません</b>。よってクローン直後や _src
+            を変更したあとは
+            <code>npm run build:inject</code> が必須です（<code>tauri:dev</code>
+            / <code>tauri:build</code> は前段で自動実行）。
+          </p>
+
+          <div class="callout warn">
+            <b>ES module の import が使えない</b>
+            <p>
+              各 inject は独立した 1 ファイルとして出力され、Rust
+              が単純に文字列連結します。複数のエントリが同じモジュールを import
+              すると Rollup が共有チャンク（<code>import</code>
+              文付き）を作り、連結が壊れます。だから定数もローカルに重複定義し、共有機能は
+              <code>window.__mcxDomObserver</code> /
+              <code>window.__mcxI18n</code> のようなグローバル経由にしています。
+            </p>
+          </div>
+        </section>
+
+        <section id="external">
+          <h2>外部設計</h2>
+
+          <h3 id="ext-responsibility">責務と境界</h3>
+          <ul>
+            <li>
+              <b>責務</b>：X の画面の加工（要素の非表示・拡大縮小・CSS）、X
+              の挙動の補助（自動更新・新着検知・ポップアップ・ショートカット）、状態の
+              Rust への報告。
+            </li>
+            <li>
+              <b>持たないもの</b>：永続的な状態。設定の保存は
+              <span class="badge" data-layer="react">React</span>/<span
+                class="badge"
+                data-layer="rust"
+                >Rust</span
+              >
+              側（settings.json）が持ち、inject は起動時に埋め込まれた値と、eval
+              で渡される更新だけを受け取ります。
+            </li>
+            <li>
+              <b>対象 WebView</b
+              >：カラム（<code>column-*</code>）、ポップアップ（<code>popup-*</code>）、コンポーズ窓（<code>compose-*</code>）。
+              アカウント追加窓（<code>add-account</code>）は capability
+              の対象に含まれます（inject の注入有無は
+              <span class="badge warn">要確認</span>）。
+            </li>
+            <li>
+              <b>page_type による出し分け</b
+              >：home（前回の境目へ戻る）、compose（投稿専用表示）、external（任意
+              URL カラム。custom_css だけの最小注入）。
+            </li>
+          </ul>
+
+          <h3 id="ext-interface">層間インターフェース</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>方向</th>
+                <th>手段</th>
+                <th>内容</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Rust → inject（起動時）</td>
+                <td><code>window.__multiColumnXConfig</code> ほか</td>
+                <td>
+                  設定フラグ 21 項目（NG
+                  ワード、ポップアップ可否、画像縮小…）。言語は別グローバル
+                  <code>window.__mcxLang</code>。ポップアップは
+                  <code>__mcxAccounts</code> /
+                  <code>__mcxCurrentAccountId</code> /
+                  <code>__mcxTargetHref</code> /
+                  <code>__mcxEscCloseEnabled</code>。
+                </td>
+              </tr>
+              <tr>
+                <td>React → inject（実行中）</td>
+                <td>
+                  <code>eval_in_webview</code> + <code>WEBVIEW_SCRIPTS</code>
+                </td>
+                <td>
+                  JS 文字列を評価させる。config の書換と<code
+                    >window.__multiColumnX.*</code
+                  >
+                  の呼び出し（<code>recheckNgWords</code>,
+                  <code>applyAreaVisibility</code>,
+                  <code>setReturnToLastReadEnabled</code>,
+                  <code>triggerReload</code>, <code>applyCustomCSS</code>,
+                  <code>__mcxI18n.setLang</code>）。
+                </td>
+              </tr>
+              <tr>
+                <td>inject → Rust</td>
+                <td><code>invoke</code>（Android はブリッジ）</td>
+                <td>
+                  下表の 10 コマンド。許可は
+                  <code>column-webview.json</code> と厳密一致。
+                </td>
+              </tr>
+              <tr>
+                <td>Rust → inject（イベント）</td>
+                <td><code>listen</code></td>
+                <td>
+                  ポップアップの
+                  <code>video-download-progress</code> のみ（popup_toolbar
+                  が購読）。
+                </td>
+              </tr>
+              <tr>
+                <td>inject → React</td>
+                <td>Rust が <code>emit</code> で中継</td>
+                <td>
+                  <code>webview-scroll</code> /
+                  <code>webview-new-posts-count</code> /
+                  <code>webview-keyboard-shortcut</code> /
+                  <code>webview-api-rate-limit</code> /
+                  <code>webview-official-settings-captured</code>。inject は
+                  React に直接話しかけず、必ず Rust を経由します。
+                </td>
+              </tr>
+              <tr>
+                <td>inject → Android</td>
+                <td><code>postMessage(JSON)</code></td>
+                <td>
+                  <code>__mcxPopupBridge</code> /
+                  <code>__mcxVideoDownloadBridge</code> /
+                  <code>__mcxApiRateLimitBridge</code>（オリジンを x.com /
+                  twitter.com 系に限定）。
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="catalog" data-catalog="inject.ipc"></div>
+
+          <div class="callout note">
+            <b>許可集合の厳密一致</b>
+            <p>
+              <code>src-tauri/capabilities/column-webview.json</code>
+              の許可は、<code>_src</code> で実際に invoke されるコマンド集合と
+              <b>過不足なく一致</b>することを
+              <code>acl_contract.rs</code> が検査します。inject
+              で新しいコマンドを呼ぶなら、 <code>build.rs</code> の
+              AppManifest・capability・テストの期待値を同時に更新します。詳細は
+              <a href="../development/tauri-commands.md">tauri-commands.md</a>
+              と
+              <a href="../development/inject-ipc-shortcuts-notes.md"
+                >inject-ipc-shortcuts-notes.md</a
+              >。
+            </p>
+          </div>
+
+          <h3 id="ext-config">設定フラグの受け渡し</h3>
+          <p>
+            カラム個別設定は <code>column.rs</code> が
+            <code>column.settings.*</code> から、グローバル設定は
+            <code>settings_store.rs</code> の
+            <code>column_script_settings_from</code> を通して
+            <code>InitScriptParams</code> に詰め、<code>mod.rs</code> が
+            <code>window.__multiColumnXConfig</code> に変換します。新しい
+            GlobalSettings フラグを inject へ届けるには <b>7 箇所の同期</b>（TS
+            型、fixture、settings.rs、settings_store.rs、column.rs、inject/mod.rs、types.d.ts）が必要です
+            （<a href="../development/inject-ipc-shortcuts-notes.md">ノート</a
+            >と <code>.claude/skills/inject-script-dev</code> を参照）。
+          </p>
+          <div class="tabs">
+            <div class="tab" data-tab="desktop" data-label="デスクトップ">
+              <p>
+                Tauri の <code>initialization_script</code> に登録。image_popup
+                / context_menu / scroll_event / keyboard_shortcut
+                が含まれ、mobile_area_hide
+                は含まれません。ショートカットや横スクロールはカラムがネイティブウィンドウで独立しているため
+                inject が代わりに拾います。
+              </p>
+            </div>
+            <div class="tab" data-tab="mobile" data-label="Android">
+              <p>
+                <code>is_mobile = true</code> のとき上の 4
+                つは除外され、mobile_area_hide が含まれます。Rust→JS は
+                <code>eval_in_webview</code> が
+                <code>android_bridge::eval_in_column_webview</code>
+                経由で評価。JS→Rust は上述のブリッジ。
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section id="build-runtime">
+          <h2>構成図：ビルドとランタイム</h2>
+          <p>ノードをクリックすると詳細パネルが開きます。</p>
+
+          <h3 id="diagram-build">ビルドの流れ</h3>
+          <div class="diagram dg-row" data-diagram>
+            <div class="dg-group" data-layer="inject">
+              <div class="dg-title">ソース〜成果物</div>
+              <button class="dg-node" data-detail="inject.src">
+                _src/*.ts
+              </button>
+              <button class="dg-node" data-detail="inject.vite">
+                build:inject（Vite 2 パス）
+              </button>
+              <button class="dg-node" data-detail="inject.built">
+                inject/*.js（gitignore）
+              </button>
+            </div>
+            <div class="dg-arrow" data-label="include_str!">→</div>
+            <div class="dg-group" data-layer="rust">
+              <div class="dg-title">Rust</div>
+              <button class="dg-node" data-detail="inject.modrs">
+                inject/mod.rs
+              </button>
+              <button class="dg-node" data-detail="inject.callers">
+                column.rs / popup.rs
+              </button>
+            </div>
+            <div class="dg-arrow" data-label="initialization_script">→</div>
+            <div class="dg-group" data-layer="inject">
+              <div class="dg-title">X の WebView</div>
+              <button class="dg-node" data-detail="inject.config">
+                __multiColumnXConfig
+              </button>
+              <button class="dg-node" data-detail="inject.x-dom">
+                X の DOM
+              </button>
+            </div>
+          </div>
+
+          <h3 id="diagram-runtime">ランタイムの構成</h3>
+          <div class="diagram" data-diagram>
+            <div class="dg-group" data-layer="inject">
+              <div class="dg-title">共通基盤（最初に連結される）</div>
+              <button class="dg-node" data-detail="inject.hub-dom">
+                dom_observer
+              </button>
+              <button class="dg-node" data-detail="inject.hub-i18n">
+                i18n（__mcxI18n）
+              </button>
+              <button class="dg-node" data-detail="inject.config">
+                config
+              </button>
+            </div>
+            <div class="dg-group" data-layer="inject">
+              <div class="dg-title">タイムライン・更新</div>
+              <button class="dg-node" data-detail="inject.autoreload">
+                auto_reload
+              </button>
+              <button class="dg-node" data-detail="inject.rtlr">
+                return_to_last_read
+              </button>
+              <button class="dg-node" data-detail="inject.ngword">
+                ng_word / hide_ad
+              </button>
+            </div>
+            <div class="dg-group" data-layer="inject">
+              <div class="dg-title">表示カスタマイズ・メディア</div>
+              <button class="dg-node" data-detail="inject.header">
+                header_customizer（React）
+              </button>
+              <button class="dg-node" data-detail="inject.video">
+                動画関連
+              </button>
+              <button class="dg-node" data-detail="inject.popuptoolbar">
+                popup_toolbar
+              </button>
+              <button class="dg-node" data-detail="inject.ratelimit">
+                api_rate_limit_monitor
+              </button>
+            </div>
+            <div class="dg-arrow" data-label="invoke / postMessage">⇅</div>
+            <div class="dg-group" data-layer="rust">
+              <div class="dg-title">外部とのつなぎ</div>
+              <button class="dg-node" data-detail="inject.tauri-ipc">
+                Tauri IPC + capability
+              </button>
+            </div>
+            <div class="dg-group" data-layer="android">
+              <div class="dg-title">Android</div>
+              <button class="dg-node" data-detail="inject.android-bridge">
+                addWebMessageListener ブリッジ
+              </button>
+            </div>
+          </div>
+
+          <details>
+            <summary>連結順（build_init_script）</summary>
+            <ol>
+              <li><code>dom_observer.js</code>（共有ハブ）</li>
+              <li><code>window.__mcxLang = "ja" | "en"</code></li>
+              <li><code>i18n.js</code>（<code>__mcxI18n</code>）</li>
+              <li><code>window.__multiColumnXConfig = {…}</code></li>
+              <li>
+                tab_selector → header_customizer（設定 ON のみ）→ auto_reload →
+                return_to_last_read（home のみ）→ video_control（設定 ON のみ）
+              </li>
+              <li>
+                small_image → blur_image → hide_ad → ng_word → custom_css →
+                image_popup / context_menu / scroll_event /
+                keyboard_shortcut（desktop）→ sidebar_hide →
+                mobile_area_hide（mobile）→ notification_header_hide →
+                compose_only（compose のみ）→ video_long_press_menu →
+                api_rate_limit_monitor
+              </li>
+              <li>
+                最後に値があれば <code>applyCustomCSS(...)</code> 呼び出し
+              </li>
+            </ol>
+            <p>
+              ポップアップ／コンポーズ窓は
+              <code>build_popup_init_script</code>：dom_observer → 言語 → i18n →
+              アカウント等の window 変数 → popup_toolbar →
+              popup_video_autoplay。<code>minimal_injection</code>（external
+              カラム）は custom_css のみ。
+            </p>
+          </details>
+
+          <div class="flow" data-flow="inject.build-attach"></div>
+        </section>
+
+        <section id="scripts">
+          <h2>機能スクリプト一覧</h2>
+          <p>
+            <code>src-tauri/src/inject/_src/</code>
+            の機能エントリを網羅します。検索・種別／対象での絞り込みができ、行をクリックすると詳細が開きます。
+            純粋関数を切り出したファイル（<code>ng_word_matcher.ts</code>,
+            <code>repost_hide_matcher.ts</code>,
+            <code>return_to_last_read_logic.ts</code>,
+            <code>headerCustomizerTypes.ts</code>
+            など）は各機能の行にまとめています。
+          </p>
+          <div class="catalog" data-catalog="inject.scripts"></div>
+        </section>
+
+        <section id="details">
+          <h2>詳細設計</h2>
+
+          <h3 id="detail-modrs">mod.rs：設定から 1 本の JS を組む</h3>
+          <p>
+            <code>build_init_script</code>
+            は、<code>InitScriptParams</code>（bool
+            群・文字列・配列）を受け取り、<code>include_if</code>
+            で機能を足し引きして連結します。連結後は<b>1 つのスクリプト</b
+            >になるので、トップレベルの <code>function</code> /
+            <code>const</code> 名が機能間で重複すると、後勝ちの上書きや
+            SyntaxError になります（だから各機能は IIFE
+            で囲み、複製関数は別名にします）。テストは連結順・含有・config
+            の値を検証します。
+          </p>
+
+          <h3 id="detail-autoreload">auto_reload：更新方式の違いを吸収する</h3>
+          <ul>
+            <li>
+              検索・通知は『下へスクロール → 60ms 後に先頭へ戻す』で X
+              の取得を誘発し、おすすめ／リストはタブの再クリック、フォロー中は
+              focus と新着ボタンのクリック。リスト詳細は自動更新の対象外。
+            </li>
+            <li>
+              新着判定は<b>『見たことのある最大の status ID より新しい ID』</b
+              >。旧方式（スナップショット差分）は表示が入れ替わるおすすめで誤報告したため廃止。
+            </li>
+            <li>
+              通知・検索は scroll と DOM 変化を常時監視し、X
+              のポーリングで先頭がずれたら補正します。
+              <b>共有ハブを使わない</b>のは、描画されないカラム（Android
+              の非アクティブタブ等）でハブが止まり新着の報告が遅れるため。
+            </li>
+            <li>
+              スクロール距離・待ち時間は<b>実測値</b>で、カラムの高さにも依存します。変更時は必ず再計測（詳細はノート）。
+            </li>
+          </ul>
+
+          <h3 id="detail-rtlr">return_to_last_read：triggerReload のラップ</h3>
+          <p>
+            更新を検知するために
+            <code>window.__multiColumnX.triggerReload</code>
+            をラップするので、auto_reload
+            より後ろに連結する必要があります。基準（更新前の先頭付近の最大 5
+            件）は「最後に先頭にいたときのスナップショット」を使います（手動更新は先頭へ戻すのと同じ
+            tick
+            で取得が始まり、その時点の仮想リストは深い位置しか描画していないため）。純粋ロジックは
+            <code>_logic.ts</code> に分離され、DOM グルーと別にテストされます。
+          </p>
+
+          <h3 id="detail-filter">ng_word と hide_ad：隠す方法</h3>
+          <p>
+            追加された <code>article</code> を判定し、仮想リストのセル（<code
+              >cellInnerDiv</code
+            >
+            + absolute + transform）はセルごと
+            <code>remove()</code> して空白を残さず、それ以外は
+            <code>display:none !important</code> にします。NG ワードは設定を毎回
+            config から読むため、eval で書き換えて
+            <code>recheckNgWords</code> を呼べば即時反映されます。マッチ判定は
+            <code>/正規表現/</code> 形式にも対応した純粋関数です。
+          </p>
+
+          <h3 id="detail-popup">popup_toolbar：ポップアップ専用 UI</h3>
+          <p>
+            アカウント切替・閉じる・動画ダウンロード・『カラムへ適用』（公式設定の送信）・Esc
+            で閉じる・<code>targetHref</code> の自動クリックを持ちます。desktop
+            は invoke、Android は
+            <code>__mcxPopupBridge</code>
+            に投げます。ポップアップは言語の即時切替の対象外で、作成時の言語で固定されます。
+          </p>
+
+          <h3 id="detail-header">header_customizer：React 製で大きい理由</h3>
+          <p>
+            表示するリンクを選ぶ独自メニューが状態を持つため React
+            で描画します。React 本体を同梱するので生成物は約 587KB（他の数
+            KB〜数十 KB と桁違い）。Vite の設定でも専用の
+            <code>--mode react</code> パスにして
+            <code>inlineDynamicImports</code> で 1
+            ファイルに固めます。全カラムに入れると重いので、
+            <b>ヘッダー非表示または投稿欄非表示が ON のカラムだけ</b> Rust
+            が連結します。設定変更時は『アンマウント →
+            必要なら再マウント』で整合を取ります。
+          </p>
+
+          <h3 id="detail-video">動画関連</h3>
+          <p>
+            <code>video_control</code> は
+            <code>HTMLMediaElement.prototype.play</code>
+            を差し替えて自動再生を抑えます（X のプレイヤーは pause されると
+            play() を再試行するため、最初の play() だけ通して 1
+            度止める工夫付き）。<code>video_long_press_menu</code> は DOM に URL
+            が無いため React Fiber の props から動画 variants
+            を取り出します。ダウンロードは Android ブリッジ専用です。
+          </p>
+
+          <h3 id="detail-ratelimit">
+            api_rate_limit_monitor：XHR を傍受して報告
+          </h3>
+          <p>
+            X の内部 API
+            の応答ヘッダ（<code>x-rate-limit-*</code>）を読み、バケットごとに
+            Rust へ報告します。表示側の設計は
+            <a href="../development/api-rate-limit-operations-notes.md"
+              >api-rate-limit-operations-notes.md</a
+            >
+            を参照。
+          </p>
+
+          <h3 id="detail-i18n">i18n ハブ</h3>
+          <p>
+            inject の自前 UI は ja/en 対応です。辞書は <code>i18n.ts</code> の
+            ja と en にあり、<code>t</code> は 現在言語 → ja →
+            キー文字列の順に引きます。静的要素は <code>apply</code> で
+            <code>data-mcx-i18n*</code>
+            を付け、言語切替時に自動再適用されます。React 描画のものは
+            <code>onChange</code> で追従します。
+          </p>
+        </section>
+
+        <section id="flows">
+          <h2>処理フロー</h2>
+          <p>ステップを順に再生できます（キーボードの ←/→ も可）。</p>
+          <div class="flow" data-flow="inject.settings-live"></div>
+          <div class="flow" data-flow="inject.invoke-rust"></div>
+          <div class="flow" data-flow="inject.dom-hide"></div>
+          <div class="flow" data-flow="inject.keyboard"></div>
+          <div class="flow" data-flow="inject.ratelimit"></div>
+        </section>
+
+        <section id="development">
+          <h2>開発・検証</h2>
+
+          <h3 id="dev-workflow">基本の流れ</h3>
+          <ol class="checklist" data-checklist="inject.dev-workflow">
+            <li>
+              <b><code>_src</code> の TypeScript を編集</b>
+              <div class="ck-body">
+                テストは同ディレクトリにコロケーション（<code
+                  >&lt;name&gt;.test.ts</code
+                >
+                / <code>&lt;name&gt;.property.test.ts</code>）。新規機能なら
+                <code class="path">vite.inject.config.ts</code> の
+                <code>plainEntries</code> にも追加。
+              </div>
+            </li>
+            <li>
+              <b><code>npm run build:inject</code></b>
+              <div class="ck-body">
+                開発起動中のアプリは再ビルドされる。Rust のテスト前にも必須。
+              </div>
+            </li>
+            <li>
+              <b>設定フラグが要るなら 7 箇所同期</b>
+              <div class="ck-body">
+                <code class="path">src-tauri/src/inject/mod.rs</code> の
+                <code>InitScriptParams</code> と <code>config_script</code>、
+                <code class="path">src-tauri/src/inject/_src/types.d.ts</code>
+                の <code>MultiColumnXConfig</code> など。
+              </div>
+            </li>
+            <li>
+              <b>新しい Rust コマンドを呼ぶなら ACL も同時に</b>
+              <div class="ck-body">
+                <code class="path">src-tauri/build.rs</code> の AppManifest と
+                <code class="path"
+                  >src-tauri/capabilities/column-webview.json</code
+                >。
+              </div>
+            </li>
+            <li>
+              <b>テストとビルドを通す</b>
+              <div class="ck-body">
+                <code>npm test</code>、Rust を触ったら
+                <code>cargo test</code> と <code>npm run lint:rust</code>。
+              </div>
+            </li>
+          </ol>
+
+          <h3 id="dev-realdom">実 DOM 検証のルール</h3>
+          <p>
+            jsdom の合成 DOM では X の実際の挙動を保証できません。<b
+              >新規作成や DOM 依存ロジックの変更では、実 X
+              での検証が必要か否かを必ずユーザーに確認</b
+            >し、必要なら claude-in-chrome で実ページの DOM
+            を調べてから完了とします（例：引用 RT の動画は status リンクが DOM
+            に無く、React Fiber の <code>tweet.id_str</code> からしか ID
+            が取れない、は実 DOM
+            調査でのみ判明）。実アプリ（WebView2）の検証手順（CDP 接続）は
+            <a href="../development/inject-ipc-shortcuts-notes.md">ノート</a
+            >にあります。
+          </p>
+
+          <h3 id="dev-tests">テストの種類</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>種類</th>
+                <th>何を守るか</th>
+                <th>場所／コマンド</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>単体（jsdom）</td>
+                <td>DOM 加工・イベント処理。合成 DOM で検証</td>
+                <td><code>_src/*.test.ts</code> / <code>npm test</code></td>
+              </tr>
+              <tr>
+                <td>プロパティテスト</td>
+                <td>純粋ロジックの不変条件（fast-check）</td>
+                <td>
+                  <code>_src/*.property.test.ts</code> /
+                  <code>npm run test:property</code>
+                </td>
+              </tr>
+              <tr>
+                <td>i18n 契約</td>
+                <td>ja/en のキー集合・補間変数の一致、日本語直書きの検出</td>
+                <td><code>i18n.contract.test.ts</code></td>
+              </tr>
+              <tr>
+                <td>Rust 側</td>
+                <td>連結順・含有・config の値・ACL の厳密一致</td>
+                <td>
+                  <code>inject/mod.rs</code> のテスト、<code
+                    >acl_contract.rs</code
+                  >
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="callout tip">
+            <b>X の画面と照合する日本語は許可リストに</b>
+            <p>
+              <code>hide_ad.ts</code> の <code>AD_TEXTS</code>、<code
+                >notification_header_hide.ts</code
+              >
+              の <code>aria-label="通知タイムライン"</code>、<code
+                >headerCustomizerTypes.ts</code
+              >
+              のキー／ariaLabel などは X
+              の画面の文言と照合する値なので翻訳しません。
+              <code>i18n.contract.test.ts</code>
+              の許可リスト（ファイル＋部分文字列＋理由）に載せ、未使用の許可項目が残るとテストが失敗します。
+            </p>
+          </div>
+
+          <h3 id="dev-forgot-build">ビルドを忘れたときの症状</h3>
+          <ul>
+            <li>
+              <b>Rust のビルド／テストが「ファイルが見つからない」で失敗</b
+              >：.js が一度も生成されていない。
+            </li>
+            <li>
+              <b>挙動が直らない／テストが古い JS で通る</b>：_src を直したが
+              build:inject していない（.js は include_str!
+              で埋め込まれた古いまま）。
+            </li>
+            <li>
+              <b>新機能が動かない</b>：<code>plainEntries</code>
+              に追加しておらず .js が出力されていない、または
+              <code>mod.rs</code> で連結していない。
+            </li>
+          </ul>
+        </section>
+
+        <section id="pitfalls">
+          <h2>落とし穴・関連資料</h2>
+          <div class="callout danger">
+            <b>import 禁止と重複定義</b>
+            <p>
+              共有チャンクを作る import
+              は連結を壊します。定数は各ファイルにローカル定義し、<code
+                >constants.ts</code
+              >
+              は参照用。Window 拡張の型もメインアプリ用と inject 用の 2
+              箇所があり、手動で同期します。グローバル名（<code
+                >__multiColumnX</code
+              >
+              など）を変えるときは、型 2 箇所・各スクリプトのローカル定数・Rust
+              の <code>ipc_constants::globals</code>・<code>ipc.ts</code> の
+              eval テンプレート（直接埋め込み）まで見直します。
+            </p>
+          </div>
+          <div class="callout warn">
+            <b>連結順と名前衝突</b>
+            <p>
+              return_to_last_read は auto_reload より後ろ、dom_observer と i18n
+              は最初。順序を変えるとテストが落ちます。連結後は 1
+              本のスクリプトなので、トップレベル名の重複に注意。
+            </p>
+          </div>
+          <div class="callout warn">
+            <b>多重注入・観測ループ</b>
+            <p>
+              ページ遷移のたびに再注入されるため、冪等に（例：dom_observer
+              は二重生成しない、auto_reload は
+              <code>disposeAutoReloadWatchers</code>
+              で前回を解除）。自分の描画が DOM
+              監視に拾われて無限ループにならないよう、値が変わるときだけ DOM
+              を更新します。
+            </p>
+          </div>
+          <div class="callout note">
+            <b>Android 固有</b>
+            <p>
+              Android のカラムには Tauri IPC が無く、<code
+                >report_new_posts_count</code
+              >
+              のような invoke
+              は何も起きません。必要な機能はブリッジ経由で別実装します。MainActivity.kt
+              のシグネチャを変えたら ProGuard の keep ルールも更新が必要です（<a
+                href="../development/android-notes.md"
+                >android-notes.md</a
+              >）。
+            </p>
+          </div>
+
+          <h3 id="pitfall-docs">関連資料</h3>
+          <ul>
+            <li>
+              <a href="../development/inject-ipc-shortcuts-notes.md"
+                >inject-ipc-shortcuts-notes.md</a
+              >
+              ：ビルド・IPC 定数・ショートカット・自動更新と前回の境目の実測結果
+            </li>
+            <li>
+              <a href="../development/i18n-notes.md">i18n-notes.md</a
+              >：多言語の規約
+            </li>
+            <li>
+              <a href="../development/android-notes.md">android-notes.md</a
+              >：Android ブリッジと ProGuard
+            </li>
+            <li>
+              <a href="../development/api-rate-limit-operations-notes.md"
+                >api-rate-limit-operations-notes.md</a
+              >
+            </li>
+            <li>
+              <a href="../development/tauri-commands.md">tauri-commands.md</a
+              >：コマンド一覧と ACL
+            </li>
+            <li>
+              <code class="path">.claude/skills/inject-script-dev/SKILL.md</code
+              >：開発ワークフロー
+            </li>
+          </ul>
+        </section>
+      </main>
+    </div>
+    <aside id="mcx-detail" hidden></aside>
+    <script src="assets/data/index.js"></script>
+    <script src="assets/data/inject.js"></script>
+    <script src="assets/common.js"></script>
+  </body>
+</html>
