@@ -719,6 +719,8 @@ summary {
   border-top: 1px dashed var(--border);
   padding-top: 8px;
   min-height: 4em;
+  /* コマンド名など空白の無い長いラベルが狭い画面ではみ出さないように */
+  overflow-wrap: anywhere;
 }
 .fl-detail h4 {
   margin: 0 0 0.3em;
@@ -776,6 +778,10 @@ summary {
   color: var(--fg-muted);
   font-size: 13px;
   margin: 4px 0;
+}
+/* 列が多い一覧は本文幅を超えるため、ページ全体ではなく一覧の中だけ横スクロールさせる */
+.cat-body {
+  overflow-x: auto;
 }
 .cat-table {
   display: table;
