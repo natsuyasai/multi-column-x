@@ -118,8 +118,8 @@ function checkRepoPath(where, raw) {
 
 function pathsInHtml(html) {
   const out = [];
-  const re = /<code\s+class="path"[^>]*>([\s\S]*?)<\/code>/g;
-  for (let m; (m = re.exec(html)); ) out.push(decodeEntities(m[1]));
+  const re = /<code\s+class="path"[^>]*>([\s\S]*?)<\/code\s*>/g;
+  for (let m; (m = re.exec(html)); ) out.push(decodeEntities(m[1]).trim());
   return out;
 }
 
