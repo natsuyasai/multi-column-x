@@ -129,12 +129,13 @@ cd src-tauri && cargo test   # Rust 単体テスト
 
 ## ドキュメント
 
-| ドキュメント                                                          | 内容                                                         |
-| --------------------------------------------------------------------- | ------------------------------------------------------------ |
-| [利用ガイド](https://natsuyasai.github.io/multi-column-x/)            | アプリの使い方（利用者向け）                                 |
-| [開発ノート一覧](docs/development/README.md)                          | 設計判断・落とし穴・仕様の背景（開発者向け）                 |
-| [プロジェクト構成](docs/development/project-structure.md)             | `src/` / `src-tauri/` / Android Kotlin 層のファイル構成      |
-| [Tauri コマンド一覧](docs/development/tauri-commands.md)              | アプリ独自コマンドと ACL 更新ルール                          |
-| [アーキテクチャ上の注意点](docs/development/architecture-overview.md) | WebView・remote capability・更新セキュリティ・条件コンパイル |
-| [Linux カラム WebView 仕様](docs/development/linux-column-spec.md)    | 配置・クリッピング・クラッシュ対策・GStreamer 同梱           |
-| [CLAUDE.md](CLAUDE.md)                                                | 開発ガイドライン・アーキテクチャ上の制約                     |
+| ドキュメント                                                          | 内容                                                                                          |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| [利用ガイド](https://natsuyasai.github.io/multi-column-x/)            | アプリの使い方（利用者向け）                                                                  |
+| [開発者ガイド](docs/developer-guide/index.html)                       | 全体像・各層の設計・機能追加レシピ（初めての開発者向け。ブラウザで開くインタラクティブ HTML） |
+| [開発ノート一覧](docs/development/README.md)                          | 設計判断・落とし穴・仕様の背景（開発者向け）                                                  |
+| [プロジェクト構成](docs/development/project-structure.md)             | `src/` / `src-tauri/` / Android Kotlin 層のファイル構成                                       |
+| [Tauri コマンド一覧](docs/development/tauri-commands.md)              | アプリ独自コマンドと ACL 更新ルール                                                           |
+| [アーキテクチャ上の注意点](docs/development/architecture-overview.md) | WebView・remote capability・更新セキュリティ・条件コンパイル                                  |
+| [Linux カラム WebView 仕様](docs/development/linux-column-spec.md)    | 配置・クリッピング・クラッシュ対策・GStreamer 同梱                                            |
+| [CLAUDE.md](CLAUDE.md)                                                | 開発ガイドライン・アーキテクチャ上の制約                                                      |
