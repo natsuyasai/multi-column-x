@@ -384,6 +384,14 @@ function checkIndex(pages, data) {
       );
   }
   for (const p of pages) {
+    // id の無い見出しは目次・横断検索から漏れる（section 側に id を付けた誤りを含む）
+    for (const level of [2, 3]) {
+      const missing = (
+        p.html.match(new RegExp(`<h${level}(\\s[^>]*)?>`, "g")) ?? []
+      ).filter((tag) => !/\sid="/.test(tag)).length;
+      if (missing)
+        error("index", p.file, `id の無い h${level} が ${missing} 件ある`);
+    }
     for (const id of headingIds(p.html, 2)) {
       if (!indexed.has(`${p.pageId}#${id}`))
         error("index", p.file, `h2「${id}」が MCX_DATA.index に未登録`);
