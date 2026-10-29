@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="mcx-synced-commit" content="68b23eed" />
+    <title>全体像 | MCX 開発者ガイド</title>
+    <link rel="stylesheet" href="assets/common.css" />
+  </head>
+  <body data-page="index">
+    <div id="mcx-header"></div>
+    <div class="layout">
+      <nav id="mcx-toc"></nav>
+      <main id="content">
+        <h1>Multi Column X 開発者ガイド</h1>
+        <p class="lead">
+          このページでは、アプリの全体構成（どんな部品がどの順で動くか）、層と層をつなぐインターフェース、主要な処理の流れ、開発環境とテスト、開発の進め方を俯瞰します。各層の詳細は専用ページへ進んでください。
+        </p>
+
+        <section>
+          <h2 id="guide-usage">このガイドの使い方</h2>
+          <h3 id="guide-order">読む順番</h3>
+          <ol>
+            <li>
+              このページで全体像（特に「全体アーキテクチャ」と「主要フロー」）をつかむ
+            </li>
+            <li>
+              触りたい層のページへ:
+              <a href="react.html">React</a> / <a href="rust.html">Rust</a> /
+              <a href="android.html">Android</a> /
+              <a href="inject.html">inject</a>
+            </li>
+            <li>
+              実際に機能を足すときは
+              <a href="howto.html">機能追加ハウツー</a>
+              のチェックリストを上から順に
+            </li>
+          </ol>
+          <h3 id="guide-pages">ページ一覧</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>ページ</th>
+                <th>内容</th>
+                <th>こんなときに</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><a href="react.html">react.html</a></td>
+                <td>フロントエンド（React / TypeScript / Zustand）</td>
+                <td>画面・状態・設定 UI を変えたい</td>
+              </tr>
+              <tr>
+                <td><a href="rust.html">rust.html</a></td>
+                <td>バックエンド（Rust / Tauri コマンド・WebView 管理）</td>
+                <td>コマンド追加、WebView 生成、永続化を変えたい</td>
+              </tr>
+              <tr>
+                <td><a href="android.html">android.html</a></td>
+                <td>Android ネイティブ層（Kotlin）</td>
+                <td>Android 固有の挙動、JNI、ブリッジを変えたい</td>
+              </tr>
+              <tr>
+                <td><a href="inject.html">inject.html</a></td>
+                <td>X の画面に注入するスクリプト</td>
+                <td>X の表示加工・フィルタを変えたい</td>
+              </tr>
+              <tr>
+                <td><a href="howto.html">howto.html</a></td>
+                <td>機能追加のチェックリスト</td>
+                <td>手を動かして機能を足す</td>
+              </tr>
+            </tbody>
+          </table>
+          <h3 id="guide-parts">ページ上の部品の操作</h3>
+          <ul>
+            <li>
+              <b>構成図</b>:
+              箱（ノード）をクリックすると右に詳細パネルが開きます。Esc か ×
+              で閉じます。パネル内の「関連」リンクで別の箱へ移動できます。
+            </li>
+            <li>
+              <b>フロー図</b>: ▶ で自動再生、◀ ▶
+              でコマ送り。フローにフォーカスして ← → キーでも動かせます。
+            </li>
+            <li>
+              <b>一覧（catalog）</b>:
+              検索ボックスとチップで絞り込み、行をクリックすると詳細が開きます。
+            </li>
+            <li>
+              <b>用語</b>: 破線の下線がある語は、ホバー /
+              タップで説明が出ます（例:
+              <span class="term" data-term="アプリに埋め込まれたブラウザ部品。"
+                >WebView</span
+              >）。
+            </li>
+            <li>ヘッダーの検索は全ページ横断で見出し・一覧項目を探せます。</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 id="about">Multi Column X とは</h2>
+          <p>
+            TweetDeck スタイルの Twitter/X
+            クライアントです。複数アカウント・複数カラム（ホーム、通知、検索、リスト、カスタム
+            URL、投稿専用、外部 URL）を 1 画面に並べて表示します。<b
+              >X の画面そのものは x.com を WebView で直接表示</b
+            >し、その上に NG
+            ワード・広告非表示・自動更新などの加工をスクリプト注入で加える、というのが基本の作りです。
+          </p>
+          <h3 id="about-platforms">対応プラットフォーム</h3>
+          <ul>
+            <li>
+              デスクトップ: Windows / Linux（配布は Windows インストーラ・Linux
+              AppImage・deb。コード上は <code>#[cfg(desktop)]</code>）
+            </li>
+            <li>
+              Android: APK（<code>#[cfg(mobile)]</code> /
+              <code>target_os = "android"</code>）
+            </li>
+          </ul>
+          <h3 id="about-stack">技術スタック</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>層</th>
+                <th>技術</th>
+                <th>主な場所</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="badge" data-layer="react">React</span></td>
+                <td>
+                  React 19 + TypeScript + Vite、SCSS Modules、Zustand、i18next
+                </td>
+                <td><code class="path">src/App.tsx</code></td>
+              </tr>
+              <tr>
+                <td><span class="badge" data-layer="rust">Rust</span></td>
+                <td>
+                  Rust +
+                  <span
+                    class="term"
+                    data-term="Rust 製のアプリ基盤。UI を OS の WebView で描画し、Rust と JS が IPC で通信する。本プロジェクトは v2。"
+                    >Tauri</span
+                  >
+                  v2、tauri-plugin-store
+                </td>
+                <td><code class="path">src-tauri/src/lib.rs</code></td>
+              </tr>
+              <tr>
+                <td><span class="badge" data-layer="inject">inject</span></td>
+                <td>TypeScript（Vite でバンドルした JS を WebView へ注入）</td>
+                <td><code class="path">src-tauri/src/inject/mod.rs</code></td>
+              </tr>
+              <tr>
+                <td><span class="badge" data-layer="android">Android</span></td>
+                <td>Kotlin（Gradle）。Rust と JNI で接続</td>
+                <td>
+                  <code class="path">src-tauri/src/android_bridge.rs</code>
+                </td>
+              </tr>
+              <tr>
+                <td>テスト</td>
+                <td>
+                  Vitest、Storybook、fast-check、cargo test、Gradle 単体テスト
+                </td>
+                <td><code class="path">vitest.config.ts</code></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="callout note">
+            <b>押さえる前提</b>
+            <p>
+              Tauri では、アプリの画面は OS の WebView（ブラウザ部品）に HTML/JS
+              で描かれ、ネイティブ処理は Rust が担当します。両者は
+              <span
+                class="term"
+                data-term="JS から Rust の関数を呼ぶ仕組み。invoke('名前', 引数) が Promise を返す。"
+                >invoke</span
+              >
+              （呼び出し）と
+              <span
+                class="term"
+                data-term="Rust がイベントを発行し JS が listen で受け取る通知の仕組み。"
+                >emit</span
+              >
+              （通知）でやり取りします。
+            </p>
+          </div>
+        </section>
+
+        <section>
+          <h2 id="architecture">全体アーキテクチャ</h2>
+          <p>
+            まず「<b>WebView が複数ある</b>」ことを理解するのが近道です。メイン
+            UI 用の WebView が 1 つ、その上（または横）に、カラムごとの x.com 用
+            WebView が並びます。箱をクリックすると詳細が開きます。
+          </p>
+          <div class="tabs">
+            <div class="tab" data-tab="desktop" data-label="デスクトップ">
+              <div class="diagram" data-diagram>
+                <div class="dg-group" data-layer="react">
+                  <div class="dg-title">メインウィンドウ（1 つの WebView）</div>
+                  <button class="dg-node" data-detail="index.main-window">
+                    React UI（App / Zustand）
+                  </button>
+                </div>
+                <div class="dg-arrow" data-label="invoke / emit / eval">⇅</div>
+                <div class="dg-group" data-layer="rust">
+                  <div class="dg-title">Rust バックエンド（単一プロセス）</div>
+                  <button class="dg-node" data-detail="index.rust-commands">
+                    Tauri コマンド・状態
+                  </button>
+                  <button class="dg-node" data-detail="index.settings-file">
+                    settings.json
+                  </button>
+                  <button class="dg-node" data-detail="index.popup-compose">
+                    ポップアップ / コンポーズ生成
+                  </button>
+                </div>
+                <div class="dg-arrow" data-label="add_child / init script">
+                  ⇅
+                </div>
+                <div class="dg-group" data-layer="inject">
+                  <div class="dg-title">カラム WebView（カラム数ぶん）</div>
+                  <button class="dg-node" data-detail="index.column-webview">
+                    x.com（アカウント別データディレクトリ）
+                  </button>
+                  <button class="dg-node" data-detail="index.inject">
+                    inject スクリプト
+                  </button>
+                </div>
+              </div>
+              <p>
+                デスクトップでは、カラム WebView は Rust が
+                <code>window.add_child()</code>
+                でメインウィンドウに貼り付ける<b>子 WebView</b>です。Linux
+                だけは親クリップが効かないため独立ウィンドウになります（
+                <a href="../development/linux-column-spec.md"
+                  >linux-column-spec.md</a
+                >）。
+              </p>
+            </div>
+            <div class="tab" data-tab="android" data-label="Android">
+              <div class="diagram" data-diagram>
+                <div class="dg-group" data-layer="android">
+                  <div class="dg-title">MainActivity（1 つの Activity）</div>
+                  <button class="dg-node" data-detail="index.android-main">
+                    FrameLayout にカラム WebView を重ねる
+                  </button>
+                  <button class="dg-node" data-detail="index.android-profile">
+                    WebView Profile（アカウント分離）
+                  </button>
+                  <button
+                    class="dg-node"
+                    data-detail="index.android-add-account"
+                  >
+                    AddAccount Activity
+                  </button>
+                </div>
+                <div class="dg-arrow" data-label="JNI">⇅</div>
+                <div class="dg-group" data-layer="rust">
+                  <div class="dg-title">
+                    Rust（同一プロセス内の共有ライブラリ）
+                  </div>
+                  <button class="dg-node" data-detail="index.android-bridge-rs">
+                    android_bridge.rs
+                  </button>
+                  <button class="dg-node" data-detail="index.rust-commands">
+                    Tauri コマンド・状態
+                  </button>
+                </div>
+                <div class="dg-arrow" data-label="invoke / emit">⇅</div>
+                <div class="dg-group" data-layer="react">
+                  <div class="dg-title">メイン WebView（背面）</div>
+                  <button class="dg-node" data-detail="index.main-window">
+                    React UI（タブバー等）
+                  </button>
+                </div>
+                <div class="dg-arrow" data-label="addWebMessageListener">⇅</div>
+                <div class="dg-group" data-layer="inject">
+                  <div class="dg-title">カラム WebView（ネイティブ）</div>
+                  <button class="dg-node" data-detail="index.android-bridge-kt">
+                    JS ブリッジ
+                  </button>
+                  <button class="dg-node" data-detail="index.inject">
+                    inject スクリプト
+                  </button>
+                </div>
+              </div>
+              <p>
+                Android では Tauri の <code>add_child()</code>
+                が使えないため、カラムは Tauri の WebView ではなく
+                <b>Android ネイティブの WebView</b>です。Rust が JNI で
+                <code>MainActivity</code>
+                を呼び、React の WebView の上に重ねて表示します。ネイティブ
+                WebView には Tauri IPC が無いので、inject から Rust への通信は
+                JS ブリッジ → Kotlin → JNI という別経路になります。
+              </p>
+              <div class="callout warn">
+                <b>desktop との主な差</b>
+                <p>
+                  カラムの生成主体（Rust の Tauri API か Kotlin のネイティブ API
+                  か）、inject
+                  の通信経路、アカウント追加の完了検出、コンポーズ（Android は X
+                  公式アプリを Intent で起動）が異なります。同名コマンドでも
+                  <code>#[cfg(desktop)]</code> / <code>#[cfg(mobile)]</code>
+                  で実装が分かれるので、変更時は両方を確認してください。
+                </p>
+              </div>
+            </div>
+          </div>
+          <h3 id="arch-rules">構成上の重要な制約</h3>
+          <ul>
+            <li>
+              子 WebView は OS ネイティブ部品のため CSS の <code>z-index</code>
+              が効きません。ダイアログ表示中はカラムを画面外へ退避します（
+              <a href="../development/column-layout-notes.md"
+                >column-layout-notes.md</a
+              >）。
+            </li>
+            <li>
+              アカウントごとに <code>data_directory</code>（Android は
+              Profile）を 分けて Cookie を混ぜません。
+            </li>
+            <li>
+              x.com に IPC を開放するのは <code>column-webview</code> capability
+              の remote 設定で、対象ドメインは x.com / twitter.com
+              系に限定されています。
+            </li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 id="interfaces">層間インターフェース総覧</h2>
+          <p>
+            層をまたぐ通信は次の種類に集約されます。名前の二重定義（Rust と
+            TS）は契約テストで同期が検証されます。
+          </p>
+          <div class="catalog" data-catalog="index.interfaces"></div>
+          <div class="callout tip">
+            <b>迷ったら</b>
+            <p>
+              「どの方向に何を渡したいか」で上の表から選びます。React → Rust
+              なら invoke、Rust → React なら emit、X の画面の加工が目的なら
+              inject、Android 固有なら JNI / ブリッジです。
+            </p>
+          </div>
+        </section>
+
+        <section>
+          <h2 id="flows">主要フロー</h2>
+          <p>
+            実コードで確認した流れです。▶
+            で再生、各ステップの詳細は下部に表示されます。
+          </p>
+          <h3 id="flow-startup">アプリ起動〜カラム表示</h3>
+          <div class="flow" data-flow="index.startup"></div>
+          <h3 id="flow-add-account">
+            アカウント追加（desktop / Android の差）
+          </h3>
+          <div class="tabs">
+            <div class="tab" data-tab="desktop" data-label="デスクトップ">
+              <div class="flow" data-flow="index.add-account-desktop"></div>
+            </div>
+            <div class="tab" data-tab="android" data-label="Android">
+              <div class="flow" data-flow="index.add-account-mobile"></div>
+            </div>
+          </div>
+          <h3 id="flow-settings">設定変更が各カラムに反映されるまで</h3>
+          <div class="flow" data-flow="index.settings-apply"></div>
+          <h3 id="flow-report">inject からの通知（新着数）</h3>
+          <div class="flow" data-flow="index.inject-report"></div>
+        </section>
+
+        <section>
+          <h2 id="directories">ディレクトリ構成マップ</h2>
+          <p>主要ディレクトリの役割です。行をクリックすると詳細が開きます。</p>
+          <div class="catalog" data-catalog="index.directories"></div>
+          <p>
+            ファイル単位の一覧は
+            <a href="../development/project-structure.md"
+              >project-structure.md</a
+            >
+            にあります。
+          </p>
+        </section>
+
+        <section>
+          <h2 id="build-test">開発環境・ビルド・テスト</h2>
+          <h3 id="bt-prereq">前提ツール</h3>
+          <ul>
+            <li>
+              Node.js 22 以上、Rust / Cargo、Tauri の前提条件（Windows は
+              WebView2 など）
+            </li>
+            <li>
+              Android を触る場合は Android Studio / SDK（Gradle は
+              <code>src-tauri/gen/android</code> 内）
+            </li>
+            <li>初回は <code>npm install</code></li>
+          </ul>
+          <h3 id="bt-commands">コマンド早見表</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>コマンド</th>
+                <th>用途</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>npm run tauri:dev</code></td>
+                <td>開発起動（先に <code>build:inject</code> を実行）</td>
+              </tr>
+              <tr>
+                <td><code>npm run build:inject</code></td>
+                <td>inject スクリプトのみビルド</td>
+              </tr>
+              <tr>
+                <td>
+                  <code>npm run tauri:build</code> /
+                  <code>tauri:build:debug</code>
+                </td>
+                <td>リリース / デバッグビルド</td>
+              </tr>
+              <tr>
+                <td><code>npm run tauri:android:build</code></td>
+                <td>Android ビルド</td>
+              </tr>
+              <tr>
+                <td><code>npm run format</code></td>
+                <td>TS / Rust / Kotlin の整形</td>
+              </tr>
+              <tr>
+                <td>
+                  <code>npm run typecheck</code> / <code>npm run lint</code>
+                </td>
+                <td>型チェック / ESLint（<code>lint:fix</code> で自動修正）</td>
+              </tr>
+              <tr>
+                <td><code>npm run lint:rust</code></td>
+                <td>clippy（警告もエラー）</td>
+              </tr>
+              <tr>
+                <td><code>npm run docs:build</code></td>
+                <td>
+                  ユーザーガイド（VitePress）のビルド。リンク切れ検出を兼ねる
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="callout warn">
+            <b>cargo test の前提</b>
+            <p>
+              <code>cargo test --manifest-path src-tauri/Cargo.toml</code>
+              の前に <code>npm run build:inject</code> が必要です（Rust が
+              inject の <code>*.js</code> を
+              <code>include_str!</code> で取り込むため）。inject の
+              <code>*.js</code>
+              は成果物で gitignore 対象、直接編集は禁止です。
+            </p>
+          </div>
+          <h3 id="bt-tests">テスト体系</h3>
+          <div class="catalog" data-catalog="index.tests"></div>
+          <h3 id="bt-contract">契約テストが守っているもの</h3>
+          <p>
+            このプロジェクトには「2
+            か所以上に同じ事実を書かざるを得ない」箇所が多く、食い違いは実行時まで気づきにくい（特にリリースビルドや
+            Android）ため、機械的に検査しています。
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>守っているもの</th>
+                <th>検査するテスト</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>コマンドの ACL（build.rs・capability・実装）の漏れ</td>
+                <td><code class="path">src-tauri/src/acl_contract.rs</code></td>
+              </tr>
+              <tr>
+                <td>IPC 名・イベント名の Rust/TS 一致</td>
+                <td>
+                  <code class="path">src/constants/ipc.contract.test.ts</code>
+                </td>
+              </tr>
+              <tr>
+                <td>設定既定値の Rust / TS / fixture の一致</td>
+                <td>
+                  <code class="path">src/types/defaults.contract.test.ts</code>
+                </td>
+              </tr>
+              <tr>
+                <td>SCSS 寸法と rem 定数の一致</td>
+                <td>
+                  <code class="path">src/lib/gridLayout.contract.test.ts</code>
+                </td>
+              </tr>
+              <!-- prettier-ignore -->
+              <tr><td>配色のコントラスト</td><td><code class="path">src/lib/themeContrast.contract.test.ts</code></td></tr>
+              <!-- prettier-ignore -->
+              <tr><td>Android スワイプバーの色同期</td><td><code class="path">src/lib/swipeBarColors.contract.test.ts</code></td></tr>
+              <!-- prettier-ignore -->
+              <tr><td>辞書の ja/en キー集合</td><td><code class="path">src/i18n/resources.contract.test.ts</code></td></tr>
+              <!-- prettier-ignore -->
+              <tr><td>辞書の未使用キー</td><td><code class="path">src/i18n/unusedKeys.contract.test.ts</code></td></tr>
+              <tr>
+                <td>開発者向けログ・panic が英語であること</td>
+                <td>
+                  <code class="path"
+                    >src-tauri/src/log_language_contract.rs</code
+                  >
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <p>
+            契約テストが赤くなったら「どれかの定義だけを直した」サインです。メッセージに従い、対になる箇所も同時に更新します。
+          </p>
+        </section>
+
+        <section>
+          <h2 id="workflow">開発の進め方</h2>
+          <p>
+            詳細は <code class="path">CLAUDE.md</code> と
+            <code>.claude/skills/</code> にあります。要点だけ示します。
+          </p>
+          <ul>
+            <li>
+              <b>ブランチ</b>: develop を最新化 → develop から作業ブランチ →
+              作業完了後 push → develop への
+              PR。新規ブランチ作成前にユーザー確認。
+            </li>
+            <li>
+              <b>1 度に 1 つのこと</b
+              >を行い、作業ごとにコミット。必ずテストを書く。
+            </li>
+            <li>
+              <b>仕様はGherkin</b
+              >（<code>docs/specs/&lt;機能名&gt;.feature</code>、日本語）で承認を得る（機能追加・挙動変更・バグ修正）。→
+              <code class="path">.claude/skills/gherkin-spec/SKILL.md</code>
+            </li>
+            <li>
+              <b>TDD</b>（t-wada 流）。Gherkin
+              由来のテストは実装後作成も可だが、ミューテーション確認は必須。→
+              <code class="path">.claude/skills/tdd/SKILL.md</code>
+            </li>
+            <!-- prettier-ignore -->
+            <li>全体フロー（要求明確化 → プラン → 実装 → プロパティテスト → 完了処理）→ <code class="path">.claude/skills/feature-development-flow/SKILL.md</code></li>
+            <li>
+              完了時はフォーマッターとテストをオールグリーンにする。テスト名は日本語、Rust
+              のテスト関数名に ASCII 大文字を使わない。
+            </li>
+            <li>
+              UI の寸法は
+              <code>rem</code>、画面文言は辞書（i18n）に置く（日本語の直書きは
+              ESLint でエラー）。
+            </li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 id="glossary">用語集</h2>
+          <div class="catalog" data-catalog="index.glossary"></div>
+        </section>
+
+        <section>
+          <h2 id="notes">既存の開発ノート（docs/development）への案内</h2>
+          <p>
+            このガイドは全体像と各層の入門を担い、判断の経緯や落とし穴の詳細は次のノートが一次資料です。一覧は
+            <a href="../development/README.md">開発ノート README</a>。
+          </p>
+          <div class="catalog" data-catalog="index.notes"></div>
+        </section>
+      </main>
+    </div>
+    <aside id="mcx-detail" hidden></aside>
+    <script src="assets/data/index.js"></script>
+    <script src="assets/data/index-page.js"></script>
+    <script src="assets/common.js"></script>
+  </body>
+</html>
