@@ -21,8 +21,8 @@
           各モジュールの役割・設計判断・落とし穴（詳細設計）を説明します。
         </p>
 
-        <section id="prerequisites">
-          <h2>前提知識</h2>
+        <section>
+          <h2 id="prerequisites">前提知識</h2>
           <p>
             Rust や Tauri
             を触ったことがなくても読めるよう、このプロジェクトを読むのに最低限必要な概念だけ挙げます。
@@ -129,8 +129,8 @@
           </table>
         </section>
 
-        <section id="external">
-          <h2>外部設計</h2>
+        <section>
+          <h2 id="external">外部設計</h2>
 
           <h3 id="external-role">責務と境界</h3>
           <ul>
@@ -246,8 +246,8 @@
           <div class="flow" data-flow="rust.acl"></div>
         </section>
 
-        <section id="modules">
-          <h2>モジュール構成</h2>
+        <section>
+          <h2 id="modules">モジュール構成</h2>
           <p>ノードをクリックすると詳細が開きます。</p>
           <div class="diagram" data-diagram>
             <div class="dg-group" data-layer="rust">
@@ -315,8 +315,8 @@
           </div>
         </section>
 
-        <section id="commands">
-          <h2>Tauri コマンド一覧</h2>
+        <section>
+          <h2 id="commands">Tauri コマンド一覧</h2>
           <p>
             <code>src-tauri/build.rs</code> の AppManifest
             に列挙された全コマンドです。「呼び出し元」はコード上の検査または
@@ -330,16 +330,16 @@
           </p>
         </section>
 
-        <section id="events-state">
-          <h2>イベントと State</h2>
+        <section>
+          <h2 id="events-state">イベントと State</h2>
           <h3 id="events">発行イベント</h3>
           <div class="catalog" data-catalog="rust.events"></div>
           <h3 id="state">管理状態と共有定数</h3>
           <div class="catalog" data-catalog="rust.state"></div>
         </section>
 
-        <section id="settings">
-          <h2>設定の永続化</h2>
+        <section>
+          <h2 id="settings">設定の永続化</h2>
           <p>
             設定は tauri-plugin-store が
             <code>settings.json</code> に持ちます。壊れても起動できるよう、
@@ -394,8 +394,8 @@
           </p>
         </section>
 
-        <section id="webviews">
-          <h2>WebView 管理</h2>
+        <section>
+          <h2 id="webviews">WebView 管理</h2>
           <p>
             X の画面は WebView で表示します。種類は 3
             つで、ラベル接頭辞で区別します （<code>column-</code> /
@@ -532,8 +532,8 @@
           </p>
         </section>
 
-        <section id="accounts">
-          <h2>アカウントとログイン検出</h2>
+        <section>
+          <h2 id="accounts">アカウントとログイン検出</h2>
           <p>
             アカウントごとに独立したデータディレクトリ（Cookie
             等）を持ち、WebView の <code>data_directory</code> として使います。
@@ -585,8 +585,8 @@
           </ul>
         </section>
 
-        <section id="errors">
-          <h2>エラー設計</h2>
+        <section>
+          <h2 id="errors">エラー設計</h2>
           <ul>
             <li>
               <b>Rust は文章を返さない。</b>新しめのコマンドは
@@ -625,8 +625,8 @@
           <p>詳細：<a href="../development/i18n-notes.md">i18n-notes.md</a></p>
         </section>
 
-        <section id="other-features">
-          <h2>その他の機能</h2>
+        <section>
+          <h2 id="other-features">その他の機能</h2>
           <h3 id="feature-update">自動更新</h3>
           <div class="tabs">
             <div class="tab" data-tab="desktop" data-label="デスクトップ">
@@ -703,8 +703,8 @@
           </p>
         </section>
 
-        <section id="flows">
-          <h2>主要フロー</h2>
+        <section>
+          <h2 id="flows">主要フロー</h2>
           <ul>
             <li>
               <a href="#settings"
@@ -720,8 +720,8 @@
           </ul>
         </section>
 
-        <section id="conventions">
-          <h2>規約とテスト</h2>
+        <section>
+          <h2 id="conventions">規約とテスト</h2>
           <ul>
             <li>
               テスト関数名は日本語で書く。<b>ASCII 大文字を含めない</b>（<code
@@ -832,8 +832,8 @@
           </table>
         </section>
 
-        <section id="pitfalls">
-          <h2>落とし穴・関連資料</h2>
+        <section>
+          <h2 id="pitfalls">落とし穴・関連資料</h2>
           <div class="callout danger">
             <b>よくある事故</b>
             <ul>

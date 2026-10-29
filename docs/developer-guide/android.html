@@ -35,8 +35,8 @@
           </p>
         </div>
 
-        <section id="prerequisites">
-          <h2>前提知識</h2>
+        <section>
+          <h2 id="prerequisites">前提知識</h2>
           <p>
             Android や Tauri の Android
             対応に慣れていない人向けに、このページを読むための最低限をまとめます。
@@ -134,8 +134,8 @@
           </table>
         </section>
 
-        <section id="external">
-          <h2>外部設計: Android 層の責務</h2>
+        <section>
+          <h2 id="external">外部設計: Android 層の責務</h2>
           <p>
             デスクトップではカラムが独立した Tauri の WebView
             として作られますが、Android では
@@ -201,8 +201,8 @@
           </div>
         </section>
 
-        <section id="files">
-          <h2>構成図とファイル一覧</h2>
+        <section>
+          <h2 id="files">構成図とファイル一覧</h2>
           <p>ノードをクリックすると詳細が開きます。</p>
           <div class="diagram" data-diagram>
             <div class="dg-group" data-layer="inject">
@@ -254,8 +254,8 @@
           <div class="catalog" data-catalog="android.files"></div>
         </section>
 
-        <section id="interfaces">
-          <h2>インターフェース一覧</h2>
+        <section>
+          <h2 id="interfaces">インターフェース一覧</h2>
           <h3 id="if-rust-to-kotlin">Rust → Kotlin</h3>
           <p>
             <code>android_bridge.rs</code> が
@@ -280,8 +280,8 @@
           <div class="catalog" data-catalog="android.sentinels"></div>
         </section>
 
-        <section id="accounts">
-          <h2>アカウント追加・再認証（AddAccount）</h2>
+        <section>
+          <h2 id="accounts">アカウント追加・再認証（AddAccount）</h2>
           <ul>
             <li>
               Rust の <code>open_add_account_window</code>（mobile 版）が新しい
@@ -316,8 +316,8 @@
           </ul>
         </section>
 
-        <section id="webview-profiles">
-          <h2>WebView プロファイルとセッション分離</h2>
+        <section>
+          <h2 id="webview-profiles">WebView プロファイルとセッション分離</h2>
           <p>
             <code>WebViewProfiles</code> が Profile
             API（<code>WebViewFeature.MULTI_PROFILE</code>）の対応判定と適用を担当します。プロファイル名は
@@ -379,8 +379,8 @@
           </p>
         </section>
 
-        <section id="swipe-bar">
-          <h2>スワイプバー</h2>
+        <section>
+          <h2 id="swipe-bar">スワイプバー</h2>
           <p>
             カラム下端の横スワイプ領域は、<code>SwipeBarOverlayView</code>（ネイティブ
             View）で実装しています。WebView より手前に置くことで、X
@@ -418,8 +418,8 @@
           </ul>
         </section>
 
-        <section id="media">
-          <h2>ファイル選択・動画ダウンロード</h2>
+        <section>
+          <h2 id="media">ファイル選択・動画ダウンロード</h2>
           <h3 id="media-chooser">ファイル選択</h3>
           <p>
             ネイティブ WebView は <code>onShowFileChooser</code> を実装しないと
@@ -470,8 +470,8 @@
           </ul>
         </section>
 
-        <section id="update-backup">
-          <h2>APK 自己更新・バックアップ</h2>
+        <section>
+          <h2 id="update-backup">APK 自己更新・バックアップ</h2>
           <h3 id="update">APK 自己更新</h3>
           <p>
             Rust の <code>install_apk_update</code> が URL・呼び出し元を検証して
@@ -515,8 +515,8 @@
           </p>
         </section>
 
-        <section id="security">
-          <h2>セキュリティ（ブリッジのオリジン検証）</h2>
+        <section>
+          <h2 id="security">セキュリティ（ブリッジのオリジン検証）</h2>
           <p>
             X を表示する WebView
             に、ネイティブ呼び出し口を開けるのは危険です。そこで次の多重防御を行っています。
@@ -558,8 +558,8 @@
           </div>
         </section>
 
-        <section id="flows">
-          <h2>処理フロー</h2>
+        <section>
+          <h2 id="flows">処理フロー</h2>
           <h3 id="flow-add-account">アカウント追加（mobile）</h3>
           <div class="flow" data-flow="android.add-account"></div>
           <h3 id="flow-reauth">再認証</h3>
@@ -574,8 +574,8 @@
           <div class="flow" data-flow="android.backup-export"></div>
         </section>
 
-        <section id="build-test">
-          <h2>ビルド・テスト</h2>
+        <section>
+          <h2 id="build-test">ビルド・テスト</h2>
           <table>
             <thead>
               <tr>
@@ -654,8 +654,8 @@
           </div>
         </section>
 
-        <section id="pitfalls">
-          <h2>落とし穴・関連資料</h2>
+        <section>
+          <h2 id="pitfalls">落とし穴・関連資料</h2>
           <ul>
             <li>
               <code>WebviewWindowBuilder::build()</code> 直後に IPC
