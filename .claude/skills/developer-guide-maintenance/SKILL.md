@@ -51,7 +51,7 @@ argument-hint: "（省略可）対象ページ（index/react/rust/android/inject
 1. **同期基準を確認する**: 各ページの `<meta name="mcx-synced-commit" content="...">`（全ページ同値）を読む。引数で比較元コミットが指定されていればそれを使う。
 2. **差分を把握する**:
    ```bash
-   git diff --stat <synced>..HEAD -- src src-tauri/src src-tauri/build.rs src-tauri/capabilities src-tauri/gen/android/app/src CLAUDE.md package.json contracts .claude/skills
+   git diff --stat <synced>..HEAD -- src src-tauri/src src-tauri/build.rs src-tauri/capabilities src-tauri/gen/android/app/src CLAUDE.md package.json contracts .claude/skills ':!.claude/skills/developer-guide-maintenance'
    git log --oneline <synced>..HEAD
    ```
    ソース対応表で影響ページを特定する。差分が無いページは触らない。
