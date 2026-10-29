@@ -1,0 +1,940 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="mcx-synced-commit" content="68b23eed" />
+    <title>React 層 | MCX 開発者ガイド</title>
+    <link rel="stylesheet" href="assets/common.css" />
+  </head>
+  <body data-page="react">
+    <div id="mcx-header"></div>
+    <div class="layout">
+      <nav id="mcx-toc"></nav>
+      <main id="content">
+        <h1>フロントエンド（React 層）</h1>
+        <p class="lead">
+          <code class="path">src/</code> 配下の React 19 + TypeScript
+          が担う範囲を、外部設計（責務・境界・Rust
+          との接点）と詳細設計（状態管理・カラム管理・各機能・一覧・フロー）に分けて説明します。X
+          の画面に注入されるスクリプトは
+          <a href="inject.html">inject ページ</a>を参照してください。
+        </p>
+
+        <section id="prerequisites">
+          <h2>前提知識</h2>
+          <p>このコードベースを読むのに最低限必要なものだけを挙げます。</p>
+          <table>
+            <thead>
+              <tr>
+                <th>技術</th>
+                <th>このプロジェクトでの使われ方</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>関数コンポーネントとフック</td>
+                <td>
+                  クラスは使わない。状態・副作用は
+                  <code>useState</code> /
+                  <code>useEffect</code> と、自作フック（<code class="path"
+                    >src/hooks/</code
+                  >）に切り出す。<span
+                    class="term"
+                    data-term="依存配列が変わったときだけ実行される副作用。宣言した順に実行されるため、順序が仕様になっている箇所がある。"
+                    >effect</span
+                  >
+                  の宣言順に意味がある箇所は多い。
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <span
+                    class="term"
+                    data-term="React 用の軽量な状態管理ライブラリ。create() で作ったストアを、フックや getState() で読み書きする。"
+                    >Zustand</span
+                  >
+                </td>
+                <td>
+                  単一ストア <code>useAppStore</code>。React 外（services
+                  など）からも <code>useAppStore.getState()</code> で参照する。
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  Tauri の
+                  <span
+                    class="term"
+                    data-term="フロントエンド(JS)から Rust の #[tauri::command] 関数を呼ぶ仕組み。Promise を返す。"
+                    >invoke</span
+                  >
+                  /
+                  <span
+                    class="term"
+                    data-term="Rust 側から emit されたイベントを JS で購読する仕組み。戻り値の unlisten 関数で購読解除する。"
+                    >listen</span
+                  >
+                </td>
+                <td>
+                  コマンド名・イベント名は文字列で渡すため、定義元
+                  <code class="path">src/constants/ipc.ts</code> に集約する。
+                </td>
+              </tr>
+              <tr>
+                <td>CSS Modules / SCSS</td>
+                <td>
+                  <code>*.module.scss</code>
+                  をコンポーネントと同じ場所に置く。寸法は
+                  <code>rem</code>（後述の規約）。
+                </td>
+              </tr>
+              <tr>
+                <td>i18next</td>
+                <td>
+                  文言は <code>t("ns:key")</code> の名前空間付き完全キー。辞書は
+                  <code>src/locales/{ja,en}/</code>。
+                </td>
+              </tr>
+              <tr>
+                <td><code>@/</code> エイリアス</td>
+                <td>
+                  <code>@/*</code> は <code>src/*</code> を指す。新規コードは
+                  <code>@/</code> で import する。
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="external">
+          <h2>外部設計: 責務と境界</h2>
+          <h3 id="responsibility">フロントエンドの責務</h3>
+          <p>
+            React が描くのは<b>メインウィンドウの UI</b
+            >（ツールバー・各カラムのヘッダー・ダイアログ・設定画面・モバイルのタブバー）と、アプリの状態（アカウント・カラム・設定）の管理です。X
+            の画面そのものは React では描きません。カラムごとに作られる<span
+              class="term"
+              data-term="Tauri が OS のウィンドウ上に重ねて配置する、独立した WebView。メインウィンドウの DOM の外にある。"
+              >子 WebView</span
+            >（OS ネイティブ）がそれを表示し、React
+            は「どこに置くか」を数値で指示するだけです。
+          </p>
+          <div class="callout warn">
+            <b>z-index が効かない</b>
+            <p>
+              子 WebView は DOM の外にあるため、React のダイアログを CSS
+              でどれだけ手前にしても、X
+              の画面が上に表示されてしまいます。そこでダイアログ表示中は全カラムを画面外（x=-9999）へ退避し、閉じたら元に戻します（フローは
+              <a href="#flows">フロー</a
+              >参照）。新しいダイアログ・ポップアップ系 UI を足すときは
+              <code>App.tsx</code> の
+              <code>anyDialogOpen</code> に条件を足すこと。詳しくは
+              <a href="../development/column-layout-notes.md"
+                >column-layout-notes.md</a
+              >。
+            </p>
+          </div>
+
+          <h3 id="rust-if">Rust との接点（インターフェース）</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>方向</th>
+                <th>手段</th>
+                <th>React 側の置き場</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>React → Rust</td>
+                <td>
+                  <code>invoke(IPC_COMMANDS.XXX, args)</code>
+                </td>
+                <td>
+                  <code class="path">src/services/</code>
+                  のラッパー、またはストア（<code>load_settings</code> /
+                  <code>save_settings</code
+                  >）、一部フック（アカウント系・自動更新など）
+                </td>
+              </tr>
+              <tr>
+                <td>Rust → React</td>
+                <td>
+                  <code>listen(IPC_EVENTS.XXX, handler)</code>
+                </td>
+                <td>
+                  <code class="path">src/hooks/useWebviewEvents.ts</code>
+                  に集約。アカウント系は
+                  <code>useAccounts</code>、ショートカットは
+                  <code>useKeyboardShortcuts</code>
+                </td>
+              </tr>
+              <tr>
+                <td>React → カラム WebView</td>
+                <td>
+                  <code>eval_in_webview</code> で JS 文字列を実行（<code
+                    >WEBVIEW_SCRIPTS</code
+                  >
+                  が文字列を生成）
+                </td>
+                <td>
+                  <code>evalInColumn</code
+                  >（<code>services/columnWebview.ts</code>）
+                </td>
+              </tr>
+              <tr>
+                <td>カラム WebView → React</td>
+                <td>
+                  inject が <code>invoke</code> → Rust が <code>emit</code> →
+                  React が <code>listen</code>
+                </td>
+                <td>下表「購読イベント一覧」</td>
+              </tr>
+            </tbody>
+          </table>
+          <p>
+            コマンドの全体像は
+            <a href="rust.html">Rust 層ページ</a>と
+            <a href="../development/tauri-commands.md">tauri-commands.md</a>
+            を参照。コマンド名・イベント名の食い違いは契約テスト（<code
+              class="path"
+              >src/constants/ipc.contract.test.ts</code
+            >
+            など）が検出します。
+          </p>
+          <div class="catalog" data-catalog="react.events"></div>
+        </section>
+
+        <section id="layers">
+          <h2>レイヤ構成</h2>
+          <p>
+            依存の向きは基本的に
+            <b
+              >components → hooks → services / store → lib / constants /
+              types</b
+            >
+            です。<code>lib</code> は Tauri にも React
+            にも依存しない純粋関数で、最も下に置かれます。ノードをクリックすると詳細が開きます。
+          </p>
+          <div class="diagram dg-col" data-diagram>
+            <div class="dg-group" data-layer="react">
+              <div class="dg-title">メインウィンドウ（React / src/）</div>
+              <button class="dg-node" data-detail="react.main">main.tsx</button>
+              <button class="dg-node" data-detail="react.app">App.tsx</button>
+              <button class="dg-node" data-detail="react.components">
+                components/
+              </button>
+              <button class="dg-node" data-detail="react.hooks">hooks/</button>
+              <button class="dg-node" data-detail="react.store">
+                store/useAppStore
+              </button>
+              <button class="dg-node" data-detail="react.services">
+                services/
+              </button>
+              <button class="dg-node" data-detail="react.lib">
+                lib/（純粋関数）
+              </button>
+              <button class="dg-node" data-detail="react.constants">
+                constants/ipc.ts
+              </button>
+              <button class="dg-node" data-detail="react.types">types/</button>
+              <button class="dg-node" data-detail="react.i18n">
+                i18n/・locales/
+              </button>
+              <button class="dg-node" data-detail="react.styles">
+                styles/・index.css
+              </button>
+            </div>
+            <div class="dg-arrow" data-label="invoke / eval">⇅</div>
+            <div class="dg-group" data-layer="rust">
+              <div class="dg-title">Rust バックエンド</div>
+              <button class="dg-node" data-detail="react.rust">
+                コマンド / イベント送出
+              </button>
+            </div>
+            <div class="dg-arrow" data-label="座標を指示 ⇒ 描画">⇅</div>
+            <div class="dg-group" data-layer="inject">
+              <div class="dg-title">子 WebView（OS ネイティブ）</div>
+              <button class="dg-node" data-detail="react.column-webview">
+                カラム WebView（x.com）
+              </button>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>ディレクトリ</th>
+                <th>役割</th>
+                <th>依存してよい先</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code class="path">src/components/</code></td>
+                <td>表示部品。操作はコールバック props で親へ返す</td>
+                <td>hooks（一部）、store、lib、constants、locales</td>
+              </tr>
+              <tr>
+                <td><code class="path">src/hooks/</code></td>
+                <td>副作用・状態の取りまとめ（ロジックの主戦場）</td>
+                <td>services、store、lib、constants</td>
+              </tr>
+              <tr>
+                <td><code class="path">src/services/</code></td>
+                <td>invoke ラッパー＋呼び出し前後の共通処理</td>
+                <td>store、lib、constants</td>
+              </tr>
+              <tr>
+                <td><code class="path">src/store/</code></td>
+                <td>Zustand ストア（永続化対象の状態）</td>
+                <td>constants、lib、types</td>
+              </tr>
+              <tr>
+                <td><code class="path">src/lib/</code></td>
+                <td>純粋関数（Tauri / React 非依存）</td>
+                <td>types、constants（最小限）</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="state">
+          <h2>詳細設計: 状態管理</h2>
+          <h3 id="store">useAppStore</h3>
+          <p>
+            状態はほぼ <code class="path">src/store/useAppStore.ts</code>
+            の単一ストアに置きます。2 種類に分かれます。
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>種別</th>
+                <th>内容</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>永続化される</td>
+                <td>
+                  <code>accounts</code> / <code>columns</code> /
+                  <code>globalSettings</code>（<code>settings.json</code>
+                  に保存）
+                </td>
+              </tr>
+              <tr>
+                <td>揮発</td>
+                <td>
+                  <code>isLoaded</code> / <code>isMobile</code> /
+                  <code>topBarExpanded</code> / <code>unreadCounts</code> /
+                  <code>apiRateLimits</code> / <code>restoreInProgress</code> /
+                  <code>reloadAllSignal</code> など
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 id="persistence">永続化（settings.json）との同期</h3>
+          <ul>
+            <li>
+              起動時に <code>loadSettings()</code> が
+              <code>load_settings</code> を invoke。旧形式のカラムは
+              <code>migrateColumn</code> で gridRow/gridCol を補う。
+            </li>
+            <li>
+              更新アクション（<code>addColumn</code> /
+              <code>updateColumn</code> /
+              <code>updateGlobalSettings</code> など）は、state 更新の直後に
+              <code>saveSettings()</code> を呼ぶ＝<b>自動保存</b>。保存対象は
+              <code>{ accounts, columns, globalSettings }</code> を丸ごと
+              <code>save_settings</code> へ。
+            </li>
+            <li>
+              保存はモジュール変数
+              <code>saveChain</code>
+              に連結して<b>直列化</b>。実行時点の最新状態を
+              <code>get()</code>
+              で読むので、連続呼び出しでも最後に書かれるのは最新。
+              <code>flushPendingSaves()</code> で保存完了を待てる。
+            </li>
+            <li>
+              <code>createColumnWebview</code> は作成前に
+              <code>flushPendingSaves()</code> を待つ（全体設定は Rust が
+              <code>settings.json</code> から読んで WebView
+              へ埋め込むため、保存前の古い値が入るのを防ぐ）。
+            </li>
+            <li>
+              読み込みに失敗したら <code>settingsSaveBlocked</code>
+              を立てて保存を止める（既定値で保存済み設定を空上書きしないため）。
+            </li>
+          </ul>
+          <div class="callout note">
+            <b>復元中は保存しない</b>
+            <p>
+              バックアップ復元中は <code>restoreInProgress</code> が true
+              になり、自動保存・自動更新（<code>useAutoReload</code>）・アカウント追加／再認証が止まります。復元の置換処理（Rust
+              の
+              <code>apply_restore</code
+              >）が書くファイルと競合しないための仕組みです。Rust
+              側の保存の安全策は
+              <a href="../development/settings-file-crash-safety-notes.md"
+                >settings-file-crash-safety-notes.md</a
+              >。
+            </p>
+          </div>
+          <p>
+            設定の既定値は Rust の <code>impl Default</code> が唯一の定義で、TS
+            の <code>DEFAULT_GLOBAL_SETTINGS</code>（<code class="path"
+              >src/types/index.ts</code
+            >）と <code class="path">contracts/default-settings.json</code>
+            と契約テストで一致を保証します。既定値を変えるときは 3
+            箇所を同時に更新します。
+          </p>
+        </section>
+
+        <section id="columns">
+          <h2>詳細設計: カラム管理</h2>
+          <h3 id="grid">グリッドと座標計算</h3>
+          <p>
+            カラムは <code>gridRow</code> /
+            <code>gridCol</code> のマトリクスで配置します。同じ
+            <code>gridCol</code>
+            に複数あれば縦積みで、<code>heightMode</code>（auto / fixed）と
+            <code>heightValue</code> / <code>heightUnit</code>
+            が各カラムの高さを決めます。座標計算は純粋関数
+            <code>calculateGridBounds</code>（<code class="path"
+              >src/lib/gridLayout.ts</code
+            >）で、コンテナ高・スクロール量・各種バー高を受け取り
+            <code>Record&lt;columnId, ColumnBounds&gt;</code> を返します。
+          </p>
+          <ul>
+            <li>
+              新規カラムは「既存の最大 <code>gridCol</code> +
+              1」に置かれる（空きセル探索はしない）。
+            </li>
+            <li>
+              <code>heightMode: "fixed"</code>
+              の合計が溢れる／余るケースは未対応の割り切り仕様（空白になる）。
+            </li>
+            <li><code>order</code> は後方互換のため残している。</li>
+          </ul>
+
+          <h3 id="desktop-mobile">desktop と mobile の差分</h3>
+          <p>
+            <code>useColumns</code>（<code class="path"
+              >src/hooks/useColumns.ts</code
+            >）が <code>useDesktopColumns</code> と
+            <code>useMobileColumns</code>
+            を束ねるファサードです。
+          </p>
+          <div class="tabs">
+            <div class="tab" data-tab="desktop" data-label="デスクトップ">
+              <ul>
+                <li>
+                  全カラムを同時に表示。横スクロールは下部のスクロールバー（<code>scrollbarRef</code>）で表現し、WebView
+                  を <code>scrollLeft</code> 分ずらして配置。
+                </li>
+                <li>
+                  <code>recalculateAllBounds</code> が全カラムの bounds
+                  を再計算し <code>resize_column_webview</code> を並列で呼ぶ。
+                </li>
+                <li>
+                  リサイズは 100ms デバウンス、スクロールは
+                  <code>rafThrottle</code> で間引く。
+                </li>
+                <li>
+                  Linux は WebView
+                  が独立ウィンドウのため、ウィンドウ移動（<code>onMoved</code>）でも再計算。仕様は
+                  <a href="../development/linux-column-spec.md"
+                    >linux-column-spec.md</a
+                  >。
+                </li>
+              </ul>
+            </div>
+            <div class="tab" data-tab="mobile" data-label="Android">
+              <ul>
+                <li>
+                  アクティブなカラム（2
+                  カラム表示設定ならその隣も）だけ画面内、他は画面外（<code>OFFSCREEN.MOBILE_X</code>）。
+                </li>
+                <li>
+                  <code>setActiveColumn</code> は先に Cookie
+                  をアクティブカラムのアカウントへ切替 → 非表示分を並列 resize →
+                  表示分を順に
+                  resize（アクティブを最後に）。世代番号で古い呼び出しを打ち切る。
+                </li>
+                <li>
+                  アクティブ ID は localStorage に保存し、バックグラウンド復帰で
+                  React が再読込されても復元できる。
+                </li>
+                <li>
+                  座標は
+                  <code>mobileColumnLayout</code
+                  >（<code>lib/gridLayout.ts</code>）に一本化。作成時とリサイズ時で別計算にしない。
+                </li>
+                <li>
+                  スワイプバーはネイティブ（Kotlin）のオーバーレイ。React は
+                  <code>useMobileSwipeBarSync</code>
+                  で状態を同期するだけ。詳細は
+                  <a href="android.html">Android ページ</a>。
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <h3 id="rem">ネイティブ bounds と rem</h3>
+          <p>
+            アプリ UI の倍率は <code>&lt;html&gt;</code> の
+            <code>font-size</code> で変えます（<code>useUiScale</code>）。子
+            WebView は DOM
+            外なので、TopBar・ヘッダー・スクロールバー・モバイルタブバーの高さは
+            <code>rem</code> 定数（<code>HEADER_HEIGHT_REM</code> など）で持ち、
+            <code>get*Height()</code> が <code>remToPx</code> で px に変換して
+            bounds に渡します。
+            <b>SCSS の高さと rem 定数は同じ値に保つ</b>必要があり、
+            <code class="path">src/lib/gridLayout.contract.test.ts</code>
+            が検証します。倍率変更時の bounds 再計算は
+            <code>dialogOpen</code> effect とは別の effect
+            にしてあり、依存を足して壊さないこと。詳細は
+            <a href="../development/ui-scale-notes.md">ui-scale-notes.md</a>。
+          </p>
+
+          <h3 id="rebuild">設定の埋め込みと WebView の再構築</h3>
+          <p>
+            画像ぼかし・カスタム CSS・広告非表示などは、WebView
+            <b>作成時</b>に初期化スクリプトへ埋め込まれます。eval
+            や再読み込みでは変わりません。そこで WebView
+            の作成成功時に「埋め込まれる項目だけから作った署名」を記録（<code>columnBuildRegistry</code>）し、現在の設定との差（<code>isColumnBuildStale</code>）で<b>古いカラムだけ</b>を再構築します。
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>操作</th>
+                <th>反映方法</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>カラム個別設定の「適用」</td>
+                <td>
+                  当該カラムを必ず再構築（<code>recreateColumnWebview</code>）
+                </td>
+              </tr>
+              <tr>
+                <td>全体設定の「適用」</td>
+                <td>
+                  必要な eval
+                  を送った上で、古いカラムだけ直列に再構築（<code>recreateStaleColumns</code>）
+                </td>
+              </tr>
+              <tr>
+                <td>手動の再読み込み（↺・r キー等）</td>
+                <td>
+                  古ければ再構築、そうでなければ eval
+                  による軽量リロード（<code>columnReload.ts</code>）
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="features">
+          <h2>詳細設計: 各機能</h2>
+
+          <h3 id="accounts">アカウント管理</h3>
+          <p>
+            <code>useAccounts</code> が追加・削除・再認証を管理し、UI は
+            <code>AccountManager</code> /
+            <code>AccountNameDialog</code>。ログイン完了の検出経路が
+            <b>desktop と mobile で異なります</b>。
+          </p>
+          <div class="tabs">
+            <div class="tab" data-tab="desktop" data-label="デスクトップ">
+              <p>
+                <code>open_add_account_window</code>
+                はウィンドウを開いて即座に返る。Rust が URL
+                をポーリングしてログイン完了を検出し、
+                <code>account-login-complete</code> を emit。React は listen
+                してアカウント名入力へ進む。ウィンドウをログイン前に閉じたら
+                <code>delete_account_data</code> で作成済みディレクトリを削除。
+              </p>
+            </div>
+            <div class="tab" data-tab="mobile" data-label="Android">
+              <p>
+                <code>open_add_account_window</code> が AddAccount Activity
+                の終了までブロックし、成功なら resolve（キャンセルは reject
+                で何もしない）。 <code>xUserId</code> も戻り値で届く。
+              </p>
+            </div>
+          </div>
+          <p>
+            アカウント削除時の保存先削除失敗は
+            <code>pendingDataDirectoryDeletions</code>
+            に積み、後で再試行します。再認証の同一性照合は
+            <code>lib/reauthIdentity.ts</code>。詳細は
+            <a href="../development/release-theme-reauth-notes.md"
+              >release-theme-reauth-notes.md</a
+            >。
+          </p>
+
+          <h3 id="settings-panels">設定パネル</h3>
+          <ul>
+            <li>
+              <b>SettingsPanel</b>: カラム個別設定。適用で当該カラムを再構築。
+            </li>
+            <li>
+              <b>AppSettingsPanel</b>:
+              アプリ全体設定。タブ（レイアウト・プリセット・バックアップ・拡張機能）とセクション分割。入力中は下書き（<code>settingsDraft.ts</code>）を持ち、「適用」で
+              <code>handleApplyGlobalSettings</code> が保存と反映を行う。
+            </li>
+            <li>
+              適用処理は <code>useSettingsApplyHandlers</code> に集約（フローは
+              <a href="#flows">フロー</a>参照）。
+            </li>
+          </ul>
+
+          <h3 id="dialogs">ダイアログ群と TopBar / MobileTabBar</h3>
+          <p>
+            ダイアログの開閉は <code>useDialogState</code> で一元管理され、その
+            OR が <code>dialogOpen</code>。App
+            では更新通知・アカウント名入力・レート制限ポップオーバーなども足した
+            <code>anyDialogOpen</code> が WebView
+            退避の条件です。パネル型ダイアログを新設するときは
+            <code class="path">src/styles/_dialog-fullscreen.scss</code>
+            のミキシンで Android 全画面化します。TopBar は desktop
+            の常設ツールバー（展開で高さが変わり、変化時に bounds
+            を再計算）、MobileTabBar は Android の下部タブです。
+          </p>
+
+          <h3 id="shortcuts">キーボードショートカット</h3>
+          <p>
+            <code>useKeyboardShortcuts</code> はメインウィンドウの keydown
+            を扱い、修飾キー無しのもの（<code>r</code> /
+            <code>?</code>）は入力要素上では無効にします。ダイアログ表示中は
+            <code>disabled</code>。カラム WebView 側で押されたキーは、inject が
+            invoke → Rust が <code>webview-keyboard-shortcut</code> を emit
+            して同じフックが受けます。 ショートカット一覧の表示は
+            <code>ShortcutHelpDialog</code>。
+          </p>
+
+          <h3 id="theme-scale-lang">テーマ・UI スケール・言語</h3>
+          <ul>
+            <li>
+              <b>テーマ</b>: <code>useTheme</code> が解決済みテーマを
+              <code>&lt;html data-theme&gt;</code> に反映（system のときだけ OS
+              配色を購読）。適用時はカラム側にも night_mode Cookie を eval
+              で反映。配色トークンは
+              <code>src/index.css</code>、白文字を載せる塗り背景は
+              <code>--mcx-accent-fill</code> を使う。
+            </li>
+            <li>
+              <b>UI スケール</b>: <code>useUiScale</code>。デスクトップの auto
+              は 1.0 固定、Android は端末のフォント倍率を測定。<code
+                >useAppBootstrap</code
+              >
+              の<b>直前</b>に呼ぶ。
+            </li>
+            <li>
+              <b>言語</b>: <code>useAppLanguage</code> が設定に応じて i18next
+              を切替。変更時は開いているカラムの注入 UI の言語も eval で更新。
+            </li>
+          </ul>
+
+          <h3 id="updater">自動更新</h3>
+          <p>
+            <code>useAppUpdater</code> が <code>createUpdater(isMobile)</code>
+            で desktop（プラグイン）／mobile（APK
+            自己更新）の実装を切り替えます。起動時チェックはカラム復元完了（<code>columnsRestored</code>）までゲートし、更新ダイアログがネイティブ
+            WebView の裏に隠れるのを防ぎます。「後で」のバージョンは
+            localStorage に記録して再通知を抑制します。
+          </p>
+
+          <h3 id="backup">バックアップ / リストア</h3>
+          <p>
+            <code>useBackupFlow</code>（画面状態）→
+            <code>services/backup.ts</code>（IPC と
+            <code>performRestore</code>）→ Rust の
+            <code>apply_restore</code>。復元手順は 「フラグ設定 → 保存待ち →
+            置換 → 旧 WebView 破棄 → ストア置換（保存しない）→ WebView 再生成 →
+            フラグ解除」。出力は
+            <code>BackupGlobalSettings</code> のホワイトリスト方式です。詳細は
+            <a href="../development/backup-restore-notes.md"
+              >backup-restore-notes.md</a
+            >。
+          </p>
+
+          <h3 id="rate-limit">API レート制限表示</h3>
+          <p>
+            inject が X の API 応答ヘッダから読んだ残量を報告し、<code
+              >webview-api-rate-limit</code
+            >
+            を <code>useApiRateLimitReports</code> が受けて
+            <code>apiRateLimits</code>（accountId → bucketKey）へ反映。<code
+              >ApiRateLimitIndicator</code
+            >
+            がポップオーバーで表示します。ポップオーバーの開閉も WebView
+            退避の対象です。詳細は
+            <a href="../development/api-rate-limit-operations-notes.md"
+              >api-rate-limit-operations-notes.md</a
+            >。
+          </p>
+        </section>
+
+        <section id="catalogs">
+          <h2>一覧</h2>
+          <h3 id="catalog-components">コンポーネント一覧</h3>
+          <div class="catalog" data-catalog="react.components"></div>
+          <h3 id="catalog-hooks">フック一覧</h3>
+          <div class="catalog" data-catalog="react.hooks"></div>
+          <h3 id="catalog-services">サービス一覧</h3>
+          <div class="catalog" data-catalog="react.services"></div>
+          <h3 id="catalog-lib">lib 主要関数一覧</h3>
+          <div class="catalog" data-catalog="react.lib"></div>
+        </section>
+
+        <section id="flows">
+          <h2>主要フロー</h2>
+          <p>
+            各矢印が実コードのどこに対応するかは、ステップを選ぶと下部に表示されます。
+          </p>
+          <h3 id="flow-startup">起動時の初期化</h3>
+          <div class="flow" data-flow="react.startup"></div>
+          <h3 id="flow-add-column">カラム追加 → WebView 生成 → 配置</h3>
+          <div class="flow" data-flow="react.add-column"></div>
+          <h3 id="flow-settings">設定変更 → 保存 → 各カラムへ反映</h3>
+          <div class="flow" data-flow="react.settings-apply"></div>
+          <h3 id="flow-resize">ウィンドウリサイズ → bounds 再計算</h3>
+          <div class="flow" data-flow="react.resize"></div>
+          <h3 id="flow-dialog">ダイアログ表示 → WebView 退避 → 復元</h3>
+          <div class="flow" data-flow="react.dialog-hide"></div>
+          <h3 id="flow-event">WebView からのイベント受信</h3>
+          <div class="flow" data-flow="react.webview-event"></div>
+        </section>
+
+        <section id="conventions">
+          <h2>規約</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>項目</th>
+                <th>ルール</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>寸法</td>
+                <td>
+                  UI の寸法は <code>rem</code>（<code>px</code> 禁止。1px
+                  以下のヘアラインと media query を除く）。ネイティブ bounds
+                  に使う高さ定数は <code>gridLayout.ts</code> の rem 定数 +
+                  <code>remToPx</code>。
+                </td>
+              </tr>
+              <tr>
+                <td>i18n</td>
+                <td>
+                  <code>t("ns:key")</code>
+                  の完全キー。画面コードへの日本語直書きは ESLint
+                  (<code>no-restricted-syntax</code>) の error。ja / en
+                  のキー集合と補間変数、未使用キーは契約テストが検査。React 外は
+                  <code>i18n.t</code> を呼び出し時に評価。詳細は
+                  <a href="../development/i18n-notes.md">i18n-notes.md</a>。
+                </td>
+              </tr>
+              <tr>
+                <td>import 順</td>
+                <td>
+                  外部パッケージ → vitest/storybook → <code>@/</code> →
+                  相対パス。同グループ内はアルファベット順、グループ間に空行を入れない。<code
+                    >npm run lint:fix</code
+                  >
+                  で自動整列。
+                </td>
+              </tr>
+              <tr>
+                <td>Storybook</td>
+                <td>
+                  コンポーネントと<b>同じディレクトリ</b>に
+                  <code>&lt;Name&gt;.stories.tsx</code
+                  >。バレル（<code>index.ts</code>）は作らない。play function は
+                  <code>npm run test:story</code>。
+                </td>
+              </tr>
+              <tr>
+                <td>テスト</td>
+                <td>
+                  Vitest 単体（<code>npm test</code>）、fast-check
+                  プロパティ（<code>*.property.test.ts</code>）、契約テスト（<code>*.contract.test.ts</code>）、Storybook
+                  play。テストケース名は日本語。
+                </td>
+              </tr>
+              <tr>
+                <td>失敗の扱い</td>
+                <td>
+                  影響の小さい失敗は
+                  <code>logError("タグ")</code>
+                  でログのみ（<code>lib/log.ts</code>）。
+                </td>
+              </tr>
+              <tr>
+                <td>serde 命名</td>
+                <td>
+                  Tauri は JS→Rust のケース変換をしない。camelCase
+                  のフィールドは Rust 側に
+                  <code>#[serde(rename)]</code> が必要。
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="pitfalls">
+          <h2>落とし穴・関連資料</h2>
+          <h3 id="pitfall-list">よくある落とし穴</h3>
+          <ul>
+            <li>
+              <b>ダイアログを足したのに WebView が前面に残る</b> →
+              <code>App.tsx</code> の
+              <code>anyDialogOpen</code> に条件を足し忘れている。
+            </li>
+            <li>
+              <b>effect の順序を入れ替えて起動が壊れる</b> →
+              <code>useUiScale</code> → <code>useAppBootstrap</code>、<code
+                >isMobile</code
+              >
+              確定 → <code>loadSettings</code> の順は仕様。
+            </li>
+            <li>
+              <b><code>anyDialogOpen</code> の effect に依存を足す</b> →
+              他の依存で再実行されると退避／復元が暴発する。別 effect にする。
+            </li>
+            <li>
+              <b>設定を変えたのにカラムに反映されない</b> →
+              構築時に埋め込む項目は署名（<code>columnBuildSignature</code>）に含める。含めすぎると無駄な再構築になる。
+            </li>
+            <li>
+              <b>SCSS の高さだけ変更</b> → rem 定数と不一致になり WebView と UI
+              がずれる。契約テストで検出される。
+            </li>
+            <li>
+              <b>連続リサイズ／スクロールで Linux がクラッシュ</b> → 高頻度の
+              <code>resize_column_webview</code> は
+              <code>rafThrottle</code> で間引く。
+            </li>
+            <li>
+              <b>新規コマンドの追加</b> → ACL 3 点（<code>build.rs</code> /
+              capability）の更新が必要。<a href="howto.html">ハウツー</a
+              >を参照。
+            </li>
+          </ul>
+          <h3 id="related-docs">関連資料</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>テーマ</th>
+                <th>資料</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  カラムレイアウト、WebView 退避、再構築、モバイルスワイプ
+                </td>
+                <td>
+                  <a href="../development/column-layout-notes.md"
+                    >column-layout-notes.md</a
+                  >
+                </td>
+              </tr>
+              <tr>
+                <td>UI 倍率、rem、Android 全画面ダイアログ</td>
+                <td>
+                  <a href="../development/ui-scale-notes.md"
+                    >ui-scale-notes.md</a
+                  >
+                </td>
+              </tr>
+              <tr>
+                <td>i18n</td>
+                <td>
+                  <a href="../development/i18n-notes.md">i18n-notes.md</a>
+                </td>
+              </tr>
+              <tr>
+                <td>設定ファイルの保存</td>
+                <td>
+                  <a href="../development/settings-file-crash-safety-notes.md"
+                    >settings-file-crash-safety-notes.md</a
+                  >
+                </td>
+              </tr>
+              <tr>
+                <td>バックアップ / リストア</td>
+                <td>
+                  <a href="../development/backup-restore-notes.md"
+                    >backup-restore-notes.md</a
+                  >
+                </td>
+              </tr>
+              <tr>
+                <td>テーマ・再認証・自動更新</td>
+                <td>
+                  <a href="../development/release-theme-reauth-notes.md"
+                    >release-theme-reauth-notes.md</a
+                  >
+                </td>
+              </tr>
+              <tr>
+                <td>API レート制限</td>
+                <td>
+                  <a href="../development/api-rate-limit-operations-notes.md"
+                    >api-rate-limit-operations-notes.md</a
+                  >
+                </td>
+              </tr>
+              <tr>
+                <td>Linux のカラム</td>
+                <td>
+                  <a href="../development/linux-column-spec.md"
+                    >linux-column-spec.md</a
+                  >
+                  /
+                  <a href="../development/linux-webview-notes.md"
+                    >linux-webview-notes.md</a
+                  >
+                </td>
+              </tr>
+              <tr>
+                <td>TopBar の並べ替え</td>
+                <td>
+                  <a href="../development/topbar-column-reorder-notes.md"
+                    >topbar-column-reorder-notes.md</a
+                  >
+                </td>
+              </tr>
+              <tr>
+                <td>全体構成・コマンド</td>
+                <td>
+                  <a href="../development/project-structure.md"
+                    >project-structure.md</a
+                  >
+                  /
+                  <a href="../development/tauri-commands.md"
+                    >tauri-commands.md</a
+                  >
+                  /
+                  <a href="../development/architecture-overview.md"
+                    >architecture-overview.md</a
+                  >
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      </main>
+    </div>
+    <aside id="mcx-detail" hidden></aside>
+    <script src="assets/data/index.js"></script>
+    <script src="assets/data/react.js"></script>
+    <script src="assets/common.js"></script>
+  </body>
+</html>
