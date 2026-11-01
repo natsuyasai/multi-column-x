@@ -7,6 +7,7 @@ React 19 + TypeScript フロントエンドと Rust バックエンドで構成�
 デスクトップ（Windows/Mac/Linux）と Android に対応。
 
 詳細は `README.md`（概要）と `docs/development/`（技術詳細。構成は `project-structure.md`、コマンドは `tauri-commands.md`、設計上の注意は `architecture-overview.md`）を参照。
+初めての人向けの全体像・各層（React / Rust / Android / inject）の設計・機能追加レシピは `docs/developer-guide/index.html`（ブラウザで直接開くインタラクティブな HTML）にまとめている。コマンド・イベント・設定・ブリッジ・モジュール構成などを変えたら、`.claude/skills/developer-guide-maintenance` に従ってガイドを追従させること（`check-guide.mjs` がずれを検出する）。
 
 このプロジェクトではCodeGraphを利用しています。
 

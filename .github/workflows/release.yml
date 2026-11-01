@@ -221,6 +221,12 @@ jobs:
         if: matrix.platform == 'ubuntu-latest'
         run: ./scripts/build-linux-codec-plugins.sh
       - run: npm ci
+      # AppImage に libwayland-* を同梱させない（Ubuntu 26.04 で EGL_BAD_PARAMETER により灰色画面になるため）。
+      # tauri-action の署名は bundler 内で行われるため、bundler が使う linuxdeploy の出力プラグインを
+      # 差し替えて AppDir から除外する。後続の事前検査ビルド・tauri-action の両方に効く。
+      - name: Strip libwayland from AppImage bundling
+        if: matrix.platform == 'ubuntu-latest'
+        run: ./scripts/strip-appimage-wayland-libs.sh
       # アップロード前の関門。失敗すると後続の tauri-action に到達せず、AppImage はアップロードされない。
       # 署名鍵は渡さない（createUpdaterArtifacts:false のため不要）。
       - name: Build and verify AppImage media bundle

@@ -1,0 +1,1404 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="mcx-synced-commit" content="68b23eed" />
+    <title>機能追加ハウツー | MCX 開発者ガイド</title>
+    <link rel="stylesheet" href="assets/common.css" />
+  </head>
+  <body data-page="howto">
+    <div id="mcx-header"></div>
+    <div class="layout">
+      <nav id="mcx-toc"></nav>
+      <main id="content">
+        <h1>機能追加ハウツー</h1>
+        <p class="lead">
+          手作業で機能を足す・変えるときの手順書です。各レシピは「いつ使うか →
+          流れ → チェックリスト → 確認方法 →
+          よくあるミス」の順で、チェック状態はブラウザに保存されます。Claude
+          Code を使わない場合も、<code class="path">.claude/skills/</code>
+          の手順書は人間が読んでそのまま使えます。
+        </p>
+
+        <div class="callout tip">
+          <b>最初に知っておくこと</b>
+          <p>
+            このプロジェクトは「同じ事実が複数の場所にある」箇所（コマンド名・既定値・辞書・色）を<b>契約テスト</b>で守っています。チェックリストの最後は必ず「どのテストが落ちるか」を確認する形にしてあり、変更の途中で何度か実行すると漏れに早く気づけます。
+          </p>
+        </div>
+
+        <section>
+          <h2 id="before-start">1. 開発を始める前に</h2>
+          <p>
+            <b>いつ使う:</b>
+            初めてリポジトリを触るとき、または新しい作業を始める前。
+          </p>
+
+          <div class="flow" data-flow="howto.dev-flow"></div>
+
+          <h3 id="before-start-checklist">チェックリスト</h3>
+          <ol class="checklist" data-checklist="howto.before-start">
+            <li>
+              <b>環境を用意する</b>
+              <div class="ck-body">
+                Node.js（npm）、Rust ツールチェーン、Tauri
+                の前提ソフトを入れ、<code>npm install</code>
+                を実行。Android は Android Studio / NDK も必要です（ビルド時に
+                <code>ANDROID_NDK_HOME</code> が無いと reqwest
+                系で失敗）。入口は
+                <code class="path">README.md</code>、技術詳細は
+                <code class="path">docs/development/project-structure.md</code
+                >。
+              </div>
+            </li>
+            <li>
+              <b>inject を一度ビルドする</b>
+              <div class="ck-body">
+                <code>npm run build:inject</code>。Rust は生成済みの inject
+                <code>.js</code> を
+                <code>include_str!</code> で埋め込むため、新しい clone /
+                worktree ではこれが無いと
+                <code>cargo</code> がコンパイルできません。
+              </div>
+            </li>
+            <li>
+              <b>作業ブランチを切る</b>
+              <div class="ck-body">
+                develop を最新化 → develop から作業ブランチ → 完了後に push →
+                develop 向け
+                PR。新規ブランチを切るかは着手前に確認するのが決まりです（<code
+                  class="path"
+                  >CLAUDE.md</code
+                >）。1 回の作業では 1
+                つのことだけを行い、作業の粒度ごとにコミットします。
+              </div>
+            </li>
+            <li>
+              <b>要求を明確にし、Gherkin で仕様を書く</b>
+              <div class="ck-body">
+                機能追加・挙動変更・バグ修正では
+                <code class="path">docs/specs/</code>
+                に日本語 Gherkin
+                の仕様を書いて承認を得ます（挙動不変のリファクタ・docs・CI
+                設定のみの変更は不要）。手順は
+                <code class="path">.claude/skills/gherkin-spec/SKILL.md</code>。
+              </div>
+            </li>
+            <li>
+              <b>テストを先に（または仕様由来なら後に）書く</b>
+              <div class="ck-body">
+                TDD（t-wada 流）が基本。Gherkin
+                由来のテストだけは実装後でも構いませんが、主要な分岐を壊して Red
+                になるか確かめるミューテーション確認は必須。テスト名は日本語、Rust
+                のテスト関数名には ASCII 大文字を入れない。
+                <code class="path">.claude/skills/tdd/SKILL.md</code>
+              </div>
+            </li>
+            <li>
+              <b>テストに .feature への参照を書かない</b>
+              <div class="ck-body">
+                テストコード・コメント・コミットメッセージに仕様ファイルへの言及を残さず、<code
+                  >.feature</code
+                >
+                自体もコミットしません。
+              </div>
+            </li>
+          </ol>
+
+          <h3 id="before-start-verify">確認方法</h3>
+          <p>
+            変更ごとに下のコマンドを実行します（全体は 10
+            章）。いずれもリポジトリ直下で実行します。
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>コマンド</th>
+                <th>何を守るか</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>npm run format</code></td>
+                <td>
+                  TS / Rust / Kotlin の整形（TS のみは <code>format:ts</code>）
+                </td>
+              </tr>
+              <tr>
+                <td><code>npm run typecheck</code></td>
+                <td>型エラー（<code>tsc --noEmit</code>）</td>
+              </tr>
+              <tr>
+                <td><code>npm run lint</code></td>
+                <td>
+                  ESLint（src の TS/TSX）。自動整列は <code>lint:fix</code>
+                </td>
+              </tr>
+              <tr>
+                <td><code>npm test</code></td>
+                <td>Vitest 単体テスト（契約テスト含む）</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="callout warn">
+            <b>よくあるミス</b>
+            <p>
+              build:inject を忘れて Rust のテストが落ちる／Gherkin
+              を書かずに実装に入る／新ブランチを確認なしに作る／コミット前にミューテーション確認をしていない。
+            </p>
+          </div>
+          <p>
+            参考:
+            <a href="../../.claude/skills/feature-development-flow/SKILL.md"
+              >feature-development-flow</a
+            >（全体フロー）、
+            <a href="../../.claude/skills/check-creation/SKILL.md"
+              >check-creation</a
+            >
+            （品質チェック一式）。
+          </p>
+        </section>
+
+        <section>
+          <h2 id="add-command">2. Tauri コマンドを追加・削除する</h2>
+          <p>
+            <b>いつ使う:</b>
+            React から Rust の処理を呼びたいとき（<span
+              class="term"
+              data-term="invoke: フロントエンドから Rust の関数（コマンド）を名前で呼び出す Tauri の IPC 機構"
+              >invoke</span
+            >
+            の相手を増やす）。
+          </p>
+
+          <div class="flow" data-flow="howto.command-flow"></div>
+
+          <div class="callout danger">
+            <b>登録先は 4 点セット</b>
+            <p>
+              <code class="path">src-tauri/src/lib.rs</code> の
+              <code>generate_handler!</code> /
+              <code class="path">src-tauri/build.rs</code> の
+              <code>AppManifest</code> /
+              <code class="path">src-tauri/capabilities/default.json</code>（X
+              ページから呼ぶなら
+              <code class="path"
+                >src-tauri/capabilities/column-webview.json</code
+              >）/
+              <code class="path">contracts/ipc-constants.json</code>
+              を必ず同時に更新します。削除も同じ 4 点です。
+            </p>
+          </div>
+
+          <h3 id="add-command-checklist">チェックリスト</h3>
+          <ol class="checklist" data-checklist="howto.add-command">
+            <li>
+              <b>Rust にコマンド関数を書く</b>
+              <div class="ck-body">
+                <code class="path">src-tauri/src/commands/</code>
+                配下の適切なモジュール（例:
+                <code class="path">src-tauri/src/commands/settings.rs</code>）に
+                <code>#[tauri::command]</code> を付けて実装し、<code
+                  >commands/mod.rs</code
+                >
+                からモジュールを公開します。失敗は文章でなく
+                <code>AppError</code> （<code class="path"
+                  >src-tauri/src/commands/app_error.rs</code
+                >）で返す。
+              </div>
+            </li>
+            <li>
+              <b>デスクトップ専用／モバイル専用なら cfg を付ける</b>
+              <div class="ck-body">
+                <code>#[cfg(desktop)]</code> /
+                <code>#[cfg(mobile)]</code>
+                で実装が分かれる場合は両方を確認。<code>generate_handler!</code>
+                側のコマンド名の直前にも同じ属性が必要です（付け忘れると Android
+                ビルドで失敗）。
+              </div>
+            </li>
+            <li>
+              <b>引数・戻り値の serde 名を揃える</b>
+              <div class="ck-body">
+                Tauri v2 は JS→Rust のケース変換をしません。JS 側 camelCase
+                のフィールドには <code>#[serde(rename = "...")]</code> が必要。
+              </div>
+            </li>
+            <li>
+              <b>メイン専用なら require_main_caller を呼ぶ</b>
+              <div class="ck-body">
+                破壊的な操作は
+                <code>require_main_caller(&amp;webview)</code>
+                で呼び出し元を検証（<code class="path"
+                  >src-tauri/src/commands/mod.rs</code
+                >）。
+              </div>
+            </li>
+            <li>
+              <b>lib.rs の generate_handler! に登録</b>
+              <div class="ck-body">
+                <code class="path">src-tauri/src/lib.rs</code>
+                の
+                <code>.invoke_handler(tauri::generate_handler![...])</code>
+                に追加。
+              </div>
+            </li>
+            <li>
+              <b>build.rs の AppManifest にコマンド名を追加</b>
+              <div class="ck-body">
+                <code class="path">src-tauri/build.rs</code>
+                の一覧に（cfg 付きコマンドも含めて）追加。無いとどの capability
+                でも拒否されます。
+              </div>
+            </li>
+            <li>
+              <b>capability に allow-&lt;kebab-case&gt; を追加</b>
+              <div class="ck-body">
+                メインウィンドウ向けは
+                <code class="path">src-tauri/capabilities/default.json</code
+                >。<b>inject（X のページ）から呼ぶコマンドだけ</b>
+                <code class="path"
+                  >src-tauri/capabilities/column-webview.json</code
+                >
+                にも足します（許可集合は inject
+                が実際に使うコマンドと厳密一致で検証される）。
+              </div>
+            </li>
+            <li>
+              <b>IPC 定数を 3 箇所にそろえる</b>
+              <div class="ck-body">
+                <code class="path">src/constants/ipc.ts</code
+                >（<code>IPC_COMMANDS</code>）、
+                <code class="path">src-tauri/src/ipc_constants.rs</code>、
+                <code class="path">contracts/ipc-constants.json</code>。
+              </div>
+            </li>
+            <li>
+              <b>TS のラッパーを services に書く</b>
+              <div class="ck-body">
+                <code>invoke(IPC_COMMANDS.XXX, 引数)</code> を呼ぶ薄い関数を
+                <code class="path">src/services/</code>（例:
+                <code class="path">src/services/extensions.ts</code
+                >）に置き、フックや UI から使います。失敗の表示には
+                <code>describeAppError</code> （<code class="path"
+                  >src/lib/appError.ts</code
+                >）を使う。
+              </div>
+            </li>
+            <li>
+              <b>Rust 側と TS 側のテストを書く</b>
+              <div class="ck-body">
+                Rust の純粋なロジックは
+                <code>#[cfg(test)]</code> でテスト（関数名に ASCII
+                大文字を使わない）。services はモックした
+                <code>invoke</code> でテスト。
+              </div>
+            </li>
+            <li>
+              <b>契約テストを通す</b>
+              <div class="ck-body">
+                <code>npm run build:inject</code> →
+                <code>cargo test --manifest-path src-tauri/Cargo.toml</code
+                >（<code class="path">src-tauri/src/acl_contract.rs</code> と
+                <code>ipc_constants.rs</code>）、<code>npm test</code>（<code
+                  class="path"
+                  >src/constants/ipc.contract.test.ts</code
+                >）。
+              </div>
+            </li>
+          </ol>
+
+          <h3 id="add-command-verify">確認方法・守ってくれるテスト</h3>
+          <ul>
+            <li>
+              <code class="path">src-tauri/src/acl_contract.rs</code>:
+              全コマンドが <code>AppManifest</code> と capability
+              に載っているか、X 向け capability の許可集合が inject
+              の使用集合と一致するか、メイン向け capability に
+              <code>remote</code> が無いか。
+            </li>
+            <li>
+              <code class="path">src-tauri/src/ipc_constants.rs</code> /
+              <code class="path">src/constants/ipc.contract.test.ts</code>:
+              定数と fixture と <code>lib.rs</code> 登録の一致。
+            </li>
+          </ul>
+          <div class="callout warn">
+            <b>よくあるミス</b>
+            <p>
+              build.rs だけ直して capability を忘れる／mobile でだけ
+              <code>cfg</code> の付け忘れでビルドが落ちる／<code>serde</code> の
+              rename 忘れで引数が
+              <code>undefined</code> として届く／column-webview.json
+              にメイン専用コマンドを足してしまう。
+            </p>
+          </div>
+          <p>
+            詳細:
+            <a href="../development/tauri-commands.md">tauri-commands.md</a>、<a
+              href="../development/architecture-overview.md"
+              >architecture-overview.md</a
+            >
+          </p>
+        </section>
+
+        <section>
+          <h2 id="add-setting">3. 設定項目を追加する</h2>
+          <p>
+            <b>いつ使う:</b>
+            設定画面にオン/オフや数値などの項目を足すとき。X
+            の画面の挙動に反映させたい（inject
+            に渡す）場合は特に漏れが出やすい。
+          </p>
+
+          <div class="flow" data-flow="howto.setting-flow"></div>
+
+          <div class="callout note">
+            <b>経路は 2 種類</b>
+            <p>
+              <b>グローバル設定</b>は <code>settings_store.rs</code> の
+              <code>column_script_settings_from</code>
+              経由、<b>カラム個別設定</b>は
+              <code>build_column_init_script</code> 内で
+              <code>column.settings.*</code> から直接
+              <code>InitScriptParams</code> へ渡ります（この場合は
+              <code>settings_store.rs</code> の手順は不要）。
+            </p>
+          </div>
+
+          <h3 id="add-setting-checklist">チェックリスト</h3>
+          <ol class="checklist" data-checklist="howto.add-setting">
+            <li>
+              <b>TS の型と既定値を追加</b>
+              <div class="ck-body">
+                <code class="path">src/types/index.ts</code> の
+                <code>GlobalSettings</code>（または
+                <code>ColumnSettings</code>）と
+                <code>DEFAULT_GLOBAL_SETTINGS</code
+                >（<code>DEFAULT_COLUMN_SETTINGS</code>）。
+              </div>
+            </li>
+            <li>
+              <b>Rust の設定構造体と impl Default を追加</b>
+              <div class="ck-body">
+                <code class="path">src-tauri/src/commands/settings.rs</code> の
+                <code>GlobalSettingsData</code>（または
+                <code>ColumnSettings</code>）に
+                <code>#[serde(rename = "camelCase名")]</code>
+                付きで追加。構造体レベルの
+                <code>#[serde(default)]</code> があるので、フィールドごとの
+                <code>#[serde(default = "...")]</code> は<b>付けず</b>、<code
+                  >impl Default</code
+                >
+                を唯一の既定値とします。
+              </div>
+            </li>
+            <li>
+              <b>contracts/default-settings.json に既定値を追加</b>
+              <div class="ck-body">
+                <code class="path">contracts/default-settings.json</code>。Rust
+                / TS / fixture の 3 箇所を<b>同時に</b>更新するのが決まりです。
+              </div>
+            </li>
+            <li>
+              <b>設定 UI を足す</b>
+              <div class="ck-body">
+                グローバルなら
+                <code class="path"
+                  >src/components/AppSettingsPanel/GeneralSettingsSections.tsx</code
+                >
+                など該当セクション、ドラフトの扱いは
+                <code class="path"
+                  >src/components/AppSettingsPanel/settingsDraft.ts</code
+                >。カラム個別は
+                <code class="path">src/components/SettingsPanel/</code
+                >。画面文言は 4 章に従い辞書化する。
+              </div>
+            </li>
+            <li>
+              <b>保存経路を確認する</b>
+              <div class="ck-body">
+                保存は <code class="path">src/store/useAppStore.ts</code> から
+                <code>save_settings</code> へ。Rust 側は
+                <code>Store::save</code> を直接呼ばず
+                <code>save_store_atomically</code> を使う（<a
+                  href="../development/settings-file-crash-safety-notes.md"
+                  >settings-file-crash-safety-notes.md</a
+                >）。
+              </div>
+            </li>
+            <li>
+              <b>バックアップに含めるか判断する</b>
+              <div class="ck-body">
+                <code>GlobalSettingsData</code> に項目を足すと
+                <code class="path"
+                  >src-tauri/src/commands/backup/format_tests.rs</code
+                >
+                のキー集合テストが失敗し、取捨の判断を強制されます。端末依存の項目は除外一覧に、移行したい項目は
+                <code class="path"
+                  >src-tauri/src/commands/backup/format.rs</code
+                >
+                のホワイトリストに足します（<a
+                  href="../development/backup-restore-notes.md"
+                  >backup-restore-notes.md</a
+                >）。
+              </div>
+            </li>
+            <li>
+              <b>inject に渡す場合: 配線 4 箇所を足す</b>
+              <div class="ck-body">
+                <code class="path"
+                  >src-tauri/src/commands/settings_store.rs</code
+                >（グローバル設定のみ）→
+                <code class="path"
+                  >src-tauri/src/commands/webview/column.rs</code
+                >
+                の <code>build_column_init_script</code> →
+                <code class="path">src-tauri/src/inject/mod.rs</code> の
+                <code>InitScriptParams</code> と
+                <code>window.__multiColumnXConfig</code> →
+                <code class="path">src-tauri/src/inject/_src/types.d.ts</code>
+                の <code>MultiColumnXConfig</code>。
+              </div>
+            </li>
+            <li>
+              <b>テストを書く</b>
+              <div class="ck-body">
+                正規化・変換ロジックの単体テスト。UI は
+                <code>*.test.tsx</code>。
+              </div>
+            </li>
+          </ol>
+
+          <h3 id="add-setting-verify">確認方法・守ってくれるテスト</h3>
+          <ul>
+            <li>
+              <code class="path">src/types/defaults.contract.test.ts</code> と
+              Rust の
+              <code>default_settings_match_contract_fixture</code>（<code
+                class="path"
+                >src-tauri/src/commands/settings.rs</code
+              >）: 既定値 3 点の一致。
+            </li>
+            <li>
+              <code>format_tests.rs</code>: バックアップのキー集合（出力キー ∪
+              除外一覧 ＝ 既定値のキー集合）。
+            </li>
+          </ul>
+          <div class="callout warn">
+            <b>よくあるミス</b>
+            <p>
+              既定値を 1 箇所だけ変える／フィールドに
+              <code>serde(default = ...)</code>
+              を付けて既定値を二重定義する／inject
+              に渡す経路のどこかを忘れ値が常に既定値になる／バックアップ判断を後回しにしてテストが落ちる。
+            </p>
+          </div>
+        </section>
+
+        <section>
+          <h2 id="add-text">4. 画面文言を追加する</h2>
+          <p>
+            <b>いつ使う:</b>
+            ボタン・見出し・エラーメッセージなど、利用者に見える文字を足すとき（日本語・英語の両方）。
+          </p>
+
+          <div class="flow" data-flow="howto.error-flow"></div>
+
+          <div class="tabs">
+            <div class="tab" data-tab="react" data-label="React の画面文言">
+              <ol class="checklist" data-checklist="howto.add-text">
+                <li>
+                  <b>ja の辞書にキーを追加</b>
+                  <div class="ck-body">
+                    <code class="path">src/locales/ja/</code> の該当名前空間
+                    JSON に、camelCase のネストでキーを追加（例:
+                    <code>settings.general.xxx.label</code>）。名前空間は common
+                    / settings / columnSettings / columns / topbar / mobile /
+                    accounts / dialogs / rateLimit / messages（<a
+                      href="../development/i18n-notes.md"
+                      >i18n-notes.md</a
+                    >）。
+                  </div>
+                </li>
+                <li>
+                  <b>en の辞書に同じキー・同じ補間変数で追加</b>
+                  <div class="ck-body">
+                    <code class="path">src/locales/en/</code>。補間は
+                    <code>{{name}}</code>、件数は <code>key_one</code> /
+                    <code>key_other</code>。用語は i18n-notes.md
+                    の用語集に合わせ、新しい訳語は用語集に追記。
+                  </div>
+                </li>
+                <li>
+                  <b>コードで t("ns:key") を使う</b>
+                  <div class="ck-body">
+                    <code>useTranslation()</code>
+                    は引数なしで呼び、必ず名前空間付きの完全キーで参照。要素を含む文は
+                    <code>&lt;Trans&gt;</code>、属性（title / aria-label /
+                    placeholder / alt）も辞書化。React 外は呼び出し時に
+                    <code>i18n.t</code>、純粋関数は
+                    <code>t</code> を引数で受ける。
+                  </div>
+                </li>
+                <li>
+                  <b>新しい名前空間なら登録する</b>
+                  <div class="ck-body">
+                    <code class="path">src/i18n/index.ts</code> の
+                    <code>ns</code> と
+                    <code class="path">src/i18n/resources.ts</code>（ja・en
+                    両方）。
+                  </div>
+                </li>
+                <li>
+                  <b>英語表示のテストを書く</b>
+                  <div class="ck-body">
+                    <code>i18n.changeLanguage("en")</code> して描画し
+                    <code class="path">src/test-utils/japanese.ts</code> の
+                    <code>expectNoJapanese</code>
+                    で日本語の残りを検出。テスト後は言語を ja に戻す。
+                  </div>
+                </li>
+                <li>
+                  <b>契約テストを通す</b>
+                  <div class="ck-body">
+                    <code>npx vitest run --project unit src/i18n</code>。
+                  </div>
+                </li>
+              </ol>
+            </div>
+            <div class="tab" data-tab="inject" data-label="inject の文言">
+              <ol class="checklist" data-checklist="howto.add-text-inject">
+                <li>
+                  <b>辞書は i18next ではなく __mcxI18n に足す</b>
+                  <div class="ck-body">
+                    <code class="path">src-tauri/src/inject/_src/i18n.ts</code>
+                    が <code>window.__mcxI18n</code> を公開します。各 inject は
+                    <code>window.__mcxI18n.t("key")</code> で引き、<b
+                      >ES import はしない</b
+                    >
+                    （各スクリプトを
+                    <code>include_str!</code> で連結するため）。
+                  </div>
+                </li>
+                <li>
+                  <b>X の画面と照合する日本語は翻訳しない</b>
+                  <div class="ck-body">
+                    「広告」などは
+                    <code class="path"
+                      >src-tauri/src/inject/_src/i18n.contract.test.ts</code
+                    >
+                    の許可リストに理由付きで載せます。
+                  </div>
+                </li>
+              </ol>
+            </div>
+            <div
+              class="tab"
+              data-tab="rust"
+              data-label="Rust のエラー・タイトル"
+            >
+              <ol class="checklist" data-checklist="howto.add-text-rust">
+                <li>
+                  <b>Rust は文章を返さない</b>
+                  <div class="ck-body">
+                    エラーは <code>codes</code> に
+                    <code>area.camelCase</code> 定数を追加（<code class="path"
+                      >src-tauri/src/commands/app_error.rs</code
+                    >）→ <code>messages.json</code> の
+                    <code>rustError.&lt;area&gt;.&lt;name&gt;</code> に ja・en
+                    を追加。詳細メッセージは <code>detail</code> に。
+                  </div>
+                </li>
+                <li>
+                  <b>ウィンドウタイトル等は ui_text に追加</b>
+                  <div class="ck-body">
+                    <code class="path"
+                      >src-tauri/src/commands/ui_language.rs</code
+                    >
+                    の <code>UiText</code> にバリアントと ja/en
+                    を追加。開発者向けログは固定の英語 （日本語を含めると
+                    <code class="path"
+                      >src-tauri/src/log_language_contract.rs</code
+                    >
+                    が検出）。
+                  </div>
+                </li>
+              </ol>
+            </div>
+          </div>
+
+          <h3 id="add-text-verify">確認方法・守ってくれるテスト</h3>
+          <ul>
+            <li>
+              <code class="path">src/i18n/resources.contract.test.ts</code>:
+              ja/en のキー集合・補間変数の一致。
+            </li>
+            <li>
+              <code class="path">src/i18n/unusedKeys.contract.test.ts</code>:
+              辞書の未使用キーを失敗にする。動的キーは ``t(`ns:prefix.${x}`)``
+              のように名前空間付き接頭辞を先頭に。
+            </li>
+            <li>
+              ESLint の <code>no-restricted-syntax</code>（<code class="path"
+                >eslint.config.js</code
+              >、<code class="path">src/lib/i18nLint.contract.test.ts</code>）:
+              画面コードへの日本語直書きをエラー化。
+            </li>
+            <li>
+              <code class="path">src/lib/appError.contract.test.ts</code>: Rust
+              の全エラーコードが辞書にあること。
+            </li>
+          </ul>
+          <div class="callout warn">
+            <b>よくあるミス</b>
+            <p>
+              <code>useTranslation("settings")</code>
+              のように名前空間を引数に渡す（使わない）／モジュール直下の定数に翻訳結果を入れて言語切替に追従しない／日本語文言を一字でも変えてしまう／Rust
+              が日本語文字列を返す。
+            </p>
+          </div>
+        </section>
+
+        <section>
+          <h2 id="add-component">5. React コンポーネントを追加する</h2>
+          <p>
+            <b>いつ使う:</b>
+            画面部品（ダイアログ・設定パネル・バー等）を新設するとき。雛形は
+            <a href="../../.claude/skills/component-create/SKILL.md"
+              >component-create</a
+            >
+            と、Story 駆動の進め方は<a
+              href="../../.claude/skills/storybook-dev/SKILL.md"
+              >storybook-dev</a
+            >。
+          </p>
+
+          <h3 id="add-component-checklist">チェックリスト</h3>
+          <ol class="checklist" data-checklist="howto.add-component">
+            <li>
+              <b>同じディレクトリに 4 ファイルをコロケーション配置</b>
+              <div class="ck-body">
+                <code>src/components/&lt;Name&gt;/</code> に
+                <code>&lt;Name&gt;.tsx</code> / <code>.module.scss</code> /
+                <code>.test.tsx</code> /
+                <code>.stories.tsx</code
+                >。<b>バレル（index.ts）は作らず</b>、import
+                は各ファイルを直接指す。例:
+                <code class="path"
+                  >src/components/MobileTabBar/MobileTabBar.stories.tsx</code
+                >。
+              </div>
+            </li>
+            <li>
+              <b>UI の寸法は rem で書く</b>
+              <div class="ck-body">
+                アプリ UI の倍率は <code>&lt;html&gt;</code> の font-size
+                で変わるため <code>px</code> は禁止（1px 以下のヘアラインと
+                media query を除く）。ネイティブ WebView の bounds に使う高さは
+                <code class="path">src/lib/gridLayout.ts</code> の rem 定数と
+                <code>remToPx</code>。SCSS と同値に保つ（<a
+                  href="../development/ui-scale-notes.md"
+                  >ui-scale-notes.md</a
+                >）。
+              </div>
+            </li>
+            <li>
+              <b>配色は CSS トークンを使う</b>
+              <div class="ck-body">
+                <code class="path">src/index.css</code>
+                のトークン（<code>--mcx-*</code>）。白文字を載せる塗り背景は
+                <code>--mcx-accent-fill</code>。
+              </div>
+            </li>
+            <li>
+              <b>パネル型ダイアログなら Android 全画面ミキシン</b>
+              <div class="ck-body">
+                <code class="path">src/styles/_dialog-fullscreen.scss</code> の
+                <code>android-fullscreen-overlay</code> /
+                <code>android-fullscreen-panel($padding)</code>（panel
+                全体がスクロールする構造なら
+                <code>android-fullscreen-sticky-header</code>）を
+                <code>@include</code>。 小さな確認ダイアログは全画面化しない。
+              </div>
+            </li>
+            <li>
+              <b>文言は辞書化する</b>
+              <div class="ck-body">
+                4 章のとおり。日本語直書きは ESLint でエラーになる。
+              </div>
+            </li>
+            <li>
+              <b>単体テストと Story を書く</b>
+              <div class="ck-body">
+                テスト名は日本語。Story は play function
+                で操作を検証し、テーマは
+                <code>document.documentElement</code> の
+                <code>data-theme</code> で切り替える。コールバックは
+                <code>fn()</code>。
+              </div>
+            </li>
+            <li>
+              <b>import 順を守る</b>
+              <div class="ck-body">
+                外部パッケージ → vitest/storybook → <code>@/</code> →
+                相対パス、各グループ内はアルファベット昇順、グループ間に空行を入れない。<code
+                  >npm run lint:fix</code
+                >
+                で自動整列。新規コードは <code>@/</code> エイリアス（<code
+                  >@/*</code
+                >
+                → <code>src/*</code>）を使う。
+              </div>
+            </li>
+            <li>
+              <b>共通のフック・状態に載せるか判断する</b>
+              <div class="ck-body">
+                アプリ状態は
+                <code class="path">src/store/useAppStore.ts</code>
+                （Zustand）、副作用は <code class="path">src/hooks/</code>
+                のフックに切り出す。カラム WebView は OS ネイティブのため
+                <code>z-index</code> が効かない点に注意（<a
+                  href="../development/column-layout-notes.md"
+                  >column-layout-notes.md</a
+                >）。
+              </div>
+            </li>
+          </ol>
+
+          <h3 id="add-component-verify">確認方法</h3>
+          <ul>
+            <li>
+              <code>npm run lint</code>（警告も残さない）／<code>npm test</code
+              >／<code>npm run test:story</code>（chromium でブラウザ実行。Story
+              を追加・変更したら必須）。
+            </li>
+            <li>
+              目視確認は <code>npm run storybook</code>。Storybook は
+              <code>index.css</code>
+              を読まないため、テーマ変数が必要な検証には注意。
+            </li>
+            <li>
+              <code class="path">src/lib/gridLayout.contract.test.ts</code>:
+              SCSS の高さと rem 定数の一致。
+            </li>
+          </ul>
+          <div class="callout warn">
+            <b>よくあるミス</b>
+            <p>
+              <code>px</code>
+              で寸法を書き表示サイズ設定に追従しない／Android
+              でダイアログが見切れる（ミキシン未使用）／バレルを作る／ Story
+              を作らず <code>test:story</code> が通らない。
+            </p>
+          </div>
+        </section>
+
+        <section>
+          <h2 id="add-inject">6. inject 機能を追加する</h2>
+          <p>
+            <b>いつ使う:</b>
+            X（x.com）のページの中で動く処理を足すとき（広告非表示・NG
+            ワード等）。生成物の
+            <code>.js</code> は直接編集しない。詳細は
+            <a href="../development/inject-ipc-shortcuts-notes.md"
+              >inject-ipc-shortcuts-notes.md</a
+            >
+            と
+            <a href="../../.claude/skills/inject-script-dev/SKILL.md"
+              >inject-script-dev</a
+            >。
+          </p>
+
+          <h3 id="add-inject-checklist">チェックリスト</h3>
+          <ol class="checklist" data-checklist="howto.add-inject">
+            <li>
+              <b>_src に TypeScript を書く</b>
+              <div class="ck-body">
+                <code>src-tauri/src/inject/_src/&lt;name&gt;.ts</code
+                >。テストは同ディレクトリに
+                <code>&lt;name&gt;.test.ts</code>（vitest + jsdom）。DOM
+                の監視は
+                <code class="path"
+                  >src-tauri/src/inject/_src/dom_observer.ts</code
+                >
+                の共通ハブを使う。
+              </div>
+            </li>
+            <li>
+              <b>ビルド対象に登録する</b>
+              <div class="ck-body">
+                <code class="path">vite.inject.config.ts</code> の
+                <code>plainEntries</code> に名前を追加。
+                <code>npm run build:inject</code> で
+                <code>src-tauri/src/inject/&lt;name&gt;.js</code>
+                が生成される（gitignore 済み）。
+              </div>
+            </li>
+            <li>
+              <b>mod.rs で組み込む</b>
+              <div class="ck-body">
+                <code class="path">src-tauri/src/inject/mod.rs</code> の
+                <code>build_init_script</code> で
+                <code>include_str!("&lt;name&gt;.js")</code>
+                して連結。モバイル専用／デスクトップ専用は
+                <code>include_if(...)</code>。
+              </div>
+            </li>
+            <li>
+              <b>設定フラグを配線する（必要なら）</b>
+              <div class="ck-body">
+                3 章の経路。<code>window.__multiColumnXConfig</code>
+                から読む。型は
+                <code class="path">src-tauri/src/inject/_src/types.d.ts</code>。
+              </div>
+            </li>
+            <li>
+              <b>Rust のコマンドを呼ぶ場合は ACL も更新</b>
+              <div class="ck-body">
+                inject から呼ぶコマンド名は
+                <code class="path">src-tauri/src/inject/_src/constants.ts</code>
+                （<code>INJECT_COMMANDS</code>）に載せ、2 章の 4
+                点セットに加えて
+                <code class="path"
+                  >src-tauri/capabilities/column-webview.json</code
+                >
+                へ。Android のカラムはネイティブ WebView で Tauri IPC が無く、JS
+                ブリッジ経由（8 章）。
+              </div>
+            </li>
+            <li>
+              <b>キーボードショートカットなら 3 箇所を同期</b>
+              <div class="ck-body">
+                <code class="path">src/hooks/useKeyboardShortcuts.ts</code
+                >（メインフォーカス時の keydown と、WebView
+                からのイベント受信側の switch）と
+                <code class="path"
+                  >src-tauri/src/inject/_src/keyboard_shortcut.ts</code
+                >。
+              </div>
+            </li>
+            <li>
+              <b>実 DOM で検証する</b>
+              <div class="ck-body">
+                X の DOM は頻繁に変わり、jsdom の合成 DOM
+                だけでは保証できません。実 X
+                ページでの確認が必要かを依頼者に確認し、必要なら完了前に検証する。判明した恒久的な知見は
+                inject-ipc-shortcuts-notes.md に追記。
+              </div>
+            </li>
+          </ol>
+
+          <h3 id="add-inject-verify">確認方法</h3>
+          <ul>
+            <li>
+              <code>npm run build:inject</code> が成功し、<code>npm test</code>
+              がグリーン。
+            </li>
+            <li>
+              Rust も変更したら
+              <code>cargo test --manifest-path src-tauri/Cargo.toml</code> と
+              <code>npm run lint:rust</code>（build:inject の後に）。
+            </li>
+            <li>
+              <code class="path"
+                >src-tauri/src/inject/_src/i18n.contract.test.ts</code
+              >: inject の辞書契約。
+            </li>
+          </ul>
+          <div class="callout warn">
+            <b>よくあるミス</b>
+            <p>
+              生成された <code>.js</code> を直接編集して次のビルドで消える／
+              <code>plainEntries</code> か
+              <code>include_str!</code> の片方だけ足す／inject から ES import
+              して連結が壊れる。
+            </p>
+          </div>
+        </section>
+
+        <section>
+          <h2 id="webview-builder">7. WebView builder を新設・変更する</h2>
+          <p>
+            <b>いつ使う:</b>
+            カラム・ポップアップ・コンポーズなど、Rust で
+            WebView（ウィンドウ）を作る処理を足す・変えるとき。
+          </p>
+
+          <div class="callout danger">
+            <b>契約テストが検査する必須項目</b>
+            <p>
+              builder
+              を足したら、以下を付け忘れるとテストが落ちる（または実機で不具合になる）。実装は
+              <code class="path">src-tauri/src/commands/webview/</code> の
+              <code>column.rs</code> / <code>compose.rs</code> /
+              <code>popup.rs</code>。
+            </p>
+          </div>
+
+          <h3 id="webview-builder-checklist">チェックリスト</h3>
+          <ol class="checklist" data-checklist="howto.webview-builder">
+            <li>
+              <b
+                >.on_new_window(external_link::new_window_handler(app.clone()))
+                を付ける</b
+              >
+              <div class="ck-body">
+                新規ウィンドウ要求を受け、http/https/mailto/tel
+                だけ既定ブラウザで開き常に Deny する。
+                <code class="path"
+                  >src-tauri/src/commands/webview/external_link.rs</code
+                >。理由と CDP での実機検証手順は
+                <a href="../development/external-link-new-window-notes.md"
+                  >external-link-new-window-notes.md</a
+                >。
+              </div>
+            </li>
+            <li>
+              <b>.disable_drag_drop_handler() を付ける</b>
+              <div class="ck-body">
+                Windows で Tauri 既定のファイルドロップ処理が X ページの HTML5
+                DnD を横取りするのを防ぐ。
+              </div>
+            </li>
+            <li>
+              <b>Windows 用に browser_extensions_enabled(true) を付ける</b>
+              <div class="ck-body">
+                アカウントの <code>data_directory</code> を使う全 builder に
+                <code>#[cfg(windows)]</code> で付ける（食い違うと
+                <code>ERROR_INVALID_STATE</code>）。
+                <code class="path">src-tauri/src/commands/webview/mod.rs</code>
+                の契約テストが検査。 詳細は
+                <a href="../development/browser-extensions-notes.md"
+                  >browser-extensions-notes.md</a
+                >。
+              </div>
+            </li>
+            <li>
+              <b>desktop / mobile の分岐を確認する</b>
+              <div class="ck-body">
+                同一コマンド名でも <code>#[cfg(desktop)]</code> /
+                <code>#[cfg(mobile)]</code> で実装が別。Linux
+                のカラムは独立ウィンドウで親クリップが効かないため
+                <code>linux_column_layout</code>（<code class="path"
+                  >src-tauri/src/commands/webview/column.rs</code
+                >）で制御する。変更時は
+                <a href="../development/linux-column-spec.md"
+                  >linux-column-spec.md</a
+                >
+                と
+                <a href="../development/linux-webview-notes.md"
+                  >linux-webview-notes.md</a
+                >
+                のテスト方針に従う（過去に何度もデグレードした領域）。
+              </div>
+            </li>
+            <li>
+              <b>prevent_close を使う常駐ウィンドウなら destroy() を追加</b>
+              <div class="ck-body">
+                <code>close()</code> は効かないため、メインウィンドウの
+                <code>CloseRequested</code>（<code class="path"
+                  >src-tauri/src/lib.rs</code
+                >）に明示 <code>destroy()</code> を足す。詳細は
+                <a href="../development/compose-popup-topbar-notes.md"
+                  >compose-popup-topbar-notes.md</a
+                >。
+              </div>
+            </li>
+          </ol>
+
+          <h3 id="webview-builder-verify">確認方法</h3>
+          <ul>
+            <li>
+              <code>npm run build:inject</code> →
+              <code>cargo test --manifest-path src-tauri/Cargo.toml</code
+              >（<code>webview/mod.rs</code> の契約テスト:
+              <code>external_link::new_window_handler</code>
+              の数、拡張機能フラグ等）／<code>npm run lint:rust</code>。
+            </li>
+            <li>
+              CI の Rust ジョブは ubuntu のみ。<code>#[cfg(windows)]</code>
+              や macOS 向けコードはローカルの clippy / test が唯一の検証になる。
+            </li>
+          </ul>
+          <div class="callout warn">
+            <b>よくあるミス</b>
+            <p>
+              ポップアップ用 builder にだけ
+              <code>on_new_window</code> を付け忘れ、X
+              内のリンクがアプリ内の新規ウィンドウで開く／
+              常駐ウィンドウを足したのにアプリ終了後もプロセスが残る。
+            </p>
+          </div>
+        </section>
+
+        <section>
+          <h2 id="android-native">8. Android ネイティブ機能を追加・変更する</h2>
+          <p>
+            <b>いつ使う:</b>
+            Kotlin 側（<code class="path">src-tauri/gen/android/</code
+            >）で端末の機能を使う処理を足す・変えるとき。 Android
+            のカラム／ポップアップ WebView は Tauri の IPC が使えず、JS
+            ブリッジ（JavaScript と Kotlin をつなぐ入口）を通ります。
+          </p>
+
+          <h3 id="android-native-checklist">チェックリスト</h3>
+          <ol class="checklist" data-checklist="howto.android-native">
+            <li>
+              <b>Kotlin に処理を書く</b>
+              <div class="ck-body">
+                <code class="path"
+                  >src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/MainActivity.kt</code
+                >
+                または専用クラス。純粋に切り出せるロジックは JVM
+                単体テストが書ける形（例:
+                <code>BackupFileSelector</code>）にする。
+              </div>
+            </li>
+            <li>
+              <b>Rust から呼ぶなら android_bridge.rs にラッパーを足す</b>
+              <div class="ck-body">
+                <code class="path">src-tauri/src/android_bridge.rs</code> が JNI
+                の
+                <code>env.call_method()</code>
+                でメソッド名とシグネチャを<b>文字列指定</b>で呼ぶ。Kotlin
+                側のシグネチャと完全に一致させる。 Kotlin → Rust の通知は
+                <code>Java_com_natsuyasai_multicolumnx_AppBridge_*</code> の
+                <code>extern "C"</code> 関数。
+              </div>
+            </li>
+            <li>
+              <b>proguard-rules.pro を同時に更新する</b>
+              <div class="ck-body">
+                <code>MainActivity.kt</code> のメソッドシグネチャを変えたら、
+                <code class="path"
+                  >src-tauri/gen/android/app/proguard-rules.pro</code
+                >
+                の
+                <code>-keepclassmembers</code>
+                を同じ型で追加・更新・削除。デバッグでは R8
+                が無効で症状が出ず、<b>リリースビルドでだけ</b>
+                <code>NoSuchMethodException</code> になる。
+              </div>
+            </li>
+            <li>
+              <b>JS ブリッジはオリジンを検証する</b>
+              <div class="ck-body">
+                <code>addJavascriptInterface</code>
+                は任意オリジンから呼べてしまうため、新規ブリッジは
+                <code>WebViewCompat.addWebMessageListener</code>
+                を使い、許可オリジン (<code class="path"
+                  >src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/BridgeOrigins.kt</code
+                >
+                の <code>BRIDGE_ALLOWED_ORIGIN_RULES</code>) とコールバック内の
+                <code>isAllowedBridgeOrigin</code>
+                で二重チェックする（メインフレームのみ受理、メッセージは
+                <code class="path"
+                  >src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/BridgeMessage.kt</code
+                >
+                でパース）。既存の <code>MainActivity.kt</code> の実装に倣う。
+              </div>
+            </li>
+            <li>
+              <b>利用者に見える文言は文字列リソースに</b>
+              <div class="ck-body">
+                <code class="path"
+                  >src-tauri/gen/android/app/src/main/res/values/strings.xml</code
+                >
+                （既定=英語）と
+                <code class="path"
+                  >src-tauri/gen/android/app/src/main/res/values-ja/strings.xml</code
+                >
+                に同じキーを追加。書式付きは
+                <code>%1$d</code> の位置指定子、コードは
+                <code>getString(R.string.…)</code>。端末の言語に従い、アプリ内の
+                <code>language</code> 設定とは独立。
+              </div>
+            </li>
+            <li>
+              <b>権限・Manifest を確認する</b>
+              <div class="ck-body">
+                Foreground Service は Android 14 以降
+                <code>foregroundServiceType</code>
+                の明示が必須。バックアップ対象は
+                <code>data_extraction_rules.xml</code>
+                等（ワイルドカード非対応）。詳細は
+                <a href="../development/android-notes.md">android-notes.md</a>。
+              </div>
+            </li>
+            <li>
+              <b>単体テストを書き Gradle で実行する</b>
+              <div class="ck-body">
+                テストは
+                <code>src/test/java/com/natsuyasai/multicolumnx/</code>（例:
+                <code>BridgeOriginsTest.kt</code> /
+                <code>StringResourcesTest.kt</code> /
+                <code>MainActivityTest.kt</code>）。
+              </div>
+            </li>
+          </ol>
+
+          <h3 id="android-native-verify">確認方法</h3>
+          <pre><code>cd src-tauri/gen/android &amp;&amp; ./gradlew.bat :app:testUniversalDebugUnitTest</code></pre>
+          <ul>
+            <li>
+              <code>testDebugUnitTest</code> では app
+              のテストが<b>実行されない</b>（universal
+              フレーバー付きのため）。必ず
+              <code>:app:testUniversalDebugUnitTest</code>。
+            </li>
+            <li>
+              Kotlin の整形は
+              <code>npm run format:kotlin</code>（ktlint）。新しい git worktree
+              には gitignore 済みの生成ファイルが無いので、先に
+              <code>tauri android</code>
+              系コマンドで生成する（android-notes.md）。
+            </li>
+            <li>
+              リリースビルド（<code>npm run tauri:android:build</code
+              >）で実機動作を確認する。
+            </li>
+          </ul>
+          <div class="callout warn">
+            <b>よくあるミス</b>
+            <p>
+              <code>proguard-rules.pro</code>
+              の更新漏れ（リリースだけクラッシュ）／英語の既定側に日本語を直書き／
+              <code>registerForActivityResult</code> を onCreate
+              後に登録する（プロパティ初期化子で行う）。
+            </p>
+          </div>
+        </section>
+
+        <section>
+          <h2 id="color-token">9. 配色トークンを変更する</h2>
+          <p>
+            <b>いつ使う:</b>
+            アプリ UI の色（ライト/ダーク）を変えるとき。
+          </p>
+
+          <h3 id="color-token-checklist">チェックリスト</h3>
+          <ol class="checklist" data-checklist="howto.color-token">
+            <li>
+              <b>index.css のトークンを変更する</b>
+              <div class="ck-body">
+                <code class="path">src/index.css</code>
+                の <code>:root</code> / <code>:root[data-theme="dark"]</code> /
+                <code>:root[data-theme="light"]</code>
+                の値を、<b>該当する全ブロックで</b>更新。
+              </div>
+            </li>
+            <li>
+              <b>白文字を載せる塗り背景は --mcx-accent-fill を使う</b>
+              <div class="ck-body">
+                <code>--mcx-accent</code>
+                を背景にすると白文字が読めない。新規の塗りボタンは
+                <code>--mcx-accent-fill</code>。
+              </div>
+            </li>
+            <li>
+              <b>コントラスト基準を満たす</b>
+              <div class="ck-body">
+                <code class="path">src/lib/themeContrast.contract.test.ts</code>
+                （計算は <code class="path">src/lib/contrast.ts</code>）。
+              </div>
+            </li>
+            <li>
+              <b>Android のスワイプバーの色を同期する</b>
+              <div class="ck-body">
+                <code class="path"
+                  >src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/SwipeBarOverlayView.kt</code
+                >
+                に複製した色を、<code class="path"
+                  >src/lib/swipeBarColors.contract.test.ts</code
+                >
+                が一致を検証する。
+              </div>
+            </li>
+            <li>
+              <b>Storybook / 実機で目視する</b>
+              <div class="ck-body">
+                Storybook は
+                <code>index.css</code>
+                を読み込まないため、トークンの検証は実アプリまたは Story
+                側でトークンを定義して確認。
+              </div>
+            </li>
+          </ol>
+          <h3 id="color-token-verify">確認方法</h3>
+          <p>
+            <code
+              >npx vitest run --project unit
+              src/lib/themeContrast.contract.test.ts
+              src/lib/swipeBarColors.contract.test.ts</code
+            >
+            または <code>npm test</code>。テーマ切替の仕組みは
+            <a href="../development/release-theme-reauth-notes.md"
+              >release-theme-reauth-notes.md</a
+            >。
+          </p>
+          <div class="callout warn">
+            <b>よくあるミス</b>
+            <p>
+              ライトだけ直してダークを忘れる／Kotlin
+              の複製色を更新せず契約テストが落ちる。
+            </p>
+          </div>
+        </section>
+
+        <section>
+          <h2 id="final-check">10. 完了前の最終チェック</h2>
+          <p>
+            <b>いつ使う:</b>
+            PR を出す前。変更した層に応じて、上から順に実行しエラー・警告を 0
+            にします。
+          </p>
+
+          <ol class="checklist" data-checklist="howto.final-check">
+            <li>
+              <b>npm run format</b>
+              <div class="ck-body">TS / Rust / Kotlin をまとめて整形。</div>
+            </li>
+            <li>
+              <b>npx prettier --check .</b>
+              <div class="ck-body">
+                CI（<code class="path">.github/workflows/ci.yml</code
+                >）と同じ。docs・md だけの変更でも必須。落ちたら
+                <code>npx prettier --write &lt;対象&gt;</code>。
+              </div>
+            </li>
+            <li>
+              <b>npm run typecheck</b>
+              <div class="ck-body"><code>tsc --noEmit</code>。</div>
+            </li>
+            <li>
+              <b>npm run lint</b>
+              <div class="ck-body">
+                警告も残さない。自動整列は <code>npm run lint:fix</code>。
+              </div>
+            </li>
+            <li>
+              <b>npm test</b>
+              <div class="ck-body">Vitest 単体テスト（契約テストを含む）。</div>
+            </li>
+            <li>
+              <b>npm run test:story</b>
+              <div class="ck-body">
+                Story を追加・変更した場合は必須（chromium で実行）。
+              </div>
+            </li>
+            <li>
+              <b>npm run test:property</b>
+              <div class="ck-body">
+                プロパティテスト（fast-check）。仕様が明確ならまず
+                <a href="../../.claude/skills/property-based-testing/SKILL.md"
+                  >property-based-testing</a
+                >
+                を検討。
+              </div>
+            </li>
+            <li>
+              <b>npm run build:inject → npm run lint:rust → cargo test</b>
+              <div class="ck-body">
+                <code>src-tauri/</code> を変更した場合。
+                <code>cargo test --manifest-path src-tauri/Cargo.toml</code>。
+              </div>
+            </li>
+            <li>
+              <b>Android のテスト・リリースビルド</b>
+              <div class="ck-body">
+                Kotlin を変更した場合は
+                <code>./gradlew.bat :app:testUniversalDebugUnitTest</code
+                >、必要ならリリースビルド。
+              </div>
+            </li>
+            <li>
+              <b>npm run docs:build</b>
+              <div class="ck-body">
+                <code class="path">docs/guide/</code
+                >（ユーザーガイド）を変更した場合は必須。VitePress
+                のリンク切れ検出を兼ねる。
+              </div>
+            </li>
+            <li>
+              <b>npm run build</b>
+              <div class="ck-body">最終のビルド確認。</div>
+            </li>
+            <li>
+              <b>手動テスト項目を用意する</b>
+              <div class="ck-body">
+                Gherkin の <code>@manual</code> シナリオは手動テスト項目として
+                <code>integration-test.md</code> に出力（手順は
+                <a
+                  href="../../.claude/skills/integration-test-viewpoints/SKILL.md"
+                  >integration-test-viewpoints</a
+                >）。例:
+                <code class="path"
+                  >docs/development/backup-restore/integration-test.md</code
+                >。
+              </div>
+            </li>
+            <li>
+              <b>開発者ガイドを更新する</b>
+              <div class="ck-body">
+                コマンド・設定・コンポーネント等を増減したら
+                <a
+                  href="../../.claude/skills/developer-guide-maintenance/SKILL.md"
+                  >developer-guide-maintenance</a
+                >
+                でこのガイドも追従させる。
+              </div>
+            </li>
+          </ol>
+          <div class="callout tip">
+            <b>目安</b>
+            <p>
+              TS だけの変更なら 1〜7 とビルド、Rust を触ったら 8、Kotlin
+              を触ったら 9 を足す、と覚えると迷いません。まとめて実行する手順は
+              <a href="../../.claude/skills/check-creation/SKILL.md"
+                >check-creation</a
+              >。
+            </p>
+          </div>
+        </section>
+
+        <section>
+          <h2 id="troubleshooting">11. 困ったとき</h2>
+          <p>
+            症状から原因と対処を引けます。検索ボックスやチップで絞り込んでください。クリックすると詳細と関連ファイルが開きます。
+          </p>
+          <div class="catalog" data-catalog="howto.troubles"></div>
+
+          <h3 id="troubleshooting-first">まず試すこと</h3>
+          <ol class="checklist" data-checklist="howto.troubleshooting-first">
+            <li>
+              <b>契約テストを先に走らせる</b>
+              <div class="ck-body">
+                <code>npm test</code> と
+                <code>cargo test --manifest-path src-tauri/Cargo.toml</code>
+                は「どこが食い違っているか」を名前で教えてくれます。
+              </div>
+            </li>
+            <li>
+              <b>build:inject を実行したか確認する</b>
+              <div class="ck-body">inject と Rust の不具合の多くはここ。</div>
+            </li>
+            <li>
+              <b>CLAUDE.md の該当節と docs/development のノートを読む</b>
+              <div class="ck-body">
+                <code class="path">CLAUDE.md</code>
+                は変更箇所ごとに参照すべきノートを示しています。
+              </div>
+            </li>
+          </ol>
+        </section>
+      </main>
+    </div>
+    <aside id="mcx-detail" hidden></aside>
+    <script src="assets/data/index.js"></script>
+    <script src="assets/data/howto.js"></script>
+    <script src="assets/common.js"></script>
+  </body>
+</html>

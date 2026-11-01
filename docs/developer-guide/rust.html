@@ -1,0 +1,927 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="mcx-synced-commit" content="68b23eed" />
+    <title>Rust 層 | MCX 開発者ガイド</title>
+    <link rel="stylesheet" href="assets/common.css" />
+  </head>
+  <body data-page="rust">
+    <div id="mcx-header"></div>
+    <div class="layout">
+      <nav id="mcx-toc"></nav>
+      <main id="content">
+        <h1>Rust 層（src-tauri/）</h1>
+        <p class="lead">
+          Multi Column X のバックエンド。設定の永続化、X を表示する WebView
+          の生成と管理、アカウントのログイン検出、
+          アプリ更新・動画保存・バックアップなど「OS
+          に近い仕事」を担います。このページでは責務と公開 IF（外部設計）、
+          各モジュールの役割・設計判断・落とし穴（詳細設計）を説明します。
+        </p>
+
+        <section>
+          <h2 id="prerequisites">前提知識</h2>
+          <p>
+            Rust や Tauri
+            を触ったことがなくても読めるよう、このプロジェクトを読むのに最低限必要な概念だけ挙げます。
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>概念</th>
+                <th>このプロジェクトでの意味</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <span
+                    class="term"
+                    data-term="Rust のバックエンドと Web 技術（HTML/JS）のフロントを組み合わせてデスクトップ/モバイルアプリを作るフレームワーク。"
+                    >Tauri v2</span
+                  >
+                </td>
+                <td>
+                  メインウィンドウは React、バックエンドは Rust。両者は
+                  <span
+                    class="term"
+                    data-term="WebView(JS) から Rust 関数を呼ぶ仕組み。invoke('名前', 引数) が Promise を返す。"
+                    >invoke</span
+                  >
+                  と
+                  <span
+                    class="term"
+                    data-term="Rust から JS へ通知を送る仕組み。app.emit('名前', payload) を JS 側が listen('名前') で受ける。"
+                    >イベント</span
+                  >
+                  でやり取りする。
+                </td>
+              </tr>
+              <tr>
+                <td>コマンド</td>
+                <td>
+                  <code>#[tauri::command]</code> を付けた Rust 関数。<code
+                    >lib.rs</code
+                  >
+                  の <code>generate_handler!</code> に登録すると JS
+                  から呼べる。引数は serde で JSON から復元される。
+                </td>
+              </tr>
+              <tr>
+                <td>State</td>
+                <td>
+                  <code>.manage(AppState::new())</code>
+                  で登録する共有オブジェクト。複数コマンドから
+                  <code>app.state::&lt;AppState&gt;()</code> で参照する（内部は
+                  <code>Mutex</code>）。
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <span
+                    class="term"
+                    data-term="Tauri のアクセス制御。どのウィンドウ/URL がどのコマンドを呼べるかを capability(JSON) で許可する。"
+                    >capability（ACL）</span
+                  >
+                </td>
+                <td>
+                  アプリ独自コマンドは <code>build.rs</code> の
+                  <code>AppManifest</code> に列挙し、capability で
+                  <code>allow-&lt;コマンド名のケバブケース&gt;</code>
+                  を許可しないと呼べない。
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <span
+                    class="term"
+                    data-term="コンパイル時に有効なコードを切り替える Rust の仕組み。#[cfg(desktop)] / #[cfg(mobile)] / #[cfg(windows)] など。"
+                    >条件コンパイル</span
+                  >
+                </td>
+                <td>
+                  同じコマンド名で <code>#[cfg(desktop)]</code> 版と
+                  <code>#[cfg(mobile)]</code> 版の 2 実装がある場合が多い。
+                  変更時は<b>必ず両方</b>を確認する。
+                </td>
+              </tr>
+              <tr>
+                <td>serde の命名</td>
+                <td>
+                  Tauri v2 は JS→Rust のケース変換をしない。JS が camelCase
+                  で送る項目は
+                  <code>#[serde(rename = "…")]</code>、コマンド引数なら
+                  <code>#[allow(non_snake_case)]</code> の引数名で受ける。
+                </td>
+              </tr>
+              <tr>
+                <td>Result とエラー型</td>
+                <td>
+                  コマンドは <code>Result&lt;T, E&gt;</code> を返す。E は
+                  <code>String</code>（旧来）または種別コードだけを持つ
+                  <code>AppError</code> / <code>BackupError</code>。JS 側では
+                  Promise の reject になる。
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section>
+          <h2 id="external">外部設計</h2>
+
+          <h3 id="external-role">責務と境界</h3>
+          <ul>
+            <li>
+              設定（<code>settings.json</code>）の読み書き・破損復旧・バックアップ/リストア
+            </li>
+            <li>
+              カラム/ポップアップ/コンポーズの WebView 生成・配置・破棄、inject
+              スクリプトの組み立てと注入
+            </li>
+            <li>アカウント（追加・再認証・削除・X ユーザー ID 検出）</li>
+            <li>
+              inject からの報告（新着数・スクロール・レート制限など）を React
+              へ中継、動画ダウンロード、アプリ更新、 Linux
+              コーデック補完、ブラウザ拡張（Windows）
+            </li>
+          </ul>
+          <div class="callout note">
+            <b>画面は作らない</b>
+            <p>
+              UI の状態管理は React 層の責務。Rust は「OS/WebView
+              の操作」と「永続化」に徹し、画面文言も返さない （<a href="#errors"
+                >エラー</a
+              >参照）。
+            </p>
+          </div>
+
+          <h3 id="external-if">公開インターフェース</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>種別</th>
+                <th>内容</th>
+                <th>詳細</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Tauri コマンド</td>
+                <td>React / inject が invoke する 43 個</td>
+                <td><a href="#commands">コマンド一覧</a></td>
+              </tr>
+              <tr>
+                <td>イベント</td>
+                <td>Rust が emit し React が listen する通知（15 種）</td>
+                <td><a href="#events-state">イベント・State</a></td>
+              </tr>
+              <tr>
+                <td>永続化ファイル</td>
+                <td>
+                  アプリデータ配下の <code>settings.json</code>（<code
+                    >appSettings</code
+                  >
+                  キー＋Windows 拡張用
+                  <code>browserExtensions</code>
+                  キー）、<code>settings.json.prev</code>、壊れた設定の退避ファイル、
+                  復元前スナップショット、<code>accounts/</code>
+                  配下のアカウント別データディレクトリ
+                </td>
+                <td><a href="#settings">設定の永続化</a></td>
+              </tr>
+              <tr>
+                <td>Android ブリッジ</td>
+                <td>
+                  Rust→Kotlin の JNI
+                  呼び出し（<code>android_bridge.rs</code>）と、Kotlin→Rust
+                  コールバック（emit への変換）、 センチネルファイル
+                </td>
+                <td><a href="android.html">Android ページ</a></td>
+              </tr>
+              <tr>
+                <td>inject への注入</td>
+                <td>init script（JS 文字列）と window グローバル</td>
+                <td><a href="inject.html">inject ページ</a></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 id="external-acl">ACL（誰がどのコマンドを呼べるか）</h3>
+          <p>
+            x.com を表示するカラム/ポップアップ WebView には remote capability
+            で IPC（<code>window.__TAURI__</code>）が注入されます。
+            外部コンテンツにアプリのコマンドを開放することになるため、<b>二重に</b>防御しています。
+          </p>
+          <ol>
+            <li>
+              <b>ACL</b>：<code>build.rs</code> の AppManifest（定義）→
+              capability（許可）。 <code>default.json</code> は main 専用、<code
+                >column-webview.json</code
+              >
+              は x.com/twitter.com 系ドメイン限定で、 inject
+              が使うコマンド（<code>report_*</code>・ポップアップ系・<code>download_video</code>）だけ。
+              desktop の更新用に <code>updater.json</code> もある。
+            </li>
+            <li>
+              <b>コード側</b>：多くのコマンドが
+              <code>require_main_caller</code> で caller の WebView ラベルが
+              <code>main</code> であることを検査する。
+            </li>
+          </ol>
+          <div class="callout warn">
+            <b>コマンドの追加・削除は 3 点同時</b>
+            <p>
+              <code>lib.rs</code> の <code>generate_handler!</code>、<code
+                >build.rs</code
+              >
+              の <code>AppManifest</code>、 <code>capabilities/*.json</code> の
+              <code>allow-…</code>。漏れると実行時に 'not allowed by ACL'
+              で拒否されます。 <code>acl_contract.rs</code> が
+              <code>cargo test</code> で検出します。
+            </p>
+          </div>
+          <div class="flow" data-flow="rust.acl"></div>
+        </section>
+
+        <section>
+          <h2 id="modules">モジュール構成</h2>
+          <p>ノードをクリックすると詳細が開きます。</p>
+          <div class="diagram" data-diagram>
+            <div class="dg-group" data-layer="rust">
+              <div class="dg-title">エントリ・共通</div>
+              <button class="dg-node" data-detail="rust.main">
+                main.rs / lib.rs
+              </button>
+              <button class="dg-node" data-detail="rust.state">state.rs</button>
+              <button class="dg-node" data-detail="rust.ipc">
+                ipc_constants.rs
+              </button>
+              <button class="dg-node" data-detail="rust.acl">
+                build.rs + capabilities
+              </button>
+              <button class="dg-node" data-detail="rust.callers">
+                require_main_caller
+              </button>
+              <button class="dg-node" data-detail="rust.errors">
+                app_error / ui_language
+              </button>
+            </div>
+            <div class="dg-arrow" data-label="generate_handler!">⇣</div>
+            <div class="dg-group" data-layer="rust">
+              <div class="dg-title">commands/（Tauri コマンド実装）</div>
+              <button class="dg-node" data-detail="rust.settings">
+                settings / settings_file / settings_store
+              </button>
+              <button class="dg-node" data-detail="rust.webview">
+                webview/（column・popup・compose）
+              </button>
+              <button class="dg-node" data-detail="rust.account">
+                account
+              </button>
+              <button class="dg-node" data-detail="rust.backup">backup/</button>
+              <button class="dg-node" data-detail="rust.extensions">
+                extensions/（Windows）
+              </button>
+              <button class="dg-node" data-detail="rust.update">update</button>
+              <button class="dg-node" data-detail="rust.video">
+                video_download + video/
+              </button>
+              <button class="dg-node" data-detail="rust.codec">
+                media_codec / openh264_* / linux_codec_env
+              </button>
+            </div>
+            <div class="dg-arrow" data-label="組み立て・JNI">⇣</div>
+            <div class="dg-group" data-layer="inject">
+              <div class="dg-title">連携先</div>
+              <button class="dg-node" data-detail="rust.inject">
+                inject/mod.rs
+              </button>
+            </div>
+            <div class="dg-group" data-layer="android">
+              <div class="dg-title">Android</div>
+              <button class="dg-node" data-detail="rust.android_bridge">
+                android_bridge.rs
+              </button>
+            </div>
+            <div class="dg-group" data-layer="common">
+              <div class="dg-title">契約テスト</div>
+              <button class="dg-node" data-detail="rust.contracts">
+                acl / log_language / ipc / default fixture
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2 id="commands">Tauri コマンド一覧</h2>
+          <p>
+            <code>src-tauri/build.rs</code> の AppManifest
+            に列挙された全コマンドです。「呼び出し元」はコード上の検査または
+            capability による制限を示します。
+          </p>
+          <div class="catalog" data-catalog="rust.commands"></div>
+          <p>
+            補足資料：<a href="../development/tauri-commands.md"
+              >tauri-commands.md</a
+            >
+          </p>
+        </section>
+
+        <section>
+          <h2 id="events-state">イベントと State</h2>
+          <h3 id="events">発行イベント</h3>
+          <div class="catalog" data-catalog="rust.events"></div>
+          <h3 id="state">管理状態と共有定数</h3>
+          <div class="catalog" data-catalog="rust.state"></div>
+        </section>
+
+        <section>
+          <h2 id="settings">設定の永続化</h2>
+          <p>
+            設定は tauri-plugin-store が
+            <code>settings.json</code> に持ちます。壊れても起動できるよう、
+            次の仕組みで守っています。
+          </p>
+          <ul>
+            <li>
+              <b>アトミック保存</b>：<code>save_store_atomically</code>
+              が一時ファイル → sync → rename で置換し、直前世代を
+              <code>settings.json.prev</code> に残す。<code>Store::save</code>
+              を直接呼ばない。並行保存 （<code>save_settings</code> と終了時の
+              windowBounds 保存）は <code>SAVE_LOCK</code> で直列化。
+            </li>
+            <li>
+              <b>起動時復旧</b>：setup の冒頭で
+              <code>recover_settings_file</code> が JSON として読めるか検査し、
+              壊れていれば退避して <code>.prev</code> から復元。結果は
+              <code>SettingsRecoveryState</code> に入り、 最初の
+              <code>load_settings</code> が React に伝える。
+            </li>
+            <li>
+              <b>順序は崩さない</b>：「復旧 →
+              自動保存を無効にしたストアの登録」。ストア生成後だとプラグインが読み込み失敗を握りつぶし、
+              自動保存が生きているとアトミック書き込みをすり抜ける。
+            </li>
+            <li>
+              <b>既定値の 3 点同期</b>：Rust の
+              <code>impl Default</code>（構造体レベル
+              <code>#[serde(default)]</code> が唯一の定義）、 TS
+              側の既定値、<code>contracts/default-settings.json</code>。変更時は
+              3 箇所同時に更新（契約テストが一致を検査）。
+            </li>
+            <li>
+              <b>バックアップ/リストア</b>：出力は
+              <code>BackupGlobalSettings</code> のホワイトリスト。 復元は
+              <code>apply_restore</code>（退避 → 置換 → アトミック保存 1 回）。
+            </li>
+          </ul>
+          <div class="flow" data-flow="rust.setup"></div>
+          <p>
+            desktop/mobile 差分：windowBounds の保存・復元は desktop
+            のみ。バックアップのファイル選択は desktop が
+            tauri-plugin-dialog、Android が Kotlin の SAF（JNI）。
+          </p>
+          <p>
+            詳細：<a href="../development/settings-file-crash-safety-notes.md"
+              >settings-file-crash-safety-notes.md</a
+            >、
+            <a href="../development/backup-restore-notes.md"
+              >backup-restore-notes.md</a
+            >
+          </p>
+        </section>
+
+        <section>
+          <h2 id="webviews">WebView 管理</h2>
+          <p>
+            X の画面は WebView で表示します。種類は 3
+            つで、ラベル接頭辞で区別します （<code>column-</code> /
+            <code>popup-</code> / <code>compose-</code>。ほかに
+            <code>add-account-</code> と <code>extension-</code>）。
+          </p>
+          <div class="tabs">
+            <div class="tab" data-tab="desktop" data-label="デスクトップ">
+              <ul>
+                <li>
+                  <b>Windows / macOS</b>：<code>window.add_child()</code>
+                  でメインウィンドウの<b>子 WebView</b>として配置。
+                </li>
+                <li>
+                  <b>Linux</b>：子 WebView が使えないため、親付きの独立
+                  <code>WebviewWindow</code>。親クリップが効かないので
+                  横スクロール時のはみ出しを
+                  <code>linux_column_layout</code>
+                  で幅を縮めて制御し、WebProcess クラッシュを検知して
+                  <code>column-webview-crashed</code> を emit
+                  する（過去にデグレした領域。変更時は必ず参照ノートのテスト方針に従う）。
+                </li>
+                <li>
+                  子 WebView は OS ネイティブ要素なので CSS の
+                  <code>z-index</code> が効かない。ダイアログ表示中は x:-9999
+                  へ退避する運用。
+                </li>
+              </ul>
+            </div>
+            <div class="tab" data-tab="mobile" data-label="Android">
+              <ul>
+                <li>
+                  カラム/ポップアップは Kotlin 側のネイティブ Android
+                  WebView（content FrameLayout のオーバーレイ）を JNI （<code
+                    >android_bridge.rs</code
+                  >
+                  → <code>MainActivity.kt</code>）で生成/破棄/eval する。
+                </li>
+                <li>
+                  ネイティブ WebView は Tauri IPC
+                  非対応のため、ポップアップからの報告は専用ブリッジ経由
+                  （例：<code>report_official_settings_from_android</code>）。
+                </li>
+                <li>
+                  <code>MainActivity.kt</code> のメソッドシグネチャを変えたら
+                  <code>proguard-rules.pro</code> も同時更新
+                  （リリースビルドだけ NoSuchMethodException になる）。
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <h3 id="webview-required">builder の必須設定</h3>
+          <p>
+            WebView builder
+            を新設・変更したら次を必ず付けます（契約テストが検査）。
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>設定</th>
+                <th>理由</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <code
+                    >.on_new_window(external_link::new_window_handler(app.clone()))</code
+                  >
+                </td>
+                <td>
+                  target=_blank / window.open を http/https/mailto/tel
+                  だけ既定ブラウザで開き、常に Deny
+                  （アプリ内に新規ウィンドウを作らない）。desktop の opener
+                  自動クリックスクリプトは無効化している。
+                </td>
+              </tr>
+              <tr>
+                <td><code>.disable_drag_drop_handler()</code></td>
+                <td>
+                  Windows で Tauri 既定のファイルドロップ処理が X ページの HTML5
+                  DnD を横取りするのを防ぐ。
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <code>#[cfg(windows)] .browser_extensions_enabled(true)</code>
+                </td>
+                <td>
+                  アカウントの <code>data_directory</code> を使う全 builder
+                  に必須。同一ディレクトリの WebView2 環境はフラグが
+                  食い違うと生成に失敗する（<code>ERROR_INVALID_STATE</code>）。
+                </td>
+              </tr>
+              <tr>
+                <td><code>.initialization_script(…)</code></td>
+                <td>
+                  inject スクリプトの注入。<a href="inject.html"
+                    >inject ページ</a
+                  >参照。
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 id="webview-close">close() と destroy()</h3>
+          <p>
+            常駐コンポーズは × を <code>prevent_close()</code> +
+            <code>hide()</code> で握るため、<code>close()</code>
+            では閉じません。 メインの
+            <code>CloseRequested</code>（<code>lib.rs</code>）で
+            <code>compose-</code> ウィンドウを明示的に
+            <code>destroy()</code> しています。<code>prevent_close</code>
+            を使う常駐ウィンドウを新設したら、同じ場所に destroy
+            を必ず追加してください。
+          </p>
+
+          <div class="flow" data-flow="rust.column-webview"></div>
+          <div class="flow" data-flow="rust.android-column"></div>
+          <p>
+            詳細：<a href="../development/linux-webview-notes.md"
+              >linux-webview-notes.md</a
+            >、
+            <a href="../development/linux-column-spec.md"
+              >linux-column-spec.md</a
+            >、
+            <a href="../development/external-link-new-window-notes.md"
+              >external-link-new-window-notes.md</a
+            >、
+            <a href="../development/compose-popup-topbar-notes.md"
+              >compose-popup-topbar-notes.md</a
+            >
+          </p>
+        </section>
+
+        <section>
+          <h2 id="accounts">アカウントとログイン検出</h2>
+          <p>
+            アカウントごとに独立したデータディレクトリ（Cookie
+            等）を持ち、WebView の <code>data_directory</code> として使います。
+            ログイン完了の検出は IPC でも JS 注入でもなく、<b
+              >Rust 側で行います</b
+            >（ログイン画面の遷移を JS 注入に依存させないため）。
+          </p>
+          <div class="tabs">
+            <div class="tab" data-tab="desktop" data-label="デスクトップ">
+              <p>
+                <code>open_add_account_window</code> が
+                <code>add-account-&lt;uuid8&gt;</code> ウィンドウで
+                <code>https://x.com/login</code> を開き、tokio タスクが URL を
+                <b>500ms ごと</b>にポーリング。パスが
+                <code>/home</code> になったら <code>twid</code> Cookie から X
+                ユーザー ID を読み、 <code>account-login-complete</code> を emit
+                して終了（最大 10 分で打ち切り）。コマンド自体は即座に accountId
+                / dataDirectory / windowLabel を返す。再認証は
+                <code>account-reauth-complete</code>。
+              </p>
+            </div>
+            <div class="tab" data-tab="mobile" data-label="Android">
+              <p>
+                <code>open_add_account_window</code> が AddAccount Activity を
+                JNI で起動し、<b>コマンド自体がブロック</b>して
+                アプリデータ配下の
+                <code>add_account_login_complete</code> センチネルファイルを
+                500ms ごとにポーリング （キャンセル用の
+                <code>add_account_login_cancelled</code> もある、最大 10
+                分）。AddAccount.kt がファイルを書くと その内容から xUserId
+                を取り出して戻り値で返す。メイン WebView の JS が止まっていても
+                tokio は動き続ける。
+              </p>
+            </div>
+          </div>
+          <ul>
+            <li>
+              <code>delete_account_data</code> は
+              <code>accounts</code> 配下のパスのみ許可し、ファイルロックに備えて
+              200ms 間隔でリトライ。
+            </li>
+            <li>
+              再認証（既存アカウントのログインし直し）は新セッションのディレクトリを返し、呼び出し側が対象アカウントへ
+              Cookie を上書きする。 詳細は
+              <a href="../development/release-theme-reauth-notes.md"
+                >release-theme-reauth-notes.md</a
+              >。
+            </li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 id="errors">エラー設計</h2>
+          <ul>
+            <li>
+              <b>Rust は文章を返さない。</b>新しめのコマンドは
+              <code>AppError { code, detail? }</code>
+              （<code>app_error.rs</code>）を返す。code は
+              <code>&lt;領域&gt;.&lt;camelCase&gt;</code>（例：
+              <code>extension.notFound</code>）で、React が辞書
+              <code>messages:rustError.*</code> で翻訳する。 コードを追加したら
+              <code>src/locales/{ja,en}/messages.json</code>
+              にも足す（契約テストが検査）。
+            </li>
+            <li>
+              <code>detail</code> には OS/WebView 由来の生の文字列や HRESULT の
+              16 進など、文言に混ぜない情報だけを入れる。
+            </li>
+            <li>
+              旧来のコマンドは
+              <code>Result&lt;_, String&gt;</code
+              >（英語固定の短い文字列）。バックアップは専用の
+              <code>BackupError</code>。
+            </li>
+            <li>
+              ウィンドウタイトル等 Rust が直接使う文言は
+              <code>ui_language.rs</code> の <code>ui_text</code>（ja/en
+              の表）。 表示言語の解決規則は TS の
+              <code>language.ts</code> と同じ。
+            </li>
+            <li>
+              開発者向けログ・<code>expect</code>・<code>panic</code>
+              のメッセージは<b>英語固定</b> （<code
+                >log_language_contract.rs</code
+              >
+              が日本語を検出して失敗にする）。
+            </li>
+          </ul>
+          <p>詳細：<a href="../development/i18n-notes.md">i18n-notes.md</a></p>
+        </section>
+
+        <section>
+          <h2 id="other-features">その他の機能</h2>
+          <h3 id="feature-update">自動更新</h3>
+          <div class="tabs">
+            <div class="tab" data-tab="desktop" data-label="デスクトップ">
+              <p>
+                <code>tauri-plugin-updater</code> が
+                <code>tauri.conf.json</code>
+                の公開鍵（minisign）で署名検証してから適用。 再起動は
+                <code>tauri-plugin-process</code>。capability は
+                <code>updater.json</code>。
+              </p>
+            </div>
+            <div class="tab" data-tab="mobile" data-label="Android">
+              <p>
+                <code>install_apk_update</code> を 3 層で検証：呼び出し元 main
+                限定／URL は自リポジトリの GitHub Releases の
+                <code>.apk</code> のみ（<code>..</code> や
+                <code>?</code> 等を拒否）／Kotlin 側で SHA-256
+                照合（fail-closed）。
+              </p>
+            </div>
+          </div>
+
+          <h3 id="feature-video">動画ダウンロード</h3>
+          <p>
+            desktop は <code>download_video</code>。mp4 progressive があれば 1
+            ファイル、HLS のみなら映像・音声を別ファイルで保存。 URL は
+            <code>video.twimg.com</code> 系のみ許可（SSRF 対策）、検証を経る公開
+            API と実 I/O を分離。進捗は
+            <code>video-download-progress</code>。Android
+            はネイティブ通知付きの別経路（<code>handle_android_video_download_request</code>）。
+          </p>
+
+          <h3 id="feature-codec">Linux コーデック / OpenH264</h3>
+          <p>
+            AppImage は H.264/AAC のデコーダが不足しがち。<code
+              >check_media_codec_support</code
+            >
+            で判定し、 <code>download_and_enable_h264</code>（Linux
+            desktop・x86_64 のみ）が Cisco OpenH264 を取得 → SHA-256 検証 → 展開
+            → <code>openh264_lib_dir()</code> へ配置する。<code
+              >linux_codec_env</code
+            >
+            は起動時に LD_LIBRARY_PATH
+            を整えるため、変更が必要なら自プロセスを再起動する（動的リンカが解釈するのは起動時一度きりのため）。
+            Linux 以外は常に「利用可能」を返す。
+          </p>
+
+          <h3 id="feature-extensions">ブラウザ拡張（Windows のみ）</h3>
+          <p>
+            WebView2 の拡張機能 API で Chrome/Edge の拡張を読み込む。状態は
+            <code>browserExtensions</code> キー（バックアップ対象外）。
+            追加フォルダの <code>_</code> 始まり予約名エントリは WebView2
+            が拒否するため、除外コピー（サニタイズ）を作って読み込む。
+            状態の読み書きと reconcile（desired state を各プロファイルへ反映）は
+            1 つの Mutex で直列化。 Windows 以外の全コマンドは
+            <code>extension.unsupported</code> を返す。macOS/Linux
+            を見送った理由は
+            <a href="../development/browser-extensions-notes.md"
+              >browser-extensions-notes.md</a
+            >。
+          </p>
+
+          <h3 id="feature-inject">inject の組み立て</h3>
+          <p>
+            <code>inject/mod.rs</code> がビルド済み <code>inject/*.js</code> を
+            <code>include_str!</code> で束ね、設定を JSON エンコードして window
+            グローバルに前置した init script を生成する（<code
+              >build_init_script</code
+            >
+            / <code>build_popup_init_script</code>）。TS
+            ソース（<code>inject/_src</code>）のビルドは
+            <code>npm run build:inject</code>。実装は
+            <a href="inject.html">inject ページ</a>へ。
+          </p>
+        </section>
+
+        <section>
+          <h2 id="flows">主要フロー</h2>
+          <ul>
+            <li>
+              <a href="#settings"
+                >起動 setup（復旧 → ストア登録 → ウィンドウ生成）</a
+              >
+            </li>
+            <li>
+              <a href="#webviews"
+                >カラム WebView 生成 〜 inject 注入 / Android のカラム生成</a
+              >
+            </li>
+            <li><a href="#external-acl">コマンド呼び出しと ACL 判定</a></li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 id="conventions">規約とテスト</h2>
+          <ul>
+            <li>
+              テスト関数名は日本語で書く。<b>ASCII 大文字を含めない</b>（<code
+                >non_snake_case</code
+              >
+              警告が
+              <code>cargo clippy -- -D warnings</code>
+              でビルドエラーになる。英単語はすべて小文字）。
+            </li>
+            <li>
+              静的解析：<code>npm run lint:rust</code>（<code
+                >cargo clippy --all-targets -- -D warnings</code
+              >）。警告は残さない。
+            </li>
+            <li>
+              テスト：<code
+                >cargo test --manifest-path src-tauri/Cargo.toml</code
+              >。<b>事前に <code>npm run build:inject</code></b> （inject の .js
+              を <code>include_str!</code> するため）。
+            </li>
+            <li>ログ・expect・panic のメッセージは英語固定。</li>
+            <li>
+              純粋関数に切り出してテストする。OS 依存部（WebView2
+              呼び出し等）は薄く保つ。
+            </li>
+          </ul>
+          <h3 id="contract-tests">契約テスト一覧</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>ファイル</th>
+                <th>検査内容</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>src-tauri/src/acl_contract.rs</code></td>
+                <td>
+                  <code>generate_handler!</code> /
+                  <code>build.rs</code> AppManifest / capability の整合。
+                  <code>column-webview.json</code> は inject
+                  が使うコマンド集合と厳密一致。x.com 系以外の remote を持つ
+                  capability が無い。 main 用 capability は remote を持たない
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <code>src-tauri/src/log_language_contract.rs</code>
+                </td>
+                <td>
+                  ログ系マクロ・expect・panic のメッセージに日本語が含まれない
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <code>src-tauri/src/ipc_constants.rs</code>
+                </td>
+                <td>
+                  events / labels / globals が
+                  <code>contracts/ipc-constants.json</code>
+                  と一致。登録コマンドと fixture の一致
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <code>src-tauri/src/commands/settings.rs</code>
+                </td>
+                <td>
+                  既定値が <code>contracts/default-settings.json</code> と一致
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <code>src-tauri/src/commands/webview/mod.rs</code>
+                </td>
+                <td>
+                  全 WebView 生成箇所（column / popup / compose）に
+                  <code>on_new_window</code> /
+                  <code>disable_drag_drop_handler</code> / Windows 限定の
+                  <code>browser_extensions_enabled</code> が付いている
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <code>src-tauri/src/commands/extensions/mod.rs</code>
+                </td>
+                <td>
+                  拡張機能ページのウィンドウにも <code>on_new_window</code> /
+                  Windows 限定の拡張機能有効化が付いている。<code
+                    >extension-</code
+                  >
+                  ラベルが capability の対象ウィンドウに含まれない
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <code>src-tauri/src/commands/extensions/store.rs</code>
+                </td>
+                <td>
+                  <code>save_settings</code> / <code>apply_restore</code> が
+                  <code>appSettings</code> キーだけを書き換える（<code
+                    >browserExtensions</code
+                  >
+                  は別キー）
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section>
+          <h2 id="pitfalls">落とし穴・関連資料</h2>
+          <div class="callout danger">
+            <b>よくある事故</b>
+            <ul>
+              <li>
+                コマンド追加で build.rs / capability を更新し忘れる（実行時に
+                ACL 拒否）。
+              </li>
+              <li>
+                <code>Store::save</code>
+                を直接呼ぶ（アトミック保存をすり抜ける）。setup
+                の復旧→ストア登録の順序を崩す。
+              </li>
+              <li>
+                desktop と mobile の片方だけを修正する（同名コマンドが 2
+                実装）。
+              </li>
+              <li>
+                JS の camelCase 引数に <code>rename</code> /
+                <code>non_snake_case</code> を付け忘れる（値が届かない）。
+              </li>
+              <li>
+                新しい WebView builder に
+                <code>on_new_window</code> 等を付け忘れる／<code
+                  >prevent_close</code
+                >
+                の常駐ウィンドウに destroy を足し忘れる。
+              </li>
+              <li>
+                Linux
+                カラムのクリッピング変更をテストなしで行う（過去に複数回デグレ）。
+              </li>
+              <li>
+                Mutex を保持したまま await する／ロック順序（registry →
+                compose）を崩す。
+              </li>
+              <li>
+                設定の既定値を Rust だけ変える（TS と fixture の 3
+                点同期が必要）。
+              </li>
+            </ul>
+          </div>
+          <h3 id="related">関連資料</h3>
+          <ul>
+            <li>
+              <a href="../development/tauri-commands.md">tauri-commands.md</a
+              >（コマンド一覧）
+            </li>
+            <li>
+              <a href="../development/architecture-overview.md"
+                >architecture-overview.md</a
+              >（設計上の注意）
+            </li>
+            <li>
+              <a href="../development/project-structure.md"
+                >project-structure.md</a
+              >（ファイル構成）
+            </li>
+            <li>
+              <a href="../development/inject-ipc-shortcuts-notes.md"
+                >inject-ipc-shortcuts-notes.md</a
+              >
+            </li>
+            <li>
+              <a href="../development/linux-webview-notes.md"
+                >linux-webview-notes.md</a
+              >
+              /
+              <a href="../development/linux-column-spec.md"
+                >linux-column-spec.md</a
+              >
+            </li>
+            <li>
+              <a href="../development/browser-extensions-notes.md"
+                >browser-extensions-notes.md</a
+              >
+            </li>
+            <li>
+              <a href="inject.html">inject ページ</a> /
+              <a href="android.html">Android ページ</a> /
+              <a href="react.html">React ページ</a>
+            </li>
+          </ul>
+        </section>
+      </main>
+    </div>
+    <aside id="mcx-detail" hidden></aside>
+    <script src="assets/data/index.js"></script>
+    <script src="assets/data/rust.js"></script>
+    <script src="assets/common.js"></script>
+  </body>
+</html>
