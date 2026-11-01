@@ -13,6 +13,7 @@
 #   B  h264parse(videoparsersbad) / codecparsers / openh264・va グルーが含まれる
 #   C  同梱環境のみで H.264 + AAC の動画を最後までデコードできる (Got EOS)
 #   D  オプションプラグインの rpath が usr/lib の同梱ライブラリを解決する
+#   E  usr/lib に libwayland-* が含まれない（ホストの Mesa/EGL と不整合を起こすため）
 
 set -euo pipefail
 
@@ -142,6 +143,13 @@ for f in "${D_TARGETS[@]}"; do
     printf '%s\n' "$OUTSIDE" >&2
   fi
 done
+
+echo "== 検査 E: libwayland-* を同梱していないこと"
+FOUND_WAYLAND="$(find "${R}/usr/lib" -name 'libwayland-*' 2>/dev/null)"
+if [ -n "$FOUND_WAYLAND" ]; then
+  fail "libwayland-* が AppImage に含まれています（古い同梱版がホストの EGL と不整合を起こし灰色画面になる。scripts/strip-appimage-wayland-libs.sh を事前に実行すること）:"
+  echo "$FOUND_WAYLAND" >&2
+fi
 
 if [ "$FAILED" -ne 0 ]; then
   echo "AppImage の動画同梱検査に失敗しました。" >&2

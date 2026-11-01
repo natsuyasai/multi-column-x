@@ -12,6 +12,7 @@ Linux 環境固有のカラム WebView 配置・クリッピング・WebProcess 
 - `src-tauri/src/linux_codec_env.rs` — `ensure_openh264_ld_library_path`（再実行）/ `configure_gstreamer_env`（GStreamer 環境変数）
 - `src/hooks/useH264Setup.ts` / `src/components/H264SetupDialog/` / `src/components/AppSettingsPanel/LinuxVideoPlaybackSection.tsx` — H.264 取得の案内 UI
 - `scripts/build-linux-codec-plugins.sh` / `scripts/verify-appimage-media.sh` — 同梱プラグインのビルドと AppImage 検査
+- `scripts/strip-appimage-wayland-libs.sh`（テスト: `.test.sh`）— AppImage から `libwayland-*` を除く linuxdeploy 出力プラグインのラッパー設置
 - `scripts/install.sh` の `print_codec_hint()` — AppImage インストール時の案内
 
 ## Linux カラム WebView のクリッピング（デグレ注意）
@@ -54,6 +55,16 @@ X の動画は MP4（`video/x-h264, stream-format=avc`）で、同梱の `openh2
 ### libopenh264 を同梱しない理由と取得方法
 
 Cisco OpenH264 の特許ロイヤリティ負担は「Cisco 自身の配布チャネルから直接ダウンロードする」場合にのみ適用される（`openh264.org/faq.html`）。Ubuntu パッケージ由来のバイナリを同梱するのはこの条件の対象外のため、AppImage には同梱しない。実体の `libopenh264.so.7` は、ユーザーの同意を得たうえで `download_and_enable_h264` が Cisco 公式サーバーから直接ダウンロード・SHA256 検証して取得する（Firefox/Chromium と同じ方式）。
+
+### libwayland-\* は同梱しない（Ubuntu 26.04 の灰色画面対策）
+
+AppImage に同梱された古い `usr/lib/libwayland-{client,cursor,egl,server}` がホストの Mesa/EGL と不整合を起こし、Ubuntu 26.04 で `Could not create default EGL display: EGL_BAD_PARAMETER. Aborting...` となってウィンドウが灰色のままになる。`GDK_BACKEND=x11` や `WEBKIT_DISABLE_*` では直らず、これらを除く（ホスト側を使う）と直る。
+
+- **除外はバンドル工程の内側で行う**。updater 署名（`.sig`）は bundler が AppImage 生成時に付けるため、`tauri-action` 後に AppImage を再パックすると署名が壊れる。`bundle.linux.appimage.files` は追加専用で除外には使えない。
+- 方式: `scripts/strip-appimage-wayland-libs.sh` が、bundler が `~/.cache/tauri/` にキャッシュする `linuxdeploy-plugin-appimage.AppImage`（linuxdeploy の出力プラグイン）を `.real` へ退避し、同名のラッパーに置き換える。ラッパーは linuxdeploy が渡す `--appdir <dir>`（無ければ環境変数 `APPDIR`）配下の `usr/lib/libwayland-*` を削除してから実体へ `exec` する。bundler は存在するキャッシュを再ダウンロード・上書きしない。
+- `release.yml` の ubuntu ジョブで、事前検査ビルド・`tauri-action` の**前**にこのスクリプトを実行する（両方のビルドに効く）。
+- `verify-appimage-media.sh` の検査 E が `usr/lib/libwayland-*` の混入を NG にする（事前検査と出荷物の再検査の両方）。
+- ローカルで AppImage をビルドするときも、同じスクリプトを先に実行すれば再現できる（`~/.cache/tauri` を書き換えるため、戻すなら `.real` を元の名前へ戻す）。
 
 ### libva はホストのものを使う
 
