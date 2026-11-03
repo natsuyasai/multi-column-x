@@ -11,42 +11,56 @@ export function shouldAutoplay(targetHref: string | undefined): boolean {
 (function () {
   if (!shouldAutoplay(window.__mcxTargetHref)) return;
 
-  // mcx-video-autoplay: 多重起動防止ガード (一意マーカーも兼ねる)
-  const initMarker = "data-mcx-video-autoplay";
-  if (document.documentElement.hasAttribute(initMarker)) return;
-  document.documentElement.setAttribute(initMarker, "1");
+  // mcx-video-autoplay: 多重起動防止ガード (一意マーカーも兼ねる)。
+  // この inject は document 生成時に走り、その時点では documentElement / body が
+  // null のため DOM 属性には依存せず window 上のフラグで判定する。
+  if (window.__mcxVideoAutoplayStarted) return;
+  window.__mcxVideoAutoplayStarted = true;
 
-  let done = false;
+  let unsubscribe: () => void = () => {};
+  // 同じ要素に対して再生操作を重ねない (トグルで一時停止になるのを防ぐ)
+  const attemptedVideos = new WeakSet<HTMLVideoElement>();
+  const clickedButtons = new WeakSet<HTMLButtonElement>();
 
   const playButtonSelector = 'button[data-testid="playButton"]';
 
+  // 再生が実際に始まったら購読を解除する (何度呼んでも安全)。
+  // 以降の変化には反応しないため、ユーザーが一時停止しても再生し直さない。
+  const finish = (): void => {
+    unsubscribe();
+    unsubscribe = () => {};
+  };
+
   const tryPlayVideo = (video: HTMLVideoElement): void => {
+    attemptedVideos.add(video);
+    video.addEventListener("playing", finish);
     const result = video.play();
     if (result && typeof result.then === "function") {
-      result.catch(() => {
+      result.then(finish, () => {
         // autoplay ポリシーで音あり再生が拒否されたらミュートして再試行する
         video.muted = true;
-        video.play().catch(() => {
+        video.play().then(finish, () => {
           // ミュート再生も失敗した場合は諦める
         });
       });
     }
   };
 
+  // 再生済みなら true。再生操作が必要なものにだけ操作を行う。
   const tryPlay = (): boolean => {
     const video = document.querySelector<HTMLVideoElement>("video");
-    const playButton =
-      document.querySelector<HTMLButtonElement>(playButtonSelector);
+    if (video && !video.paused) return true;
 
-    if (!video && !playButton) return false;
-
-    if (video) {
+    if (video && !attemptedVideos.has(video)) {
       tryPlayVideo(video);
     }
-    if (playButton) {
+    const playButton =
+      document.querySelector<HTMLButtonElement>(playButtonSelector);
+    if (playButton && !clickedButtons.has(playButton)) {
+      clickedButtons.add(playButton);
       playButton.click();
     }
-    return true;
+    return false;
   };
 
   // 共有DOM監視ハブ(dom_observer.ts, window.__mcxDomObserver)経由でDOM変化を購読する。
@@ -65,25 +79,22 @@ export function shouldAutoplay(targetHref: string | undefined): boolean {
     return () => observer.disconnect();
   }
 
+  // document.body が存在してから呼ぶこと。
   const start = (): void => {
-    if (tryPlay()) {
-      done = true;
-      return;
-    }
+    // 起動済みマーカー属性 (documentElement が無い環境でも例外を出さない)
+    (document.documentElement as HTMLElement | null)?.setAttribute(
+      "data-mcx-video-autoplay",
+      "1",
+    );
+    // すでに再生中なら購読せずに終了する
+    if (tryPlay()) return;
 
-    const unsubscribe = subscribeDomChanges(() => {
-      if (done) {
-        unsubscribe();
-        return;
-      }
-      if (tryPlay()) {
-        done = true;
-        unsubscribe();
-      }
+    unsubscribe = subscribeDomChanges(() => {
+      if (tryPlay()) finish();
     });
 
     // X のメディアモーダルが描画されない場合に備えてタイムアウトで打ち切る
-    setTimeout(() => unsubscribe(), 10000);
+    setTimeout(() => finish(), 10000);
   };
 
   if (document.body) {

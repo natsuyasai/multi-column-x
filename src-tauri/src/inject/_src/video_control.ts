@@ -1,8 +1,9 @@
 // mediaviewer（X の全画面メディアビューア）ではユーザーが明示的に再生を望んでいるため、
 // オートプレイ抑制を行わない。Android で動画再生時にこの URL へ遷移する。
 // 例: /ANIMA_info/status/2070703676067635303/mediaviewer
+// X は遷移直後に /mediaviewer を /mediaViewer に書き換えるため、大文字小文字は区別しない。
 export function isMediaViewerPath(pathname: string): boolean {
-  return /\/mediaviewer\/?$/.test(pathname);
+  return /\/mediaviewer\/?$/i.test(pathname);
 }
 
 const VIDEO_CONTROL_PLAYER_SELECTOR = '[data-testid="videoComponent"]';

@@ -31,6 +31,12 @@ describe("inject/video_control isMediaViewerPath", () => {
     ).toBe(true);
   });
 
+  it("Xが書き換える大文字混じりの mediaViewer も true", () => {
+    expect(isMediaViewerPath("/u/status/1/mediaViewer")).toBe(true);
+    expect(isMediaViewerPath("/u/status/1/MEDIAVIEWER")).toBe(true);
+    expect(isMediaViewerPath("/u/status/1/mediaViewer/")).toBe(true);
+  });
+
   it("通常のタイムライン/ステータスのパスは false", () => {
     expect(isMediaViewerPath("/home")).toBe(false);
     expect(isMediaViewerPath("/ANIMA_info/status/2070703676067635303")).toBe(
@@ -44,6 +50,7 @@ describe("inject/video_control isMediaViewerPath", () => {
 
   it("mediaviewer を部分文字列として含むだけのパスは false", () => {
     expect(isMediaViewerPath("/foo/notmediaviewer")).toBe(false);
+    expect(isMediaViewerPath("/foo/notMediaViewer")).toBe(false);
   });
 });
 
@@ -301,6 +308,23 @@ describe("inject/video_control 動画自動再生ブロック", () => {
       void video.play();
       void video.play();
       video.dispatchEvent(new Event("playing"));
+
+      expect(playMock).toHaveBeenCalledTimes(3);
+      expect(pauseMock).not.toHaveBeenCalled();
+    });
+
+    it("Xが書き換えた大文字混じりのmediaViewerでもplay()が元のplayに通りpauseされないこと", async () => {
+      history.pushState({}, "", "/u/status/1/mediaViewer");
+      const video = document.createElement("video");
+      document.body.appendChild(video);
+      await importVideoControl();
+      pauseMock.mockClear();
+
+      void video.play();
+      void video.play();
+      void video.play();
+      video.dispatchEvent(new Event("playing"));
+      video.dispatchEvent(new Event("play"));
 
       expect(playMock).toHaveBeenCalledTimes(3);
       expect(pauseMock).not.toHaveBeenCalled();
