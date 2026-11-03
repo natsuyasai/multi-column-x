@@ -188,3 +188,30 @@ Chrome 拡張だけでは、カラムの寸法など実アプリ固有の条件�
 - ホームで写真リンクをクリックしたとき、`closest("article")` のステータス ID をモジュール内変数 `pendingPhotoReturnId` に保存する。写真 → ホームの遷移（popstate / pushState）を検知したら、`waitForTimelineReady`（100ms ポーリング・上限 5 秒、ホーム離脱 or ユーザー入力で中止）でタイムライン表示を待ち、`searchReturnTarget([id])` で上端に合わせる。見つからなければ「前回の位置が見つかりませんでした」のトースト。
 - 写真復元中は `photoRestoring` を立てて他機能と排他するが、`render()` の可視判定には混ぜない（「探しています…」ボタンを出さないため）。
 - 未検証（実機）: X 実 DOM での article からの ID 取得、5 秒上限の十分性、ネイティブ WebView ごとの pushState/popstate の挙動。
+
+## 動画の自動再生（`popup_video_autoplay.ts` / `mediaviewer_autoplay.ts`）
+
+### document 生成時の inject で守ること（2026-11-03 の不具合）
+
+- inject は document 生成時に走るため、その時点では `document.documentElement` / `document.body` が **null** のことがある。冒頭で `documentElement.hasAttribute(...)` のような属性ガードを書くと TypeError で即死する（`popup_video_autoplay.ts` が PC で動かなかった原因）。
+- 多重起動防止は DOM 属性ではなく `window` 変数（`__mcxVideoAutoplayStarted` / `__mcxMediaviewerAutoplayStarted`）で行い、DOM の操作は body が出現してから始める。
+- **jsdom では `documentElement` / `body` が常に存在するため、単体テストでは再現しない。** document 生成時に走る inject を書く・直すときは、`documentElement` / `body` を null にした状態で例外なく開始し、body 出現後に動き出す回帰テストを必ず書く。
+
+### ポップアップ（PC）の実機 DOM（2026-11-03、WebView2 + CDP で確認）
+
+- 初期表示には `video` 要素が無く、`button[data-testid="playButton"]` だけがある。playButton を click すると X が `video` を生成し、X 自身が `play()` する。
+- 完了条件は「再生が確認できたこと」（`video` の生成だけでは完了にしない）。
+- カルーセルでは playButton が複数ある。現仕様は先頭のみ click する。
+
+### モバイルの動画拡大表示（`mediaviewer_autoplay.ts`）
+
+- モバイルでは動画タップ後にカラム内で X 標準の拡大表示（パス末尾 `/mediaviewer`。大文字小文字は区別しない）になる。モバイルのカラム init script にのみ、`video_control` の直後に連結する。設定項目は無く常に有効。
+- 状態は mediaviewer に入るたびの「訪問」ごとに作り直す。訪問の同一性はパスを小文字化して比較する（X のパス書き換えで再開始しない）。対象の video は、画面内で見えている面積が最大のもの（`pickMostVisibleVideo`。全て面積 0 なら先頭）。playButton の click / `video.play()`（拒否時はミュートで再試行）を試み、再生確認後は何もしない。10 秒で打ち切る。タイムラインのインライン動画には触れない。
+- DOM 監視は共有ハブ `window.__mcxDomObserver`（無ければ `MutationObserver`）と `popstate`。購読は常駐させ、各コールバックは `pathname` の比較だけで抜けるようにして軽量に保つ。
+- `history.pushState` / `replaceState` のモンキーパッチはしない（他機能・X 本体との干渉を避けるため）。そのため、ハブも `popstate` も拾えない遷移は取りこぼす可能性がある。
+- 同じ inject ファイル間は import できない（ES の複数エントリ・連結注入）ため、`isMediaViewerPath` は `video_control.ts` と同等のものを複製している。どちらかを変えたらもう一方も揃える。
+- **実測結果（2026-11-03、Android エミュレータの WebView を CDP で実測）**:
+  - 動画タップ後、パスは `/<user>/status/<id>/mediaviewer`（小文字）になり、約 100ms 後に `/mediaViewer`（V が大文字）へ書き換わる。大文字小文字を区別する判定だと書き換え後を拡大表示と認識できない。
+  - `button[data-testid="playButton"]` は無い。`video` は 2 個（`[data-testid="videoComponent"]` 内、blob: ソース）で、1 つ目が現在のポストの動画（画面内）、2 つ目が次のポストの動画（画面のすぐ外）。X 自身が `play()` を何度も呼ぶ。
+  - `video_control` も同じ正規表現でパスを判定しており、大文字パスを拡大表示と認識できず「最初の 1 回だけ通して直後に pause、以降の `play()` は握りつぶす」で X の再生を止めていた。これが再生されない主因だった。`isMediaViewerPath` を `i` フラグ付きにして解消した。
+  - 修正後の再生確認は Android 実機での手動テスト（`integration-test.md`）で行う。

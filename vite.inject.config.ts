@@ -20,6 +20,7 @@ const plainEntries = [
   "popup_video_autoplay",
   "context_menu",
   "video_control",
+  "mediaviewer_autoplay",
   "small_image",
   "hide_ad",
   "keyboard_shortcut",

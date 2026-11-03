@@ -150,8 +150,8 @@ fn include_if(cond: bool, script: &'static str) -> &'static str {
 }
 
 // 連結順どおりに並べたスクリプト片。tab_selector の直後に続く
-// header/auto_reload/return_to_last_read/video_control の4つは自身の
-// 先頭に "\n" を含む（無効時は空文字列）。それ以降は区切りなしで連結する。
+// header/auto_reload/return_to_last_read/video_control/mediaviewer_autoplay の5つは
+// 自身の先頭に "\n" を含む（無効時は空文字列）。それ以降は区切りなしで連結する。
 // 既存テストが連結順（例: return_to_last_read は auto_reload より後ろ）を
 // 検証しているため、並び順を変えないこと。
 fn script_parts(params: &InitScriptParams) -> Vec<Cow<'static, str>> {
@@ -194,12 +194,19 @@ fn script_parts(params: &InitScriptParams) -> Vec<Cow<'static, str>> {
         String::new()
     };
 
+    let mediaviewer_autoplay_part = if params.is_mobile {
+        format!("\n{}", include_str!("mediaviewer_autoplay.js"))
+    } else {
+        String::new()
+    };
+
     vec![
         Cow::Borrowed(tab_selector),
         Cow::Owned(header_part),
         Cow::Owned(auto_reload_part),
         Cow::Owned(return_to_last_read_part),
         Cow::Owned(video_control_part),
+        Cow::Owned(mediaviewer_autoplay_part),
         Cow::Borrowed(small_image),
         Cow::Borrowed(blur_image),
         Cow::Borrowed(hide_ad),
@@ -670,6 +677,46 @@ mod tests {
         params.video_auto_play_stop_enabled = false;
         let script = build_init_script(&params);
         assert!(!script.contains("firstPlayDone"));
+    }
+
+    #[test]
+    fn モバイルのときmediaviewer自動再生スクリプトが注入結果に含まれる() {
+        let mut params = default_params();
+        params.is_mobile = true;
+        let script = build_init_script(&params);
+        // mediaviewer_autoplay.ts がビルド後も残す一意な文字列
+        assert!(script.contains("data-mcx-mediaviewer-autoplay"));
+        assert!(script.contains("isMediaViewerPath"));
+    }
+
+    #[test]
+    fn デスクトップのときmediaviewer自動再生スクリプトが注入結果に含まれない() {
+        let mut params = default_params();
+        params.is_mobile = false;
+        let script = build_init_script(&params);
+        assert!(!script.contains("data-mcx-mediaviewer-autoplay"));
+    }
+
+    #[test]
+    fn 動画自動再生停止の有無にかかわらずモバイルではmediaviewer自動再生スクリプトが含まれる() {
+        for stop_enabled in [true, false] {
+            let mut params = default_params();
+            params.is_mobile = true;
+            params.video_auto_play_stop_enabled = stop_enabled;
+            let script = build_init_script(&params);
+            assert!(script.contains("data-mcx-mediaviewer-autoplay"));
+        }
+    }
+
+    #[test]
+    fn mediaviewer自動再生スクリプトはvideo_controlの直後に連結される() {
+        let mut params = default_params();
+        params.is_mobile = true;
+        params.video_auto_play_stop_enabled = true;
+        let script = build_init_script(&params);
+        let video_control = script.find("firstPlayDone").unwrap();
+        let mediaviewer = script.find("data-mcx-mediaviewer-autoplay").unwrap();
+        assert!(video_control < mediaviewer);
     }
 
     #[test]

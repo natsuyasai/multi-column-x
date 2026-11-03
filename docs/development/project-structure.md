@@ -161,11 +161,12 @@ multi-column-x/
             │   ├── i18n.ts           # inject の自前 UI 文言の ja/en 切替ハブ（window.__mcxI18n を公開）
             │   ├── image_popup.ts    # メディアリンクをポップアップで開く
             │   ├── keyboard_shortcut.ts # ショートカットキーを main へ転送
+            │   ├── mediaviewer_autoplay.ts # モバイルの動画拡大表示（/mediaviewer）を開くたびに自動再生
             │   ├── mobile_area_hide.ts  # モバイル用の領域非表示
             │   ├── ng_word.ts / ng_word_matcher.ts  # NG ワードフィルタ
             │   ├── notification_header_hide.ts # 通知ページの設定ヘッダー非表示
             │   ├── popup_toolbar.ts  # ポップアップツールバー（アカウント切替）
-            │   ├── popup_video_autoplay.ts # ポップアップ動画の自動再生
+            │   ├── popup_video_autoplay.ts # ポップアップ動画の自動再生（playButton を click → 生成された video を再生。body 出現後に開始）
             │   ├── repost_hide_matcher.ts # 指定ユーザーのリポスト非表示判定
             │   ├── return_to_last_read.ts / return_to_last_read_logic.ts # 前回の境目へ戻るボタン・写真閲覧後の位置復元
             │   ├── scroll_event.ts   # 横スクロールイベントを main WebView に中継
