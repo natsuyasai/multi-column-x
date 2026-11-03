@@ -9,9 +9,59 @@ const PLAY_BUTTON_SELECTOR = 'button[data-testid="playButton"]';
 /**
  * パスが動画の拡大表示 (末尾セグメントが mediaviewer) かどうかを判定する純粋関数。
  * 他の inject ファイルとは import で共有できないため video_control.ts と同等の判定を持つ。
+ * X は遷移直後に /mediaviewer を /mediaViewer に書き換えるため、大文字小文字は区別しない。
  */
 export function isMediaViewerPath(pathname: string): boolean {
-  return /\/mediaviewer\/?$/.test(pathname);
+  return /\/mediaviewer\/?$/i.test(pathname);
+}
+
+interface VideoRect {
+  getBoundingClientRect(): {
+    top: number;
+    left: number;
+    bottom: number;
+    right: number;
+  };
+}
+
+function visibleArea<T extends VideoRect>(
+  video: T,
+  viewportWidth: number,
+  viewportHeight: number,
+): number {
+  const rect = video.getBoundingClientRect();
+  const width = Math.min(rect.right, viewportWidth) - Math.max(rect.left, 0);
+  const height = Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
+  return Math.max(0, width) * Math.max(0, height);
+}
+
+/**
+ * 拡大表示には現在のポストの動画と、画面のすぐ外にある次のポストの動画が同時に
+ * 存在する。ビューポート内で見えている面積が最大の動画を対象にする純粋関数。
+ * 面積が同じなら先に現れた動画を選ぶ。すべて面積 0 (レイアウト未確定) のときは
+ * 先頭の動画にフォールバックする。動画が無ければ null。
+ */
+export function pickMostVisibleVideo<T extends VideoRect>(
+  videos: readonly T[],
+  viewportWidth: number,
+  viewportHeight: number,
+): T | null {
+  let best: T | null = null;
+  let bestArea = 0;
+  for (const video of videos) {
+    const area = visibleArea(video, viewportWidth, viewportHeight);
+    if (area > bestArea) {
+      best = video;
+      bestArea = area;
+    }
+  }
+  return best ?? videos[0] ?? null;
+}
+
+// 訪問の同一性を判定するキー。X は /mediaviewer を /mediaViewer に書き換えるため
+// 大文字小文字を無視して比較する。
+function visitKey(pathname: string): string {
+  return pathname.toLowerCase();
 }
 
 // 拡大表示を開くたびに作る「訪問」の状態。
@@ -78,7 +128,11 @@ interface Visit {
   };
 
   const tryPlay = (target: Visit): void => {
-    const video = document.querySelector<HTMLVideoElement>("video");
+    const video = pickMostVisibleVideo(
+      Array.from(document.querySelectorAll<HTMLVideoElement>("video")),
+      window.innerWidth,
+      window.innerHeight,
+    );
     if (video && !video.paused) {
       finish(target);
       return;
@@ -101,7 +155,7 @@ interface Visit {
       leaveVisit();
       return;
     }
-    if (!visit || visit.path !== path) {
+    if (!visit || visitKey(visit.path) !== visitKey(path)) {
       leaveVisit();
       visit = enterVisit(path);
     }

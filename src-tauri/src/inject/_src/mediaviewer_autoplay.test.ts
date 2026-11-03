@@ -1,7 +1,10 @@
 // mediaviewer_autoplay.ts は IIFE のため、import 時に監視が始まる。
 // 純粋関数 isMediaViewerPath の判定と、IIFE の video.play / click の挙動を検証する。
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { isMediaViewerPath } from "./mediaviewer_autoplay";
+import {
+  isMediaViewerPath,
+  pickMostVisibleVideo,
+} from "./mediaviewer_autoplay";
 
 // 静的 import による起動 (IIFE) を抑止する。各テストが importAutoplay で改めて
 // 起動し、挙動を検証する (純粋関数 isMediaViewerPath のためだけに import している)。
@@ -99,6 +102,12 @@ describe("inject/mediaviewer_autoplay の isMediaViewerPath", () => {
     expect(isMediaViewerPath("/user/status/123/mediaviewer/")).toBe(true);
   });
 
+  it("Xが書き換える大文字混じりの mediaViewer も対象になる", () => {
+    expect(isMediaViewerPath("/user/status/123/mediaViewer")).toBe(true);
+    expect(isMediaViewerPath("/user/status/123/MEDIAVIEWER")).toBe(true);
+    expect(isMediaViewerPath("/user/status/123/mediaViewer/")).toBe(true);
+  });
+
   it("タイムラインや status ページは対象にならない", () => {
     expect(isMediaViewerPath("/home")).toBe(false);
     expect(isMediaViewerPath("/user/status/123")).toBe(false);
@@ -110,11 +119,100 @@ describe("inject/mediaviewer_autoplay の isMediaViewerPath", () => {
 
   it("mediaviewer を含むだけの別名セグメントは対象にならない", () => {
     expect(isMediaViewerPath("/user/status/123/xmediaviewer")).toBe(false);
+    expect(isMediaViewerPath("/user/status/123/xMediaViewer")).toBe(false);
   });
 
   it("空文字は対象にならない", () => {
     expect(isMediaViewerPath("")).toBe(false);
   });
+});
+
+/** getBoundingClientRect を持つだけの最小の要素 (純粋関数の検証用)。 */
+function box(top: number, left: number, width: number, height: number) {
+  return {
+    getBoundingClientRect: () => ({
+      top,
+      left,
+      bottom: top + height,
+      right: left + width,
+    }),
+  };
+}
+
+/** jsdom ではレイアウトが無いので、video の表示位置を差し替える。 */
+function stubRect(
+  video: HTMLVideoElement,
+  top: number,
+  left: number,
+  width: number,
+  height: number,
+): void {
+  video.getBoundingClientRect = () =>
+    ({
+      top,
+      left,
+      bottom: top + height,
+      right: left + width,
+      width,
+      height,
+      x: left,
+      y: top,
+      toJSON: () => ({}),
+    }) as DOMRect;
+}
+
+describe("inject/mediaviewer_autoplay の pickMostVisibleVideo", () => {
+  it("動画が無いときは null を返す", () => {
+    expect(pickMostVisibleVideo([], 410, 789)).toBeNull();
+  });
+
+  it("画面内で見えている面積が最大の動画を選ぶ", () => {
+    const next = box(787, 0, 410, 793);
+    const current = box(-2, 0, 410, 793);
+    expect(pickMostVisibleForTest([next, current])).toBe(current);
+  });
+
+  it("画面外にはみ出した部分は面積に数えない", () => {
+    const mostlyOut = box(700, 0, 410, 793); // 見えるのは高さ 89
+    const partlyIn = box(-600, 0, 410, 793); // 見えるのは高さ 193
+    expect(pickMostVisibleForTest([mostlyOut, partlyIn])).toBe(partlyIn);
+  });
+
+  it("横方向にはみ出した部分も面積に数えない", () => {
+    const narrowIn = box(0, 300, 410, 789); // 見えるのは幅 110
+    const wideIn = box(0, -100, 410, 789); // 見えるのは幅 310
+    expect(pickMostVisibleForTest([narrowIn, wideIn])).toBe(wideIn);
+  });
+
+  it("面積が同じなら先に現れた動画を選ぶ", () => {
+    const first = box(0, 0, 100, 100);
+    const second = box(0, 0, 100, 100);
+    expect(pickMostVisibleForTest([first, second])).toBe(first);
+  });
+
+  it("画面外の動画しか無いときは先頭の動画にフォールバックする", () => {
+    const first = box(900, 0, 410, 793);
+    const second = box(1700, 0, 410, 793);
+    expect(pickMostVisibleForTest([first, second])).toBe(first);
+  });
+
+  it("すべて面積 0 (レイアウト未確定) のときは先頭の動画にフォールバックする", () => {
+    const first = box(0, 0, 0, 0);
+    const second = box(0, 0, 0, 0);
+    expect(pickMostVisibleForTest([first, second])).toBe(first);
+  });
+
+  it("面積 0 の動画より見えている動画を優先する", () => {
+    const hidden = box(0, 0, 0, 0);
+    const visible = box(0, 0, 10, 10);
+    expect(pickMostVisibleForTest([hidden, visible])).toBe(visible);
+  });
+
+  function pickMostVisibleForTest<T extends ReturnType<typeof box>>(
+    items: T[],
+  ): T | null {
+    return pickMostVisibleVideo(items, 410, 789);
+  }
 });
 
 describe("inject/mediaviewer_autoplay の自動再生挙動(共有ハブ非存在時のフォールバック)", () => {
@@ -499,6 +597,82 @@ describe("inject/mediaviewer_autoplay の自動再生挙動(共有ハブ非存�
     await navigate(VIEWER_PATH);
 
     expect(playMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("Xがパスを大文字混じりの mediaViewer に書き換えても同じ訪問として扱い再生を重ねない", async () => {
+    document.body.appendChild(document.createElement("video"));
+    await importAutoplay();
+    await navigate("/user/status/123/mediaviewer");
+    expect(playMock).toHaveBeenCalledTimes(1);
+
+    await navigate("/user/status/123/mediaViewer");
+
+    expect(playMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("パス書き換えのとき再生確認前でも play を重ねず打ち切りタイマーも増やさない", async () => {
+    playMock.mockImplementation(() => new Promise<void>(() => {}));
+    document.body.appendChild(document.createElement("video"));
+    await importAutoplay();
+    await navigate("/user/status/123/mediaviewer");
+
+    await navigate("/user/status/123/mediaViewer");
+
+    expect(playMock).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(1);
+  });
+
+  it("ステータス ID が違えば大文字小文字が違っても別の訪問になる", async () => {
+    playMock.mockImplementation(() => new Promise<void>(() => {}));
+    document.body.appendChild(document.createElement("video"));
+    await importAutoplay();
+    await navigate("/user/status/123/mediaviewer");
+
+    await navigate("/user/status/456/mediaViewer");
+
+    expect(playMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("画面のすぐ外にある次のポストの動画ではなく画面内の動画を再生する", async () => {
+    const next = document.createElement("video");
+    const current = document.createElement("video");
+    stubRect(next, 787, 0, 410, 793);
+    stubRect(current, -2, 0, 410, 793);
+    document.body.appendChild(next);
+    document.body.appendChild(current);
+    await importAutoplay();
+
+    await navigate(VIEWER_PATH);
+
+    expect(playMock).toHaveBeenCalledTimes(1);
+    expect(playMock.mock.contexts[0]).toBe(current);
+  });
+
+  it("画面内の動画がすでに再生中なら画面外の動画が停止中でも再生しない", async () => {
+    const next = document.createElement("video");
+    const current = document.createElement("video");
+    stubRect(next, 787, 0, 410, 793);
+    stubRect(current, -2, 0, 410, 793);
+    setPaused(current, false);
+    document.body.appendChild(next);
+    document.body.appendChild(current);
+    await importAutoplay();
+
+    await navigate(VIEWER_PATH);
+
+    expect(playMock).not.toHaveBeenCalled();
+  });
+
+  it("どの動画もレイアウトが確定していないときは最初の動画を再生する", async () => {
+    const first = document.createElement("video");
+    const second = document.createElement("video");
+    document.body.appendChild(first);
+    document.body.appendChild(second);
+    await importAutoplay();
+
+    await navigate(VIEWER_PATH);
+
+    expect(playMock.mock.contexts[0]).toBe(first);
   });
 
   it("戻る操作で拡大表示から離れて再度入っても自動再生される", async () => {
