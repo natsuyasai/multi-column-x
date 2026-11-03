@@ -205,9 +205,13 @@ Chrome 拡張だけでは、カラムの寸法など実アプリ固有の条件�
 
 ### モバイルの動画拡大表示（`mediaviewer_autoplay.ts`）
 
-- モバイルでは動画タップ後にカラム内で X 標準の拡大表示（パス末尾 `/mediaviewer`）になる。モバイルのカラム init script にのみ、`video_control` の直後に連結する。設定項目は無く常に有効。
-- 状態は mediaviewer に入るたびの「訪問」ごとに作り直す。playButton の click / `video.play()`（拒否時はミュートで再試行）を試み、再生確認後は何もしない。10 秒で打ち切る。タイムラインのインライン動画には触れない。
+- モバイルでは動画タップ後にカラム内で X 標準の拡大表示（パス末尾 `/mediaviewer`。大文字小文字は区別しない）になる。モバイルのカラム init script にのみ、`video_control` の直後に連結する。設定項目は無く常に有効。
+- 状態は mediaviewer に入るたびの「訪問」ごとに作り直す。訪問の同一性はパスを小文字化して比較する（X のパス書き換えで再開始しない）。対象の video は、画面内で見えている面積が最大のもの（`pickMostVisibleVideo`。全て面積 0 なら先頭）。playButton の click / `video.play()`（拒否時はミュートで再試行）を試み、再生確認後は何もしない。10 秒で打ち切る。タイムラインのインライン動画には触れない。
 - DOM 監視は共有ハブ `window.__mcxDomObserver`（無ければ `MutationObserver`）と `popstate`。購読は常駐させ、各コールバックは `pathname` の比較だけで抜けるようにして軽量に保つ。
 - `history.pushState` / `replaceState` のモンキーパッチはしない（他機能・X 本体との干渉を避けるため）。そのため、ハブも `popstate` も拾えない遷移は取りこぼす可能性がある。
 - 同じ inject ファイル間は import できない（ES の複数エントリ・連結注入）ため、`isMediaViewerPath` は `video_control.ts` と同等のものを複製している。どちらかを変えたらもう一方も揃える。
-- **mediaviewer の実 DOM は Windows では再現できず未実測。Android 実機での確認が必要**（playButton の有無、`video` の生成タイミング）。
+- **実測結果（2026-11-03、Android エミュレータの WebView を CDP で実測）**:
+  - 動画タップ後、パスは `/<user>/status/<id>/mediaviewer`（小文字）になり、約 100ms 後に `/mediaViewer`（V が大文字）へ書き換わる。大文字小文字を区別する判定だと書き換え後を拡大表示と認識できない。
+  - `button[data-testid="playButton"]` は無い。`video` は 2 個（`[data-testid="videoComponent"]` 内、blob: ソース）で、1 つ目が現在のポストの動画（画面内）、2 つ目が次のポストの動画（画面のすぐ外）。X 自身が `play()` を何度も呼ぶ。
+  - `video_control` も同じ正規表現でパスを判定しており、大文字パスを拡大表示と認識できず「最初の 1 回だけ通して直後に pause、以降の `play()` は握りつぶす」で X の再生を止めていた。これが再生されない主因だった。`isMediaViewerPath` を `i` フラグ付きにして解消した。
+  - 修正後の再生確認は Android 実機での手動テスト（`integration-test.md`）で行う。

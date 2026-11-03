@@ -538,7 +538,9 @@
           <p>
             <code>mediaviewer_autoplay</code> は <b>モバイルのカラムだけ</b>に
             video_control の直後で連結され、X 標準の拡大表示（パス末尾が
-            <code>/mediaviewer</code>）を開くたびに playButton の click または
+            <code>/mediaviewer</code>。X が <code>/mediaViewer</code>
+            に書き換えるため大文字小文字は区別しない）を開くたびに playButton の
+            click または
             <code>video.play()</code>（拒否時は
             ミュートで再試行）で自動再生します（再生確認後は何もせず、10
             秒で打ち切り。設定項目は無く常に有効）。ポップアップ側の

@@ -489,7 +489,7 @@ Object.assign(window.MCX_DATA.catalogs, {
       {
         name: "mediaviewer_autoplay.ts",
         summary:
-          "モバイルの動画拡大表示（パス末尾 /mediaviewer）を開くたびに自動再生（playButton の click / video.play()、拒否時はミュートで再試行）。再生確認後は何もせず 10 秒で打ち切り。",
+          "モバイルの動画拡大表示（パス末尾 /mediaviewer、大文字小文字は区別しない）を開くたびに自動再生（playButton の click / video.play()、拒否時はミュートで再試行）。再生確認後は何もせず 10 秒で打ち切り。",
         enable:
           "モバイルのカラム init script に常に連結（video_control の直後。設定項目なし）",
         target: "カラム",
@@ -497,7 +497,7 @@ Object.assign(window.MCX_DATA.catalogs, {
         test: "あり（+ プロパティ）",
         kind: "メディア",
         detail:
-          "<p>mediaviewer に入るたび（訪問ごと）に状態を作り直す。DOM 監視は共有ハブ window.__mcxDomObserver（無ければ MutationObserver）と popstate で、pathname 比較のみの軽量処理。history のモンキーパッチはしない。タイムラインのインライン動画には触れない。mediaviewer の実 DOM は未実測（Android 実機で要確認）。</p>",
+          "<p>mediaviewer に入るたび（訪問ごと）に状態を作り直す。DOM 監視は共有ハブ window.__mcxDomObserver（無ければ MutationObserver）と popstate で、pathname 比較のみの軽量処理。history のモンキーパッチはしない。タイムラインのインライン動画には触れない。パスは大文字小文字を区別せず判定する（X は /mediaviewer を約 100ms 後に /mediaViewer へ書き換える）ため、訪問の同一性もパスを小文字化して比較する。拡大表示には現在のポストと次のポストの video が 2 個あり playButton は無いので、画面内の可視面積が最大の video を対象にする（2026-11-03 Android エミュレータで実測）。</p>",
         files: [
           INJ + "mediaviewer_autoplay.ts",
           INJ + "mediaviewer_autoplay.test.ts",
@@ -964,7 +964,7 @@ Object.assign(window.MCX_DATA.details, {
     layer: "inject",
     summary:
       "自動再生の抑止、長押しメニュー、ポップアップとモバイル拡大表示での自動再生を担う 4 つ。",
-    body: "<p><b>video_control</b>: <code>HTMLMediaElement.prototype.play</code> を差し替え、最初の play() だけ通して playing 後に 1 度止める。mediaviewer（全画面）やユーザー操作済みの動画は止めない。</p><p><b>video_long_press_menu</b>: contextmenu（長押し/右クリック）で独自メニュー。動画 URL は X の React Fiber の props（variants）から取る（DOM に URL が無いため）。ダウンロードは Android ブリッジへ委譲。</p><p><b>popup_video_autoplay</b>: /video/ を含むポップアップで再生、拒否されたらミュートで再試行。document 生成時に走るため body 出現を待って開始し、window.__mcxVideoAutoplayStarted で多重起動を防ぐ。初期表示は playButton のみで click 後に video が生成される。</p><p><b>mediaviewer_autoplay</b>: モバイルのカラムのみ。X 標準の拡大表示（/mediaviewer）に入るたびに自動再生を試みる。</p>",
+    body: "<p><b>video_control</b>: <code>HTMLMediaElement.prototype.play</code> を差し替え、最初の play() だけ通して playing 後に 1 度止める。mediaviewer（全画面。X が /mediaViewer と書き換えるため大文字小文字は区別しない）やユーザー操作済みの動画は止めない。</p><p><b>video_long_press_menu</b>: contextmenu（長押し/右クリック）で独自メニュー。動画 URL は X の React Fiber の props（variants）から取る（DOM に URL が無いため）。ダウンロードは Android ブリッジへ委譲。</p><p><b>popup_video_autoplay</b>: /video/ を含むポップアップで再生、拒否されたらミュートで再試行。document 生成時に走るため body 出現を待って開始し、window.__mcxVideoAutoplayStarted で多重起動を防ぐ。初期表示は playButton のみで click 後に video が生成される。</p><p><b>mediaviewer_autoplay</b>: モバイルのカラムのみ。X 標準の拡大表示（/mediaviewer）に入るたびに自動再生を試みる（画面内で最も見えている video が対象）。</p>",
     files: [
       "src-tauri/src/inject/_src/video_control.ts",
       "src-tauri/src/inject/_src/video_long_press_menu.ts",
