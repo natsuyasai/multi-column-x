@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="mcx-synced-commit" content="68b23eed" />
+    <meta name="mcx-synced-commit" content="d06c40e" />
     <title>inject スクリプト | MCX 開発者ガイド</title>
     <link rel="stylesheet" href="assets/common.css" />
   </head>
@@ -399,7 +399,8 @@
               <li><code>window.__multiColumnXConfig = {…}</code></li>
               <li>
                 tab_selector → header_customizer（設定 ON のみ）→ auto_reload →
-                return_to_last_read（home のみ）→ video_control（設定 ON のみ）
+                return_to_last_read（home のみ）→ video_control（設定 ON のみ）→
+                mediaviewer_autoplay（mobile のみ）
               </li>
               <li>
                 small_image → blur_image → hide_ad → ng_word → custom_css →
@@ -533,6 +534,18 @@
             度止める工夫付き）。<code>video_long_press_menu</code> は DOM に URL
             が無いため React Fiber の props から動画 variants
             を取り出します。ダウンロードは Android ブリッジ専用です。
+          </p>
+          <p>
+            <code>mediaviewer_autoplay</code> は <b>モバイルのカラムだけ</b>に
+            video_control の直後で連結され、X 標準の拡大表示（パス末尾が
+            <code>/mediaviewer</code>）を開くたびに playButton の click または
+            <code>video.play()</code>（拒否時は
+            ミュートで再試行）で自動再生します（再生確認後は何もせず、10
+            秒で打ち切り。設定項目は無く常に有効）。ポップアップ側の
+            <code>popup_video_autoplay</code> は document 生成時に走るため body
+            出現を待って開始し、「再生が確認できた」ことを
+            完了条件にします。詳細は
+            <code>docs/development/inject-ipc-shortcuts-notes.md</code>。
           </p>
 
           <h3 id="detail-ratelimit">

@@ -188,3 +188,26 @@ Chrome 拡張だけでは、カラムの寸法など実アプリ固有の条件�
 - ホームで写真リンクをクリックしたとき、`closest("article")` のステータス ID をモジュール内変数 `pendingPhotoReturnId` に保存する。写真 → ホームの遷移（popstate / pushState）を検知したら、`waitForTimelineReady`（100ms ポーリング・上限 5 秒、ホーム離脱 or ユーザー入力で中止）でタイムライン表示を待ち、`searchReturnTarget([id])` で上端に合わせる。見つからなければ「前回の位置が見つかりませんでした」のトースト。
 - 写真復元中は `photoRestoring` を立てて他機能と排他するが、`render()` の可視判定には混ぜない（「探しています…」ボタンを出さないため）。
 - 未検証（実機）: X 実 DOM での article からの ID 取得、5 秒上限の十分性、ネイティブ WebView ごとの pushState/popstate の挙動。
+
+## 動画の自動再生（`popup_video_autoplay.ts` / `mediaviewer_autoplay.ts`）
+
+### document 生成時の inject で守ること（2026-11-03 の不具合）
+
+- inject は document 生成時に走るため、その時点では `document.documentElement` / `document.body` が **null** のことがある。冒頭で `documentElement.hasAttribute(...)` のような属性ガードを書くと TypeError で即死する（`popup_video_autoplay.ts` が PC で動かなかった原因）。
+- 多重起動防止は DOM 属性ではなく `window` 変数（`__mcxVideoAutoplayStarted` / `__mcxMediaviewerAutoplayStarted`）で行い、DOM の操作は body が出現してから始める。
+- **jsdom では `documentElement` / `body` が常に存在するため、単体テストでは再現しない。** document 生成時に走る inject を書く・直すときは、`documentElement` / `body` を null にした状態で例外なく開始し、body 出現後に動き出す回帰テストを必ず書く。
+
+### ポップアップ（PC）の実機 DOM（2026-11-03、WebView2 + CDP で確認）
+
+- 初期表示には `video` 要素が無く、`button[data-testid="playButton"]` だけがある。playButton を click すると X が `video` を生成し、X 自身が `play()` する。
+- 完了条件は「再生が確認できたこと」（`video` の生成だけでは完了にしない）。
+- カルーセルでは playButton が複数ある。現仕様は先頭のみ click する。
+
+### モバイルの動画拡大表示（`mediaviewer_autoplay.ts`）
+
+- モバイルでは動画タップ後にカラム内で X 標準の拡大表示（パス末尾 `/mediaviewer`）になる。モバイルのカラム init script にのみ、`video_control` の直後に連結する。設定項目は無く常に有効。
+- 状態は mediaviewer に入るたびの「訪問」ごとに作り直す。playButton の click / `video.play()`（拒否時はミュートで再試行）を試み、再生確認後は何もしない。10 秒で打ち切る。タイムラインのインライン動画には触れない。
+- DOM 監視は共有ハブ `window.__mcxDomObserver`（無ければ `MutationObserver`）と `popstate`。購読は常駐させ、各コールバックは `pathname` の比較だけで抜けるようにして軽量に保つ。
+- `history.pushState` / `replaceState` のモンキーパッチはしない（他機能・X 本体との干渉を避けるため）。そのため、ハブも `popstate` も拾えない遷移は取りこぼす可能性がある。
+- 同じ inject ファイル間は import できない（ES の複数エントリ・連結注入）ため、`isMediaViewerPath` は `video_control.ts` と同等のものを複製している。どちらかを変えたらもう一方も揃える。
+- **mediaviewer の実 DOM は Windows では再現できず未実測。Android 実機での確認が必要**（playButton の有無、`video` の生成タイミング）。
