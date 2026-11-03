@@ -131,6 +131,7 @@ declare global {
     __mcxAccounts?: TvAccountInfo[];
     __mcxCurrentAccountId?: string;
     __mcxTargetHref?: string;
+    __mcxVideoAutoplayStarted?: boolean;
     __mcxEscCloseEnabled?: boolean;
     __mcxPopupBridge?: McxPopupBridge;
     __mcxVideoDownloadBridge?: McxVideoDownloadBridge;
