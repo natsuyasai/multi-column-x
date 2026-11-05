@@ -99,3 +99,60 @@ export function evaluate(
   }
   return elapsed >= START_WAIT_MS ? INITIAL_LOADING_STATE : state;
 }
+
+// --- X 自身が処理する更新操作の判定 ---
+// return_to_last_read_logic.ts の isEditableEventTarget / isRefreshShortcut /
+// isRefreshClickTarget と同じ条件。別 inject エントリから import すると共有チャンクが生じて
+// 連結が壊れるため複製し、連結後のトップレベル名が重複しないよう別名にしている。
+
+/** 入力欄（編集可能要素）か。 */
+export function isEditableKeyTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return (
+    target.closest(
+      'input, textarea, select, [contenteditable=""], [contenteditable="true"], [role="textbox"]',
+    ) !== null
+  );
+}
+
+/** X の「新しいポストを読み込む」ショートカット（"."）。修飾キー無し・入力欄以外のとき真。 */
+export function isLoadingRefreshShortcut(event: {
+  key: string;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  altKey: boolean;
+  shiftKey: boolean;
+  target: EventTarget | null;
+}): boolean {
+  if (event.key !== ".") return false;
+  if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) {
+    return false;
+  }
+  return !isEditableKeyTarget(event.target);
+}
+
+/**
+ * 更新操作となるクリック対象か。
+ * (1) 選択中で aria-expanded を持たないタブ
+ * (2) タイムライン内の新着ピル（投稿を含まないセル内の button[type=button]、UserCell 除く）
+ */
+export function isLoadingRefreshClickTarget(
+  target: EventTarget | null,
+): boolean {
+  if (!(target instanceof Element)) return false;
+
+  const tab = target.closest<HTMLElement>('div[role="tab"]');
+  if (tab) {
+    return (
+      tab.getAttribute("aria-selected") === "true" &&
+      !tab.hasAttribute("aria-expanded")
+    );
+  }
+
+  const button = target.closest<HTMLButtonElement>('button[type="button"]');
+  if (!button) return false;
+  if (button.getAttribute("data-testid") === "UserCell") return false;
+  const cell = button.closest('[data-testid="cellInnerDiv"]');
+  if (!cell || cell.querySelector("article")) return false;
+  return cell.closest("section[aria-labelledby]") !== null;
+}

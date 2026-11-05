@@ -4,6 +4,8 @@ import {
   INITIAL_LOADING_STATE,
   POLL_INTERVAL_MS,
   evaluate,
+  isLoadingRefreshClickTarget,
+  isLoadingRefreshShortcut,
   isTimelineRequestUrl,
   requestFinished,
   requestStarted,
@@ -683,6 +685,23 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
       "touchcancel",
       "blur",
     ] as const;
+    // X 自身が処理する更新操作（選択中タブ・新着ピルのクリック、「.」キー）は
+    // triggerReload を通らないため、ここでもバーを出す。
+    const onRefreshClick = (event: Event): void => {
+      if (isLoadingRefreshClickTarget(event.target)) startRefreshLoading();
+    };
+    const onRefreshKeydown = (event: Event): void => {
+      if (isLoadingRefreshShortcut(event as KeyboardEvent)) {
+        startRefreshLoading();
+      }
+    };
+    const refreshListenerOptions = { capture: true, passive: true } as const;
+    window.addEventListener("click", onRefreshClick, refreshListenerOptions);
+    window.addEventListener(
+      "keydown",
+      onRefreshKeydown,
+      refreshListenerOptions,
+    );
     for (const type of SCROLL_TOP_PIN_RELEASE_EVENTS) {
       window.addEventListener(type, onUserInput, { passive: true });
     }
@@ -705,6 +724,16 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
     else document.addEventListener("DOMContentLoaded", startDom);
 
     return function dispose(): void {
+      window.removeEventListener(
+        "click",
+        onRefreshClick,
+        refreshListenerOptions,
+      );
+      window.removeEventListener(
+        "keydown",
+        onRefreshKeydown,
+        refreshListenerOptions,
+      );
       for (const type of SCROLL_TOP_PIN_RELEASE_EVENTS) {
         window.removeEventListener(type, onUserInput);
       }

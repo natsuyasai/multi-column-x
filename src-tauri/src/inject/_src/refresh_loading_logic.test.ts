@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
   INITIAL_LOADING_STATE,
@@ -6,6 +6,9 @@ import {
   MIN_DISPLAY_MS,
   START_WAIT_MS,
   evaluate,
+  isEditableKeyTarget,
+  isLoadingRefreshClickTarget,
+  isLoadingRefreshShortcut,
   isTimelineRequestUrl,
   requestFinished,
   requestStarted,
@@ -163,6 +166,169 @@ describe("更新ローディングの状態遷移", () => {
       expect(evaluate(state, 100, "/notifications")).toBe(
         INITIAL_LOADING_STATE,
       );
+    });
+  });
+});
+
+describe("X 自身の更新操作の判定", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  function addTab(selected: boolean, expanded = false): HTMLElement {
+    const tab = document.createElement("div");
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-selected", String(selected));
+    if (expanded) tab.setAttribute("aria-expanded", "false");
+    const label = document.createElement("span");
+    tab.appendChild(label);
+    document.body.appendChild(tab);
+    return label;
+  }
+
+  function addSection(): HTMLElement {
+    const section = document.createElement("section");
+    section.setAttribute("aria-labelledby", "timeline");
+    document.body.appendChild(section);
+    return section;
+  }
+
+  function addButtonCell(
+    parent: HTMLElement,
+    options: { article?: boolean; userCell?: boolean } = {},
+  ): HTMLButtonElement {
+    const cell = document.createElement("div");
+    cell.dataset.testid = "cellInnerDiv";
+    if (options.article) cell.appendChild(document.createElement("article"));
+    const button = document.createElement("button");
+    button.type = "button";
+    if (options.userCell) button.dataset.testid = "UserCell";
+    cell.appendChild(button);
+    parent.appendChild(cell);
+    return button;
+  }
+
+  function keyEvent(
+    key: string,
+    target: EventTarget | null,
+    modifiers: Partial<
+      Record<"ctrlKey" | "metaKey" | "altKey" | "shiftKey", boolean>
+    > = {},
+  ) {
+    return {
+      key,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+      shiftKey: false,
+      target,
+      ...modifiers,
+    };
+  }
+
+  describe("isLoadingRefreshClickTarget", () => {
+    it("選択中のタブ名（内側の要素を含む）は更新操作と判定される", () => {
+      expect(isLoadingRefreshClickTarget(addTab(true))).toBe(true);
+    });
+
+    it("選択中でないタブは更新操作と判定されない", () => {
+      expect(isLoadingRefreshClickTarget(addTab(false))).toBe(false);
+    });
+
+    it("メニューが開くタイプ（aria-expanded を持つ）のタブは更新操作と判定されない", () => {
+      expect(isLoadingRefreshClickTarget(addTab(true, true))).toBe(false);
+    });
+
+    it("タイムラインの新着ポストのボタンは更新操作と判定される", () => {
+      const button = addButtonCell(addSection());
+      expect(isLoadingRefreshClickTarget(button)).toBe(true);
+    });
+
+    it("ポストを含むセル内のボタンは更新操作と判定されない", () => {
+      const button = addButtonCell(addSection(), { article: true });
+      expect(isLoadingRefreshClickTarget(button)).toBe(false);
+    });
+
+    it("UserCell のボタンは更新操作と判定されない", () => {
+      const button = addButtonCell(addSection(), { userCell: true });
+      expect(isLoadingRefreshClickTarget(button)).toBe(false);
+    });
+
+    it("タイムライン（section）の外のセルのボタンは更新操作と判定されない", () => {
+      const button = addButtonCell(document.body);
+      expect(isLoadingRefreshClickTarget(button)).toBe(false);
+    });
+
+    it("セルに入っていないボタンやボタン以外の要素は更新操作と判定されない", () => {
+      const section = addSection();
+      const lone = document.createElement("button");
+      lone.type = "button";
+      section.appendChild(lone);
+      const div = document.createElement("div");
+      section.appendChild(div);
+      expect(isLoadingRefreshClickTarget(lone)).toBe(false);
+      expect(isLoadingRefreshClickTarget(div)).toBe(false);
+    });
+
+    it("Element でない対象は更新操作と判定されない", () => {
+      expect(isLoadingRefreshClickTarget(null)).toBe(false);
+      expect(isLoadingRefreshClickTarget(document)).toBe(false);
+    });
+  });
+
+  describe("isLoadingRefreshShortcut", () => {
+    it("入力欄以外での「.」キーは更新操作と判定される", () => {
+      expect(isLoadingRefreshShortcut(keyEvent(".", document.body))).toBe(true);
+    });
+
+    it("「.」以外のキーは更新操作と判定されない", () => {
+      expect(isLoadingRefreshShortcut(keyEvent("j", document.body))).toBe(
+        false,
+      );
+    });
+
+    it("修飾キー付きの「.」キーは更新操作と判定されない", () => {
+      for (const mod of ["ctrlKey", "metaKey", "altKey", "shiftKey"] as const) {
+        expect(
+          isLoadingRefreshShortcut(
+            keyEvent(".", document.body, { [mod]: true }),
+          ),
+        ).toBe(false);
+      }
+    });
+
+    it("入力欄にフォーカスがあるときの「.」キーは更新操作と判定されない", () => {
+      const input = document.createElement("input");
+      document.body.appendChild(input);
+      expect(isLoadingRefreshShortcut(keyEvent(".", input))).toBe(false);
+    });
+  });
+
+  describe("isEditableKeyTarget", () => {
+    it("input・textarea・select・contenteditable・role=textbox は入力欄と判定される", () => {
+      const html = [
+        "<input>",
+        "<textarea></textarea>",
+        "<select></select>",
+        '<div contenteditable=""></div>',
+        '<div contenteditable="true"></div>',
+        '<div role="textbox"></div>',
+      ];
+      for (const h of html) {
+        document.body.innerHTML = h;
+        expect(isEditableKeyTarget(document.body.firstElementChild)).toBe(true);
+      }
+    });
+
+    it("入力欄の内側の要素も入力欄と判定される", () => {
+      document.body.innerHTML = '<div role="textbox"><span></span></div>';
+      expect(isEditableKeyTarget(document.querySelector("span"))).toBe(true);
+    });
+
+    it("通常の要素と Element でない対象は入力欄と判定されない", () => {
+      document.body.innerHTML = '<div contenteditable="false"></div>';
+      expect(isEditableKeyTarget(document.body.firstElementChild)).toBe(false);
+      expect(isEditableKeyTarget(null)).toBe(false);
     });
   });
 });

@@ -2126,4 +2126,117 @@ describe("inject/auto_reload の更新ローディング表示", () => {
     vi.advanceTimersByTime(500);
     expect(getBar()).toBeNull();
   });
+
+  describe("X 自身の更新操作", () => {
+    function clickOn(target: Element): void {
+      target.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    }
+
+    function pressKey(
+      key: string,
+      target: Element = document.body,
+      init: KeyboardEventInit = {},
+    ): void {
+      target.dispatchEvent(
+        new KeyboardEvent("keydown", { key, bubbles: true, ...init }),
+      );
+    }
+
+    it("選択中のタブ名をクリックまたはタップして更新するとローディングバーが表示される", () => {
+      clickOn(addTab(true, false));
+
+      expect(getBars()).toHaveLength(1);
+    });
+
+    it("選択中でないタブを押して切り替えてもローディングバーは表示されない", () => {
+      clickOn(addTab(false, false));
+
+      expect(getBar()).toBeNull();
+    });
+
+    it("メニューが開くタイプのタブを押してもローディングバーは表示されない", () => {
+      clickOn(addTab(true, true));
+
+      expect(getBar()).toBeNull();
+    });
+
+    it("タイムラインの新着ポストのボタンを押して更新するとローディングバーが表示される", () => {
+      const button = addNewPostsButton(addSection(), "新しいポストを表示");
+
+      clickOn(button);
+
+      expect(getBars()).toHaveLength(1);
+    });
+
+    it("新着ポストのボタン以外（ポスト内・UserCell 内のボタン）を押してもローディングバーは表示されない", () => {
+      const section = addSection();
+      const postButton = addNewPostsButton(section, "返信");
+      postButton.closest("div")?.appendChild(document.createElement("article"));
+      const userCellButton = addNewPostsButton(section, "フォロー");
+      userCellButton.dataset.testid = "UserCell";
+
+      clickOn(postButton);
+      clickOn(userCellButton);
+
+      expect(getBar()).toBeNull();
+    });
+
+    it("新しいポストを読み込むショートカットキー（.）で更新するとローディングバーが表示される", () => {
+      pressKey(".");
+
+      expect(getBars()).toHaveLength(1);
+    });
+
+    it("入力欄にフォーカスがあるときの.キーではローディングバーは表示されない", () => {
+      const input = document.createElement("input");
+      document.body.appendChild(input);
+
+      pressKey(".", input);
+      pressKey(".", document.body, { ctrlKey: true });
+
+      expect(getBar()).toBeNull();
+    });
+
+    it("X 自身の更新操作でもタイムライン取得の完了でバーが消える", () => {
+      clickOn(addTab(true, false));
+      const xhr = sendXhr(TIMELINE_URL);
+
+      vi.advanceTimersByTime(5000);
+      expect(getBar()).not.toBeNull();
+
+      finishXhr(xhr);
+      vi.advanceTimersByTime(500);
+      expect(getBar()).toBeNull();
+    });
+
+    it("X 自身の更新操作で取得が始まらなくても1.5秒でバーが消える", () => {
+      clickOn(addTab(true, false));
+
+      vi.advanceTimersByTime(1400);
+      expect(getBar()).not.toBeNull();
+
+      vi.advanceTimersByTime(100);
+      expect(getBar()).toBeNull();
+    });
+
+    it("手動更新で表示中に更新操作を行ってもバーは1本のままである", () => {
+      triggerReload(true);
+      expect(getBars()).toHaveLength(1);
+
+      clickOn(addTab(true, false));
+      pressKey(".");
+
+      expect(getBars()).toHaveLength(1);
+    });
+
+    it("監視の解除後はクリックやキー入力に反応しない", () => {
+      const tab = addTab(true, false);
+      window.__multiColumnX.disposeAutoReloadWatchers?.();
+
+      clickOn(tab);
+      pressKey(".");
+
+      expect(getBar()).toBeNull();
+    });
+  });
 });
