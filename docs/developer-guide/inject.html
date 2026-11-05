@@ -480,7 +480,11 @@
               <b>手動更新のローディングバー</b>：<code
                 >triggerReload(true)</code
               >
-              のときだけカラム上部に細いバーを出します。XHR
+              のとき、および X
+              自身が処理する更新操作（選択中のタブのクリック・新着ポストのピル・「.」キー）のときに、カラム上部に細いバーを出します。後者の判定
+              (<code>isLoadingRefreshClickTarget</code> など) は
+              <code>return_to_last_read_logic.ts</code>
+              と同じ条件の複製なので、変更時は両方を揃えてください。XHR
               を観測し、更新の後に始まった GraphQL
               <code>*Timeline</code>
               がすべて完了（最低 400ms 表示）したら消え、取得が始まらなければ

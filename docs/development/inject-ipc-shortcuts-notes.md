@@ -126,7 +126,12 @@ Chrome 拡張だけでは、カラムの寸法など実アプリ固有の条件�
 
 ### 対象と終了条件
 
-- 対象は `triggerReload(true)`（手動更新）のみ。自動更新（`triggerReload()`）とプルダウン更新は対象外。`isScrolling()` で更新自体がスキップされたときは出さない（`startRefreshLoading` は `isScrolling()` の直後）。
+- 対象は `triggerReload(true)`（手動更新）と、X 自身が処理する更新操作（下記）。自動更新（`triggerReload()`）とプルダウン更新は対象外。`isScrolling()` で更新自体がスキップされたときは出さない（`startRefreshLoading` は `isScrolling()` の直後）。
+- **X 自身の更新操作**（`startWatchers()` が `window` の `click` / `keydown`（capture, passive）を購読し、判定が真なら `startRefreshLoading()`。dispose で解除。ページ種別の制限なし）:
+  - 選択中（`aria-selected="true"`）で `aria-expanded` を持たない `div[role="tab"]` のクリック／タップ。選択中でないタブの切替は対象外。
+  - タイムライン内の新着ポストのピル／ボタン（投稿を含まないセル内の `button[type="button"]`。`UserCell` を除く。`section[aria-labelledby]` 内）。
+  - 「.」キー（修飾キー無し・入力欄以外）。
+- 判定は `refresh_loading_logic.ts` の `isLoadingRefreshClickTarget` / `isLoadingRefreshShortcut` / `isEditableKeyTarget`。これは `return_to_last_read_logic.ts` の `isRefreshClickTarget` / `isRefreshShortcut` / `isEditableEventTarget` と**同じ条件の複製**。`return_to_last_read_logic.ts` は別 inject エントリのため `auto_reload.ts` から import できない（共有チャンクが生じ、`include_str!` 連結が壊れる）。連結後のトップレベル名の重複を避けるため別名にしている。**判定条件を変えるときは両方を揃えること**（前回の境目へ戻る機能側も同様）。
 - 終了条件は、手動更新の**後に始まった** GraphQL `*Timeline` の XHR がすべて完了（`loadend`）したら、最低表示 400ms 経過後に消える。取得が一度も始まらなければ 1.5 秒で消える。全体の上限は 15 秒。ページ遷移（`location.pathname` の変化）でも消える。
 - 評価は 250ms の `setInterval`（バー表示中のみ動かす）。
 
@@ -136,7 +141,8 @@ Chrome 拡張だけでは、カラムの寸法など実アプリ固有の条件�
 - リスト `ListLatestTweetsTimeline`: 約 9ms 後に開始し、約 0.3 秒で完了。
 - 通知: 更新直後に取得なし（`NotificationsTimeline` は X の約 30 秒ポーリングで起きるだけ）。取得が起きないので 1.5 秒で消える。
 - `flow/timeline.json` は約 3 秒ごとの定期ポーリングで更新と無関係なので対象外（`isTimelineRequestUrl` は GraphQL の `*Timeline` だけを真にする）。
-- **未計測**: 検索（`SearchTimeline`）、フォロー中（`HomeLatestTimeline`）、Android 実機。
+- X 自身の更新操作: リスト「情報」のアクティブなタブをクリック → 約 5ms 後に `ListLatestTweetsTimeline` が開始し、約 0.3 秒で完了。クリックは capture で X の処理より先に呼ばれるため、直後に始まる XHR は追跡対象になる。
+- **未計測**: 検索（`SearchTimeline`）、フォロー中（`HomeLatestTimeline`）、Android 実機。スクロール済みの状態でのタブ名クリック（X が先頭へ戻すだけで取得しない可能性）は**未確定**（手動確認項目）。
 
 ### 上限 15 秒の根拠
 

@@ -447,7 +447,7 @@ Object.assign(window.MCX_DATA.catalogs, {
         test: "あり（+ プロパティ）",
         kind: "更新・新着",
         detail:
-          '<p>window.__multiColumnX.triggerReload / disposeAutoReloadWatchers を公開。新着数は <code>report_new_posts_count</code> で Rust へ。<b>Android のカラムには Tauri IPC が無い</b>ため、この invoke は何もしません（Android の未読経路は <span class="badge warn">要確認</span>）。</p><p>手動更新（<code>triggerReload(true)</code>）では、更新後に始まった GraphQL <code>*Timeline</code> の XHR がすべて完了するまでカラム上部にバーを表示します（XHR パッチは別フラグで 1 回だけ。純粋ロジックは refresh_loading_logic.ts）。</p>',
+          '<p>window.__multiColumnX.triggerReload / disposeAutoReloadWatchers を公開。新着数は <code>report_new_posts_count</code> で Rust へ。<b>Android のカラムには Tauri IPC が無い</b>ため、この invoke は何もしません（Android の未読経路は <span class="badge warn">要確認</span>）。</p><p>手動更新（<code>triggerReload(true)</code>）と、X 自身が処理する更新操作（選択中のタブのクリック・新着ポストのピル・「.」キー。判定は return_to_last_read_logic.ts と同じ条件の複製なので変更時は両方を揃える）では、更新後に始まった GraphQL <code>*Timeline</code> の XHR がすべて完了するまでカラム上部にバーを表示します（XHR パッチは別フラグで 1 回だけ。純粋ロジックは refresh_loading_logic.ts）。</p>',
         files: [
           INJ + "auto_reload.ts",
           INJ + "refresh_loading_logic.ts",
