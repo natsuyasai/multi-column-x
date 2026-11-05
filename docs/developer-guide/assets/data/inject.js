@@ -440,18 +440,21 @@ Object.assign(window.MCX_DATA.catalogs, {
       {
         name: "auto_reload.ts",
         summary:
-          "自動更新・手動更新の実行（triggerReload）、新着投稿の検知と件数報告、通知・検索ページの常時監視。",
+          "自動更新・手動更新の実行（triggerReload）、新着投稿の検知と件数報告、通知・検索ページの常時監視、手動更新時のローディングバー。",
         enable: "常に（カラム）。更新の発火は React 側のタイマー/操作",
         target: "カラム",
         platform: "共通",
         test: "あり（+ プロパティ）",
         kind: "更新・新着",
         detail:
-          '<p>window.__multiColumnX.triggerReload / disposeAutoReloadWatchers を公開。新着数は <code>report_new_posts_count</code> で Rust へ。<b>Android のカラムには Tauri IPC が無い</b>ため、この invoke は何もしません（Android の未読経路は <span class="badge warn">要確認</span>）。</p>',
+          '<p>window.__multiColumnX.triggerReload / disposeAutoReloadWatchers を公開。新着数は <code>report_new_posts_count</code> で Rust へ。<b>Android のカラムには Tauri IPC が無い</b>ため、この invoke は何もしません（Android の未読経路は <span class="badge warn">要確認</span>）。</p><p>手動更新（<code>triggerReload(true)</code>）では、更新後に始まった GraphQL <code>*Timeline</code> の XHR がすべて完了するまでカラム上部にバーを表示します（XHR パッチは別フラグで 1 回だけ。純粋ロジックは refresh_loading_logic.ts）。</p>',
         files: [
           INJ + "auto_reload.ts",
+          INJ + "refresh_loading_logic.ts",
           INJ + "auto_reload.test.ts",
           INJ + "auto_reload.property.test.ts",
+          INJ + "refresh_loading_logic.test.ts",
+          INJ + "refresh_loading_logic.property.test.ts",
         ],
       },
       {
