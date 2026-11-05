@@ -140,6 +140,11 @@ declare global {
     __mobileTopInset?: number;
     __mobileBottomInset?: number;
     __xhrRateLimitPatched?: boolean;
+    __mcxLoadingXhrPatched?: boolean;
+    __mcxTimelineXhrListener?: (event: {
+      type: "start" | "finish";
+      id: number;
+    }) => void;
     __mcxDomObserver?: McxDomObserver;
     __mcxLang?: string;
     __mcxI18n?: McxI18n;
