@@ -1892,3 +1892,238 @@ describe("inject/auto_reload 通知・検索ページを開いた直後と戻る
     expect(scrollingElementStub.scrollTop).toBe(300);
   });
 });
+
+describe("inject/auto_reload の更新ローディング表示", () => {
+  const BAR_ID = "mcx-refresh-loading-bar";
+  const TIMELINE_URL = "/i/api/graphql/abc123/HomeTimeline?variables=%7B%7D";
+  const FLOW_TIMELINE_URL = "/i/api/1.1/flow/timeline.json";
+
+  const originalOpen = XMLHttpRequest.prototype.open;
+  const originalSend = XMLHttpRequest.prototype.send;
+
+  function getBars(): NodeListOf<Element> {
+    return document.querySelectorAll(`#${BAR_ID}`);
+  }
+
+  function getBar(): HTMLElement | null {
+    return document.getElementById(BAR_ID);
+  }
+
+  /** 実通信を行わないフェイク XHR を open + send まで進める。 */
+  function sendXhr(url: string): XMLHttpRequest {
+    const xhr = new XMLHttpRequest();
+    xhr.open("GET", url);
+    xhr.send();
+    return xhr;
+  }
+
+  function finishXhr(xhr: XMLHttpRequest): void {
+    xhr.dispatchEvent(new Event("loadend"));
+  }
+
+  beforeEach(async () => {
+    // 実際の通信が起きないよう、パッチ対象の open/send をフェイクに差し替えてから読み込む。
+    XMLHttpRequest.prototype.open =
+      function () {} as typeof XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.send =
+      function () {} as typeof XMLHttpRequest.prototype.send;
+    window.__mcxLoadingXhrPatched = undefined;
+    window.__mcxTimelineXhrListener = undefined;
+    vi.resetModules();
+    await import("./auto_reload");
+    document.body.innerHTML = "";
+    setScrolling(0);
+    history.replaceState({}, "", "/home");
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    window.__multiColumnX?.disposeAutoReloadWatchers?.();
+    vi.useRealTimers();
+    XMLHttpRequest.prototype.open = originalOpen;
+    XMLHttpRequest.prototype.send = originalSend;
+    window.__mcxLoadingXhrPatched = undefined;
+    window.__mcxTimelineXhrListener = undefined;
+    history.replaceState({}, "", "/");
+  });
+
+  it("手動更新を行うとカラム上部にローディングバーが表示される", () => {
+    triggerReload(true);
+
+    const bar = getBar();
+    expect(bar).not.toBeNull();
+    expect(bar?.parentElement).toBe(document.documentElement);
+  });
+
+  it("自動更新ではローディングバーは表示されない", () => {
+    triggerReload();
+
+    expect(getBar()).toBeNull();
+  });
+
+  it("スクロール中で更新がスキップされるときはローディングバーは表示されない", () => {
+    // 先頭へ戻す操作が効かずスクロール位置が残る状況を再現する
+    Object.defineProperty(document, "scrollingElement", {
+      value: {
+        get scrollTop() {
+          return 100;
+        },
+        set scrollTop(_value: number) {},
+      },
+      configurable: true,
+    });
+
+    triggerReload(true);
+
+    expect(getBar()).toBeNull();
+  });
+
+  it("取得中に再度手動更新を行ってもバーは1本のままで消える時刻が延長される", () => {
+    triggerReload(true);
+    vi.advanceTimersByTime(1000);
+    triggerReload(true);
+    vi.advanceTimersByTime(1000);
+
+    // 最初の更新から 2000ms 経過（延長されなければ 1500ms で消えている）
+    expect(getBars()).toHaveLength(1);
+
+    vi.advanceTimersByTime(600);
+    expect(getBars()).toHaveLength(0);
+  });
+
+  it("タイムライン取得が完了するとローディングバーが消える", () => {
+    triggerReload(true);
+    const xhr = sendXhr(TIMELINE_URL);
+
+    vi.advanceTimersByTime(5000);
+    expect(getBar()).not.toBeNull();
+
+    finishXhr(xhr);
+    // 最低表示時間（400ms）を過ぎた次のティックで消える
+    vi.advanceTimersByTime(500);
+    expect(getBar()).toBeNull();
+  });
+
+  it("タイムライン取得が一瞬で完了しても最低表示時間まではバーが残る", () => {
+    triggerReload(true);
+    finishXhr(sendXhr(TIMELINE_URL));
+
+    vi.advanceTimersByTime(250);
+    expect(getBar()).not.toBeNull();
+
+    vi.advanceTimersByTime(250);
+    expect(getBar()).toBeNull();
+  });
+
+  it("タイムライン以外の通信ではバーの表示は変わらない", () => {
+    triggerReload(true);
+    // 完了しない非対象の通信が残っていても、バーを延命しない
+    sendXhr(FLOW_TIMELINE_URL);
+    sendXhr("/i/api/graphql/abc123/UserByScreenName?variables=%7B%7D");
+
+    vi.advanceTimersByTime(1500);
+
+    expect(getBar()).toBeNull();
+  });
+
+  it("手動更新の前から進行中だった取得の完了ではバーは消えない", () => {
+    const oldXhr = sendXhr(TIMELINE_URL);
+    triggerReload(true);
+
+    vi.advanceTimersByTime(100);
+    finishXhr(oldXhr);
+    vi.advanceTimersByTime(900);
+
+    // 更新後に始まった取得は無いため、開始待ち時間（1500ms）までバーは残る
+    expect(getBar()).not.toBeNull();
+
+    vi.advanceTimersByTime(600);
+    expect(getBar()).toBeNull();
+  });
+
+  const COLUMN_PATHS = [
+    ["ホーム", "/home"],
+    ["リスト", "/i/lists/123456"],
+    ["検索", "/search"],
+    ["通知", "/notifications"],
+  ] as const;
+
+  for (const [label, path] of COLUMN_PATHS) {
+    it(`${label}カラムでも手動更新でバーが表示される`, () => {
+      history.replaceState({}, "", path);
+
+      triggerReload(true);
+
+      expect(getBars()).toHaveLength(1);
+    });
+  }
+
+  it("通知カラムで取得が起きなくても1.5秒でバーが消える", () => {
+    history.replaceState({}, "", "/notifications");
+
+    triggerReload(true);
+    vi.advanceTimersByTime(1400);
+    expect(getBar()).not.toBeNull();
+
+    vi.advanceTimersByTime(100);
+    expect(getBar()).toBeNull();
+  });
+
+  it("ローディングバーは操作を妨げない", () => {
+    triggerReload(true);
+
+    const bar = getBar() as HTMLElement;
+    expect(bar.getAttribute("aria-hidden")).toBe("true");
+    expect(getComputedStyle(bar).pointerEvents).toBe("none");
+    expect(getComputedStyle(bar).position).toBe("fixed");
+  });
+
+  it("ローディングバー表示中にページが切り替わっても残らない", () => {
+    triggerReload(true);
+    // 取得が未完了でも、ページが切り替わったら消える
+    sendXhr(TIMELINE_URL);
+    vi.advanceTimersByTime(500);
+    expect(getBar()).not.toBeNull();
+
+    history.pushState({}, "", "/search");
+    vi.advanceTimersByTime(250);
+
+    expect(getBar()).toBeNull();
+  });
+
+  it("消えた後は新しい手動更新で再びバーが表示される", () => {
+    triggerReload(true);
+    vi.advanceTimersByTime(1500);
+    expect(getBar()).toBeNull();
+
+    triggerReload(true);
+
+    expect(getBars()).toHaveLength(1);
+  });
+
+  it("監視の解除でバーとタイマーも後始末される", () => {
+    triggerReload(true);
+
+    window.__multiColumnX.disposeAutoReloadWatchers?.();
+
+    expect(getBar()).toBeNull();
+    expect(window.__mcxTimelineXhrListener).toBeUndefined();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("モジュールを再読み込みしても通信のパッチは1回のままで通知先だけ更新される", async () => {
+    const patchedSend = XMLHttpRequest.prototype.send;
+
+    vi.resetModules();
+    await import("./auto_reload");
+
+    expect(XMLHttpRequest.prototype.send).toBe(patchedSend);
+    triggerReload(true);
+    const xhr = sendXhr(TIMELINE_URL);
+    vi.advanceTimersByTime(5000);
+    expect(getBar()).not.toBeNull();
+    finishXhr(xhr);
+    vi.advanceTimersByTime(500);
+    expect(getBar()).toBeNull();
+  });
+});

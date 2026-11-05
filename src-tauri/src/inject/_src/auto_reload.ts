@@ -1,5 +1,16 @@
 // src-tauri/src/inject/_src/auto_reload.ts
 
+import {
+  INITIAL_LOADING_STATE,
+  POLL_INTERVAL_MS,
+  evaluate,
+  isTimelineRequestUrl,
+  requestFinished,
+  requestStarted,
+  startLoading,
+  type LoadingState,
+} from "./refresh_loading_logic";
+
 // --- 純粋関数（vitest で単体テストする） ---
 
 /**
@@ -466,12 +477,157 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
     }, SCROLL_ROUNDTRIP_WAIT_MS);
   }
 
+  // --- 手動更新のローディングバー ---
+  // 状態遷移は refresh_loading_logic.ts（純粋ロジック）に任せ、ここでは
+  // XHR 観測・バー DOM・ポーリングタイマーの副作用だけを扱う。
+
+  const LOADING_BAR_ID = "mcx-refresh-loading-bar";
+  const LOADING_STYLE_ID = "mcx-refresh-loading-style";
+  const LOADING_BAR_CSS = `
+#${LOADING_BAR_ID} { position: fixed; top: 0; left: 0; right: 0; height: 3px; overflow: hidden; pointer-events: none; z-index: 2147483647; }
+#${LOADING_BAR_ID} > div { width: 40%; height: 100%; background: #1d9bf0; animation: mcx-refresh-loading-slide 1.1s ease-in-out infinite; }
+@keyframes mcx-refresh-loading-slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@media (prefers-reduced-motion: reduce) { #${LOADING_BAR_ID} > div { width: 100%; animation: none; } }
+`;
+
+  let loadingState: LoadingState = INITIAL_LOADING_STATE;
+  let loadingTimerId: ReturnType<typeof setInterval> | null = null;
+
+  function showLoadingBar(): void {
+    const root = document.documentElement;
+    if (!document.getElementById(LOADING_STYLE_ID)) {
+      const style = document.createElement("style");
+      style.id = LOADING_STYLE_ID;
+      style.textContent = LOADING_BAR_CSS;
+      root.appendChild(style);
+    }
+    // バーは1要素を使い回す（再更新で2本にしない）
+    if (document.getElementById(LOADING_BAR_ID)) return;
+    const bar = document.createElement("div");
+    bar.id = LOADING_BAR_ID;
+    bar.setAttribute("aria-hidden", "true");
+    bar.appendChild(document.createElement("div"));
+    root.appendChild(bar);
+  }
+
+  function hideLoadingBar(): void {
+    document.getElementById(LOADING_BAR_ID)?.remove();
+  }
+
+  function stopLoadingTimer(): void {
+    if (loadingTimerId === null) return;
+    clearInterval(loadingTimerId);
+    loadingTimerId = null;
+  }
+
+  /** 消す条件を評価し、非 active になったらバーとタイマーを片付ける。 */
+  function evaluateLoading(): void {
+    loadingState = evaluate(loadingState, Date.now(), location.pathname);
+    if (!loadingState.active) {
+      hideLoadingBar();
+      stopLoadingTimer();
+    }
+  }
+
+  function startRefreshLoading(): void {
+    loadingState = startLoading(loadingState, Date.now(), location.pathname);
+    showLoadingBar();
+    if (loadingTimerId === null) {
+      loadingTimerId = setInterval(evaluateLoading, POLL_INTERVAL_MS);
+    }
+  }
+
+  function handleTimelineXhrEvent(event: {
+    type: "start" | "finish";
+    id: number;
+  }): void {
+    loadingState =
+      event.type === "start"
+        ? requestStarted(loadingState, event.id)
+        : requestFinished(loadingState, event.id);
+  }
+
+  function disposeRefreshLoading(): void {
+    stopLoadingTimer();
+    loadingState = INITIAL_LOADING_STATE;
+    hideLoadingBar();
+    document.getElementById(LOADING_STYLE_ID)?.remove();
+    if (window.__mcxTimelineXhrListener === handleTimelineXhrEvent) {
+      window.__mcxTimelineXhrListener = undefined;
+    }
+  }
+
+  type LoadingXhr = XMLHttpRequest & { __mcxLoadingUrl?: string };
+  let nextTimelineXhrId = 1;
+
+  // 更新に伴うタイムライン取得の開始・完了を観測する。監視設定に左右されないよう、
+  // api_rate_limit_monitor とは別フラグで1回だけパッチし、再注入時は listener だけ差し替える。
+  function installTimelineXhrObserver(): void {
+    if (window.__mcxLoadingXhrPatched) return;
+    window.__mcxLoadingXhrPatched = true;
+
+    const origOpen = XMLHttpRequest.prototype.open;
+    const origSend = XMLHttpRequest.prototype.send;
+
+    XMLHttpRequest.prototype.open = function (
+      this: LoadingXhr,
+      method: string,
+      url: string | URL,
+      ...rest: unknown[]
+    ) {
+      try {
+        this.__mcxLoadingUrl = typeof url === "string" ? url : url.toString();
+      } catch {
+        // 観測の失敗で元の通信を壊さない
+      }
+      return (
+        origOpen as unknown as (
+          this: XMLHttpRequest,
+          method: string,
+          url: string | URL,
+          ...rest: unknown[]
+        ) => void
+      ).call(this, method, url, ...rest);
+    } as typeof XMLHttpRequest.prototype.open;
+
+    XMLHttpRequest.prototype.send = function (
+      this: LoadingXhr,
+      ...args: unknown[]
+    ) {
+      try {
+        const url = this.__mcxLoadingUrl;
+        if (typeof url === "string" && isTimelineRequestUrl(url)) {
+          const id = nextTimelineXhrId++;
+          window.__mcxTimelineXhrListener?.({ type: "start", id });
+          // error / abort / timeout も含めて loadend に一本化する
+          this.addEventListener("loadend", () => {
+            try {
+              window.__mcxTimelineXhrListener?.({ type: "finish", id });
+            } catch {
+              // 観測の失敗で元の通信を壊さない
+            }
+          });
+        }
+      } catch {
+        // 観測の失敗で元の通信を壊さない
+      }
+      return (
+        origSend as unknown as (
+          this: XMLHttpRequest,
+          ...args: unknown[]
+        ) => void
+      ).apply(this, args);
+    } as typeof XMLHttpRequest.prototype.send;
+  }
+
   function triggerReload(scrollToTop?: boolean): void {
     if (scrollToTop && document.scrollingElement) {
       scrollToTopByScript(document.scrollingElement);
     }
     correctExternalScrollOffset();
     if (isScrolling()) return;
+    // 手動更新（scrollToTop あり）のときだけ出す。スキップされる更新では出さない。
+    if (scrollToTop) startRefreshLoading();
 
     if (isScrollRoundtripPage()) {
       // 監視の開始は先頭へ戻した後（triggerScrollRoundtrip 内）。
@@ -569,6 +725,12 @@ export function collectMaxNotificationTimeMs(section: Element): number | null {
     window.__multiColumnX || ({} as Window["__multiColumnX"]);
   // 多重注入（単体テストでのモジュール再読み込みを含む）に備え、前回の監視を解除してから登録する。
   window.__multiColumnX.disposeAutoReloadWatchers?.();
+  installTimelineXhrObserver();
+  window.__mcxTimelineXhrListener = handleTimelineXhrEvent;
   window.__multiColumnX.triggerReload = triggerReload;
-  window.__multiColumnX.disposeAutoReloadWatchers = startWatchers();
+  const disposeWatchers = startWatchers();
+  window.__multiColumnX.disposeAutoReloadWatchers = function (): void {
+    disposeWatchers();
+    disposeRefreshLoading();
+  };
 })();
