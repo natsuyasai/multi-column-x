@@ -476,6 +476,23 @@
             <li>
               スクロール距離・待ち時間は<b>実測値</b>で、カラムの高さにも依存します。変更時は必ず再計測（詳細はノート）。
             </li>
+            <li>
+              <b>手動更新のローディングバー</b>：<code
+                >triggerReload(true)</code
+              >
+              のとき、および X
+              自身が処理する更新操作（選択中のタブのクリック・新着ポストのピル・「.」キー）のときに、カラム上部に細いバーを出します。後者の判定
+              (<code>isLoadingRefreshClickTarget</code> など) は
+              <code>return_to_last_read_logic.ts</code>
+              と同じ条件の複製なので、変更時は両方を揃えてください。XHR
+              を観測し、更新の後に始まった GraphQL
+              <code>*Timeline</code>
+              がすべて完了（最低 400ms 表示）したら消え、取得が始まらなければ
+              1.5 秒、上限は 15 秒、ページ遷移でも消えます。XHR パッチは
+              <code>api_rate_limit_monitor</code>
+              とは別フラグで 1 回だけ行い、純粋ロジックは
+              <code>refresh_loading_logic.ts</code>。
+            </li>
           </ul>
 
           <h3 id="detail-rtlr">return_to_last_read：triggerReload のラップ</h3>

@@ -120,6 +120,51 @@ Chrome 拡張だけでは、カラムの寸法など実アプリ固有の条件�
 - 体感（位置ジャンプの見え方）は目視での評価が必要。
 - フォロー中の更新間隔は最低 1 分が必要とのユーザー申告があるが、実測では未確認。60 秒未満のカラムへの警告や下限は設けていない。
 
+## 手動更新のローディングバー（Issue #264）
+
+対象: `auto_reload.ts` の「手動更新のローディングバー」節（`showLoadingBar` 〜 `installTimelineXhrObserver`、`triggerReload` 内の `startRefreshLoading`）と、純粋ロジックの `refresh_loading_logic.ts`（`auto_reload.ts` からのみ import）。スマホなどでダブルタップしても取得中なのか開始できていないのか分からない、という問題への対応で、カラム上部に細いバーを出す。
+
+### 対象と終了条件
+
+- 対象は `triggerReload(true)`（手動更新）と、X 自身が処理する更新操作（下記）。自動更新（`triggerReload()`）とプルダウン更新は対象外。`isScrolling()` で更新自体がスキップされたときは出さない（`startRefreshLoading` は `isScrolling()` の直後）。
+- **X 自身の更新操作**（`startWatchers()` が `window` の `click` / `keydown`（capture, passive）を購読し、判定が真なら `startRefreshLoading()`。dispose で解除。ページ種別の制限なし）:
+  - 選択中（`aria-selected="true"`）で `aria-expanded` を持たない `div[role="tab"]` のクリック／タップ。選択中でないタブの切替は対象外。
+  - タイムライン内の新着ポストのピル／ボタン（投稿を含まないセル内の `button[type="button"]`。`UserCell` を除く。`section[aria-labelledby]` 内）。
+  - 「.」キー（修飾キー無し・入力欄以外）。
+- 判定は `refresh_loading_logic.ts` の `isLoadingRefreshClickTarget` / `isLoadingRefreshShortcut` / `isEditableKeyTarget`。これは `return_to_last_read_logic.ts` の `isRefreshClickTarget` / `isRefreshShortcut` / `isEditableEventTarget` と**同じ条件の複製**。`return_to_last_read_logic.ts` は別 inject エントリのため `auto_reload.ts` から import できない（共有チャンクが生じ、`include_str!` 連結が壊れる）。連結後のトップレベル名の重複を避けるため別名にしている。**判定条件を変えるときは両方を揃えること**（前回の境目へ戻る機能側も同様）。
+- 終了条件は、手動更新の**後に始まった** GraphQL `*Timeline` の XHR がすべて完了（`loadend`）したら、最低表示 400ms 経過後に消える。取得が一度も始まらなければ 1.5 秒で消える。全体の上限は 15 秒。ページ遷移（`location.pathname` の変化）でも消える。
+- 評価は 250ms の `setInterval`（バー表示中のみ動かす）。
+
+### 実測（2026-11-05、WebView2 + CDP、実アカウント）
+
+- ホーム `HomeTimeline`: 更新の約 7ms 後に開始し、約 0.7 秒で完了。
+- リスト `ListLatestTweetsTimeline`: 約 9ms 後に開始し、約 0.3 秒で完了。
+- 通知: 更新直後に取得なし（`NotificationsTimeline` は X の約 30 秒ポーリングで起きるだけ）。取得が起きないので 1.5 秒で消える。
+- `flow/timeline.json` は約 3 秒ごとの定期ポーリングで更新と無関係なので対象外（`isTimelineRequestUrl` は GraphQL の `*Timeline` だけを真にする）。
+- X 自身の更新操作: リスト「情報」のアクティブなタブをクリック → 約 5ms 後に `ListLatestTweetsTimeline` が開始し、約 0.3 秒で完了。クリックは capture で X の処理より先に呼ばれるため、直後に始まる XHR は追跡対象になる。
+- **未計測**: 検索（`SearchTimeline`）、フォロー中（`HomeLatestTimeline`）、Android 実機。スクロール済みの状態でのタブ名クリック（X が先頭へ戻すだけで取得しない可能性）は**未確定**（手動確認項目）。
+
+### 上限 15 秒の根拠
+
+X の XHR ラッパーは `timeout` の既定が 0（無制限）で固定のタイムアウト値が無く、モバイル回線では約 10 秒待つことがあるため。取得が止まったままでも 15 秒で必ず消える。
+
+### 落とし穴
+
+- XHR パッチは `api_rate_limit_monitor.ts` とは**別のフラグ**（`__mcxLoadingXhrPatched`）で 1 回だけ行う（監視設定に左右されない）。再注入時はパッチを重ねず `window.__mcxTimelineXhrListener` を差し替える。
+- バーは `document.documentElement` 直下に置き、`pointer-events: none`・`aria-hidden="true"`。`prefers-reduced-motion` では静止表示にする。不確定アニメーションは `transform` のみでレイアウトを動かさない。
+- バーを隠すときは要素ごと `remove()` する（再表示時に作り直す。値が変わるときだけ代入して MutationObserver とのループを避ける）。
+- 手動更新の前から進行中だった取得は追跡しない（`requestStarted` は表示中のみ pending に入れる）。再度の手動更新ではバーは 1 本のまま、起点時刻だけ更新する。
+
+### 不採用案
+
+- 固定時間だけ表示: 更新の実態と無関係で、遅い回線で早く消える。
+- X の DOM のスピナーの消滅待ち: X の DOM 変更に弱い。
+- React 側（タブ）へのイベント: IPC・ACL の追加が必要で、カラム内の見た目にも合わない。
+
+### 手動確認が必要な点
+
+- Android 実機（スワイプ領域のダブルタップ）、検索・フォロー中の取得タイミングの実測、ライト／ダーク両テーマでの見え方。
+
 ## 前回の境目へ戻るボタン（`return_to_last_read.ts`）
 
 対象: `src-tauri/src/inject/_src/return_to_last_read.ts`（DOM グルー・IIFE）と `return_to_last_read_logic.ts`（純粋ロジック）、カラム設定 `returnToLastReadEnabled`（既定 false）。ホームカラム（`pageType: "home"`）にだけ注入し、設定は `WEBVIEW_SCRIPTS.applyReturnToLastRead` → `setReturnToLastReadEnabled` で即時に切り替える（`handleApplySettings` は WebView を作り直さないため、「ON のときだけ注入」方式では再起動まで反映されない）。以下は 2026-09-23 に実 X（Chrome・ログイン済み）で計測・検証した結果。
