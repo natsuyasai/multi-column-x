@@ -100,8 +100,7 @@ bash "$SANDBOX/scripts/bump-version.sh" 0.1.3 >/dev/null
 assert_contains "$SANDBOX/package.json" '"version": "0.1.3"' "package.json が更新される"
 assert_contains "$SANDBOX/src-tauri/tauri.conf.json" '"version": "0.1.3"' "tauri.conf.json が更新される"
 assert_contains "$SANDBOX/src-tauri/Cargo.toml" 'version = "0.1.3"' "Cargo.toml が更新される"
-assert_contains "$SANDBOX/src-tauri/gen/android/app/tauri.properties" 'tauri.android.versionName=0.1.3' "Android versionName が更新される"
-assert_contains "$SANDBOX/src-tauri/gen/android/app/tauri.properties" 'tauri.android.versionCode=1003' "Android versionCode が算出される (0.1.3 -> 1003)"
+assert_contains "$SANDBOX/src-tauri/gen/android/app/tauri.properties" 'tauri.android.versionName=0.1.0' "未管理の tauri.properties は更新対象外"
 
 # Cargo.lock は multicolumnx だけ更新し、他クレートは据え置き
 echo "[テスト] Cargo.lock は multicolumnx のみ更新"

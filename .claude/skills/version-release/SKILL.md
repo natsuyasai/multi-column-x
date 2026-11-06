@@ -42,13 +42,14 @@ git pull origin develop
 ./scripts/bump-version.sh <new-version>
 ```
 
-- 対象ファイル: `package.json` / `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` / `src-tauri/Cargo.lock` / `src-tauri/gen/android/app/tauri.properties`
+- `tauri.properties` は gitignore 済みの生成物（ビルド時に生成）なので対象外
+- 対象ファイル: `package.json` / `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` / `src-tauri/Cargo.lock`
 - 実行後 `git status` / `git diff` で意図した箇所のみ変更されていることを確認する
 
 ### Phase 4: develop に直接コミットする
 
 ```bash
-git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/gen/android/app/tauri.properties
+git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
 git commit -m "v<new-version>"
 git push origin develop
 ```
