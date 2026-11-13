@@ -260,3 +260,19 @@ X の XHR ラッパーは `timeout` の既定が 0（無制限）で固定のタ
   - `button[data-testid="playButton"]` は無い。`video` は 2 個（`[data-testid="videoComponent"]` 内、blob: ソース）で、1 つ目が現在のポストの動画（画面内）、2 つ目が次のポストの動画（画面のすぐ外）。X 自身が `play()` を何度も呼ぶ。
   - `video_control` も同じ正規表現でパスを判定しており、大文字パスを拡大表示と認識できず「最初の 1 回だけ通して直後に pause、以降の `play()` は握りつぶす」で X の再生を止めていた。これが再生されない主因だった。`isMediaViewerPath` を `i` フラグ付きにして解消した。
   - 修正後の再生確認は Android 実機での手動テスト（`integration-test.md`）で行う。
+
+## 広告の非表示（`hide_ad.ts` / `hide_ad_matcher.ts`）
+
+### 判定の手がかり（2026-11-13、WebView2 + CDP、実アカウントで実測）
+
+- 従来の `placementTracking` や `span` の完全一致「Ad」では拾えない広告パターンがおすすめタブに出る。ラベルは `span` ではなく `<a role="link">` 自体の本文「Ad from starlink.com」（`Ad from <広告主ドメイン>`）で、`placementTracking` は無い。
+- 同じ広告の外部リンク（`a[href]`）には広告計測用の `twclid` クエリが付く（`utm_medium=paid` も併記）。表示言語に依存しない手がかりとして `twclid` も判定に使う。
+- 判定は `span, a` の本文が `^Ad from\s+\S`（大小無視）に一致するか、外部リンクに `twclid` があるか。本文中の「Ad from」は前方一致のため誤判定しない。
+- `twclid` はサンプル数が少ない（スターリンク／コルセア／アマゾン／ヤプリの広告で確認）。通常ポストの外部リンクには付かない前提。誤判定が報告されたら見直すこと。
+
+### 落とし穴: inject のトップレベル宣言名は全ファイルで一意にする
+
+- inject スクリプトは `mod.rs` で 1 本に連結して実行される。トップレベルの `const` / `function` の名前が他の inject と重複すると、再宣言の SyntaxError で**連結スクリプト全体が動かず、全カラムの注入（設定含む）が消える**。単体テストは各ファイル単独で動くため検出できない。
+- 実例: `hide_ad_matcher.ts` を新設した際、トップレベルの `AD_TEXTS` が `return_to_last_read.js` の同名と衝突した。matcher にはモジュール固有の接頭辞を付ける（`HIDE_AD_TEXTS` など）。
+- 検出: `inject_concat.contract.test.ts` が、ビルド済み inject を連結して構文チェックする（`build:inject` 後に有効）。`mod.rs` に inject を追加したらこのテストの対象リストにも追加する。
+- 実機で CDP から検証するときは `Page.reload` しない（注入済みの設定が消える）。アプリを再起動して確認する。

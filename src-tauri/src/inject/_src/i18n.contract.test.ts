@@ -15,7 +15,7 @@ interface AllowedLiteral {
 
 const ALLOWED_LITERALS: AllowedLiteral[] = [
   {
-    file: "hide_ad.ts",
+    file: "hide_ad_matcher.ts",
     pattern: /AD_TEXTS = \[.*"広告".*\]/,
     reason: "X の広告ラベルのテキストと照合する値（表示文言ではない）",
   },
