@@ -1,10 +1,11 @@
+import { hasAdTrackingHref, isAdLabelText } from "./hide_ad_matcher";
+
 (function () {
   const config = window.__multiColumnXConfig;
   if (!config?.hideAdEnabled) return;
 
   const TWEET_CONTAINER_SELECTOR = 'article[role="article"]';
   const AD_DATA_TESTID_SELECTOR = '[data-testid="placementTracking"]';
-  const AD_TEXTS = ["Ad", "Promoted", "広告"];
   const TIMELINE_SELECTOR = 'main[role="main"]';
 
   function removeAdCell(el: HTMLElement): void {
@@ -39,17 +40,18 @@
       return;
     }
 
-    const spans = el.querySelectorAll("span");
-    for (const span of spans) {
-      const text = span.textContent?.trim() ?? "";
-      if (
-        text &&
-        AD_TEXTS.some((t) => t.toLowerCase() === text.toLowerCase()) &&
-        span.offsetParent !== null
-      ) {
+    for (const node of el.querySelectorAll<HTMLElement>("span, a")) {
+      if (isAdLabelText(node.textContent ?? "") && node.offsetParent !== null) {
         removeAdCell(el);
         return;
       }
+    }
+
+    const hrefs = Array.from(el.querySelectorAll("a[href]")).map(
+      (a) => a.getAttribute("href") ?? "",
+    );
+    if (hasAdTrackingHref(hrefs)) {
+      removeAdCell(el);
     }
   }
 
