@@ -9,6 +9,16 @@
             "command": "bash .claude/hooks/pre-edit-dev-notes.sh"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/pre-push-check.sh",
+            "timeout": 300
+          }
+        ]
       }
     ],
     "PostToolUse": [
