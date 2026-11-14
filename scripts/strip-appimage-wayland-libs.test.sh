@@ -42,12 +42,24 @@ make_appdir() {
 
 echo "[テスト] ラッパー設置"
 bash "$TARGET_SCRIPT" "$CACHE" >/dev/null
-[ -f "$CACHE/linuxdeploy-plugin-appimage.AppImage.real" ] && ok "実体が .real へ退避される" || ng "実体が退避されない"
+[ -f "$CACHE/.real/linuxdeploy-plugin-appimage.AppImage" ] && ok "実体が .real/ サブディレクトリへ退避される" || ng "実体が退避されない"
+# linuxdeploy はキャッシュ直下の linuxdeploy-plugin-* を名前で重複登録し、重複時は走査順で
+# どちらが使われるか不定になる。ラッパー以外の linuxdeploy-plugin-* を直下に残さないこと。
+COUNT="$(find "$CACHE" -maxdepth 1 -type f -name 'linuxdeploy-plugin-*' | wc -l)"
+[ "$COUNT" -eq 1 ] && ok "キャッシュ直下の linuxdeploy-plugin-* はラッパーのみ" || ng "キャッシュ直下に linuxdeploy-plugin-* が ${COUNT} 件ある"
 head -n1 "$PLUGIN" | grep -q bash && ok "同名のラッパースクリプトが置かれる" || ng "ラッパーが置かれない"
 
 echo "[テスト] 冪等: 2 回目でも実体を上書きしない"
 bash "$TARGET_SCRIPT" "$CACHE" >/dev/null
-grep -q 'real-args' "$CACHE/linuxdeploy-plugin-appimage.AppImage.real" && ok "2 回実行しても .real は元の実体のまま" || ng "2 回目で .real が壊れた"
+grep -q 'real-args' "$CACHE/.real/linuxdeploy-plugin-appimage.AppImage" && ok "2 回実行しても .real は元の実体のまま" || ng "2 回目で .real が壊れた"
+
+echo "[テスト] 旧方式（直下の .AppImage.real）からの移行"
+LEGACY="$SANDBOX/legacy"; mkdir -p "$LEGACY"
+printf '#!/usr/bin/env bash\necho legacy-real\n' >"$LEGACY/linuxdeploy-plugin-appimage.AppImage.real"
+chmod +x "$LEGACY/linuxdeploy-plugin-appimage.AppImage.real"
+bash "$TARGET_SCRIPT" "$LEGACY" >/dev/null
+[ ! -e "$LEGACY/linuxdeploy-plugin-appimage.AppImage.real" ] && ok "旧 .real が直下から消える" || ng "旧 .real が直下に残っている"
+grep -q 'legacy-real' "$LEGACY/.real/linuxdeploy-plugin-appimage.AppImage" && ok "旧 .real の中身が .real/ へ移る" || ng "旧 .real が移行されない"
 
 echo "[テスト] --appdir <dir> 形式: libwayland を消して実体を呼ぶ"
 A="$SANDBOX/AppDir1"; make_appdir "$A"
