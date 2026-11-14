@@ -382,3 +382,39 @@ describe("mobileColumnLayout プロパティ", () => {
     );
   });
 });
+
+describe("mobileColumnLayout 窓の先頭維持 プロパティ", () => {
+  // windowStartId は null / 不明ID / 登録済みID のいずれか
+  const keepWindowScenarioArb = mobileMultiExistingActiveArb.chain((input) =>
+    fc
+      .oneof(
+        fc.constant(null),
+        fc.constant("nonexistent-id"),
+        fc.constantFrom(...input.columns.map((c) => c.id)),
+      )
+      .map((windowStartId) => ({ ...input, windowStartId })),
+  );
+
+  it("windowStartId指定時も表示カラムはorder順で連続したvisibleCount個でアクティブを含む", () => {
+    fc.assert(
+      fc.property(keepWindowScenarioArb, (input) => {
+        const result = mobileColumnLayout(input);
+        const sorted = [...input.columns].sort((a, b) => a.order - b.order);
+        const positions = sorted
+          .map((c, i) => ({ id: c.id, i }))
+          .filter(({ id }) => result[id].x >= 0)
+          .map(({ i }) => i);
+        const multi =
+          input.twoColumnEnabled &&
+          input.viewportWidth >= MOBILE_TWO_COLUMN_MIN_WIDTH &&
+          expectedMaxColumns(input) >= 2;
+        const expectedCount = multi ? expectedMaxColumns(input) : 1;
+        expect(positions.length).toBe(expectedCount);
+        for (let i = 1; i < positions.length; i++) {
+          expect(positions[i]).toBe(positions[i - 1] + 1);
+        }
+        expect(result[input.activeColumnId].x).toBeGreaterThanOrEqual(0);
+      }),
+    );
+  });
+});
