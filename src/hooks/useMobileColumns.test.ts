@@ -802,3 +802,219 @@ describe("mobileLayoutForViewport（UI倍率の反映）", () => {
     expect(mobileLayoutForViewport(columns, "c1").c1.height).toBe(730);
   });
 });
+
+describe("useMobileColumns（複数カラム表示での表示位置の維持）", () => {
+  const mk = (id: string, order: number): Column => ({
+    ...column1,
+    id,
+    order,
+    gridCol: order + 1,
+  });
+  const colA = mk("col-a", 0);
+  const colB = mk("col-b", 1);
+  const colC = mk("col-c", 2);
+  const colD = mk("col-d", 3);
+  const colE = mk("col-e", 4);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockInvoke.mockResolvedValue(undefined);
+    localStorage.clear();
+    useAppStore.setState({
+      accounts: [account1],
+      columns: [colA, colB, colC, colD],
+      globalSettings: {
+        ...DEFAULT_GLOBAL_SETTINGS,
+        mobileTwoColumnEnabled: true,
+        mobileColumnCount: 2,
+      },
+      isLoaded: true,
+      isMobile: true,
+      topBarExpanded: false,
+      profileApiSupported: true,
+    });
+  });
+
+  function setup() {
+    const dialogOpenRef = { current: false };
+    const recreateRef = { current: null };
+    return renderHook(() => useMobileColumns(dialogOpenRef, recreateRef));
+  }
+
+  /** 直近の resize_column_webview で各カラムに送られた bounds を返す */
+  function lastBounds() {
+    const byId: Record<string, { x: number; width: number; height: number }> =
+      {};
+    const order: string[] = [];
+    for (const c of mockInvoke.mock.calls) {
+      if (c[0] !== IPC_COMMANDS.RESIZE_COLUMN_WEBVIEW) continue;
+      const b = (
+        c[1] as {
+          bounds: {
+            columnId: string;
+            x: number;
+            width: number;
+            height: number;
+          };
+        }
+      ).bounds;
+      byId[b.columnId] = b;
+      order.push(b.columnId);
+    }
+    return { byId, order };
+  }
+
+  const visibleIds = () =>
+    Object.entries(lastBounds().byId)
+      .filter(([, b]) => b.x >= 0)
+      .map(([id]) => id)
+      .sort();
+
+  async function show(
+    result: { current: ReturnType<typeof useMobileColumns> },
+    id: string,
+  ) {
+    await act(async () => {
+      await result.current.setActiveColumn(id);
+    });
+    mockInvoke.mockClear();
+  }
+
+  it("表示中の右側カラムのタブを選ぶと表示位置は変わらずアクティブだけ切り替わる", async () => {
+    const { result } = setup();
+    await show(result, "col-a");
+
+    await act(async () => {
+      await result.current.selectColumn("col-b");
+    });
+
+    expect(visibleIds()).toEqual(["col-a", "col-b"]);
+    expect(result.current.activeColumnId).toBe("col-b");
+  });
+
+  it("表示中の左側カラムのタブを選ぶと表示位置は変わらずアクティブだけ切り替わる", async () => {
+    const { result } = setup();
+    await show(result, "col-a");
+    await act(async () => {
+      await result.current.selectColumn("col-b");
+    });
+    mockInvoke.mockClear();
+
+    await act(async () => {
+      await result.current.selectColumn("col-a");
+    });
+
+    expect(visibleIds()).toEqual(["col-a", "col-b"]);
+    expect(result.current.activeColumnId).toBe("col-a");
+  });
+
+  it("表示されていないカラムのタブを選ぶとそのカラムを含む位置へ遷移する", async () => {
+    const { result } = setup();
+    await show(result, "col-a");
+
+    await act(async () => {
+      await result.current.selectColumn("col-c");
+    });
+
+    expect(visibleIds()).toEqual(["col-c", "col-d"]);
+    expect(result.current.activeColumnId).toBe("col-c");
+  });
+
+  it("表示窓の内側へのスワイプ移動では表示位置は変わらない", async () => {
+    const { result } = setup();
+    await show(result, "col-a");
+    await act(async () => {
+      result.current.navigateColumn("left"); // A -> B（窓 A,B）
+    });
+    await act(async () => {
+      result.current.navigateColumn("left"); // B -> C（窓外へ → B,C）
+    });
+    await act(async () => {
+      result.current.navigateColumn("right"); // C -> B（窓内）
+    });
+    mockInvoke.mockClear();
+
+    await act(async () => {
+      result.current.navigateColumn("left"); // B -> C（窓内）
+    });
+
+    expect(visibleIds()).toEqual(["col-b", "col-c"]);
+    expect(result.current.activeColumnId).toBe("col-c");
+  });
+
+  it("表示窓の右端を越える方向へスワイプ移動すると表示位置が1カラム分ずれる", async () => {
+    const { result } = setup();
+    await show(result, "col-a");
+    await act(async () => {
+      await result.current.selectColumn("col-b");
+    });
+    mockInvoke.mockClear();
+
+    await act(async () => {
+      result.current.navigateColumn("left");
+    });
+
+    expect(visibleIds()).toEqual(["col-b", "col-c"]);
+    expect(result.current.activeColumnId).toBe("col-c");
+  });
+
+  it("表示窓の左端を越える方向へスワイプ移動すると表示位置が1カラム分ずれる", async () => {
+    const { result } = setup();
+    await show(result, "col-a");
+    await act(async () => {
+      result.current.navigateColumn("left"); // A -> B
+    });
+    await act(async () => {
+      result.current.navigateColumn("left"); // B -> C（窓 B,C）
+    });
+    await act(async () => {
+      result.current.navigateColumn("right"); // C -> B（窓 B,C のまま）
+    });
+    mockInvoke.mockClear();
+
+    await act(async () => {
+      result.current.navigateColumn("right"); // B -> A（左端越え）
+    });
+
+    expect(visibleIds()).toEqual(["col-a", "col-b"]);
+    expect(result.current.activeColumnId).toBe("col-a");
+  });
+
+  it("表示カラムを選択した後にカラムを追加すると従来どおりアクティブ基準で表示位置が決まる", async () => {
+    const { result } = setup();
+    await show(result, "col-a");
+    await act(async () => {
+      await result.current.selectColumn("col-b");
+    });
+    useAppStore.setState({
+      columns: [colA, colB, colC, colD, colE],
+    });
+    mockInvoke.mockClear();
+
+    await act(async () => {
+      await result.current.setActiveColumn("col-e");
+    });
+
+    expect(visibleIds()).toEqual(["col-d", "col-e"]);
+    expect(result.current.activeColumnId).toBe("col-e");
+  });
+
+  it("表示中カラムのタブをタップしても各カラムWebViewの表示位置は変更されない", async () => {
+    const { result } = setup();
+    await show(result, "col-a");
+    await act(async () => {
+      await result.current.setActiveColumn("col-a");
+    });
+    const before = lastBounds().byId;
+    mockInvoke.mockClear();
+
+    await act(async () => {
+      await result.current.selectColumn("col-b");
+    });
+
+    const { byId, order } = lastBounds();
+    expect(byId["col-a"]).toEqual(before["col-a"]);
+    expect(byId["col-b"]).toEqual(before["col-b"]);
+    expect(order[order.length - 1]).toBe("col-b");
+  });
+});

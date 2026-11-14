@@ -95,7 +95,7 @@ const App: React.FC = () => {
     handleScrollbarScroll,
     activeColumnId,
     swipeState,
-    setActiveColumn,
+    selectColumn,
     setDialogOpen,
     recreateAllWebviews,
     recreateColumnWebview,
@@ -462,7 +462,7 @@ const App: React.FC = () => {
           columns={columns}
           accounts={accounts}
           activeColumnId={activeColumnId}
-          onSelectColumn={setActiveColumn}
+          onSelectColumn={selectColumn}
           onAddColumn={() => setShowAddColumn(true)}
           onAccountManager={() => setShowAccountManager(true)}
           onAppSettings={() => setShowAppSettings(true)}

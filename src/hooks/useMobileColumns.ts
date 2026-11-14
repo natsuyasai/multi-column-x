@@ -3,7 +3,11 @@
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { IPC_EVENTS, STORAGE_KEYS, WEBVIEW_SCRIPTS } from "../constants/ipc";
-import { mobileColumnLayout, type ColumnBounds } from "../lib/gridLayout";
+import {
+  mobileColumnLayout,
+  mobileWindowStartId,
+  type ColumnBounds,
+} from "../lib/gridLayout";
 import { logError } from "../lib/log";
 import { reloadColumnOrRecreate } from "../services/columnReload";
 import {
@@ -34,10 +38,12 @@ export function resolveTwoColumnEnabled(): boolean {
 export function mobileLayoutForViewport(
   columns: Column[],
   activeColumnId: string | null,
+  windowStartId?: string | null,
 ): Record<string, ColumnBounds> {
   return mobileColumnLayout({
     columns,
     activeColumnId,
+    windowStartId,
     twoColumnEnabled: resolveTwoColumnEnabled(),
     columnCount: useAppStore.getState().globalSettings.mobileColumnCount,
     viewportWidth: window.innerWidth,
@@ -60,55 +66,71 @@ export function useMobileColumns(
   // 短時間に連続で setActiveColumn が呼ばれたとき、古い呼び出しの残りの
   // await 後処理を打ち切るための世代番号（最新の呼び出しのみ完走させる）。
   const generationRef = useRef(0);
+  // 複数列表示で現在の窓の先頭カラム ID。タブ選択・スワイプで窓を動かさないために保持する。
+  const windowStartIdRef = useRef<string | null>(null);
+  // selectColumn が最新のアクティブカラムを参照するための ref（state の反映待ちを避ける）
+  const activeColumnIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    activeColumnIdRef.current = activeColumnId;
+  }, [activeColumnId]);
 
-  const setActiveColumn = useCallback(async (id: string) => {
-    const generation = ++generationRef.current;
-    const isStale = () => generation !== generationRef.current;
+  const setActiveColumn = useCallback(
+    async (id: string, options?: { keepWindow?: boolean }) => {
+      const generation = ++generationRef.current;
+      const isStale = () => generation !== generationRef.current;
 
-    setActiveColumnIdState(id);
-    // バックグラウンド復帰後に React がリロードされても復元できるよう保存する
-    try {
-      localStorage.setItem(STORAGE_KEYS.ACTIVE_COLUMN_ID, id);
-    } catch {}
-    const { columns: currentColumns, isMobile } = useAppStore.getState();
+      setActiveColumnIdState(id);
+      activeColumnIdRef.current = id;
+      // バックグラウンド復帰後に React がリロードされても復元できるよう保存する
+      try {
+        localStorage.setItem(STORAGE_KEYS.ACTIVE_COLUMN_ID, id);
+      } catch {}
+      const { columns: currentColumns, isMobile } = useAppStore.getState();
 
-    // モバイル: resize_column_webview より先にアクティブカラムのクッキーを切り替える。
-    // CookieManager は共有のため、WebView が表示される前に正しいアカウントを設定する必要がある。
-    if (isMobile) {
-      const activeCol = currentColumns.find((c) => c.id === id);
-      if (activeCol) {
-        await setColumnCookies(activeCol.accountId).catch(
-          logError("setActiveColumn:setColumnCookies"),
+      // モバイル: resize_column_webview より先にアクティブカラムのクッキーを切り替える。
+      // CookieManager は共有のため、WebView が表示される前に正しいアカウントを設定する必要がある。
+      if (isMobile) {
+        const activeCol = currentColumns.find((c) => c.id === id);
+        if (activeCol) {
+          await setColumnCookies(activeCol.accountId).catch(
+            logError("setActiveColumn:setColumnCookies"),
+          );
+        }
+      }
+      // Cookie 切替を待っている間に別のカラムへ切り替えられていたら、
+      // この呼び出しの表示位置更新はもう不要（新しい呼び出しに委ねる）。
+      if (isStale()) return;
+
+      const layout = mobileLayoutForViewport(
+        currentColumns,
+        id,
+        options?.keepWindow ? windowStartIdRef.current : null,
+      );
+      windowStartIdRef.current = mobileWindowStartId(layout);
+      // 非表示（hide）分は並列でよい。表示（show）分は Kotlin 側
+      // activeColumnWebViewId（戻るボタン/ダブルタップ対象）が最後の
+      // showColumnWebView で決まるため、アクティブカラムを必ず最後に送る。
+      const hidden = currentColumns.filter((c) => layout[c.id].x < 0);
+      const shown = currentColumns
+        .filter((c) => layout[c.id].x >= 0)
+        .sort((a, b) => (a.id === id ? 1 : b.id === id ? -1 : 0)); // active を末尾へ
+      await Promise.all(
+        hidden.map((col) =>
+          resizeColumnWebview(col.id, layout[col.id]).catch(
+            logError("setActiveColumn:resizeColumnWebview"),
+          ),
+        ),
+      );
+      if (isStale()) return;
+      for (const col of shown) {
+        if (isStale()) return;
+        await resizeColumnWebview(col.id, layout[col.id]).catch(
+          logError("setActiveColumn:resizeColumnWebview"),
         );
       }
-    }
-    // Cookie 切替を待っている間に別のカラムへ切り替えられていたら、
-    // この呼び出しの表示位置更新はもう不要（新しい呼び出しに委ねる）。
-    if (isStale()) return;
-
-    const layout = mobileLayoutForViewport(currentColumns, id);
-    // 非表示（hide）分は並列でよい。表示（show）分は Kotlin 側
-    // activeColumnWebViewId（戻るボタン/ダブルタップ対象）が最後の
-    // showColumnWebView で決まるため、アクティブカラムを必ず最後に送る。
-    const hidden = currentColumns.filter((c) => layout[c.id].x < 0);
-    const shown = currentColumns
-      .filter((c) => layout[c.id].x >= 0)
-      .sort((a, b) => (a.id === id ? 1 : b.id === id ? -1 : 0)); // active を末尾へ
-    await Promise.all(
-      hidden.map((col) =>
-        resizeColumnWebview(col.id, layout[col.id]).catch(
-          logError("setActiveColumn:resizeColumnWebview"),
-        ),
-      ),
-    );
-    if (isStale()) return;
-    for (const col of shown) {
-      if (isStale()) return;
-      await resizeColumnWebview(col.id, layout[col.id]).catch(
-        logError("setActiveColumn:resizeColumnWebview"),
-      );
-    }
-  }, []);
+    },
+    [],
+  );
 
   // 全カラムのWebViewを作成（起動時に呼ぶ）
   const restoreMobileColumns = useCallback(
@@ -132,6 +154,7 @@ export function useMobileColumns(
         sortedByOrder,
         targetColumn?.id ?? null,
       );
+      windowStartIdRef.current = mobileWindowStartId(layout);
       // 全カラムを並列作成して loadUrl を一斉に開始する。mobile の
       // create_column_webview は visible = args.x >= 0.0 で可視判定するため、
       // 表示ペア（1〜2枚）が visible で作成される。
@@ -197,10 +220,28 @@ export function useMobileColumns(
           logError("navigateColumn:flashMobileSwipeBar"),
         );
       }
-      setActiveColumn(sorted[targetIdx].id);
+      setActiveColumn(sorted[targetIdx].id, { keepWindow: true });
     },
     [activeColumnId, setActiveColumn, dialogOpenRef, isMobile],
   );
+
+  // タブバーからのカラム選択。表示中のカラムなら窓を動かさずアクティブだけ切り替え、
+  // 表示されていないカラムなら従来どおりそのカラムを含む窓へ遷移する。
+  const selectColumn = useCallback(
+    (id: string) => {
+      const { columns: cols } = useAppStore.getState();
+      const current = mobileLayoutForViewport(
+        cols,
+        activeColumnIdRef.current,
+        windowStartIdRef.current,
+      );
+      const isVisible = (current[id]?.x ?? -1) >= 0;
+      return setActiveColumn(id, { keepWindow: isVisible });
+    },
+    [setActiveColumn],
+  );
+
+  const getWindowStartId = useCallback(() => windowStartIdRef.current, []);
 
   // スワイプ中の指の移動量に応じた進捗表示（phase: "progress"）を反映する
   const setSwipeProgress = useCallback((direction: "left" | "right" | null) => {
@@ -258,6 +299,8 @@ export function useMobileColumns(
     setActiveColumnIdState,
     swipeState,
     setActiveColumn,
+    selectColumn,
+    getWindowStartId,
     navigateColumn,
     setSwipeProgress,
     restoreMobileColumns,

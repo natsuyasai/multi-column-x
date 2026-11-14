@@ -64,6 +64,8 @@ export function useColumns() {
     setActiveColumnIdState,
     swipeState,
     setActiveColumn,
+    selectColumn,
+    getWindowStartId,
     navigateColumn,
     setSwipeProgress,
     restoreMobileColumns,
@@ -204,8 +206,11 @@ export function useColumns() {
         isMobile &&
         activeColumnId != null &&
         activeColumnId !== columnId &&
-        mobileLayoutForViewport(columnsBeforeRemoval, activeColumnId)[columnId]
-          ?.x >= 0;
+        mobileLayoutForViewport(
+          columnsBeforeRemoval,
+          activeColumnId,
+          getWindowStartId(),
+        )[columnId]?.x >= 0;
 
       await removeColumnWebview(columnId).catch(
         logError("handleRemoveColumn:removeColumnWebview"),
@@ -244,6 +249,7 @@ export function useColumns() {
       activeColumnId,
       setActiveColumn,
       setActiveColumnIdState,
+      getWindowStartId,
     ],
   );
 
@@ -315,9 +321,10 @@ export function useColumns() {
           const displayLayout = mobileLayoutForViewport(
             currentColumns,
             activeColumnId,
+            getWindowStartId(),
           );
           if (displayLayout[columnId].x >= 0) {
-            await setActiveColumn(activeColumnId);
+            await setActiveColumn(activeColumnId, { keepWindow: true });
           }
         }
         await hideIfDialogOpen();
@@ -354,6 +361,7 @@ export function useColumns() {
       scrollbarRef,
       activeColumnId,
       setActiveColumn,
+      getWindowStartId,
       recalculateAllBounds,
       hideColumnWebviews,
     ],
@@ -452,6 +460,7 @@ export function useColumns() {
     activeColumnId,
     swipeState,
     setActiveColumn,
+    selectColumn,
     navigateColumn,
     setSwipeProgress,
     setDialogOpen,

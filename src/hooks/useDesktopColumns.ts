@@ -27,7 +27,10 @@ interface DesktopColumnsArgs {
   dialogOpenRef: React.RefObject<boolean>;
   /** モバイル時の再計算はアクティブカラムの再配置に委譲する */
   activeColumnId: string | null;
-  setActiveColumn: (id: string) => Promise<void>;
+  setActiveColumn: (
+    id: string,
+    options?: { keepWindow?: boolean },
+  ) => Promise<void>;
 }
 
 interface DesktopViewport {
