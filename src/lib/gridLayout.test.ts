@@ -10,6 +10,7 @@ import {
   getTopBarHeight,
   MOBILE_TWO_COLUMN_MIN_WIDTH,
   mobileColumnLayout,
+  mobileWindowStartId,
   resolveSwipeAreaHeight,
 } from "./gridLayout";
 import { setRootFontPx } from "./uiScale";
@@ -587,5 +588,98 @@ describe("mobileColumnLayout 列数設定", () => {
     expect(
       visibleIds(mobileColumnLayout({ ...wide, columnCount: 7 }), idsOf(cols7)),
     ).toEqual(["C1", "C2", "C3", "C4", "C5", "C6"]);
+  });
+});
+
+describe("mobileColumnLayout 窓の先頭維持", () => {
+  const cols4 = ["A", "B", "C", "D"].map((id, i) => ({ id, order: i }));
+  const layoutOf = (
+    activeColumnId: string,
+    windowStartId?: string | null,
+    overrides: { twoColumnEnabled?: boolean; columns?: typeof cols4 } = {},
+  ) =>
+    mobileColumnLayout({
+      columns: overrides.columns ?? cols4,
+      activeColumnId,
+      twoColumnEnabled: overrides.twoColumnEnabled ?? true,
+      columnCount: 2,
+      windowStartId,
+      viewportWidth: 800,
+      viewportHeight: 1000,
+    });
+  const shown = (result: Record<string, { x: number }>) =>
+    Object.keys(result).filter((id) => result[id].x >= 0);
+
+  it("表示中の右側カラムのタブを選ぶと表示位置は変わらずアクティブだけ切り替わる", () => {
+    const result = layoutOf("B", "A");
+    expect(shown(result)).toEqual(["A", "B"]);
+    expect(result["A"].x).toBe(0);
+    expect(result["B"].x).toBe(400);
+  });
+
+  it("表示中の左側カラムのタブを選ぶと表示位置は変わらずアクティブだけ切り替わる", () => {
+    expect(shown(layoutOf("A", "A"))).toEqual(["A", "B"]);
+    expect(shown(layoutOf("B", "B"))).toEqual(["B", "C"]);
+    expect(shown(layoutOf("C", "B"))).toEqual(["B", "C"]);
+  });
+
+  it("表示されていないカラムのタブを選ぶとそのカラムを含む位置へ遷移する", () => {
+    expect(shown(layoutOf("C"))).toEqual(["C", "D"]);
+  });
+
+  it("表示窓の内側へのスワイプ移動では表示位置は変わらない", () => {
+    expect(shown(layoutOf("C", "B"))).toEqual(["B", "C"]);
+  });
+
+  it("表示窓の右端を越える方向へスワイプ移動すると表示位置が1カラム分ずれる", () => {
+    expect(shown(layoutOf("C", "A"))).toEqual(["B", "C"]);
+  });
+
+  it("表示窓の左端を越える方向へスワイプ移動すると表示位置が1カラム分ずれる", () => {
+    expect(shown(layoutOf("A", "B"))).toEqual(["A", "B"]);
+  });
+
+  it("1列表示のときはタブ選択でそのカラムが全幅で表示される", () => {
+    const result = layoutOf("C", "A", { twoColumnEnabled: false });
+    expect(shown(result)).toEqual(["C"]);
+    expect(result["C"]).toEqual({ x: 0, y: 0, width: 800, height: 944 });
+  });
+
+  it("登録数が表示可能数以下ならタブ選択しても並びは変わらない", () => {
+    const cols2 = cols4.slice(0, 2);
+    const result = layoutOf("B", "A", { columns: cols2 });
+    expect(shown(result)).toEqual(["A", "B"]);
+    expect(result["A"].x).toBe(0);
+    expect(result["B"].x).toBe(400);
+  });
+
+  it("windowStartIdが削除済みなどの不明IDのときは従来どおりアクティブ基準で窓が決まる", () => {
+    expect(shown(layoutOf("C", "deleted"))).toEqual(["C", "D"]);
+    expect(shown(layoutOf("B", "deleted"))).toEqual(["B", "C"]);
+    expect(shown(layoutOf("D", "deleted"))).toEqual(["C", "D"]);
+  });
+});
+
+describe("mobileWindowStartId", () => {
+  const bounds = (x: number) => ({ x, y: 0, width: 400, height: 944 });
+
+  it("x が 0 のカラムの ID を返す", () => {
+    expect(
+      mobileWindowStartId({
+        A: bounds(OFFSCREEN.MOBILE_X),
+        B: bounds(0),
+        C: bounds(400),
+      }),
+    ).toBe("B");
+  });
+
+  it("x が 0 のカラムがなければ null を返す", () => {
+    expect(
+      mobileWindowStartId({
+        A: bounds(OFFSCREEN.MOBILE_X),
+        B: bounds(OFFSCREEN.MOBILE_X),
+      }),
+    ).toBeNull();
+    expect(mobileWindowStartId({})).toBeNull();
   });
 });

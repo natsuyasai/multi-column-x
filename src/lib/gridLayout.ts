@@ -168,6 +168,8 @@ interface MobileColumnLayoutInput {
   twoColumnEnabled: boolean;
   /** 複数カラム表示の列数設定（2〜6 に丸められる。未設定は 2 扱い） */
   columnCount: number;
+  /** 複数列表示で窓の先頭として維持したいカラム ID。未指定・不明 ID ならアクティブ基準で導出（従来動作） */
+  windowStartId?: string | null;
   viewportWidth: number;
   viewportHeight: number;
 }
@@ -184,6 +186,7 @@ export function mobileColumnLayout(
     activeColumnId,
     twoColumnEnabled,
     columnCount,
+    windowStartId,
     viewportWidth,
     viewportHeight,
   } = input;
@@ -234,7 +237,20 @@ export function mobileColumnLayout(
   }
 
   // 窓の先頭 index を決める。末尾付近がアクティブなら左へずらして N 列を保つ。
-  const startIdx = Math.min(activeIdx, sorted.length - visibleCount);
+  const maxStart = sorted.length - visibleCount;
+  const keptIdx = windowStartId
+    ? sorted.findIndex((c) => c.id === windowStartId)
+    : -1;
+  let startIdx: number;
+  if (keptIdx === -1) {
+    startIdx = Math.min(activeIdx, maxStart);
+  } else {
+    // 維持した窓にアクティブが収まるならそのまま。外なら最小限（1 カラム分）ずらす
+    let s = Math.min(keptIdx, maxStart);
+    if (activeIdx < s) s = activeIdx;
+    else if (activeIdx >= s + visibleCount) s = activeIdx - visibleCount + 1;
+    startIdx = Math.max(0, Math.min(s, maxStart));
+  }
   const baseWidth = Math.floor(viewportWidth / visibleCount);
   for (let i = 0; i < visibleCount; i++) {
     const isLast = i === visibleCount - 1;
@@ -247,4 +263,14 @@ export function mobileColumnLayout(
   }
 
   return result;
+}
+
+/**
+ * レイアウト結果から窓の先頭カラム ID（x === 0 のカラム）を取り出す。なければ null。
+ * 1 列表示ではアクティブが x=0 になるが、1 列表示では窓先頭は使われないため無害。
+ */
+export function mobileWindowStartId(
+  layout: Record<string, ColumnBounds>,
+): string | null {
+  return Object.entries(layout).find(([, b]) => b.x === 0)?.[0] ?? null;
 }
