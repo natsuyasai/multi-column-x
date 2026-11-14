@@ -61,10 +61,11 @@ Cisco OpenH264 の特許ロイヤリティ負担は「Cisco 自身の配布チ�
 AppImage に同梱された古い `usr/lib/libwayland-{client,cursor,egl,server}` がホストの Mesa/EGL と不整合を起こし、Ubuntu 26.04 で `Could not create default EGL display: EGL_BAD_PARAMETER. Aborting...` となってウィンドウが灰色のままになる。`GDK_BACKEND=x11` や `WEBKIT_DISABLE_*` では直らず、これらを除く（ホスト側を使う）と直る。
 
 - **除外はバンドル工程の内側で行う**。updater 署名（`.sig`）は bundler が AppImage 生成時に付けるため、`tauri-action` 後に AppImage を再パックすると署名が壊れる。`bundle.linux.appimage.files` は追加専用で除外には使えない。
-- 方式: `scripts/strip-appimage-wayland-libs.sh` が、bundler が `~/.cache/tauri/` にキャッシュする `linuxdeploy-plugin-appimage.AppImage`（linuxdeploy の出力プラグイン）を `.real` へ退避し、同名のラッパーに置き換える。ラッパーは linuxdeploy が渡す `--appdir <dir>`（無ければ環境変数 `APPDIR`）配下の `usr/lib/libwayland-*` を削除してから実体へ `exec` する。bundler は存在するキャッシュを再ダウンロード・上書きしない。
+- 方式: `scripts/strip-appimage-wayland-libs.sh` が、bundler が `~/.cache/tauri/` にキャッシュする `linuxdeploy-plugin-appimage.AppImage`（linuxdeploy の出力プラグイン）を `.real/` サブディレクトリ（`~/.cache/tauri/.real/`）へ退避し、同名のラッパーに置き換える。ラッパーは linuxdeploy が渡す `--appdir <dir>`（無ければ環境変数 `APPDIR`）配下の `usr/lib/libwayland-*` を削除してから実体へ `exec` する。bundler は存在するキャッシュを再ダウンロード・上書きしない。
+- **退避先をキャッシュ直下（`*.AppImage.real`）にしてはいけない**: linuxdeploy は直下の `linuxdeploy-plugin-*` を正規表現 `^linuxdeploy-plugin-([^\s\.-]+)(?:-[^\.]+)?(?:\..+)?$` でプラグイン名（`appimage`）に解決するため、`.real` も同名で重複登録され、どちらが呼ばれるかがディレクトリ走査順（ランナーごとに不定）で決まる。実体が呼ばれると libwayland が残り、検査 E が失敗する（直前まで成功していたのに急に落ちた原因）。旧方式のキャッシュは再実行時に自動で移行する。
 - `release.yml` の ubuntu ジョブで、事前検査ビルド・`tauri-action` の**前**にこのスクリプトを実行する（両方のビルドに効く）。
 - `verify-appimage-media.sh` の検査 E が `usr/lib/libwayland-*` の混入を NG にする（事前検査と出荷物の再検査の両方）。
-- ローカルで AppImage をビルドするときも、同じスクリプトを先に実行すれば再現できる（`~/.cache/tauri` を書き換えるため、戻すなら `.real` を元の名前へ戻す）。
+- ローカルで AppImage をビルドするときも、同じスクリプトを先に実行すれば再現できる（`~/.cache/tauri` を書き換えるため、戻すなら `.real/` 内の実体を元の名前でキャッシュ直下へ戻す）。
 
 ### libva はホストのものを使う
 
