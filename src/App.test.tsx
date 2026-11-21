@@ -1075,7 +1075,7 @@ describe("App (拡張機能の変更後の全カラム再読込)", () => {
   it("拡張機能を追加すると全カラムのページが再読込される", async () => {
     render(<App />);
     fireEvent.click(screen.getByTitle("アプリ設定 (Ctrl+,)"));
-    fireEvent.click(screen.getByRole("button", { name: "拡張機能" }));
+    fireEvent.click(screen.getByRole("tab", { name: "拡張機能" }));
     mockInvoke.mockClear();
 
     fireEvent.click(
@@ -1121,6 +1121,12 @@ describe("App (表示言語)", () => {
     useAppStore.setState({ isLoaded: false, globalSettings });
     render(<App />);
     expect(screen.getByText("読み込み中...")).toBeInTheDocument();
+  });
+
+  it("読み込み中の表示は status ロールで支援技術に伝わる", () => {
+    useAppStore.setState({ isLoaded: false, globalSettings });
+    render(<App />);
+    expect(screen.getByRole("status")).toHaveTextContent("読み込み中...");
   });
 
   it("表示言語が英語のとき読み込み中の表示が英語になる", async () => {

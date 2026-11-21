@@ -31,8 +31,11 @@ const ToolbarButton: React.FC<ToolbarButtonProps> = ({
   label,
 }) => (
   <button
+    type="button"
     className={`${baseClassName}${expanded ? ` ${styles.btnExpanded}` : ""}`}
     onClick={onClick}
+    // 展開時は見えているラベルが名前になる。折りたたみ時はアイコンだけなので title を名前にする
+    aria-label={expanded ? undefined : title}
     title={title}
   >
     <Icon
@@ -84,7 +87,10 @@ export const TopBar: React.FC<TopBarProps> = ({
 }) => {
   const { t } = useTranslation();
   return (
-    <div className={`${styles.topbar}${expanded ? ` ${styles.expanded}` : ""}`}>
+    <nav
+      className={`${styles.topbar}${expanded ? ` ${styles.expanded}` : ""}`}
+      aria-label={t("topbar:label")}
+    >
       <div className={styles.row1}>
         <div className={styles.actions}>
           <ToolbarButton
@@ -153,7 +159,11 @@ export const TopBar: React.FC<TopBarProps> = ({
         {!expanded && (
           <>
             <div className={styles.divider} />
-            <div className={styles.columnList}>
+            <div
+              className={styles.columnList}
+              role="group"
+              aria-label={t("topbar:columnListLabel")}
+            >
               <SortableColumnGroups
                 variant="collapsed"
                 columns={columns}
@@ -169,8 +179,11 @@ export const TopBar: React.FC<TopBarProps> = ({
         <div className={styles.spacer} />
 
         <button
+          type="button"
           className={styles.toggleBtn}
           onClick={onToggleExpand}
+          aria-label={expanded ? t("topbar:collapse") : t("topbar:expand")}
+          aria-expanded={expanded}
           title={expanded ? t("topbar:collapse") : t("topbar:expand")}
         >
           {expanded ? "▲" : "▼"}
@@ -178,7 +191,12 @@ export const TopBar: React.FC<TopBarProps> = ({
       </div>
 
       {expanded && (
-        <div className={styles.row2} data-testid="topbar-row2">
+        <div
+          className={styles.row2}
+          data-testid="topbar-row2"
+          role="group"
+          aria-label={t("topbar:columnListLabel")}
+        >
           <SortableColumnGroups
             variant="expanded"
             columns={columns}
@@ -189,6 +207,6 @@ export const TopBar: React.FC<TopBarProps> = ({
           />
         </div>
       )}
-    </div>
+    </nav>
   );
 };

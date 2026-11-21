@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/i18n";
 import type { BackupContent } from "@/lib/backupRestore";
+import { expectAccessibleControls } from "@/test-utils/a11y";
 import { expectNoJapanese } from "@/test-utils/japanese";
 import { DEFAULT_COLUMN_SETTINGS, DEFAULT_GLOBAL_SETTINGS } from "@/types";
 import type { Account, Column } from "@/types";
@@ -494,5 +495,83 @@ describe("BackupTab 英語表示", () => {
     expect(
       screen.queryByRole("button", { name: "バックアップを書き出す" }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("BackupTab デザイン原則（アクセシビリティ）", () => {
+  const mappingProps = {
+    step: "mapping" as const,
+    content,
+    mapping: { A: "t1" },
+  };
+
+  it("初期表示のすべてのボタンにアクセシブルネームがある", () => {
+    const { container } = render(<BackupTab {...baseProps()} />);
+    expectAccessibleControls(container);
+  });
+
+  it("紐づけ画面のすべての選択欄とボタンにアクセシブルネームがある", () => {
+    const { container } = render(
+      <BackupTab {...baseProps()} {...mappingProps} />,
+    );
+    expectAccessibleControls(container);
+  });
+
+  it("確認画面のすべてのボタンにアクセシブルネームがある", () => {
+    const { container } = render(
+      <BackupTab {...baseProps()} {...mappingProps} step="confirm" />,
+    );
+    expectAccessibleControls(container);
+  });
+
+  it("エラーのメッセージは alert のまま警告の記号を併用する", () => {
+    renderTab({ message: { kind: "error", text: "読み込めませんでした" } });
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("読み込めませんでした");
+    expect(
+      alert.querySelector('[aria-hidden="true"][data-kind="warning"]'),
+    ).not.toBeNull();
+  });
+
+  it("成功のメッセージは status のまま成功の記号を併用する", () => {
+    renderTab({ message: { kind: "success", text: "復元しました" } });
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("復元しました");
+    expect(
+      status.querySelector('[aria-hidden="true"][data-kind="success"]'),
+    ).not.toBeNull();
+  });
+
+  it("保存が止まっている旨の警告にも警告の記号が付く", () => {
+    renderTab({ saveBlocked: true });
+    expect(
+      screen
+        .getByRole("alert")
+        .querySelector('[aria-hidden="true"][data-kind="warning"]'),
+    ).not.toBeNull();
+  });
+
+  it("紐づけが1件も無いとき確認へ進むボタンは無効でクリックしても呼ばれない", () => {
+    const props = baseProps();
+    render(
+      <BackupTab {...props} {...mappingProps} mapping={{ A: null, B: null }} />,
+    );
+    const proceed = screen.getByRole("button", { name: "確認へ進む" });
+    expect(proceed).toBeDisabled();
+
+    fireEvent.click(proceed);
+
+    expect(props.onProceedToConfirm).not.toHaveBeenCalled();
+  });
+
+  it("処理中は復元の実行ボタンが無効でクリックしても呼ばれない", () => {
+    const props = baseProps();
+    render(<BackupTab {...props} {...mappingProps} step="confirm" busy />);
+    const execute = screen.getByRole("button", { name: "置き換えて復元" });
+    expect(execute).toBeDisabled();
+
+    fireEvent.click(execute);
+
+    expect(props.onExecute).not.toHaveBeenCalled();
   });
 });

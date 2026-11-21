@@ -1,6 +1,8 @@
-import React from "react";
+import React, { useCallback, useId } from "react";
 import { useTranslation } from "react-i18next";
 import type { AppTFunction } from "@/i18n/types";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { useRestoreFocus } from "../../hooks/useRestoreFocus";
 import type { AppUpdate, UpdateProgress } from "../../services/updater";
 import styles from "./UpdateDialog.module.scss";
 
@@ -56,11 +58,25 @@ export const UpdateDialog: React.FC<Props> = ({
   onLater,
 }) => {
   const { t } = useTranslation();
+  useRestoreFocus();
+  const titleId = useId();
+  // 更新中は「後で」が無効なので、Esc でも閉じない
+  const handleEscape = useCallback(() => {
+    if (!installing) onLater();
+  }, [installing, onLater]);
+  useEscapeKey(handleEscape);
   const status = progress ? describeProgress(progress, t) : null;
   return (
     <div className={styles.overlay}>
-      <div className={styles.dialog}>
-        <h2 className={styles.title}>{t("dialogs:update.title")}</h2>
+      <div
+        className={styles.dialog}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
+        <h2 id={titleId} className={styles.title}>
+          {t("dialogs:update.title")}
+        </h2>
         <p className={styles.version}>
           {t("dialogs:update.version", { version: update.version })}
         </p>
@@ -95,7 +111,11 @@ export const UpdateDialog: React.FC<Props> = ({
         )}
         {installError && (
           <p className={styles.error} role="alert">
-            {installError}
+            <span aria-hidden="true">⚠</span>
+            <strong className={styles.errorPrefix}>
+              {t("dialogs:update.errorPrefix")}
+            </strong>
+            <span className={styles.errorMessage}>{installError}</span>
           </p>
         )}
         <div className={styles.actions}>

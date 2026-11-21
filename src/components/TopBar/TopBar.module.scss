@@ -1,5 +1,7 @@
+@use "../../styles/tokens" as t;
+@use "../../styles/mixins" as m;
+
 $topbar-row-height: 2rem;
-$transition: 200ms ease;
 
 .topbar {
   width: 100%;
@@ -23,13 +25,13 @@ $transition: 200ms ease;
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 0.125rem;
+  gap: t.$space-1;
   flex-shrink: 0;
 }
 
 .divider {
   width: 1px;
-  height: 1.125rem;
+  height: 1.25rem;
   background: var(--mcx-surface-muted);
   margin: 0 0.25rem;
   flex-shrink: 0;
@@ -39,7 +41,7 @@ $transition: 200ms ease;
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 0.125rem;
+  gap: t.$space-1;
   overflow-x: auto;
   overflow-y: hidden;
   flex: 1;
@@ -60,7 +62,7 @@ $transition: 200ms ease;
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 0.125rem;
+  gap: t.$space-1;
   padding: 0.125rem 0.25rem;
   border-top: 1px solid var(--mcx-border-subtle);
   overflow-x: auto;
@@ -79,38 +81,47 @@ $transition: 200ms ease;
   border: none;
   color: var(--mcx-text-muted);
   cursor: pointer;
-  border-radius: 0.25rem;
+  border-radius: t.$radius-sm;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.875rem;
+  font-size: t.$font-size-md;
   flex-shrink: 0;
   padding: 0;
-  transition:
-    width $transition,
-    background $transition;
+  @include m.transition-base(color, background-color);
 
   &:hover {
     color: var(--mcx-text-tertiary);
     background: var(--mcx-surface-hover);
+  }
+
+  &:active {
+    color: var(--mcx-text);
+    background: var(--mcx-surface-muted);
+  }
+
+  // .columnList / .row2 の overflow で外側のリングが切れるため、リングはボタンの内側に描く
+  &:focus-visible {
+    @include m.focus-ring;
+    outline-offset: -(t.$focus-ring-offset);
   }
 }
 
 .btnExpanded {
   height: 1.5rem;
   flex-direction: row;
-  gap: 0.3125rem;
+  gap: t.$space-1;
   justify-content: flex-start;
-  padding: 0 0.5rem;
-  font-size: 0.75rem;
+  padding: 0 t.$space-2;
+  font-size: t.$font-size-xs;
 
   .icon {
-    font-size: 0.875rem;
+    font-size: t.$font-size-md;
     flex-shrink: 0;
   }
 
   .label {
-    font-size: 0.6875rem;
+    font-size: t.$font-size-xs;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -123,7 +134,8 @@ $transition: 200ms ease;
   background: var(--mcx-accent-fill);
   color: var(--mcx-text-on-accent);
 
-  &:hover {
+  &:hover,
+  &:active {
     background: var(--mcx-accent-hover);
     color: var(--mcx-text-on-accent);
   }
@@ -137,11 +149,16 @@ $transition: 200ms ease;
 .toggleBtn {
   composes: btn;
   color: var(--mcx-text-muted);
-  font-size: 0.6875rem;
+  font-size: t.$font-size-xs;
 
   &:hover {
     color: var(--mcx-text-secondary);
     background: var(--mcx-surface-hover);
+  }
+
+  &:active {
+    color: var(--mcx-text);
+    background: var(--mcx-surface-muted);
   }
 }
 
@@ -158,9 +175,9 @@ $transition: 200ms ease;
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 0.125rem;
+  gap: t.$space-1;
   flex-shrink: 0;
-  border-radius: 0.25rem;
+  border-radius: t.$radius-sm;
   // グループ全体がドラッグの取っ手（ボタンは .btn の cursor: pointer を維持）
   cursor: grab;
   user-select: none;

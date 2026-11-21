@@ -3,6 +3,12 @@ import type { ReactNode } from "react";
 import { useEffect, useLayoutEffect } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 import { H264SetupDialog } from "@/components/H264SetupDialog/H264SetupDialog";
+import { installThemeTokens } from "@/test-utils/storyTheme";
+import {
+  expectAdjacentGap,
+  expectTapTargets,
+  setPlatform,
+} from "@/test-utils/tapTargets";
 
 // アプリは documentElement の data-theme でテーマを切り替えるため、Story でもそれに合わせる
 function ThemeRoot({
@@ -93,6 +99,13 @@ const meta: Meta<typeof H264SetupDialog> = {
   title: "Components/H264SetupDialog",
   component: H264SetupDialog,
   parameters: { layout: "fullscreen" },
+  // Storybook は index.css を読まないため、--mcx-* のテーマ変数を Story 側で有効にする
+  decorators: [
+    (Story) => {
+      installThemeTokens();
+      return <Story />;
+    },
+  ],
   args: {
     downloadState: "idle",
     downloadError: null,
@@ -180,6 +193,10 @@ export const ErrorState: Story = {
     await expect(canvas.getByRole("alert")).toHaveTextContent(
       "ネットワークを確認してください",
     );
+    // 色だけでなくアイコンと接頭ラベルでもエラーだと分かる
+    await expect(
+      within(canvas.getByRole("alert")).getByText("エラー:"),
+    ).toBeInTheDocument();
     // 「再試行」で onDownload が呼ばれる
     await userEvent.click(canvas.getByRole("button", { name: "再試行" }));
     await expect(args.onDownload).toHaveBeenCalledTimes(1);
@@ -212,6 +229,47 @@ export const AndroidFitsLargeScale: Story = {
       await expectFitsAndScrollable(dialog);
     } finally {
       await restoreViewport();
+    }
+  },
+};
+
+export const AndroidTapTargets: Story = {
+  name: "Android・すべての操作要素が44px以上で隣り合うボタンに間隔がある",
+  play: async ({ canvasElement }) => {
+    const restorePlatform = setPlatform("android");
+    try {
+      await expectTapTargets(canvasElement, 44);
+      await expectAdjacentGap(canvasElement, 8);
+    } finally {
+      restorePlatform();
+    }
+  },
+};
+
+export const KeyboardFocusShowsRing: Story = {
+  name: "キーボードでフォーカスしたボタンにはフォーカスリングが出る",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    // 初期フォーカスは主操作ボタン。Shift+Tab で副次ボタンへ移す
+    await userEvent.tab({ shift: true });
+    const focused = document.activeElement as HTMLElement;
+    await expect(focused).toBe(
+      canvas.getByRole("button", { name: "今はしない" }),
+    );
+    await expect(getComputedStyle(focused).outlineStyle).not.toBe("none");
+  },
+};
+
+export const DownloadingLooksDisabled: Story = {
+  name: "ダウンロード中は両方のボタンが見た目でも無効だと分かる",
+  args: { downloadState: "downloading" },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    for (const name of ["今はしない", "ダウンロードして有効化"]) {
+      const button = canvas.getByRole("button", { name });
+      await expect(button).toBeDisabled();
+      await expect(Number(getComputedStyle(button).opacity)).toBeLessThan(1);
+      await expect(getComputedStyle(button).cursor).toBe("not-allowed");
     }
   },
 };

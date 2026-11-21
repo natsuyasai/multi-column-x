@@ -1,4 +1,6 @@
 @use "../../styles/dialog-fullscreen" as fs;
+@use "../../styles/tokens" as t;
+@use "../../styles/mixins" as m;
 
 .overlay {
   position: fixed;
@@ -11,7 +13,7 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 1rem;
+  padding: t.$space-3;
   box-sizing: border-box;
   overflow-y: auto;
 
@@ -21,20 +23,20 @@
 .dialog {
   background: var(--mcx-surface);
   border: 1px solid var(--mcx-border);
-  border-radius: 0.5rem;
-  padding: 1.5rem;
+  border-radius: t.$radius-md;
+  padding: t.$space-4;
   width: min(25rem, 100%);
   max-height: calc(100% - 2rem);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: t.$space-3;
 
   @include fs.android-fullscreen-panel(1.5rem, true);
 }
 
 .title {
-  font-size: 1rem;
+  font-size: t.$font-size-base;
   color: var(--mcx-text);
   margin: 0;
 
@@ -45,16 +47,16 @@
 .field {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: t.$space-1;
 }
 
 .label {
-  font-size: 0.75rem;
+  font-size: t.$font-size-xs;
   color: var(--mcx-text-tertiary);
 }
 
 .hint {
-  font-size: 0.6875rem;
+  font-size: t.$font-size-xs;
   color: var(--mcx-text-tertiary);
   margin: 0;
 }
@@ -62,13 +64,26 @@
 .select,
 .input {
   background: var(--mcx-surface-sunken);
-  border: 1px solid var(--mcx-border);
-  border-radius: 0.25rem;
+  border: 1px solid var(--mcx-border-strong);
+  border-radius: t.$radius-sm;
   color: var(--mcx-text);
-  font-size: 0.8125rem;
-  padding: 0.5rem;
+  font-size: t.$font-size-sm;
+  padding: t.$space-2;
   width: 100%;
   box-sizing: border-box;
+  @include m.transition-base(border-color);
+  @include m.android-tap-target;
+}
+
+.select:hover,
+.input:hover {
+  border-color: var(--mcx-text-muted);
+}
+
+.select:focus-visible,
+.input:focus-visible {
+  border-color: var(--mcx-accent);
+  @include m.focus-ring;
 }
 
 // WebKitGTK はデフォルトで GTK ネイティブ描画するため CSS が無視される。
@@ -90,32 +105,65 @@
 .actions {
   display: flex;
   justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
+  gap: t.$space-2;
+  margin-top: t.$space-2;
+
+  @include m.android-button-gap;
 }
 
 .cancelBtn {
   background: var(--mcx-surface-muted);
   border: 1px solid var(--mcx-border-strong);
-  border-radius: 0.25rem;
+  border-radius: t.$radius-sm;
   color: var(--mcx-text-tertiary);
   cursor: pointer;
-  font-size: 0.8125rem;
-  padding: 0.5rem 1rem;
+  font-size: t.$font-size-sm;
+  padding: t.$space-2 t.$space-3;
+  @include m.transition-base(background-color, border-color, color);
+  @include m.android-tap-target;
+
+  &:hover {
+    background: var(--mcx-surface-hover);
+    color: var(--mcx-text);
+  }
+
+  &:active {
+    background: var(--mcx-surface-hover);
+    border-color: var(--mcx-text-tertiary);
+  }
+
+  &:focus-visible {
+    @include m.focus-ring;
+  }
 }
 
 .submitBtn {
   background: var(--mcx-accent-fill);
   border: none;
-  border-radius: 0.25rem;
+  border-radius: t.$radius-sm;
   color: var(--mcx-text-on-accent);
   cursor: pointer;
-  font-size: 0.8125rem;
+  font-size: t.$font-size-sm;
   font-weight: bold;
-  padding: 0.5rem 1rem;
+  padding: t.$space-2 t.$space-3;
+  @include m.transition-base(background-color, color);
+  @include m.android-tap-target;
+
+  &:hover {
+    background: var(--mcx-accent-hover);
+  }
+
+  &:active {
+    background: var(--mcx-accent-hover);
+  }
+
+  &:focus-visible {
+    @include m.focus-ring;
+  }
 
   &:disabled {
     background: var(--mcx-surface-muted);
+    color: var(--mcx-text-muted);
     cursor: not-allowed;
   }
 }

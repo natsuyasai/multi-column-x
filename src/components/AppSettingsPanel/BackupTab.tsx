@@ -1,5 +1,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
+import { StatusMark } from "@/components/StatusMark/StatusMark";
 import type { BackupMessage, BackupStep } from "@/hooks/useBackupFlow";
 import {
   canExecuteRestore,
@@ -56,6 +57,7 @@ export const BackupTab: React.FC<BackupTabProps> = ({
       role={message.kind === "error" ? "alert" : "status"}
       className={`${styles.message} ${styles[message.kind]}`}
     >
+      <StatusMark kind={message.kind === "success" ? "success" : "warning"} />
       {message.text}
     </p>
   );
@@ -87,6 +89,7 @@ export const BackupTab: React.FC<BackupTabProps> = ({
               })}
             </p>
             <p className={`${styles.message} ${styles.warning}`}>
+              <StatusMark kind="warning" />
               {t("settings:backup.replaceWarning")}
             </p>
             <p className={styles.note}>{t("settings:backup.noCredentials")}</p>
@@ -124,6 +127,7 @@ export const BackupTab: React.FC<BackupTabProps> = ({
         <p className={styles.note}>{t("settings:backup.export.note")}</p>
         <p className={styles.note}>{t("settings:backup.noCredentials")}</p>
         <p className={`${styles.message} ${styles.warning}`}>
+          <StatusMark kind="warning" />
           {t("settings:backup.exportPrivacy")}
         </p>
         <div className={styles.buttonRow}>
@@ -145,13 +149,14 @@ export const BackupTab: React.FC<BackupTabProps> = ({
         <p className={styles.note}>{t("settings:backup.noCredentials")}</p>
         {saveBlocked && (
           <p role="alert" className={`${styles.message} ${styles.error}`}>
+            <StatusMark kind="warning" />
             {t("settings:backup.saveBlocked")}
           </p>
         )}
         <div className={styles.buttonRow}>
           <button
             type="button"
-            className={styles.primaryBtn}
+            className={styles.secondaryBtn}
             onClick={onPickFile}
             disabled={busy || saveBlocked}
           >
@@ -200,6 +205,7 @@ const MappingStep: React.FC<MappingStepProps> = ({
       <p className={styles.note}>{t("settings:backup.noCredentials")}</p>
       {accounts.length === 0 && (
         <p role="alert" className={`${styles.message} ${styles.error}`}>
+          <StatusMark kind="warning" />
           {t("settings:backup.mapping.noTargets")}
         </p>
       )}
@@ -242,6 +248,7 @@ const MappingStep: React.FC<MappingStepProps> = ({
       </ul>
       {sharedTargets.length > 0 && (
         <p role="status" className={`${styles.message} ${styles.warning}`}>
+          <StatusMark kind="warning" />
           {t("settings:backup.mapping.shared", {
             names: sharedTargets
               .map(labelOf)
@@ -254,6 +261,7 @@ const MappingStep: React.FC<MappingStepProps> = ({
       )}
       {!canExecute && (
         <p role="status" className={`${styles.message} ${styles.warning}`}>
+          <StatusMark kind="warning" />
           {t("settings:backup.mapping.none")}
         </p>
       )}

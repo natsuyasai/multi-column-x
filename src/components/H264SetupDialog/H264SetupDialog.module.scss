@@ -1,3 +1,6 @@
+@use "../../styles/tokens" as t;
+@use "../../styles/mixins" as m;
+
 .overlay {
   position: fixed;
   inset: 0;
@@ -11,78 +14,129 @@
 .dialog {
   background: var(--mcx-surface);
   color: var(--mcx-text);
-  border-radius: 0.5rem;
+  border-radius: t.$radius-md;
   padding: 1.25rem;
   width: min(27.5rem, 90vw);
   max-height: 80vh;
   overflow: auto;
   box-shadow: 0 0.5rem 2rem var(--mcx-shadow);
 
-  &:focus {
-    outline: none;
+  // フォーカスはダイアログ内側に描く（overflow でクリップされないように）
+  &:focus-visible {
+    @include m.focus-ring;
+    outline-offset: -0.25rem;
   }
 }
 
 .title {
   margin: 0 0 0.75rem;
-  font-size: 1.1rem;
+  font-size: t.$font-size-lg;
 }
 
 .description {
-  margin: 0 0 0.5rem;
-  font-size: 0.9rem;
+  margin: 0 0 t.$space-2;
+  font-size: t.$font-size-md;
 }
 
 .note {
   margin: 0 0 0.75rem;
-  font-size: 0.8rem;
+  font-size: t.$font-size-sm;
   color: var(--mcx-text);
 }
 
 .status {
+  display: flex;
+  align-items: baseline;
+  gap: t.$space-1;
   margin: 0.75rem 0 0;
-  font-size: 0.9rem;
+  font-size: t.$font-size-md;
 }
 
 .error {
+  display: flex;
+  align-items: baseline;
+  gap: t.$space-1;
   margin: 0.75rem 0 0;
-  padding: 0.5rem 0.625rem;
-  border-radius: 0.25rem;
-  font-size: 0.85rem;
+  padding: t.$space-2 0.75rem;
+  border-radius: t.$radius-sm;
+  font-size: t.$font-size-md;
   color: var(--mcx-danger);
   background: var(--mcx-danger-bg);
   border: 1px solid var(--mcx-danger-border);
+}
+
+.errorPrefix {
+  flex-shrink: 0;
+}
+
+.errorMessage {
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 
 .actions {
   display: flex;
   justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 1rem;
+  gap: t.$space-2;
+  margin-top: t.$space-3;
+
+  @include m.android-button-gap;
 }
 
 .primaryBtn,
 .secondaryBtn {
-  padding: 0.5rem 1rem;
-  border-radius: 0.25rem;
+  padding: t.$space-2 t.$space-3;
+  border-radius: t.$radius-sm;
+  font-size: t.$font-size-sm;
   cursor: pointer;
+  @include m.transition-base(background-color, border-color, color);
+  @include m.android-tap-target;
 }
 
 .secondaryBtn {
   background: transparent;
   border: 1px solid var(--mcx-border-strong);
   color: inherit;
+
+  &:hover {
+    background: var(--mcx-surface-hover);
+  }
+
+  &:active {
+    background: var(--mcx-surface-muted);
+    border-color: var(--mcx-text-tertiary);
+  }
+
+  &:focus-visible {
+    @include m.focus-ring;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 }
 
 .primaryBtn {
   background: var(--mcx-accent-fill);
   color: var(--mcx-text-on-accent);
   border: none;
-}
+  font-weight: bold;
 
-.primaryBtn:disabled,
-.secondaryBtn:disabled {
-  opacity: 0.6;
-  cursor: default;
+  &:hover {
+    background: var(--mcx-accent-hover);
+  }
+
+  &:active {
+    background: var(--mcx-accent-hover);
+  }
+
+  &:focus-visible {
+    @include m.focus-ring;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 }

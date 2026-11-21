@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { StatusMark } from "@/components/StatusMark/StatusMark";
 import type { AppTFunction } from "@/i18n/types";
 import { describeAppError } from "@/lib/appError";
 import type { ExtensionPageKind } from "@/services/extensions";
@@ -216,11 +217,13 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
         </div>
         {failure && (
           <p role="alert" className={`${styles.message} ${styles.error}`}>
+            <StatusMark kind="warning" />
             {describeAppError(failure.error, t)}
           </p>
         )}
         {detected && !detected.browserFound && (
           <p role="status" className={`${styles.message} ${styles.warning}`}>
+            <StatusMark kind="warning" />
             {t("settings:extensions.browserNotFound")}
           </p>
         )}
@@ -245,12 +248,13 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
                 </span>
                 {item.added && (
                   <span className={styles.badge}>
+                    <StatusMark kind="success" />
                     {t("settings:extensions.added")}
                   </span>
                 )}
                 <button
                   type="button"
-                  className={styles.primaryBtn}
+                  className={styles.secondaryBtn}
                   onClick={() => void handleAddChrome(item.chromeId)}
                   disabled={busy || item.added}
                   aria-busy={busyKey === `chrome:${item.chromeId}`}
@@ -298,6 +302,7 @@ export const ExtensionsTab: React.FC<ExtensionsTabProps> = ({
                   </div>
                   {entry.missing && (
                     <span className={`${styles.badge} ${styles.badgeWarn}`}>
+                      <StatusMark kind="warning" />
                       {t("settings:extensions.missing")}
                     </span>
                   )}

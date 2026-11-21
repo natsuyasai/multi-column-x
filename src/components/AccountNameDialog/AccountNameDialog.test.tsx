@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import i18n from "@/i18n";
+import { expectAccessibleControls } from "@/test-utils/a11y";
 import { expectNoJapanese } from "@/test-utils/japanese";
 import { AccountNameDialog } from "./AccountNameDialog";
 
@@ -75,6 +76,56 @@ describe("AccountNameDialog", () => {
     );
     fireEvent.click(screen.getByText("キャンセル"));
     expect(onCancel).toHaveBeenCalled();
+  });
+
+  describe("ダイアログのアクセシビリティ", () => {
+    const renderDialog = (props: Partial<{ onSubmit: () => void }> = {}) =>
+      render(
+        <AccountNameDialog
+          defaultValue="アカウント 1"
+          title="アカウント名を入力"
+          onSubmit={props.onSubmit ?? vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+
+    it("見出しがダイアログの名前になり aria-modal が付く", () => {
+      renderDialog();
+      expect(
+        screen.getByRole("dialog", { name: "アカウント名を入力" }),
+      ).toHaveAttribute("aria-modal", "true");
+    });
+
+    it("入力欄とボタンにアクセシブルネームがある", () => {
+      const { container } = renderDialog();
+      expectAccessibleControls(container);
+    });
+
+    it("閉じたあと開く前にフォーカスしていた要素へフォーカスが戻る", () => {
+      const opener = document.createElement("button");
+      document.body.appendChild(opener);
+      opener.focus();
+
+      const { unmount } = renderDialog();
+      screen.getByLabelText("アカウント名").focus();
+      unmount();
+
+      expect(opener).toHaveFocus();
+      opener.remove();
+    });
+
+    it("名前が空のとき OK ボタンは無効でクリックしても onSubmit が呼ばれない", () => {
+      const onSubmit = vi.fn();
+      renderDialog({ onSubmit });
+      fireEvent.change(screen.getByLabelText("アカウント名"), {
+        target: { value: "" },
+      });
+
+      const ok = screen.getByRole("button", { name: "OK" });
+      expect(ok).toBeDisabled();
+      fireEvent.click(ok);
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
   });
 
   describe("表示言語", () => {

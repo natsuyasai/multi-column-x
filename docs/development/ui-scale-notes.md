@@ -58,12 +58,14 @@ Android では画面が狭く、表示サイズを大きくすると中央カー
 - **新しくパネル型ダイアログを追加するときは必ず上記ミキシンを `@include` すること**（`overlay` と panel、panel 全体スクロールなら sticky ヘッダーも）。
 - **小さなダイアログ（全画面化しない）**: `ConfirmDialog` / `AccountNameDialog` / `TabActionDialog` / `UpdateDialog` / `LinkPopupDialog` / `H264SetupDialog` は中央表示のまま、次を満たす。幅は画面内に収まり、縦に収まらないときは内部スクロールで末尾のボタンへ到達できる。監査の結果、満たしていなかったのは `TabActionDialog`（ボトムシートに `max-height` と縦スクロールが無く、特大では上端がはみ出した）だけで、`.sheet` に `max-height: 100%` と `overflow-y: auto` を追加した。
 - **Storybook 検証の注意**: Storybook は `index.css` を読み込まないため、`--mcx-border` などのテーマ変数が未定義になり、`border` が無効値になって枠線幅が常に 0 になる。枠線の有無を検証する Story では panel に `--mcx-border` を手動で設定している。狭い画面は `vitest/browser` の `page.viewport` で再現し、終了時に元へ戻す。`data-platform` と `font-size` もアンマウント時に戻す。
+- **a11y と Android の 44px**: パネル型ダイアログ（と小ダイアログ）は `role="dialog"` / `aria-modal` / `aria-labelledby` / Esc / `useRestoreFocus` を持ち、操作要素は Android で 44px 以上（`android-tap-target`）。ミキシンは `_dialog-fullscreen.scss` と併用でき、既存の padding 引数とは干渉しない。詳細は `ui-design-principles-notes.md` を参照。
 - **手動確認項目（実機）**: ノッチやナビゲーションバーにヘッダー・本文末尾が隠れないこと、フォントサイズ最大での見え方、全画面ダイアログを閉じたときにカラム WebView が元の位置へ復元されること。
 
 ## 大きな表示サイズでのボトムバーと案内ダイアログ
 
 - **ボトムバー（`MobileTabBar`）**
   - ツイート作成ボタン・展開トグル・展開時のアクション群を `.menu`（`flex: 0 1 auto; min-width: 0; overflow-x: auto`）で包み、収まらないときは横スクロールにする。スクロールバーは非表示。`.tabs` には `min-width: 6.25rem`（タブ1つ分）を付け、メニュー列に押し潰されないようにした。
+  - `.tab` は Android で `min-height: 2.75rem` を指定する（44px 以上）。`android-tap-target` は `min-width` も上書きするため、`min-width: 6.25rem` を持つ `.tab` には使わない（`ui-design-principles-notes.md`）。バー高さ 3.5rem は 44px を超えているので、高さは増やさない。
   - バー高さ `3.5rem`（`MOBILE_TAB_BAR_HEIGHT_REM`）は `gridLayout.contract.test.ts` が SCSS を読んで検証し、カラム WebView の bounds にも使うため増やさない。高さを増やす（メニューを2段にする）案は gridLayout の定数変更が必要になるため不採用。
   - API レート制限インジケーターのモバイル用ポップオーバーは `position: fixed` で、祖先に `transform` などが無いため、`.menu` の `overflow` ではクリップされない。
   - 通常サイズでも幅 360px・メニュー展開時は、メニューが約 344px になりタブ最小幅と合わせて収まらず横スクロールになる（以前はタブ領域がほぼ潰れていた）。実機での確認が必要。

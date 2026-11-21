@@ -2,6 +2,7 @@ import { render, screen, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import i18n from "@/i18n";
+import { expectAccessibleControls } from "@/test-utils/a11y";
 import { expectNoJapanese } from "@/test-utils/japanese";
 import type { Column, Account } from "../../types";
 import apiRateLimitIndicatorStyles from "../ApiRateLimitIndicator/ApiRateLimitIndicator.module.scss";
@@ -472,6 +473,84 @@ describe("MobileTabBar", () => {
       fireEvent.click(screen.getByText("通知"));
       expect(onDoubleTapColumn).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("MobileTabBar アクセシビリティ", () => {
+  it("折りたたみ時も展開後もすべての操作要素がアクセシブルネームを持つ", async () => {
+    const { container } = render(
+      <MobileTabBar {...defaultProps} columns={[col1, col2]} />,
+    );
+    expectAccessibleControls(container);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "メニュー表示の切り替え" }),
+    );
+    expectAccessibleControls(container);
+    expect(screen.getByRole("button", { name: "APIレート制限" })).toBeVisible();
+  });
+
+  it("タブバーが名前付きのナビゲーションランドマークになる", () => {
+    render(<MobileTabBar {...defaultProps} columns={[col1, col2]} />);
+    expect(
+      screen.getByRole("navigation", { name: "カラムのタブ" }),
+    ).toBeInTheDocument();
+  });
+
+  it("選択中のタブだけが aria-current で現在地として伝わる", () => {
+    render(
+      <MobileTabBar
+        {...defaultProps}
+        columns={[col1, col2]}
+        activeColumnId="col-2"
+      />,
+    );
+    const current = screen
+      .getAllByRole("button")
+      .filter((el) => el.getAttribute("aria-current") === "true");
+    expect(current).toHaveLength(1);
+    expect(current[0]).toHaveTextContent("通知");
+    expect(
+      screen.getByText("ホーム").closest("[role=button]"),
+    ).not.toHaveAttribute("aria-current");
+  });
+
+  it("メニューの開閉ボタンが開閉状態を aria-expanded で伝える", async () => {
+    render(<MobileTabBar {...defaultProps} columns={[col1]} />);
+    const toggle = screen.getByRole("button", {
+      name: "メニュー表示の切り替え",
+    });
+    expect(toggle).toHaveAttribute("aria-label", "メニュー表示の切り替え");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("操作ボタンはすべて type=button でフォーム送信を起こさない", async () => {
+    render(<MobileTabBar {...defaultProps} columns={[col1]} />);
+    await userEvent.click(
+      screen.getByRole("button", { name: "メニュー表示の切り替え" }),
+    );
+    const buttons = screen
+      .getAllByRole("button")
+      .filter((el) => el.tagName === "BUTTON");
+    expect(buttons.length).toBeGreaterThan(4);
+    for (const button of buttons) {
+      expect(button).toHaveAttribute("type", "button");
+    }
+  });
+
+  it("スワイプの矢印は装飾なので支援技術から隠される", () => {
+    const { container } = render(
+      <MobileTabBar
+        {...defaultProps}
+        columns={[col1]}
+        swipeState={{ direction: "left", phase: "progress" }}
+      />,
+    );
+    const arrow = container.querySelector('[aria-hidden="true"]');
+    expect(arrow).toHaveTextContent("›");
   });
 });
 

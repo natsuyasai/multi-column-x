@@ -149,6 +149,8 @@
     "heightTitle": "Height settings — {{label}}",
     "heightAuto": "Even (auto)",
     "heightFixed": "Fixed:",
+    "heightValue": "Height value",
+    "heightUnit": "Height unit",
     "dragReorder": "Drag to reorder",
     "moveUp": "Move up",
     "moveDown": "Move down",

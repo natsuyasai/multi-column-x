@@ -64,6 +64,8 @@
   "indicator": {
     "triggerLabel": "API rate limits",
     "listLabel": "API rate limit list",
+    "severityWarning": "Running low",
+    "severityCritical": "Almost exhausted",
     "noData": "No data",
     "soon": "Soon",
     "resetInMinutes_one": "in {{count}} min",

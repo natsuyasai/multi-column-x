@@ -1,3 +1,6 @@
+@use "../../styles/tokens" as t;
+@use "../../styles/mixins" as m;
+
 .container {
   display: flex;
   flex-direction: column;
@@ -6,15 +9,15 @@
 }
 
 .section {
-  padding: 1rem 1.25rem;
+  padding: t.$space-3 1.25rem;
   border-bottom: 1px solid var(--mcx-border-subtle);
   display: flex;
   flex-direction: column;
-  gap: 0.625rem;
+  gap: t.$space-2;
 }
 
 .sectionTitle {
-  font-size: 0.6875rem;
+  font-size: t.$font-size-xs;
   font-weight: 600;
   color: var(--mcx-text-muted);
   text-transform: uppercase;
@@ -22,28 +25,29 @@
 }
 
 .note {
-  font-size: 0.75rem;
+  font-size: t.$font-size-xs;
   color: var(--mcx-text-secondary);
   line-height: 1.5;
   margin: 0;
 }
 
 .summary {
-  font-size: 0.875rem;
+  font-size: t.$font-size-md;
   font-weight: 600;
   color: var(--mcx-text);
   margin: 0;
 }
 
 .message {
-  font-size: 0.75rem;
+  font-size: t.$font-size-xs;
   line-height: 1.5;
   margin: 0;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.375rem;
+  padding: t.$space-2 0.75rem;
+  border-radius: t.$radius-md;
   border: 1px solid var(--mcx-border-subtle);
 }
 
+// エラーは色だけでなく ⚠ の記号（StatusMark）でも示す
 .error {
   color: var(--mcx-danger);
   background: var(--mcx-danger-bg);
@@ -62,22 +66,36 @@
 
 .buttonRow {
   display: flex;
-  gap: 0.5rem;
+  flex-wrap: wrap;
+  gap: t.$space-2;
   justify-content: flex-end;
+
+  @include m.android-button-gap;
 }
 
+// この画面の主 CTA（書き出す / 確認へ進む）。強調は 1 画面に 1 つだけ
 .primaryBtn {
   background: var(--mcx-accent-fill);
   border: none;
-  border-radius: 0.25rem;
+  border-radius: t.$radius-sm;
   color: var(--mcx-text-on-accent);
   cursor: pointer;
-  font-size: 0.75rem;
+  font-size: t.$font-size-xs;
   font-weight: 600;
-  padding: 0.4375rem 0.75rem;
+  padding: t.$space-2 0.75rem;
+  @include m.transition-base(background-color);
+  @include m.android-tap-target;
 
   &:hover:not(:disabled) {
     background: var(--mcx-accent-hover);
+  }
+
+  &:active:not(:disabled) {
+    background: var(--mcx-accent-hover);
+  }
+
+  &:focus-visible {
+    @include m.focus-ring;
   }
 
   &:disabled {
@@ -90,40 +108,63 @@
 .secondaryBtn {
   background: var(--mcx-surface-muted);
   border: 1px solid var(--mcx-border-strong);
-  border-radius: 0.25rem;
+  border-radius: t.$radius-sm;
   color: var(--mcx-text-tertiary);
   cursor: pointer;
-  font-size: 0.75rem;
-  padding: 0.4375rem 0.75rem;
+  font-size: t.$font-size-xs;
+  padding: t.$space-2 0.75rem;
+  @include m.transition-base(background-color, border-color, color);
+  @include m.android-tap-target;
 
   &:hover:not(:disabled) {
     background: var(--mcx-surface-hover);
     color: var(--mcx-text);
   }
 
+  &:active:not(:disabled) {
+    background: var(--mcx-surface-hover);
+    border-color: var(--mcx-text-tertiary);
+  }
+
+  &:focus-visible {
+    @include m.focus-ring;
+  }
+
   &:disabled {
     cursor: not-allowed;
-    opacity: 0.6;
+    opacity: 0.5;
   }
 }
 
+// 破壊的操作（置き換えて復元）は danger の色と枠で区別する
 .dangerBtn {
   background: none;
   border: 1px solid var(--mcx-danger-border);
-  border-radius: 0.25rem;
+  border-radius: t.$radius-sm;
   color: var(--mcx-danger);
   cursor: pointer;
-  font-size: 0.75rem;
+  font-size: t.$font-size-xs;
   font-weight: 600;
-  padding: 0.4375rem 0.75rem;
+  padding: t.$space-2 0.75rem;
+  @include m.transition-base(background-color, border-color);
+  @include m.android-tap-target;
 
   &:hover:not(:disabled) {
     background: var(--mcx-danger-bg);
   }
 
+  &:active:not(:disabled) {
+    background: var(--mcx-danger-bg);
+    border-color: var(--mcx-danger);
+  }
+
+  &:focus-visible {
+    @include m.focus-ring;
+  }
+
   &:disabled {
     cursor: not-allowed;
-    opacity: 0.6;
+    opacity: 0.5;
   }
 }
 
@@ -133,18 +174,18 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: t.$space-2;
 }
 
 .mappingRow {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: t.$space-2;
   flex-wrap: wrap;
-  padding: 0.5rem 0.75rem;
+  padding: t.$space-2 0.75rem;
   background: var(--mcx-surface-sunken);
   border: 1px solid var(--mcx-border-subtle);
-  border-radius: 0.375rem;
+  border-radius: t.$radius-md;
 }
 
 .colorDot {
@@ -155,29 +196,42 @@
 }
 
 .accountLabel {
-  font-size: 0.8125rem;
+  font-size: t.$font-size-sm;
   color: var(--mcx-text-secondary);
   flex: 1;
   min-width: 5rem;
+  overflow-wrap: anywhere;
 }
 
 .columnCount {
-  font-size: 0.75rem;
+  font-size: t.$font-size-xs;
   color: var(--mcx-text-muted);
   white-space: nowrap;
 }
 
 .select {
   background: var(--mcx-surface-sunken);
-  border: 1px solid var(--mcx-border);
-  border-radius: 0.25rem;
+  border: 1px solid var(--mcx-border-strong);
+  border-radius: t.$radius-sm;
   color: var(--mcx-text);
-  font-size: 0.8125rem;
-  padding: 0.375rem 0.5rem;
+  font-size: t.$font-size-sm;
+  padding: t.$space-2;
   min-width: 8.75rem;
+  max-width: 100%;
+  @include m.transition-base(border-color);
+  @include m.android-tap-target;
 
-  &:focus {
-    outline: none;
+  &:hover:not(:disabled) {
+    border-color: var(--mcx-text-muted);
+  }
+
+  &:focus-visible {
     border-color: var(--mcx-accent);
+    @include m.focus-ring;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
   }
 }

@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { useRestoreFocus } from "../../hooks/useRestoreFocus";
 import styles from "./ConfirmDialog.module.scss";
 
 interface ConfirmDialogProps {
@@ -24,12 +25,27 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 }) => {
   const { t } = useTranslation();
   useEscapeKey(onCancel);
+  useRestoreFocus();
+  const titleId = useId();
+  const messageId = useId();
 
   return (
     <div className={styles.overlay}>
-      <div className={styles.dialog}>
-        {title && <h2 className={styles.title}>{title}</h2>}
-        <p className={styles.message}>{message}</p>
+      <div
+        className={styles.dialog}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? titleId : messageId}
+        aria-describedby={title ? messageId : undefined}
+      >
+        {title && (
+          <h2 id={titleId} className={styles.title}>
+            {title}
+          </h2>
+        )}
+        <p id={messageId} className={styles.message}>
+          {message}
+        </p>
 
         <div className={styles.actions}>
           {!singleButton && (

@@ -85,6 +85,10 @@ Tauri v2 の子 WebView は OS ネイティブウィンドウのため、CSS `z-
 アプリ UI の倍率は `<html>` の font-size で変えるため、UI の寸法は `rem` で書く（`px` 禁止。1px 以下のヘアラインと media query を除く）。ネイティブ bounds に使う高さ定数は `src/lib/gridLayout.ts` の rem 定数 + `remToPx` を使い、SCSS の同値と一致させる（`gridLayout.contract.test.ts` が検証する）。詳細は `docs/development/ui-scale-notes.md` を参照。
 パネル型ダイアログを新設するときは `src/styles/_dialog-fullscreen.scss` のミキシンで Android 全画面化すること（詳細は `docs/development/ui-scale-notes.md`）。
 
+### UI のデザイン原則
+
+UI（React / SCSS）を新規作成・変更するときは `.claude/skills/ui-design-principles` と `docs/development/ui-design-principles-notes.md` に従う。要点: 余白は 0.25rem の倍数・最小文字 12px・hover / active / focus-visible / disabled の定義・操作要素の 44px は Android のみ（固定バー高さは変えない）。契約テスト `src/lib/uiDesign.contract.test.ts` が検査する。
+
 ### serde のフィールド命名
 
 Tauri v2 は JS→Rust のケース変換を行わない。JS 側 camelCase フィールドには `#[serde(rename = "...")]` が必要。

@@ -157,6 +157,7 @@ export const ColumnDefaultsSections: React.FC<ColumnDefaultsSectionsProps> = ({
           className={styles.cssTextarea}
           value={draft.defaultColumnCustomCSS}
           onChange={(e) => set("defaultColumnCustomCSS", e.target.value)}
+          aria-label={t("settings:columnDefaults.customCss.title")}
           placeholder={t("settings:columnDefaults.customCss.placeholder")}
           spellCheck={false}
         />

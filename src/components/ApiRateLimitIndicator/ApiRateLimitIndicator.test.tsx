@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as apiRateLimitLabels from "@/constants/apiRateLimitLabels";
 import i18n from "@/i18n";
+import { expectAccessibleControls } from "@/test-utils/a11y";
 import { expectNoJapanese } from "@/test-utils/japanese";
 import type { Account, ApiRateLimitBucket } from "@/types";
 import { ApiRateLimitIndicator } from "./ApiRateLimitIndicator";
@@ -503,6 +504,129 @@ describe("ApiRateLimitIndicator", () => {
 
       expect(screen.getByRole("dialog")).toBeInTheDocument();
     });
+  });
+});
+
+describe("ApiRateLimitIndicator アクセシビリティ", () => {
+  const renderIndicator = (
+    apiRateLimits = normalRateLimits,
+    props: {
+      isMobile?: boolean;
+      onOpenChange?: (isOpen: boolean) => void;
+    } = {},
+  ) =>
+    render(
+      <div>
+        <button type="button">別のボタン</button>
+        <ApiRateLimitIndicator
+          accounts={accounts}
+          apiRateLimits={apiRateLimits}
+          {...props}
+        />
+      </div>,
+    );
+
+  it("トリガーはアクセシブルネームを持ち開閉状態をaria属性で伝える", () => {
+    const { container } = renderIndicator();
+    expectAccessibleControls(container);
+
+    const trigger = screen.getByRole("button", { name: "APIレート制限" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
+
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(trigger).toHaveAttribute(
+      "aria-controls",
+      screen.getByRole("dialog").id,
+    );
+  });
+
+  it("ポップオーバーはデスクトップでもモバイルでもaria-modalを付けない", () => {
+    const { unmount } = renderIndicator();
+    fireEvent.click(screen.getByRole("button", { name: "APIレート制限" }));
+    expect(screen.getByRole("dialog")).not.toHaveAttribute("aria-modal");
+    unmount();
+
+    renderIndicator(normalRateLimits, { isMobile: true });
+    fireEvent.click(screen.getByRole("button", { name: "APIレート制限" }));
+    expect(
+      screen.getByRole("dialog", { name: "APIレート制限一覧" }),
+    ).not.toHaveAttribute("aria-modal");
+  });
+
+  it("Escapeで閉じるとフォーカスが開いたトリガーへ戻る", () => {
+    renderIndicator();
+    const trigger = screen.getByRole("button", { name: "APIレート制限" });
+    fireEvent.click(trigger);
+    screen.getByRole("button", { name: "別のボタン" }).focus();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
+  it("モバイル表示でもEscapeで閉じるとフォーカスがトリガーへ戻る", () => {
+    renderIndicator(normalRateLimits, { isMobile: true });
+    const trigger = screen.getByRole("button", { name: "APIレート制限" });
+    fireEvent.click(trigger);
+    screen.getByRole("button", { name: "別のボタン" }).focus();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
+  it("閉じているときのEscapeではフォーカスを動かさず通知もしない", () => {
+    const onOpenChange = vi.fn();
+    renderIndicator(normalRateLimits, { onOpenChange });
+    const other = screen.getByRole("button", { name: "別のボタン" });
+    other.focus();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(other).toHaveFocus();
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it("危険状態のトリガーは色以外に記号と支援技術向けの説明を持つ", () => {
+    renderIndicator(mixedSeverityRateLimits);
+    const trigger = screen.getByRole("button", { name: "APIレート制限" });
+
+    expect(trigger).toHaveTextContent("⚠");
+    expect(trigger).toHaveAccessibleDescription("残りがほとんどありません");
+  });
+
+  it("警告状態のトリガーは警告用の説明を持ち通常状態では記号も説明も出ない", () => {
+    const { unmount } = renderIndicator({
+      "acc-1": { SearchTimeline: bucket("SearchTimeline", 10, 100) },
+    });
+    const warning = screen.getByRole("button", { name: "APIレート制限" });
+    expect(warning).toHaveTextContent("⚠");
+    expect(warning).toHaveAccessibleDescription("残りが少なくなっています");
+    unmount();
+
+    renderIndicator(normalRateLimits);
+    const normal = screen.getByRole("button", { name: "APIレート制限" });
+    expect(normal).not.toHaveTextContent("⚠");
+    expect(normal).not.toHaveAttribute("aria-describedby");
+  });
+
+  it("警告・危険の行だけが記号と状態の文言を持つ", () => {
+    renderIndicator(mixedSeverityRateLimits);
+    fireEvent.click(screen.getByRole("button", { name: "APIレート制限" }));
+
+    const warningRow = screen.getByText("10/100").closest("li")!;
+    const criticalRow = screen.getByText("2/100").closest("li")!;
+    const normalRow = screen.getByText("900/900").closest("li")!;
+
+    expect(warningRow).toHaveTextContent("⚠");
+    expect(warningRow).toHaveTextContent("残りが少なくなっています");
+    expect(criticalRow).toHaveTextContent("⚠");
+    expect(criticalRow).toHaveTextContent("残りがほとんどありません");
+    expect(normalRow).not.toHaveTextContent("⚠");
   });
 });
 

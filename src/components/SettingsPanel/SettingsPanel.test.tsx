@@ -2,6 +2,7 @@ import { act, render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import i18n from "@/i18n";
+import { expectAccessibleControls } from "@/test-utils/a11y";
 import { expectNoJapanese } from "@/test-utils/japanese";
 import type { Column } from "../../types";
 import { SettingsPanel } from "./SettingsPanel";
@@ -1060,5 +1061,141 @@ describe("SettingsPanel の表示言語", () => {
     ).toBeInTheDocument();
     expectNoJapanese(container);
     expect(onApply).not.toHaveBeenCalled();
+  });
+});
+describe("SettingsPanel デザイン原則（アクセシビリティ）", () => {
+  it("見出しがダイアログの名前になり aria-modal が付く", () => {
+    render(<SettingsPanel {...defaultProps} />);
+    expect(screen.getByRole("dialog", { name: "カラム設定" })).toHaveAttribute(
+      "aria-modal",
+      "true",
+    );
+  });
+
+  it("すべての入力欄とボタンにアクセシブルネームがある", () => {
+    const { container } = render(
+      <SettingsPanel {...defaultProps} onReload={vi.fn()} />,
+    );
+    expectAccessibleControls(container);
+  });
+
+  it("自動更新・通知など条件付きの項目を表示してもすべてにアクセシブルネームがある", async () => {
+    const user = userEvent.setup();
+    const col = {
+      ...mockColumn,
+      settings: {
+        ...baseSettings,
+        autoReloadEnabled: true,
+        smallImageEnabled: true,
+        blurImageEnabled: true,
+        whitelistEnabled: true,
+      },
+    };
+    const { container } = render(
+      <SettingsPanel {...defaultProps} column={col} />,
+    );
+    await user.click(
+      screen.getByRole("checkbox", { name: "ホワイトリストを有効にする" }),
+    );
+    expectAccessibleControls(container);
+  });
+
+  it("NGワード・ホワイトリスト・カスタムCSSの入力欄に名前が付く", () => {
+    render(<SettingsPanel {...defaultProps} />);
+    for (const name of [
+      "NGワード",
+      "リポストを非表示にするユーザー",
+      "ホワイトリスト",
+      "カスタム CSS",
+    ]) {
+      expect(screen.getByRole("textbox", { name })).toBeInTheDocument();
+    }
+  });
+
+  it("モバイルでもすべての入力欄とボタンにアクセシブルネームがある", () => {
+    const { container } = render(<SettingsPanel {...defaultProps} isMobile />);
+    expectAccessibleControls(container);
+  });
+
+  it("閉じたあと開く前にフォーカスしていた要素へフォーカスが戻る", () => {
+    const opener = document.createElement("button");
+    document.body.appendChild(opener);
+    opener.focus();
+
+    const { unmount } = render(<SettingsPanel {...defaultProps} />);
+    screen.getByRole("button", { name: "キャンセル" }).focus();
+    unmount();
+
+    expect(opener).toHaveFocus();
+    opener.remove();
+  });
+
+  it("閉じるボタンとキャンセルボタンで onClose が呼ばれる", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(<SettingsPanel {...defaultProps} onClose={onClose} />);
+
+    await user.click(screen.getByRole("button", { name: "閉じる" }));
+    await user.click(screen.getByRole("button", { name: "キャンセル" }));
+
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  it("ホワイトリストが無効の間は入力欄が無効で、有効にすると入力できる", async () => {
+    const user = userEvent.setup();
+    render(<SettingsPanel {...defaultProps} />);
+    const textarea = screen.getByRole("textbox", { name: "ホワイトリスト" });
+    expect(textarea).toBeDisabled();
+
+    await user.click(
+      screen.getByRole("checkbox", { name: "ホワイトリストを有効にする" }),
+    );
+
+    expect(textarea).toBeEnabled();
+  });
+
+  describe("状態を色だけで伝えない", () => {
+    const expectWarningMark = (message: HTMLElement) =>
+      expect(
+        message.querySelector('[aria-hidden="true"][data-kind="warning"]'),
+      ).not.toBeNull();
+
+    it("不正なNGワードのエラーには警告の記号が付く", async () => {
+      const user = userEvent.setup();
+      render(<SettingsPanel {...defaultProps} />);
+      await user.type(
+        screen.getByRole("textbox", { name: "NGワード" }),
+        "/[[/",
+      );
+      await user.click(screen.getByRole("button", { name: "適用" }));
+      expectWarningMark(screen.getByText("正規表現が不正です: /[/"));
+    });
+
+    it("不正なリポスト非表示ユーザーのエラーには警告の記号が付く", async () => {
+      const user = userEvent.setup();
+      render(<SettingsPanel {...defaultProps} />);
+      await user.type(
+        screen.getByRole("textbox", { name: "リポストを非表示にするユーザー" }),
+        "bad-id!",
+      );
+      await user.click(screen.getByRole("button", { name: "適用" }));
+      expectWarningMark(
+        screen.getByText(/はXのユーザーIDとして正しくありません/),
+      );
+    });
+
+    it("不正なホワイトリストのエラーには警告の記号が付く", async () => {
+      const user = userEvent.setup();
+      render(<SettingsPanel {...defaultProps} />);
+      await user.click(
+        screen.getByRole("checkbox", { name: "ホワイトリストを有効にする" }),
+      );
+      await user.type(
+        screen.getByRole("textbox", { name: "ホワイトリスト" }),
+        "/[[/",
+      );
+      await user.click(screen.getByRole("button", { name: "適用" }));
+      expectWarningMark(screen.getByText("正規表現が不正です: /[/"));
+    });
   });
 });

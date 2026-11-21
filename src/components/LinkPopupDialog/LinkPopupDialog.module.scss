@@ -1,3 +1,6 @@
+@use "../../styles/tokens" as t;
+@use "../../styles/mixins" as m;
+
 .overlay {
   position: fixed;
   top: 0;
@@ -9,7 +12,7 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 1rem;
+  padding: t.$space-3;
   box-sizing: border-box;
   overflow-y: auto;
 }
@@ -17,7 +20,7 @@
 .panel {
   background: var(--mcx-surface);
   border: 1px solid var(--mcx-border);
-  border-radius: 0.5rem;
+  border-radius: t.$radius-md;
   padding: 1.25rem;
   width: min(25rem, 100%);
   max-height: calc(100% - 2rem);
@@ -28,71 +31,104 @@
 
   h3 {
     margin: 0;
-    font-size: 0.875rem;
+    font-size: t.$font-size-md;
     color: var(--mcx-text);
     font-weight: normal;
   }
+}
 
-  input,
-  select {
+.input,
+.select {
+  background: var(--mcx-surface-sunken);
+  border: 1px solid var(--mcx-border-strong);
+  border-radius: t.$radius-sm;
+  color: var(--mcx-text);
+  font-size: t.$font-size-sm;
+  padding: t.$space-2 0.75rem;
+  width: 100%;
+  box-sizing: border-box;
+  @include m.transition-base(border-color);
+  @include m.android-tap-target;
+}
+
+.input:hover,
+.select:hover {
+  border-color: var(--mcx-text-muted);
+}
+
+.input:focus-visible,
+.select:focus-visible {
+  border-color: var(--mcx-accent);
+  @include m.focus-ring;
+}
+
+.select {
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  padding-right: 1.75rem;
+
+  option {
     background: var(--mcx-surface-sunken);
-    border: 1px solid var(--mcx-border);
-    border-radius: 0.25rem;
     color: var(--mcx-text);
-    font-size: 0.8125rem;
-    padding: 0.5rem 0.625rem;
-    width: 100%;
-    box-sizing: border-box;
-    outline: none;
-
-    &:focus {
-      border-color: var(--mcx-accent);
-    }
-  }
-
-  select {
-    -webkit-appearance: none;
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 0.5rem center;
-    padding-right: 1.75rem;
-
-    option {
-      background: var(--mcx-surface-sunken);
-      color: var(--mcx-text);
-    }
   }
 }
 
 .actions {
   display: flex;
   justify-content: flex-end;
-  gap: 0.5rem;
+  gap: t.$space-2;
 
-  button {
-    border: none;
-    border-radius: 0.25rem;
-    cursor: pointer;
-    font-size: 0.8125rem;
-    padding: 0.4375rem 1rem;
-  }
+  @include m.android-button-gap;
+}
+
+.cancelBtn,
+.okBtn {
+  border-radius: t.$radius-sm;
+  cursor: pointer;
+  font-size: t.$font-size-sm;
+  padding: t.$space-2 t.$space-3;
+  @include m.transition-base(background-color, border-color, color);
+  @include m.android-tap-target;
 }
 
 .cancelBtn {
   background: var(--mcx-surface-muted);
+  border: 1px solid var(--mcx-border-strong);
   color: var(--mcx-text-tertiary);
 
   &:hover {
     background: var(--mcx-surface-hover);
+    color: var(--mcx-text);
+  }
+
+  &:active {
+    background: var(--mcx-surface-hover);
+    border-color: var(--mcx-text-tertiary);
+  }
+
+  &:focus-visible {
+    @include m.focus-ring;
   }
 }
 
 .okBtn {
   background: var(--mcx-accent-fill);
+  border: none;
   color: var(--mcx-text-on-accent);
+  font-weight: bold;
 
   &:hover {
     background: var(--mcx-accent-hover);
+  }
+
+  &:active {
+    background: var(--mcx-accent-hover);
+  }
+
+  &:focus-visible {
+    @include m.focus-ring;
   }
 }

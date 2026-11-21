@@ -9,10 +9,19 @@ multi-column-x/
 │   ├── App.tsx                       # ルートコンポーネント・イベント配線
 │   ├── types/index.ts                # 型定義（Column, Account, GlobalSettings 等）
 │   ├── index.css                     # 配色トークン（--mcx-*）・テーマ別 CSS 変数
-│   ├── styles/_dialog-fullscreen.scss  # パネル型ダイアログを Android で全画面化するミキシン（詳細: ui-scale-notes.md）
+│   ├── styles/
+│   │   ├── _dialog-fullscreen.scss   # パネル型ダイアログを Android で全画面化するミキシン（詳細: ui-scale-notes.md）
+│   │   ├── _tokens.scss              # UI 共通デザイントークン（SCSS 変数: space / radius / font-size / duration / tap-target。詳細: ui-design-principles-notes.md）
+│   │   └── _mixins.scss              # focus-ring / transition-base / android-tap-target / android-button-gap
 │   ├── i18n/                         # 多言語対応の初期化（index.ts=i18next 初期化, resources.ts=辞書の集約, types.ts=AppTFunction 型。詳細: i18n-notes.md）
 │   ├── locales/{ja,en}/              # 画面文言の辞書（名前空間ごとの JSON。ja と en でキー集合を一致させる）
-│   ├── test-utils/japanese.ts        # 英語表示で日本語が残っていないことを検査するテスト用ヘルパー（expectNoJapanese）
+│   ├── test-utils/
+│   │   ├── japanese.ts               # 英語表示で日本語が残っていないことを検査するテスト用ヘルパー（expectNoJapanese）
+│   │   ├── scssBlocks.ts             # SCSS をセレクタ・宣言・include のブロックへ分解する最小パーサと *.module.scss の列挙（契約テスト用）
+│   │   ├── uiDesignRules.ts          # UI デザイン原則の検査ルール（checkGrid 等）と例外定数 GRID_EXEMPT / ANDROID_TAP_EXEMPT
+│   │   ├── a11y.ts                   # 操作要素がアクセシブルネームを持つことを検査する（expectAccessibleControls）
+│   │   ├── tapTargets.ts             # Story 用: Android の当たり判定・隣接ボタン間隔の実測と data-platform の切替
+│   │   └── storyTheme.ts             # Story 用: テーマ変数（installThemeTokens）と border-box リセット（installAppReset）の差し込み
 │   ├── constants/
 │   │   ├── ipc.ts                    # IPC 定数（コマンド名・イベント名・ラベル・スクリプト）
 │   │   ├── accountColors.ts          # アカウント識別色のパレット
@@ -21,6 +30,7 @@ multi-column-x/
 │   ├── lib/
 │   │   ├── gridLayout.ts             # グリッド座標計算（純粋関数・calculateGridBounds）
 │   │   ├── gridLayout.contract.test.ts  # SCSS の寸法と gridLayout の rem 定数の一致を検証する契約テスト
+│   │   ├── uiDesign.contract.test.ts # 全 *.module.scss が UI デザイン原則（余白・文字・動き・状態・枠色・Android 当たり判定）を満たすことを検証する契約テスト
 │   │   ├── uiScale.ts                # アプリUI倍率の決定ロジック・rem→px 変換（詳細: ui-scale-notes.md）
 │   │   ├── log.ts                    # 文脈名付きエラーロガー（plugin-log 連携）
 │   │   ├── appError.ts               # Rust の AppError（種別コード＋詳細）の判定と翻訳（describeAppError）
@@ -69,6 +79,7 @@ multi-column-x/
 │   │   ├── useUiScale.ts             # アプリUI倍率を <html> の font-size へ反映（端末倍率の測定含む）
 │   │   ├── useDialogState.ts         # ダイアログ開閉状態管理
 │   │   ├── useEscapeKey.ts           # Esc キーでのダイアログ/ポップアップ閉じる処理
+│   │   ├── useRestoreFocus.ts        # ダイアログを閉じたときに開く前の要素へフォーカスを戻す
 │   │   ├── useOutsideClick.ts        # 要素外クリック検出
 │   │   └── useKeyboardShortcuts.ts   # キーボードショートカット処理
 │   └── components/
@@ -76,6 +87,7 @@ multi-column-x/
 │       ├── AddColumnDialog/          # カラム追加ダイアログ
 │       ├── AccountManager/           # アカウント管理ダイアログ
 │       ├── AccountNameDialog/        # アカウント名入力ダイアログ
+│       ├── StatusMark/               # 成功・警告・選択中を色だけで伝えないための記号（✓ / ⚠）
 │       ├── ApiRateLimitIndicator/    # API レート制限モニターのツールバー表示
 │       ├── SettingsPanel/            # カラム個別設定パネル（SettingsSections.tsx=セクション部品, lineListInputs.ts=行リスト入力の parse / 検証）
 │       ├── AppSettingsPanel/         # アプリ全体設定

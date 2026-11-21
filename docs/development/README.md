@@ -16,6 +16,7 @@
 - [settings-file-crash-safety-notes.md](settings-file-crash-safety-notes.md) — settings.json のアトミック書き込み、起動時の検査と復旧、`.prev` 世代、読み込み失敗時の保存ガード
 - [browser-extensions-notes.md](browser-extensions-notes.md) — ブラウザ拡張機能（Windows のみ）：永続化（`browserExtensions` キー）、reconcile、WebView2 の PoC で確認した事実、不採用案、落とし穴、macOS / Linux を見送った調査結果
 - [i18n-notes.md](i18n-notes.md) — 多言語対応（日本語／英語）：辞書とキーの規約、名前空間、用語集、新規文言の追加手順、React 外・純粋関数での翻訳、`expectNoJapanese` によるテスト
+- [ui-design-principles-notes.md](ui-design-principles-notes.md) — UI デザイン原則のアプリ向け翻訳：余白 0.25rem 倍数・最小文字 12px・フォーカスリング・Android のみ 44px・契約テスト（全 `*.module.scss` を例外定数付きで検査）・共通トークン／ミキシン・Storybook の落とし穴
 - [ui-scale-notes.md](ui-scale-notes.md) — アプリUI表示サイズ（端末倍率への追従と設定での上書き）：`<html>` の font-size による倍率、UI 寸法の rem 規約、ネイティブ bounds 用の rem 定数、Android のパネル型ダイアログ全画面化
 - [external-link-new-window-notes.md](external-link-new-window-notes.md) — 外部リンクの新規ウィンドウ処理：`on_new_window` で http/https/mailto/tel を既定ブラウザで開き常に Deny する仕組み（iframe 内リンク対応）、`.disable_drag_drop_handler()`
 

@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { expect, userEvent, within } from "storybook/test";
 import { HelpPopover } from "@/components/HelpPopover/HelpPopover";
+import { installThemeTokens } from "@/test-utils/storyTheme";
+import { expectTapTargets, setPlatform } from "@/test-utils/tapTargets";
 
 // アプリは documentElement の data-theme でテーマを切り替えるため、Story でもそれに合わせる
 function ThemeRoot({
@@ -28,6 +30,13 @@ const meta: Meta<typeof HelpPopover> = {
   title: "Components/HelpPopover",
   component: HelpPopover,
   parameters: { layout: "centered" },
+  // Storybook は index.css を読まないため、--mcx-* のテーマ変数を Story 側で有効にする
+  decorators: [
+    (Story) => {
+      installThemeTokens();
+      return <Story />;
+    },
+  ],
   args: {
     label: "正規表現の書き方",
     children: (
@@ -84,4 +93,43 @@ export const DarkTheme: Story = {
       </ThemeRoot>
     ),
   ],
+};
+
+export const AndroidTapTarget: Story = {
+  name: "Android・トリガーが44px以上になる",
+  play: async ({ canvasElement }) => {
+    const restorePlatform = setPlatform("android");
+    try {
+      await expectTapTargets(canvasElement, 44);
+    } finally {
+      restorePlatform();
+    }
+  },
+};
+
+export const DesktopKeepsDensity: Story = {
+  name: "デスクトップ・トリガーは44px未満のまま密度が変わらない",
+  play: async ({ canvasElement, args }) => {
+    const restorePlatform = setPlatform("desktop");
+    try {
+      const trigger = within(canvasElement).getByRole("button", {
+        name: args.label,
+      });
+      await expect(trigger.getBoundingClientRect().height).toBeLessThan(44);
+    } finally {
+      restorePlatform();
+    }
+  },
+};
+
+export const KeyboardFocusShowsRing: Story = {
+  name: "キーボードでフォーカスしたトリガーにはフォーカスリングが出る",
+  play: async ({ canvasElement, args }) => {
+    const trigger = within(canvasElement).getByRole("button", {
+      name: args.label,
+    });
+    await userEvent.tab();
+    await expect(trigger).toHaveFocus();
+    await expect(getComputedStyle(trigger).outlineStyle).not.toBe("none");
+  },
 };

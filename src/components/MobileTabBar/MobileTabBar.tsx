@@ -179,9 +179,10 @@ export const MobileTabBar: React.FC<Props> = ({
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className={styles.tabBar}>
+    <nav className={styles.tabBar} aria-label={t("mobile:tabBarLabel")}>
       {swipeState && (
         <div
+          aria-hidden="true"
           className={[
             styles.swipeIndicator,
             swipeState.direction === "left"
@@ -215,6 +216,7 @@ export const MobileTabBar: React.FC<Props> = ({
       </div>
       <div className={styles.menu}>
         <button
+          type="button"
           className={styles.actionBtn}
           aria-label={t("mobile:composeTweet")}
           title={t("mobile:composeTweet")}
@@ -224,8 +226,11 @@ export const MobileTabBar: React.FC<Props> = ({
         </button>
 
         <button
+          type="button"
           className={styles.toggleBtn}
           onClick={() => setExpanded((prev) => !prev)}
+          aria-label={t("mobile:toggleMenu")}
+          aria-expanded={expanded}
           title={t("mobile:toggleMenu")}
         >
           {expanded ? (
@@ -245,6 +250,7 @@ export const MobileTabBar: React.FC<Props> = ({
         {expanded && (
           <div className={styles.actions}>
             <button
+              type="button"
               className={styles.actionBtn}
               aria-label={t("mobile:openLinkPopup")}
               title={t("mobile:openLinkPopup")}
@@ -253,6 +259,7 @@ export const MobileTabBar: React.FC<Props> = ({
               <LinkIcon width={18} height={18} data-testid="icon-link" />
             </button>
             <button
+              type="button"
               className={styles.actionBtn}
               aria-label={t("mobile:appSettings")}
               title={t("mobile:appSettings")}
@@ -265,6 +272,7 @@ export const MobileTabBar: React.FC<Props> = ({
               />
             </button>
             <button
+              type="button"
               className={styles.actionBtn}
               aria-label={t("mobile:accountManager")}
               title={t("mobile:accountManager")}
@@ -273,6 +281,7 @@ export const MobileTabBar: React.FC<Props> = ({
               <PersonIcon width={18} height={18} data-testid="icon-person" />
             </button>
             <button
+              type="button"
               className={styles.actionBtn}
               aria-label={t("mobile:addColumn")}
               title={t("mobile:addColumn")}
@@ -291,6 +300,6 @@ export const MobileTabBar: React.FC<Props> = ({
           </div>
         )}
       </div>
-    </div>
+    </nav>
   );
 };

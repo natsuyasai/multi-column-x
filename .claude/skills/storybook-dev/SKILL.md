@@ -105,6 +105,10 @@ import type { SomeType } from "@/types";
 
 `npm run lint:fix` で自動整列できる。
 
+## デザイン原則
+
+UI のスタイル・a11y（余白・文字サイズ・状態・フォーカスリング・Android の 44px）は `ui-design-principles` スキルに従う。Storybook は `src/index.css` を読まないため、`--mcx-*` を使う Story ではテーマ変数を Story 側で設定すること。
+
 ## 参考
 
 - `src/components/MobileTabBar/MobileTabBar.stories.tsx` — play function・テーマバリエーションの参考実装

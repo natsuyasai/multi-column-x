@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useId } from "react";
 import { useTranslation } from "react-i18next";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { useRestoreFocus } from "../../hooks/useRestoreFocus";
 import styles from "./WhatsNewDialog.module.scss";
 
 interface Props {
@@ -62,10 +64,20 @@ export const WhatsNewDialog: React.FC<Props> = ({
   onClose,
 }) => {
   const { t } = useTranslation();
+  useEscapeKey(onClose);
+  useRestoreFocus();
+  const titleId = useId();
   return (
     <div className={styles.overlay}>
-      <div className={styles.dialog}>
-        <h2 className={styles.title}>{t("dialogs:whatsNew.title")}</h2>
+      <div
+        className={styles.dialog}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
+        <h2 id={titleId} className={styles.title}>
+          {t("dialogs:whatsNew.title")}
+        </h2>
         {version && (
           <p className={styles.version}>
             {t("dialogs:whatsNew.version", { version })}

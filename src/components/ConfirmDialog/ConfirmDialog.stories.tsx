@@ -3,6 +3,12 @@ import type { ReactNode } from "react";
 import { useEffect, useLayoutEffect } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 import { ConfirmDialog } from "@/components/ConfirmDialog/ConfirmDialog";
+import { installThemeTokens } from "@/test-utils/storyTheme";
+import {
+  expectAdjacentGap,
+  expectTapTargets,
+  setPlatform,
+} from "@/test-utils/tapTargets";
 
 // アプリは documentElement の data-theme でテーマを切り替えるため、Story でもそれに合わせる
 function ThemeRoot({
@@ -93,6 +99,13 @@ const meta: Meta<typeof ConfirmDialog> = {
   title: "Components/ConfirmDialog",
   component: ConfirmDialog,
   parameters: { layout: "fullscreen" },
+  // Storybook は index.css を読まないため、--mcx-* のテーマ変数を Story 側で有効にする
+  decorators: [
+    (Story) => {
+      installThemeTokens();
+      return <Story />;
+    },
+  ],
   args: {
     title: "アカウントの削除",
     message: "「アカウントA」を削除しますか？セッションデータも削除されます。",
@@ -218,5 +231,66 @@ export const AndroidScrollableWhenTall: Story = {
     } finally {
       await restoreViewport();
     }
+  },
+};
+
+export const AndroidTapTargets: Story = {
+  name: "Android・すべての操作要素が44px以上で隣り合うボタンに間隔がある",
+  play: async ({ canvasElement }) => {
+    const restorePlatform = setPlatform("android");
+    try {
+      await expectTapTargets(canvasElement, 44);
+      await expectAdjacentGap(canvasElement, 8);
+    } finally {
+      restorePlatform();
+    }
+  },
+};
+
+export const DesktopKeepsDensity: Story = {
+  name: "デスクトップ・ボタンの高さは44px未満のまま密度が変わらない",
+  play: async ({ canvasElement }) => {
+    const restorePlatform = setPlatform("desktop");
+    try {
+      const canvas = within(canvasElement);
+      const button = canvas.getByRole("button", { name: "削除する" });
+      await expect(button.getBoundingClientRect().height).toBeLessThan(44);
+    } finally {
+      restorePlatform();
+    }
+  },
+};
+
+export const KeyboardFocusShowsRing: Story = {
+  name: "キーボードでフォーカスしたボタンにはフォーカスリングが出る",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.tab();
+    const focused = document.activeElement as HTMLElement;
+    await expect(focused).toBe(
+      canvas.getByRole("button", { name: "キャンセル" }),
+    );
+    await expect(getComputedStyle(focused).outlineStyle).not.toBe("none");
+    await expect(focused.matches(":focus-visible")).toBe(true);
+  },
+};
+
+export const MouseClickHidesRing: Story = {
+  name: "マウスでクリックしただけのボタンにはフォーカスリングが出ない",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const button = canvas.getByRole("button", { name: "キャンセル" });
+    // :focus-visible は入力の種類（マウス / キーボード）で決まる。合成イベントでは再現できないため、
+    // vitest の browser 実行時だけ実ブラウザのマウス操作でクリックする（Storybook の画面上では実行しない）
+    let realClick: ((element: Element) => Promise<void>) | undefined;
+    try {
+      const { userEvent: browserUser } = await import("vitest/browser");
+      realClick = (element) => browserUser.click(element);
+    } catch {
+      return;
+    }
+    await realClick(button);
+    await expect(document.activeElement).toBe(button);
+    await expect(getComputedStyle(button).outlineStyle).toBe("none");
   },
 };

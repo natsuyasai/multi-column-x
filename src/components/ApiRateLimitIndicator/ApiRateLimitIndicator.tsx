@@ -1,5 +1,6 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { StatusMark } from "@/components/StatusMark/StatusMark";
 import {
   getApiRateLimitDescription,
   getApiRateLimitLabel,
@@ -46,6 +47,16 @@ function formatResetLabel(resetUnixSeconds: number, t: AppTFunction): string {
     : t("rateLimit:indicator.resetInMinutes", { count: minutes });
 }
 
+/** 色に頼らず、警告・危険を支援技術へ伝える文言 */
+function severityText(
+  severity: Exclude<Severity, "normal">,
+  t: AppTFunction,
+): string {
+  return severity === "critical"
+    ? t("rateLimit:indicator.severityCritical")
+    : t("rateLimit:indicator.severityWarning");
+}
+
 function joinClassNames(...names: (string | false | undefined)[]): string {
   return names.filter(Boolean).join(" ");
 }
@@ -59,13 +70,23 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverId = useId();
+  const severityId = useId();
 
   const close = () => {
     setIsOpen(false);
     onOpenChange?.(false);
   };
 
-  useEscapeKey(close);
+  // Escape で閉じたときは、開いたトリガーへフォーカスを戻す（外側クリックではフォーカスを奪わない）
+  const closeByEscape = () => {
+    if (!isOpen) return;
+    close();
+    triggerRef.current?.focus();
+  };
+
+  useEscapeKey(closeByEscape);
   useOutsideClick(containerRef, close, isOpen);
 
   const overallSeverity = useMemo<Severity>(() => {
@@ -158,6 +179,14 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
                 return (
                   <li key={bucket.bucketKey} className={rowClassName}>
                     <div className={styles.bucketMain}>
+                      {severity !== "normal" && (
+                        <>
+                          <StatusMark kind="warning" />
+                          <span className={styles.visuallyHidden}>
+                            {severityText(severity, t)}
+                          </span>
+                        </>
+                      )}
                       <span className={styles.bucketLabel}>
                         {getApiRateLimitLabel(bucket.bucketKey, t)}
                       </span>
@@ -184,6 +213,7 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
   return (
     <div className={styles.container} ref={containerRef}>
       <button
+        ref={triggerRef}
         type="button"
         className={triggerClassName}
         onClick={() =>
@@ -195,10 +225,19 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
         }
         aria-label={t("rateLimit:indicator.triggerLabel")}
         aria-expanded={isOpen}
+        aria-haspopup="dialog"
+        aria-controls={isOpen ? popoverId : undefined}
+        aria-describedby={overallSeverity === "normal" ? undefined : severityId}
         title={t("rateLimit:indicator.triggerLabel")}
       >
+        {overallSeverity !== "normal" && <StatusMark kind="warning" />}
         API
       </button>
+      {overallSeverity !== "normal" && (
+        <span id={severityId} className={styles.visuallyHidden}>
+          {severityText(overallSeverity, t)}
+        </span>
+      )}
       {isOpen && isMobile && (
         <div
           className={styles.overlay}
@@ -208,6 +247,7 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
           role="presentation"
         >
           <div
+            id={popoverId}
             className={joinClassNames(styles.popover, styles.popoverMobile)}
             role="dialog"
             aria-label={t("rateLimit:indicator.listLabel")}
@@ -218,6 +258,7 @@ export const ApiRateLimitIndicator: React.FC<ApiRateLimitIndicatorProps> = ({
       )}
       {isOpen && !isMobile && (
         <div
+          id={popoverId}
           className={styles.popover}
           role="dialog"
           aria-label={t("rateLimit:indicator.listLabel")}

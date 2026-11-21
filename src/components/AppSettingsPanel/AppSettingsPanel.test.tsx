@@ -10,6 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import i18n from "@/i18n";
 import * as extensionsService from "@/services/extensions";
+import { expectAccessibleControls } from "@/test-utils/a11y";
 import { expectNoJapanese } from "@/test-utils/japanese";
 import type { GlobalSettings, Column, Account } from "../../types";
 import { AppSettingsPanel } from "./AppSettingsPanel";
@@ -571,9 +572,7 @@ describe("AppSettingsPanel モバイルのカラム並び替え", () => {
         accounts={mockAccounts}
       />,
     );
-    expect(
-      screen.getByRole("button", { name: "カラム配置" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "カラム配置" })).toBeInTheDocument();
   });
 
   it("isMobile=true でカラム配置タブを開くと表示順序セクションが表示される", () => {
@@ -584,7 +583,7 @@ describe("AppSettingsPanel モバイルのカラム並び替え", () => {
         accounts={mockAccounts}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "カラム配置" }));
+    fireEvent.click(screen.getByRole("tab", { name: "カラム配置" }));
     expect(screen.getByText("表示順序")).toBeInTheDocument();
   });
 
@@ -596,7 +595,7 @@ describe("AppSettingsPanel モバイルのカラム並び替え", () => {
         accounts={mockAccounts}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "カラム配置" }));
+    fireEvent.click(screen.getByRole("tab", { name: "カラム配置" }));
     // 列数入力（グリッドエディタ）が表示されない
     expect(screen.queryByText("列数:")).not.toBeInTheDocument();
   });
@@ -984,7 +983,7 @@ describe("AppSettingsPanel プリセット", () => {
         onClose={onClose}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "プリセット" }));
+    fireEvent.click(screen.getByRole("tab", { name: "プリセット" }));
     fireEvent.click(screen.getByRole("button", { name: "読み込む" }));
     expect(onLoadPreset).toHaveBeenCalledWith("preset-1");
     // ストアの loadPreset を直接呼ばず、onLoadPreset 経由のみで読み込むこと
@@ -1262,7 +1261,7 @@ describe("AppSettingsPanel バックアップタブ", () => {
     mockStoreState.isMobile = false;
     render(<AppSettingsPanel {...defaultProps} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "バックアップ" }));
+    fireEvent.click(screen.getByRole("tab", { name: "バックアップ" }));
 
     expect(
       screen.getByRole("button", { name: "バックアップを書き出す" }),
@@ -1277,7 +1276,7 @@ describe("AppSettingsPanel バックアップタブ", () => {
     render(<AppSettingsPanel {...defaultProps} />);
 
     expect(
-      screen.getByRole("button", { name: "バックアップ" }),
+      screen.getByRole("tab", { name: "バックアップ" }),
     ).toBeInTheDocument();
   });
 });
@@ -1723,7 +1722,7 @@ describe("AppSettingsPanel 拡張機能タブ", () => {
   it("Windowsでは設定画面に拡張機能の管理が表示される", async () => {
     render(<AppSettingsPanel {...defaultProps} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "拡張機能" }));
+    fireEvent.click(screen.getByRole("tab", { name: "拡張機能" }));
 
     expect(
       await screen.findByRole("button", { name: "フォルダを指定して追加" }),
@@ -1745,7 +1744,7 @@ describe("AppSettingsPanel 拡張機能タブ", () => {
       render(<AppSettingsPanel {...defaultProps} />);
 
       expect(
-        screen.queryByRole("button", { name: "拡張機能" }),
+        screen.queryByRole("tab", { name: "拡張機能" }),
       ).not.toBeInTheDocument();
     },
   );
@@ -1764,7 +1763,7 @@ describe("AppSettingsPanel 拡張機能タブ", () => {
         onExtensionsChanged={onExtensionsChanged}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "拡張機能" }));
+    fireEvent.click(screen.getByRole("tab", { name: "拡張機能" }));
 
     fireEvent.click(
       await screen.findByRole("button", { name: "フォルダを指定して追加" }),
@@ -1977,7 +1976,7 @@ describe("AppSettingsPanel 英語表示", () => {
     );
     expect(screen.getByText("Android only")).toBeInTheDocument();
     expectNoJapaneseOutsideLanguagePicker();
-    await user.click(screen.getByRole("button", { name: "Column layout" }));
+    await user.click(screen.getByRole("tab", { name: "Column layout" }));
     expect(screen.getByText("Display order")).toBeInTheDocument();
     expectNoJapaneseOutsideLanguagePicker();
   });
@@ -1991,7 +1990,7 @@ describe("AppSettingsPanel 英語表示", () => {
         columns={layoutColumns}
       />,
     );
-    await user.click(screen.getByRole("button", { name: "Column layout" }));
+    await user.click(screen.getByRole("tab", { name: "Column layout" }));
     expectNoJapaneseOutsideLanguagePicker();
 
     // 空きセルを選ぶと配置待ちの案内が出る
@@ -2016,7 +2015,7 @@ describe("AppSettingsPanel 英語表示", () => {
   it("表示言語が英語のときプリセットタブに日本語の文言が表示されない", async () => {
     const user = userEvent.setup();
     const { rerender } = render(<AppSettingsPanel {...defaultProps} />);
-    await user.click(screen.getByRole("button", { name: "Presets" }));
+    await user.click(screen.getByRole("tab", { name: "Presets" }));
     expect(screen.getByText("No saved presets")).toBeInTheDocument();
     expectNoJapaneseOutsideLanguagePicker();
 
@@ -2050,7 +2049,7 @@ describe("AppSettingsPanel 表示言語の動的な切り替え", () => {
     expect(screen.queryByText("アプリ設定")).not.toBeInTheDocument();
 
     // 開いたまま別タブへ移動しても英語のまま
-    await user.click(screen.getByRole("button", { name: "Presets" }));
+    await user.click(screen.getByRole("tab", { name: "Presets" }));
     expect(screen.getByText("No saved presets")).toBeInTheDocument();
   });
 
@@ -2087,5 +2086,255 @@ describe("AppSettingsPanel 表示言語の動的な切り替え", () => {
       ),
     ).toBeInTheDocument();
     expect(onApply).not.toHaveBeenCalled();
+  });
+});
+describe("AppSettingsPanel デザイン原則（アクセシビリティ）", () => {
+  const h264Failed = {
+    downloadApplicable: true,
+    h264Available: false,
+    downloadState: "error" as const,
+    downloadError: null,
+    onEnable: vi.fn(),
+    onRelaunch: vi.fn(),
+  };
+
+  it("見出しがダイアログの名前になり aria-modal が付く", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(screen.getByRole("dialog", { name: "アプリ設定" })).toHaveAttribute(
+      "aria-modal",
+      "true",
+    );
+  });
+
+  it("一般タブのすべての入力欄とボタンにアクセシブルネームがある", () => {
+    const { container } = render(
+      <AppSettingsPanel
+        {...defaultProps}
+        isLinux
+        h264Setup={h264Failed}
+        pendingDataDirectoryDeletionCount={1}
+      />,
+    );
+    expectAccessibleControls(container);
+  });
+
+  it("モバイルの一般タブでもすべての入力欄とボタンにアクセシブルネームがある", () => {
+    mockStoreState.isMobile = true;
+    const { container } = render(<AppSettingsPanel {...defaultProps} />);
+    expectAccessibleControls(container);
+  });
+
+  it("カラムデフォルトのカスタムCSSとグローバルNGワードの入力欄に名前が付く", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(
+      screen.getByRole("textbox", { name: "グローバルNGワード" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "カラムデフォルト - カスタムCSS" }),
+    ).toBeInTheDocument();
+  });
+
+  it("選択中のタブだけが selected になり、切り替えると移る", async () => {
+    const user = userEvent.setup();
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(screen.getAllByRole("tab", { selected: true })).toHaveLength(1);
+    expect(screen.getByRole("tab", { selected: true })).toHaveAccessibleName(
+      "一般",
+    );
+
+    await user.click(screen.getByRole("tab", { name: "カラム配置" }));
+
+    expect(screen.getAllByRole("tab", { selected: true })).toHaveLength(1);
+    expect(screen.getByRole("tab", { selected: true })).toHaveAccessibleName(
+      "カラム配置",
+    );
+  });
+
+  it("タブパネルは選択中のタブで名前が付き、タブから参照される", async () => {
+    const user = userEvent.setup();
+    render(<AppSettingsPanel {...defaultProps} />);
+    expect(screen.getByRole("tablist")).toBeInTheDocument();
+    expect(screen.getByRole("tabpanel")).toHaveAccessibleName("一般");
+    expect(screen.getByRole("tab", { name: "一般" })).toHaveAttribute(
+      "aria-controls",
+      screen.getByRole("tabpanel").id,
+    );
+
+    await user.click(screen.getByRole("tab", { name: "カラム配置" }));
+
+    expect(screen.getByRole("tabpanel")).toHaveAccessibleName("カラム配置");
+  });
+
+  it("閉じたあと開く前にフォーカスしていた要素へフォーカスが戻る", () => {
+    const opener = document.createElement("button");
+    document.body.appendChild(opener);
+    opener.focus();
+
+    const { unmount } = render(<AppSettingsPanel {...defaultProps} />);
+    screen.getByRole("button", { name: "キャンセル" }).focus();
+    unmount();
+
+    expect(opener).toHaveFocus();
+    opener.remove();
+  });
+
+  it("閉じるボタンで onClose が呼ばれる", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onClose={onClose} />);
+    await user.click(screen.getByRole("button", { name: "閉じる" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("表示サイズ・テーマの選択肢は選択中の項目だけ押下状態になる", () => {
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        settings={{
+          ...baseGlobalSettings,
+          columnScale: "large",
+          theme: "light",
+        }}
+      />,
+    );
+    const columnScale = within(
+      screen.getByRole("group", { name: "カラム内の表示サイズ" }),
+    );
+    expect(columnScale.getByRole("button", { name: "大" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(columnScale.getByRole("button", { name: "標準" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    const theme = within(screen.getByRole("group", { name: "テーマ" }));
+    expect(theme.getByRole("button", { name: "ライト" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(theme.getByRole("button", { name: "ダーク" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
+  it("変更チェックボックスがOFFの間は選択肢が無効でクリックしても選択状態が変わらない", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    const group = within(
+      screen.getByRole("group", { name: "カラム内の表示サイズ" }),
+    );
+    const before = group
+      .getAllByRole("button")
+      .map((b) => b.getAttribute("aria-pressed"));
+    const target = group.getByRole("button", { name: "大" });
+    expect(target).toBeDisabled();
+
+    fireEvent.click(target);
+
+    expect(
+      group.getAllByRole("button").map((b) => b.getAttribute("aria-pressed")),
+    ).toEqual(before);
+  });
+
+  it("更新確認中は更新確認ボタンが無効でクリックしても onCheckUpdate が呼ばれない", () => {
+    const onCheckUpdate = vi.fn();
+    render(
+      <AppSettingsPanel
+        {...defaultProps}
+        updateChecking
+        onCheckUpdate={onCheckUpdate}
+      />,
+    );
+    const button = screen.getByRole("button", { name: "確認中..." });
+    expect(button).toBeDisabled();
+
+    fireEvent.click(button);
+
+    expect(onCheckUpdate).not.toHaveBeenCalled();
+  });
+
+  describe("状態を色だけで伝えない", () => {
+    const markOf = (text: string) =>
+      screen
+        .getByText(text)
+        .querySelector('[aria-hidden="true"][data-kind]') as HTMLElement | null;
+
+    it("更新が最新のときは成功の記号が付く", () => {
+      render(<AppSettingsPanel {...defaultProps} updateManualResult="none" />);
+      expect(markOf("最新のバージョンです")).toHaveAttribute(
+        "data-kind",
+        "success",
+      );
+    });
+
+    it("更新確認に失敗したときは警告の記号が付く", () => {
+      render(<AppSettingsPanel {...defaultProps} updateManualResult="error" />);
+      expect(markOf("更新の確認に失敗しました")).toHaveAttribute(
+        "data-kind",
+        "warning",
+      );
+    });
+
+    it("データフォルダの削除に成功したときは成功の記号が付く", async () => {
+      render(
+        <AppSettingsPanel
+          {...defaultProps}
+          pendingDataDirectoryDeletionCount={1}
+        />,
+      );
+      fireEvent.click(
+        screen.getByRole("button", { name: "データフォルダの削除を再実行" }),
+      );
+      await screen.findByText("データフォルダを削除しました");
+      expect(markOf("データフォルダを削除しました")).toHaveAttribute(
+        "data-kind",
+        "success",
+      );
+    });
+
+    it("データフォルダの削除に一部失敗したときは警告の記号が付く", async () => {
+      render(
+        <AppSettingsPanel
+          {...defaultProps}
+          pendingDataDirectoryDeletionCount={2}
+          onRetryDataDirectoryDeletion={vi
+            .fn()
+            .mockResolvedValue({ remaining: 1 })}
+        />,
+      );
+      fireEvent.click(
+        screen.getByRole("button", { name: "データフォルダの削除を再実行" }),
+      );
+      await screen.findByText("1件のデータフォルダを削除できませんでした");
+      expect(
+        markOf("1件のデータフォルダを削除できませんでした"),
+      ).toHaveAttribute("data-kind", "warning");
+    });
+
+    it("H.264の取得に失敗したときは警告の記号が付く", () => {
+      render(
+        <AppSettingsPanel {...defaultProps} isLinux h264Setup={h264Failed} />,
+      );
+      const alert = screen.getByRole("alert");
+      expect(
+        alert.querySelector('[aria-hidden="true"][data-kind="warning"]'),
+      ).not.toBeNull();
+    });
+
+    it("不正な入力のエラーには警告の記号が付く", () => {
+      render(<AppSettingsPanel {...defaultProps} />);
+      fireEvent.change(
+        screen.getByRole("textbox", {
+          name: "リポストを非表示にするユーザー",
+        }),
+        { target: { value: "bad-id!" } },
+      );
+      fireEvent.click(screen.getByRole("button", { name: "適用" }));
+      const message = screen.getByText(/はXのユーザーIDとして正しくありません/);
+      expect(
+        message.querySelector('[aria-hidden="true"][data-kind="warning"]'),
+      ).not.toBeNull();
+    });
   });
 });

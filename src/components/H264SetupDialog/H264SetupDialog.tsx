@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useId, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useEscapeKey } from "@/hooks/useEscapeKey";
 import type {
   H264DownloadError,
   H264DownloadState,
 } from "@/hooks/useH264Setup";
+import { useRestoreFocus } from "@/hooks/useRestoreFocus";
 import { describeAppError } from "@/lib/appError";
 import styles from "./H264SetupDialog.module.scss";
 
@@ -28,6 +29,8 @@ export const H264SetupDialog: React.FC<Props> = ({
   onRelaunch,
 }) => {
   const { t } = useTranslation();
+  useRestoreFocus();
+  const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const primaryRef = useRef<HTMLButtonElement>(null);
   const downloading = downloadState === "downloading";
@@ -51,11 +54,11 @@ export const H264SetupDialog: React.FC<Props> = ({
         className={styles.dialog}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="h264-setup-title"
+        aria-labelledby={titleId}
         aria-busy={downloading}
         tabIndex={-1}
       >
-        <h2 id="h264-setup-title" className={styles.title}>
+        <h2 id={titleId} className={styles.title}>
           {t("dialogs:h264.title")}
         </h2>
 
@@ -95,7 +98,8 @@ export const H264SetupDialog: React.FC<Props> = ({
         {downloadState === "success" && (
           <>
             <p className={styles.status} role="status">
-              {t("dialogs:h264.success")}
+              <span aria-hidden="true">✓</span>
+              <span>{t("dialogs:h264.success")}</span>
             </p>
             <div className={styles.actions}>
               <button
@@ -120,9 +124,15 @@ export const H264SetupDialog: React.FC<Props> = ({
         {downloadState === "error" && (
           <>
             <p className={styles.error} role="alert">
-              {downloadError
-                ? describeAppError(downloadError, t)
-                : t("dialogs:h264.fallbackError")}
+              <span aria-hidden="true">⚠</span>
+              <strong className={styles.errorPrefix}>
+                {t("dialogs:h264.errorPrefix")}
+              </strong>
+              <span className={styles.errorMessage}>
+                {downloadError
+                  ? describeAppError(downloadError, t)
+                  : t("dialogs:h264.fallbackError")}
+              </span>
             </p>
             <div className={styles.actions}>
               <button

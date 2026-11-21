@@ -36,11 +36,13 @@ export const PresetsTab: React.FC<PresetsTabProps> = ({
           <input
             type="text"
             className={styles.nameInput}
+            aria-label={t("settings:presets.namePlaceholder")}
             placeholder={t("settings:presets.namePlaceholder")}
             value={presetName}
             onChange={(e) => setPresetName(e.target.value)}
           />
           <button
+            type="button"
             className={styles.saveBtn}
             onClick={handleSave}
             disabled={!presetName.trim()}
@@ -63,12 +65,14 @@ export const PresetsTab: React.FC<PresetsTabProps> = ({
                 <span className={styles.presetName}>{preset.name}</span>
                 <div className={styles.presetActions}>
                   <button
+                    type="button"
                     className={styles.loadBtn}
                     onClick={() => onLoad(preset.id)}
                   >
                     {t("settings:presets.load")}
                   </button>
                   <button
+                    type="button"
                     className={styles.deleteBtn}
                     onClick={() => onDelete(preset.id)}
                   >

@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { IPC_COMMANDS, WEBVIEW_LABELS } from "@/constants/ipc";
 import i18n from "@/i18n";
+import { expectAccessibleControls } from "@/test-utils/a11y";
 import { expectNoJapanese } from "@/test-utils/japanese";
 import { useAutoReload } from "../../hooks/useAutoReload";
 import type { Column, Account } from "../../types";
@@ -131,6 +132,28 @@ describe("ColumnHeader", () => {
         .querySelector('[title="カラムを閉じる"]')
         ?.querySelector('[data-testid="icon-close"]'),
     ).toBeInTheDocument();
+  });
+
+  it("アイコンだけのボタンを含むすべての操作要素がアクセシブルネームを持つ", () => {
+    const { container } = render(
+      <ColumnHeader {...defaultProps} unreadCount={2} />,
+    );
+    expectAccessibleControls(container);
+    expect(screen.getAllByRole("button")).toHaveLength(6);
+  });
+
+  it("ヘッダー全体がカラム名で名前付けられたグループになる", () => {
+    render(<ColumnHeader {...defaultProps} />);
+    expect(
+      screen.getByRole("group", { name: "テストアカウント - フォロー中" }),
+    ).toBeInTheDocument();
+  });
+
+  it("操作ボタンはすべて type=button でフォーム送信を起こさない", () => {
+    render(<ColumnHeader {...defaultProps} unreadCount={2} />);
+    for (const button of screen.getAllByRole("button")) {
+      expect(button).toHaveAttribute("type", "button");
+    }
   });
 
   it("unreadCount が 0 のとき未読バッジは表示されない", () => {

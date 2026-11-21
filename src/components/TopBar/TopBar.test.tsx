@@ -5,6 +5,7 @@ import { createElement } from "react";
 import type { ComponentProps } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import i18n from "@/i18n";
+import { expectAccessibleControls } from "@/test-utils/a11y";
 import { expectNoJapanese } from "@/test-utils/japanese";
 import type { Column, Account } from "../../types";
 import { TopBar } from "./TopBar";
@@ -718,6 +719,81 @@ describe("TopBar", () => {
         ).toBeInTheDocument();
       },
     );
+  });
+});
+
+describe("TopBar アクセシビリティ", () => {
+  it("折りたたみ時のアイコンだけのボタンもアクセシブルネームを持つ", () => {
+    const { container } = render(<TopBar {...defaultProps} />);
+    expectAccessibleControls(container);
+    // ツールバーの操作ボタン + カラムジャンプ 2 + 展開トグル + APIレート制限
+    expect(
+      screen.getByRole("button", { name: "ツイートを作成 (Ctrl+T)" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "アカウント1 - ホーム (Ctrl+1)" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "ツールバーを展開 (Ctrl+B)" }),
+    ).toBeInTheDocument();
+  });
+
+  it("文字を持たないアイコンだけのボタンは title とは別に aria-label を持つ", () => {
+    render(<TopBar {...defaultProps} />);
+    const iconOnly = screen
+      .getAllByRole("button")
+      .filter((button) => !(button.textContent ?? "").trim());
+    expect(iconOnly).toHaveLength(8);
+    for (const button of iconOnly) {
+      expect(button).toHaveAttribute("aria-label");
+    }
+  });
+
+  it("展開時もすべての操作要素がアクセシブルネームを持ち、見えているラベルが名前になる", () => {
+    const { container } = render(<TopBar {...defaultProps} expanded={true} />);
+    expectAccessibleControls(container);
+    expect(
+      screen.getByRole("button", { name: "ツイート" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: "カラムを閉じる" }),
+    ).toHaveLength(2);
+  });
+
+  it("ツールバー全体と並び順のカラム一覧が名前付きのランドマーク・グループになる", () => {
+    const { rerender } = render(<TopBar {...defaultProps} />);
+    expect(
+      screen.getByRole("navigation", { name: "ツールバー" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("group", { name: "カラム一覧" }),
+    ).toBeInTheDocument();
+
+    rerender(<TopBar {...defaultProps} expanded={true} />);
+    expect(
+      screen.getByRole("group", { name: "カラム一覧" }),
+    ).toBeInTheDocument();
+  });
+
+  it("展開トグルが展開状態を aria-expanded で伝える", () => {
+    const { rerender } = render(<TopBar {...defaultProps} expanded={false} />);
+    expect(
+      screen.getByRole("button", { name: "ツールバーを展開 (Ctrl+B)" }),
+    ).toHaveAttribute("aria-expanded", "false");
+
+    rerender(<TopBar {...defaultProps} expanded={true} />);
+    expect(
+      screen.getByRole("button", { name: "ツールバーを折りたたむ (Ctrl+B)" }),
+    ).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("操作ボタンはすべて type=button でフォーム送信を起こさない", () => {
+    render(<TopBar {...defaultProps} expanded={true} />);
+    const buttons = screen.getAllByRole("button");
+    expect(buttons.length).toBeGreaterThan(8);
+    for (const button of buttons) {
+      expect(button).toHaveAttribute("type", "button");
+    }
   });
 });
 

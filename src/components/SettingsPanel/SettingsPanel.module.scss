@@ -1,4 +1,6 @@
 @use "../../styles/dialog-fullscreen" as fs;
+@use "../../styles/tokens" as t;
+@use "../../styles/mixins" as m;
 
 .overlay {
   position: fixed;
@@ -11,7 +13,7 @@
   align-items: center;
   justify-content: center;
   z-index: 100;
-  padding: 1rem;
+  padding: t.$space-3;
   box-sizing: border-box;
   overflow-y: auto;
 
@@ -21,7 +23,7 @@
 .panel {
   background: var(--mcx-surface);
   border: 1px solid var(--mcx-border);
-  border-radius: 0.5rem;
+  border-radius: t.$radius-md;
   width: min(26.25rem, 100%);
   max-height: min(80%, calc(100% - 2rem));
   display: flex;
@@ -35,13 +37,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.25rem;
+  padding: t.$space-3 1.25rem;
   border-bottom: 1px solid var(--mcx-border-subtle);
   flex-shrink: 0;
 }
 
 .title {
-  font-size: 0.9375rem;
+  font-size: t.$font-size-base;
   font-weight: 600;
   color: var(--mcx-text);
 }
@@ -49,14 +51,27 @@
 .closeBtn {
   background: none;
   border: none;
+  border-radius: t.$radius-sm;
   color: var(--mcx-text-muted);
   cursor: pointer;
-  font-size: 1rem;
-  padding: 0.25rem;
+  font-size: t.$font-size-base;
+  padding: t.$space-1;
   line-height: 1;
+  @include m.transition-base(color, background-color);
+  @include m.android-tap-target;
 
   &:hover {
     color: var(--mcx-text-tertiary);
+    background: var(--mcx-surface-hover);
+  }
+
+  &:active {
+    color: var(--mcx-text);
+    background: var(--mcx-surface-muted);
+  }
+
+  &:focus-visible {
+    @include m.focus-ring;
   }
 }
 
@@ -68,48 +83,75 @@
 }
 
 .section {
-  padding: 1rem 1.25rem;
+  padding: t.$space-3 1.25rem;
   border-bottom: 1px solid var(--mcx-border-subtle);
   display: flex;
   flex-direction: column;
-  gap: 0.625rem;
+  gap: t.$space-2;
 }
 
 .sectionTitle {
-  font-size: 0.6875rem;
+  font-size: t.$font-size-xs;
   font-weight: 600;
   color: var(--mcx-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   display: flex;
   align-items: center;
-  gap: 0.375rem;
+  gap: t.$space-2;
 }
 
 .errorText {
   color: var(--mcx-danger);
-  font-size: 0.75rem;
+  font-size: t.$font-size-xs;
+}
+
+// 成功・警告を色だけで伝えないための記号（⚠）。読み上げは本文に任せるため aria-hidden にする
+.statusMark {
+  display: inline-block;
+  margin-right: t.$space-1;
+  font-weight: 700;
 }
 
 .hint {
-  font-size: 0.6875rem;
+  font-size: t.$font-size-xs;
   color: var(--mcx-text-muted);
   margin: 0;
 }
 
+// チェックボックスの input 自体は拡大せず、行全体（label）を押せる範囲として Android で 44px 以上にする
 .checkLabel {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8125rem;
+  gap: t.$space-2;
+  font-size: t.$font-size-sm;
   color: var(--mcx-text-secondary);
   cursor: pointer;
+  border-radius: t.$radius-sm;
+  @include m.transition-base(color);
+  @include m.android-tap-target;
 
   input[type="checkbox"] {
-    width: 0.875rem;
-    height: 0.875rem;
+    width: t.$space-3;
+    height: t.$space-3;
     accent-color: var(--mcx-accent);
-    cursor: pointer;
+  }
+
+  // フォーカスリングは input ではなく行全体に出す（二重にならないよう input 側は消す）
+  input[type="checkbox"]:focus-visible {
+    outline: none;
+  }
+
+  &:hover {
+    color: var(--mcx-text);
+  }
+
+  &:active {
+    color: var(--mcx-text);
+  }
+
+  &:has(input:focus-visible) {
+    @include m.focus-ring;
   }
 }
 
@@ -117,66 +159,86 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.8125rem;
+  gap: t.$space-2;
+  font-size: t.$font-size-sm;
   color: var(--mcx-text-secondary);
 }
 
 .fieldLabelBlock {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  font-size: 0.8125rem;
+  gap: t.$space-2;
+  font-size: t.$font-size-sm;
   color: var(--mcx-text-secondary);
 }
 
 .numberInput {
   background: var(--mcx-surface-sunken);
-  border: 1px solid var(--mcx-border);
-  border-radius: 0.25rem;
+  border: 1px solid var(--mcx-border-strong);
+  border-radius: t.$radius-sm;
   color: var(--mcx-text);
-  font-size: 0.8125rem;
-  padding: 0.4375rem 0.5rem;
+  font-size: t.$font-size-sm;
+  padding: t.$space-2;
   width: 5rem;
   text-align: center;
+  @include m.transition-base(border-color);
+  @include m.android-tap-target;
 
   &::-webkit-inner-spin-button {
-    margin-left: 0.25rem;
+    margin-left: t.$space-1;
   }
 
-  &:focus {
-    outline: none;
+  &:hover {
+    border-color: var(--mcx-text-muted);
+  }
+
+  &:focus-visible {
     border-color: var(--mcx-accent);
+    @include m.focus-ring;
   }
 }
 
 .textInput {
   background: var(--mcx-surface-sunken);
-  border: 1px solid var(--mcx-border);
-  border-radius: 0.25rem;
+  border: 1px solid var(--mcx-border-strong);
+  border-radius: t.$radius-sm;
   color: var(--mcx-text);
-  font-size: 0.8125rem;
-  padding: 0.4375rem 0.5rem;
+  font-size: t.$font-size-sm;
+  padding: t.$space-2;
   width: 7.5rem;
+  @include m.transition-base(border-color);
+  @include m.android-tap-target;
 
-  &:focus {
-    outline: none;
+  &:hover {
+    border-color: var(--mcx-text-muted);
+  }
+
+  &:focus-visible {
     border-color: var(--mcx-accent);
+    @include m.focus-ring;
   }
 }
 
+// スライダー（透明度）。Android では指で掴める高さを確保する
 .labelInput {
   background: var(--mcx-surface-sunken);
-  border: 1px solid var(--mcx-border);
-  border-radius: 0.25rem;
+  border: 1px solid var(--mcx-border-strong);
+  border-radius: t.$radius-sm;
   color: var(--mcx-text);
-  font-size: 0.8125rem;
-  padding: 0.4375rem 0.5rem;
+  font-size: t.$font-size-sm;
+  padding: t.$space-2;
   min-width: 0;
   box-sizing: border-box;
+  @include m.transition-base(border-color);
+  @include m.android-tap-target;
 
-  &:focus {
-    outline: none;
+  &:hover {
+    border-color: var(--mcx-text-muted);
+  }
+
+  &:focus-visible {
     border-color: var(--mcx-accent);
+    @include m.focus-ring;
   }
 
   &::placeholder {
@@ -186,19 +248,30 @@
 
 .cssTextarea {
   background: var(--mcx-surface-sunken);
-  border: 1px solid var(--mcx-border);
-  border-radius: 0.25rem;
+  border: 1px solid var(--mcx-border-strong);
+  border-radius: t.$radius-sm;
   color: var(--mcx-text);
   font-family: "Consolas", "Monaco", monospace;
-  font-size: 0.75rem;
+  font-size: t.$font-size-xs;
   height: 8.75rem;
-  padding: 0.5rem;
+  padding: t.$space-2;
   resize: vertical;
   width: 100%;
+  @include m.transition-base(border-color);
+  @include m.android-tap-target;
 
-  &:focus {
-    outline: none;
+  &:hover {
+    border-color: var(--mcx-text-muted);
+  }
+
+  &:focus-visible {
     border-color: var(--mcx-accent);
+    @include m.focus-ring;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
   }
 
   &::placeholder {
@@ -209,51 +282,88 @@
 .actions {
   display: flex;
   justify-content: flex-end;
-  gap: 0.5rem;
-  padding: 1rem 1.25rem;
+  gap: t.$space-2;
+  padding: t.$space-3 1.25rem;
   flex-shrink: 0;
+  flex-wrap: wrap;
+
+  @include m.android-button-gap;
 }
 
 .reloadBtn {
   background: var(--mcx-surface-muted);
-  border: 1px solid var(--mcx-border);
-  border-radius: 0.25rem;
+  border: 1px solid var(--mcx-border-strong);
+  border-radius: t.$radius-sm;
   color: var(--mcx-text-tertiary);
   cursor: pointer;
-  font-size: 0.8125rem;
-  padding: 0.4375rem 1rem;
+  font-size: t.$font-size-sm;
+  padding: t.$space-2 t.$space-3;
   margin-right: auto;
+  @include m.transition-base(background-color, border-color, color);
+  @include m.android-tap-target;
 
   &:hover {
     background: var(--mcx-surface-hover);
+    color: var(--mcx-text);
+  }
+
+  &:active {
+    background: var(--mcx-surface-hover);
+    border-color: var(--mcx-text-tertiary);
+  }
+
+  &:focus-visible {
+    @include m.focus-ring;
   }
 }
 
 .cancelBtn {
   background: var(--mcx-surface-muted);
-  border: 1px solid var(--mcx-border);
-  border-radius: 0.25rem;
+  border: 1px solid var(--mcx-border-strong);
+  border-radius: t.$radius-sm;
   color: var(--mcx-text-tertiary);
   cursor: pointer;
-  font-size: 0.8125rem;
-  padding: 0.4375rem 1rem;
+  font-size: t.$font-size-sm;
+  padding: t.$space-2 t.$space-3;
+  @include m.transition-base(background-color, border-color, color);
+  @include m.android-tap-target;
 
   &:hover {
     background: var(--mcx-surface-hover);
+    color: var(--mcx-text);
+  }
+
+  &:active {
+    background: var(--mcx-surface-hover);
+    border-color: var(--mcx-text-tertiary);
+  }
+
+  &:focus-visible {
+    @include m.focus-ring;
   }
 }
 
 .applyBtn {
   background: var(--mcx-accent-fill);
   border: none;
-  border-radius: 0.25rem;
+  border-radius: t.$radius-sm;
   color: var(--mcx-text-on-accent);
   cursor: pointer;
-  font-size: 0.8125rem;
+  font-size: t.$font-size-sm;
   font-weight: 600;
-  padding: 0.4375rem 1.25rem;
+  padding: t.$space-2 1.25rem;
+  @include m.transition-base(background-color);
+  @include m.android-tap-target;
 
   &:hover {
     background: var(--mcx-accent-hover);
+  }
+
+  &:active {
+    background: var(--mcx-accent-hover);
+  }
+
+  &:focus-visible {
+    @include m.focus-ring;
   }
 }

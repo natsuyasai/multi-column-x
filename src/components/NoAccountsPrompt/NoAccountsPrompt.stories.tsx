@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import { useEffect, useLayoutEffect } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 import { NoAccountsPrompt } from "@/components/NoAccountsPrompt/NoAccountsPrompt";
+import { installThemeTokens } from "@/test-utils/storyTheme";
+import { expectTapTargets, setPlatform } from "@/test-utils/tapTargets";
 
 // アプリは documentElement の data-theme でテーマを切り替えるため、Story でもそれに合わせる
 function ThemeRoot({
@@ -66,6 +68,13 @@ const meta: Meta<typeof NoAccountsPrompt> = {
   title: "Components/NoAccountsPrompt",
   component: NoAccountsPrompt,
   parameters: { layout: "fullscreen" },
+  // Storybook は index.css を読まないため、--mcx-* のテーマ変数を Story 側で有効にする
+  decorators: [
+    (Story) => {
+      installThemeTokens();
+      return <Story />;
+    },
+  ],
   args: { onOpenAccountManager: fn() },
 };
 
@@ -159,5 +168,31 @@ export const NormalScaleWideViewport: Story = {
     } finally {
       await restoreViewport();
     }
+  },
+};
+
+export const AndroidTapTarget: Story = {
+  name: "Android・アカウント管理を開くボタンが44px以上になる",
+  play: async ({ canvasElement }) => {
+    const restorePlatform = setPlatform("android");
+    try {
+      await expectTapTargets(canvasElement, 44);
+    } finally {
+      restorePlatform();
+    }
+  },
+};
+
+export const KeyboardFocusShowsRing: Story = {
+  name: "キーボードでフォーカスしたボタンにはフォーカスリングが出る",
+  play: async ({ canvasElement }) => {
+    await userEvent.tab();
+    const focused = document.activeElement as HTMLElement;
+    await expect(focused).toBe(
+      within(canvasElement).getByRole("button", {
+        name: "アカウント管理を開く",
+      }),
+    );
+    await expect(getComputedStyle(focused).outlineStyle).not.toBe("none");
   },
 };

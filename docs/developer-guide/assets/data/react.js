@@ -129,10 +129,25 @@ Object.assign(window.MCX_DATA.details, {
   "react.styles": {
     title: "styles/ と index.css",
     layer: "react",
-    summary: "配色トークン（index.css）と SCSS の共有ミキシン（styles/）。",
-    body: "<p><code>index.css</code> に配色トークン（<code>--mcx-*</code>）。パネル型ダイアログの Android 全画面化は <code>styles/_dialog-fullscreen.scss</code> のミキシンを使う。寸法は <code>rem</code> で書く。</p>",
-    files: ["src/index.css", "src/styles/_dialog-fullscreen.scss"],
-    docs: ["../development/ui-scale-notes.md"],
+    summary:
+      "配色トークン（index.css）と、SCSS の共有トークン・ミキシン（styles/）。",
+    body:
+      "<p><code>index.css</code> に配色トークン（<code>--mcx-*</code>）とグローバル既定（<code>:focus-visible</code>・<code>:disabled</code>・<code>prefers-reduced-motion</code>）。寸法は <code>rem</code> で書く。</p>" +
+      "<ul><li><b>_tokens.scss</b>: 余白・角丸・文字サイズ・動きの時間・タップ領域の SCSS 変数。Storybook は <code>index.css</code> を読まないため CSS 変数ではなく SCSS 変数。</li>" +
+      "<li><b>_mixins.scss</b>: <code>focus-ring</code> / <code>transition-base</code> / <code>android-tap-target</code> / <code>android-button-gap</code>。</li>" +
+      "<li><b>_dialog-fullscreen.scss</b>: パネル型ダイアログの Android 全画面化。</li></ul>" +
+      "<p>各 <code>*.module.scss</code> は契約テスト <code>uiDesign.contract.test.ts</code> が検査する（余白は 0.25rem の倍数・最小文字 0.75rem・状態の定義・Android の 44px など。除外リストは無い）。</p>",
+    files: [
+      "src/index.css",
+      "src/styles/_tokens.scss",
+      "src/styles/_mixins.scss",
+      "src/styles/_dialog-fullscreen.scss",
+      "src/lib/uiDesign.contract.test.ts",
+    ],
+    docs: [
+      "../development/ui-design-principles-notes.md",
+      "../development/ui-scale-notes.md",
+    ],
   },
   "react.types": {
     title: "types/index.ts",
@@ -736,6 +751,15 @@ Object.assign(window.MCX_DATA.catalogs, {
         files: ["src/components/NoAccountsPrompt/NoAccountsPrompt.tsx"],
       },
       {
+        name: "StatusMark",
+        summary: "成功・警告・選択中を色だけで伝えないための記号（✓ / ⚠）。",
+        kind: "部品",
+        detail:
+          '<p>props: <code>kind: "success" | "warning" | "selected"</code>。<code>aria-hidden</code> で、読み上げは隣の本文に任せる。</p>',
+        files: ["src/components/StatusMark/StatusMark.tsx"],
+        docs: ["../development/ui-design-principles-notes.md"],
+      },
+      {
         name: "HelpPopover",
         summary: "設定項目横の「？」ヘルプ用ポップオーバー。",
         kind: "部品",
@@ -925,6 +949,14 @@ Object.assign(window.MCX_DATA.catalogs, {
         summary: "Esc キーで閉じる・外側クリックで閉じる共通フック。",
         area: "UI",
         files: ["src/hooks/useEscapeKey.ts", "src/hooks/useOutsideClick.ts"],
+      },
+      {
+        name: "useRestoreFocus",
+        summary:
+          "ダイアログを閉じたとき、開く前にフォーカスしていた要素へ戻す。",
+        area: "UI",
+        files: ["src/hooks/useRestoreFocus.ts"],
+        docs: ["../development/ui-design-principles-notes.md"],
       },
     ],
   },

@@ -3,6 +3,12 @@ import type { ReactNode } from "react";
 import { useEffect, useLayoutEffect } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 import { LinkPopupDialog } from "@/components/LinkPopupDialog/LinkPopupDialog";
+import { installThemeTokens } from "@/test-utils/storyTheme";
+import {
+  expectAdjacentGap,
+  expectTapTargets,
+  setPlatform,
+} from "@/test-utils/tapTargets";
 import type { Account } from "@/types";
 
 const accounts: Account[] = [
@@ -111,6 +117,13 @@ const meta: Meta<typeof LinkPopupDialog> = {
   title: "Components/LinkPopupDialog",
   component: LinkPopupDialog,
   parameters: { layout: "fullscreen" },
+  // Storybook は index.css を読まないため、--mcx-* のテーマ変数を Story 側で有効にする
+  decorators: [
+    (Story) => {
+      installThemeTokens();
+      return <Story />;
+    },
+  ],
   args: {
     accounts,
     defaultAccountId: "acc-1",
@@ -201,5 +214,28 @@ export const AndroidFitsLargeScale: Story = {
     } finally {
       await restoreViewport();
     }
+  },
+};
+
+export const AndroidTapTargets: Story = {
+  name: "Android・すべての操作要素が44px以上で隣り合うボタンに間隔がある",
+  play: async ({ canvasElement }) => {
+    const restorePlatform = setPlatform("android");
+    try {
+      await expectTapTargets(canvasElement, 44);
+      await expectAdjacentGap(canvasElement, 8);
+    } finally {
+      restorePlatform();
+    }
+  },
+};
+
+export const FocusedInputShowsRing: Story = {
+  name: "フォーカスした入力欄にはフォーカスリングが出る",
+  play: async ({ canvasElement }) => {
+    const input =
+      within(canvasElement).getByPlaceholderText("https://x.com/...");
+    await expect(input).toHaveFocus();
+    await expect(getComputedStyle(input).outlineStyle).not.toBe("none");
   },
 };

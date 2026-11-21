@@ -1,5 +1,7 @@
 import { render, screen, fireEvent, within } from "@testing-library/react";
+import type React from "react";
 import { describe, it, expect, vi } from "vitest";
+import { expectAccessibleControls } from "@/test-utils/a11y";
 import type { Account, Column } from "../../types";
 import { ColumnLayoutTab } from "./ColumnLayoutTab";
 
@@ -591,5 +593,122 @@ describe("ColumnLayoutTab カラム順序", () => {
       />,
     );
     expect(screen.getAllByLabelText("ドラッグして並び替え")).toHaveLength(2);
+  });
+});
+
+describe("ColumnLayoutTab デザイン原則（アクセシビリティ）", () => {
+  const renderTab = (
+    props: Partial<React.ComponentProps<typeof ColumnLayoutTab>> = {},
+  ) =>
+    render(
+      <ColumnLayoutTab
+        columns={mockColumns}
+        accounts={mockAccounts}
+        onApply={vi.fn()}
+        onCancel={vi.fn()}
+        {...props}
+      />,
+    );
+  const cellOf = (label: string) =>
+    within(screen.getByTestId("grid-preview")).getByLabelText(label);
+  const selectedMark = '[aria-hidden="true"][data-kind="selected"]';
+
+  it("デスクトップのすべての入力欄とボタンにアクセシブルネームがある", () => {
+    const { container } = renderTab();
+    expectAccessibleControls(container);
+  });
+
+  it("モバイルのすべてのボタンにアクセシブルネームがある", () => {
+    const { container } = renderTab({ isMobile: true });
+    expectAccessibleControls(container);
+  });
+
+  it("高さ設定（固定）を開いた状態でもすべての入力欄にアクセシブルネームがある", () => {
+    const { container } = renderTab();
+    fireEvent.click(cellOf("列1行1のセル"));
+    fireEvent.click(screen.getByRole("radio", { name: "固定:" }));
+
+    expect(screen.getByRole("spinbutton", { name: "高さの値" })).toBeVisible();
+    expect(screen.getByRole("combobox", { name: "高さの単位" })).toBeVisible();
+    expectAccessibleControls(container);
+  });
+
+  it("列数の入力欄に名前が付く", () => {
+    renderTab();
+    expect(screen.getByRole("spinbutton", { name: "列数:" })).toBeVisible();
+  });
+
+  it("選択したセルだけが押下状態になり、記号でも示される", () => {
+    renderTab();
+    const first = cellOf("列1行1のセル");
+    const second = cellOf("列2行1のセル");
+    expect(first).toHaveAttribute("aria-pressed", "false");
+    expect(first.querySelector(selectedMark)).toBeNull();
+
+    fireEvent.click(first);
+
+    expect(first).toHaveAttribute("aria-pressed", "true");
+    expect(first.querySelector(selectedMark)).not.toBeNull();
+    expect(second).toHaveAttribute("aria-pressed", "false");
+    expect(second.querySelector(selectedMark)).toBeNull();
+  });
+
+  it("配置先として選んだ空セルは押下状態になり、記号でも示される", () => {
+    renderTab();
+    fireEvent.click(screen.getAllByLabelText("割り当て解除")[0]);
+    const empty = cellOf("列1行1のセル");
+    expect(empty).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(empty);
+
+    expect(empty).toHaveAttribute("aria-pressed", "true");
+    expect(empty.querySelector(selectedMark)).not.toBeNull();
+  });
+
+  it("セルはキーボードで操作でき、フォーカス可能なボタンとして公開される", () => {
+    renderTab();
+    const cell = cellOf("列1行1のセル");
+    expect(cell).toHaveAttribute("role", "button");
+    expect(cell).toHaveAttribute("tabindex", "0");
+  });
+
+  it("ドラッグの代わりに上へ・下へのボタンで並び替えられ、端のボタンは無効", () => {
+    renderTab();
+    const order = within(screen.getByTestId("order-list"));
+    const up = order.getAllByRole("button", { name: "上へ" });
+    const down = order.getAllByRole("button", { name: "下へ" });
+    expect(up[0]).toBeDisabled();
+    expect(down[down.length - 1]).toBeDisabled();
+    expect(up[1]).toBeEnabled();
+  });
+
+  it("セルを選ぶ前は未割当のカラムのボタンが無効でクリックしても割り当てられない", () => {
+    renderTab();
+    fireEvent.click(screen.getAllByLabelText("割り当て解除")[0]);
+    const section = screen.getByText("未割当").parentElement!;
+    const item = within(section).getByRole("button", {
+      name: /テストアカウント/,
+    });
+    expect(item).toBeDisabled();
+
+    fireEvent.click(item);
+
+    expect(
+      within(screen.getByText("未割当").parentElement!).getByRole("button", {
+        name: /テストアカウント/,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("キャンセルと適用のボタンがそれぞれのコールバックを呼ぶ", () => {
+    const onApply = vi.fn();
+    const onCancel = vi.fn();
+    renderTab({ onApply, onCancel });
+
+    fireEvent.click(screen.getByRole("button", { name: "キャンセル" }));
+    fireEvent.click(screen.getByRole("button", { name: "適用" }));
+
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onApply).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,6 +1,8 @@
 import { render, screen, fireEvent } from "@testing-library/react";
+import type React from "react";
 import { describe, it, expect, vi } from "vitest";
 import i18n from "@/i18n";
+import { expectAccessibleControls } from "@/test-utils/a11y";
 import { expectNoJapanese } from "@/test-utils/japanese";
 import type { Account } from "../../types";
 import { LinkPopupDialog } from "./LinkPopupDialog";
@@ -210,6 +212,73 @@ describe("LinkPopupDialog", () => {
     expect(
       screen.getByText("URLをポップアップウィンドウで開く"),
     ).toBeInTheDocument();
+  });
+});
+
+describe("LinkPopupDialog のダイアログのアクセシビリティ", () => {
+  const renderDialog = (
+    props: Partial<React.ComponentProps<typeof LinkPopupDialog>> = {},
+  ) =>
+    render(
+      <LinkPopupDialog
+        accounts={mockAccounts}
+        defaultAccountId="acc-1"
+        onSubmit={vi.fn()}
+        onClose={vi.fn()}
+        {...props}
+      />,
+    );
+
+  it("既定の見出しがダイアログの名前になり aria-modal が付く", () => {
+    renderDialog();
+    expect(
+      screen.getByRole("dialog", { name: "URLをポップアップウィンドウで開く" }),
+    ).toHaveAttribute("aria-modal", "true");
+  });
+
+  it("titleを指定したときはその見出しがダイアログの名前になる", () => {
+    renderDialog({ title: "公式設定を開く" });
+    expect(
+      screen.getByRole("dialog", { name: "公式設定を開く" }),
+    ).toBeInTheDocument();
+  });
+
+  it("URL入力欄とアカウント選択とボタンにアクセシブルネームがある", () => {
+    const { container } = renderDialog();
+    expectAccessibleControls(container);
+    expect(screen.getByRole("textbox", { name: "URL" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("combobox", { name: "アカウント" }),
+    ).toBeInTheDocument();
+  });
+
+  it("Escapeで1回だけ閉じる", () => {
+    const onClose = vi.fn();
+    renderDialog({ onClose });
+    fireEvent.keyDown(screen.getByPlaceholderText("https://x.com/..."), {
+      key: "Escape",
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("URL入力欄が無い固定URLのときもEscapeで閉じる", () => {
+    const onClose = vi.fn();
+    renderDialog({ onClose, fixedUrl: "https://x.com/settings" });
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("閉じたあと開く前にフォーカスしていた要素へフォーカスが戻る", () => {
+    const opener = document.createElement("button");
+    document.body.appendChild(opener);
+    opener.focus();
+
+    const { unmount } = renderDialog();
+    expect(screen.getByPlaceholderText("https://x.com/...")).toHaveFocus();
+    unmount();
+
+    expect(opener).toHaveFocus();
+    opener.remove();
   });
 });
 

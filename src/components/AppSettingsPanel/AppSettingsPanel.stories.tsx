@@ -5,6 +5,12 @@ import { expect, fn, userEvent, within } from "storybook/test";
 import { AppSettingsPanel } from "@/components/AppSettingsPanel/AppSettingsPanel";
 import i18n from "@/i18n";
 import { useAppStore } from "@/store/useAppStore";
+import { installThemeTokens } from "@/test-utils/storyTheme";
+import {
+  expectAdjacentGap,
+  expectTapTargets,
+  setPlatform,
+} from "@/test-utils/tapTargets";
 import type { Account, Column, GlobalSettings } from "@/types";
 
 const columnSettings = {
@@ -174,6 +180,13 @@ const meta: Meta<typeof AppSettingsPanel> = {
   title: "Components/AppSettingsPanel",
   component: AppSettingsPanel,
   parameters: { layout: "fullscreen" },
+  // Storybook は index.css を読まないため、--mcx-* のテーマ変数を Story 側で有効にする
+  decorators: [
+    (Story) => {
+      installThemeTokens();
+      return <Story />;
+    },
+  ],
   args: {
     settings: globalSettings,
     columns,
@@ -206,10 +219,10 @@ export const Default: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getByText("アプリ設定")).toBeInTheDocument();
     // カラム配置タブに切り替えると表示順序セクションが表示される
-    await userEvent.click(canvas.getByRole("button", { name: "カラム配置" }));
+    await userEvent.click(canvas.getByRole("tab", { name: "カラム配置" }));
     await expect(canvas.getByText("表示順序")).toBeInTheDocument();
     // プリセットタブに切り替えると保存セクションが表示される
-    await userEvent.click(canvas.getByRole("button", { name: "プリセット" }));
+    await userEvent.click(canvas.getByRole("tab", { name: "プリセット" }));
     await expect(
       canvas.getByPlaceholderText("プリセット名を入力"),
     ).toBeInTheDocument();
@@ -797,6 +810,93 @@ export const AndroidLargeScaleNoOverflow: Story = {
       await expect(root.scrollWidth).toBeLessThanOrEqual(root.clientWidth);
     } finally {
       await restoreViewport();
+    }
+  },
+};
+
+export const AndroidTapTargets: Story = {
+  name: "Android・設定の操作要素がすべて44px以上で隣り合うボタンに間隔がある",
+  args: {
+    updateManualResult: "error",
+    pendingDataDirectoryDeletionCount: 1,
+  },
+  decorators: [
+    (Story) => (
+      <MobileRoot>
+        <Story />
+      </MobileRoot>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const restorePlatform = setPlatform("android");
+    const restoreViewport = await narrowViewport(360, 640);
+    try {
+      await expectTapTargets(canvasElement, 44);
+      await expectAdjacentGap(canvasElement, 8);
+    } finally {
+      await restoreViewport();
+      restorePlatform();
+    }
+  },
+};
+
+export const KeyboardFocusShowsRing: Story = {
+  name: "キーボードでフォーカスしたボタンにはフォーカスリングが出る",
+  play: async ({ canvasElement }) => {
+    await userEvent.tab();
+    const focused = document.activeElement as HTMLElement;
+    await expect(focused).toBe(
+      within(canvasElement).getByRole("button", { name: "閉じる" }),
+    );
+    await expect(getComputedStyle(focused).outlineStyle).not.toBe("none");
+  },
+};
+
+export const KeyboardFocusRingOnCheckboxRow: Story = {
+  name: "キーボードでチェックボックスにフォーカスすると行全体にフォーカスリングが出る",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const checkbox = canvas.getByRole("checkbox", {
+      name: "Escキーで閉じる",
+    });
+    // キーボードの Tab 送りで到達させる（プログラムからの focus() では focus-visible にならないことがある）
+    for (let i = 0; i < 40 && document.activeElement !== checkbox; i++) {
+      await userEvent.tab();
+    }
+    await expect(document.activeElement).toBe(checkbox);
+    const label = checkbox.closest("label") as HTMLElement;
+    await expect(getComputedStyle(label).outlineStyle).not.toBe("none");
+  },
+};
+
+export const AndroidOtherTabsTapTargets: Story = {
+  name: "Android・カラム配置とバックアップのタブを開いても操作要素が44px以上で間隔があり横にはみ出さない",
+  decorators: [
+    (Story) => (
+      <MobileRoot>
+        <Story />
+      </MobileRoot>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const restorePlatform = setPlatform("android");
+    const restoreViewport = await narrowViewport(360, 640);
+    try {
+      const root = document.documentElement;
+      for (const name of ["カラム配置", "バックアップ"]) {
+        await userEvent.click(canvas.getByRole("tab", { name }));
+        await expect(canvas.getByRole("tab", { name })).toHaveAttribute(
+          "aria-selected",
+          "true",
+        );
+        await expectTapTargets(canvasElement, 44);
+        await expectAdjacentGap(canvasElement, 8);
+        await expect(root.scrollWidth).toBeLessThanOrEqual(root.clientWidth);
+      }
+    } finally {
+      await restoreViewport();
+      restorePlatform();
     }
   },
 };

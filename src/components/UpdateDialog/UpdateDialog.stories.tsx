@@ -4,6 +4,12 @@ import { useEffect, useLayoutEffect } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 import { UpdateDialog } from "@/components/UpdateDialog/UpdateDialog";
 import type { AppUpdate } from "@/services/updater";
+import { installThemeTokens } from "@/test-utils/storyTheme";
+import {
+  expectAdjacentGap,
+  expectTapTargets,
+  setPlatform,
+} from "@/test-utils/tapTargets";
 
 const update: AppUpdate = {
   version: "1.2.0",
@@ -99,6 +105,13 @@ const meta: Meta<typeof UpdateDialog> = {
   title: "Components/UpdateDialog",
   component: UpdateDialog,
   parameters: { layout: "fullscreen" },
+  // Storybook は index.css を読まないため、--mcx-* のテーマ変数を Story 側で有効にする
+  decorators: [
+    (Story) => {
+      installThemeTokens();
+      return <Story />;
+    },
+  ],
   args: {
     update,
     installing: false,
@@ -142,6 +155,9 @@ export const InstallFailed: Story = {
     await expect(alert).toHaveTextContent(
       "更新のインストールに失敗しました。時間をおいて再度お試しください。",
     );
+    // 色だけでなくアイコンと接頭ラベルでもエラーだと分かる
+    await expect(within(alert).getByText("エラー:")).toBeInTheDocument();
+    await expect(alert.querySelector('[aria-hidden="true"]')).not.toBeNull();
     // 失敗表示中も更新ボタンは押せる状態
     await expect(canvas.getByText("更新する")).toBeEnabled();
   },
@@ -186,5 +202,43 @@ export const AndroidFitsLargeScale: Story = {
     } finally {
       await restoreViewport();
     }
+  },
+};
+
+export const InstallingLooksDisabled: Story = {
+  name: "更新中は両方のボタンが無効で見た目でも無効だと分かる",
+  args: { installing: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    for (const name of ["後で", "更新中..."]) {
+      const button = canvas.getByRole("button", { name });
+      await expect(button).toBeDisabled();
+      await expect(Number(getComputedStyle(button).opacity)).toBeLessThan(1);
+      await expect(getComputedStyle(button).cursor).toBe("not-allowed");
+    }
+  },
+};
+
+export const AndroidTapTargets: Story = {
+  name: "Android・すべての操作要素が44px以上で隣り合うボタンに間隔がある",
+  play: async ({ canvasElement }) => {
+    const restorePlatform = setPlatform("android");
+    try {
+      await expectTapTargets(canvasElement, 44);
+      await expectAdjacentGap(canvasElement, 8);
+    } finally {
+      restorePlatform();
+    }
+  },
+};
+
+export const KeyboardFocusShowsRing: Story = {
+  name: "キーボードでフォーカスしたボタンにはフォーカスリングが出る",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.tab();
+    const focused = document.activeElement as HTMLElement;
+    await expect(focused).toBe(canvas.getByRole("button", { name: "後で" }));
+    await expect(getComputedStyle(focused).outlineStyle).not.toBe("none");
   },
 };

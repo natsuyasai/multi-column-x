@@ -4,6 +4,12 @@ import { useEffect } from "react";
 import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 import { ExtensionsTab } from "@/components/AppSettingsPanel/ExtensionsTab";
 import i18n from "@/i18n";
+import { installThemeTokens } from "@/test-utils/storyTheme";
+import {
+  expectAdjacentGap,
+  expectTapTargets,
+  setPlatform,
+} from "@/test-utils/tapTargets";
 import type { DetectResult, ExtensionEntry } from "@/types";
 
 const folderExtension: ExtensionEntry = {
@@ -140,10 +146,31 @@ const services = createStatefulServices([
   missingExtension,
 ]);
 
+// 狭い画面（スマホ幅）を再現するため、vitest の browser 実行時だけ viewport を絞る。戻す関数を返す。
+// Storybook の画面上で開いた場合は viewport を変えられないので何もしない
+async function narrowViewport(width: number, height: number) {
+  const originalWidth = window.innerWidth;
+  const originalHeight = window.innerHeight;
+  try {
+    const { page } = await import("vitest/browser");
+    await page.viewport(width, height);
+    return () => page.viewport(originalWidth, originalHeight);
+  } catch {
+    return async () => {};
+  }
+}
+
 const meta: Meta<typeof ExtensionsTab> = {
   title: "Components/AppSettingsPanel/ExtensionsTab",
   component: ExtensionsTab,
   parameters: { layout: "fullscreen" },
+  // Storybook は index.css を読まないため、--mcx-* のテーマ変数を Story 側で有効にする
+  decorators: [
+    (Story) => {
+      installThemeTokens();
+      return <Story />;
+    },
+  ],
   args: {
     accountId: "acc-1",
     onExtensionsChanged: fn(),
@@ -430,4 +457,55 @@ export const Dark: Story = {
       </ThemeRoot>
     ),
   ],
+};
+
+export const AndroidTapTargets: Story = {
+  name: "Android・拡張機能の一覧と検出候補の操作要素が44px以上で横にはみ出さない",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const restorePlatform = setPlatform("android");
+    const restoreViewport = await narrowViewport(360, 640);
+    try {
+      await canvas.findByText("フォルダから追加した拡張");
+      await userEvent.click(
+        canvas.getByRole("button", { name: "ブラウザから検出" }),
+      );
+      await canvas.findByText("未追加の候補");
+      await expectTapTargets(canvasElement, 44);
+      await expectAdjacentGap(canvasElement, 8);
+      const root = document.documentElement;
+      await expect(root.scrollWidth).toBeLessThanOrEqual(root.clientWidth);
+    } finally {
+      await restoreViewport();
+      restorePlatform();
+    }
+  },
+};
+
+export const KeyboardFocusShowsRing: Story = {
+  name: "キーボードでフォーカスしたボタンにはフォーカスリングが出る",
+  play: async ({ canvasElement }) => {
+    await userEvent.tab();
+    const focused = document.activeElement as HTMLElement;
+    await expect(focused).toBe(
+      within(canvasElement).getByRole("button", { name: "ブラウザから検出" }),
+    );
+    await expect(getComputedStyle(focused).outlineStyle).not.toBe("none");
+  },
+};
+
+export const KeyboardFocusRingOnToggleRow: Story = {
+  name: "キーボードで有効切替のチェックボックスにフォーカスすると行全体にフォーカスリングが出る",
+  play: async ({ canvasElement }) => {
+    const checkbox = await within(canvasElement).findByRole("checkbox", {
+      name: "フォルダから追加した拡張 を有効にする",
+    });
+    // キーボードの Tab 送りで到達させる（プログラムからの focus() では focus-visible にならないことがある）
+    for (let i = 0; i < 40 && document.activeElement !== checkbox; i++) {
+      await userEvent.tab();
+    }
+    await expect(document.activeElement).toBe(checkbox);
+    const label = checkbox.closest("label") as HTMLElement;
+    await expect(getComputedStyle(label).outlineStyle).not.toBe("none");
+  },
 };

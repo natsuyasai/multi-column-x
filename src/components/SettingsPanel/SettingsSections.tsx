@@ -1,6 +1,7 @@
 import React, { type ReactNode } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { HelpPopover } from "@/components/HelpPopover/HelpPopover";
+import { StatusMark } from "@/components/StatusMark/StatusMark";
 import type { ColumnSettings } from "@/types";
 import styles from "./SettingsPanel.module.scss";
 
@@ -258,10 +259,16 @@ export const NgWordsSection: React.FC<LineListSectionProps> = ({
         className={styles.cssTextarea}
         value={text}
         onChange={(e) => onChange(e.target.value)}
+        aria-label={t("columnSettings:ngWords.title")}
         placeholder={t("columnSettings:ngWords.placeholder")}
         spellCheck={false}
       />
-      {error && <p className={styles.errorText}>{error}</p>}
+      {error && (
+        <p className={styles.errorText}>
+          <StatusMark kind="warning" />
+          {error}
+        </p>
+      )}
     </section>
   );
 };
@@ -286,7 +293,12 @@ export const RepostHiddenUsersSection: React.FC<LineListSectionProps> = ({
         placeholder={t("columnSettings:repostHidden.placeholder")}
         spellCheck={false}
       />
-      {error && <p className={styles.errorText}>{error}</p>}
+      {error && (
+        <p className={styles.errorText}>
+          <StatusMark kind="warning" />
+          {error}
+        </p>
+      )}
       <p className={styles.hint}>{t("columnSettings:repostHidden.hint")}</p>
     </section>
   );
@@ -329,11 +341,17 @@ export const WhitelistSection: React.FC<WhitelistSectionProps> = ({
         className={styles.cssTextarea}
         value={text}
         onChange={(e) => onChange(e.target.value)}
+        aria-label={t("columnSettings:whitelist.title")}
         placeholder={t("columnSettings:whitelist.placeholder")}
         spellCheck={false}
         disabled={!settings.whitelistEnabled}
       />
-      {error && <p className={styles.errorText}>{error}</p>}
+      {error && (
+        <p className={styles.errorText}>
+          <StatusMark kind="warning" />
+          {error}
+        </p>
+      )}
     </section>
   );
 };
@@ -353,6 +371,7 @@ export const CustomCssSection: React.FC<SettingsSectionProps> = ({
         className={styles.cssTextarea}
         value={settings.customCSS}
         onChange={(e) => updateSetting("customCSS", e.target.value)}
+        aria-label={t("columnSettings:customCss.title")}
         placeholder={t("columnSettings:customCss.placeholder")}
         spellCheck={false}
       />

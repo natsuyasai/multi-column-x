@@ -3,6 +3,12 @@ import type { ReactNode } from "react";
 import { useEffect, useLayoutEffect } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 import { WhatsNewDialog } from "@/components/WhatsNewDialog/WhatsNewDialog";
+import { installThemeTokens } from "@/test-utils/storyTheme";
+import {
+  expectAdjacentGap,
+  expectTapTargets,
+  setPlatform,
+} from "@/test-utils/tapTargets";
 
 const LONG_NOTES = `### 新機能
 - マルチカラム表示に対応しました
@@ -101,6 +107,13 @@ const meta: Meta<typeof WhatsNewDialog> = {
   title: "Components/WhatsNewDialog",
   component: WhatsNewDialog,
   parameters: { layout: "fullscreen" },
+  // Storybook は index.css を読まないため、--mcx-* のテーマ変数を Story 側で有効にする
+  decorators: [
+    (Story) => {
+      installThemeTokens();
+      return <Story />;
+    },
+  ],
   args: {
     version: "0.2.0",
     notes: LONG_NOTES,
@@ -210,6 +223,75 @@ export const AndroidHeaderFixedBodyScrolls: Story = {
       await expect(lastItem.getBoundingClientRect().bottom).toBeLessThanOrEqual(
         panel.getBoundingClientRect().bottom + 1,
       );
+    } finally {
+      await restoreViewport();
+    }
+  },
+};
+
+export const AndroidTapTargets: Story = {
+  name: "Android・すべての操作要素が44px以上で隣り合うボタンに間隔がある",
+  play: async ({ canvasElement }) => {
+    const restorePlatform = setPlatform("android");
+    try {
+      await expectTapTargets(canvasElement, 44);
+      await expectAdjacentGap(canvasElement, 8);
+    } finally {
+      restorePlatform();
+    }
+  },
+};
+
+export const AndroidStickyHeaderSpansPanelWidth: Story = {
+  name: "Android全画面の固定ヘッダーはパネルの幅いっぱいに広がり本文に重ならない",
+  decorators: [
+    (Story) => (
+      <AndroidRoot fontSize="20px">
+        <Story />
+      </AndroidRoot>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const restoreViewport = await narrowViewport(360, 400);
+    try {
+      const canvas = within(canvasElement);
+      const panel = queryPanel(canvasElement);
+      const header = canvas.getByRole("heading", {
+        name: "アプリが更新されました",
+      });
+      const headerRect = header.getBoundingClientRect();
+      const panelRect = panel.getBoundingClientRect();
+      // 固定ヘッダーの幅・位置が panel の padding 引数と一致していれば、画面の左右端まで届く
+      await expect(headerRect.left).toBe(panelRect.left);
+      await expect(headerRect.right).toBe(panel.clientWidth + panelRect.left);
+      // 本文（バージョン表記）の先頭がヘッダーの下に隠れていない
+      const version = canvas.getByText("バージョン 0.2.0 の更新内容");
+      await expect(version.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+        headerRect.bottom - 1,
+      );
+    } finally {
+      await restoreViewport();
+    }
+  },
+};
+
+export const AndroidNotesHaveNoInnerScroll: Story = {
+  name: "Android全画面の更新内容の本文は内側スクロールを持たず二重スクロールにならない",
+  decorators: [
+    (Story) => (
+      <AndroidRoot fontSize="20px">
+        <Story />
+      </AndroidRoot>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const restoreViewport = await narrowViewport(360, 400);
+    try {
+      const notes = canvasElement.querySelector<HTMLElement>(
+        '[class*="notes"]',
+      ) as HTMLElement;
+      await expect(getComputedStyle(notes).overflowY).toBe("visible");
+      await expect(getComputedStyle(notes).maxHeight).toBe("none");
     } finally {
       await restoreViewport();
     }

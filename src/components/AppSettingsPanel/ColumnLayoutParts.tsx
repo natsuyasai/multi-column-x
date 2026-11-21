@@ -21,6 +21,7 @@ import { CSS } from "@dnd-kit/utilities";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { rowCountForCol } from "@/components/AppSettingsPanel/columnLayoutDraft";
+import { StatusMark } from "@/components/StatusMark/StatusMark";
 import type { ColumnGroup } from "@/lib/columnOrder";
 import type { Column } from "@/types";
 import styles from "./ColumnLayoutTab.module.scss";
@@ -81,6 +82,7 @@ export const GridPreview: React.FC<GridPreviewProps> = ({
                       className={`${styles.cell} ${styles.cellAssigned} ${isSelected ? styles.cellSelected : ""}`}
                       role="button"
                       tabIndex={0}
+                      aria-pressed={isSelected}
                       aria-label={t("settings:layout.cellLabel", {
                         col: colNum,
                         row: r,
@@ -94,6 +96,7 @@ export const GridPreview: React.FC<GridPreviewProps> = ({
                       }}
                     >
                       <span className={styles.cellName}>
+                        {isSelected && <StatusMark kind="selected" />}
                         {getLabel(colAtCell)}
                       </span>
                       <span className={styles.cellHeight}>
@@ -102,6 +105,7 @@ export const GridPreview: React.FC<GridPreviewProps> = ({
                           : t("settings:layout.heightEven")}
                       </span>
                       <button
+                        type="button"
                         className={styles.removeBtn}
                         aria-label={t("settings:layout.unassign")}
                         onClick={(e) => {
@@ -120,6 +124,7 @@ export const GridPreview: React.FC<GridPreviewProps> = ({
                     className={`${styles.cell} ${isPending ? styles.cellPending : ""}`}
                     role="button"
                     tabIndex={0}
+                    aria-pressed={isPending}
                     aria-label={t("settings:layout.cellLabel", {
                       col: colNum,
                       row: r,
@@ -132,11 +137,13 @@ export const GridPreview: React.FC<GridPreviewProps> = ({
                       }
                     }}
                   >
+                    {isPending && <StatusMark kind="selected" />}
                     {pendingCell ? t("settings:layout.placeHere") : "+"}
                   </div>
                 );
               })}
               <button
+                type="button"
                 className={styles.addRowBtn}
                 onClick={() => onCellClick(rows + 1, colNum)}
               >
@@ -248,6 +255,7 @@ export const HeightSettings: React.FC<HeightSettingsProps> = ({
             <input
               type="number"
               className={styles.numberInput}
+              aria-label={t("settings:layout.heightValue")}
               min={1}
               value={column.heightValue ?? 400}
               onChange={(e) =>
@@ -261,6 +269,7 @@ export const HeightSettings: React.FC<HeightSettingsProps> = ({
             />
             <select
               className={styles.unitSelect}
+              aria-label={t("settings:layout.heightUnit")}
               value={column.heightUnit ?? "px"}
               onChange={(e) =>
                 onHeightChange(

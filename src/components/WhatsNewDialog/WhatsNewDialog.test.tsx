@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/i18n";
+import { expectAccessibleControls } from "@/test-utils/a11y";
 import { expectNoJapanese } from "@/test-utils/japanese";
 import { WhatsNewDialog } from "./WhatsNewDialog";
 
@@ -86,6 +87,42 @@ describe("WhatsNewDialog", () => {
   it("見出しでもリストでもない行は p として描画される", () => {
     render(<WhatsNewDialog notes={"通常テキスト行"} onClose={vi.fn()} />);
     expect(screen.getByText("通常テキスト行")).toBeInTheDocument();
+  });
+
+  describe("ダイアログのアクセシビリティ", () => {
+    it("見出しがダイアログの名前になり aria-modal が付く", () => {
+      render(<WhatsNewDialog notes="" onClose={vi.fn()} />);
+      expect(
+        screen.getByRole("dialog", { name: "アプリが更新されました" }),
+      ).toHaveAttribute("aria-modal", "true");
+    });
+
+    it("Escapeで閉じる", () => {
+      const onClose = vi.fn();
+      render(<WhatsNewDialog notes="" onClose={onClose} />);
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+
+    it("ボタンにアクセシブルネームがある", () => {
+      const { container } = render(
+        <WhatsNewDialog notes="### 新機能" onClose={vi.fn()} />,
+      );
+      expectAccessibleControls(container);
+    });
+
+    it("閉じたあと開く前にフォーカスしていた要素へフォーカスが戻る", () => {
+      const opener = document.createElement("button");
+      document.body.appendChild(opener);
+      opener.focus();
+
+      const { unmount } = render(<WhatsNewDialog notes="" onClose={vi.fn()} />);
+      screen.getByRole("button", { name: "閉じる" }).focus();
+      unmount();
+
+      expect(opener).toHaveFocus();
+      opener.remove();
+    });
   });
 
   describe("表示言語", () => {

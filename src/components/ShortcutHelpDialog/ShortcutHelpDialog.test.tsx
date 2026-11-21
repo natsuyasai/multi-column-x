@@ -1,6 +1,7 @@
 import { act, render, screen, fireEvent } from "@testing-library/react";
 import { afterEach, describe, it, expect, vi } from "vitest";
 import i18n from "@/i18n";
+import { expectAccessibleControls } from "@/test-utils/a11y";
 import { expectNoJapanese } from "@/test-utils/japanese";
 import { ShortcutHelpDialog } from "./ShortcutHelpDialog";
 
@@ -25,6 +26,33 @@ describe("ShortcutHelpDialog", () => {
     render(<ShortcutHelpDialog onClose={onClose} />);
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  describe("ダイアログのアクセシビリティ", () => {
+    it("見出しがダイアログの名前になり aria-modal が付く", () => {
+      render(<ShortcutHelpDialog onClose={vi.fn()} />);
+      expect(
+        screen.getByRole("dialog", { name: "キーボードショートカット" }),
+      ).toHaveAttribute("aria-modal", "true");
+    });
+
+    it("ボタンにアクセシブルネームがある", () => {
+      const { container } = render(<ShortcutHelpDialog onClose={vi.fn()} />);
+      expectAccessibleControls(container);
+    });
+
+    it("閉じたあと開く前にフォーカスしていた要素へフォーカスが戻る", () => {
+      const opener = document.createElement("button");
+      document.body.appendChild(opener);
+      opener.focus();
+
+      const { unmount } = render(<ShortcutHelpDialog onClose={vi.fn()} />);
+      screen.getByRole("button", { name: "閉じる" }).focus();
+      unmount();
+
+      expect(opener).toHaveFocus();
+      opener.remove();
+    });
   });
 
   describe("表示言語", () => {

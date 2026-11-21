@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import i18n from "@/i18n";
+import { expectAccessibleControls } from "@/test-utils/a11y";
 import { expectNoJapanese } from "@/test-utils/japanese";
 import { TabActionDialog } from "./TabActionDialog";
 
@@ -82,6 +83,33 @@ describe("TabActionDialog", () => {
     render(<TabActionDialog {...defaultProps} onClose={onClose} />);
     fireEvent.click(screen.getByRole("dialog"));
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe("TabActionDialog のダイアログのアクセシビリティ", () => {
+  it("カラム名がダイアログの名前になり aria-modal が付く", () => {
+    render(<TabActionDialog {...defaultProps} />);
+    expect(
+      screen.getByRole("dialog", { name: "テストカラム" }),
+    ).toHaveAttribute("aria-modal", "true");
+  });
+
+  it("すべてのボタンにアクセシブルネームがある", () => {
+    const { container } = render(<TabActionDialog {...defaultProps} />);
+    expectAccessibleControls(container);
+  });
+
+  it("閉じたあと開く前にフォーカスしていた要素へフォーカスが戻る", () => {
+    const opener = document.createElement("button");
+    document.body.appendChild(opener);
+    opener.focus();
+
+    const { unmount } = render(<TabActionDialog {...defaultProps} />);
+    screen.getByRole("button", { name: /再読み込み/ }).focus();
+    unmount();
+
+    expect(opener).toHaveFocus();
+    opener.remove();
   });
 });
 

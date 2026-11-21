@@ -113,6 +113,8 @@ CLAUDE.md「フロントエンドの品質ツール」節のimport順ルール�
 
 > 既存コードには段階解消中の a11y 警告が残っているが、新規コードでは解消すること。
 
+スタイル（余白・文字サイズ・hover / focus-visible / disabled 状態・Android の 44px・ダイアログ a11y）は `ui-design-principles` スキルに従う。
+
 ### 既存パターンの参考
 
 - 本体の書き方: `src/components/ColumnHeader/ColumnHeader.tsx` / `src/components/MobileTabBar/MobileTabBar.tsx`

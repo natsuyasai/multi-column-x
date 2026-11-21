@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { useRestoreFocus } from "../../hooks/useRestoreFocus";
 import styles from "./AccountNameDialog.module.scss";
 
 interface AccountNameDialogProps {
@@ -18,6 +19,9 @@ export const AccountNameDialog: React.FC<AccountNameDialogProps> = ({
 }) => {
   const { t } = useTranslation();
   useEscapeKey(onCancel);
+  useRestoreFocus();
+  const titleId = useId();
+  const inputId = useId();
 
   const [name, setName] = useState(defaultValue);
   const trimmed = name.trim();
@@ -30,15 +34,23 @@ export const AccountNameDialog: React.FC<AccountNameDialogProps> = ({
 
   return (
     <div className={styles.overlay}>
-      <form className={styles.dialog} onSubmit={handleSubmit}>
-        <h2 className={styles.title}>{title}</h2>
+      <form
+        className={styles.dialog}
+        onSubmit={handleSubmit}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
+        <h2 id={titleId} className={styles.title}>
+          {title}
+        </h2>
 
         <div className={styles.field}>
-          <label className={styles.label} htmlFor="account-name-input">
+          <label className={styles.label} htmlFor={inputId}>
             {t("accounts:nameDialog.nameLabel")}
           </label>
           <input
-            id="account-name-input"
+            id={inputId}
             className={styles.input}
             value={name}
             onChange={(e) => setName(e.target.value)}

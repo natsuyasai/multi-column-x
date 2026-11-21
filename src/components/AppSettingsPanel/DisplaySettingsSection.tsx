@@ -118,6 +118,7 @@ export const DisplaySettingsSection: React.FC<DisplaySettingsSectionProps> = ({
               key={value}
               type="button"
               className={`${styles.scaleBtn} ${draft.columnScale === value ? styles.scaleBtnActive : ""}`}
+              aria-pressed={draft.columnScale === value}
               disabled={!draft.columnScaleOverrideEnabled}
               onClick={() => set("columnScale", value)}
             >
@@ -141,12 +142,17 @@ export const DisplaySettingsSection: React.FC<DisplaySettingsSectionProps> = ({
           />
           {t("settings:display.theme.override")}
         </label>
-        <div className={styles.scaleOptions}>
+        <div
+          className={styles.scaleOptions}
+          role="group"
+          aria-label={t("settings:display.theme.label")}
+        >
           {THEME_VALUES.map((value) => (
             <button
               key={value}
               type="button"
               className={`${styles.scaleBtn} ${draft.theme === value ? styles.scaleBtnActive : ""}`}
+              aria-pressed={draft.theme === value}
               disabled={!draft.themeOverrideEnabled}
               onClick={() => set("theme", value)}
             >

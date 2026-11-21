@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { isAutoReloadSupported } from "@/lib/autoReloadTarget";
 import { nextColumnSettingsOnSmallImageChange } from "@/lib/scrollRestoreSetting";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { useRestoreFocus } from "../../hooks/useRestoreFocus";
 import {
   COLUMN_LABEL_MAX_LENGTH,
   normalizeColumnLabel,
@@ -50,6 +51,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 }) => {
   const { t } = useTranslation();
   useEscapeKey(onClose);
+  useRestoreFocus();
+  const titleId = useId();
 
   const isExternal = column.pageType === "external";
 
@@ -97,10 +100,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   return (
     <div className={styles.overlay}>
-      <div className={styles.panel}>
+      <div
+        className={styles.panel}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
         <div className={styles.header}>
-          <h2 className={styles.title}>{t("columnSettings:title")}</h2>
+          <h2 id={titleId} className={styles.title}>
+            {t("columnSettings:title")}
+          </h2>
           <button
+            type="button"
             className={styles.closeBtn}
             onClick={onClose}
             aria-label={t("columnSettings:close")}

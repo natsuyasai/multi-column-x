@@ -149,6 +149,8 @@
     "heightTitle": "高さ設定 — {{label}}",
     "heightAuto": "均等（自動）",
     "heightFixed": "固定:",
+    "heightValue": "高さの値",
+    "heightUnit": "高さの単位",
     "dragReorder": "ドラッグして並び替え",
     "moveUp": "上へ",
     "moveDown": "下へ",

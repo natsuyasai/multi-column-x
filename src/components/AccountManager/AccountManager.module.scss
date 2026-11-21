@@ -1,4 +1,6 @@
 @use "../../styles/dialog-fullscreen" as fs;
+@use "../../styles/tokens" as t;
+@use "../../styles/mixins" as m;
 
 .overlay {
   position: fixed;
@@ -11,7 +13,7 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 1rem;
+  padding: t.$space-3;
   box-sizing: border-box;
   overflow-y: auto;
 
@@ -21,13 +23,13 @@
 .panel {
   background: var(--mcx-surface);
   border: 1px solid var(--mcx-border);
-  border-radius: 0.5rem;
-  padding: 1.5rem;
+  border-radius: t.$radius-md;
+  padding: t.$space-4;
   max-height: calc(100% - 2rem);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: t.$space-3;
 
   @include fs.android-fullscreen-panel(1.5rem, true);
 }
@@ -42,7 +44,7 @@
 }
 
 .title {
-  font-size: 1rem;
+  font-size: t.$font-size-base;
   color: var(--mcx-text);
   margin: 0;
 }
@@ -50,43 +52,58 @@
 .closeBtn {
   background: none;
   border: none;
+  border-radius: t.$radius-sm;
   color: var(--mcx-text-muted);
   cursor: pointer;
-  font-size: 1rem;
+  font-size: t.$font-size-base;
+  @include m.transition-base(color, background-color);
+  @include m.android-tap-target;
+
   &:hover {
     color: var(--mcx-text-tertiary);
+    background: var(--mcx-surface-hover);
+  }
+
+  &:active {
+    color: var(--mcx-text);
+    background: var(--mcx-surface-muted);
+  }
+
+  &:focus-visible {
+    @include m.focus-ring;
   }
 }
 
+// アカウント行どうしの間隔（0.75rem）は、行の内側の間隔（0.5rem）より大きくして、行ごとのまとまりを見せる
 .list {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.75rem;
   min-height: 3.75rem;
 }
 
 .empty {
   color: var(--mcx-text-muted);
-  font-size: 0.8125rem;
+  font-size: t.$font-size-sm;
   text-align: center;
-  padding: 1rem 0;
+  padding: t.$space-3 0;
 }
 
 // 1段目: 色・アカウント名・メイン設定（★）、2段目: 編集などのボタン。横幅が狭くても見切れない
 .item {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.625rem;
+  gap: t.$space-2;
+  padding: 0.75rem;
   background: var(--mcx-surface-sunken);
-  border-radius: 0.375rem;
+  border-radius: t.$radius-md;
   border: 1px solid var(--mcx-border-subtle);
 }
 
 .summary {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
+  gap: 0.75rem;
   min-width: 0;
 }
 
@@ -94,12 +111,14 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 0.5rem;
+  gap: t.$space-2;
+
+  @include m.android-button-gap;
 }
 
 .dot {
-  width: 0.625rem;
-  height: 0.625rem;
+  width: 0.75rem;
+  height: 0.75rem;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -108,45 +127,85 @@
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
-  font-size: 0.8125rem;
+  font-size: t.$font-size-sm;
   color: var(--mcx-text-secondary);
 }
 
+// 破壊的操作: 他の操作から少し離し、danger の色と枠で区別する
 .removeBtn {
   background: none;
   border: 1px solid var(--mcx-danger-border);
-  border-radius: 0.25rem;
+  border-radius: t.$radius-sm;
   color: var(--mcx-danger);
   cursor: pointer;
-  font-size: 0.75rem;
-  padding: 0.25rem 0.625rem;
+  font-size: t.$font-size-xs;
+  margin-left: t.$space-2;
+  padding: t.$space-1 0.75rem;
+  @include m.transition-base(background-color, border-color);
+  @include m.android-tap-target;
+
   &:hover {
     background: var(--mcx-danger-bg);
+  }
+
+  &:active {
+    background: var(--mcx-danger-bg);
+    border-color: var(--mcx-danger);
+  }
+
+  &:focus-visible {
+    @include m.focus-ring;
   }
 }
 
 .addBtn {
   background: var(--mcx-accent-fill);
   border: none;
-  border-radius: 0.375rem;
+  border-radius: t.$radius-sm;
   color: var(--mcx-text-on-accent);
   cursor: pointer;
-  font-size: 0.8125rem;
+  font-size: t.$font-size-sm;
   font-weight: bold;
-  padding: 0.625rem;
+  padding: 0.75rem;
   width: 100%;
+  @include m.transition-base(background-color);
+  @include m.android-tap-target;
+
+  &:hover {
+    background: var(--mcx-accent-hover);
+  }
+
+  &:active {
+    background: var(--mcx-accent-hover);
+  }
+
+  &:focus-visible {
+    @include m.focus-ring;
+  }
 }
 
 .defaultBtn {
   background: none;
   border: none;
+  border-radius: t.$radius-sm;
   color: var(--mcx-text-muted);
   cursor: pointer;
-  font-size: 1rem;
-  padding: 0.125rem 0.375rem;
+  font-size: t.$font-size-base;
+  padding: t.$space-1;
   line-height: 1;
+  @include m.transition-base(color, background-color);
+  @include m.android-tap-target;
+
   &:hover {
     color: var(--mcx-warning);
+  }
+
+  &:active {
+    background: var(--mcx-surface-muted);
+  }
+
+  &:focus-visible {
+    @include m.focus-ring;
   }
 }
 
@@ -157,43 +216,68 @@
 .editBtn {
   background: none;
   border: 1px solid var(--mcx-border-strong);
-  border-radius: 0.25rem;
+  border-radius: t.$radius-sm;
   color: var(--mcx-text-tertiary);
   cursor: pointer;
-  font-size: 0.75rem;
-  padding: 0.25rem 0.625rem;
+  font-size: t.$font-size-xs;
+  padding: t.$space-1 0.75rem;
+  @include m.transition-base(background-color, border-color);
+  @include m.android-tap-target;
+
   &:hover {
     background: var(--mcx-surface-muted);
+  }
+
+  &:active {
+    background: var(--mcx-surface-hover);
+    border-color: var(--mcx-text-tertiary);
+  }
+
+  &:focus-visible {
+    @include m.focus-ring;
   }
 }
 
 .editForm {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: t.$space-2;
   width: 100%;
 }
 
 .editLabel {
-  font-size: 0.75rem;
+  font-size: t.$font-size-xs;
   color: var(--mcx-text-tertiary);
 }
 
 .editInput {
   background: var(--mcx-surface);
-  border: 1px solid var(--mcx-border);
-  border-radius: 0.25rem;
+  border: 1px solid var(--mcx-border-strong);
+  border-radius: t.$radius-sm;
   color: var(--mcx-text);
-  font-size: 0.8125rem;
-  padding: 0.375rem 0.5rem;
+  font-size: t.$font-size-sm;
+  padding: t.$space-2;
   width: 100%;
   box-sizing: border-box;
+  @include m.transition-base(border-color);
+  @include m.android-tap-target;
+}
+
+.editInput:hover {
+  border-color: var(--mcx-text-muted);
+}
+
+.editInput:focus-visible {
+  border-color: var(--mcx-accent);
+  @include m.focus-ring;
 }
 
 .colorSwatches {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.375rem;
+  gap: t.$space-2;
+
+  @include m.android-button-gap;
 }
 
 .colorSwatch {
@@ -203,35 +287,85 @@
   border: 0.125rem solid transparent;
   cursor: pointer;
   padding: 0;
+  @include m.transition-base(box-shadow);
+  @include m.android-tap-target;
+
+  &:hover {
+    border-color: var(--mcx-text-muted);
+  }
+
+  &:active {
+    border-color: var(--mcx-text-tertiary);
+  }
+
+  &:focus-visible {
+    @include m.focus-ring;
+  }
 }
 
+// 選択中は色だけでなく二重のリング（形）でも示す
 .colorSwatchActive {
   border-color: var(--mcx-text);
+  box-shadow:
+    0 0 0 0.125rem var(--mcx-surface),
+    0 0 0 0.25rem var(--mcx-text);
 }
 
 .editActions {
   display: flex;
   justify-content: flex-end;
-  gap: 0.5rem;
+  gap: t.$space-2;
+
+  @include m.android-button-gap;
 }
 
 .cancelEditBtn {
   background: var(--mcx-surface-muted);
   border: 1px solid var(--mcx-border-strong);
-  border-radius: 0.25rem;
+  border-radius: t.$radius-sm;
   color: var(--mcx-text-tertiary);
   cursor: pointer;
-  font-size: 0.75rem;
-  padding: 0.375rem 0.75rem;
+  font-size: t.$font-size-xs;
+  padding: t.$space-2 0.75rem;
+  @include m.transition-base(background-color, border-color, color);
+  @include m.android-tap-target;
+
+  &:hover {
+    background: var(--mcx-surface-hover);
+    color: var(--mcx-text);
+  }
+
+  &:active {
+    background: var(--mcx-surface-hover);
+    border-color: var(--mcx-text-tertiary);
+  }
+
+  &:focus-visible {
+    @include m.focus-ring;
+  }
 }
 
 .saveEditBtn {
   background: var(--mcx-accent-fill);
   border: none;
-  border-radius: 0.25rem;
+  border-radius: t.$radius-sm;
   color: var(--mcx-text-on-accent);
   cursor: pointer;
-  font-size: 0.75rem;
+  font-size: t.$font-size-xs;
   font-weight: bold;
-  padding: 0.375rem 0.75rem;
+  padding: t.$space-2 0.75rem;
+  @include m.transition-base(background-color);
+  @include m.android-tap-target;
+
+  &:hover {
+    background: var(--mcx-accent-hover);
+  }
+
+  &:active {
+    background: var(--mcx-accent-hover);
+  }
+
+  &:focus-visible {
+    @include m.focus-ring;
+  }
 }

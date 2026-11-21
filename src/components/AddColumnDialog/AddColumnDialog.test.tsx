@@ -1,7 +1,9 @@
 import { act, render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type React from "react";
 import { describe, it, expect, vi } from "vitest";
 import i18n from "@/i18n";
+import { expectAccessibleControls } from "@/test-utils/a11y";
 import { expectNoJapanese } from "@/test-utils/japanese";
 import type { Account, Column, GlobalSettings } from "../../types";
 import { DEFAULT_COLUMN_SETTINGS } from "../../types";
@@ -469,6 +471,72 @@ describe("AddColumnDialog", () => {
     );
     const labelInput = screen.getByRole("textbox", { name: /表示名（任意）/ });
     expect(labelInput).toHaveAttribute("maxLength", "30");
+  });
+
+  describe("ダイアログのアクセシビリティ", () => {
+    const renderDialog = (
+      props: Partial<React.ComponentProps<typeof AddColumnDialog>> = {},
+    ) =>
+      render(
+        <AddColumnDialog
+          accounts={mockAccounts}
+          globalSettings={mockGlobalSettings}
+          existingColumns={[]}
+          onAdd={vi.fn()}
+          onCancel={vi.fn()}
+          {...props}
+        />,
+      );
+
+    it("見出しがダイアログの名前になり aria-modal が付く", () => {
+      renderDialog();
+      expect(
+        screen.getByRole("dialog", { name: "カラムを追加" }),
+      ).toHaveAttribute("aria-modal", "true");
+    });
+
+    it("ページタイプごとにすべての入力欄とボタンにアクセシブルネームがある", async () => {
+      const user = userEvent.setup();
+      const { container } = renderDialog();
+      for (const type of ["home", "search", "list", "custom", "external"]) {
+        await user.selectOptions(screen.getByLabelText("ページタイプ"), type);
+        expectAccessibleControls(container);
+      }
+    });
+
+    it("ページタイプ選択は選択中の項目を支援技術へ伝えるコンボボックスである", async () => {
+      const user = userEvent.setup();
+      renderDialog();
+      const select = screen.getByRole("combobox", { name: "ページタイプ" });
+      await user.selectOptions(select, "search");
+      expect(
+        screen.getByRole("option", { name: "検索", selected: true }),
+      ).toBeInTheDocument();
+    });
+
+    it("閉じたあと開く前にフォーカスしていた要素へフォーカスが戻る", () => {
+      const opener = document.createElement("button");
+      document.body.appendChild(opener);
+      opener.focus();
+
+      const { unmount } = renderDialog();
+      screen.getByRole("button", { name: "キャンセル" }).focus();
+      unmount();
+
+      expect(opener).toHaveFocus();
+      opener.remove();
+    });
+
+    it("アカウントが0件のとき追加ボタンは無効でクリックしても onAdd が呼ばれない", () => {
+      const onAdd = vi.fn();
+      renderDialog({ accounts: [], onAdd });
+
+      const submit = screen.getByRole("button", { name: "追加" });
+      expect(submit).toBeDisabled();
+      fireEvent.click(submit);
+
+      expect(onAdd).not.toHaveBeenCalled();
+    });
   });
 });
 

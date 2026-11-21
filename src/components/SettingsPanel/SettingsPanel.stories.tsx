@@ -3,6 +3,12 @@ import type { ReactNode } from "react";
 import { useEffect, useLayoutEffect } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 import { SettingsPanel } from "@/components/SettingsPanel/SettingsPanel";
+import { installThemeTokens } from "@/test-utils/storyTheme";
+import {
+  expectAdjacentGap,
+  expectTapTargets,
+  setPlatform,
+} from "@/test-utils/tapTargets";
 import type { Column } from "@/types";
 
 const columnSettings = {
@@ -103,10 +109,31 @@ function expectFullscreenPanel(panel: HTMLElement) {
   });
 }
 
+// 狭い画面（スマホ幅）を再現するため、vitest の browser 実行時だけ viewport を絞る。戻す関数を返す。
+// Storybook の画面上で開いた場合は viewport を変えられないので何もしない
+async function narrowViewport(width: number, height: number) {
+  const originalWidth = window.innerWidth;
+  const originalHeight = window.innerHeight;
+  try {
+    const { page } = await import("vitest/browser");
+    await page.viewport(width, height);
+    return () => page.viewport(originalWidth, originalHeight);
+  } catch {
+    return async () => {};
+  }
+}
+
 const meta: Meta<typeof SettingsPanel> = {
   title: "Components/SettingsPanel",
   component: SettingsPanel,
   parameters: { layout: "fullscreen" },
+  // Storybook は index.css を読まないため、--mcx-* のテーマ変数を Story 側で有効にする
+  decorators: [
+    (Story) => {
+      installThemeTokens();
+      return <Story />;
+    },
+  ],
   args: {
     column,
     isMobile: false,
@@ -349,5 +376,64 @@ export const AndroidFullscreen: Story = {
       borderRadius: "0px",
       borderWidth: "0px",
     });
+  },
+};
+
+export const AndroidTapTargets: Story = {
+  name: "Android・カラム設定の操作要素がすべて44px以上で隣り合うボタンに間隔がある",
+  args: {
+    isMobile: true,
+    column: {
+      ...column,
+      settings: {
+        ...columnSettings,
+        autoReloadEnabled: true,
+        smallImageEnabled: true,
+        blurImageEnabled: true,
+        whitelistEnabled: true,
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const restorePlatform = setPlatform("android");
+    const restoreViewport = await narrowViewport(360, 640);
+    try {
+      await expectTapTargets(canvasElement, 44);
+      await expectAdjacentGap(canvasElement, 8);
+      // 狭い画面でも横にはみ出さない（フッターのボタン列は折り返す）
+      const root = document.documentElement;
+      await expect(root.scrollWidth).toBeLessThanOrEqual(root.clientWidth);
+    } finally {
+      await restoreViewport();
+      restorePlatform();
+    }
+  },
+};
+
+export const KeyboardFocusShowsRing: Story = {
+  name: "キーボードでフォーカスしたボタンにはフォーカスリングが出る",
+  play: async ({ canvasElement }) => {
+    await userEvent.tab();
+    const focused = document.activeElement as HTMLElement;
+    await expect(focused).toBe(
+      within(canvasElement).getByRole("button", { name: "閉じる" }),
+    );
+    await expect(getComputedStyle(focused).outlineStyle).not.toBe("none");
+  },
+};
+
+export const KeyboardFocusRingOnCheckboxRow: Story = {
+  name: "キーボードでチェックボックスにフォーカスすると行全体にフォーカスリングが出る",
+  play: async ({ canvasElement }) => {
+    const checkbox = within(canvasElement).getByRole("checkbox", {
+      name: "新着をデスクトップ通知する",
+    });
+    // キーボードの Tab 送りで到達させる（プログラムからの focus() では focus-visible にならないことがある）
+    for (let i = 0; i < 40 && document.activeElement !== checkbox; i++) {
+      await userEvent.tab();
+    }
+    await expect(document.activeElement).toBe(checkbox);
+    const label = checkbox.closest("label") as HTMLElement;
+    await expect(getComputedStyle(label).outlineStyle).not.toBe("none");
   },
 };

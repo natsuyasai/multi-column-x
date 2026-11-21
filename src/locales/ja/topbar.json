@@ -25,5 +25,7 @@
   },
   "collapse": "ツールバーを折りたたむ (Ctrl+B)",
   "expand": "ツールバーを展開 (Ctrl+B)",
-  "closeColumn": "カラムを閉じる"
+  "closeColumn": "カラムを閉じる",
+  "label": "ツールバー",
+  "columnListLabel": "カラム一覧"
 }

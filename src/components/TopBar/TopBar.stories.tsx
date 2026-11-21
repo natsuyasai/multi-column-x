@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ReactNode } from "react";
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 import { TopBar } from "@/components/TopBar/TopBar";
+import { installAppReset, installThemeTokens } from "@/test-utils/storyTheme";
+import { setPlatform } from "@/test-utils/tapTargets";
 import type { Account, Column } from "@/types";
 
 const settings = {
@@ -100,10 +102,28 @@ function ThemeRoot({
   return <>{children}</>;
 }
 
+// index.css の `*` リセット（border-box など）を再現する。固定高さのバーは border-box 前提で、
+// Storybook は index.css を読まないため、これが無いと border / padding 分だけ高さが増える
+function AppReset({ children }: { children: ReactNode }) {
+  useLayoutEffect(() => installAppReset(), []);
+  return <>{children}</>;
+}
+
 const meta: Meta<typeof TopBar> = {
   title: "Components/TopBar",
   component: TopBar,
   parameters: { layout: "fullscreen" },
+  // Storybook は index.css を読まないため、--mcx-* のテーマ変数と * リセットを Story 側で有効にする
+  decorators: [
+    (Story) => {
+      installThemeTokens();
+      return (
+        <AppReset>
+          <Story />
+        </AppReset>
+      );
+    },
+  ],
   args: {
     columns,
     accounts: [account],
@@ -448,4 +468,65 @@ export const DarkThemeDragging: Story = {
     ),
   ],
   play: Dragging.play,
+};
+
+// デスクトップの固定高さのバー: 1 行は 2rem。すべてのボタンが行の高さ内に収まり、44px 化もされない
+async function expectButtonsFitRows(canvasElement: HTMLElement) {
+  const bar = canvasElement.querySelector("nav");
+  if (!bar) throw new Error("ツールバーが見つかりません");
+  const rootFontPx = parseFloat(
+    getComputedStyle(document.documentElement).fontSize,
+  );
+  const rowHeight = rootFontPx * 2;
+  const row1 = bar.firstElementChild as HTMLElement;
+  await expect(row1.getBoundingClientRect().height).toBeCloseTo(rowHeight, 0);
+  const buttons = Array.from(bar.querySelectorAll("button"));
+  await expect(buttons.length).toBeGreaterThan(0);
+  for (const button of buttons) {
+    const row = button.closest("[class*='row']") as HTMLElement;
+    const rowRect = row.getBoundingClientRect();
+    const rect = button.getBoundingClientRect();
+    await expect(rect.height).toBeLessThan(rowHeight);
+    await expect(rect.top).toBeGreaterThanOrEqual(rowRect.top);
+    await expect(rect.bottom).toBeLessThanOrEqual(rowRect.bottom);
+  }
+}
+
+export const DesktopButtonsFitFixedRowCollapsed: Story = {
+  name: "デスクトップ・折りたたみ時のボタンが固定高さの行内に収まる",
+  args: { apiRateLimits: { "acc-1": {} } },
+  play: async ({ canvasElement }) => {
+    const restorePlatform = setPlatform("desktop");
+    try {
+      await expectButtonsFitRows(canvasElement);
+    } finally {
+      restorePlatform();
+    }
+  },
+};
+
+export const DesktopButtonsFitFixedRowExpanded: Story = {
+  name: "デスクトップ・展開時（ラベル付き）のボタンが固定高さの行内に収まる",
+  args: { expanded: true },
+  play: async ({ canvasElement }) => {
+    const restorePlatform = setPlatform("desktop");
+    try {
+      await expectButtonsFitRows(canvasElement);
+    } finally {
+      restorePlatform();
+    }
+  },
+};
+
+export const KeyboardFocusShowsRing: Story = {
+  name: "キーボードでフォーカスしたツールバーのボタンにフォーカスリングが出る",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.tab();
+    const compose = canvas.getByRole("button", {
+      name: "ツイートを作成 (Ctrl+T)",
+    });
+    await expect(compose).toHaveFocus();
+    await expect(getComputedStyle(compose).outlineStyle).not.toBe("none");
+  },
 };

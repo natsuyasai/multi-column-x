@@ -369,6 +369,19 @@ Object.assign(window.MCX_DATA.catalogs, {
         files: ["eslint.config.js", "src/lib/i18nLint.contract.test.ts"],
       },
       {
+        symptom: "uiDesign.contract.test.ts が失敗する",
+        cause:
+          "SCSS が余白（0.25rem の倍数）・最小文字・状態の定義・Android の当たり判定などの規約から外れた",
+        area: "React",
+        detail:
+          "<p>失敗メッセージの <code>[ルール名] ファイル セレクタ — 詳細</code> のとおりに SCSS を直します（丸め・<code>:hover</code> / <code>:active</code> / <code>:focus-visible</code> の追加・<code>android-tap-target</code> など）。固定バー高さのように本当に直せないときだけ <code>src/test-utils/uiDesignRules.ts</code> の例外定数に理由付きで足します。</p>",
+        files: [
+          "src/lib/uiDesign.contract.test.ts",
+          "src/test-utils/uiDesignRules.ts",
+        ],
+        docs: ["../development/ui-design-principles-notes.md"],
+      },
+      {
         symptom: "gridLayout.contract.test.ts が失敗する",
         cause: "SCSS の高さと gridLayout.ts の rem 定数がずれた",
         area: "React",

@@ -1,5 +1,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
+import { StatusMark } from "@/components/StatusMark/StatusMark";
 import styles from "./AppSettingsPanel.module.scss";
 
 interface AppInfoSectionsProps {
@@ -79,10 +80,16 @@ export const AppInfoSections: React.FC<AppInfoSectionsProps> = ({
             : t("settings:info.app.check")}
         </button>
         {updateManualResult === "none" && (
-          <p className={styles.hint}>{t("settings:info.app.upToDate")}</p>
+          <p className={styles.hint}>
+            <StatusMark kind="success" />
+            {t("settings:info.app.upToDate")}
+          </p>
         )}
         {updateManualResult === "error" && (
-          <p className={styles.hint}>{t("settings:info.app.checkFailed")}</p>
+          <p className={styles.hint}>
+            <StatusMark kind="warning" />
+            {t("settings:info.app.checkFailed")}
+          </p>
         )}
       </section>
 
@@ -107,10 +114,14 @@ export const AppInfoSections: React.FC<AppInfoSectionsProps> = ({
               : t("settings:info.dataDir.retry")}
           </button>
           {dataDirectoryDeletionRetryResult === "success" && (
-            <p className={styles.hint}>{t("settings:info.dataDir.success")}</p>
+            <p className={styles.hint}>
+              <StatusMark kind="success" />
+              {t("settings:info.dataDir.success")}
+            </p>
           )}
           {dataDirectoryDeletionRetryResult === "remaining" && (
             <p className={styles.hint}>
+              <StatusMark kind="warning" />
               {t("settings:info.dataDir.remaining", {
                 count: dataDirectoryDeletionRemainingCount,
               })}

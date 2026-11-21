@@ -60,8 +60,10 @@ const ColumnEntry: React.FC<ColumnEntryProps> = ({
   if (variant === "collapsed") {
     return (
       <button
+        type="button"
         className={styles.btn}
         onClick={() => onJumpToColumn(column.id)}
+        aria-label={title}
         title={title}
       >
         {getColumnIcon(column.pageType)}
@@ -72,6 +74,7 @@ const ColumnEntry: React.FC<ColumnEntryProps> = ({
   return (
     <div className={styles.columnItem}>
       <button
+        type="button"
         className={`${styles.btn} ${styles.btnExpanded}`}
         onClick={() => onJumpToColumn(column.id)}
         title={title}
@@ -80,6 +83,7 @@ const ColumnEntry: React.FC<ColumnEntryProps> = ({
         <span className={styles.label}>{name}</span>
       </button>
       <button
+        type="button"
         className={styles.btn}
         onClick={() => onClose(column.id)}
         aria-label={t("topbar:closeColumn")}

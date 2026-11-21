@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { useRestoreFocus } from "../../hooks/useRestoreFocus";
 import type { Account, Column, GlobalSettings, PageType } from "../../types";
 import {
   COLUMN_LABEL_MAX_LENGTH,
@@ -26,6 +27,9 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
 }) => {
   const { t } = useTranslation();
   useEscapeKey(onCancel);
+  useRestoreFocus();
+  const uid = useId();
+  const fieldId = (name: string) => `${uid}-${name}`;
 
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
   const [pageType, setPageType] = useState<PageType>("home");
@@ -87,16 +91,24 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
 
   return (
     <div className={styles.overlay}>
-      <form className={styles.dialog} onSubmit={handleSubmit}>
-        <h2 className={styles.title}>{t("columns:addDialog.title")}</h2>
+      <form
+        className={styles.dialog}
+        onSubmit={handleSubmit}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={fieldId("title")}
+      >
+        <h2 id={fieldId("title")} className={styles.title}>
+          {t("columns:addDialog.title")}
+        </h2>
 
         {!isExternal && (
           <div className={styles.field}>
-            <label className={styles.label} htmlFor="account-select">
+            <label className={styles.label} htmlFor={fieldId("account")}>
               {t("columns:addDialog.account")}
             </label>
             <select
-              id="account-select"
+              id={fieldId("account")}
               className={styles.select}
               value={accountId}
               onChange={(e) => setAccountId(e.target.value)}
@@ -111,11 +123,11 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
         )}
 
         <div className={styles.field}>
-          <label className={styles.label} htmlFor="page-type-select">
+          <label className={styles.label} htmlFor={fieldId("page-type")}>
             {t("columns:addDialog.pageType")}
           </label>
           <select
-            id="page-type-select"
+            id={fieldId("page-type")}
             className={styles.select}
             value={pageType}
             onChange={(e) => setPageType(e.target.value as PageType)}
@@ -140,13 +152,13 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
           <div className={styles.field}>
             <label
               className={styles.label}
-              htmlFor="tab-name"
+              htmlFor={fieldId("tab-name")}
               aria-label={t("columns:addDialog.homeTabName")}
             >
               {t("columns:addDialog.homeTabName")}
             </label>
             <input
-              id="tab-name"
+              id={fieldId("tab-name")}
               aria-label={t("columns:addDialog.homeTabName")}
               className={styles.input}
               value={homeTabName}
@@ -158,11 +170,11 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
 
         {pageType === "search" && (
           <div className={styles.field}>
-            <label className={styles.label} htmlFor="search-query">
+            <label className={styles.label} htmlFor={fieldId("search-query")}>
               {t("columns:addDialog.searchQuery")}
             </label>
             <input
-              id="search-query"
+              id={fieldId("search-query")}
               className={styles.input}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -174,11 +186,11 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
 
         {pageType === "list" && (
           <div className={styles.field}>
-            <label className={styles.label} htmlFor="list-id">
+            <label className={styles.label} htmlFor={fieldId("list-id")}>
               {t("columns:addDialog.listId")}
             </label>
             <input
-              id="list-id"
+              id={fieldId("list-id")}
               className={styles.input}
               value={listId}
               onChange={(e) => setListId(e.target.value)}
@@ -190,11 +202,11 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
 
         {(pageType === "custom" || isExternal) && (
           <div className={styles.field}>
-            <label className={styles.label} htmlFor="custom-url">
+            <label className={styles.label} htmlFor={fieldId("custom-url")}>
               {t("columns:addDialog.url")}
             </label>
             <input
-              id="custom-url"
+              id={fieldId("custom-url")}
               className={styles.input}
               value={customUrl}
               onChange={(e) => setCustomUrl(e.target.value)}
@@ -210,11 +222,11 @@ export const AddColumnDialog: React.FC<AddColumnDialogProps> = ({
         )}
 
         <div className={styles.field}>
-          <label className={styles.label} htmlFor="column-label">
+          <label className={styles.label} htmlFor={fieldId("column-label")}>
             {t("columns:addDialog.label")}
           </label>
           <input
-            id="column-label"
+            id={fieldId("column-label")}
             aria-label={t("columns:addDialog.label")}
             className={styles.input}
             value={label}

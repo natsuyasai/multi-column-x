@@ -3,6 +3,12 @@ import type { ReactNode } from "react";
 import { useEffect, useLayoutEffect } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 import { AccountNameDialog } from "@/components/AccountNameDialog/AccountNameDialog";
+import { installThemeTokens } from "@/test-utils/storyTheme";
+import {
+  expectAdjacentGap,
+  expectTapTargets,
+  setPlatform,
+} from "@/test-utils/tapTargets";
 
 // アプリは documentElement の data-theme でテーマを切り替えるため、Story でもそれに合わせる
 function ThemeRoot({
@@ -93,6 +99,13 @@ const meta: Meta<typeof AccountNameDialog> = {
   title: "Components/AccountNameDialog",
   component: AccountNameDialog,
   parameters: { layout: "fullscreen" },
+  // Storybook は index.css を読まないため、--mcx-* のテーマ変数を Story 側で有効にする
+  decorators: [
+    (Story) => {
+      installThemeTokens();
+      return <Story />;
+    },
+  ],
   args: {
     defaultValue: "アカウント 1",
     title: "アカウント名を入力",
@@ -164,6 +177,38 @@ export const AndroidFitsLargeScale: Story = {
       await expectFitsAndScrollable(dialog);
     } finally {
       await restoreViewport();
+    }
+  },
+};
+
+export const AndroidTapTargets: Story = {
+  name: "Android・すべての操作要素が44px以上で隣り合うボタンに間隔がある",
+  play: async ({ canvasElement }) => {
+    const restorePlatform = setPlatform("android");
+    try {
+      await expectTapTargets(canvasElement, 44);
+      await expectAdjacentGap(canvasElement, 8);
+    } finally {
+      restorePlatform();
+    }
+  },
+};
+
+export const DesktopKeepsDensity: Story = {
+  name: "デスクトップ・入力欄とボタンの高さは44px未満のまま密度が変わらない",
+  play: async ({ canvasElement }) => {
+    const restorePlatform = setPlatform("desktop");
+    try {
+      const canvas = within(canvasElement);
+      await expect(
+        canvas.getByLabelText("アカウント名").getBoundingClientRect().height,
+      ).toBeLessThan(44);
+      await expect(
+        canvas.getByRole("button", { name: "OK" }).getBoundingClientRect()
+          .height,
+      ).toBeLessThan(44);
+    } finally {
+      restorePlatform();
     }
   },
 };

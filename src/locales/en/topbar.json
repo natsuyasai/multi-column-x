@@ -25,5 +25,7 @@
   },
   "collapse": "Collapse toolbar (Ctrl+B)",
   "expand": "Expand toolbar (Ctrl+B)",
-  "closeColumn": "Close column"
+  "closeColumn": "Close column",
+  "label": "Toolbar",
+  "columnListLabel": "Columns"
 }

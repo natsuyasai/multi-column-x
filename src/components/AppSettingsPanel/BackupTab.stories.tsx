@@ -5,6 +5,12 @@ import { expect, fn, userEvent, within } from "storybook/test";
 import { BackupTab } from "@/components/AppSettingsPanel/BackupTab";
 import i18n from "@/i18n";
 import type { BackupContent, RestoreMapping } from "@/lib/backupRestore";
+import { installThemeTokens } from "@/test-utils/storyTheme";
+import {
+  expectAdjacentGap,
+  expectTapTargets,
+  setPlatform,
+} from "@/test-utils/tapTargets";
 import { DEFAULT_COLUMN_SETTINGS, DEFAULT_GLOBAL_SETTINGS } from "@/types";
 import type { Account, Column } from "@/types";
 
@@ -111,10 +117,46 @@ function StatefulMapping(
   );
 }
 
+// 狭い画面（スマホ幅）を再現するため、vitest の browser 実行時だけ viewport を絞る。戻す関数を返す。
+// Storybook の画面上で開いた場合は viewport を変えられないので何もしない
+async function narrowViewport(width: number, height: number) {
+  const originalWidth = window.innerWidth;
+  const originalHeight = window.innerHeight;
+  try {
+    const { page } = await import("vitest/browser");
+    await page.viewport(width, height);
+    return () => page.viewport(originalWidth, originalHeight);
+  } catch {
+    return async () => {};
+  }
+}
+
+// Android の 360x640 で操作要素の大きさ・間隔・横はみ出しを検査する
+async function expectAndroidUsable(canvasElement: HTMLElement) {
+  const restorePlatform = setPlatform("android");
+  const restoreViewport = await narrowViewport(360, 640);
+  try {
+    await expectTapTargets(canvasElement, 44);
+    await expectAdjacentGap(canvasElement, 8);
+    const root = document.documentElement;
+    await expect(root.scrollWidth).toBeLessThanOrEqual(root.clientWidth);
+  } finally {
+    await restoreViewport();
+    restorePlatform();
+  }
+}
+
 const meta: Meta<typeof BackupTab> = {
   title: "Components/AppSettingsPanel/BackupTab",
   component: BackupTab,
   parameters: { layout: "fullscreen" },
+  // Storybook は index.css を読まないため、--mcx-* のテーマ変数を Story 側で有効にする
+  decorators: [
+    (Story) => {
+      installThemeTokens();
+      return <Story />;
+    },
+  ],
   args: {
     accounts,
     step: "idle",
@@ -291,4 +333,44 @@ export const DarkTheme: Story = {
       <StatefulMapping {...args} initialMapping={{ A: "t1", B: "t1" }} />
     </ThemeRoot>
   ),
+};
+
+export const AndroidTapTargetsIdle: Story = {
+  name: "Android・初期表示の操作要素が44px以上で横にはみ出さない",
+  args: {
+    message: { kind: "error", text: "読み込めませんでした" },
+  },
+  play: async ({ canvasElement }) => {
+    await expectAndroidUsable(canvasElement);
+  },
+};
+
+export const AndroidTapTargetsMapping: Story = {
+  name: "Android・紐づけ画面の操作要素が44px以上で横にはみ出さない",
+  args: { step: "mapping", content, mapping: { A: "t1", B: "t1" } },
+  play: async ({ canvasElement }) => {
+    await expectAndroidUsable(canvasElement);
+  },
+};
+
+export const AndroidTapTargetsConfirm: Story = {
+  name: "Android・確認画面の操作要素が44px以上で横にはみ出さない",
+  args: { step: "confirm", content, mapping: { A: "t1" } },
+  play: async ({ canvasElement }) => {
+    await expectAndroidUsable(canvasElement);
+  },
+};
+
+export const KeyboardFocusShowsRing: Story = {
+  name: "キーボードでフォーカスしたボタンにはフォーカスリングが出る",
+  play: async ({ canvasElement }) => {
+    await userEvent.tab();
+    const focused = document.activeElement as HTMLElement;
+    await expect(focused).toBe(
+      within(canvasElement).getByRole("button", {
+        name: "バックアップを書き出す",
+      }),
+    );
+    await expect(getComputedStyle(focused).outlineStyle).not.toBe("none");
+  },
 };

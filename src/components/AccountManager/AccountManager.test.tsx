@@ -1,8 +1,11 @@
 import { render, screen, fireEvent, act } from "@testing-library/react";
+import type React from "react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import i18n from "@/i18n";
+import { expectAccessibleControls } from "@/test-utils/a11y";
 import { expectNoJapanese } from "@/test-utils/japanese";
 import type { Account } from "../../types";
+import { ConfirmDialog } from "../ConfirmDialog/ConfirmDialog";
 import { AccountManager } from "./AccountManager";
 
 const mockAccounts: Account[] = [
@@ -203,6 +206,106 @@ describe("AccountManager", () => {
         .querySelector('[aria-label="閉じる"]')
         ?.querySelector('[data-testid="icon-close"]'),
     ).toBeInTheDocument();
+  });
+
+  describe("ダイアログのアクセシビリティ", () => {
+    const secondAccount: Account = {
+      id: "acc-2",
+      label: "アカウントB",
+      dataDirectory: "/data/b",
+      color: "#e0245e",
+      createdAt: "2026-05-02T00:00:00Z",
+    };
+    const renderManager = (
+      props: Partial<React.ComponentProps<typeof AccountManager>> = {},
+    ) =>
+      render(
+        <AccountManager
+          accounts={[mockAccounts[0], secondAccount]}
+          defaultAccountId="acc-1"
+          onAddAccount={vi.fn()}
+          onRemoveAccount={vi.fn()}
+          onSetDefault={vi.fn()}
+          onUpdateAccount={vi.fn()}
+          onClose={vi.fn()}
+          onReauthAccount={vi.fn()}
+          {...props}
+        />,
+      );
+
+    it("見出しがダイアログの名前になり aria-modal が付く", () => {
+      renderManager();
+      expect(
+        screen.getByRole("dialog", { name: "アカウント管理" }),
+      ).toHaveAttribute("aria-modal", "true");
+    });
+
+    it("一覧と編集中のすべてのボタン・入力欄にアクセシブルネームがある", () => {
+      const { container } = renderManager();
+      expectAccessibleControls(container);
+
+      fireEvent.click(screen.getByLabelText("アカウントA を編集"));
+      expectAccessibleControls(container);
+    });
+
+    it("メインのアカウントは色だけでなく押下状態でも伝わる", () => {
+      renderManager();
+      expect(
+        screen.getByRole("button", { name: /アカウントA/, pressed: true }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /アカウントB を/, pressed: false }),
+      ).toBeInTheDocument();
+    });
+
+    it("編集中の現在の色は色だけでなく押下状態でも伝わる", () => {
+      renderManager();
+      fireEvent.click(screen.getByLabelText("アカウントA を編集"));
+
+      expect(
+        screen.getByRole("button", {
+          name: "色を #1d9bf0 に変更",
+          pressed: true,
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", {
+          name: "色を #e5c07b に変更",
+          pressed: false,
+        }),
+      ).toBeInTheDocument();
+    });
+
+    it("開く前にフォーカスしていた要素へフォーカスが戻る", () => {
+      const opener = document.createElement("button");
+      document.body.appendChild(opener);
+      opener.focus();
+
+      const { unmount } = renderManager();
+      screen.getByRole("button", { name: "閉じる" }).focus();
+      unmount();
+
+      expect(opener).toHaveFocus();
+      opener.remove();
+    });
+
+    it("確認ダイアログを重ねて閉じても管理画面の操作ボタンへフォーカスが戻る", () => {
+      renderManager();
+      const removeButton = screen.getByLabelText("アカウントA を削除");
+      removeButton.focus();
+
+      const confirm = render(
+        <ConfirmDialog
+          message="削除しますか？"
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      screen.getByRole("button", { name: "OK" }).focus();
+      confirm.unmount();
+
+      expect(removeButton).toHaveFocus();
+    });
   });
 
   describe("表示言語", () => {

@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ExtensionsTab } from "@/components/AppSettingsPanel/ExtensionsTab";
 import i18n from "@/i18n";
+import { expectAccessibleControls } from "@/test-utils/a11y";
 import { expectNoJapanese } from "@/test-utils/japanese";
 import type { DetectResult, ExtensionEntry } from "@/types";
 
@@ -815,5 +816,124 @@ describe("ExtensionsTab 英語表示", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Added extensions")).toBeInTheDocument();
     expect(screen.queryByText("追加済みの拡張機能")).not.toBeInTheDocument();
+  });
+});
+
+describe("ExtensionsTab デザイン原則（アクセシビリティ）", () => {
+  const warningMark = '[aria-hidden="true"][data-kind="warning"]';
+  const successMark = '[aria-hidden="true"][data-kind="success"]';
+
+  it("追加済みの拡張機能の一覧のすべての入力欄とボタンにアクセシブルネームがある", async () => {
+    setup({}, [entry(), entry({ id: "e2", name: "拡張B", missing: true })]);
+    await screen.findByText("拡張A");
+    expectAccessibleControls(document.body);
+  });
+
+  it("検出した候補の一覧のすべてのボタンにアクセシブルネームがある", async () => {
+    const { user } = setup({
+      detectChromeExtensions: vi.fn(async (): Promise<DetectResult> => ({
+        browserFound: true,
+        items: [
+          {
+            chromeId: "aaaaaaaaaaaaaaaa",
+            profile: "Default",
+            browser: "chrome",
+            name: "候補A",
+            path: "C:\\chrome\\aaaa",
+            hasPopup: false,
+            hasOptions: false,
+            added: false,
+          },
+        ],
+      })),
+    });
+    await user.click(screen.getByRole("button", { name: "ブラウザから検出" }));
+    await screen.findByText("候補A");
+    expectAccessibleControls(document.body);
+  });
+
+  it("操作が失敗したときのエラーは alert のまま警告の記号を併用する", async () => {
+    const { user } = setup({
+      pickFolder: vi.fn(async () => {
+        throw "manifest.json が見つかりません";
+      }),
+    });
+    await user.click(
+      screen.getByRole("button", { name: "フォルダを指定して追加" }),
+    );
+    const alert = await screen.findByRole("alert");
+    expect(alert.querySelector(warningMark)).not.toBeNull();
+  });
+
+  it("ブラウザが見つからないときの通知は status のまま警告の記号を併用する", async () => {
+    const { user } = setup({
+      detectChromeExtensions: vi.fn(async (): Promise<DetectResult> => ({
+        browserFound: false,
+        items: [],
+      })),
+    });
+    await user.click(screen.getByRole("button", { name: "ブラウザから検出" }));
+    const status = await screen.findByRole("status");
+    expect(status.querySelector(warningMark)).not.toBeNull();
+  });
+
+  it("見つかりませんのバッジは警告の記号とともに表示される", async () => {
+    setup({}, [entry({ missing: true })]);
+    const badge = await screen.findByText(
+      i18n.t("settings:extensions.missing"),
+    );
+    expect(badge.querySelector(warningMark)).not.toBeNull();
+  });
+
+  it("追加済みの候補は成功の記号つきのバッジで示される", async () => {
+    const { user } = setup({
+      detectChromeExtensions: vi.fn(async (): Promise<DetectResult> => ({
+        browserFound: true,
+        items: [
+          {
+            chromeId: "aaaaaaaaaaaaaaaa",
+            profile: "Default",
+            browser: "chrome",
+            name: "候補A",
+            path: "C:\\chrome\\aaaa",
+            hasPopup: false,
+            hasOptions: false,
+            added: true,
+          },
+        ],
+      })),
+    });
+    await user.click(screen.getByRole("button", { name: "ブラウザから検出" }));
+    const badge = await screen.findByText(i18n.t("settings:extensions.added"));
+    expect(badge.querySelector(successMark)).not.toBeNull();
+  });
+
+  it("追加済みの候補の追加ボタンは無効でクリックしても追加されない", async () => {
+    const addChrome = vi.fn(async () => undefined);
+    const { user } = setup({
+      addChrome,
+      detectChromeExtensions: vi.fn(async (): Promise<DetectResult> => ({
+        browserFound: true,
+        items: [
+          {
+            chromeId: "aaaaaaaaaaaaaaaa",
+            profile: "Default",
+            browser: "chrome",
+            name: "候補A",
+            path: "C:\\chrome\\aaaa",
+            hasPopup: false,
+            hasOptions: false,
+            added: true,
+          },
+        ],
+      })),
+    });
+    await user.click(screen.getByRole("button", { name: "ブラウザから検出" }));
+    const add = await screen.findByRole("button", { name: "候補A を追加" });
+    expect(add).toBeDisabled();
+
+    await user.click(add);
+
+    expect(addChrome).not.toHaveBeenCalled();
   });
 });

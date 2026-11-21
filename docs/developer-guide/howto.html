@@ -706,6 +706,25 @@
               </div>
             </li>
             <li>
+              <b>デザイン原則（ui-design-principles）に従う</b>
+              <div class="ck-body">
+                UI を新規作成・変更するときは
+                <code class="path"
+                  >.claude/skills/ui-design-principles/SKILL.md</code
+                >
+                のチェックリストに従う。余白・角丸・文字サイズ・動きの時間は
+                <code class="path">src/styles/_tokens.scss</code
+                >、フォーカスリングと Android の 44px は
+                <code class="path">src/styles/_mixins.scss</code>
+                のミキシンを使う。契約テスト
+                <code class="path">src/lib/uiDesign.contract.test.ts</code>
+                が全 <code>*.module.scss</code> を検査する（<a
+                  href="../development/ui-design-principles-notes.md"
+                  >ui-design-principles-notes.md</a
+                >）。
+              </div>
+            </li>
+            <li>
               <b>配色は CSS トークンを使う</b>
               <div class="ck-body">
                 <code class="path">src/index.css</code>
@@ -778,11 +797,19 @@
             <li>
               目視確認は <code>npm run storybook</code>。Storybook は
               <code>index.css</code>
-              を読まないため、テーマ変数が必要な検証には注意。
+              を読まないため、テーマ変数が必要な検証は
+              <code class="path">src/test-utils/storyTheme.ts</code> の
+              <code>installThemeTokens()</code>、固定高さを実測する検証は
+              <code>installAppReset()</code>（border-box リセット）を使う。
             </li>
             <li>
               <code class="path">src/lib/gridLayout.contract.test.ts</code>:
               SCSS の高さと rem 定数の一致。
+            </li>
+            <li>
+              <code class="path">src/lib/uiDesign.contract.test.ts</code>: 全
+              <code>*.module.scss</code>
+              が余白・文字・状態・Android の当たり判定などの規約を満たすこと。
             </li>
           </ul>
           <div class="callout warn">

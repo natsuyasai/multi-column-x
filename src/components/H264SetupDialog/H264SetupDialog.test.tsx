@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { H264SetupDialog } from "@/components/H264SetupDialog/H264SetupDialog";
 import type {
@@ -6,6 +6,7 @@ import type {
   H264DownloadState,
 } from "@/hooks/useH264Setup";
 import i18n from "@/i18n";
+import { expectAccessibleControls } from "@/test-utils/a11y";
 import { expectNoJapanese } from "@/test-utils/japanese";
 
 function renderDialog(
@@ -161,6 +162,62 @@ describe("H264SetupDialog", () => {
       expect(screen.getByRole("alert")).toHaveTextContent(
         "ダウンロードに失敗しました。",
       );
+    });
+  });
+
+  describe("アクセシビリティ", () => {
+    it.each<H264DownloadState>(["idle", "downloading", "success", "error"])(
+      "%s の状態でもすべてのボタンにアクセシブルネームがある",
+      (state) => {
+        const { container } = render(
+          <H264SetupDialog
+            downloadState={state}
+            downloadError={null}
+            onDownload={vi.fn()}
+            onDismiss={vi.fn()}
+            onClose={vi.fn()}
+            onRelaunch={vi.fn()}
+          />,
+        );
+        expectAccessibleControls(container);
+      },
+    );
+
+    it("閉じたあと開く前にフォーカスしていた要素へフォーカスが戻る", () => {
+      const opener = document.createElement("button");
+      document.body.appendChild(opener);
+      opener.focus();
+
+      const { unmount } = render(
+        <H264SetupDialog
+          downloadState="idle"
+          downloadError={null}
+          onDownload={vi.fn()}
+          onDismiss={vi.fn()}
+          onClose={vi.fn()}
+          onRelaunch={vi.fn()}
+        />,
+      );
+      expect(
+        screen.getByRole("button", { name: "ダウンロードして有効化" }),
+      ).toHaveFocus();
+      unmount();
+
+      expect(opener).toHaveFocus();
+      opener.remove();
+    });
+
+    it("失敗は色だけでなくアイコンと接頭ラベルでも伝える", () => {
+      renderDialog("error", { downloadError: "失敗" });
+      const alert = screen.getByRole("alert");
+      expect(within(alert).getByText("エラー:")).toBeInTheDocument();
+      expect(alert.querySelector('[aria-hidden="true"]')).not.toBeNull();
+    });
+
+    it("成功は文言だけでなくチェックのアイコンでも伝える", () => {
+      renderDialog("success");
+      const status = screen.getByRole("status");
+      expect(status.querySelector('[aria-hidden="true"]')).not.toBeNull();
     });
   });
 

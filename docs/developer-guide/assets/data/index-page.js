@@ -834,11 +834,12 @@ Object.assign(window.MCX_DATA.catalogs, {
         target: "二重定義の同期・規約の機械的な保証",
         area: "TS",
         detail:
-          "<p>例: <code>ipc.contract.test.ts</code>（IPC 名と contracts の一致）、<code>defaults.contract.test.ts</code>（設定既定値）、<code>gridLayout.contract.test.ts</code>（SCSS と rem 定数）、<code>themeContrast.contract.test.ts</code>（配色コントラスト）、<code>swipeBarColors.contract.test.ts</code>（Android の色同期）、<code>unusedKeys.contract.test.ts</code>・<code>resources.contract.test.ts</code>（辞書）、<code>capabilities.contract.test.ts</code>、<code>csp.contract.test.ts</code>、<code>i18nLint.contract.test.ts</code>。</p>",
+          "<p>例: <code>ipc.contract.test.ts</code>（IPC 名と contracts の一致）、<code>defaults.contract.test.ts</code>（設定既定値）、<code>gridLayout.contract.test.ts</code>（SCSS と rem 定数）、<code>uiDesign.contract.test.ts</code>（全 <code>*.module.scss</code> のデザイン原則）、<code>themeContrast.contract.test.ts</code>（配色コントラスト）、<code>swipeBarColors.contract.test.ts</code>（Android の色同期）、<code>unusedKeys.contract.test.ts</code>・<code>resources.contract.test.ts</code>（辞書）、<code>capabilities.contract.test.ts</code>、<code>csp.contract.test.ts</code>、<code>i18nLint.contract.test.ts</code>。</p>",
         files: [
           "src/constants/ipc.contract.test.ts",
           "src/types/defaults.contract.test.ts",
           "src/lib/gridLayout.contract.test.ts",
+          "src/lib/uiDesign.contract.test.ts",
         ],
       },
       {
@@ -1059,6 +1060,11 @@ Object.assign(window.MCX_DATA.catalogs, {
         summary: "ブラウザ拡張機能（Windows のみ）。",
       },
       { name: "i18n-notes.md", summary: "多言語対応の規約と追加手順。" },
+      {
+        name: "ui-design-principles-notes.md",
+        summary:
+          "UI デザイン原則（余白・文字・フォーカス・Android 44px）と契約テスト。",
+      },
       {
         name: "ui-scale-notes.md",
         summary: "UI 表示サイズ（rem 規約、Android 全画面ダイアログ）。",

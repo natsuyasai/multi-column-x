@@ -151,7 +151,7 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
     <div className={styles.container}>
       {!isMobile && (
         <>
-          <div className={styles.gridSizeRow}>
+          <label className={styles.gridSizeRow}>
             <span>{t("settings:layout.gridCols")}</span>
             <input
               type="number"
@@ -166,7 +166,7 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
                 setPendingCell(null);
               }}
             />
-          </div>
+          </label>
 
           <div className={styles.body}>
             <GridPreview
@@ -216,10 +216,14 @@ export const ColumnLayoutTab: React.FC<ColumnLayoutTabProps> = ({
       />
 
       <div className={styles.actions}>
-        <button className={styles.cancelBtn} onClick={onCancel}>
+        <button type="button" className={styles.cancelBtn} onClick={onCancel}>
           {t("settings:panel.actions.cancel")}
         </button>
-        <button className={styles.applyBtn} onClick={() => onApply(draft)}>
+        <button
+          type="button"
+          className={styles.applyBtn}
+          onClick={() => onApply(draft)}
+        >
           {t("settings:panel.actions.apply")}
         </button>
       </div>

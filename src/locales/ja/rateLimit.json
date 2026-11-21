@@ -64,6 +64,8 @@
   "indicator": {
     "triggerLabel": "APIレート制限",
     "listLabel": "APIレート制限一覧",
+    "severityWarning": "残りが少なくなっています",
+    "severityCritical": "残りがほとんどありません",
     "noData": "データなし",
     "soon": "まもなく",
     "resetInMinutes_one": "あと{{count}}分",

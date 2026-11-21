@@ -3,6 +3,12 @@ import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 import { ColumnLayoutTab } from "@/components/AppSettingsPanel/ColumnLayoutTab";
+import { installThemeTokens } from "@/test-utils/storyTheme";
+import {
+  expectAdjacentGap,
+  expectTapTargets,
+  setPlatform,
+} from "@/test-utils/tapTargets";
 import type { Account, Column } from "@/types";
 
 const columnSettings = {
@@ -81,10 +87,31 @@ function ThemeRoot({
   return <>{children}</>;
 }
 
+// 狭い画面（スマホ幅）を再現するため、vitest の browser 実行時だけ viewport を絞る。戻す関数を返す。
+// Storybook の画面上で開いた場合は viewport を変えられないので何もしない
+async function narrowViewport(width: number, height: number) {
+  const originalWidth = window.innerWidth;
+  const originalHeight = window.innerHeight;
+  try {
+    const { page } = await import("vitest/browser");
+    await page.viewport(width, height);
+    return () => page.viewport(originalWidth, originalHeight);
+  } catch {
+    return async () => {};
+  }
+}
+
 const meta: Meta<typeof ColumnLayoutTab> = {
   title: "Components/AppSettingsPanel/ColumnLayoutTab",
   component: ColumnLayoutTab,
   parameters: { layout: "fullscreen" },
+  // Storybook は index.css を読まないため、--mcx-* のテーマ変数を Story 側で有効にする
+  decorators: [
+    (Story) => {
+      installThemeTokens();
+      return <Story />;
+    },
+  ],
   args: {
     columns,
     accounts,
@@ -313,5 +340,87 @@ export const MobileLongColumnNames: Story = {
     const nameEl2 = within(orderList).getByText(longGroup2Label);
     await expect(nameEl1).toBeInTheDocument();
     await expect(nameEl2).toBeInTheDocument();
+  },
+};
+
+export const AndroidTapTargets: Story = {
+  name: "Android（モバイル）・並び替えと操作ボタンが44px以上で間隔があり横にはみ出さない",
+  args: { isMobile: true },
+  play: async ({ canvasElement }) => {
+    const restorePlatform = setPlatform("android");
+    const restoreViewport = await narrowViewport(360, 640);
+    try {
+      await expectTapTargets(canvasElement, 44);
+      await expectAdjacentGap(canvasElement, 8);
+      const root = document.documentElement;
+      await expect(root.scrollWidth).toBeLessThanOrEqual(root.clientWidth);
+    } finally {
+      await restoreViewport();
+      restorePlatform();
+    }
+  },
+};
+
+// Android では isMobile でグリッド編集は表示されないが、表示された場合（広い画面）でも操作要素が小さくならないことを確かめる
+export const AndroidGridTapTargets: Story = {
+  name: "Android・グリッド編集を表示した場合もセルと高さ設定の操作要素が44px以上になる",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const restorePlatform = setPlatform("android");
+    try {
+      const grid = canvas.getByTestId("grid-preview");
+      await userEvent.click(
+        within(grid).getByText("テストアカウント - ホーム"),
+      );
+      await userEvent.click(canvas.getByRole("radio", { name: "固定:" }));
+      await expectTapTargets(canvasElement, 44);
+      await expectAdjacentGap(canvasElement, 8);
+    } finally {
+      restorePlatform();
+    }
+  },
+};
+
+export const CellSelectionShownBeyondColor: Story = {
+  name: "選択中のセルは押下状態と記号でも示される",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const cell = canvas.getByLabelText("列1行1のセル");
+    await userEvent.click(cell);
+    await expect(cell).toHaveAttribute("aria-pressed", "true");
+    await expect(cell.querySelector('[data-kind="selected"]')).not.toBeNull();
+  },
+};
+
+export const KeyboardFocusShowsRing: Story = {
+  name: "キーボードでフォーカスしたセルにはフォーカスリングが出る",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const cell = canvas.getByLabelText("列1行1のセル");
+    // キーボードの Tab 送りで到達させる（プログラムからの focus() では focus-visible にならないことがある）
+    for (let i = 0; i < 20 && document.activeElement !== cell; i++) {
+      await userEvent.tab();
+    }
+    await expect(document.activeElement).toBe(cell);
+    await expect(getComputedStyle(cell).outlineStyle).not.toBe("none");
+  },
+};
+
+export const KeyboardFocusRingOnRadioRow: Story = {
+  name: "キーボードでラジオボタンにフォーカスすると行全体にフォーカスリングが出る",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      within(canvas.getByTestId("grid-preview")).getByText(
+        "テストアカウント - ホーム",
+      ),
+    );
+    const radio = canvas.getByRole("radio", { name: "均等（自動）" });
+    for (let i = 0; i < 40 && document.activeElement !== radio; i++) {
+      await userEvent.tab();
+    }
+    await expect(document.activeElement).toBe(radio);
+    const label = radio.closest("label") as HTMLElement;
+    await expect(getComputedStyle(label).outlineStyle).not.toBe("none");
   },
 };

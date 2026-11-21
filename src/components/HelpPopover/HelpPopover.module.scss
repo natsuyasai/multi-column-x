@@ -1,3 +1,6 @@
+@use "../../styles/tokens" as t;
+@use "../../styles/mixins" as m;
+
 .container {
   position: relative;
   display: inline-block;
@@ -7,21 +10,32 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.125rem;
-  height: 1.125rem;
+  width: 1.25rem;
+  height: 1.25rem;
   background: none;
-  border: 1px solid var(--mcx-border);
+  border: 1px solid var(--mcx-border-strong);
   border-radius: 50%;
   color: var(--mcx-text-muted);
   cursor: pointer;
-  font-size: 0.6875rem;
+  font-size: t.$font-size-xs;
   font-weight: bold;
   line-height: 1;
   padding: 0;
+  @include m.transition-base(color, background-color);
+  @include m.android-tap-target;
 
   &:hover {
     color: var(--mcx-text-tertiary);
     background: var(--mcx-surface-hover);
+  }
+
+  &:active {
+    color: var(--mcx-text);
+    background: var(--mcx-surface-muted);
+  }
+
+  &:focus-visible {
+    @include m.focus-ring;
   }
 }
 
@@ -32,10 +46,10 @@
   width: min(20rem, 90vw);
   background: var(--mcx-surface);
   border: 1px solid var(--mcx-border);
-  border-radius: 0.5rem;
+  border-radius: t.$radius-md;
   padding: 0.75rem;
-  font-size: 0.75rem;
+  font-size: t.$font-size-xs;
   line-height: 1.5;
   color: var(--mcx-text-tertiary);
-  box-shadow: 0 0.25rem 1rem rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0.25rem 1rem var(--mcx-shadow);
 }

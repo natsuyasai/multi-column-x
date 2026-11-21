@@ -8,6 +8,8 @@
   "linkPopup": {
     "defaultTitle": "Open URL in a popup window",
     "urlPlaceholder": "https://x.com/...",
+    "urlLabel": "URL",
+    "accountLabel": "Account",
     "cancel": "Cancel",
     "open": "Open"
   },
@@ -26,7 +28,8 @@
     "awaitingInstall": "Downloading. The installer will appear when it finishes.",
     "later": "Later",
     "install": "Update",
-    "installingButton": "Updating..."
+    "installingButton": "Updating...",
+    "errorPrefix": "Error:"
   },
   "h264": {
     "title": "Additional component for video playback",
@@ -40,7 +43,8 @@
     "relaunch": "Restart now",
     "fallbackError": "Download failed.",
     "close": "Close",
-    "retry": "Retry"
+    "retry": "Retry",
+    "errorPrefix": "Error:"
   },
   "shortcutHelp": {
     "title": "Keyboard shortcuts",

@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 import { ColumnHeader } from "@/components/ColumnHeader/ColumnHeader";
+import { installAppReset, installThemeTokens } from "@/test-utils/storyTheme";
+import { setPlatform } from "@/test-utils/tapTargets";
 import type { Account, Column } from "@/types";
 
 const settings = {
@@ -70,6 +72,13 @@ function ThemeRoot({
 const meta: Meta<typeof ColumnHeader> = {
   title: "Components/ColumnHeader",
   component: ColumnHeader,
+  // Storybook は index.css を読まないため、--mcx-* のテーマ変数を Story 側で有効にする
+  decorators: [
+    (Story) => {
+      installThemeTokens();
+      return <Story />;
+    },
+  ],
   args: {
     column,
     account,
@@ -137,4 +146,45 @@ export const DarkTheme: Story = {
       </ThemeRoot>
     ),
   ],
+};
+
+export const DesktopButtonsFitFixedHeader: Story = {
+  name: "デスクトップ・操作要素が固定高さのヘッダー内に収まる",
+  play: async ({ canvasElement }) => {
+    const restorePlatform = setPlatform("desktop");
+    const removeReset = installAppReset();
+    try {
+      const header = canvasElement.querySelector<HTMLElement>('[role="group"]');
+      await expect(header).not.toBeNull();
+      const headerRect = header!.getBoundingClientRect();
+      // 2.25rem（16px 基準で 36px）。ネイティブ WebView の bounds と連動するため増やさない
+      await expect(headerRect.height).toBeCloseTo(36, 0);
+      const buttons = Array.from(canvasElement.querySelectorAll("button"));
+      await expect(buttons.length).toBeGreaterThan(0);
+      for (const button of buttons) {
+        const rect = button.getBoundingClientRect();
+        await expect(rect.height).toBeLessThanOrEqual(headerRect.height);
+        await expect(rect.top).toBeGreaterThanOrEqual(headerRect.top);
+        await expect(rect.bottom).toBeLessThanOrEqual(headerRect.bottom);
+      }
+    } finally {
+      removeReset();
+      restorePlatform();
+    }
+  },
+};
+
+export const KeyboardFocusShowsRing: Story = {
+  name: "キーボードでフォーカスした操作ボタンにフォーカスリングが出る",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.tab();
+    const first = canvas.getByLabelText("未読あり");
+    await expect(first).toHaveFocus();
+    await expect(getComputedStyle(first).outlineStyle).not.toBe("none");
+    await userEvent.tab();
+    const scrollTop = canvas.getByLabelText("先頭までスクロール");
+    await expect(scrollTop).toHaveFocus();
+    await expect(getComputedStyle(scrollTop).outlineStyle).not.toBe("none");
+  },
 };

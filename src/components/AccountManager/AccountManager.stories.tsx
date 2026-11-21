@@ -3,6 +3,12 @@ import type { ReactNode } from "react";
 import { useEffect, useLayoutEffect } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 import { AccountManager } from "@/components/AccountManager/AccountManager";
+import { installThemeTokens } from "@/test-utils/storyTheme";
+import {
+  expectAdjacentGap,
+  expectTapTargets,
+  setPlatform,
+} from "@/test-utils/tapTargets";
 import type { Account } from "@/types";
 
 const accounts: Account[] = [
@@ -105,6 +111,13 @@ const meta: Meta<typeof AccountManager> = {
   title: "Components/AccountManager",
   component: AccountManager,
   parameters: { layout: "fullscreen" },
+  // Storybook は index.css を読まないため、--mcx-* のテーマ変数を Story 側で有効にする
+  decorators: [
+    (Story) => {
+      installThemeTokens();
+      return <Story />;
+    },
+  ],
   args: {
     accounts,
     defaultAccountId: "acc-1",
@@ -310,5 +323,82 @@ export const NarrowTwoRowItems: Story = {
     } finally {
       await restoreViewport();
     }
+  },
+};
+
+export const AndroidTapTargets: Story = {
+  name: "Android・すべての操作要素が44px以上で隣り合うボタンに間隔がある",
+  play: async ({ canvasElement }) => {
+    const restorePlatform = setPlatform("android");
+    try {
+      await expectTapTargets(canvasElement, 44);
+      await expectAdjacentGap(canvasElement, 8);
+    } finally {
+      restorePlatform();
+    }
+  },
+};
+
+export const AndroidEditingTapTargets: Story = {
+  name: "Android・編集中の入力欄と色の選択肢も44px以上で間隔がある",
+  play: async ({ canvasElement }) => {
+    const restorePlatform = setPlatform("android");
+    try {
+      const canvas = within(canvasElement);
+      await userEvent.click(canvas.getByLabelText("アカウントA を編集"));
+      await expectTapTargets(canvasElement, 44);
+      await expectAdjacentGap(canvasElement, 8);
+    } finally {
+      restorePlatform();
+    }
+  },
+};
+
+export const AndroidStickyHeaderSpansPanelWidth: Story = {
+  name: "Android全画面の固定ヘッダーはパネルの幅いっぱいに広がり閉じるボタンが増えても本文に重ならない",
+  decorators: [
+    (Story) => (
+      <AndroidRoot fontSize="20px">
+        <Story />
+      </AndroidRoot>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const restoreViewport = await narrowViewport(360, 400);
+    try {
+      const canvas = within(canvasElement);
+      const panel = queryPanel(canvasElement);
+      const header = canvas.getByText("アカウント管理")
+        .parentElement as HTMLElement;
+      const headerRect = header.getBoundingClientRect();
+      const panelRect = panel.getBoundingClientRect();
+      // 固定ヘッダーの幅・位置が panel の padding 引数と一致していれば、画面の左右端まで届く
+      await expect(headerRect.left).toBe(panelRect.left);
+      await expect(headerRect.right).toBe(panel.clientWidth + panelRect.left);
+      // 閉じるボタンはヘッダーの中に収まる
+      const close = canvas.getByRole("button", { name: "閉じる" });
+      await expect(close.getBoundingClientRect().bottom).toBeLessThanOrEqual(
+        headerRect.bottom,
+      );
+      // 本文の先頭がヘッダーの下に隠れない
+      const firstBody = header.nextElementSibling as HTMLElement;
+      await expect(
+        firstBody.getBoundingClientRect().top,
+      ).toBeGreaterThanOrEqual(headerRect.bottom);
+    } finally {
+      await restoreViewport();
+    }
+  },
+};
+
+export const KeyboardFocusShowsRing: Story = {
+  name: "キーボードでフォーカスしたボタンにはフォーカスリングが出る",
+  play: async ({ canvasElement }) => {
+    await userEvent.tab();
+    const focused = document.activeElement as HTMLElement;
+    await expect(focused).toBe(
+      within(canvasElement).getByRole("button", { name: "閉じる" }),
+    );
+    await expect(getComputedStyle(focused).outlineStyle).not.toBe("none");
   },
 };

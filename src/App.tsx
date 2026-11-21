@@ -429,7 +429,7 @@ const App: React.FC = () => {
 
   if (!isLoaded) {
     return (
-      <div className={styles.loading}>
+      <div className={styles.loading} role="status">
         <span>{t("messages:app.loading")}</span>
       </div>
     );

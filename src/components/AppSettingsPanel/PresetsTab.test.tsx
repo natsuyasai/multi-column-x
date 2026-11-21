@@ -1,5 +1,7 @@
 import { render, screen, fireEvent } from "@testing-library/react";
+import type React from "react";
 import { describe, it, expect, vi } from "vitest";
+import { expectAccessibleControls } from "@/test-utils/a11y";
 import type { ColumnPreset } from "../../types";
 import { PresetsTab } from "./PresetsTab";
 
@@ -137,5 +139,49 @@ describe("PresetsTab", () => {
     expect(
       screen.getByText("保存済みプリセットはありません"),
     ).toBeInTheDocument();
+  });
+});
+
+describe("PresetsTab デザイン原則（アクセシビリティ）", () => {
+  const renderTab = (
+    props: Partial<React.ComponentProps<typeof PresetsTab>> = {},
+  ) =>
+    render(
+      <PresetsTab
+        presets={mockPresets}
+        onSave={vi.fn()}
+        onLoad={vi.fn()}
+        onDelete={vi.fn()}
+        {...props}
+      />,
+    );
+
+  it("すべての入力欄とボタンにアクセシブルネームがある", () => {
+    const { container } = renderTab();
+    expectAccessibleControls(container);
+  });
+
+  it("プリセット名の入力欄に名前が付く", () => {
+    renderTab();
+    expect(
+      screen.getByRole("textbox", { name: "プリセット名を入力" }),
+    ).toBeInTheDocument();
+  });
+
+  it("名前が空白だけのとき保存ボタンは無効でクリックしても onSave が呼ばれない", () => {
+    const onSave = vi.fn();
+    renderTab({ onSave });
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "プリセット名を入力" }),
+      {
+        target: { value: "   " },
+      },
+    );
+    const save = screen.getByRole("button", { name: "現在のレイアウトを保存" });
+    expect(save).toBeDisabled();
+
+    fireEvent.click(save);
+
+    expect(onSave).not.toHaveBeenCalled();
   });
 });

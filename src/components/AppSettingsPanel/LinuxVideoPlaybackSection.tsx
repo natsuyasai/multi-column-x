@@ -1,5 +1,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
+import { StatusMark } from "@/components/StatusMark/StatusMark";
 import type {
   H264DownloadError,
   H264DownloadState,
@@ -71,6 +72,7 @@ const H264Row: React.FC<{ h264: H264SettingsInfo }> = ({ h264 }) => {
     return (
       <>
         <p className={styles.errorText} role="alert">
+          <StatusMark kind="warning" />
           {h264.downloadError
             ? describeAppError(h264.downloadError, t)
             : t("settings:linuxVideo.fetchFailed")}

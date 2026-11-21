@@ -8,6 +8,8 @@
   "linkPopup": {
     "defaultTitle": "URLをポップアップウィンドウで開く",
     "urlPlaceholder": "https://x.com/...",
+    "urlLabel": "URL",
+    "accountLabel": "アカウント",
     "cancel": "キャンセル",
     "open": "開く"
   },
@@ -26,7 +28,8 @@
     "awaitingInstall": "ダウンロード中です。完了後にインストール画面が表示されます。",
     "later": "後で",
     "install": "更新する",
-    "installingButton": "更新中..."
+    "installingButton": "更新中...",
+    "errorPrefix": "エラー:"
   },
   "h264": {
     "title": "動画を再生するための追加コンポーネント",
@@ -40,7 +43,8 @@
     "relaunch": "今すぐ再起動",
     "fallbackError": "ダウンロードに失敗しました。",
     "close": "閉じる",
-    "retry": "再試行"
+    "retry": "再試行",
+    "errorPrefix": "エラー:"
   },
   "shortcutHelp": {
     "title": "キーボードショートカット",

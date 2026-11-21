@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { expect, userEvent, within } from "storybook/test";
 import { ApiRateLimitIndicator } from "@/components/ApiRateLimitIndicator/ApiRateLimitIndicator";
+import { installAppReset, installThemeTokens } from "@/test-utils/storyTheme";
+import { expectTapTargets, setPlatform } from "@/test-utils/tapTargets";
 import type { Account, ApiRateLimitBucket } from "@/types";
 
 const NOW_SEC = Math.floor(Date.now() / 1000);
@@ -94,6 +96,13 @@ const meta: Meta<typeof ApiRateLimitIndicator> = {
   title: "Components/ApiRateLimitIndicator",
   component: ApiRateLimitIndicator,
   parameters: { layout: "centered" },
+  // Storybook は index.css を読まないため、--mcx-* のテーマ変数を Story 側で有効にする
+  decorators: [
+    (Story) => {
+      installThemeTokens();
+      return <Story />;
+    },
+  ],
   args: {
     accounts,
     apiRateLimits: normalRateLimits,
@@ -224,5 +233,80 @@ export const DarkTheme: Story = {
       canvas.getByRole("button", { name: "APIレート制限" }),
     );
     await expect(canvas.getByText("アカウント1")).toBeInTheDocument();
+  },
+};
+
+export const AndroidTapTarget: Story = {
+  name: "Android・トリガーが44px以上になりポップオーバーが画面内に収まる",
+  args: { apiRateLimits: warningRateLimits, isMobile: true },
+  play: async ({ canvasElement }) => {
+    const restorePlatform = setPlatform("android");
+    try {
+      await expectTapTargets(canvasElement, 44);
+      const canvas = within(canvasElement);
+      await userEvent.click(
+        canvas.getByRole("button", { name: "APIレート制限" }),
+      );
+      const rect = canvas.getByRole("dialog").getBoundingClientRect();
+      await expect(rect.left).toBeGreaterThanOrEqual(0);
+      await expect(rect.right).toBeLessThanOrEqual(window.innerWidth);
+      await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(
+        document.documentElement.clientWidth,
+      );
+    } finally {
+      restorePlatform();
+    }
+  },
+};
+
+export const DesktopKeepsDensity: Story = {
+  name: "デスクトップ・トリガーはTopBarの行（2rem）内に収まる密度のまま",
+  args: { apiRateLimits: criticalRateLimits },
+  play: async ({ canvasElement }) => {
+    const restorePlatform = setPlatform("desktop");
+    const removeReset = installAppReset();
+    try {
+      const trigger = within(canvasElement).getByRole("button", {
+        name: "APIレート制限",
+      });
+      const rootFontPx = parseFloat(
+        getComputedStyle(document.documentElement).fontSize,
+      );
+      // TopBar の 1 行は 2rem。危険状態の記号付きでも行内に収まり、44px 化もされない
+      await expect(trigger.getBoundingClientRect().height).toBeLessThanOrEqual(
+        rootFontPx * 1.5,
+      );
+    } finally {
+      removeReset();
+      restorePlatform();
+    }
+  },
+};
+
+export const KeyboardFocusShowsRing: Story = {
+  name: "キーボードでフォーカスしたトリガーにはフォーカスリングが出る",
+  play: async ({ canvasElement }) => {
+    const trigger = within(canvasElement).getByRole("button", {
+      name: "APIレート制限",
+    });
+    await userEvent.tab();
+    await expect(trigger).toHaveFocus();
+    await expect(getComputedStyle(trigger).outlineStyle).not.toBe("none");
+  },
+};
+
+export const EscapeReturnsFocusToTrigger: Story = {
+  name: "Escapeで閉じるとフォーカスがトリガーへ戻る",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByRole("button", { name: "APIレート制限" });
+    await userEvent.click(trigger);
+    await expect(canvas.getByRole("dialog")).toBeInTheDocument();
+    // クリックでトリガーに残ったフォーカスを外し、Escape による復帰を確かめる
+    trigger.blur();
+    await expect(trigger).not.toHaveFocus();
+    await userEvent.keyboard("{Escape}");
+    await expect(canvas.queryByRole("dialog")).toBeNull();
+    await expect(trigger).toHaveFocus();
   },
 };

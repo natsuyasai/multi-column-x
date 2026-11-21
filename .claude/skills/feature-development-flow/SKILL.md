@@ -76,6 +76,7 @@ digraph flow {
 - **inject スクリプト**: `src-tauri/src/inject/_src/` を変更したら `npm run build:inject`。ビルド済み `.js` は編集禁止。inject の開発手順は `inject-script-dev` スキルに従う。
 - **Tauri コマンドの追加・削除**: `src-tauri/build.rs` の `AppManifest` と capability（`default.json` / `column-webview.json`）の更新が必須（`acl_contract.rs` の契約テストで検出される）。
 - **領域別の設計ノート**: 変更対象に対応する `docs/development/*-notes.md`（CLAUDE.md「アーキテクチャ上の重要な制約」が参照先を示す）を着手前に読む。
+- **UI の変更**: React / SCSS を変更する場合は `ui-design-principles` スキル（余白・文字サイズ・状態・a11y・Android の 44px）を参照する。
 - **serde 命名**: JS側 camelCase には `#[serde(rename)]` が必須。
 - **Android**: `MainActivity.kt` のメソッド変更時は ProGuard keep ルールを同期（リリースビルドで動作確認）。
 

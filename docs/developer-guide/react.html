@@ -767,6 +767,23 @@
                 </td>
               </tr>
               <tr>
+                <td>UI のスタイル</td>
+                <td>
+                  余白・角丸・文字サイズは
+                  <code>src/styles/_tokens.scss</code>、フォーカスリングと
+                  Android の 44px は <code>_mixins.scss</code> を
+                  <code>@use</code>（相対パス）。ダイアログは
+                  <code>role="dialog"</code
+                  >・Esc・<code>useRestoreFocus</code>。契約テスト
+                  <code>uiDesign.contract.test.ts</code> が全
+                  <code>*.module.scss</code> を検査する。詳細は
+                  <code>.claude/skills/ui-design-principles</code> と
+                  <a href="../development/ui-design-principles-notes.md"
+                    >ui-design-principles-notes.md</a
+                  >。
+                </td>
+              </tr>
+              <tr>
                 <td>Storybook</td>
                 <td>
                   コンポーネントと<b>同じディレクトリ</b>に

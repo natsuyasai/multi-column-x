@@ -1,6 +1,7 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/i18n";
+import { expectAccessibleControls } from "@/test-utils/a11y";
 import { expectNoJapanese } from "@/test-utils/japanese";
 import { UpdateDialog } from "./UpdateDialog";
 
@@ -149,6 +150,99 @@ describe("UpdateDialog", () => {
     expect(
       screen.getByText(/完了後にインストール画面が表示されます/),
     ).toBeInTheDocument();
+  });
+
+  describe("ダイアログのアクセシビリティ", () => {
+    const renderDialog = (
+      props: Partial<{
+        installing: boolean;
+        installError: string;
+        onInstall: () => void;
+        onLater: () => void;
+      }> = {},
+    ) =>
+      render(
+        <UpdateDialog
+          update={update}
+          installing={props.installing ?? false}
+          installError={props.installError}
+          onInstall={props.onInstall ?? vi.fn()}
+          onLater={props.onLater ?? vi.fn()}
+        />,
+      );
+
+    it("見出しがダイアログの名前になり aria-modal が付く", () => {
+      renderDialog();
+      expect(
+        screen.getByRole("dialog", { name: "新しいバージョンがあります" }),
+      ).toHaveAttribute("aria-modal", "true");
+    });
+
+    it("Escapeで後でと同じく閉じる", () => {
+      const onLater = vi.fn();
+      renderDialog({ onLater });
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(onLater).toHaveBeenCalledOnce();
+    });
+
+    it("更新中はEscapeを押しても閉じない", () => {
+      const onLater = vi.fn();
+      renderDialog({ installing: true, onLater });
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(onLater).not.toHaveBeenCalled();
+    });
+
+    it("すべてのボタンと進捗バーにアクセシブルネームがある", () => {
+      const { container } = render(
+        <UpdateDialog
+          update={update}
+          installing={true}
+          progress={{ phase: "installing" }}
+          onInstall={vi.fn()}
+          onLater={vi.fn()}
+        />,
+      );
+      expectAccessibleControls(container);
+      expect(
+        screen.getByRole("progressbar", { name: "更新の進捗" }),
+      ).toBeInTheDocument();
+    });
+
+    it("閉じたあと開く前にフォーカスしていた要素へフォーカスが戻る", () => {
+      const opener = document.createElement("button");
+      document.body.appendChild(opener);
+      opener.focus();
+
+      const { unmount } = renderDialog();
+      screen.getByRole("button", { name: "後で" }).focus();
+      unmount();
+
+      expect(opener).toHaveFocus();
+      opener.remove();
+    });
+
+    it("エラーは色だけでなくアイコンと接頭ラベルでも伝える", () => {
+      renderDialog({ installError: "更新に失敗しました" });
+      const alert = screen.getByRole("alert");
+      expect(within(alert).getByText("エラー:")).toBeInTheDocument();
+      expect(alert.querySelector('[aria-hidden="true"]')).not.toBeNull();
+    });
+
+    it("更新中は両方のボタンが無効でクリックしてもコールバックが呼ばれない", () => {
+      const onInstall = vi.fn();
+      const onLater = vi.fn();
+      renderDialog({ installing: true, onInstall, onLater });
+
+      const later = screen.getByRole("button", { name: "後で" });
+      const install = screen.getByRole("button", { name: "更新中..." });
+      expect(later).toBeDisabled();
+      expect(install).toBeDisabled();
+      fireEvent.click(later);
+      fireEvent.click(install);
+
+      expect(onLater).not.toHaveBeenCalled();
+      expect(onInstall).not.toHaveBeenCalled();
+    });
   });
 
   describe("表示言語", () => {

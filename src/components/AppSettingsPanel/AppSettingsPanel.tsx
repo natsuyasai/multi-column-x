@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   currentPlatformName,
@@ -22,6 +22,7 @@ import {
 } from "@/services/extensions";
 import { useBackupFlow } from "../../hooks/useBackupFlow";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { useRestoreFocus } from "../../hooks/useRestoreFocus";
 import { useAppStore } from "../../store/useAppStore";
 import type {
   GlobalSettings,
@@ -54,6 +55,9 @@ import {
   type SettingsDraft,
 } from "./settingsDraft";
 import { SettingsGroup } from "./SettingsGroup";
+
+type SettingsTabKey =
+  "general" | "layout" | "presets" | "extensions" | "backup";
 
 interface AppSettingsPanelProps {
   settings: GlobalSettings;
@@ -124,9 +128,10 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
   const isMobile = useAppStore((s) => s.isMobile);
   const { savePreset, deletePreset } = useAppStore();
   useEscapeKey(onClose);
-  const [activeTab, setActiveTab] = useState<
-    "general" | "layout" | "presets" | "extensions" | "backup"
-  >("general");
+  useRestoreFocus();
+  const titleId = useId();
+  const tabsId = useId();
+  const [activeTab, setActiveTab] = useState<SettingsTabKey>("general");
   const extensionsSupported = isExtensionsSupported(
     currentPlatformName(),
     isMobile,
@@ -206,12 +211,39 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
     onApplyColumnDefaults(toColumnDefaults(draft));
   };
 
+  const tabId = (key: SettingsTabKey) => `${tabsId}-tab-${key}`;
+  const panelId = `${tabsId}-panel`;
+  const renderTab = (key: SettingsTabKey, label: string) => {
+    const selected = activeTab === key;
+    return (
+      <button
+        type="button"
+        role="tab"
+        id={tabId(key)}
+        aria-selected={selected}
+        aria-controls={selected ? panelId : undefined}
+        className={`${styles.tab} ${selected ? styles.tabActive : ""}`}
+        onClick={() => setActiveTab(key)}
+      >
+        {label}
+      </button>
+    );
+  };
+
   return (
     <div className={styles.overlay}>
-      <div className={styles.panel}>
+      <div
+        className={styles.panel}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
         <div className={styles.header}>
-          <h2 className={styles.title}>{t("settings:panel.title")}</h2>
+          <h2 id={titleId} className={styles.title}>
+            {t("settings:panel.title")}
+          </h2>
           <button
+            type="button"
             className={styles.closeBtn}
             onClick={onClose}
             aria-label={t("settings:panel.close")}
@@ -220,44 +252,21 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
           </button>
         </div>
 
-        <div className={styles.tabs}>
-          <button
-            className={`${styles.tab} ${activeTab === "general" ? styles.tabActive : ""}`}
-            onClick={() => setActiveTab("general")}
-          >
-            {t("settings:panel.tabs.general")}
-          </button>
-          <button
-            className={`${styles.tab} ${activeTab === "layout" ? styles.tabActive : ""}`}
-            onClick={() => setActiveTab("layout")}
-          >
-            {t("settings:panel.tabs.layout")}
-          </button>
-          {!isMobile && (
-            <button
-              className={`${styles.tab} ${activeTab === "presets" ? styles.tabActive : ""}`}
-              onClick={() => setActiveTab("presets")}
-            >
-              {t("settings:panel.tabs.presets")}
-            </button>
-          )}
-          {extensionsSupported && (
-            <button
-              className={`${styles.tab} ${activeTab === "extensions" ? styles.tabActive : ""}`}
-              onClick={() => setActiveTab("extensions")}
-            >
-              {t("settings:panel.tabs.extensions")}
-            </button>
-          )}
-          <button
-            className={`${styles.tab} ${activeTab === "backup" ? styles.tabActive : ""}`}
-            onClick={() => setActiveTab("backup")}
-          >
-            {t("settings:panel.tabs.backup")}
-          </button>
+        <div className={styles.tabs} role="tablist">
+          {renderTab("general", t("settings:panel.tabs.general"))}
+          {renderTab("layout", t("settings:panel.tabs.layout"))}
+          {!isMobile && renderTab("presets", t("settings:panel.tabs.presets"))}
+          {extensionsSupported &&
+            renderTab("extensions", t("settings:panel.tabs.extensions"))}
+          {renderTab("backup", t("settings:panel.tabs.backup"))}
         </div>
 
-        <div className={styles.tabContent}>
+        <div
+          className={styles.tabContent}
+          role="tabpanel"
+          id={panelId}
+          aria-labelledby={tabId(activeTab)}
+        >
           {activeTab === "general" && (
             <form
               id="app-settings-form"

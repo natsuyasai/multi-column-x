@@ -66,6 +66,8 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
   return (
     <div
       className={styles.header}
+      role="group"
+      aria-label={label}
       style={{ borderTopColor: account?.color ?? "#888" }}
     >
       <span
@@ -75,6 +77,7 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
       <span className={styles.label}>{label}</span>
       {!isExternal && unreadCount > 0 && (
         <button
+          type="button"
           className={styles.unreadBadge}
           data-testid="unread-badge"
           onClick={() => onClearUnread?.(column.id)}
@@ -93,6 +96,7 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
       <div className={styles.actions}>
         {!isExternal && (
           <button
+            type="button"
             className={styles.actionBtn}
             onClick={() => onScrollTop(column.id)}
             aria-label={t("columns:header.scrollTop")}
@@ -107,6 +111,7 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
         )}
         {!isExternal && (
           <button
+            type="button"
             className={styles.actionBtn}
             onClick={withCountdownReset(onReload)}
             aria-label={t("columns:header.reload")}
@@ -116,6 +121,7 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
           </button>
         )}
         <button
+          type="button"
           className={styles.actionBtn}
           onClick={withCountdownReset(onReloadPage)}
           aria-label={t("columns:header.reloadPage")}
@@ -124,6 +130,7 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
           ⟳
         </button>
         <button
+          type="button"
           className={styles.actionBtn}
           onClick={() => onSettings(column.id)}
           aria-label={t("columns:header.settings")}
@@ -132,6 +139,7 @@ export const ColumnHeader: React.FC<ColumnHeaderProps> = ({
           <SettingsIcon width={14} height={14} data-testid="icon-settings" />
         </button>
         <button
+          type="button"
           className={styles.actionBtn}
           onClick={() => onClose(column.id)}
           aria-label={t("columns:header.close")}

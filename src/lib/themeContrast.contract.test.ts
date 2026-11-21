@@ -90,6 +90,10 @@ describe.each(themeNames)("配色トークンのコントラスト契約（%s）
     );
   });
 
+  it("フォーカスリングに使うaccentが全背景で3対1以上である", () => {
+    expectMinContrast(tokens, cross(["accent"], BACKGROUNDS), 3);
+  });
+
   it("塗りボタンの白文字がaccent-fillとaccent-hoverの上で4.5対1以上である", () => {
     expectMinContrast(
       tokens,
