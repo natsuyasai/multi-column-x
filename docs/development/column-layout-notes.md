@@ -7,6 +7,7 @@
 - `src/lib/gridLayout.ts` — グリッド座標計算（`calculateGridBounds` など純粋関数）
 - `src/services/columnWebview.ts` — カラム WebView への IPC 呼び出し集約
 - `src/App.tsx` — ダイアログ表示時の WebView 退避（`dialogOpen` effect）
+- `src/hooks/useFocusMainWebviewOnDialogOpen.ts` / `src/services/mainWebview.ts` — ダイアログを開いたときのメイン WebView へのフォーカス移動
 - `src/hooks/useMobileSwipeBarSync.ts` — モバイルスワイプバーのネイティブオーバーレイ同期（`syncMobileSwipeBar`）
 - `src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/MainActivity.kt` — カラム／ポップアップ／スワイプバーオーバーレイの View 管理、Z順の不変条件（`restoreOverlayOrder()`）
 - `src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/SwipeBarOverlayView.kt` — スワイプバーのネイティブ描画・タッチ判定
@@ -15,6 +16,15 @@
 
 - カラムは `gridRow` / `gridCol` でマトリクス配置する。座標計算は `src/lib/gridLayout.ts` の `calculateGridBounds`（純粋関数）が担当し、各カラムの絶対座標を Rust の `create_column_webview` / `resize_column_webview` に渡す。WebView への IPC 呼び出しは `src/services/columnWebview.ts` に集約されている。
 - Tauri v2 の子 WebView は OS ネイティブウィンドウのため、CSS の `z-index` は機能しない。ダイアログ表示中は `hideColumnWebviews()` で全 WebView を画面外に退避し、閉じると `recalculateAllBounds()` で復元する。この挙動は `src/App.tsx` の `dialogOpen` effect（`anyDialogOpen` の変化のみで発火し、他の依存では再実行しない設計）で制御している。新しいダイアログ・ポップアップ系 UI を追加する際は、この `anyDialogOpen` の条件（`dialogOpen || updater.available || whatsNew.selection || h264Setup.isDialogOpen || pendingAccountName || pendingRemoval || pendingColumnRemoval || accountNotice || settingsLoadNotice || apiRateLimitPopoverOpen` など。定義は `App.tsx` の `anyDialogOpen`）に追加する必要がある。
+
+### ダイアログを開くときのフォーカス移動
+
+- **症状**: Windows でカラムをクリックした直後（OS のキーボードフォーカスがカラム WebView にある状態）に Ctrl+, などでダイアログを開くと、ダイアログは開くが OS フォーカスはカラム WebView に残り、Tab / Esc がカラム側へ届いてダイアログに効かない。
+- **原因**: DOM の `focus()` は同一 WebView 内でしか効かない。別 WebView が OS フォーカスを持っていると移らず、上記の退避（`hideColumnWebviews()`）もフォーカスは動かさない。
+- **採用**: `anyDialogOpen` が false → true になったとき、`useFocusMainWebviewOnDialogOpen`（`src/hooks/useFocusMainWebviewOnDialogOpen.ts`）が `focusMainWebview()`（`src/services/mainWebview.ts`）経由で `getCurrentWebview().setFocus()` を呼び、メイン WebView へフォーカスを移す。`src/App.tsx` で `anyDialogOpen` の直後に配線している。デスクトップのみで、Android（`isMobile`）は対象外（呼ばない）。失敗してもダイアログは使えるのでログのみ（`logError`）。
+- **capability**: `core:webview:allow-set-webview-focus` は `core:default` / `core:webview:default` に**含まれない**。`src-tauri/capabilities/default.json`（メインウィンドウ専用）に明示追加している。カラム WebView（`column-webview.json`）には足さない（X のページ側にフォーカス操作させない）。単体テストは Tauri をモックするため権限漏れを検出できず、`acl_contract.rs` の契約テストで担保している。
+- **不採用**: ① Rust コマンドの新設（`build.rs` / capability / 契約テストの3点更新が要るだけで得るものが無い）。② 各ダイアログ側での個別対応（`anyDialogOpen` に含まれる更新ポップアップ等を取りこぼす）。③ `getCurrentWindow().setFocus()` の併用（起動時に自動表示される更新・新機能ダイアログで、他アプリから前面を奪う恐れがある。`Webview.setFocus` は WebView 内のフォーカス移動で前面化はしない）。
+- **未検証・割り切り**: Linux はカラムが独立 `WebviewWindow` のため、`Webview.setFocus` が別ウィンドウにある OS フォーカスをメインへ移せるかは未検証（実機で確認し、効かなければ別途対処する）。ダイアログを閉じた後にフォーカスをカラムへ戻す処理は無い（従来どおり何もしない）。
 
 ## モバイルのカラム切り替え（スワイプバー）
 

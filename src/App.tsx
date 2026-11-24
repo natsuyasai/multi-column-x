@@ -40,6 +40,7 @@ import { useAppUpdater } from "./hooks/useAppUpdater";
 import { useColumnNavigation } from "./hooks/useColumnNavigation";
 import { useColumns } from "./hooks/useColumns";
 import { useDialogState } from "./hooks/useDialogState";
+import { useFocusMainWebviewOnDialogOpen } from "./hooks/useFocusMainWebviewOnDialogOpen";
 import { useH264Setup } from "./hooks/useH264Setup";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useMobileSwipeBarSync } from "./hooks/useMobileSwipeBarSync";
@@ -278,6 +279,10 @@ const App: React.FC = () => {
     !!accountNotice ||
     !!settingsLoadNotice ||
     apiRateLimitPopoverOpen;
+
+  // ダイアログが開いたら OS のキーボードフォーカスをメイン WebView へ移す
+  // （カラム WebView にフォーカスがあると Tab / Esc がダイアログに届かないため）。
+  useFocusMainWebviewOnDialogOpen(anyDialogOpen, isMobile);
 
   // TopBar の開閉で高さが変わったら、DOM 反映直後（描画前）にカラム WebView を追従させる。
   // ダイアログ表示中（WebView 退避中）は閉じたときの復元（anyDialogOpen effect）に任せる。

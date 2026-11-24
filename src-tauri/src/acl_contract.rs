@@ -269,6 +269,38 @@ mod tests {
     }
 
     #[test]
+    fn メインウィンドウはメインwebviewへのフォーカス移動を許可している() {
+        // core:default / core:webview:default には含まれないため、明示許可が無いと
+        // ダイアログを開いたときの Webview.setFocus がランタイムで ACL 拒否される。
+        let json: serde_json::Value =
+            serde_json::from_str(include_str!("../capabilities/default.json"))
+                .expect("default.json のパースに失敗した");
+        let permissions = json["permissions"]
+            .as_array()
+            .expect("permissions 配列が見つからない");
+        assert!(
+            permissions
+                .iter()
+                .any(|p| p.as_str() == Some("core:webview:allow-set-webview-focus")),
+            "default.json に core:webview:allow-set-webview-focus が必要"
+        );
+
+        // カラム WebView（X のページ側）からフォーカス操作させない。
+        let column: serde_json::Value =
+            serde_json::from_str(include_str!("../capabilities/column-webview.json"))
+                .expect("column-webview.json のパースに失敗した");
+        let column_permissions = column["permissions"]
+            .as_array()
+            .expect("column-webview.json の permissions 配列が見つからない");
+        assert!(
+            !column_permissions
+                .iter()
+                .any(|p| p.as_str() == Some("core:webview:allow-set-webview-focus")),
+            "column-webview.json に core:webview:allow-set-webview-focus を足してはならない"
+        );
+    }
+
+    #[test]
     fn メインウィンドウ向けcapabilityはremoteを持たずlocalのみに適用される() {
         for (name, content) in [
             ("default.json", include_str!("../capabilities/default.json")),
