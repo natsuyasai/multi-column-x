@@ -71,6 +71,14 @@ vi.mock("./hooks/useColumns", async (importOriginal) => {
   };
 });
 
+const mainWebviewSpies = vi.hoisted(() => ({
+  focusMainWebview: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("./services/mainWebview", () => ({
+  focusMainWebview: mainWebviewSpies.focusMainWebview,
+}));
+
 const mockInvoke = vi.mocked(invoke);
 const mockPlatform = vi.mocked(platform);
 
@@ -341,6 +349,50 @@ describe("App (desktop)", () => {
       expect((resizeCalls[0][1] as any).bounds).toMatchObject({
         columnId: "col-1",
         x: -9999,
+      });
+    });
+  });
+
+  describe("ダイアログを開いたときのメインWebViewへのフォーカス移動", () => {
+    beforeEach(() => {
+      mainWebviewSpies.focusMainWebview.mockClear();
+      useAppStore.setState({ columns: [column] });
+    });
+
+    it("カラムにフォーカスがある状態でショートカットから設定を開くとフォーカス移動が要求される", async () => {
+      render(<App />);
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith(
+          "create_column_webview",
+          expect.anything(),
+        );
+      });
+      expect(mainWebviewSpies.focusMainWebview).not.toHaveBeenCalled();
+
+      fireEvent.keyDown(window, { key: ",", ctrlKey: true });
+
+      expect(
+        await screen.findByRole("dialog", { name: "アプリ設定" }),
+      ).toBeInTheDocument();
+      await waitFor(() => {
+        expect(mainWebviewSpies.focusMainWebview).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it("ボタン操作でダイアログを開いた場合もフォーカス移動が要求される", async () => {
+      render(<App />);
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith(
+          "create_column_webview",
+          expect.anything(),
+        );
+      });
+      expect(mainWebviewSpies.focusMainWebview).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByTitle("カラムを追加 (Ctrl+N)"));
+
+      await waitFor(() => {
+        expect(mainWebviewSpies.focusMainWebview).toHaveBeenCalledTimes(1);
       });
     });
   });
