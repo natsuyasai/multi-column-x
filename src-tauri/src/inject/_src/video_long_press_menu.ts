@@ -5,7 +5,9 @@
 // desktop（ブリッジ無し）では Rust コマンド download_video を invoke する。
 // desktop の進捗は自 WebView 宛てのイベント video-download-progress で受け取り、
 // カラム下端のトーストに表示する。
-// 「動画をポップアップで表示」は videoPopupEnabled 設定に従い desktop/mobile 共通で有効。
+// 「動画をポップアップで表示」は desktop では videoPopupEnabled 設定だけで決まる。Android では
+// 設定 ON かつ複数カラム表示中（window.__mcxMultiColumnActive）かつブリッジ有りのときだけ表示し、
+// 要求はブリッジ window.__mcxMediaPopupBridge へ送る。
 // メニュー描画パターンは context_menu.ts を踏襲する。
 
 // 動画情報（variants）の抽出は popup_toolbar.ts と同じ React Fiber 解析パターン。
@@ -207,6 +209,45 @@ export function extractLongPressQuotedTweetId(
   });
   if (!props) return null;
   return (props.tweet as Record<string, unknown>).id_str as string;
+}
+
+export interface LongPressMediaPopupGateConfig {
+  imagePopupEnabled?: boolean;
+  videoPopupEnabled?: boolean;
+  /** Android（mobile）の init script でだけ true が埋め込まれる。デスクトップでは undefined。 */
+  mediaPopupRequiresMultiColumn?: boolean;
+}
+
+/**
+ * ポップアップ表示を有効にするかを返す。image_popup.ts の isMediaPopupEnabled と同じ仕様の独立実装
+ * （inject 間は import できないため複製。食い違いは同期テストが検出する）。
+ */
+export function isLongPressMediaPopupEnabled(
+  kind: "image" | "video",
+  config: LongPressMediaPopupGateConfig | undefined,
+  env: { hasBridge: boolean; multiColumnActive: boolean | undefined },
+): boolean {
+  // 既定（undefined）は後方互換のため有効扱い。
+  const kindEnabled =
+    kind === "image"
+      ? config?.imagePopupEnabled !== false
+      : config?.videoPopupEnabled !== false;
+  if (!kindEnabled) return false;
+  // デスクトップ: 従来どおり設定だけで決まる（列数・ブリッジに依存しない）。
+  if (config?.mediaPopupRequiresMultiColumn !== true) return true;
+  // Android: 複数列表示中 かつ 届ける手段（ブリッジ）がある場合だけ。undefined は false 扱い。
+  return env.hasBridge && env.multiColumnActive === true;
+}
+
+export type LongPressPopupTransport = "bridge" | "invoke" | "none";
+
+/** ポップアップ要求の送信経路を選ぶ。Android ブリッジがあれば優先し、無ければ invoke、どちらも無ければ none。 */
+export function chooseLongPressPopupTransport(env: {
+  hasBridge: boolean;
+  hasInvoke: boolean;
+}): LongPressPopupTransport {
+  if (env.hasBridge) return "bridge";
+  return env.hasInvoke ? "invoke" : "none";
 }
 
 // --- 動画ダウンロード（desktop）の純粋関数 ---
@@ -412,8 +453,12 @@ export function shouldAutoDismissLongPressToast(
     }
   }
 
+  // メニュー表示時（createMenu 実行時）に評価する。回転などで変わる複数カラム表示フラグへ追従する。
   function isLongPressVideoPopupEnabled(): boolean {
-    return window.__multiColumnXConfig?.videoPopupEnabled !== false;
+    return isLongPressMediaPopupEnabled("video", window.__multiColumnXConfig, {
+      hasBridge: window.__mcxMediaPopupBridge !== undefined,
+      multiColumnActive: window.__mcxMultiColumnActive,
+    });
   }
 
   function tauriInvoke(cmd: string, args: Record<string, unknown>): void {
@@ -424,9 +469,22 @@ export function shouldAutoDismissLongPressToast(
   }
 
   function openLongPressPopup(url: string): void {
+    const invoke = window.__TAURI__?.core?.invoke ?? window.__TAURI__?.invoke;
+    const transport = chooseLongPressPopupTransport({
+      hasBridge: window.__mcxMediaPopupBridge !== undefined,
+      hasInvoke: invoke !== undefined,
+    });
+    if (transport === "bridge") {
+      // Android: 送信元カラムの特定と URL 検証はネイティブ／Rust 側で行う。
+      postBridgeMessage(window.__mcxMediaPopupBridge, {
+        type: "openMediaPopup",
+        url,
+      });
+      return;
+    }
     // webviewLabelCaller は渡さない。実際の送信元 WebView（呼び出し元）は
     // Rust 側が caller.label() で判定するため、JS が自己申告する必要も権限も無い。
-    tauriInvoke(OPEN_POPUP_WINDOW, { url });
+    if (transport === "invoke") tauriInvoke(OPEN_POPUP_WINDOW, { url });
   }
 
   function requestVideoPopup(videoEl: Element): void {
