@@ -30,6 +30,7 @@ fn main() {
             "is_webview_profile_supported",
             "update_mobile_swipe_bar",
             "flash_mobile_swipe_bar",
+            "set_mobile_media_popup_active",
             "open_add_account_window",
             "reauth_account_window",
             "delete_account_data",

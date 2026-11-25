@@ -587,7 +587,6 @@ pub fn set_swipe_bar_overlay(
 
 /// MainActivity.setMediaPopupActive を呼び出して、複数カラム表示フラグ
 /// （メディアのポップアップ表示の有効条件）をネイティブへ伝える。
-#[allow(dead_code)] // 呼び出し元（set_mobile_media_popup_active コマンド）は後続ステップで追加する
 pub fn set_media_popup_active(active: bool) -> Result<(), String> {
     call_activity_method(|env, activity| {
         env.call_method(

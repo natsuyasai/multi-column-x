@@ -25,6 +25,7 @@
     "allow-is-webview-profile-supported",
     "allow-update-mobile-swipe-bar",
     "allow-flash-mobile-swipe-bar",
+    "allow-set-mobile-media-popup-active",
     "allow-open-add-account-window",
     "allow-reauth-account-window",
     "allow-delete-account-data",

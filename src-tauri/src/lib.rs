@@ -327,6 +327,7 @@ pub fn run() {
             commands::webview::is_webview_profile_supported,
             commands::webview::update_mobile_swipe_bar,
             commands::webview::flash_mobile_swipe_bar,
+            commands::webview::set_mobile_media_popup_active,
             commands::account::open_add_account_window,
             commands::account::reauth_account_window,
             commands::account::delete_account_data,
