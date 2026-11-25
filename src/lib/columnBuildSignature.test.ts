@@ -69,6 +69,30 @@ describe("columnBuildSignature", () => {
     expect(after).not.toBe(before);
   });
 
+  it("画像のポップアップ設定をOFFにして保存すると署名が変わり表示中のカラムが再構築される", () => {
+    const before = columnBuildSignature(column, {
+      ...DEFAULT_GLOBAL_SETTINGS,
+      imagePopupEnabled: true,
+    });
+    const after = columnBuildSignature(column, {
+      ...DEFAULT_GLOBAL_SETTINGS,
+      imagePopupEnabled: false,
+    });
+    expect(after).not.toBe(before);
+  });
+
+  it("動画のポップアップ設定をOFFにして保存すると署名が変わり表示中のカラムが再構築される", () => {
+    const before = columnBuildSignature(column, {
+      ...DEFAULT_GLOBAL_SETTINGS,
+      videoPopupEnabled: true,
+    });
+    const after = columnBuildSignature(column, {
+      ...DEFAULT_GLOBAL_SETTINGS,
+      videoPopupEnabled: false,
+    });
+    expect(after).not.toBe(before);
+  });
+
   it("旧データで repostHiddenUserIds が無くても空配列と同じ署名になる", () => {
     const legacy = {
       ...column,

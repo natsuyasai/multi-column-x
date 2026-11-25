@@ -681,7 +681,7 @@ export const LinuxAppImageLightTheme: Story = {
 };
 
 export const MobileGroups: Story = {
-  name: "モバイル（カテゴリ一覧にAndroid専用・メディアにポップアップ項目なし）",
+  name: "モバイル（カテゴリ一覧にAndroid専用・メディアに画像/動画ポップアップと注意書き）",
   decorators: [
     (Story) => (
       <MobileRoot>
@@ -704,13 +704,32 @@ export const MobileGroups: Story = {
       canvas.getByRole("heading", { level: 2, name: "メディア" }),
     ).toBeInTheDocument();
     await expect(
-      canvas.queryByRole("checkbox", { name: /ポップアップ/ }),
+      canvas.getByRole("checkbox", { name: /画像をポップアップ/ }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByRole("checkbox", { name: /動画をポップアップ/ }),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByText(/複数カラム表示中のみ有効です/),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("checkbox", { name: /Esc/ }),
     ).not.toBeInTheDocument();
   },
 };
 
 export const MobileGroupsLightTheme: Story = {
   name: "モバイル・ライトテーマ",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await openCategory(canvas, "メディア");
+    await expect(
+      canvas.getByText(/複数カラム表示中のみ有効です/),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.queryByRole("checkbox", { name: /Esc/ }),
+    ).not.toBeInTheDocument();
+  },
   decorators: [
     (Story) => (
       <MobileRoot>
