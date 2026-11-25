@@ -195,6 +195,91 @@ describe("inject/popup_video_autoplay の自動再生挙動(共有ハブ非存�
     expect(clickSpy).toHaveBeenCalledTimes(1);
   });
 
+  it("再生ボタンを押しても動画が現れないときは一定時間後に押し直す", async () => {
+    window.__mcxTargetHref = VIDEO_HREF;
+    const { button, clickSpy } = createPlayButton();
+    document.body.appendChild(button);
+
+    await importAutoplay();
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(1000);
+    expect(clickSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("再生ボタンを押し直しても動画が現れない場合は回数に上限を設ける", async () => {
+    window.__mcxTargetHref = VIDEO_HREF;
+    const { button, clickSpy } = createPlayButton();
+    document.body.appendChild(button);
+
+    await importAutoplay();
+    vi.advanceTimersByTime(9000);
+
+    // 初回 + 再試行8回
+    expect(clickSpy).toHaveBeenCalledTimes(9);
+  });
+
+  it("再生が始まった後に動画が消えて再生ボタンが戻ったときは押し直す", async () => {
+    window.__mcxTargetHref = VIDEO_HREF;
+    const video = document.createElement("video");
+    document.body.appendChild(video);
+
+    await importAutoplay();
+    await flushMicrotasks();
+    expect(playMock).toHaveBeenCalledTimes(1);
+
+    // 画面の再描画で動画が消え、再生ボタンが元に戻った
+    video.remove();
+    const { button, clickSpy } = createPlayButton();
+    document.body.appendChild(button);
+    vi.advanceTimersByTime(1000);
+
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("動画が現れた後は再生ボタンを押し直さない", async () => {
+    window.__mcxTargetHref = VIDEO_HREF;
+    const { button, clickSpy } = createPlayButton();
+    document.body.appendChild(button);
+
+    await importAutoplay();
+    document.body.appendChild(document.createElement("video"));
+    await flushMicrotasks();
+    vi.advanceTimersByTime(5000);
+
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("ポップアップで開いた GIF は自動で再生が始まる", async () => {
+    window.__mcxTargetHref = VIDEO_HREF;
+    // 実測した GIF 表示ページの断片 (previewInterstitial 内に「このGIF画像を再生」ボタン)。
+    // 最初のクリックは X の画面が操作可能になる前で取りこぼされ、後のクリックで video が現れる。
+    document.body.innerHTML = `
+      <div data-testid="previewInterstitial" aria-label="埋め込み動画">
+        <img alt="埋め込み動画" src="https://pbs.twimg.com/tweet_video_thumb/x?format=jpg&name=900x900">
+        <span>GIF</span>
+        <button aria-label="このGIF画像を再生" role="button" data-testid="playButton" type="button"><svg viewBox="0 0 60 61"><path d="M22 17L43 30L22 43Z"></path></svg></button>
+      </div>`;
+    const playButton = document.querySelector<HTMLButtonElement>(
+      'button[data-testid="playButton"]',
+    ) as HTMLButtonElement;
+    let ready = false;
+    playButton.addEventListener("click", () => {
+      if (!ready) return;
+      document.body.appendChild(document.createElement("video"));
+    });
+
+    await importAutoplay();
+    expect(document.querySelector("video")).toBeNull();
+
+    ready = true;
+    vi.advanceTimersByTime(1000);
+    await flushMicrotasks();
+
+    expect(document.querySelector("video")).not.toBeNull();
+    expect(playMock).toHaveBeenCalledTimes(1);
+  });
+
   it("再生開始の操作が重なっても play もクリックも1回ずつしか行わない", async () => {
     window.__mcxTargetHref = VIDEO_HREF;
     // 再生確定前（pending）の状態を保つ

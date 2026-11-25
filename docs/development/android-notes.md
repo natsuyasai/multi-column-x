@@ -204,7 +204,9 @@ Android では、画像・動画のポップアップ表示（全画面）を**�
 - タイムラインの動画: `<video>` も `videoComponent` も `a[href*="/video/"]` も無い。`img`（サムネイル）+ `div[data-testid=previewInterstitial] > button[data-testid=playButton]` で、playButton は `<a>` に包まれない。**サムネイル画像（ボタン外）をタップしても target は `img` で、`<a>` も playButton も経由せず X が `/<user>/status/<id>/mediaViewer?...` へ遷移する**ため、playButton への click 判定だけでは拾えない。→ `previewInterstitial` を含む最小のプレビュー領域から playButton を辿る（領域が article・引用コンテナ・本文やリンクを含む場合、`previewInterstitial` が 1 つでない場合は対象外にして誤マッチを避ける）。
 - 引用 RT 内の動画: 引用コンテナ内に `a[href]` も時刻リンクも無い（同じ `previewInterstitial` 構造）。引用元ツイート ID は React fiber から取る（`extractQuotedTweetId`。実機での id 取得は未検証）。
 - 長押し: 動画サムネイルの 1 秒長押しで `contextmenu` は発火するが、`video_long_press_menu.ts` は `closest('[data-testid="videoComponent"]')` を要求するため、**タイムラインのサムネイル状態ではメニューは出ない**（videoComponent は mediaViewer 内で出現する）。メニューの項目表示条件は同じ有効判定を使う。
-- `/<user>/status/<id>/video/1` を直接開くと動画表示ページとして機能する（自動再生はされず playButton が出る）。ポップアップの組み立て先 URL として有効。複数動画ツイートの `/video/<n>` の n、GIF の DOM は未確認。
+- `/<user>/status/<id>/video/1` を直接開くと動画表示ページとして機能する（自動再生はされず playButton が出る）。ポップアップの組み立て先 URL として有効。複数動画ツイートの `/video/<n>` の n は未確認。
+- GIF の `/video/1`（2026-11-26 実測）: `<video>` は最初無く、`previewInterstitial` 内に「このGIF画像を再生」の `playButton` が出る。手タップは playButton 内 `svg path` への trusted な pointerdown→touchstart→pointerup→touchend→mousedown→mouseup→click で、click の約 20ms 後に `<video>`（`tweet_video/*.mp4`）が現れて再生される。
+- GIF ポップアップは自動再生の click が一度効いて `<video>` が現れても、約 0.7 秒後に X が再描画して `<video>` が消え playButton が元に戻る（通常動画では起きない）。`popup_video_autoplay.ts` は再生確認（`finish`）後も 1 秒間隔・最大 8 回、「video が無く playButton がある」ときだけ押し直す（video があれば押さないので一時停止は上書きしない）。2 回目の click で再生が続く（実機 5/5）。
 
 ### 不採用にした案
 

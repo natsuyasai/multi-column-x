@@ -24,6 +24,13 @@ export function shouldAutoplay(targetHref: string | undefined): boolean {
 
   const playButtonSelector = 'button[data-testid="playButton"]';
 
+  // GIF の表示ページでは、再生ボタンのクリックで video が現れて再生が始まった直後に
+  // X が画面を再描画し、video が消えて再生ボタンが元に戻ることがある (Android 実測)。
+  // この再試行は finish() の後も続け、video が無く再生ボタンがあるときだけ押し直す。
+  const RETRY_INTERVAL_MS = 1000;
+  const MAX_RETRIES = 8;
+  let retries = 0;
+
   // 再生が実際に始まったら購読を解除する (何度呼んでも安全)。
   // 以降の変化には反応しないため、ユーザーが一時停止しても再生し直さない。
   const finish = (): void => {
@@ -63,6 +70,22 @@ export function shouldAutoplay(targetHref: string | undefined): boolean {
     return false;
   };
 
+  // video が無く再生ボタンがあるときだけ押し直す。video が存在すれば、一時停止など
+  // ユーザー操作を上書きしないよう何もしない。回数の上限で必ず終了する。
+  const retryPlayButton = (): void => {
+    if (document.querySelector("video")) return;
+    document.querySelector<HTMLButtonElement>(playButtonSelector)?.click();
+  };
+
+  const scheduleRetry = (): void => {
+    if (retries >= MAX_RETRIES) return;
+    setTimeout(() => {
+      retries += 1;
+      retryPlayButton();
+      scheduleRetry();
+    }, RETRY_INTERVAL_MS);
+  };
+
   // 共有DOM監視ハブ(dom_observer.ts, window.__mcxDomObserver)経由でDOM変化を購読する。
   // ハブは document.body を childList+subtree で監視し、MutationRecordの詳細に依存
   // しないコールバックをrequestAnimationFrameで1フレームにまとめて配る。ハブが無い
@@ -92,6 +115,7 @@ export function shouldAutoplay(targetHref: string | undefined): boolean {
     unsubscribe = subscribeDomChanges(() => {
       if (tryPlay()) finish();
     });
+    scheduleRetry();
 
     // X のメディアモーダルが描画されない場合に備えてタイムアウトで打ち切る
     setTimeout(() => finish(), 10000);
