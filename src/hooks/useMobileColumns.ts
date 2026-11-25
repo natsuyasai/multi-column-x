@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { IPC_EVENTS, STORAGE_KEYS, WEBVIEW_SCRIPTS } from "../constants/ipc";
 import {
+  isMultiColumnLayout,
   mobileColumnLayout,
   mobileWindowStartId,
   type ColumnBounds,
@@ -17,6 +18,7 @@ import {
   setColumnCookies,
 } from "../services/columnWebview";
 import { resolveColumnDataDirectory } from "../services/externalColumn";
+import { syncMobileMediaPopupActive } from "../services/mediaPopup";
 import { useAppStore } from "../store/useAppStore";
 import type { Column } from "../types";
 
@@ -107,6 +109,13 @@ export function useMobileColumns(
         options?.keepWindow ? windowStartIdRef.current : null,
       );
       windowStartIdRef.current = mobileWindowStartId(layout);
+      // 実効列数（レイアウト結果）から導いた複数カラム表示フラグをネイティブへ同期する。
+      // デスクトップでは呼ばない。値が変わったときだけ送られる。
+      if (isMobile) {
+        void syncMobileMediaPopupActive(isMultiColumnLayout(layout)).catch(
+          logError("setActiveColumn:syncMobileMediaPopupActive"),
+        );
+      }
       // 非表示（hide）分は並列でよい。表示（show）分は Kotlin 側
       // activeColumnWebViewId（戻るボタン/ダブルタップ対象）が最後の
       // showColumnWebView で決まるため、アクティブカラムを必ず最後に送る。
@@ -155,6 +164,11 @@ export function useMobileColumns(
         targetColumn?.id ?? null,
       );
       windowStartIdRef.current = mobileWindowStartId(layout);
+      // カラム作成前にネイティブの複数カラム表示フラグを確定させる
+      // （新規カラムが正しい初期値を受け取れるようにする）。
+      void syncMobileMediaPopupActive(isMultiColumnLayout(layout)).catch(
+        logError("restoreMobileColumns:syncMobileMediaPopupActive"),
+      );
       // 全カラムを並列作成して loadUrl を一斉に開始する。mobile の
       // create_column_webview は visible = args.x >= 0.0 で可視判定するため、
       // 表示ペア（1〜2枚）が visible で作成される。
