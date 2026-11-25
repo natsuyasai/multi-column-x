@@ -39,7 +39,7 @@ _Long-press a tab to open a menu where you can choose Reload, Settings, or Delet
 
 ## Android-only settings
 
-In App settings, an **"Android"** category is shown on Android only (post button behavior, swipe switching, and multi-column display on wide screens). The "Popup windows" items for desktop are not shown.
+In App settings, an **"Android"** category is shown on Android only (post button behavior, swipe switching, and multi-column display on wide screens). The "Media" category shows the popup settings for images and videos (the desktop "Close with the Esc key" option is not shown). See "Showing multiple columns at once" below.
 
 ![Android app settings (Android category)](../images/android-app-settings-android.png)
 
@@ -67,6 +67,13 @@ Once enabled, you can choose the **number of columns** to show (2 to 6; the defa
 - If the number of columns you choose cannot fit at about 300dp per column, it is automatically reduced to the largest number that fits.
 - Columns are laid out consecutively starting from the one currently shown (the active column). Near the end, the layout shifts left so that the last column fits at the right edge.
 - If you have fewer columns than the number you set, only the columns you have are shown.
+
+### Image and video popups
+
+Only while multiple columns are shown at once, tapping an image or video in the timeline opens it in a full-screen popup (for videos, tapping either the play button or the thumbnail works). Use the back gesture to close the popup.
+
+- With a single column (phones, portrait, split screen, etc.), media opens inside the column as before. When the number of columns changes, for example by rotating the device, the behavior switches accordingly.
+- You can turn the image and video popups on or off separately in App settings → the "Media" category.
 
 ## Composing posts
 

@@ -485,6 +485,24 @@ Object.assign(window.MCX_DATA.catalogs, {
         ],
       },
       {
+        name: "MediaPopupBridge.kt",
+        role: "openMediaPopup を AppBridge.onMediaPopupRequest へ振り分け。送信元は閉包の columnId、同一 URL は 1 秒間無視",
+        caller:
+          "inject image_popup.ts / video_long_press_menu.ts → Rust popup.rs",
+        kind: "ブリッジ",
+        files: [
+          ANDROID_DIR + "MediaPopupBridge.kt",
+          "src-tauri/src/inject/_src/image_popup.ts",
+        ],
+      },
+      {
+        name: "MediaPopupFlagSync.kt",
+        role: "複数カラム表示フラグの唯一の保持者。全カラムの document-start script 差し替えと eval で配布",
+        caller: "MainActivity.setMediaPopupActive / カラム作成・削除・表示",
+        kind: "状態",
+        files: [ANDROID_DIR + "MediaPopupFlagSync.kt"],
+      },
+      {
         name: "PopupSessionBridge.kt",
         role: "switchPopupSession / reportOfficialSettings / closePopup / downloadVideo の振り分け",
         caller: "inject popup_toolbar.ts",
@@ -735,6 +753,13 @@ Object.assign(window.MCX_DATA.catalogs, {
         area: "スワイプバー",
       },
       {
+        name: "setMediaPopupActive",
+        summary:
+          "複数カラム表示フラグ（メディアのポップアップの有効条件）を全カラムへ配布",
+        rsfn: "set_media_popup_active",
+        area: "メディアのポップアップ",
+      },
+      {
         name: "downloadAndInstallApk",
         summary: "APK を DL・検証・インストーラ起動",
         rsfn: "download_and_install_apk",
@@ -842,6 +867,12 @@ Object.assign(window.MCX_DATA.catalogs, {
         caller: "VideoDownloadRequestBridge",
       },
       {
+        name: "onMediaPopupRequest",
+        summary:
+          "メディアのポップアップ要求（label, url）を通知。Rust が URL を再検証して開く",
+        caller: "MediaPopupBridge",
+      },
+      {
         name: "onSwipeNavigate",
         summary: "スワイプ確定（left/right）。mobile-swipe-navigate を emit",
         caller: "SwipeBarOverlayView",
@@ -886,6 +917,16 @@ Object.assign(window.MCX_DATA.catalogs, {
         files: [
           "src-tauri/src/inject/_src/video_long_press_menu.ts",
           ANDROID_DIR + "VideoDownloadRequestBridge.kt",
+        ],
+      },
+      {
+        jsname: "__mcxMediaPopupBridge",
+        types: "openMediaPopup",
+        where: "カラム",
+        handler: "MediaPopupBridge",
+        files: [
+          "src-tauri/src/inject/_src/image_popup.ts",
+          ANDROID_DIR + "MediaPopupBridge.kt",
         ],
       },
       {
@@ -1007,6 +1048,7 @@ Object.assign(window.MCX_DATA.details, {
       ANDROID_DIR + "PopupSessionBridge.kt",
       ANDROID_DIR + "ApiRateLimitBridge.kt",
       ANDROID_DIR + "VideoDownloadRequestBridge.kt",
+      ANDROID_DIR + "MediaPopupBridge.kt",
     ],
     related: ["android.appbridge"],
   },

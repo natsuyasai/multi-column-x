@@ -128,6 +128,10 @@ Linux ではカラムが独立 `WebviewWindow`（親クリップが効かない�
 
 `src-tauri/gen/android/**` を変更する場合の詳細（単体テストコマンド、`MainActivity.kt` とのシグネチャ同期ルール）は `docs/development/android-notes.md` を参照。**`MainActivity.kt` のメソッドシグネチャを変更したら、必ず `proguard-rules.pro` も同時に更新すること**（リリースビルドでしか症状が出ないため注意）。
 
+### Android のメディアのポップアップ（複数カラム表示時のみ）
+
+複数カラム表示フラグ（`__mcxMultiColumnActive`）の保持者は Kotlin の `MediaPopupFlagSync` だけ。**init script への埋め込みや `columnBuildSignature` への列数追加はしないこと**（リロードで作成時の値が復活する／回転で全カラムが再構築される）。ポップアップ要求は `__mcxMediaPopupBridge` → JNI → `open_media_popup_from_android` で、送信元は JS に申告させず Rust で URL を再検証する。詳細は `docs/development/android-notes.md`「メディアのポップアップ（複数カラム表示時）」を参照。
+
 ### 設定画面（アプリ設定・カラム設定）のカテゴリ・タブ
 
 `AppSettingsPanel`（サイドナビ / Android は一覧→詳細）と `SettingsPanel`（カラム設定のタブ）のカテゴリ・タブを変更する場合は `docs/development/settings-panel-navigation-notes.md` を参照。カテゴリ定義は `settingsCategories.ts` が唯一の場所で、**アプリ設定の下書き（`SettingsDraft`）に項目を足したら `DRAFT_KEY_CATEGORY` に割当が必要**（`Record` なので型で強制される）。Android の端末の戻る操作を画面側で処理するときは `useAndroidBackHandler` で登録する（`MainActivity` は触らない）。

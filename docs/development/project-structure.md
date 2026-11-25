@@ -57,6 +57,7 @@ multi-column-x/
 │   ├── services/
 │   │   ├── columnWebview.ts          # カラム WebView への Tauri IPC 呼び出しを集約
 │   │   ├── externalColumn.ts         # 外部 URL カラムのデータディレクトリ操作
+│   │   ├── mediaPopup.ts             # モバイルの複数カラム表示フラグ（メディアのポップアップ可否）をネイティブへ同期
 │   │   ├── backup.ts                 # バックアップの書き出し・読み込み・復元の IPC 呼び出し
 │   │   ├── extensions.ts             # ブラウザ拡張機能（Windows のみ）の管理コマンドの IPC 呼び出し
 │   │   ├── releasePage.ts            # リリース一覧ページを既定ブラウザで開く（固定 URL。opener プラグイン）
@@ -218,6 +219,8 @@ src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/
 ├── BridgeMessage.kt / BridgeOrigins.kt  # JS ブリッジのメッセージ形式・許可オリジン
 ├── ColumnWebViewUtils.kt            # カラム WebView 生成・操作ヘルパー
 ├── FileChooserUtils.kt              # ファイル選択ダイアログ処理
+├── MediaPopupBridge.kt              # メディアのポップアップ要求の JS ブリッジ（送信元カラム固定・重複抑止）
+├── MediaPopupFlagSync.kt            # 複数カラム表示フラグの保持と全カラムへの配布
 ├── PopupSessionBridge.kt            # ポップアップのセッション切替ブリッジ
 ├── ReauthUtils.kt                   # 既存アカウント再認証ヘルパー
 ├── SwipeBarOverlayView.kt / SwipeGestureResolver.kt  # スワイプ切替バーの描画・ジェスチャー判定

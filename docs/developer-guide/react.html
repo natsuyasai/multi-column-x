@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="mcx-synced-commit" content="d06c40e" />
+    <meta name="mcx-synced-commit" content="1ddf4b4" />
     <title>React 層 | MCX 開発者ガイド</title>
     <link rel="stylesheet" href="assets/common.css" />
   </head>
@@ -469,6 +469,13 @@
                 <li>
                   アクティブ ID は localStorage に保存し、バックグラウンド復帰で
                   React が再読込されても復元できる。
+                </li>
+                <li>
+                  レイアウト結果から複数列表示かを
+                  <code>isMultiColumnLayout</code>
+                  で求め、<code>services/mediaPopup.ts</code>
+                  経由でネイティブへ通知する（メディアのポップアップの有効条件。保持者は
+                  Kotlin）。
                 </li>
                 <li>
                   座標は

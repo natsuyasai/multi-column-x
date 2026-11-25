@@ -4,8 +4,8 @@
 
 These features open content in a separate window.
 
-- **Media popup** — Opens images and videos from the timeline in a separate window.
-- **Long-press / right-click menu on videos** — Long-press a video in a column (right-click on a PC) to open a menu where you can choose to show it in a popup or download the video. On desktop, choosing "Download video" opens a save dialog, and progress appears as a toast at the bottom of the column (completion and failure messages disappear after a few seconds). Nothing is shown if you cancel the save dialog.
+- **Media popup** — Opens images and videos from the timeline in a separate window. On Android, they open in a full-screen popup only while multiple columns are shown at once (with a single column they open inside the column).
+- **Long-press / right-click menu on videos** — Long-press a video in a column (right-click on a PC) to open a menu where you can choose to show it in a popup or download the video (on Android, the popup option is available only while multiple columns are shown). On desktop, choosing "Download video" opens a save dialog, and progress appears as a toast at the bottom of the column (completion and failure messages disappear after a few seconds). Nothing is shown if you cancel the save dialog.
 - **Link popup** — Use the **Open URL** (link icon) button in the toolbar (`Ctrl+L`) to open any URL in a dedicated window.
 - **Compose window** — Use the **Post** (pencil icon) button in the toolbar (`Ctrl+T`) to open the post composer in a separate window.
 - **Switching accounts inside a popup** — Use the toolbar at the top of the popup to switch the account being shown on the spot.

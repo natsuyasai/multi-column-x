@@ -636,10 +636,11 @@ Object.assign(window.MCX_DATA.catalogs, {
       {
         name: "image_popup.ts",
         summary:
-          "画像/動画リンクのクリックを傍受して open_popup_window でポップアップ表示。",
-        enable: "imagePopupEnabled / videoPopupEnabled（undefined は有効扱い）",
+          "画像/動画リンクのクリックを傍受して open_popup_window でポップアップ表示。Android はブリッジ __mcxMediaPopupBridge 経由で、複数カラム表示中のみ（動画サムネイルのタップも横取り）。",
+        enable:
+          "imagePopupEnabled / videoPopupEnabled（undefined は有効扱い）。Android は加えて mediaPopupRequiresMultiColumn・ブリッジ・__mcxMultiColumnActive",
         target: "カラム",
-        platform: "desktop のみ",
+        platform: "desktop / Android（複数カラム表示中のみ）",
         test: "あり（+ プロパティ）",
         kind: "ポップアップ・操作",
         files: [
@@ -759,7 +760,8 @@ Object.assign(window.MCX_DATA.catalogs, {
         name: "open_popup_window",
         from: "image_popup.ts / video_long_press_menu.ts",
         summary: "メディアをポップアップで開く",
-        android: "（要確認）",
+        android:
+          "__mcxMediaPopupBridge（openMediaPopup → MediaPopupBridge → AppBridge.onMediaPopupRequest → open_media_popup_from_android）。複数カラム表示中のみ",
       },
       {
         name: "open_link_popup_window",
@@ -1018,13 +1020,14 @@ Object.assign(window.MCX_DATA.details, {
     layer: "android",
     summary:
       "Android のカラム/ポップアップは Tauri IPC が無いため、ネイティブが公開する postMessage ブリッジを使う。",
-    body: "<p>公開名: <code>__mcxPopupBridge</code>（ポップアップのアカウント切替・閉じる・公式設定）、<code>__mcxVideoDownloadBridge</code>（動画ダウンロード）、<code>__mcxApiRateLimitBridge</code>（レート制限）。JS は <code>postMessage(JSON.stringify({ type, … }))</code> を送ります。</p><p>セキュリティ: <code>addJavascriptInterface</code> はオリジン制約が無く任意のオリジンから呼べるため使わず、オリジンを x.com / twitter.com 系に限定できる <code>addWebMessageListener</code> を使います（メインフレームのみ、コールバック内でもオリジンを二重チェック。端末が非対応ならブリッジ自体を公開しない）。</p>",
+    body: "<p>公開名: <code>__mcxPopupBridge</code>（ポップアップのアカウント切替・閉じる・公式設定）、<code>__mcxVideoDownloadBridge</code>（動画ダウンロード）、<code>__mcxApiRateLimitBridge</code>（レート制限）、<code>__mcxMediaPopupBridge</code>（複数カラム表示中のメディアのポップアップ要求）。JS は <code>postMessage(JSON.stringify({ type, … }))</code> を送ります。</p><p>セキュリティ: <code>addJavascriptInterface</code> はオリジン制約が無く任意のオリジンから呼べるため使わず、オリジンを x.com / twitter.com 系に限定できる <code>addWebMessageListener</code> を使います（メインフレームのみ、コールバック内でもオリジンを二重チェック。端末が非対応ならブリッジ自体を公開しない）。</p>",
     files: [
       "src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/MainActivity.kt",
       "src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/BridgeOrigins.kt",
       "src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/PopupSessionBridge.kt",
       "src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/VideoDownloadRequestBridge.kt",
       "src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/ApiRateLimitBridge.kt",
+      "src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/MediaPopupBridge.kt",
     ],
     docs: ["../development/android-notes.md"],
     related: ["inject.tauri-ipc"],

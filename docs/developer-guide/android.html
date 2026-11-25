@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="mcx-synced-commit" content="d06c40e" />
+    <meta name="mcx-synced-commit" content="1ddf4b4" />
     <title>Android 層 | MCX 開発者ガイド</title>
     <link rel="stylesheet" href="assets/common.css" />
   </head>
@@ -435,6 +435,13 @@
               を JNI で通知するだけ。実際にカラムが遷移するかは React
               が決め、遷移した時のみ
               <code>setSwipeBarFlash</code>（演出）が戻ってくる。
+            </li>
+            <li>
+              メディアのポップアップ（複数カラム表示中のみ）の複数カラム表示フラグは
+              <code>MediaPopupFlagSync</code> だけが持つ。リロードで init script
+              の作成時の値が復活しないよう、document-start script
+              を差し替えて配布する。詳細は
+              <code>docs/development/android-notes.md</code>。
             </li>
             <li>
               Z 順は <code>restoreOverlayOrder()</code> に集約：<b
