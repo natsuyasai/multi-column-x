@@ -585,6 +585,22 @@ pub fn set_swipe_bar_overlay(
     })
 }
 
+/// MainActivity.setMediaPopupActive を呼び出して、複数カラム表示フラグ
+/// （メディアのポップアップ表示の有効条件）をネイティブへ伝える。
+#[allow(dead_code)] // 呼び出し元（set_mobile_media_popup_active コマンド）は後続ステップで追加する
+pub fn set_media_popup_active(active: bool) -> Result<(), String> {
+    call_activity_method(|env, activity| {
+        env.call_method(
+            activity,
+            "setMediaPopupActive",
+            "(Z)V",
+            &[JValue::Bool(active as u8)],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
 /// MainActivity.setSwipeBarFlash を呼び出し、スワイプによるカラム遷移が実際に確定したときの
 /// 視覚フラッシュ演出をトリガーする。React側の navigateColumn が実際に遷移を決定したときのみ
 /// 呼ばれる想定（Kotlin側でジェスチャー完了時に自前判定してはいけない。理由は plan.md 参照）。

@@ -26,6 +26,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.webkit.ScriptHandler
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import java.io.File
@@ -39,6 +40,19 @@ class MainActivity : TauriActivity() {
     get() = window.decorView.findViewById(android.R.id.content)
 
   private val columnWebViews = ConcurrentHashMap<String, WebView>()
+
+  // 複数カラム表示フラグ（メディアのポップアップ表示の有効条件）の唯一の保持者。
+  // 値の更新・カラムの登録解除はすべて UI スレッドで行い、作成と更新の競合を避ける。
+  private val mediaPopupFlagSync =
+    MediaPopupFlagSync<ScriptHandler>(
+      installOnLoad = { id, script ->
+        columnWebViews[id]
+          ?.takeIf { WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT) }
+          ?.let { WebViewCompat.addDocumentStartJavaScript(it, script, setOf("*")) }
+      },
+      removeOnLoad = { it.remove() },
+      evaluateNow = { id, script -> columnWebViews[id]?.evaluateJavascript(script, null) },
+    )
 
   // ポップアップ WebView スタック（表示順に積む）。UI スレッドからのみ操作する。
   private val popupWebViews = ArrayDeque<Pair<String, WebView>>()
@@ -719,6 +733,8 @@ class MainActivity : TauriActivity() {
       contentRoot.addView(webView, params)
       restoreOverlayOrder()
       columnWebViews[id] = webView
+      // 最初の文書ロードに現在の複数カラム表示フラグを載せる（loadUrl より前に登録する）。
+      mediaPopupFlagSync.registerColumn(id)
 
       loadUrlForAccount(webView, url, accountId, profileApplied)
     }
@@ -727,6 +743,7 @@ class MainActivity : TauriActivity() {
   // カラム WebView を削除する。
   fun removeColumnWebView(id: String) {
     runOnUiThreadSync {
+      mediaPopupFlagSync.unregisterColumn(id)
       columnWebViews[id]?.let { wv ->
         contentRoot.removeView(wv)
         wv.destroy()
@@ -756,6 +773,8 @@ class MainActivity : TauriActivity() {
           wv.layoutParams = params
         }
         wv.onResume()
+        // paused 中に評価されなかった可能性に備えて、表示時に現在値を再適用する。
+        mediaPopupFlagSync.reapply(id)
         wv.visibility = View.VISIBLE
         wv.requestLayout()
       }
@@ -771,6 +790,12 @@ class MainActivity : TauriActivity() {
         wv.visibility = View.GONE
       }
     }
+  }
+
+  // 実効表示列数が 2 以上か（メディアのポップアップ表示の有効条件）をカラムへ配布する。
+  // React → Tauri コマンド → Rust JNI から呼ばれる。
+  fun setMediaPopupActive(active: Boolean) {
+    runOnUiThread { mediaPopupFlagSync.setActive(active) }
   }
 
   // スワイプバーのネイティブオーバーレイを更新する。yDp はカラム WebView と同じ座標系
