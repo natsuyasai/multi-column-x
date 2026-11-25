@@ -47,3 +47,12 @@ private fun isXOrTwitterHost(host: String): Boolean =
  * ゲーティングの判断だけを単体テストで固定できるようにしている。
  */
 fun shouldExposeBridge(isWebMessageListenerSupported: Boolean): Boolean = isWebMessageListenerSupported
+
+/**
+ * addWebMessageListener のコールバックで共通に使う受け入れ判定。
+ * メインフレームかつ X 系オリジンからの要求のみ受け付ける。
+ */
+fun acceptBridgeMessage(
+  isMainFrame: Boolean,
+  sourceOrigin: String,
+): Boolean = isMainFrame && isAllowedBridgeOrigin(sourceOrigin)

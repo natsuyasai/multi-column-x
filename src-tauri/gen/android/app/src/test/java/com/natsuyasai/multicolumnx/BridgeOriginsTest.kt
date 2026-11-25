@@ -72,3 +72,24 @@ class BridgeOriginsTest {
     }
   }
 }
+
+/** acceptBridgeMessage（メインフレームかつ X 系オリジンのみ受け入れる入口ゲート）のテスト。 */
+class AcceptBridgeMessageTest {
+  @Test
+  fun `メインフレームかつxオリジンの要求は受け付ける`() {
+    assertTrue(acceptBridgeMessage(true, "https://x.com"))
+    assertTrue(acceptBridgeMessage(true, "https://mobile.x.com"))
+  }
+
+  @Test
+  fun `メインフレーム以外からの要求は受け付けない`() {
+    assertFalse(acceptBridgeMessage(false, "https://x.com"))
+  }
+
+  @Test
+  fun `x以外のオリジンからの要求は受け付けない`() {
+    assertFalse(acceptBridgeMessage(true, "https://x.com.evil.example"))
+    assertFalse(acceptBridgeMessage(true, "http://x.com"))
+    assertFalse(acceptBridgeMessage(true, "https://evil.example"))
+  }
+}

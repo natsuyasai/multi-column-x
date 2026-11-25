@@ -685,6 +685,25 @@ class MainActivity : TauriActivity() {
               val parsed = parseBridgeMessage(data) ?: return@addWebMessageListener
               apiRateLimitBridge.handle(parsed)
             }
+
+            // 複数カラム表示中の画像・動画ポップアップ要求を Rust へ届けるブリッジ。
+            // 送信元カラムは JS の申告でなく、ここで閉包に持つ id（= Rust のカラムラベル）を使う。
+            val mediaPopupBridge =
+              MediaPopupBridge(id, onRequest = { label, url ->
+                AppBridge.onMediaPopupRequest(label, url)
+              })
+            WebViewCompat.addWebMessageListener(
+              wv,
+              MEDIA_POPUP_BRIDGE_JS_NAME,
+              BRIDGE_ALLOWED_ORIGIN_RULES,
+            ) { _, message, sourceOrigin, isMainFrame, _ ->
+              if (!acceptBridgeMessage(isMainFrame, sourceOrigin.toString())) {
+                return@addWebMessageListener
+              }
+              val data = message.data ?: return@addWebMessageListener
+              val parsed = parseBridgeMessage(data) ?: return@addWebMessageListener
+              mediaPopupBridge.handle(parsed)
+            }
           } else {
             Log.w(TAG, "WEB_MESSAGE_LISTENER unsupported; column native bridge disabled ($id)")
           }
@@ -1063,6 +1082,9 @@ class MainActivity : TauriActivity() {
 
     // api_rate_limit_monitor.ts が参照する window.__mcxApiRateLimitBridge と一致させること。
     private const val API_RATE_LIMIT_BRIDGE_JS_NAME = "__mcxApiRateLimitBridge"
+
+    // image_popup.ts / video_long_press_menu.ts が参照する window.__mcxMediaPopupBridge と一致させること。
+    private const val MEDIA_POPUP_BRIDGE_JS_NAME = "__mcxMediaPopupBridge"
 
     // 常駐コンポーズ WebView のラベルプレフィックス。Rust 側 labels::COMPOSE_PREFIX と一致させること。
     private const val COMPOSE_LABEL_PREFIX = "compose-"

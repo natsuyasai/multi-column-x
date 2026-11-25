@@ -27,6 +27,10 @@ sealed class BridgeMessage {
   data class ReportApiRateLimit(
     val payloadJson: String,
   ) : BridgeMessage()
+
+  data class OpenMediaPopup(
+    val url: String,
+  ) : BridgeMessage()
 }
 
 private const val TYPE_SWITCH_POPUP_SESSION = "switchPopupSession"
@@ -34,6 +38,7 @@ private const val TYPE_REPORT_OFFICIAL_SETTINGS = "reportOfficialSettings"
 private const val TYPE_CLOSE_POPUP = "closePopup"
 private const val TYPE_DOWNLOAD_VIDEO = "downloadVideo"
 private const val TYPE_REPORT_API_RATE_LIMIT = "reportApiRateLimit"
+private const val TYPE_OPEN_MEDIA_POPUP = "openMediaPopup"
 
 /**
  * postMessage で受け取った JSON 文字列を [BridgeMessage] にパースする。
@@ -75,6 +80,10 @@ fun parseBridgeMessage(raw: String): BridgeMessage? {
     TYPE_REPORT_API_RATE_LIMIT -> {
       val payload = json.optString("payload", "")
       if (payload.isEmpty()) null else BridgeMessage.ReportApiRateLimit(payload)
+    }
+    TYPE_OPEN_MEDIA_POPUP -> {
+      val url = json.optString("url", "")
+      if (url.isEmpty()) null else BridgeMessage.OpenMediaPopup(url)
     }
     else -> null
   }

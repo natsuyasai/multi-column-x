@@ -93,4 +93,18 @@ class BridgeMessagesTest {
   fun `reportapiratelimitでpayloadが欠落している場合はnullを返す`() {
     assertNull(parseBridgeMessage("""{"type":"reportApiRateLimit"}"""))
   }
+
+  @Test
+  fun `openmediapopupを正しく解釈する`() {
+    val message =
+      parseBridgeMessage("""{"type":"openMediaPopup","url":"https://x.com/u/status/1/photo/1"}""")
+
+    assertEquals(BridgeMessage.OpenMediaPopup("https://x.com/u/status/1/photo/1"), message)
+  }
+
+  @Test
+  fun `openmediapopupでurlが欠落または空文字の場合はnullを返す`() {
+    assertNull(parseBridgeMessage("""{"type":"openMediaPopup"}"""))
+    assertNull(parseBridgeMessage("""{"type":"openMediaPopup","url":""}"""))
+  }
 }
