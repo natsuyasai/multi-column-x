@@ -57,6 +57,7 @@
     public void notifyVideoDownloadFailed();
     public void setSwipeBarOverlay(boolean, int, int, int, boolean);
     public void setSwipeBarFlash(java.lang.String);
+    public void setMediaPopupActive(boolean);
 }
 
 # wry (main_pipe.rs) が env.call_method() で呼び出す RustWebView のカスタムメソッド。

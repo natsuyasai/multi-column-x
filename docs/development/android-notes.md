@@ -8,6 +8,7 @@ Android 対応（アカウント追加、モバイルタブバー、APK 自己�
 - `src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/MainActivity.kt` / `src-tauri/gen/android/app/proguard-rules.pro` — ProGuard keep ルール同期
 - `src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/MainActivity.kt` / `MainPageBack.kt` — 端末の戻る操作
 - `src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/BackupFileSelector.kt` / `MultiColumnXBackupAgent.kt` — 端末引き継ぎ（Auto Backup）対応
+- `MediaPopupBridge.kt` / `MediaPopupFlagSync.kt` / `MainActivity.kt`、`src-tauri/src/android_bridge.rs`、`src-tauri/src/commands/webview/popup.rs`、`src/services/mediaPopup.ts`、`src-tauri/src/inject/_src/image_popup.ts` / `video_long_press_menu.ts` — メディアのポップアップ（複数カラム表示時）
 
 ## Android の単体テスト実行
 
@@ -168,6 +169,54 @@ adb shell am start -n com.natsuyasai.multicolumnx/.MainActivity
 - 数値の決定: 1 列あたり最小幅 300dp、列数の上限 6、600dp 未満は 1 列（従来の 2 カラム表示の下限 `MOBILE_TWO_COLUMN_MIN_WIDTH` を維持）は Issue #218 の仕様検討で決めた値。変更する場合は `gridLayout.ts` の定数と本節を合わせて更新する。
 - 窓の規則: アクティブ位置から連続 N 列を表示。末尾付近では窓が左へずれ、最後のカラムが右端に来る。n=2 は従来の固定 2 カラム配置と一致する（回帰させないこと）。
 - 設定変更の反映: 設定を購読せず、設定パネルを閉じたときの `recalculateAllBounds` → `setActiveColumn` 経由で再配置される（ストア更新 → ダイアログを閉じる、の順序に依存）。
+
+## メディアのポップアップ（複数カラム表示時）
+
+Android では、画像・動画のポップアップ表示（全画面）を**複数カラム表示中だけ**有効にする。1 列表示（スマホ・回転後・分割画面）では従来どおりカラム内で開く。設定は既存の `imagePopupEnabled` / `videoPopupEnabled`（アプリ設定のメディアカテゴリ。Esc で閉じる設定は Android では出さない）で、有効条件は「設定 ON かつ複数カラム表示中」。
+
+### 複数カラム表示フラグは Kotlin だけが持つ
+
+- 実装: `MediaPopupFlagSync.kt`（状態と配布）、`MainActivity.setMediaPopupActive`、`src/services/mediaPopup.ts`（`syncMobileMediaPopupActive`）、Rust コマンド `set_mobile_media_popup_active`（パススルー。Rust に状態は持たない）。
+- 値の源泉は `useMobileColumns` が `mobileColumnLayout` の結果から `isMultiColumnLayout(layout)`（表示中が 2 枚以上）で求める。実効列数と常に一致する単一の定義になる。`setActiveColumn`（回転・設定変更・スワイプで通る）と `restoreMobileColumns`（カラム作成前）で同期する。
+- **init script に作成時の値を埋め込んではいけない**。column WebView の init script は `addDocumentStartJavaScript` で作成時に固定され、リロード（手動更新・`applyColumnScale`・ログイン復旧）のたびに再実行される。埋め込み値や eval だけの上書きだと、「2 列で作成 → 回転で 1 列 → リロード」で作成時の `true` が復活し、1 列なのにポップアップが開く。
+- そこで Kotlin が唯一の保持者となり、(a) 既存文書へ `evaluateJavascript`、(b) 各カラムの小さな document-start script（`window.__mcxMultiColumnActive = <bool>;`）を `ScriptHandler.remove()` → 再追加で差し替え、(c) 新規カラム作成時（`registerColumn` が現在値で登録）と `showColumnWebView`（paused 中の eval 取りこぼしの保険）で再適用する。UI スレッドで直列化するので作成と更新が競合しない。値が変わったときだけ配布し、既定は無効。
+- `columnBuildSignature` に列数を入れない（回転のたびに全カラムが再構築される）。設定（画像／動画の ON/OFF）の変更は、既存どおり署名差のカラムの再構築で反映する。
+- `setMediaPopupActive` は JNI から呼ぶため `proguard-rules.pro` の keep ルールが必須（リリースビルドでしか症状が出ない。上の「ProGuard keep ルールの同期」参照）。
+
+### 要求の経路（column → ネイティブ → Rust）
+
+`window.__mcxMediaPopupBridge.postMessage(JSON)`（`{ type: "openMediaPopup", url }`）→ `MediaPopupBridge(columnId)`（`addWebMessageListener`。`acceptBridgeMessage` でメインフレーム・許可オリジンのみ）→ `AppBridge.onMediaPopupRequest(label, url)` → JNI `Java_..._AppBridge_onMediaPopupRequest` → `open_media_popup_from_android` → 共通関数 `open_media_popup_mobile`（mobile 版 `open_popup_window` と共用）。
+
+- **送信元カラムを JS に申告させない**。`MediaPopupBridge` が閉包で持つ `columnId`（= Rust の registry ラベル）を使い、ポップアップは送信元カラム自身のアカウントで開く（`ApiRateLimitBridge` と同型）。
+- JNI 経由は `require_registered = true` で、URL を `validate_media_page_url`（https + X ホスト + パスが `/<user>/status/<id>/photo|video/<n>` または `/i/status/<id>[/photo|video/<n>]`）に限定し、`column-` で始まらないラベル・registry 未登録のラベル（削除済みカラム等）を拒否する。侵害された column の JS から任意 URL を開かれないための再検証であり、Tauri コマンド版（`require_registered = false`）は従来の `validate_media_popup_url` のまま。
+- ポップアップ生成は UI スレッド同期を伴うため、JNI ハンドラは `tauri::async_runtime::spawn` へ逃がして即 return する。ダブルタップで 2 枚開かないよう、`MediaPopupBridge` は同一 URL の要求を 1 秒（`DUPLICATE_WINDOW_MS`）以内なら無視する。
+- JS 名 `__mcxMediaPopupBridge` は `MainActivity.kt`（`MEDIA_POPUP_BRIDGE_JS_NAME`）と inject で一致させる。新ブリッジにしたのは、`VideoDownloadRequestBridge`（動画 DL 専用）へ相乗りすると責務が混ざり、JS 名＝権限境界の単位も分けにくくなるため。
+
+### inject 側の判定
+
+- `image_popup.js` を mobile にも注入する。デスクトップとの区別は、mobile の config にだけ付く `mediaPopupRequiresMultiColumn: true`（`inject/mod.rs` の `config_script`）による**明示的なプラットフォーム判定**で行う（ブリッジの有無から推測しない）。
+- 有効判定 `isMediaPopupEnabled`（`video_long_press_menu.ts` に独立実装の `isLongPressMediaPopupEnabled` があり、同期テスト `media_popup_gate.contract.test.ts` で一致を保つ）: デスクトップは従来どおり設定だけで決まる。Android は「設定 ON かつ `__mcxMediaPopupBridge` がある かつ `__mcxMultiColumnActive === true`」のときだけ有効。**ブリッジが無ければ横取りしない**（カラム内の通常遷移へフォールバック）。判定はクリック時・メニュー表示時に毎回評価し、回転による変化に追従する。
+- 動画サムネイル（再生ボタン外）のタップ横取り（`findPlayButtonForMediaTap`）は Android（`mediaPopupRequiresMultiColumn`）でのみ行う。デスクトップの DOM では未検証のため。
+
+### 実 X DOM の実測知見（2026-11-25、Pixel_9 エミュレータ・WebView Chrome 153・ログイン済みホームカラム）
+
+- 画像: `a[href*="/photo/<n>"]` が `div[data-testid=tweetPhoto]` を内包する。タップは `a` への click として document capture に届く（isTrusted）ため、既存の `classifyMediaHref` がそのまま使える。引用 RT 内の画像も同形式。
+- タイムラインの動画: `<video>` も `videoComponent` も `a[href*="/video/"]` も無い。`img`（サムネイル）+ `div[data-testid=previewInterstitial] > button[data-testid=playButton]` で、playButton は `<a>` に包まれない。**サムネイル画像（ボタン外）をタップしても target は `img` で、`<a>` も playButton も経由せず X が `/<user>/status/<id>/mediaViewer?...` へ遷移する**ため、playButton への click 判定だけでは拾えない。→ `previewInterstitial` を含む最小のプレビュー領域から playButton を辿る（領域が article・引用コンテナ・本文やリンクを含む場合、`previewInterstitial` が 1 つでない場合は対象外にして誤マッチを避ける）。
+- 引用 RT 内の動画: 引用コンテナ内に `a[href]` も時刻リンクも無い（同じ `previewInterstitial` 構造）。引用元ツイート ID は React fiber から取る（`extractQuotedTweetId`。実機での id 取得は未検証）。
+- 長押し: 動画サムネイルの 1 秒長押しで `contextmenu` は発火するが、`video_long_press_menu.ts` は `closest('[data-testid="videoComponent"]')` を要求するため、**タイムラインのサムネイル状態ではメニューは出ない**（videoComponent は mediaViewer 内で出現する）。メニューの項目表示条件は同じ有効判定を使う。
+- `/<user>/status/<id>/video/1` を直接開くと動画表示ページとして機能する（自動再生はされず playButton が出る）。ポップアップの組み立て先 URL として有効。複数動画ツイートの `/video/<n>` の n は未確認。
+- GIF の `/video/1`（2026-11-26 実測）: `<video>` は最初無く、`previewInterstitial` 内に「このGIF画像を再生」の `playButton` が出る。手タップは playButton 内 `svg path` への trusted な pointerdown→touchstart→pointerup→touchend→mousedown→mouseup→click で、click の約 20ms 後に `<video>`（`tweet_video/*.mp4`）が現れて再生される。
+- GIF ポップアップは自動再生の click が一度効いて `<video>` が現れても、約 0.7 秒後に X が再描画して `<video>` が消え playButton が元に戻る（通常動画では起きない）。`popup_video_autoplay.ts` は再生確認（`finish`）後も 1 秒間隔・最大 8 回、「video が無く playButton がある」ときだけ押し直す（video があれば押さないので一時停止は上書きしない）。2 回目の click で再生が続く（実機 5/5）。
+
+### 不採用にした案
+
+- **column 内 JS が `innerWidth` と `screen.width` から自己判定する案**（IPC 不要）: 分割画面や Android 16 のデスクトップウィンドウではウィンドウ幅 < `screen.width` になり、1 列でも「複数列」と誤判定する。2 列と 3 列の境界も端数に弱く、`mobileColumnLayout` と食い違う。
+- **既存の `VideoDownloadRequestBridge` への相乗り**: 上記のとおり責務と権限境界が混ざるため新ブリッジにした。
+
+### 検証手順
+
+- エミュレータ（タブレット AVD、幅 600dp 以上）で 2 列表示 → タイムラインの画像・動画をタップ → 全画面ポップアップが開く → 戻る → 回転（1 列）でカラム内表示に戻ることを確認する。X への外部影響のある操作はしない。
+- **リリースビルド（R8）で `setMediaPopupActive` が呼べること**を必ず確認する。
 
 ## デバッグビルドでは検出できない不具合
 

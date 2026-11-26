@@ -29,24 +29,25 @@ interface FilterSettingsSectionsProps extends SectionProps {
 }
 
 /** ポップアップウィンドウ設定セクション */
-export const PopupSettingsSection: React.FC<SectionProps> = ({
-  draft,
-  set,
-}) => {
+export const PopupSettingsSection: React.FC<
+  SectionProps & { isMobile: boolean }
+> = ({ draft, set, isMobile }) => {
   const { t } = useTranslation();
   return (
     <section className={styles.section}>
       <h3 className={styles.sectionTitle}>
         {t("settings:general.popup.title")}
       </h3>
-      <label className={styles.checkLabel}>
-        <input
-          type="checkbox"
-          checked={draft.popupEscCloseEnabled}
-          onChange={(e) => set("popupEscCloseEnabled", e.target.checked)}
-        />
-        {t("settings:general.popup.escClose")}
-      </label>
+      {!isMobile && (
+        <label className={styles.checkLabel}>
+          <input
+            type="checkbox"
+            checked={draft.popupEscCloseEnabled}
+            onChange={(e) => set("popupEscCloseEnabled", e.target.checked)}
+          />
+          {t("settings:general.popup.escClose")}
+        </label>
+      )}
       <label className={styles.checkLabel}>
         <input
           type="checkbox"
@@ -63,6 +64,9 @@ export const PopupSettingsSection: React.FC<SectionProps> = ({
         />
         {t("settings:general.popup.video")}
       </label>
+      {isMobile && (
+        <p className={styles.hint}>{t("settings:general.popup.mobileNote")}</p>
+      )}
     </section>
   );
 };

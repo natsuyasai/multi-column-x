@@ -9,6 +9,8 @@ import {
   buildLongPressVideoUrl,
   buildLongPressIStatusVideoUrl,
   chooseLongPressDownloadTransport,
+  isLongPressMediaPopupEnabled,
+  chooseLongPressPopupTransport,
   formatLongPressDownloadText,
   shouldAutoDismissLongPressToast,
 } from "./video_long_press_menu";
@@ -844,5 +846,173 @@ describe("inject/video_long_press_menu のデスクトップ動画ダウンロ�
     expect(toast?.style.pointerEvents).toBe("none");
     expect(toast?.style.position).toBe("fixed");
     expect(toast?.style.zIndex).toBe("2147483647");
+  });
+});
+
+describe("inject/video_long_press_menu の isLongPressMediaPopupEnabled", () => {
+  const multi = { hasBridge: true, multiColumnActive: true };
+
+  it("デスクトップでは動画ポップアップ設定がONなら有効になる", () => {
+    expect(
+      isLongPressMediaPopupEnabled("video", { videoPopupEnabled: true }, multi),
+    ).toBe(true);
+  });
+
+  it("Androidではブリッジが無いか1列表示のときは設定がONでも無効になる", () => {
+    const config = {
+      videoPopupEnabled: true,
+      mediaPopupRequiresMultiColumn: true,
+    };
+    expect(
+      isLongPressMediaPopupEnabled("video", config, {
+        hasBridge: false,
+        multiColumnActive: true,
+      }),
+    ).toBe(false);
+    expect(
+      isLongPressMediaPopupEnabled("video", config, {
+        hasBridge: true,
+        multiColumnActive: false,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("inject/video_long_press_menu の chooseLongPressPopupTransport", () => {
+  it("Androidブリッジがあればブリッジ、無ければ invoke、どちらも無ければ none を選ぶ", () => {
+    expect(
+      chooseLongPressPopupTransport({ hasBridge: true, hasInvoke: true }),
+    ).toBe("bridge");
+    expect(
+      chooseLongPressPopupTransport({ hasBridge: false, hasInvoke: true }),
+    ).toBe("invoke");
+    expect(
+      chooseLongPressPopupTransport({ hasBridge: false, hasInvoke: false }),
+    ).toBe("none");
+  });
+});
+
+describe("inject/video_long_press_menu のAndroidでのポップアップメニュー項目", () => {
+  const popupBridgeMock = vi.fn();
+
+  function setAndroid(multiColumnActive: boolean | undefined): void {
+    setConfig({
+      videoPopupEnabled: true,
+      imagePopupEnabled: true,
+      mediaPopupRequiresMultiColumn: true,
+    });
+    window.__mcxMultiColumnActive = multiColumnActive;
+  }
+
+  function openMenu(): HTMLElement {
+    const article = buildArticle("/carol/status/555");
+    const videoEl = addTweetPhotoWithVideo(article);
+    dispatchContextMenu(videoEl);
+    return videoEl;
+  }
+
+  function selectPopupItem(): void {
+    const item = getMenu()?.children[1];
+    if (!item) throw new Error("popup menu item not found");
+    item.dispatchEvent(
+      new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
+    );
+  }
+
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    getMenu()?.remove();
+    popupBridgeMock.mockClear();
+    invokeMock.mockClear();
+    window.__TAURI__ = { core: { invoke: invokeMock } };
+    window.__mcxVideoDownloadBridge = { postMessage: postMessageMock };
+    window.__mcxMediaPopupBridge = { postMessage: popupBridgeMock };
+  });
+
+  afterEach(() => {
+    delete window.__mcxMediaPopupBridge;
+    delete window.__mcxVideoDownloadBridge;
+    delete window.__mcxMultiColumnActive;
+    delete window.__multiColumnXConfig;
+    getMenu()?.remove();
+  });
+
+  it("複数カラム表示中は動画の長押しメニューに「動画をポップアップで表示」が表示される", async () => {
+    setAndroid(true);
+    await importLongPressMenu();
+    openMenu();
+
+    expect(getMenu()?.children.length).toBe(2);
+    expect(getMenu()?.children[1]?.textContent).toBe(
+      "動画をポップアップで表示",
+    );
+  });
+
+  it("1列表示中は動画の長押しメニューに「動画をポップアップで表示」が表示されない", async () => {
+    setAndroid(false);
+    await importLongPressMenu();
+    openMenu();
+
+    expect(getMenu()?.children.length).toBe(1);
+  });
+
+  it("複数カラム表示フラグが未設定の間は「動画をポップアップで表示」が表示されない", async () => {
+    setAndroid(undefined);
+    await importLongPressMenu();
+    openMenu();
+
+    expect(getMenu()?.children.length).toBe(1);
+  });
+
+  it("ブリッジが無いAndroidでは複数カラム表示中でも「動画をポップアップで表示」が表示されない", async () => {
+    setAndroid(true);
+    delete window.__mcxMediaPopupBridge;
+    await importLongPressMenu();
+    openMenu();
+
+    expect(getMenu()?.children.length).toBe(1);
+  });
+
+  it("メニューを開くたびに複数カラム表示フラグを評価する", async () => {
+    setAndroid(false);
+    await importLongPressMenu();
+    const videoEl = openMenu();
+    expect(getMenu()?.children.length).toBe(1);
+
+    window.__mcxMultiColumnActive = true;
+    dispatchContextMenu(videoEl);
+    expect(getMenu()?.children.length).toBe(2);
+  });
+
+  it("長押しメニューの「動画をポップアップで表示」を選ぶとブリッジへポップアップを要求する", async () => {
+    setAndroid(true);
+    await importLongPressMenu();
+    openMenu();
+
+    selectPopupItem();
+
+    expect(popupBridgeMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(popupBridgeMock.mock.calls[0][0] as string)).toEqual({
+      type: "openMediaPopup",
+      url: "https://x.com/carol/status/555/video/1",
+    });
+    expect(invokeMock).not.toHaveBeenCalled();
+    expect(postMessageMock).not.toHaveBeenCalled();
+  });
+
+  it("デスクトップの長押し（右クリック）メニューは従来どおりtauri invokeでポップアップを開く", async () => {
+    setConfig({ videoPopupEnabled: true });
+    delete window.__mcxMediaPopupBridge;
+    window.__mcxMultiColumnActive = false;
+    await importLongPressMenu();
+    openMenu();
+
+    expect(getMenu()?.children.length).toBe(2);
+    selectPopupItem();
+
+    expect(invokeMock).toHaveBeenCalledWith("open_popup_window", {
+      url: "https://x.com/carol/status/555/video/1",
+    });
+    expect(popupBridgeMock).not.toHaveBeenCalled();
   });
 });

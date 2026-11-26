@@ -62,6 +62,7 @@ export const IPC_COMMANDS = {
   // モバイルスワイプバー（ネイティブオーバーレイ）
   UPDATE_MOBILE_SWIPE_BAR: "update_mobile_swipe_bar",
   FLASH_MOBILE_SWIPE_BAR: "flash_mobile_swipe_bar",
+  SET_MOBILE_MEDIA_POPUP_ACTIVE: "set_mobile_media_popup_active",
 
   // アプリ自動更新（Android APK）
   INSTALL_APK_UPDATE: "install_apk_update",

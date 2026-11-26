@@ -78,7 +78,8 @@
       "title": "Popup windows",
       "escClose": "Close with the Esc key",
       "image": "Open images in a popup window",
-      "video": "Open videos in a popup window"
+      "video": "Open videos in a popup window",
+      "mobileNote": "Applies only while multiple columns are shown. With a single column, media opens inside the column as before."
     },
     "video": {
       "title": "Video",

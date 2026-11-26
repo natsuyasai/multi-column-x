@@ -5,6 +5,7 @@ import type { Column } from "../types";
 import {
   calculateGridBounds,
   getMobileTabBarHeight,
+  isMultiColumnLayout,
   MOBILE_TWO_COLUMN_MIN_WIDTH,
   mobileColumnLayout,
 } from "./gridLayout";
@@ -415,6 +416,35 @@ describe("mobileColumnLayout 窓の先頭維持 プロパティ", () => {
         }
         expect(result[input.activeColumnId].x).toBeGreaterThanOrEqual(0);
       }),
+    );
+  });
+});
+
+describe("isMultiColumnLayout プロパティ", () => {
+  it("存在するアクティブカラムでは、2列設定が有効かつ幅と登録数が2列以上を許すときだけ複数カラム表示になる", () => {
+    fc.assert(
+      fc.property(mobileMultiExistingActiveArb, (input) => {
+        const layout = mobileColumnLayout(input);
+        const expected =
+          input.twoColumnEnabled &&
+          input.viewportWidth >= MOBILE_TWO_COLUMN_MIN_WIDTH &&
+          expectedMaxColumns(input) >= 2;
+        expect(isMultiColumnLayout(layout)).toBe(expected);
+      }),
+    );
+  });
+
+  it("アクティブカラムが無い・存在しないときは複数カラム表示にならない", () => {
+    fc.assert(
+      fc.property(
+        mobileMultiScenarioArb.map((s) => ({
+          ...s,
+          activeColumnId: null as string | null,
+        })),
+        (input) => {
+          expect(isMultiColumnLayout(mobileColumnLayout(input))).toBe(false);
+        },
+      ),
     );
   });
 });

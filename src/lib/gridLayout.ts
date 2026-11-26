@@ -274,3 +274,10 @@ export function mobileWindowStartId(
 ): string | null {
   return Object.entries(layout).find(([, b]) => b.x === 0)?.[0] ?? null;
 }
+
+/** モバイルのレイアウト結果（mobileColumnLayout の戻り値）が複数列表示かを返す純粋関数。 */
+export function isMultiColumnLayout(
+  layout: Record<string, ColumnBounds>,
+): boolean {
+  return Object.values(layout).filter((b) => b.x >= 0).length >= 2;
+}

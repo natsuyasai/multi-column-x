@@ -44,6 +44,8 @@ declare global {
     apiRateLimitMonitorEnabled?: boolean;
     imagePopupEnabled?: boolean;
     videoPopupEnabled?: boolean;
+    /** Android（mobile）の init script でだけ true。複数カラム表示中のみポップアップ傍受する。 */
+    mediaPopupRequiresMultiColumn?: boolean;
     ngWords?: string[];
     globalNgWords?: string[];
     repostHiddenUserIds?: string[];
@@ -105,6 +107,11 @@ declare global {
     postMessage: (message: string) => void;
   }
 
+  // メディアのポップアップ要求用。{ type: "openMediaPopup", url } を送る。
+  interface McxMediaPopupBridge {
+    postMessage: (message: string) => void;
+  }
+
   interface McxApiRateLimitBridge {
     postMessage: (message: string) => void;
   }
@@ -144,6 +151,9 @@ declare global {
     __mcxPopupBridge?: McxPopupBridge;
     __mcxVideoDownloadBridge?: McxVideoDownloadBridge;
     __mcxApiRateLimitBridge?: McxApiRateLimitBridge;
+    __mcxMediaPopupBridge?: McxMediaPopupBridge;
+    /** ネイティブが配布する複数カラム表示フラグ（Android のみ。未設定は false 扱い）。 */
+    __mcxMultiColumnActive?: boolean;
     __mobileTopInset?: number;
     __mobileBottomInset?: number;
     __xhrRateLimitPatched?: boolean;

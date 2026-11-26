@@ -48,6 +48,42 @@ export function buildIStatusVideoUrl(statusId: string, index: number): string {
   return resolveAbsolute(`/i/status/${statusId}/video/${index}`);
 }
 
+export interface MediaPopupGateConfig {
+  imagePopupEnabled?: boolean;
+  videoPopupEnabled?: boolean;
+  /** Android（mobile）の init script でだけ true が埋め込まれる。デスクトップでは undefined。 */
+  mediaPopupRequiresMultiColumn?: boolean;
+}
+
+/** 種別ごとの設定 + 実効列数 + 送信経路から、ポップアップ傍受を有効にするかを返す。 */
+export function isMediaPopupEnabled(
+  kind: "image" | "video",
+  config: MediaPopupGateConfig | undefined,
+  env: { hasBridge: boolean; multiColumnActive: boolean | undefined },
+): boolean {
+  // 既定（undefined）は後方互換のため有効扱い。
+  const kindEnabled =
+    kind === "image"
+      ? config?.imagePopupEnabled !== false
+      : config?.videoPopupEnabled !== false;
+  if (!kindEnabled) return false;
+  // デスクトップ: 従来どおり設定だけで決まる（列数・ブリッジに依存しない）。
+  if (config?.mediaPopupRequiresMultiColumn !== true) return true;
+  // Android: 複数列表示中 かつ 届ける手段（ブリッジ）がある場合だけ。undefined は false 扱い。
+  return env.hasBridge && env.multiColumnActive === true;
+}
+
+export type MediaPopupTransport = "bridge" | "invoke" | "none";
+
+/** 送信経路を選ぶ。Android ブリッジがあれば優先し、無ければ Tauri invoke、どちらも無ければ none。 */
+export function chooseMediaPopupTransport(env: {
+  hasBridge: boolean;
+  hasInvoke: boolean;
+}): MediaPopupTransport {
+  if (env.hasBridge) return "bridge";
+  return env.hasInvoke ? "invoke" : "none";
+}
+
 // --- DOM 依存ヘルパー（jsdom で単体テストする） ---
 
 /**
@@ -66,20 +102,60 @@ export function findStatusPermalink(article: Element): string | null {
 }
 
 /**
- * playButton を内包する tweetPhoto の、root（既定は article）配下 tweetPhoto 群における
+ * 動画サムネイル（再生ボタン外）のタップから、同じプレビュー領域の playButton を返す。
+ * target から祖先を辿り、previewInterstitial を最初に含む祖先をプレビュー領域とみなす。
+ */
+export function findPlayButtonForMediaTap(target: Element): Element | null {
+  // <a> 内（画像リンクなど）は従来のリンク判定を優先する。
+  if (target.closest("a")) return null;
+  const interstitial = '[data-testid="previewInterstitial"]';
+  let area: Element | null = target;
+  while (area && !area.querySelector(interstitial)) {
+    area = area.parentElement;
+  }
+  if (!area) return null;
+  // ツイート全体（article・引用コンテナ）や、本文・ユーザー名・リンクを含む領域は
+  // メディア専用のプレビュー領域ではないので対象外。
+  if (area.matches('article, div[role="link"][tabindex="0"]')) return null;
+  if (
+    area.querySelector(
+      '[data-testid="tweetText"], [data-testid="User-Name"], a',
+    )
+  ) {
+    return null;
+  }
+  // 複数動画の領域で別の動画に誤マッチしないよう、ちょうど 1 つのときだけ採用する。
+  const interstitials = area.querySelectorAll(interstitial);
+  if (interstitials.length !== 1) return null;
+  return interstitials[0].querySelector('button[data-testid="playButton"]');
+}
+
+/**
+ * playButton が属するメディア項目の、root（既定は article）配下のメディア項目群における
  * 1-based インデックスを返す。取得不可時は 1。引用ツイートではコンテナを root に渡す。
+ * メディア項目は div[tweetPhoto]、または tweetPhoto に包まれない div[previewInterstitial]
+ * （Android のタイムライン動画）。tweetPhoto の内側にある previewInterstitial は二重に数えない。
  */
 export function findMediaIndex(
   playButton: Element,
   root?: Element | null,
 ): number {
-  const photo = playButton.closest('div[data-testid="tweetPhoto"]');
+  const photoSelector = 'div[data-testid="tweetPhoto"]';
+  const item =
+    playButton.closest(photoSelector) ??
+    playButton.closest('div[data-testid="previewInterstitial"]');
   const container = root ?? playButton.closest("article");
-  if (!photo || !container) return 1;
-  const photos = Array.from(
-    container.querySelectorAll('div[data-testid="tweetPhoto"]'),
+  if (!item || !container) return 1;
+  const items = Array.from(
+    container.querySelectorAll(
+      `${photoSelector}, div[data-testid="previewInterstitial"]`,
+    ),
+  ).filter(
+    (el) =>
+      el.getAttribute("data-testid") !== "previewInterstitial" ||
+      !el.closest(photoSelector),
   );
-  const index = photos.indexOf(photo);
+  const index = items.indexOf(item);
   return index >= 0 ? index + 1 : 1;
 }
 
@@ -126,13 +202,12 @@ export function extractQuotedTweetId(container: Element): string | null {
 // --- 副作用（import 時に実行される IIFE） ---
 
 (function () {
-  function isImagePopupEnabled(): boolean {
-    // 既定（undefined）は後方互換のため有効扱い。
-    return window.__multiColumnXConfig?.imagePopupEnabled !== false;
-  }
-
-  function isVideoPopupEnabled(): boolean {
-    return window.__multiColumnXConfig?.videoPopupEnabled !== false;
+  // クリック時に毎回評価する（画面回転などで変わる複数カラム表示フラグへ追従するため）。
+  function isPopupEnabled(kind: "image" | "video"): boolean {
+    return isMediaPopupEnabled(kind, window.__multiColumnXConfig, {
+      hasBridge: window.__mcxMediaPopupBridge !== undefined,
+      multiColumnActive: window.__mcxMultiColumnActive,
+    });
   }
 
   function tauriInvoke(cmd: string, args: Record<string, unknown>): void {
@@ -142,15 +217,38 @@ export function extractQuotedTweetId(container: Element): string | null {
     }
   }
 
+  // Android ネイティブブリッジ（addWebMessageListener）へ JSON 文字列でメッセージを送る。
+  // inject スクリプトはビルドエントリ間で import を共有できないため、このファイル内に置く。
+  function postBridgeMessage(
+    bridge: { postMessage: (message: string) => void } | undefined,
+    message: Record<string, unknown>,
+  ): void {
+    bridge?.postMessage(JSON.stringify(message));
+  }
+
   function openPopup(url: string): void {
+    const invoke = window.__TAURI__?.core?.invoke ?? window.__TAURI__?.invoke;
+    const transport = chooseMediaPopupTransport({
+      hasBridge: window.__mcxMediaPopupBridge !== undefined,
+      hasInvoke: invoke !== undefined,
+    });
+    if (transport === "bridge") {
+      // Android: 送信元カラムの特定と URL 検証はネイティブ／Rust 側で行う。
+      postBridgeMessage(window.__mcxMediaPopupBridge, {
+        type: "openMediaPopup",
+        url,
+      });
+      return;
+    }
     // webviewLabelCaller は渡さない。実際の送信元 WebView（呼び出し元）は
     // Rust 側が caller.label() で判定するため、JS が自己申告する必要も権限も無い。
-    tauriInvoke(OPEN_POPUP_WINDOW, { url });
+    if (transport === "invoke") tauriInvoke(OPEN_POPUP_WINDOW, { url });
   }
 
   function handlePlayButton(playButton: Element, e: MouseEvent): boolean {
-    // videoPopupEnabled が false のときは傍受せずインライン再生へフォールバックする。
-    if (!isVideoPopupEnabled()) return false;
+    // 動画のポップアップが無効（設定 OFF・1 列表示・ブリッジ無し）のときは
+    // 傍受せずインライン再生へフォールバックする。
+    if (!isPopupEnabled("video")) return false;
 
     // 引用RT: 動画は引用された内側ツイートに属し、article の timestamp リンク（外側ツイート）
     // とは status が異なる。DOM 上に引用ツイートの status リンクが無いため React fiber から
@@ -193,7 +291,17 @@ export function extractQuotedTweetId(container: Element): string | null {
       }
 
       const link = target.closest("a");
-      if (!link) return;
+      if (!link) {
+        // Android のタイムライン動画: サムネイル（再生ボタン外）のタップも再生ボタン扱いにする。
+        // デスクトップの DOM では未検証のため、Android（mediaPopupRequiresMultiColumn）だけで行う。
+        if (
+          window.__multiColumnXConfig?.mediaPopupRequiresMultiColumn === true
+        ) {
+          const thumbPlayButton = findPlayButtonForMediaTap(target);
+          if (thumbPlayButton) handlePlayButton(thumbPlayButton, e);
+        }
+        return;
+      }
 
       if (link.hasAttribute("data-tv-navlink")) return;
 
@@ -203,8 +311,7 @@ export function extractQuotedTweetId(container: Element): string | null {
 
       const kind = classifyMediaHref(href);
       if (!kind) return;
-      if (kind === "image" && !isImagePopupEnabled()) return;
-      if (kind === "video" && !isVideoPopupEnabled()) return;
+      if (!isPopupEnabled(kind)) return;
 
       e.preventDefault();
       e.stopPropagation();

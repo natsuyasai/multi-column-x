@@ -8,6 +8,7 @@ import {
   getMobileTabBarHeight,
   getScrollbarHeight,
   getTopBarHeight,
+  isMultiColumnLayout,
   MOBILE_TWO_COLUMN_MIN_WIDTH,
   mobileColumnLayout,
   mobileWindowStartId,
@@ -681,5 +682,40 @@ describe("mobileWindowStartId", () => {
       }),
     ).toBeNull();
     expect(mobileWindowStartId({})).toBeNull();
+  });
+});
+
+describe("isMultiColumnLayout", () => {
+  const on = (x: number) => ({ x, y: 0, width: 400, height: 800 });
+
+  it("画面内に2枚のカラムがあれば複数カラム表示と判定する", () => {
+    expect(isMultiColumnLayout({ a: on(0), b: on(400) })).toBe(true);
+  });
+
+  it("画面内のカラムが1枚だけなら複数カラム表示ではない", () => {
+    expect(isMultiColumnLayout({ a: on(0), b: on(OFFSCREEN.MOBILE_X) })).toBe(
+      false,
+    );
+  });
+
+  it("カラムが0枚なら複数カラム表示ではない", () => {
+    expect(isMultiColumnLayout({})).toBe(false);
+  });
+
+  it("画面内に3枚あっても複数カラム表示と判定し、画面外のカラムは数えない", () => {
+    expect(
+      isMultiColumnLayout({
+        a: on(0),
+        b: on(300),
+        c: on(600),
+        d: on(OFFSCREEN.MOBILE_X),
+      }),
+    ).toBe(true);
+    expect(
+      isMultiColumnLayout({
+        a: on(OFFSCREEN.MOBILE_X),
+        b: on(OFFSCREEN.MOBILE_X),
+      }),
+    ).toBe(false);
   });
 });

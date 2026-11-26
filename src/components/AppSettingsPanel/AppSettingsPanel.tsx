@@ -285,7 +285,7 @@ export const AppSettingsPanel: React.FC<AppSettingsPanelProps> = ({
         return (
           <>
             <VideoSettingsSection draft={draft} set={set} />
-            {!isMobile && <PopupSettingsSection draft={draft} set={set} />}
+            <PopupSettingsSection draft={draft} set={set} isMobile={isMobile} />
             <LinuxVideoPlaybackSection
               draft={draft}
               set={set}

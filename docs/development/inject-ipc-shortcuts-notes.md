@@ -29,6 +29,7 @@ inject スクリプトは X(twitter.com) の実 DOM 構造に依存する。X �
 
 - `eval_in_webview` 用の Rust 側テンプレート文字列には、グローバル変数名（`window.__multiColumnX` など）が**文字列として直接埋め込まれている**。グローバル変数名を変更する場合、型定義2箇所・inject 各スクリプトのローカル定数に加えて、このテンプレート文字列内の埋め込みも別途更新が必要になる。見落としやすい同期漏れポイント。
 - コマンド名・イベント名・ラベルプレフィックスを変更する際は、Rust 側の IPC 定数定義・TS 側の IPC 定数定義・inject 側の参照用定数ドキュメント・各 inject スクリプトのローカル定数・両方の `window` 型定義、という**5箇所同期**が必要。ショートカット追加時の複数箇所同期と同種の、より広い範囲に及ぶ配線ルールとして把握しておくこと。
+- Android のメディアのポップアップ用ブリッジの JS 名 `__mcxMediaPopupBridge` は、`MainActivity.kt`（`MEDIA_POPUP_BRIDGE_JS_NAME`）と inject（`image_popup.ts` / `video_long_press_menu.ts`）、`types.d.ts` で一致させる。複数カラム表示フラグ `window.__mcxMultiColumnActive` は Kotlin（`MediaPopupFlagSync.kt` の `mediaPopupFlagScript`）が設定する。詳細は `android-notes.md`「メディアのポップアップ（複数カラム表示時）」。
 
 ### 既知の警告（対応不要）: X ページの DevTools に出る `ipc.localhost` の CSP 違反
 
@@ -341,3 +342,9 @@ article button[aria-label*="grok" i]:has(svg path[d^="M12.745 20.54"]) {
 - 保存ダイアログのキャンセルは Rust がイベントを出さず `Ok(())` で終わるため、トーストは出ない。開始前エラーは invoke の reject でのみ通知される（失敗トースト + `console.error`）。ダウンロード中のエラーは失敗イベントと reject の両方が来るため、失敗イベント受信済みなら reject 側はトーストを上書きしない。新しい進捗のたびに自動消去タイマーを解除する。
 - トーストは `textContent` を直接設定する。`__mcxI18n.apply` は key しか記録せず、言語切替の再適用で `{file}` `{percent}` が補間されなくなる。`pointer-events: none` で操作を妨げない。inject は X ページ内 DOM のため rem 規約は適用しない（px）。
 - 文言は popup と共通の `popupToolbar.download.*` を再利用する。`formatLongPressDownloadText`（`video_long_press_menu.ts`）と `formatVideoDownloadProgressText`（`popup_toolbar.ts`）はファイル間 import できないため複製で、変更時は両方を同期する。
+
+## メディアのポップアップの送信経路（`image_popup.ts` / `video_long_press_menu.ts`）
+
+- 送信経路は `chooseMediaPopupTransport`（長押し側は `chooseLongPressPopupTransport`）で選ぶ。Android ブリッジ（`__mcxMediaPopupBridge`）があれば優先し、無ければ `open_popup_window` を invoke、どちらも無ければ何もしない。ブリッジ経由では送信元カラムの特定と URL 検証をネイティブ／Rust 側で行うため、JS は `{ type: "openMediaPopup", url }` だけを送る。
+- 有効判定は `isMediaPopupEnabled`（長押し側は `isLongPressMediaPopupEnabled`。inject 間は import できないため独立実装で、`media_popup_gate.contract.test.ts` が一致を検査する）。mobile の config にだけ付く `mediaPopupRequiresMultiColumn` でプラットフォームを明示判定し、Android は「設定 ON かつブリッジ有り かつ複数カラム表示中」のときだけ有効。**ブリッジが無いときは横取りしない**。1 列表示では長押しメニューの「動画をポップアップで表示」項目も出さない。
+- 動画サムネイル（再生ボタン外）のタップ横取りは Android のみ。実 DOM の知見・不採用案は `android-notes.md` を参照。

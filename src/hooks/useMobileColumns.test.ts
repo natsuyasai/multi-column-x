@@ -15,6 +15,7 @@ import {
 import { columnBuildSignature } from "../lib/columnBuildSignature";
 import { setRootFontPx } from "../lib/uiScale";
 import { resolveColumnDataDirectory } from "../services/externalColumn";
+import { resetMobileMediaPopupSync } from "../services/mediaPopup";
 import { useAppStore } from "../store/useAppStore";
 import type { Account, Column } from "../types";
 import { DEFAULT_COLUMN_SETTINGS, DEFAULT_GLOBAL_SETTINGS } from "../types";
@@ -1016,5 +1017,139 @@ describe("useMobileColumns（複数カラム表示での表示位置の維持）
     expect(byId["col-a"]).toEqual(before["col-a"]);
     expect(byId["col-b"]).toEqual(before["col-b"]);
     expect(order[order.length - 1]).toBe("col-b");
+  });
+});
+
+describe("useMobileColumns（複数カラム表示フラグのネイティブ同期）", () => {
+  const originalWidth = window.innerWidth;
+  const setWidth = (width: number) =>
+    Object.defineProperty(window, "innerWidth", {
+      value: width,
+      configurable: true,
+      writable: true,
+    });
+  const ACTIVE = IPC_COMMANDS.SET_MOBILE_MEDIA_POPUP_ACTIVE;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetColumnBuildRegistry();
+    resetMobileMediaPopupSync();
+    mockInvoke.mockResolvedValue(undefined);
+    mockResolveColumnDataDirectory.mockImplementation(
+      async (column, accounts) =>
+        accounts.find((a) => a.id === column.accountId)?.dataDirectory,
+    );
+    localStorage.clear();
+    setWidth(1000);
+    useAppStore.setState({
+      accounts: [account1, account2],
+      columns: [column1, column2],
+      globalSettings: {
+        ...DEFAULT_GLOBAL_SETTINGS,
+        mobileTwoColumnEnabled: true,
+        mobileColumnCount: 2,
+      },
+      isLoaded: true,
+      isMobile: true,
+      topBarExpanded: false,
+      profileApiSupported: true,
+    });
+  });
+
+  afterEach(() => {
+    setWidth(originalWidth);
+  });
+
+  function setup() {
+    const dialogOpenRef = { current: false };
+    const recreateRef = { current: null };
+    return renderHook(() => useMobileColumns(dialogOpenRef, recreateRef));
+  }
+
+  /** set_mobile_media_popup_active に送られた active の履歴 */
+  function activeCalls() {
+    return mockInvoke.mock.calls
+      .filter((c) => c[0] === ACTIVE)
+      .map((c) => (c[1] as { active: boolean }).active);
+  }
+
+  it("表示列数が2列から1列に変わると各カラムのポップアップ表示が無効に切り替わる", async () => {
+    const { result } = setup();
+    await act(async () => {
+      await result.current.setActiveColumn("col-1");
+    });
+    expect(activeCalls()).toEqual([true]);
+
+    setWidth(500);
+    await act(async () => {
+      await result.current.setActiveColumn("col-1");
+    });
+
+    expect(activeCalls()).toEqual([true, false]);
+  });
+
+  it("表示列数が1列から2列に変わると各カラムのポップアップ表示が有効に切り替わる", async () => {
+    setWidth(500);
+    const { result } = setup();
+    await act(async () => {
+      await result.current.setActiveColumn("col-1");
+    });
+    expect(activeCalls()).toEqual([false]);
+
+    setWidth(1000);
+    await act(async () => {
+      await result.current.setActiveColumn("col-1");
+    });
+
+    expect(activeCalls()).toEqual([false, true]);
+  });
+
+  it("表示列数が変わらないときは再通知しない", async () => {
+    const { result } = setup();
+    await act(async () => {
+      await result.current.setActiveColumn("col-1");
+    });
+    await act(async () => {
+      await result.current.setActiveColumn("col-2");
+    });
+
+    expect(activeCalls()).toEqual([true]);
+  });
+
+  it("登録カラムが1つだけなら複数列設定でも無効を通知する", async () => {
+    useAppStore.setState({ columns: [column1] });
+    const { result } = setup();
+    await act(async () => {
+      await result.current.setActiveColumn("col-1");
+    });
+
+    expect(activeCalls()).toEqual([false]);
+  });
+
+  it("デスクトップでは複数カラム表示フラグを通知しない", async () => {
+    useAppStore.setState({ isMobile: false });
+    const { result } = setup();
+    await act(async () => {
+      await result.current.setActiveColumn("col-1");
+    });
+
+    expect(activeCalls()).toEqual([]);
+  });
+
+  it("起動時の復元ではカラム作成より先に複数カラム表示フラグを通知する", async () => {
+    const { result } = setup();
+    await act(async () => {
+      await result.current.restoreMobileColumns(
+        [column1, column2],
+        [account1, account2],
+      );
+    });
+
+    const names = mockInvoke.mock.calls.map((c) => c[0]);
+    const syncIdx = names.indexOf(ACTIVE);
+    const createIdx = names.indexOf(IPC_COMMANDS.CREATE_COLUMN_WEBVIEW);
+    expect(activeCalls()).toEqual([true]);
+    expect(syncIdx).toBeGreaterThanOrEqual(0);
+    expect(createIdx).toBeGreaterThan(syncIdx);
   });
 });

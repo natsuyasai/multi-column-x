@@ -96,6 +96,39 @@ pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onPopupSwitc
     });
 }
 
+/// AppBridge.onMediaPopupRequest(label, url) から呼ばれる JNI エントリポイント。
+/// column WebView 内の image_popup.ts / video_long_press_menu.ts が
+/// window.__mcxMediaPopupBridge 経由でメディアのポップアップ表示を要求してくる
+/// （Android のネイティブ WebView には Tauri IPC が無いため）。
+///
+/// ポップアップ生成は UI スレッド同期を伴うため、ブロックせず別タスクへ逃がして即座に返す。
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_natsuyasai_multicolumnx_AppBridge_onMediaPopupRequest<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    label: jni::objects::JString<'local>,
+    url: jni::objects::JString<'local>,
+) {
+    fn to_string(env: &mut JNIEnv, s: &jni::objects::JString) -> Option<String> {
+        env.get_string(s).ok().map(|v| v.into())
+    }
+    let (Some(label), Some(url)) = (to_string(&mut env, &label), to_string(&mut env, &url)) else {
+        return;
+    };
+    let app = TAURI_APP.lock().expect("TAURI_APP mutex poisoned").clone();
+    let Some(app) = app else {
+        eprintln!("[AppBridge.onMediaPopupRequest] app handle not initialized");
+        return;
+    };
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = crate::commands::webview::open_media_popup_from_android(&app, &label, &url)
+        {
+            eprintln!("[AppBridge.onMediaPopupRequest] {e}");
+        }
+    });
+}
+
 /// Kotlin から受け取ったシステムバーの高さ（dp）。
 static STATUS_BAR_HEIGHT_DP: AtomicI32 = AtomicI32::new(0);
 static NAV_BAR_HEIGHT_DP: AtomicI32 = AtomicI32::new(0);
@@ -546,6 +579,21 @@ pub fn set_swipe_bar_overlay(
                 JValue::Int(opacity_percent),
                 JValue::Bool(dark_theme as u8),
             ],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    })
+}
+
+/// MainActivity.setMediaPopupActive を呼び出して、複数カラム表示フラグ
+/// （メディアのポップアップ表示の有効条件）をネイティブへ伝える。
+pub fn set_media_popup_active(active: bool) -> Result<(), String> {
+    call_activity_method(|env, activity| {
+        env.call_method(
+            activity,
+            "setMediaPopupActive",
+            "(Z)V",
+            &[JValue::Bool(active as u8)],
         )
         .map_err(|e| e.to_string())?;
         Ok(())

@@ -64,6 +64,17 @@ object AppBridge {
   )
 
   /**
+   * column WebView 内の image_popup.ts / video_long_press_menu.ts から、画像・動画の
+   * ポップアップ表示要求が届いたときに MediaPopupBridge から呼ぶ。
+   * label は送信元カラムのラベル（Rust の registry キーと同一）。
+   */
+  @JvmStatic
+  external fun onMediaPopupRequest(
+    label: String,
+    url: String,
+  )
+
+  /**
    * ポップアップ内の popup_toolbar.ts から、公式設定スナップショットが
    * 届いたときに PopupSessionBridge から呼ぶ。
    */

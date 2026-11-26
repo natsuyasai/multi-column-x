@@ -75,10 +75,11 @@ Object.assign(window.MCX_DATA.details, {
     layer: "react",
     summary:
       "Tauri invoke を包む薄いラッパー層。コマンド名は constants/ipc.ts の IPC_COMMANDS を使う。",
-    body: "<p><code>columnWebview.ts</code>（作成・リサイズ・削除・eval）、<code>externalColumn.ts</code>、<code>columnReload.ts</code>、<code>backup.ts</code>、<code>updater.ts</code>、<code>releasePage.ts</code>、<code>extensions.ts</code>。UI から Rust を呼ぶ入口を一箇所に集め、呼び出し前後の共通処理（保存待ち、構築署名の記録など）をここに置く。</p>",
+    body: "<p><code>columnWebview.ts</code>（作成・リサイズ・削除・eval）、<code>externalColumn.ts</code>、<code>mediaPopup.ts</code>、<code>columnReload.ts</code>、<code>backup.ts</code>、<code>updater.ts</code>、<code>releasePage.ts</code>、<code>extensions.ts</code>。UI から Rust を呼ぶ入口を一箇所に集め、呼び出し前後の共通処理（保存待ち、構築署名の記録など）をここに置く。</p>",
     files: [
       "src/services/columnWebview.ts",
       "src/services/externalColumn.ts",
+      "src/services/mediaPopup.ts",
       "src/services/columnReload.ts",
       "src/services/backup.ts",
       "src/services/updater.ts",
@@ -1028,6 +1029,15 @@ Object.assign(window.MCX_DATA.catalogs, {
         files: ["src/services/columnWebview.ts"],
       },
       {
+        name: "mediaPopup.ts",
+        summary:
+          "モバイルの複数カラム表示フラグ（メディアのポップアップ可否）をネイティブへ同期。直前と同じ値は送らない。",
+        cmds: "set_mobile_media_popup_active",
+        detail:
+          "<p>値は <code>useMobileColumns</code> が <code>isMultiColumnLayout(layout)</code> で求める。保持者は Kotlin（<code>MediaPopupFlagSync</code>）で、React は通知するだけ。</p>",
+        files: ["src/services/mediaPopup.ts"],
+      },
+      {
         name: "externalColumn.ts",
         summary:
           "external カラム（アカウント非依存の任意 URL）のデータディレクトリ解決と削除。",
@@ -1088,7 +1098,7 @@ Object.assign(window.MCX_DATA.catalogs, {
       {
         name: "gridLayout.ts",
         summary:
-          "calculateGridBounds / mobileColumnLayout / rem 高さ定数と px 化（getHeaderHeight など）。",
+          "calculateGridBounds / mobileColumnLayout / isMultiColumnLayout / rem 高さ定数と px 化（getHeaderHeight など）。",
         files: ["src/lib/gridLayout.ts"],
         docs: ["../development/ui-scale-notes.md"],
       },

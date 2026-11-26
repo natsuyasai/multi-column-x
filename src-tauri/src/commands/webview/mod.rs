@@ -310,6 +310,23 @@ pub async fn flash_mobile_swipe_bar(
     Ok(())
 }
 
+/// モバイルの実効表示列数が 2 以上か（メディアのポップアップ表示の有効条件）をネイティブへ通知する。
+/// Android 以外は no-op。active は非 Android ビルドでのみ未参照になるため、そのビルドでのみ
+/// unused_variables を許容する。
+#[tauri::command]
+#[cfg_attr(not(target_os = "android"), allow(unused_variables))]
+pub async fn set_mobile_media_popup_active(
+    caller: tauri::Webview,
+    active: bool,
+) -> Result<(), String> {
+    crate::commands::require_main_caller(&caller)?;
+    #[cfg(target_os = "android")]
+    {
+        crate::android_bridge::set_media_popup_active(active)?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

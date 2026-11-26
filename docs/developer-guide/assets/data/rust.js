@@ -562,6 +562,17 @@ Object.assign(window.MCX_DATA.catalogs, {
         files: ["src-tauri/src/commands/webview/mod.rs"],
       },
       {
+        name: "set_mobile_media_popup_active",
+        summary:
+          "複数カラム表示中か（メディアのポップアップの有効条件）をネイティブへ通知する",
+        area: "モバイル UI",
+        platform: "共通（Android のみ実動作）",
+        caller: "メイン",
+        detail:
+          "<p>引数 <code>active</code>。Android は JNI で <code>MainActivity.setMediaPopupActive</code> を呼び、Kotlin が全カラムへ配布する（Rust に状態は持たない）。desktop は no-op。</p>",
+        files: ["src-tauri/src/commands/webview/mod.rs"],
+      },
+      {
         name: "open_add_account_window",
         summary: "アカウント追加（ログイン）を開始し完了を検出する",
         area: "アカウント",

@@ -9,7 +9,6 @@ use crate::ipc_constants::{events, labels};
 use crate::state::AppState;
 #[cfg(target_os = "android")]
 use crate::state::ComposeSession;
-#[cfg(not(target_os = "android"))]
 use crate::state::WebviewRegistry;
 #[cfg(not(target_os = "android"))]
 use std::path::PathBuf;
@@ -43,6 +42,39 @@ pub(super) fn validate_media_popup_url(url: &str) -> Result<(), String> {
         Ok(())
     } else {
         Err(format!("invalid popup url: host '{host}' is not allowed"))
+    }
+}
+
+/// 空でなく ASCII 数字のみで構成されているか。
+fn is_digits(s: &str) -> bool {
+    !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit())
+}
+
+/// モバイルのメディアポップアップで開ける URL か検証する（純粋関数）。
+/// validate_media_popup_url（https + X ホスト）に加え、パスが画像・動画の表示ページ
+/// （/<user>/status/<id>/photo|video/<n> または /i/status/<id>[/photo|video/<n>]）であること。
+/// image_popup.ts の classifyMediaHref / buildVideoUrl が生成する形に合わせる。
+#[cfg_attr(not(mobile), allow(dead_code))]
+pub(super) fn validate_media_page_url(url: &str) -> Result<(), String> {
+    validate_media_popup_url(url)?;
+    let parsed = url::Url::parse(url).map_err(|e| format!("invalid popup url: {e}"))?;
+    let segs: Vec<&str> = parsed
+        .path_segments()
+        .map(|s| s.collect())
+        .unwrap_or_default();
+    let is_media_page = match segs.as_slice() {
+        // /i/status/<id>（ユーザー名なしの短縮形。メディア指定は省略可）
+        ["i", "status", id] => is_digits(id),
+        // /<user>/status/<id>/photo|video/<n>
+        [user, "status", id, kind, n] => {
+            !user.is_empty() && is_digits(id) && matches!(*kind, "photo" | "video") && is_digits(n)
+        }
+        _ => false,
+    };
+    if is_media_page {
+        Ok(())
+    } else {
+        Err("invalid popup url: not a media page".to_string())
     }
 }
 
@@ -151,6 +183,16 @@ pub(super) fn popup_session_for_caller(
         .unwrap_or("")
         .to_string();
     (data_dir, account_id)
+}
+
+/// registry から label の account_id を引く（純粋関数）。未登録は None。
+/// モバイルのメディアポップアップで、送信元カラム自身のアカウントだけを解決するために使う。
+#[cfg_attr(not(mobile), allow(dead_code))]
+pub(super) fn media_popup_account_for_label(
+    registry: &WebviewRegistry,
+    label: &str,
+) -> Option<String> {
+    registry.get_account_id(label).map(str::to_string)
 }
 
 /// open_link_popup_window でセッションに使うアカウントの決め方（純粋関数）。
@@ -309,37 +351,48 @@ pub async fn open_popup_window(
     Ok(())
 }
 
+/// mobile: caller_label のカラムのアカウントでメディアポップアップを開く。
+/// Tauri コマンド（mobile 版 open_popup_window）と Android JNI（open_media_popup_from_android）の共通処理。
+/// `require_registered`: JNI 経由は URL をメディア表示ページに限定し、
+/// 未登録ラベル（既に削除されたカラム等）を拒否する。
 #[cfg(mobile)]
-#[tauri::command]
-pub async fn open_popup_window(
-    caller: tauri::Webview,
-    app: AppHandle,
-    url: String,
+pub(super) fn open_media_popup_mobile(
+    app: &AppHandle,
+    caller_label: &str,
+    url: &str,
+    require_registered: bool,
 ) -> Result<(), String> {
-    validate_media_popup_url(&url)?;
+    if require_registered {
+        validate_media_page_url(url)?;
+        if !caller_label.starts_with(labels::COLUMN_PREFIX) {
+            return Err("unknown column".to_string());
+        }
+    } else {
+        validate_media_popup_url(url)?;
+    }
     let state = app.state::<AppState>();
     let current_account_id = {
         let registry = state.registry.lock().expect("registry mutex poisoned");
-        registry
-            .get_account_id(caller.label())
-            .unwrap_or("")
-            .to_string()
+        match media_popup_account_for_label(&registry, caller_label) {
+            Some(id) => id,
+            None if require_registered => return Err("unknown column".to_string()),
+            None => String::new(),
+        }
     };
 
     let PopupInit {
         label: popup_label,
         init_script: popup_init,
-    } = build_popup_init(&app, labels::POPUP_PREFIX, &current_account_id, &url);
+    } = build_popup_init(app, labels::POPUP_PREFIX, &current_account_id, url);
 
     #[cfg(target_os = "android")]
     {
-        let _ = app;
-        return crate::android_bridge::create_popup_webview(
+        crate::android_bridge::create_popup_webview(
             &popup_label,
-            &url,
+            url,
             &popup_init,
             &current_account_id,
-        );
+        )
     }
 
     #[cfg(not(target_os = "android"))]
@@ -347,14 +400,14 @@ pub async fn open_popup_window(
         let data_dir = {
             let registry = state.registry.lock().expect("registry mutex poisoned");
             registry
-                .get_data_directory(caller.label())
+                .get_data_directory(caller_label)
                 .map(PathBuf::from)
                 .unwrap_or_default()
         };
         let builder = tauri::WebviewWindowBuilder::new(
-            &app,
+            app,
             &popup_label,
-            WebviewUrl::External(parse_url(&url)?),
+            WebviewUrl::External(parse_url(url)?),
         )
         .initialization_script(&popup_init)
         .on_new_window(external_link::new_window_handler(app.clone()))
@@ -365,6 +418,26 @@ pub async fn open_popup_window(
         builder.build().map_err(|e| e.to_string())?;
         Ok(())
     }
+}
+
+/// Android JNI（AppBridge.onMediaPopupRequest）から呼ばれるメディアポップアップ要求の入口。
+#[cfg(target_os = "android")]
+pub fn open_media_popup_from_android(
+    app: &AppHandle,
+    label: &str,
+    url: &str,
+) -> Result<(), String> {
+    open_media_popup_mobile(app, label, url, true)
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn open_popup_window(
+    caller: tauri::Webview,
+    app: AppHandle,
+    url: String,
+) -> Result<(), String> {
+    open_media_popup_mobile(&app, caller.label(), &url, false)
 }
 
 #[cfg(desktop)]
@@ -1117,5 +1190,127 @@ mod validate_link_popup_url_tests {
                 prop_assert!(validate_link_popup_url(&candidate).is_ok());
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod validate_media_page_url_tests {
+    use super::*;
+
+    #[test]
+    fn 画像や動画の表示ページのurlならポップアップを開ける() {
+        let urls = [
+            "https://x.com/u/status/123/photo/1",
+            "https://x.com/u/status/123/video/2",
+            "https://x.com/i/status/123",
+            "https://x.com/i/status/123/video/1",
+            "https://x.com/i/status/123/photo/1",
+            "https://twitter.com/u/status/123/photo/1",
+            "https://x.com/u/status/123/photo/1?s=20",
+        ];
+        for url in urls {
+            assert!(validate_media_page_url(url).is_ok(), "{url}");
+        }
+    }
+
+    #[test]
+    fn 画像や動画の表示ページ以外のurlが要求されたときはポップアップを開かない() {
+        let urls = [
+            "https://x.com/home",
+            "https://x.com/u/status/123",
+            "https://x.com/u/status/abc/photo/1",
+            "http://x.com/u/status/123/photo/1",
+            "https://evil.example/u/status/1/photo/1",
+            "https://x.com.evil.example/u/status/1/photo/1",
+            "",
+            "javascript:alert(1)",
+            "https://x.com/u/status/1/photo/",
+        ];
+        for url in urls {
+            assert!(validate_media_page_url(url).is_err(), "{url}");
+        }
+    }
+
+    mod properties {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            #[test]
+            fn メディア表示ページとして許可されるurlは常にメディアポップアップ共通の検証も通る(
+                user in "[a-zA-Z0-9_]{1,10}",
+                id in "[0-9]{1,10}",
+                kind in "photo|video",
+                n in "[0-9]{1,2}",
+            ) {
+                let url = format!("https://x.com/{user}/status/{id}/{kind}/{n}");
+                prop_assert!(validate_media_page_url(&url).is_ok());
+                prop_assert!(validate_media_popup_url(&url).is_ok());
+            }
+
+            #[test]
+            fn ホストがx系以外なら常にエラーになる(
+                h in "[a-z0-9-]{1,20}\\.(com|net|org)",
+                user in "[a-zA-Z0-9_]{1,10}",
+                id in "[0-9]{1,10}",
+                n in "[0-9]{1,2}",
+            ) {
+                prop_assume!(
+                    h != "x.com"
+                        && h != "twitter.com"
+                        && !h.ends_with(".x.com")
+                        && !h.ends_with(".twitter.com")
+                );
+                let url = format!("https://{h}/{user}/status/{id}/photo/{n}");
+                prop_assert!(validate_media_page_url(&url).is_err());
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod media_popup_account_tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    fn registry_with_two_columns() -> WebviewRegistry {
+        let mut registry = WebviewRegistry {
+            entries: HashMap::new(),
+        };
+        registry.register(
+            "column-a".to_string(),
+            "col-a".to_string(),
+            "account-a".to_string(),
+            "/data/a".to_string(),
+        );
+        registry.register(
+            "column-b".to_string(),
+            "col-b".to_string(),
+            "account-b".to_string(),
+            "/data/b".to_string(),
+        );
+        registry
+    }
+
+    #[test]
+    fn ポップアップ要求は送信元カラムのアカウントでポップアップを開く() {
+        let registry = registry_with_two_columns();
+        assert_eq!(
+            media_popup_account_for_label(&registry, "column-b"),
+            Some("account-b".to_string())
+        );
+        assert_eq!(
+            media_popup_account_for_label(&registry, "column-a"),
+            Some("account-a".to_string())
+        );
+    }
+
+    #[test]
+    fn 未登録のカラムからのポップアップ要求ではアカウントを解決しない() {
+        let registry = registry_with_two_columns();
+        assert_eq!(
+            media_popup_account_for_label(&registry, "column-unknown"),
+            None
+        );
     }
 }

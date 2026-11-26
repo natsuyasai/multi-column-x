@@ -145,12 +145,13 @@ Object.assign(window.MCX_DATA.details, {
     layer: "android",
     summary:
       "ネイティブ WebView には Tauri IPC が無いので、X 系オリジンに限定した addWebMessageListener で JS → Kotlin → Rust の経路を作る。",
-    body: "<p>カラム WebView 作成時に <code>__mcxVideoDownloadBridge</code>（動画ダウンロード要求）と <code>__mcxApiRateLimitBridge</code>（レート制限報告）を公開し、ポップアップには <code>__mcxPopupBridge</code> を公開します。受信側は <code>isAllowedBridgeOrigin</code> でオリジン（x.com / twitter.com とそのサブドメイン）を二重チェックし、端末が <code>WEB_MESSAGE_LISTENER</code> 非対応ならブリッジを公開しません。受け取った内容は <code>AppBridge.on…</code>（JNI）で Rust へ渡されます。</p>",
+    body: "<p>カラム WebView 作成時に <code>__mcxVideoDownloadBridge</code>（動画ダウンロード要求）、<code>__mcxApiRateLimitBridge</code>（レート制限報告）、<code>__mcxMediaPopupBridge</code>（複数カラム表示中の画像・動画ポップアップ要求）を公開し、ポップアップには <code>__mcxPopupBridge</code> を公開します。受信側は <code>isAllowedBridgeOrigin</code> でオリジン（x.com / twitter.com とそのサブドメイン）を二重チェックし、端末が <code>WEB_MESSAGE_LISTENER</code> 非対応ならブリッジを公開しません。受け取った内容は <code>AppBridge.on…</code>（JNI）で Rust へ渡されます。</p>",
     files: [
       "src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/BridgeOrigins.kt",
       "src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/BridgeMessage.kt",
       "src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/ApiRateLimitBridge.kt",
       "src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/VideoDownloadRequestBridge.kt",
+      "src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/MediaPopupBridge.kt",
       "src-tauri/gen/android/app/src/main/java/com/natsuyasai/multicolumnx/PopupSessionBridge.kt",
     ],
     docs: ["../development/android-notes.md"],

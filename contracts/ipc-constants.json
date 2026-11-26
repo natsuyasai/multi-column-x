@@ -40,6 +40,7 @@
     "report_official_settings",
     "update_mobile_swipe_bar",
     "flash_mobile_swipe_bar",
+    "set_mobile_media_popup_active",
     "install_apk_update",
     "check_media_codec_support",
     "download_and_enable_h264",

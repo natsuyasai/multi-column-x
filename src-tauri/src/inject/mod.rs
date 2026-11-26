@@ -131,11 +131,16 @@ fn config_script(params: &InitScriptParams) -> String {
             params.hide_grok_button_enabled.to_string(),
         ),
     ];
-    let body = entries
+    let mut body = entries
         .iter()
         .map(|(k, v)| format!("{k}: {v}"))
         .collect::<Vec<_>>()
         .join(", ");
+    // Android（mobile）のときだけ、メディアのポップアップを複数カラム表示中に限る目印を足す。
+    // デスクトップの出力は一切変えない。
+    if params.is_mobile {
+        body.push_str(", mediaPopupRequiresMultiColumn: true");
+    }
     format!(
         "window.{} = {{ {} }};",
         globals::MULTI_COLUMN_X_CONFIG,
@@ -169,7 +174,9 @@ fn script_parts(params: &InitScriptParams) -> Vec<Cow<'static, str>> {
     let hide_ad = include_str!("hide_ad.js");
     let hide_grok_button = include_str!("hide_grok_button.js");
     let ng_word = include_str!("ng_word.js");
-    let image_popup = include_if(!params.is_mobile, include_str!("image_popup.js"));
+    // mobile でも注入する（Android の複数カラム表示中のポップアップ用。有効判定は config の
+    // mediaPopupRequiresMultiColumn とブリッジ・複数カラム表示フラグで JS 側が行う）。
+    let image_popup = include_str!("image_popup.js");
     // 表示サイズは x.com 自身の設定 (IndexedDB device:rweb:settings.scale) で管理するため
     // CSS zoom inject は使用しない
     let context_menu = include_if(!params.is_mobile, include_str!("context_menu.js"));
@@ -605,14 +612,48 @@ mod tests {
         assert!(script.contains(r#"["https://a.com","https://b.com"]"#));
     }
 
+    // image_popup.js 固有のマーカー（他の注入物には現れない。minify 後も関数名が残る）。
+    const IMAGE_POPUP_MARKER: &str = "classifyMediaHref";
+
     #[test]
-    fn build_init_script_mobile_excludes_image_popup() {
+    fn mobileのconfigにmediapopuprequiresmulticolumnがtrueで含まれる() {
         let mut params = default_params();
         params.is_mobile = true;
-        let desktop_script = build_init_script(&default_params());
-        let mobile_script = build_init_script(&params);
-        // image_popup.js はデスクトップのみ含まれる
-        assert!(desktop_script.len() > mobile_script.len() || !mobile_script.is_empty());
+        assert!(config_script(&params).contains("mediaPopupRequiresMultiColumn: true"));
+    }
+
+    #[test]
+    fn デスクトップのconfigにはmediapopuprequiresmulticolumnが含まれない() {
+        assert!(!config_script(&default_params()).contains("mediaPopupRequiresMultiColumn"));
+    }
+
+    #[test]
+    fn モバイルでもimagepopupenabledとvideopopupenabledがconfigに埋め込まれる() {
+        let mut params = default_params();
+        params.is_mobile = true;
+        params.image_popup_enabled = false;
+        params.video_popup_enabled = true;
+        let config = config_script(&params);
+        assert!(config.contains("imagePopupEnabled: false"));
+        assert!(config.contains("videoPopupEnabled: true"));
+    }
+
+    #[test]
+    fn モバイルのinitスクリプトにimage_popupが含まれる() {
+        let mut params = default_params();
+        params.is_mobile = true;
+        assert!(build_init_script(&params).contains(IMAGE_POPUP_MARKER));
+    }
+
+    #[test]
+    fn デスクトップのinitスクリプトにimage_popupが含まれる() {
+        assert!(build_init_script(&default_params()).contains(IMAGE_POPUP_MARKER));
+    }
+
+    #[test]
+    fn ポップアップ側のinitスクリプトにはimage_popupが含まれない() {
+        let script = build_popup_init_script("[]", "acc", "https://x.com", true, "ja");
+        assert!(!script.contains(IMAGE_POPUP_MARKER));
     }
 
     #[test]

@@ -1873,11 +1873,64 @@ describe("AppSettingsPanel カテゴリ構成", () => {
     ]);
   });
 
-  it("モバイルのメディアカテゴリにはポップアップウィンドウが表示されない", () => {
+  it("Androidの設定画面に画像・動画のポップアップ設定が注意書き付きで表示される", () => {
     mockStoreState.isMobile = true;
     render(<AppSettingsPanel {...defaultProps} isLinux />);
     openCategory("メディア");
-    expect(sectionHeadings()).toEqual(["動画"]);
+    expect(sectionHeadings()).toEqual(["動画", "ポップアップウィンドウ"]);
+    expect(
+      screen.getByRole("checkbox", {
+        name: "画像をポップアップウィンドウで開く",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", {
+        name: "動画をポップアップウィンドウで開く",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/複数カラム表示中のみ有効です/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("checkbox", { name: "Escキーで閉じる" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("デスクトップの設定画面には注意書きが表示されない", () => {
+    render(<AppSettingsPanel {...defaultProps} />);
+    openCategory("メディア");
+    expect(
+      screen.getByRole("checkbox", { name: "Escキーで閉じる" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", {
+        name: "画像をポップアップウィンドウで開く",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", {
+        name: "動画をポップアップウィンドウで開く",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/複数カラム表示中のみ有効です/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("Androidで画像のポップアップ設定をOFFにして適用するとpatchに反映される", () => {
+    mockStoreState.isMobile = true;
+    const onApply = vi.fn();
+    render(<AppSettingsPanel {...defaultProps} onApply={onApply} />);
+    openCategory("メディア");
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: "画像をポップアップウィンドウで開く",
+      }),
+    );
+    fireEvent.click(footer().getByRole("button", { name: "適用" }));
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({ imagePopupEnabled: false }),
+    );
   });
 
   it("カラム既定値カテゴリの見出しがカラム設定のセクション名と同じになる", () => {
@@ -2017,7 +2070,7 @@ describe("AppSettingsPanel カテゴリ構成", () => {
     }
   });
 
-  it("モバイルで非表示のポップアップ関連設定値も適用時のpatchに保存内容のまま含まれる", () => {
+  it("モバイルで非表示のEscキー設定値も適用時のpatchに保存内容のまま含まれる", () => {
     mockStoreState.isMobile = true;
     const onApply = vi.fn();
     render(

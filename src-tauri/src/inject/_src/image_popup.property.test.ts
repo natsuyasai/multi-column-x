@@ -3,7 +3,12 @@
 // jsdom 環境では副作用なく読み込めるため純粋関数のみを検証対象にする。
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { buildVideoUrl, classifyMediaHref, isMediaLink } from "./image_popup";
+import {
+  buildVideoUrl,
+  classifyMediaHref,
+  isMediaLink,
+  isMediaPopupEnabled,
+} from "./image_popup";
 import { shouldAutoplay } from "./popup_video_autoplay";
 
 // 現実的な URL 構成要素のジェネレータ（/ や ? # 等の特殊文字を混入させない）
@@ -110,6 +115,66 @@ describe("buildVideoUrl × shouldAutoplay クロス不変条件", () => {
           expect(url.startsWith("https://")).toBe(true);
           // 末尾セグメントは除去され /status/<id>/video/<index> で終わる
           expect(url.endsWith(`/status/${id}/video/${index}`)).toBe(true);
+        },
+      ),
+    );
+  });
+});
+
+describe("isMediaPopupEnabled プロパティ", () => {
+  const kindArb = fc.constantFrom("image" as const, "video" as const);
+  const flagArb = fc.option(fc.boolean(), { nil: undefined });
+  const envArb = fc.record({
+    hasBridge: fc.boolean(),
+    multiColumnActive: flagArb,
+  });
+
+  it("mediaPopupRequiresMultiColumn が未定義なら結果は種別ごとの設定だけで決まる", () => {
+    fc.assert(
+      fc.property(
+        kindArb,
+        flagArb,
+        flagArb,
+        envArb,
+        (kind, imagePopupEnabled, videoPopupEnabled, env) => {
+          const expected =
+            kind === "image"
+              ? imagePopupEnabled !== false
+              : videoPopupEnabled !== false;
+          expect(
+            isMediaPopupEnabled(
+              kind,
+              { imagePopupEnabled, videoPopupEnabled },
+              env,
+            ),
+          ).toBe(expected);
+        },
+      ),
+    );
+  });
+
+  it("mediaPopupRequiresMultiColumn が true で有効と判定されるなら、ブリッジがあり複数カラム表示中で種別設定もONである", () => {
+    fc.assert(
+      fc.property(
+        kindArb,
+        flagArb,
+        flagArb,
+        envArb,
+        (kind, imagePopupEnabled, videoPopupEnabled, env) => {
+          const config = {
+            imagePopupEnabled,
+            videoPopupEnabled,
+            mediaPopupRequiresMultiColumn: true,
+          };
+          if (isMediaPopupEnabled(kind, config, env)) {
+            expect(env.hasBridge).toBe(true);
+            expect(env.multiColumnActive).toBe(true);
+            expect(
+              kind === "image"
+                ? imagePopupEnabled !== false
+                : videoPopupEnabled !== false,
+            ).toBe(true);
+          }
         },
       ),
     );
