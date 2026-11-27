@@ -10,7 +10,7 @@ argument-hint: "対象のプラン名や対象範囲（省略時は現在のブ�
 
 ## 使うタイミング
 
-- **必須**: 機能追加・挙動変更・バグ修正では、実装が完了し `check-creation` を通過した後、`superpowers:finishing-a-development-branch` でマージ/PR判断をする前に必ず実施する
+- **必須**: 機能追加・挙動変更・バグ修正では、実装が完了し `check-creation` を通過した後、PR 作成（`feature-development-flow` のフェーズ7）の前に必ず実施する
 - 挙動不変のリファクタ・docs・CI設定のみの変更は対象外
 - レビュアーやテスターに確認観点を渡したいとき
 
@@ -72,7 +72,7 @@ argument-hint: "対象のプラン名や対象範囲（省略時は現在のブ�
 - 自動テスト済みの項目には注記がある
 - 次回以降のリリースでも確認が必要な観点が `docs/release/pre-release-checklist.md` に追加されている（不要ならその判断を報告済み）
 
-出力後は `autonomous-manual-test` で、エージェントが自律実施できる項目（安全ルールの範囲内）を実施して結果を記録し、その後 `superpowers:finishing-a-development-branch` でマージ/PRの判断に進む。
+出力後は `autonomous-manual-test` で、エージェントが自律実施できる項目（安全ルールの範囲内）を実施して結果を記録し、その後 `feature-development-flow` のフェーズ7（PR作成）に進む。
 
 ## 禁止事項
 

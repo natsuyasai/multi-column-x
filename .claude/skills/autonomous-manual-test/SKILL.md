@@ -12,7 +12,7 @@ argument-hint: "対象の integration-test.md のパス（省略時は現在の�
 
 ## 使うタイミング
 
-- フェーズ6で `integration-test.md` を出力した直後、`superpowers:finishing-a-development-branch` の前
+- フェーズ6で `integration-test.md` を出力した直後、PR 作成（`feature-development-flow` のフェーズ7）の前
 - 挙動不変のリファクタ・docs・CI のみの変更で `integration-test.md` が無い場合は対象外
 
 ## 対象外（このスキルでは扱わない）

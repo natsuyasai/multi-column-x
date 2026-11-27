@@ -64,7 +64,7 @@ digraph flow {
 
 ## 横断ルール（全フェーズ共通）
 
-- **ブランチ運用**: 最新化した `develop` から作業ブランチを切り、PR は **`develop` 宛て**に作成する（`main` 宛てにしない。`main` へは `version-release` でのみ反映する）。`superpowers:finishing-a-development-branch` や既定の PR 作成手順は `main` を前提にしがちなので、base を必ず `develop` に指定する。
+- **ブランチ運用**: 最新化した `develop` から作業ブランチを切り、PR は **`develop` 宛て**に作成する（`main` 宛てにしない。`main` へは `version-release` でのみ反映する）。既定の PR 作成手順は `main` を前提にしがちなので、base を必ず `develop` に指定する。
 - **PR 本文**: `.github/pull_request_template.md` に従い、ユーザー向けの変更点を `## リリースノート` に箇条書きする（リリースノートはこのセクションから自動生成され、カテゴリは PR タイトル接頭辞 `feat:` / `fix:` / その他で決まる）。内部的な変更のみの PR はセクションを空にする。
 - **同様のミスの指摘が複数回発生したら、必ず `CLAUDE.md` に再発防止ルールを追記する。** → `record-recurring-mistakes`
 - セキュリティに関わる変更（WebView/IPC/inject/capabilities/外部入力）では `security-review` を併用する。
