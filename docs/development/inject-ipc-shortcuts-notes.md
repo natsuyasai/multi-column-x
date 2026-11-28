@@ -348,3 +348,37 @@ article button[aria-label*="grok" i]:has(svg path[d^="M12.745 20.54"]) {
 - 送信経路は `chooseMediaPopupTransport`（長押し側は `chooseLongPressPopupTransport`）で選ぶ。Android ブリッジ（`__mcxMediaPopupBridge`）があれば優先し、無ければ `open_popup_window` を invoke、どちらも無ければ何もしない。ブリッジ経由では送信元カラムの特定と URL 検証をネイティブ／Rust 側で行うため、JS は `{ type: "openMediaPopup", url }` だけを送る。
 - 有効判定は `isMediaPopupEnabled`（長押し側は `isLongPressMediaPopupEnabled`。inject 間は import できないため独立実装で、`media_popup_gate.contract.test.ts` が一致を検査する）。mobile の config にだけ付く `mediaPopupRequiresMultiColumn` でプラットフォームを明示判定し、Android は「設定 ON かつブリッジ有り かつ複数カラム表示中」のときだけ有効。**ブリッジが無いときは横取りしない**。1 列表示では長押しメニューの「動画をポップアップで表示」項目も出さない。
 - 動画サムネイル（再生ボタン外）のタップ横取りは Android のみ。実 DOM の知見・不採用案は `android-notes.md` を参照。
+
+## 狭い画面へ切り替えた後のレイアウト補正（`mobile_area_hide.ts`、Android）
+
+### 事象
+
+x.com を広い幅で読み込んだ後に狭い幅へ切り替えると（折りたたみ端末を内側の画面で起動し、カバー画面で開き直すなど）、タイムラインの先頭が固定タブの下に潜る。ヘッダー非表示 OFF でも起きる。
+
+### 実測値（2026-11-28、Pixel_9 エミュレータ・Android WebView Chrome 153）
+
+- `header[role="banner"]` と `main` の親要素に `flex-direction: row`（`display: flex`）が残る。
+- header は main を押し下げる余白の役目だが、横並びでは幅 0 の箱になる（`w=0 h=53`）。main は `y=0`。
+- 下記の対処の CSS を当てると main は `y=53` になり解消する。
+
+### 再現手順
+
+1. `adb shell "wm size 1968x2184; wm density 480"` を実行してからアプリを起動する。
+2. アプリを起動したまま `adb shell wm size 1080x2520` で狭い画面へ切り替える。
+3. 確認後は `adb shell "wm size reset; wm density reset"` で戻す。
+
+密度 420（749dp）で起動した 1 回の試行では再現しなかった。
+
+### 対処
+
+`<style id="multi-column-x-narrow-layout-style">` を 1 本挿入し、BottomBar にナビゲーションがある間だけ親要素を縦並びに戻す。設定値（ヘッダー非表示など）には依存しない。
+
+```css
+body:has([data-testid="BottomBar"] [role="navigation"])
+  div:has(> header[role="banner"]):has(> main) {
+  flex-direction: column !important;
+}
+```
+
+- セレクタは `headerCustomizerTypes.ts` の `BOTTOM_BAR_NAVIGATION_SELECTOR` を import している。通常ビルドのエントリでこのモジュールを import するのは `mobile_area_hide.ts` だけなので、定数だけが取り込まれる。**別の通常エントリも import すると共有チャンク（`import` 文）が出力され、`include_str!` の連結が壊れる**（`inject_concat.contract.test.ts` が検出する）。
+- 当方の inject がこの事象に関与しているかは未切り分け（素の x.com は未確認）。
