@@ -557,8 +557,8 @@
               >を行い、作業ごとにコミット。必ずテストを書く。
             </li>
             <li>
-              <b>仕様はGherkin</b
-              >（<code>docs/specs/&lt;機能名&gt;.feature</code>、日本語）で承認を得る（機能追加・挙動変更・バグ修正）。→
+              <b>仕様は EARS と Gherkin</b
+              >（<code>docs/specs/</code>、日本語）。承認モードに従いユーザー承認か自律検証で確定する（機能追加・挙動変更）。→
               <code class="path">.claude/skills/gherkin-spec/SKILL.md</code>
             </li>
             <li>
@@ -567,7 +567,9 @@
               <code class="path">.claude/skills/tdd/SKILL.md</code>
             </li>
             <!-- prettier-ignore -->
-            <li>全体フロー（要求明確化 → プラン → 実装 → プロパティテスト → 完了処理）→ <code class="path">.claude/skills/feature-development-flow/SKILL.md</code></li>
+            <li>全体フロー（承認モード確認 → 要求明確化 → EARS・Gherkin → 実装指示書 → 実装 → テスト → PR）→ <code class="path">.claude/skills/feature-development-flow/SKILL.md</code></li>
+            <!-- prettier-ignore -->
+            <li>バグ修正（再現・原因調査 → 不具合メモと再現Gherkin → 再現テストを先に書いて修正 → PR）→ <code class="path">.claude/skills/bug-fix-flow/SKILL.md</code></li>
             <li>
               完了時はフォーマッターとテストをオールグリーンにする。テスト名は日本語、Rust
               のテスト関数名に ASCII 大文字を使わない。

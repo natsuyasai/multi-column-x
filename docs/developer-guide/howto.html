@@ -75,14 +75,19 @@
               </div>
             </li>
             <li>
-              <b>要求を明確にし、Gherkin で仕様を書く</b>
+              <b>要求を明確にし、EARS と Gherkin で仕様を書く</b>
               <div class="ck-body">
-                機能追加・挙動変更・バグ修正では
-                <code class="path">docs/specs/</code>
-                に日本語 Gherkin
-                の仕様を書いて承認を得ます（挙動不変のリファクタ・docs・CI
+                機能追加・挙動変更では、最初に承認モード（承認あり /
+                自律検証）を決め、<code class="path">docs/specs/</code> に EARS
+                要求仕様と日本語 Gherkin
+                を書いて確定します（挙動不変のリファクタ・docs・CI
                 設定のみの変更は不要）。手順は
-                <code class="path">.claude/skills/gherkin-spec/SKILL.md</code>。
+                <code class="path"
+                  >.claude/skills/feature-development-flow/SKILL.md</code
+                >。バグ修正は不具合メモと再現シナリオを書き、再現テストを先に書いて直します（<code
+                  class="path"
+                  >.claude/skills/bug-fix-flow/SKILL.md</code
+                >）。
               </div>
             </li>
             <li>
@@ -145,8 +150,8 @@
           <div class="callout warn">
             <b>よくあるミス</b>
             <p>
-              build:inject を忘れて Rust のテストが落ちる／Gherkin
-              を書かずに実装に入る／新ブランチを確認なしに作る／コミット前にミューテーション確認をしていない。
+              build:inject を忘れて Rust
+              のテストが落ちる／仕様を確定せずに実装に入る／新ブランチを確認なしに作る／コミット前にミューテーション確認をしていない。
             </p>
           </div>
           <p>

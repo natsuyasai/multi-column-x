@@ -13,7 +13,7 @@ WebView に注入する JS は `src-tauri/src/inject/_src/` に TypeScript で�
 
 ## X 実 DOM への依存と検証ルール
 
-inject スクリプトは X(twitter.com) の実 DOM 構造に依存する。X の DOM はセレクタ・React 内部構造とも変更されやすく、ユニットテスト（jsdom の合成 DOM）だけでは実際の挙動を保証できない。**inject スクリプトを新規作成・DOM 依存ロジックを変更する場合は、Chrome を実際に操作して実 DOM で動作確認すべきか否かをユーザーに必ず問い合わせ、必要と判断されたら claude-in-chrome で実 X ページの DOM を調査・検証してから完了とすること。**（例: 引用RT の動画は引用ツイートに属し、status リンクが DOM 上に無く React fiber の `tweet.id_str` からのみ id を取得できる、といった事実は実 DOM 調査でしか判明しない）
+inject スクリプトは X(twitter.com) の実 DOM 構造に依存する。X の DOM はセレクタ・React 内部構造とも変更されやすく、ユニットテスト（jsdom の合成 DOM）だけでは実際の挙動を保証できない。**inject スクリプトを新規作成・DOM 依存ロジックを変更する場合は、実 DOM を調査・検証してから完了とすること**（承認ありモードでは要否をユーザーに確認し、自律検証モードでは確認せず実施する。手順は `.claude/skills/inject-script-dev`「実DOM検証の必須確認」）。（例: 引用RT の動画は引用ツイートに属し、status リンクが DOM 上に無く React fiber の `tweet.id_str` からのみ id を取得できる、といった事実は実 DOM 調査でしか判明しない）
 
 ## inject スクリプトの制約
 

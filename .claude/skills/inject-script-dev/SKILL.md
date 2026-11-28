@@ -18,7 +18,13 @@ column WebView に注入する JS（`src-tauri/src/inject/_src/`）の開発ワ�
 
 inject スクリプトは x.com の実 DOM 構造（セレクタ・React 内部構造）に依存する。X の DOM は変更されやすく、jsdom の合成 DOM によるユニットテストだけでは実際の挙動を保証できない。
 
-**新規作成・DOM 依存ロジックを変更する場合は、実 DOM での動作確認（`claude-in-chrome` での実 X ページ調査）が必要か否かを必ずユーザーに確認する。** 必要と判断されたら、完了前に実際の X ページで検証する。
+**発動条件**: `_src` の新規作成・変更、または X の実 DOM（セレクタ・React fiber・仮想リスト・スクロール位置など）に依存するロジックの変更。Rust 単体・設定 UI・React 画面のみ・docs のみは対象外。
+
+- 承認ありモード: 実 DOM 確認の要否をユーザーに確認する。自律検証モード: 発動条件に該当すれば確認せず実施する
+- 実施する場合は、**計画前に**事実（セレクタ・DOM 構造・タイミング・実測値）を調べて実装指示書に書き、**完了前に**再確認する
+- 手段は `claude-in-chrome`（実 X、調査タブを前面にする）か、実アプリの CDP（カラム寸法など実アプリ固有の条件。接続方法は下記ノート）
+- jsdom のテスト結果を実 DOM の証拠にしない。確認できなかった項目は理由とともに「未確認」と書き、推測で埋めない
+- 投稿・フォローなど副作用のある操作をせず、alert / confirm を発火させない
 
 実DOM調査で判明した知見（例: 引用RTの動画は status リンクが DOM 上に無く、React fiber の `tweet.id_str` からのみ id を取得できる）やビルドフローの詳細は `docs/development/inject-ipc-shortcuts-notes.md` に集約されている。着手前に読み、新たに判明した恒久的な知見は同ノートへ追記する。
 
@@ -60,4 +66,4 @@ inject スクリプトから新しい Tauri コマンドを `invoke` する場�
 - `npm run build:inject` が成功する
 - `npm test` がグリーン（追加・変更したテストを含む）
 - Rust 側を変更した場合、`npm run build:inject` 後に `cargo test --manifest-path src-tauri/Cargo.toml` と `npm run lint:rust` がグリーン（`include_str!` がビルド済み `.js` を埋め込むため、ビルド前は失敗する）
-- DOM 依存ロジックを変更した場合、実DOM検証の要否をユーザーに確認済みである
+- DOM 依存ロジックを変更した場合、上記「実DOM検証」の扱いを満たしている（実施結果、または未確認の理由がある）
