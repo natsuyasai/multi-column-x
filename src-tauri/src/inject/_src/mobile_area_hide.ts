@@ -94,7 +94,22 @@
     }
   }
 
+  const NARROW_LAYOUT_STYLE_ID = "multi-column-x-narrow-layout-style";
+
+  // 広い幅で読み込んだ x.com を狭い幅へ切り替えると、header と main の親要素に横並びが残り、
+  // main を押し下げる役目の header が幅0になってタイムライン先頭が固定タブの下に潜る。
+  // BottomBar にナビゲーションがある（狭い画面の表示の）間だけ縦並びに戻す。
+  function applyNarrowLayoutFix(): void {
+    if (document.getElementById(NARROW_LAYOUT_STYLE_ID)) return;
+
+    const style = document.createElement("style");
+    style.id = NARROW_LAYOUT_STYLE_ID;
+    style.textContent = `body:has([data-testid="BottomBar"] [role="navigation"]) div:has(> header[role="banner"]):has(> main) { flex-direction: column !important; }`;
+    document.head.appendChild(style);
+  }
+
   function apply(): void {
+    applyNarrowLayoutFix();
     applyTopNavHide();
     applyLayersHide();
     applyHeaderHeightSync();

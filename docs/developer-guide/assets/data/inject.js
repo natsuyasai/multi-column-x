@@ -611,7 +611,7 @@ Object.assign(window.MCX_DATA.catalogs, {
       {
         name: "mobile_area_hide.ts",
         summary:
-          "モバイル幅レイアウトの TopNavBar・#layers 配下の投稿ボタン/ヘッダー要素の個別非表示。applyLayersHide を公開。",
+          "モバイル幅レイアウトの TopNavBar・#layers 配下の投稿ボタン/ヘッダー要素の個別非表示。applyLayersHide を公開。広い幅から狭い幅へ切り替えた後に残る header と main の横並びも CSS で縦並びに補正する。",
         enable:
           "is_mobile のとき連結。hideHeaderEnabled / hideTweetInputEnabled を参照",
         target: "カラム",

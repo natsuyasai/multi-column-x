@@ -4,6 +4,7 @@
 // （rAFで1フレームにまとめられた後、100msデバウンス）でも再適用される。
 // 公開 API が無いため、各テストは「import した／DOM を変化させた結果の副作用」として検証する。
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { BOTTOM_BAR_NAVIGATION_SELECTOR } from "./headerCustomizerTypes";
 
 // dom_observer.test.ts と同様に、共有ハブが作るMutationObserverを追跡し、
 // 各テストでフレッシュなハブ（＝1本だけのMutationObserver）を使う。
@@ -331,6 +332,115 @@ describe("inject/mobile_area_hide の共有ハブ非存在時のフォールバ�
 
     await vi.waitFor(() => {
       expect(header.style.height).toBe("60px");
+    });
+  });
+});
+
+describe("inject/mobile_area_hide の狭い画面へ切り替えた後のレイアウト補正", () => {
+  beforeEach(() => {
+    document.head.innerHTML = "";
+    document.body.innerHTML = "";
+    delete window.__multiColumnXConfig;
+  });
+
+  afterEach(() => {
+    createdObservers.forEach((observer) => observer.disconnect());
+    createdObservers.clear();
+  });
+
+  // 実DOMと同じく、header と main の親はクラス指定で横並びになっている。
+  function addRowLayout(): HTMLElement {
+    const style = document.createElement("style");
+    style.textContent = ".row { flex-direction: row; }";
+    document.head.appendChild(style);
+
+    const parent = document.createElement("div");
+    parent.className = "row";
+    parent.innerHTML = '<header role="banner"></header><main></main>';
+    document.body.appendChild(parent);
+    return parent;
+  }
+
+  function addBottomBar(): HTMLElement {
+    const bottomBar = document.createElement("div");
+    bottomBar.setAttribute("data-testid", "BottomBar");
+    bottomBar.innerHTML = '<nav role="navigation"></nav>';
+    document.body.appendChild(bottomBar);
+    return bottomBar;
+  }
+
+  function flexDirectionOf(element: HTMLElement): string {
+    return getComputedStyle(element).flexDirection;
+  }
+
+  it("BottomBar内にナビゲーションがあると横並びの親要素が縦並びになる", async () => {
+    const parent = addRowLayout();
+    addBottomBar();
+
+    await importMobileAreaHide();
+
+    expect(flexDirectionOf(parent)).toBe("column");
+  });
+
+  it("BottomBar内にナビゲーションがないと親要素は横並びのまま", async () => {
+    const parent = addRowLayout();
+
+    await importMobileAreaHide();
+
+    expect(flexDirectionOf(parent)).toBe("row");
+  });
+
+  it("適用後にナビゲーションが現れるとスクリプトの再実行を待たず縦並びになる", async () => {
+    const parent = addRowLayout();
+    await importMobileAreaHide();
+
+    addBottomBar();
+
+    expect(flexDirectionOf(parent)).toBe("column");
+  });
+
+  it("ナビゲーションがなくなると横並びに戻る", async () => {
+    const parent = addRowLayout();
+    const bottomBar = addBottomBar();
+    await importMobileAreaHide();
+    expect(flexDirectionOf(parent)).toBe("column");
+
+    bottomBar.remove();
+
+    expect(flexDirectionOf(parent)).toBe("row");
+  });
+
+  it("ヘッダー非表示とツイート入力非表示がOFFでも縦並びになる", async () => {
+    setConfig({ hideTweetInputEnabled: false, hideHeaderEnabled: false });
+    const parent = addRowLayout();
+    addBottomBar();
+
+    await importMobileAreaHide();
+
+    expect(flexDirectionOf(parent)).toBe("column");
+  });
+
+  it("挿入したcssの条件はbottombarのナビゲーションのセレクタ定数と一致する", async () => {
+    await importMobileAreaHide();
+
+    const style = document.getElementById("multi-column-x-narrow-layout-style");
+
+    expect(style?.textContent).toContain(
+      `body:has(${BOTTOM_BAR_NAVIGATION_SELECTOR})`,
+    );
+  });
+
+  it("補正のstyleが削除されてもページの内容が変化すれば再挿入される", async () => {
+    const parent = addRowLayout();
+    addBottomBar();
+    await importMobileAreaHide();
+
+    document.getElementById("multi-column-x-narrow-layout-style")?.remove();
+    expect(flexDirectionOf(parent)).toBe("row");
+    document.body.appendChild(document.createElement("div"));
+
+    await vi.waitFor(() => {
+      expect(flexDirectionOf(parent)).toBe("column");
     });
   });
 });
