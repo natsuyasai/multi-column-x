@@ -380,5 +380,5 @@ body:has([data-testid="BottomBar"] [role="navigation"])
 }
 ```
 
-- セレクタは `headerCustomizerTypes.ts` の `BOTTOM_BAR_NAVIGATION_SELECTOR` を import している。通常ビルドのエントリでこのモジュールを import するのは `mobile_area_hide.ts` だけなので、定数だけが取り込まれる。**別の通常エントリも import すると共有チャンク（`import` 文）が出力され、`include_str!` の連結が壊れる**（`inject_concat.contract.test.ts` が検出する）。
+- CSS のセレクタは inject に直書きしており、`headerCustomizerTypes.ts` の `BOTTOM_BAR_NAVIGATION_SELECTOR` との一致は `mobile_area_hide.test.ts` で確認している。
 - 当方の inject がこの事象に関与しているかは未切り分け（素の x.com は未確認）。

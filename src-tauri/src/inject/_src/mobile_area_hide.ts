@@ -1,5 +1,3 @@
-import { BOTTOM_BAR_NAVIGATION_SELECTOR } from "./headerCustomizerTypes";
-
 (function () {
   // TopNavBar 配下で DashButton を含む div を非表示にする
   function applyTopNavHide(): void {
@@ -106,7 +104,7 @@ import { BOTTOM_BAR_NAVIGATION_SELECTOR } from "./headerCustomizerTypes";
 
     const style = document.createElement("style");
     style.id = NARROW_LAYOUT_STYLE_ID;
-    style.textContent = `body:has(${BOTTOM_BAR_NAVIGATION_SELECTOR}) div:has(> header[role="banner"]):has(> main) { flex-direction: column !important; }`;
+    style.textContent = `body:has([data-testid="BottomBar"] [role="navigation"]) div:has(> header[role="banner"]):has(> main) { flex-direction: column !important; }`;
     document.head.appendChild(style);
   }
 

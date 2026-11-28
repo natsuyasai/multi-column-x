@@ -4,6 +4,7 @@
 // （rAFで1フレームにまとめられた後、100msデバウンス）でも再適用される。
 // 公開 API が無いため、各テストは「import した／DOM を変化させた結果の副作用」として検証する。
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { BOTTOM_BAR_NAVIGATION_SELECTOR } from "./headerCustomizerTypes";
 
 // dom_observer.test.ts と同様に、共有ハブが作るMutationObserverを追跡し、
 // 各テストでフレッシュなハブ（＝1本だけのMutationObserver）を使う。
@@ -417,6 +418,16 @@ describe("inject/mobile_area_hide の狭い画面へ切り替えた後のレイ�
     await importMobileAreaHide();
 
     expect(flexDirectionOf(parent)).toBe("column");
+  });
+
+  it("挿入したcssの条件はbottombarのナビゲーションのセレクタ定数と一致する", async () => {
+    await importMobileAreaHide();
+
+    const style = document.getElementById("multi-column-x-narrow-layout-style");
+
+    expect(style?.textContent).toContain(
+      `body:has(${BOTTOM_BAR_NAVIGATION_SELECTOR})`,
+    );
   });
 
   it("補正のstyleが削除されてもページの内容が変化すれば再挿入される", async () => {
